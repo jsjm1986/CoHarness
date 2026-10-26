@@ -576,6 +576,27 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-hmr -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-client-modules -->
+<a id="deepseek-aidsh-client-modules"></a>
+
+## `@deepseek-ai/dsh-client-modules`
+
+- `inject`: `loader`
+- `source`: [`packages/client/modules/src/index.ts:47`](../packages/client/modules/src/index.ts)
+
+```ts config-catalog
+/** Startup transport grouping; module application keeps the declared graph order. */
+export interface Config {
+  /**
+   * Package sets transported separately from ungrouped application entries.
+   * Omission keeps one URL-bounded application sequence. Inactive packages contribute nothing;
+   * active members retain their graph order, and bootstrap packages cannot be grouped here.
+   */
+  applicationBatchGroups?: string[][]
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-modules -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-client-shortcuts -->
 <a id="deepseek-aidsh-client-shortcuts"></a>
 
@@ -4989,7 +5010,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-browser-use` | — | [`packages/browser-use/browser-use/src/index.ts`](../packages/browser-use/browser-use/src/index.ts) |
 | `@deepseek-ai/dsh-client-file-upload` | `agents` · `attachments` · `commands` · `connection` | [`packages/client/file-upload/src/index.ts`](../packages/client/file-upload/src/index.ts) |
 | `@deepseek-ai/dsh-client-locale` | — | [`packages/client/locale/src/index.ts`](../packages/client/locale/src/index.ts) |
-| `@deepseek-ai/dsh-client-modules` | `loader` | [`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts) |
 | `@deepseek-ai/dsh-client-runtime` | — | [`packages/client/runtime/src/index.ts`](../packages/client/runtime/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-agent-preset` | — | [`packages/client/ui-agent-preset/src/index.ts`](../packages/client/ui-agent-preset/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-attachment` | — | [`packages/client/ui-attachment/src/index.ts`](../packages/client/ui-attachment/src/index.ts) |

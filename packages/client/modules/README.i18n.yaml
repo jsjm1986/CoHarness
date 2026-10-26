@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/modules/README.md
 document:
-  en: 5bcfc629266f54e4660a16ae48f645eff49a602a
-  zh: 287d426d4c6610280f94a6fb08587d42097ff572
+  en: dcf3407f4988305f6ea49e9e850916c36f329fc2
+  zh: a75098ae759363522866fb825134a0e7789fa2f9
 /:
   en: 97d39db1617684ea
   zh: de11ba354583a044
@@ -24,8 +24,8 @@ document:
   en: d4a7f865f4593724
   zh: 4313eb8fe9cd5c98
 /deepseek-ai-dsh-client-modules/use-this-package/what-the-browser-loads:
-  en: a89a648d052a8c24
-  zh: 7a74d21bdc3646a6
+  en: 28b60cba52c199a8
+  zh: 1112945d50f078b5
 /deepseek-ai-dsh-client-modules/use-this-package/live-plugin-composition:
   en: 8daffc3080c64df6
   zh: d5168fd9cd2909ae
@@ -36,8 +36,8 @@ document:
   en: 0aaf0693db8bb203
   zh: 9f4738cdc6b55c26
 /deepseek-ai-dsh-client-modules/use-this-package/build-requirements:
-  en: b6a4d3b901c89efe
-  zh: 615b5f3eec41f281
+  en: c12785c6c80f8bba
+  zh: 5ef721868e6f72a4
 /deepseek-ai-dsh-client-modules/understand-the-implementation:
   en: 7ab11d2c2bdc6eaa
   zh: 54c3c9091cf59711

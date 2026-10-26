@@ -31,6 +31,7 @@ import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { Service } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Entry } from '@deepseek-ai/cordis-plugin-loader'
 import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
@@ -41,6 +42,16 @@ export { stripClientSuffix } from './client/manifest.ts'
 export type {
   BootManifest, BootModuleRow, BootPluginRow, WebBootBatch, WebBootBatchPhase, WebBootEntry, WebBootGraph,
 } from './client/manifest.ts'
+
+/** Startup transport grouping; module application keeps the declared graph order. */
+export interface Config {
+  /**
+   * Package sets transported separately from ungrouped application entries.
+   * Omission keeps one URL-bounded application sequence. Inactive packages contribute nothing;
+   * active members retain their graph order, and bootstrap packages cannot be grouped here.
+   */
+  applicationBatchGroups?: string[][]
+}
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -276,6 +287,58 @@ function partitionComboRecords(records: readonly WebPluginRecord[]): WebPluginRe
   }
   if (current.length > 0) chunks.push(current)
   return chunks
+}
+
+/** Validate package selectors before a Loader creates the service. */
+function validateApplicationBatchGroups(groups: string[][]): string[][] {
+  const assigned = new Set<string>()
+  for (const group of groups) {
+    if (group.length === 0) throw new Error('client-modules: an application batch group must name at least one package')
+    for (const id of group) {
+      if (exactPackageSpecifier(id) !== id || /[?&#,\s]/u.test(id)) {
+        throw new Error(`client-modules: application batch group needs a bare package name: ${JSON.stringify(id)}`)
+      }
+      if (PARSER_PRELOAD_IDS.some(bootstrapId => bootstrapId === id)) {
+        throw new Error(`client-modules: bootstrap package ${id} cannot belong to an application batch group`)
+      }
+      if (assigned.has(id)) throw new Error(`client-modules: repeated application batch package ${id}`)
+      assigned.add(id)
+    }
+  }
+  return groups
+}
+
+/** Resolve absent configuration to the ungrouped application sequence. */
+function resolveApplicationBatchGroups(config: Config): ReadonlyMap<string, number> {
+  const assignments = new Map<string, number>()
+  for (const [index, group] of (config.applicationBatchGroups ?? []).entries()) {
+    for (const id of group) assignments.set(id, index)
+  }
+  return assignments
+}
+
+/** Preserve graph order inside each transport group; ungrouped entries arrive in their own batches. */
+function applicationRecordGroups(
+  records: readonly WebPluginRecord[],
+  assignments: ReadonlyMap<string, number>,
+): readonly (readonly WebPluginRecord[])[] {
+  if (assignments.size === 0) return [records]
+  const ungrouped: WebPluginRecord[] = []
+  const grouped = new Map<number, WebPluginRecord[]>()
+  for (const record of records) {
+    const index = assignments.get(record.entry.id)
+    if (index === undefined) {
+      ungrouped.push(record)
+      continue
+    }
+    let group = grouped.get(index)
+    if (group === undefined) {
+      group = []
+      grouped.set(index, group)
+    }
+    group.push(record)
+  }
+  return [ungrouped, ...[...grouped].sort(([left], [right]) => left - right).map(([, group]) => group)]
 }
 
 /** Executable source plus the generated-file name used when no authored map exists. */
@@ -574,12 +637,16 @@ window.__ModuleLoader__={
  */
 export class ClientModuleRegistry extends Service {
   static inject = ['loader']
+  static Config: z<Config> = z.object({
+    applicationBatchGroups: z.transform(z.array(z.array(z.string())), validateApplicationBatchGroups).default([]),
+  })
 
   /**
    * Host release identity published in every graph: this package's version, which releases share
    * with the CLI, and the source commit the client build fixes into the built Host artifact.
    */
   private readonly release: WebBootRelease
+  private readonly applicationBatchGroups: ReadonlyMap<string, number>
   private readonly table = new Map<string, WebPluginRecord>()
   private readonly sources = new Map<string, ClientPackageSource>()
   // Resolution is entry-local: the same specifier can resolve differently in
@@ -599,9 +666,11 @@ export class ClientModuleRegistry extends Service {
    * Build the service: subscribe, seed, and run the activation flush.
    * Bundle routes follow the optional Web carrier's injected lifecycle.
    * @param ctx - plugin context carrying Loader and an optional Web carrier.
+   * @param config - validated transport groups; omission leaves application entries ungrouped.
    */
-  constructor(ctx: Context) {
+  constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'clientModules')
+    this.applicationBatchGroups = resolveApplicationBatchGroups(config)
     const { version } = createRequire(import.meta.url)('../package.json') as { version: string }
     // The Node build fixes this read into the built Host artifact.
     const commit = process.env.DSH_CLIENT_COMMIT_HASH
@@ -760,8 +829,10 @@ export class ClientModuleRegistry extends Service {
     for (const records of partitionComboRecords(bootstrap)) {
       artifacts.push(buildBatch('bootstrap', records, this.readSourceMap))
     }
-    for (const records of partitionComboRecords(application)) {
-      artifacts.push(buildBatch('application', records, this.readSourceMap))
+    for (const group of applicationRecordGroups(application, this.applicationBatchGroups)) {
+      for (const records of partitionComboRecords(group)) {
+        artifacts.push(buildBatch('application', records, this.readSourceMap))
+      }
     }
 
     const batchResponses = new Map<string, LazyResponse>()

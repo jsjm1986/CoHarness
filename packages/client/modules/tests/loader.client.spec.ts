@@ -78,6 +78,7 @@ function bench(
     transportFailures?: Record<string, number>
     /** URLs whose script loads but registers only the listed ids (a runtime throw after those registrations). */
     registerOnly?: Record<string, string[]>
+    applicationBatches?: { url: string; entries: string[] }[]
   } = {},
 ): Bench {
   const fetched: string[] = []
@@ -102,11 +103,11 @@ function bench(
       if (factory != null) win.__ModuleLoader__?.load({ id, chunk, factory })
       return
     }
-    const batchIds = url === BOOTSTRAP_URL
+    const batchIds = opts.applicationBatches?.find(batch => batch.url === url)?.entries ?? (url === BOOTSTRAP_URL
       ? entries.filter(entry => entry.initialUrl === BOOTSTRAP_URL).map(entry => entry.id)
       : url === APPLICATION_URL
         ? entries.filter(entry => entry.initialUrl === APPLICATION_URL).map(entry => entry.id)
-        : undefined
+        : undefined)
     const parsed = new URL(url, 'http://dsh.invalid')
     const combo = parsed.search.startsWith('??') ? parsed.search.slice(2).split('&', 1)[0] : undefined
     const singleId = combo?.split(',').length === 1 && combo.endsWith('/client.js')
@@ -125,9 +126,11 @@ function bench(
     ...(bootstrapEntries.length === 0 ? [] : [{
       phase: 'bootstrap' as const, url: BOOTSTRAP_URL, rev: 'bootstrap', entries: bootstrapEntries,
     }]),
-    ...(applicationEntries.length === 0 ? [] : [{
+    ...(opts.applicationBatches?.map((batch, index) => ({
+      phase: 'application' as const, url: batch.url, rev: `application-${String(index)}`, entries: batch.entries,
+    })) ?? (applicationEntries.length === 0 ? [] : [{
       phase: 'application' as const, url: APPLICATION_URL, rev: 'application', entries: applicationEntries,
-    }]),
+    }])),
   ]
   const loader = target.create({
     boot: {
@@ -156,6 +159,36 @@ describe('Cordis plugin face', () => {
 })
 
 describe('lazy CJS arrival', () => {
+  it('materializes dependencies in graph order across independently arriving transport groups', async () => {
+    const shared = comboUrl(['base', 'consumer'], 'shared')
+    const optional = comboUrl(['optional'], 'optional')
+    const executed: string[] = []
+    const b = bench([
+      row('base', { initialUrl: shared }),
+      row('optional', { initialUrl: optional, external: ['base'] }),
+      row('consumer', { initialUrl: shared, external: ['optional'] }),
+    ], {
+      base: () => {
+        executed.push('base')
+        return { value: 'base' }
+      },
+      optional: (require) => {
+        const base = require('base') as { value: string }
+        executed.push('optional')
+        return { value: `${base.value}:optional` }
+      },
+      consumer: (require) => {
+        const dependency = require('optional') as { value: string }
+        executed.push('consumer')
+        return dependency
+      },
+    }, { applicationBatches: [{ url: shared, entries: ['base', 'consumer'] }, { url: optional, entries: ['optional'] }] })
+    expect(executed).toEqual([])
+    await expect(b.loader.import('consumer', '', {})).resolves.toEqual({ value: 'base:optional' })
+    expect(executed).toEqual(['base', 'optional', 'consumer'])
+    expect(b.fetched).toEqual([shared, optional])
+  })
+
   it('drains registrations queued by parser-blocking preload scripts into the same live facade', async () => {
     const b = bench([row('runtime')], {}, {
       pending: [{ id: 'runtime', factory: () => ({ marker: 'preloaded' }) }],

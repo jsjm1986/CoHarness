@@ -1,0 +1,56 @@
+- button "New session"
+- button "Collapse sidebar":
+  - img
+- button "New session":
+  - img
+  - text: New Session
+- navigation "Panels":
+  - button "Plugins"
+- text: Workspaces
+- button "Search sessions":
+  - img
+- textbox "Search sessions…"
+- button "View options":
+  - img
+- button "Add workspace":
+  - img
+- tree "Sessions":
+  - treeitem "workspace New session in workspace" [expanded]:
+    - img
+    - text: workspace
+    - button "New session in workspace":
+      - img
+  - treeitem "New Session" [selected]
+- button "Documents":
+  - img
+  - text: Documents
+- button "Settings":
+  - img
+  - text: Settings
+- banner:
+  - button "Open right sidebar":
+    - img
+- text: COHARNESS Preview
+- button "Select workbench":
+  - text: Workbench
+  - img
+- button "Choose workspace":
+  - img
+  - text: workspace
+  - img
+- button "Standard mode":
+  - img
+  - text: Standard mode
+  - img
+- textbox "Describe what you want to build": Inspect this workspace without submitting a model task
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"': Workspace write
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message"

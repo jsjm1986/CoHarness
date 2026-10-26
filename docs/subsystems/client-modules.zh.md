@@ -82,7 +82,7 @@ interface WebBootGraph {
 }
 ```
 
-逐行 revision 遵循[可执行内容身份策略](../../packages/client/modules/README.zh.md#incremental-composition)：内容标记产物跨相同复制和重建保持 revision，未带标记产物保留文件系统 revision。初始 descriptor 把 row 划入 bootstrap 与 application 两个调度阶段，每个阶段都可以包含多条 descriptor。URL 只含有序 package 资源列表和从这些 row revision 派生的 revision，阶段名不会进入路由。图组合保持 row 顺序，并在 map 形式 URL 超过 3 KiB 前贪心切分，不拼接脚本，也不读取 map。图 revision 对 entry 与 batch descriptor 求哈希。`immediately` 标记第一阶段的 registration barrier；同一 combo 中的 row 共享脚本传输，不同 combo 则独立加载。
+逐行 revision 遵循[可执行内容身份策略](../../packages/client/modules/README.zh.md#incremental-composition)：内容标记产物跨相同复制和重建保持 revision，未带标记产物保留文件系统 revision。初始 descriptor 把 row 划入 bootstrap 与 application 两个调度阶段，每个阶段都可以包含多条 descriptor。URL 只含有序 package 资源列表和从这些 row revision 派生的 revision，阶段名不会进入路由。图组合保留 entry 顺序，并在 map 形式 URL 超过 3 KiB 前切分每个[配置的传输分组](../../packages/client/modules/README.zh.md#use-this-package)，不拼接脚本，也不读取 map。图 revision 对 entry 与 batch descriptor 求哈希。`immediately` 标记第一阶段的 registration barrier；同一 combo 中的 row 共享脚本传输，不同 combo 则独立加载。
 
 `release` 把本包的版本号与 client 构建固化进 Host 构建产物的源码 commit 配在一起，且不进入图 revision。只有 Host 提供页面启动时的 release，页面才应用图和 rebuilt 帧；另一个 release 要等页面刷新才会加载（见 [Host release 变化](../../packages/client/modules/README.zh.md#host-release-changes)）。
 

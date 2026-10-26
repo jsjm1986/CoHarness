@@ -12,7 +12,7 @@ import { Context, FiberState, type Fiber } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderIndexInjections, type WebServer, type WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import * as modulesClient from '../src/client/index.ts'
-import { ClientModuleRegistry, bootInjections, orderByModuleGraph } from '../src/index.ts'
+import { ClientModuleRegistry, bootInjections, orderByModuleGraph, type Config } from '../src/index.ts'
 import { stampClientArtifact } from '../src/artifact-revision.ts'
 import type { ClientModuleLoaderTarget, WebBootEntry, WebBootGraph } from '../src/client/index.ts'
 
@@ -125,6 +125,7 @@ function constructWithRoute(
     contextBaseUrl?: string
     entryBaseUrl?: string
     internal?: NonNullable<Context['loader']['internal']>
+    config?: Config
   } = {},
 ): { context: Context; service: ClientModuleRegistry; route: Promise<WebRoute> } {
   const ctx = new Context()
@@ -154,7 +155,7 @@ function constructWithRoute(
     tapIndex: () => () => {},
   }
   ctx.provide('webServer', webServer as WebServer)
-  const service = new ClientModuleRegistry(ctx)
+  const service = new ClientModuleRegistry(ctx, options.config)
   owned.ready = route.promise
   return { context: ctx, service, route: route.promise }
 }
@@ -845,7 +846,77 @@ describe('client bundle activation', () => {
     expect(construct([packageName]).graph()).toEqual(service.graph())
   })
 
-  it('splits startup combos before the map-form URL exceeds 3 KiB', async () => {
+  it('reuses shared application responses when an optional transport group is present', async () => {
+    const shared = ['@fixture/shared-before', '@fixture/shared-after']
+    const optional = '@fixture/optional-panel'
+    for (const id of [...shared, optional]) writeBuiltPackage(id)
+    const config = { applicationBatchGroups: [[optional]] }
+    const withoutOptional = constructWithRoute(shared, { config })
+    const withOptional = constructWithRoute([shared[0]!, optional, shared[1]!], { config })
+    const baseline = withoutOptional.service.graph()
+    const added = withOptional.service.graph()
+
+    expect(added.entries.map(row => row.id)).toEqual([shared[0], optional, shared[1]])
+    const sharedBatch = added.batches.find(batch => batch.entries.includes(shared[0]!))!
+    expect(sharedBatch.url).toBe(baseline.batches[0]!.url)
+    expect(sharedBatch.entries).toEqual(shared)
+    expect(added.batches.map(batch => batch.entries)).toEqual([shared, [optional]])
+    expect((await routeRequest(withOptional.route, sharedBatch.url)).body)
+      .toEqual((await routeRequest(withoutOptional.route, baseline.batches[0]!.url)).body)
+  })
+
+  it.each([
+    { groups: [[]], message: 'must name at least one package' },
+    { groups: [['@fixture/panel/client']], message: 'bare package name' },
+    { groups: [['not a package']], message: 'bare package name' },
+    { groups: [[MODULES_ID]], message: 'bootstrap package' },
+    { groups: [['@deepseek-ai/dsh-client-runtime']], message: 'bootstrap package' },
+    { groups: [['@fixture/panel', '@fixture/panel']], message: 'repeated application batch package' },
+    { groups: [['@fixture/panel'], ['@fixture/panel']], message: 'repeated application batch package' },
+  ])('rejects an invalid application transport group: $groups', ({ groups, message }) => {
+    expect(() => ClientModuleRegistry.Config({ applicationBatchGroups: groups })).toThrow(message)
+  })
+
+  it('keeps inactive transport groups out of the response table', () => {
+    const id = '@fixture/shared-only'
+    writeBuiltPackage(id)
+    const baseline = constructWithRoute([id])
+    const configured = constructWithRoute([id], { config: { applicationBatchGroups: [['@fixture/inactive']] } })
+    expect(ClientModuleRegistry.Config({})).toEqual({ applicationBatchGroups: [] })
+    expect(configured.service.graph()).toEqual(baseline.service.graph())
+  })
+
+  it('orders transport groups by configuration while preserving graph and within-group order', () => {
+    const ids = ['@fixture/group-b', '@fixture/shared', '@fixture/group-a-last', '@fixture/group-a-first']
+    for (const id of ids) writeBuiltPackage(id)
+    const { service } = constructWithRoute(ids, { config: { applicationBatchGroups: [
+      [ids[3]!, ids[2]!], [ids[0]!],
+    ] } })
+    expect(service.graph().entries.map(row => row.id)).toEqual(ids)
+    expect(service.graph().batches.map(batch => batch.entries)).toEqual([[ids[1]], [ids[2], ids[3]], [ids[0]]])
+  })
+
+  it('rebuilds an optional transport group without invalidating shared responses', async () => {
+    const common = '@fixture/shared-rebuild'
+    const optional = '@fixture/optional-rebuild'
+    writeBuiltPackage(common)
+    const path = writeBuiltPackage(optional)
+    const { service, route } = constructWithRoute([common, optional], {
+      config: { applicationBatchGroups: [[optional]] },
+    })
+    const before = service.graph()
+    const commonBefore = before.batches.find(batch => batch.entries.includes(common))!
+    const optionalBefore = before.batches.find(batch => batch.entries.includes(optional))!
+    const retained = await routeRequest(route, optionalBefore.url)
+    writeFileSync(path, 'module.exports = { generation: 2 }\n')
+    service.rebuilt(optional)
+    const after = service.graph()
+    expect(after.batches.find(batch => batch.entries.includes(common))!.url).toBe(commonBefore.url)
+    expect(after.batches.find(batch => batch.entries.includes(optional))!.url).not.toBe(optionalBefore.url)
+    expect((await routeRequest(route, optionalBefore.url)).body).toEqual(retained.body)
+  })
+
+  it.each([false, true])('splits startup combos before the map-form URL exceeds 3 KiB when grouped=%s', async (grouped) => {
     const packageNames = Array.from({ length: 48 }, (_, index) => (
       `@fixture/combo-url-${String(index).padStart(3, '0')}-${'x'.repeat(40)}`
     ))
@@ -862,7 +933,8 @@ describe('client bundle activation', () => {
       writeFileSync(`${clientPath}.map`, sourceMap)
     }
 
-    const { service, route } = constructWithRoute(packageNames)
+    const { service, route } = constructWithRoute(packageNames,
+      grouped ? { config: { applicationBatchGroups: [packageNames] } } : {})
     const batches = service.graph().batches.filter(batch => batch.phase === 'application')
     expect(batches.length).toBeGreaterThan(1)
     expect(batches.flatMap(batch => batch.entries)).toEqual(packageNames)

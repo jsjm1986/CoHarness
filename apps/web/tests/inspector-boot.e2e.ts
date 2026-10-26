@@ -1,5 +1,6 @@
 /** Built Inspector entry, lazy panel and native Session storage through the real Web composition. */
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -12,6 +13,7 @@ import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type {} from '@deepseek-ai/dsh-host-apiproxy'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-experimental-inspector'
+import type {} from '@deepseek-ai/dsh-client-modules'
 import {
   captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
@@ -20,6 +22,82 @@ import { connectFreshWorkspace, newEnglishPage, REPO_ROOT, saveFailureShot } fro
 const PROFILE = join(REPO_ROOT, 'packages/experimental/inspector-profile')
 const EXPECTED = fileURLToPath(new URL('./expected/inspector-boot', import.meta.url))
 const runFile = promisify(execFile)
+
+it.skipIf(webSnapshotMode() === 'record')('boots inspection from separate transport groups with reusable shared application responses', async () => {
+  const scratch = await mkdtemp(join(tmpdir(), 'dsh-inspector-transport-'))
+  const owned: { scaffold?: WebScaffold; browser?: Browser } = {}
+  onTestFinished(async () => {
+    const failures: unknown[] = []
+    await owned.browser?.close().catch((error: unknown) => failures.push(error))
+    await owned.scaffold?.close().catch((error: unknown) => failures.push(error))
+    await rm(scratch, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
+    if (failures.length > 0) throw new AggregateError(failures, 'Inspector transport fixture cleanup failed')
+  })
+  const overlay = join(scratch, 'inspector.patch.yml')
+  await writeFile(overlay, [
+    '- id: experimental-inspector', '  disabled: true',
+    '  config:', '    port: 0', '    captureFetch: false', '    clientOrigins: []',
+    '- id: session-inspector', '  disabled: true', '',
+  ].join('\n'))
+  const inspected = await launchWebScaffold({
+    workbench: true, openInApp: false,
+    extraInstallAnchors: [join(PROFILE, 'package.json')],
+    extraOverlayPath: [join(PROFILE, 'cordis.patch.yml'), overlay],
+  })
+  owned.scaffold = inspected
+  const modules = inspected.ctx.get('clientModules')
+  if (modules === undefined) throw new Error('Client module composition is missing')
+  const diagnosticIds = new Set([
+    '@deepseek-ai/dsh-experimental-inspector', '@deepseek-ai/dsh-experimental-session-inspector',
+  ])
+  const baseGraph = modules.graph()
+  expect(baseGraph.entries.some(entry => diagnosticIds.has(entry.id))).toBe(false)
+  const digest = (bytes: ArrayBuffer): string => createHash('sha256').update(new Uint8Array(bytes)).digest('hex')
+  const baseBatches = baseGraph.batches.filter(batch => batch.phase === 'application')
+  const baseResponses = new Map<string, string>()
+  for (const batch of baseBatches) {
+    const response = await inspected.hostFetch(batch.url)
+    expect(response.status).toBe(200)
+    baseResponses.set(batch.url, digest(await response.arrayBuffer()))
+  }
+  const diagnostics = [...inspected.ctx.loader.entries()].filter(entry => diagnosticIds.has(entry.options.name))
+  expect(new Set(diagnostics.map(entry => entry.options.name))).toEqual(diagnosticIds)
+  for (const entry of diagnostics) await inspected.ctx.loader.update(entry.id, { disabled: false })
+  await expect.poll(() => modules.graph().entries.filter(entry => diagnosticIds.has(entry.id)).length).toBe(2)
+  const inspectedGraph = modules.graph()
+  expect(inspectedGraph.entries.filter(entry => !diagnosticIds.has(entry.id))).toEqual(baseGraph.entries)
+  const sharedBatches = inspectedGraph.batches.filter(batch => batch.phase === 'application'
+    && !batch.entries.some(id => diagnosticIds.has(id)))
+  expect(sharedBatches).toEqual(baseBatches)
+  const diagnosticBatches = inspectedGraph.batches.filter(batch => batch.entries.some(id => diagnosticIds.has(id)))
+  expect(diagnosticBatches).toHaveLength(1)
+  expect(new Set(diagnosticBatches[0]!.entries)).toEqual(diagnosticIds)
+  for (const batch of sharedBatches) {
+    const second = await inspected.hostFetch(batch.url)
+    expect(second.status).toBe(200)
+    expect(second.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+    expect(digest(await second.arrayBuffer())).toBe(baseResponses.get(batch.url))
+  }
+  const browser = await chromium.launch()
+  owned.browser = browser
+  const page = await newEnglishPage(browser)
+  onTestFailed(() => saveFailureShot(page, 'inspector-shared-transport'))
+  const tripwire = watchConsole(page)
+  await page.goto(inspected.authenticatedUrl, { waitUntil: 'load' })
+  await connectFreshWorkspace(page, inspected.workspaceCwd)
+  const composer = page.locator('textarea:enabled[placeholder="Describe what you want to build"]')
+  await composer.fill('Inspect this workspace without submitting a model task')
+  expect(await composer.inputValue()).toBe('Inspect this workspace without submitting a model task')
+  await expect.poll(() => page.locator('[data-inspector-panel]').count()).toBe(1)
+  await compareOrRefreshGolden(join(EXPECTED, 'shared-transport-startup.expected.md'),
+    await captureStableAria(page, 'body', inspected.workspaceCwd), webSnapshotMode())
+  await page.keyboard.press('ControlOrMeta+Shift+.')
+  await page.locator('[data-inspector-panel]').waitFor({ state: 'visible' })
+  await page.frameLocator('[data-inspector-devtools]').getByRole('tab', { name: 'Console', exact: true }).waitFor()
+  expect(tripwire.pageErrors).toEqual([])
+  expect(tripwire.warnings).toEqual([])
+  expect(await page.locator('[data-slot-error]').count()).toBe(0)
+})
 
 it.skipIf(webSnapshotMode() === 'record').each([
   { hostOnly: false, name: 'loopback Client' },

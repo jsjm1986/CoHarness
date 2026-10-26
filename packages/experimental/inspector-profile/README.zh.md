@@ -38,7 +38,7 @@ kind: "package-bundle"
 <details>
 <summary>实现内部细节 — 点击展开</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) 启用会话数据诊断 和 NodeJS 诊断 后端，并设置 `captureFetch: true`，不依赖调试参数。调试与采集行为见 Inspector [README](../inspector/README.zh.md)。每个插件负责自身行为与生命周期。
+[`cordis.patch.yml`](cordis.patch.yml) 启用会话数据诊断和 NodeJS 诊断后端，并设置 `captureFetch: true`，不依赖调试参数。它把两个浏览器包配置为同一个[应用传输组](../../client/modules/README.zh.md#use-this-package)，使其启动响应与共享应用代码分开。每个插件保留其图内位置、行为与生命周期。调试与采集行为见 Inspector [README](../inspector/README.zh.md)。
 
 </details>
 

@@ -38,6 +38,9 @@
     "watch": "tsdown --watch"
   },
   "license": "Apache-2.0",
+  "dependencies": {
+    "@deepseek-ai/schemastery": "workspace:~"
+  },
   "devDependencies": {
     "@deepseek-ai/cordis-plugin-loader": "workspace:~",
     "@deepseek-ai/dsh-host-webserver": "workspace:*",

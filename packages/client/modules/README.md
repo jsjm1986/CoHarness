@@ -37,6 +37,8 @@ A browser plugin package declares `dsh.client` in its `package.json` with `platf
 
 The application combo scripts carry only each plugin's `client.js` entry and register those factories once during boot; module bodies remain lazy and run only at first import or materialization. A source `import()` split by tsdown compiles to `require.async("./client.<name>.js")`; its versioned sibling script arrives only when that expression runs. Rows that share a combo URL share one in-flight script task. HMR switches one changed row to its revisioned one-resource combo URL. `<id>/client` and the bare id resolve to the same exports, because a plugin bundle is its package's client half.
 
+The optional `applicationBatchGroups` config lists package sets that use separate startup responses. Ungrouped application entries share the default sequence; active members of each configured group retain their graph order, and absent members contribute no response. Bootstrap packages, empty groups, malformed package names and repeated membership fail configuration validation. Module dependencies and application order remain governed by the original graph. Each group is split at the same 3 KiB URL limit. This lets an optional feature bundle preserve the shared application responses across profiles with different enabled features; it does not reduce the code required by a first visit. The [Inspector bundle](../../experimental/inspector-profile/README.md) declares its own group; [the decision](../../../.agents/notes/implemented/architecture/2026-10-26-client-startup-transport-groups.md) explains the cache ownership.
+
 ### Live plugin composition
 
 An open Web page follows the Host's complete module graph through the HMR transport. Enabling an ordinary plugin adds its Loader entry; disabling it removes the entry and waits for its asynchronous effects before evicting unused modules and styles. Re-enabling loads one instance with its styles. Other Loader contributors and shared modules still needed by active entries remain loaded. The sidebar Plugins page shows page-local synchronization failures and offers retry without changing Host enablement.
@@ -51,7 +53,7 @@ The shell seeds a frozen module table (`PLATFORM_MODULES`: React, Cordis, and st
 
 ### Build requirements
 
-The host serves built client bundles, so `pnpm run build` must have produced each `lib/client.js` before launch; a missing bundle fails activation loudly with one build instruction and a package/path list. Source launch maps host imports to TypeScript source but still consumes the built client export. The package accepts no plugin config of its own.
+The host serves built client bundles, so `pnpm run build` must have produced each `lib/client.js` before launch; a missing bundle fails activation loudly with one build instruction and a package/path list. Source launch maps host imports to TypeScript source but still consumes the built client export.
 
 -----
 

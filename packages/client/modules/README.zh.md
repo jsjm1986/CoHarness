@@ -37,6 +37,8 @@ kind: "package-reference"
 
 application combo 脚本只携带每个插件的 `client.js` 入口，并在启动时仅注册一次这些 factory；模块主体仍保持惰性，只在首次 import 或物化时运行。经 tsdown 拆分的源码 `import()` 会编译为 `require.async("./client.<name>.js")`；只有执行该表达式时，对应的带版本同级脚本才会到达。共享 combo URL 的 row 共用一个进行中的脚本任务。HMR（热模块替换）会让一条发生变化的 row 改用带 revision 的单资源 combo URL。`<id>/client` 与裸 id 解析到同一组导出，因为插件 bundle 就是其包的客户端半侧。
 
+可选配置 `applicationBatchGroups` 列出使用独立启动响应的包集合。未分组的应用条目共用默认序列；每个配置组中的有效成员保留图内顺序，未挂载的成员不产生响应。引导包、空组、畸形包名和重复成员会导致配置校验失败。模块依赖与应用顺序仍由原始图管理，每组沿用相同的 3 KiB URL 限制。这使可选功能组合包能在启用功能不同的 profile 之间保留共享应用响应；首次访问所需的代码量不因此减少。[Inspector 组合包](../../experimental/inspector-profile/README.zh.md)声明自身分组；[决策记录](../../../.agents/notes/implemented/architecture/2026-10-26-client-startup-transport-groups.zh.md)说明缓存归属。
+
 ### 插件动态组合
 
 已打开的 Web 页面通过 HMR 传输跟随 Host 的完整模块图。启用普通插件会添加其 Loader 条目；停用会移除条目，并在其异步 effect 完成清理后回收未使用的模块与样式。再次启用会加载一个带样式的实例。其他 Loader 贡献方的条目及活动条目仍需使用的共享模块会保留。侧边栏「插件」页以页面本地的同步错误横幅显示失败，并提供不改变 Host 启用状态的重试。
@@ -52,7 +54,7 @@ application combo 脚本只携带每个插件的 `client.js` 入口，并在启�
 
 ### 构建要求
 
-宿主提供的是已构建的客户端 bundle，因此启动前 `pnpm run build` 必须已产出每个 `lib/client.js`；缺失 bundle 会明确导致激活失败，并给出一条构建说明及包／路径列表。源码启动会把宿主侧导入映射到 TypeScript 源码，但仍消费这一构建后的客户端导出。本包自身不接受任何插件配置。
+宿主提供的是已构建的客户端 bundle，因此启动前 `pnpm run build` 必须已产出每个 `lib/client.js`；缺失 bundle 会明确导致激活失败，并给出一条构建说明及包／路径列表。源码启动会把宿主侧导入映射到 TypeScript 源码，但仍消费这一构建后的客户端导出。
 
 -----
 

@@ -38,7 +38,7 @@ Press **Ctrl/Cmd+Shift+.** to open or collapse **NodeJS Inspector** in the botto
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) enables Session Inspector and the NodeJS Inspector backend with `captureFetch: true`, independently of debugging flags. See the Inspector [README](../inspector/README.md) for debugging and capture behavior. Each plugin owns its behavior and lifetime.
+[`cordis.patch.yml`](cordis.patch.yml) enables Session Inspector and the NodeJS Inspector backend with `captureFetch: true`, independently of debugging flags. It configures both browser packages as one [application transport group](../../client/modules/README.md#use-this-package), keeping their startup responses separate from shared application code. Each plugin retains its graph position, behavior and lifetime. See the Inspector [README](../inspector/README.md) for debugging and capture behavior.
 
 </details>
 
