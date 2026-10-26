@@ -81,12 +81,14 @@ nav{position:sticky;top:0;z-index:50;background:rgba(251,251,252,.85);backdrop-f
 /* shared section furniture */
 .sec{padding:92px 0;border-top:1px solid var(--line)}
 .sec.tint{background:#f4f6fa}
-.sec-head{margin-bottom:46px;max-width:820px;position:relative}
-.gnum{position:absolute;right:0;top:-34px;font:800 clamp(72px,10vw,128px)/1 var(--font);color:transparent;-webkit-text-stroke:1.5px #e2e6ee;letter-spacing:-.04em;user-select:none;pointer-events:none}
+[id]{scroll-margin-top:78px}
+.sec-head{margin-bottom:46px;position:relative}
+.gnum{position:absolute;right:0;top:50%;transform:translateY(-50%);font:800 clamp(72px,10vw,128px)/1 var(--font);color:transparent;-webkit-text-stroke:1.5px #e2e6ee;letter-spacing:-.04em;user-select:none;pointer-events:none}
+.sec-head h2,.sec-head .sub{max-width:min(820px,calc(100% - 160px))}
 .idx{display:flex;align-items:center;gap:14px;font:600 12px var(--mono);letter-spacing:.28em;color:var(--acc);margin-bottom:22px}
 .idx::before{content:"";width:34px;height:1.5px;background:var(--acc);flex:none}
 h2{font-size:clamp(26px,3.4vw,38px);line-height:1.28;font-weight:800;letter-spacing:-.015em;text-wrap:balance}
-.sub{margin-top:14px;font-size:16px;color:var(--sub);max-width:44em;text-wrap:pretty}
+.sub{margin-top:14px;font-size:16px;color:var(--sub);text-wrap:pretty}
 
 /* hero */
 .hero{padding:88px 0 110px;position:relative;overflow:hidden}
@@ -118,7 +120,7 @@ h1 .hl{background:linear-gradient(transparent 64%,rgba(37,71,224,.17) 64%,rgba(3
 .winbar i:first-child{background:#e8a020}
 .winbar .url{margin-left:12px;font:11.5px var(--mono);color:var(--faint);background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px 12px;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .win img{width:100%;display:block}
-.wincap{display:flex;justify-content:space-between;gap:12px;margin-top:13px;font:11px var(--mono);letter-spacing:.14em;color:var(--faint)}
+.wincap{display:flex;justify-content:space-between;gap:12px;margin-top:13px;font:11px var(--mono);letter-spacing:.14em;color:var(--sub)}
 .wincap .cap-r{flex:none}
 
 /* spec rows */
@@ -137,6 +139,7 @@ h1 .hl{background:linear-gradient(transparent 64%,rgba(37,71,224,.17) 64%,rgba(3
 .plate-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 .plate-grid .shot:first-child{grid-column:1/-1}
 .plate-grid .win{box-shadow:0 20px 50px -22px rgba(16,24,40,.22)}
+.plate-grid .win img{aspect-ratio:16/10;object-fit:cover;object-position:top}
 
 /* dark console card — the one dark moment */
 .console{background:linear-gradient(165deg,#0e1730,#0c1424);color:#dbe4f4;border-radius:16px;padding:8px;box-shadow:0 34px 80px -30px rgba(12,20,36,.5)}
@@ -174,10 +177,12 @@ h1 .hl{background:linear-gradient(transparent 64%,rgba(37,71,224,.17) 64%,rgba(3
 .cap-item p{font-size:13.5px;color:var(--sub);text-wrap:pretty}
 
 /* shots wall */
-.shots{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.shots{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:start}
 .shots .shot:nth-child(4n+1),.shots .shot:nth-child(4n+4){grid-column:span 2}
+.shots .shot:last-child{grid-column:1/-1}
 .shots .win{box-shadow:0 18px 44px -20px rgba(16,24,40,.2)}
-.shots .wincap{position:static;margin-top:0;padding:10px 4px 2px}
+.shots .win img{aspect-ratio:16/10;object-fit:cover;object-position:top}
+.shots .wincap{position:static;margin-top:0;padding:10px 4px 2px;min-height:2.7em}
 .shots .shot::before{display:none}
 
 /* mobile */
@@ -209,7 +214,7 @@ h1 .hl{background:linear-gradient(transparent 64%,rgba(37,71,224,.17) 64%,rgba(3
 .close-panel{background:linear-gradient(160deg,#101a30,#0c1424);border-radius:20px;padding:76px 40px;text-align:center;color:#dbe4f4;position:relative;overflow:hidden}
 .close-panel::before{content:"";position:absolute;inset:0;background:radial-gradient(560px 260px at 50% -10%,rgba(76,201,255,.14),transparent 65%);pointer-events:none}
 .close-panel h2{color:#f4f8ff;font-size:clamp(26px,3.4vw,38px)}
-.close-panel .sub{color:#93a3bb;margin-left:auto;margin-right:auto}
+.close-panel .sub{color:#93a3bb;margin-left:auto;margin-right:auto;max-width:44em}
 .close-panel .ffy{width:44px;height:44px;margin:0 auto 24px}
 .close-panel .m-wing{fill:#c7d4f2;stroke:none}
 .close-panel .m-dark{fill:#e8eefc}
@@ -253,7 +258,8 @@ html.js .reveal.on{opacity:1;transform:none}
   .rows .row,.rows.compact .row .c{grid-template-columns:1fr;gap:6px}
   .rows .row{grid-template-columns:34px 1fr;gap:14px}
   .cap-item{grid-template-columns:1fr;gap:4px}
-  .gnum{font-size:72px;top:-16px}
+  .gnum{font-size:56px;top:-6px;transform:none}
+  .sec-head h2,.sec-head .sub{max-width:calc(100% - 68px)}
 }
 @media (max-width:560px){
   .wrap{padding:0 20px}
@@ -487,11 +493,16 @@ html.js .reveal.on{opacity:1;transform:none}
       <p class="sub" data-i18n="mb.sub">同一套 Web 应用自适应手机：浏览器直接访问已部署的系统，另有 Android 壳可选；推送通知可开。</p>
     </div>
     <div class="mobile-in">
-      <ul class="mblist reveal">
-        <li data-i18n="mb.1">响应式工作台：会话、附件、选模型，窄屏照样顺手</li>
-        <li data-i18n="mb.2">可选推送：自动化进度和待你审批的事，及时送达</li>
-        <li data-i18n="mb.3">Android 壳接入已部署系统，不用另起服务</li>
-      </ul>
+      <div>
+        <ul class="mblist reveal">
+          <li data-i18n="mb.1">响应式工作台：会话、附件、选模型，窄屏照样顺手</li>
+          <li data-i18n="mb.2">可选推送：自动化进度和待你审批的事，及时送达</li>
+          <li data-i18n="mb.3">Android 壳接入已部署系统，不用另起服务</li>
+        </ul>
+        <div class="chiprow reveal" style="margin-top:28px" aria-hidden="true">
+          <span class="chip">RESPONSIVE WEB</span><span class="chip">ANDROID SHELL</span><span class="chip">PUSH · OPTIONAL</span>
+        </div>
+      </div>
       <div class="phones reveal">
         <figure class="phone"><img src="assets/mobile.jpg" alt="手机端工作台实录" data-i18n-alt="alt.mobileWork" loading="lazy"></figure>
         <figure class="phone"><img src="assets/demo-mobile-admin.gif" alt="手机端管理后台实录" data-i18n-alt="alt.mobileAdmin" loading="lazy" data-still="assets/still-mobile-admin.jpg"></figure>
