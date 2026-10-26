@@ -4,20 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CoHarness — 把 AI 团队，管成一个团队 | 人与智能体协作平台</title>
-<meta name="description" content="CoHarness 是面向中小团队的全插件化人与智能体协作平台：一个管理中心管住用户、项目、模型、成本与审计；成员与智能体共享持久会话、记忆、文档、审批与委派。Apache-2.0 开源。">
+<meta name="description" content="CoHarness 是面向中小企业团队的 AI 协作平台：一个后台管住账号、项目、模型、用量与审计；员工和 AI 在同一个工作台里共享任务、记忆与文档。开源、可自托管。">
 <link rel="canonical" href="https://jsjm1986.github.io/CoHarness/">
 <meta name="theme-color" content="#fbfbfc">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="CoHarness">
 <meta property="og:title" content="CoHarness — 把 AI 团队，管成一个团队">
-<meta property="og:description" content="面向中小团队的全插件化人与智能体协作平台：一个 /admin 管住全部 AI 资产，成员与智能体共享真实的工作。DeepSeek Harness 独立衍生，Apache-2.0。">
+<meta property="og:description" content="面向中小企业团队的 AI 协作平台：一个后台管住全部 AI 资产，员工和 AI 共享真实的工作。开源、可自托管。">
 <meta property="og:url" content="https://jsjm1986.github.io/CoHarness/">
 <meta property="og:image" content="https://jsjm1986.github.io/CoHarness/assets/conversation.jpg">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:locale:alternate" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="CoHarness — 把 AI 团队，管成一个团队">
-<meta name="twitter:description" content="一个 /admin 管住团队的全部 AI 资产；成员与智能体共享真实的工作。开源，自托管。">
+<meta name="twitter:description" content="一个后台管住团队的全部 AI 资产；员工和 AI 共享真实的工作。开源，可自托管。">
 <meta name="twitter:image" content="https://jsjm1986.github.io/CoHarness/assets/conversation.jpg">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <script>document.documentElement.classList.add('js')</script>
@@ -196,8 +196,8 @@ h1 .hl{background:linear-gradient(transparent 64%,rgba(37,71,224,.17) 64%,rgba(3
 .path h3{font-size:18px;font-weight:650;display:flex;align-items:center;gap:12px}
 .path h3 .n{font:12px var(--mono);color:var(--acc);border:1px solid var(--line2);border-radius:6px;padding:3px 8px}
 .path>p{margin-top:10px;font-size:14.5px;color:var(--sub)}
-.step{margin-top:16px;padding:14px 16px;background:#f4f6fa;border:1px solid var(--line);border-radius:9px;font:13.5px var(--mono);color:var(--ink);line-height:1.6}
-.path .terms{margin-top:14px;font-family:var(--font);letter-spacing:0}
+.step{margin-top:16px;padding:14px 16px;background:#f4f6fa;border:1px solid var(--line);border-radius:9px;font:13.5px var(--mono);color:var(--ink);line-height:1.9}
+.path .terms{margin-top:14px;font-family:var(--font);letter-spacing:0;font-size:13px;line-height:1.7}
 .oss-list{list-style:none;padding:0;border-top:1px solid var(--line)}
 .oss-list li{display:grid;grid-template-columns:34px 1fr;gap:16px;padding:15px 0;border-bottom:1px solid var(--line);font-size:15px;color:var(--sub);align-items:baseline}
 .oss-list li::before{content:"→";font-family:var(--mono);color:var(--acc);font-size:13px}
@@ -277,8 +277,8 @@ html.js .reveal.on{opacity:1;transform:none}
       <span class="nav-dot" title="live"></span>
     </a>
     <div class="nav-links" id="navLinks">
-      <a href="#admin" data-i18n="nav.admin">管理中心</a>
-      <a href="#runtime" data-i18n="nav.runtime">运行机制</a>
+      <a href="#admin" data-i18n="nav.admin">管理后台</a>
+      <a href="#runtime" data-i18n="nav.runtime">工作方式</a>
       <a href="#principles" data-i18n="nav.principles">协作理念</a>
       <a href="#capabilities" data-i18n="nav.capabilities">能力</a>
       <a href="#scenes" data-i18n="nav.scenes">场景</a>
@@ -296,8 +296,8 @@ html.js .reveal.on{opacity:1;transform:none}
       <details class="menu" id="siteMenu">
         <summary data-i18n="nav.menu">目录</summary>
         <div class="menu-panel" id="menuPanel">
-          <a href="#admin" data-i18n="nav.admin">管理中心</a>
-          <a href="#runtime" data-i18n="nav.runtime">运行机制</a>
+          <a href="#admin" data-i18n="nav.admin">管理后台</a>
+          <a href="#runtime" data-i18n="nav.runtime">工作方式</a>
           <a href="#principles" data-i18n="nav.principles">协作理念</a>
           <a href="#capabilities" data-i18n="nav.capabilities">能力</a>
           <a href="#scenes" data-i18n="nav.scenes">场景</a>
@@ -315,22 +315,22 @@ html.js .reveal.on{opacity:1;transform:none}
 <header class="hero" id="top">
   <div class="wrap hero-in">
     <div>
-      <div class="idx" style="margin-bottom:0">PRE-RELEASE · DEEPSEEK HARNESS DERIVATIVE</div>
+      <div class="idx" style="margin-bottom:0" data-i18n="hero.kick">PREVIEW · BUILT FOR YOUR TEAM</div>
       <h1 data-i18n="hero.title">把 AI 团队，<span class="hl">管成一个团队</span></h1>
-      <p class="lead" data-i18n="hero.sub">CoHarness 是面向中小团队的全插件化协作平台：管理员在一个管理中心里管住用户、项目、模型与成本；成员在同一个工作台里与智能体共享真实的工作——持久会话、跨会话记忆、文档、审批与委派。</p>
+      <p class="lead" data-i18n="hero.sub">给中小企业团队的 AI 协作平台。管理员在一个后台管住账号、项目、模型、用量和审计；员工和 AI 在同一个工作台里干活——会话不丢、跨任务有记忆、每个操作留痕、工作可交接。</p>
       <div class="cta-row">
         <a class="btn btn-p" href="https://github.com/jsjm1986/CoHarness" target="_blank" rel="noopener" data-i18n="hero.cta1">在 GitHub 查看</a>
-        <a class="btn btn-g" href="#admin" data-i18n="hero.cta2">看看管理中心</a>
+        <a class="btn btn-g" href="#admin" data-i18n="hero.cta2">看看管理后台</a>
       </div>
       <div class="live" data-i18n="hero.live"><span><i class="g"></i>GATEWAY :8899 · READY</span><span><i class="g"></i>MEMBER :42000 · READY</span><span><i class="a"></i>PROJECT :42010 · STARTING</span></div>
-      <p class="terms" data-i18n="hero.terms">APACHE-2.0 · 自托管 · 账本不存密钥与对话内容</p>
+      <p class="terms" data-i18n="hero.terms">APACHE-2.0 · 开源自托管 · 用量账本不记录密钥与聊天内容</p>
     </div>
     <div class="shot reveal">
       <div class="win">
         <div class="winbar"><i></i><i></i><i></i><span class="url">gateway:8899/admin</span></div>
-        <img src="assets/admin-users.jpg" alt="管理中心用户与实例页实录" data-i18n-alt="alt.adminUsers">
+        <img src="assets/admin-users.jpg" alt="管理后台用户与工作环境页实录" data-i18n-alt="alt.adminUsers">
       </div>
-      <div class="wincap"><span data-i18n="hero.cap">真实实例截图 · NOT A MOCKUP</span><span class="cap-r">ADMIN CENTER</span></div>
+      <div class="wincap"><span data-i18n="hero.cap">真实部署截图 · 不是效果图</span><span class="cap-r">ADMIN CENTER</span></div>
     </div>
   </div>
 </header>
@@ -340,28 +340,28 @@ html.js .reveal.on{opacity:1;transform:none}
     <div class="sec-head reveal">
       <span class="gnum" aria-hidden="true">01</span>
       <div class="idx">SEC.01 · ADMIN CENTER</div>
-      <h2 data-i18n="ad.title">一个 /admin，管住团队的全部 AI 资产</h2>
-      <p class="sub" data-i18n="ad.sub">Gateway 自带完整管理端：从账号与实例生命周期，到模型治理、用量成本、审计与部署——中小团队不需要再拼一套运维后台。</p>
+      <h2 data-i18n="ad.title">一个后台，管住团队的全部 AI</h2>
+      <p class="sub" data-i18n="ad.sub">AI 工具散落在每个人手里，就没法管。CoHarness 自带完整管理后台：谁在用、用什么模型、花多少钱、做过什么操作，一处看清、一处管住。</p>
     </div>
     <div class="admin-in">
       <div class="reveal">
         <div class="spec">
-          <div class="row"><span class="n">01</span><div><b data-i18n="ad.1t">用户与实例</b><p data-i18n="ad.1p">账号、角色、登录状态与每位用户独立的 Harness 运行时实例——启动、停止、重启一手掌控。</p></div></div>
-          <div class="row"><span class="n">02</span><div><b data-i18n="ad.2t">项目与成员权限</b><p data-i18n="ad.2p">管理员发起与用户发起的工作区统一管理；ro/rw 成员、邀请、项目可见或创建者私有会话。</p></div></div>
-          <div class="row"><span class="n">03</span><div><b data-i18n="ad.3t">模型治理</b><p data-i18n="ad.3p">组织统一的 Provider 与模型目录，按角色、用户、项目授权；计价规则与个人 BYOK 登记分离。</p></div></div>
-          <div class="row"><span class="n">04</span><div><b data-i18n="ad.4t">用量与成本</b><p data-i18n="ad.4p">按用户/项目的 Token 用量、成本估算、额度告警与配额配置——账本不存 API 密钥与对话内容。</p></div></div>
-          <div class="row"><span class="n">05</span><div><b data-i18n="ad.5t">审计与运维</b><p data-i18n="ad.5p">审计记录、部署状态、终端、SSH、Webhook、桌面与归档——运维面在同一个管理端里。</p></div></div>
+          <div class="row"><span class="n">01</span><div><b data-i18n="ad.1t">账号与工作环境</b><p data-i18n="ad.1p">员工账号、角色、登录状态，以及每人独立的 AI 工作环境——启动、停止、重启由管理员一手掌控。</p></div></div>
+          <div class="row"><span class="n">02</span><div><b data-i18n="ad.2t">项目与成员权限</b><p data-i18n="ad.2p">管理员或员工创建的项目统一在册；成员分只读/可写，支持邀请加入；项目里的对话可全项目可见，也可仅创建者可见。</p></div></div>
+          <div class="row"><span class="n">03</span><div><b data-i18n="ad.3t">模型治理</b><p data-i18n="ad.3p">公司统一登记可用的模型服务商和模型清单，按角色、成员、项目授权；员工也可以登记自己的 Key，两条线互不混淆。</p></div></div>
+          <div class="row"><span class="n">04</span><div><b data-i18n="ad.4t">用量与成本</b><p data-i18n="ad.4p">按成员和项目统计 Token 用量与成本估算，配额度、设告警；账本只记用量归属，不写 API 密钥和对话内容。</p></div></div>
+          <div class="row"><span class="n">05</span><div><b data-i18n="ad.5t">审计与运维</b><p data-i18n="ad.5p">谁在什么时间做了什么管理操作，全部留痕可查；部署状态、终端、SSH、Webhook、桌面与归档，在同一个后台里。</p></div></div>
         </div>
         <div class="chiprow" aria-hidden="true">
-          <span class="chip" data-i18n="ad.m1">用户</span><span class="chip" data-i18n="ad.m2">项目</span><span class="chip" data-i18n="ad.m3">插件</span><span class="chip" data-i18n="ad.m4">模型</span><span class="chip" data-i18n="ad.m5">用量</span><span class="chip" data-i18n="ad.m6">文档</span><span class="chip" data-i18n="ad.m7">归档</span><span class="chip" data-i18n="ad.m8">终端</span><span class="chip">SSH</span><span class="chip" data-i18n="ad.m10">部署</span><span class="chip" data-i18n="ad.m11">维护空间</span><span class="chip">WEBHOOK</span><span class="chip" data-i18n="ad.m13">桌面</span><span class="chip" data-i18n="ad.m14">审计</span>
+          <span class="chip" data-i18n="ad.m1">用户</span><span class="chip" data-i18n="ad.m2">项目</span><span class="chip" data-i18n="ad.m3">插件</span><span class="chip" data-i18n="ad.m4">模型</span><span class="chip" data-i18n="ad.m5">用量</span><span class="chip" data-i18n="ad.m6">文档</span><span class="chip" data-i18n="ad.m7">归档</span><span class="chip" data-i18n="ad.m8">终端</span><span class="chip">SSH</span><span class="chip" data-i18n="ad.m10">部署</span><span class="chip" data-i18n="ad.m11">运维通道</span><span class="chip">WEBHOOK</span><span class="chip" data-i18n="ad.m13">桌面</span><span class="chip" data-i18n="ad.m14">审计</span>
         </div>
       </div>
       <div class="plate-grid">
-        <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">/admin · projects</span></div><img src="assets/admin-projects.jpg" alt="项目目录实录" data-i18n-alt="alt.adminProjects" loading="lazy"></div><div class="wincap"><span data-i18n="ad.s2">项目目录：管理员/用户发起的工作区与成员数</span><span class="cap-r">ADMIN · PROJECTS</span></div></div>
-        <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">/admin · models</span></div><img src="assets/demo-member-models.gif" alt="为成员分配可用模型的操作演示" data-i18n-alt="alt.memberModels" loading="lazy" data-still="assets/still-member-models.jpg"></div><div class="wincap"><span data-i18n="ad.s3">模型治理：为成员分配可用模型的实际操作</span><span class="cap-r">LIVE</span></div></div>
+        <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">/admin · projects</span></div><img src="assets/admin-projects.jpg" alt="项目目录实录" data-i18n-alt="alt.adminProjects" loading="lazy"></div><div class="wincap"><span data-i18n="ad.s2">项目目录：管理员和员工发起的工作区与成员数</span><span class="cap-r">ADMIN · PROJECTS</span></div></div>
+        <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">/admin · models</span></div><img src="assets/demo-member-models.gif" alt="为成员分配可用模型的操作演示" data-i18n-alt="alt.memberModels" loading="lazy" data-still="assets/still-member-models.jpg"></div><div class="wincap"><span data-i18n="ad.s3">模型治理：给成员分配可用模型的实际操作</span><span class="cap-r">LIVE</span></div></div>
         <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">/admin · usage</span></div><img src="assets/admin-usage.jpg" alt="用量与成本页实录" data-i18n-alt="alt.adminUsage" loading="lazy"></div><div class="wincap"><span data-i18n="ad.s4">用量：Token、成本、额度告警与配额</span><span class="cap-r">ADMIN · USAGE</span></div></div>
         <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">/admin · audit</span></div><img src="assets/demo-audit.gif" alt="审计筛选操作演示" data-i18n-alt="alt.audit" loading="lazy" data-still="assets/still-audit.jpg"></div><div class="wincap"><span data-i18n="ad.s5">审计：按事件、用户、结果筛选管理操作留痕</span><span class="cap-r">LIVE</span></div></div>
-        <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">/admin · steward</span></div><img src="assets/demo-steward.gif" alt="维护空间配置演示" data-i18n-alt="alt.steward" loading="lazy" data-still="assets/still-steward.jpg"></div><div class="wincap"><span data-i18n="ad.s6">维护空间：常驻运维通道的准入与成员授权</span><span class="cap-r">LIVE</span></div></div>
+        <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">/admin · steward</span></div><img src="assets/demo-steward.gif" alt="运维通道配置演示" data-i18n-alt="alt.steward" loading="lazy" data-still="assets/still-steward.jpg"></div><div class="wincap"><span data-i18n="ad.s6">运维通道：常驻维护空间的准入与成员授权</span><span class="cap-r">LIVE</span></div></div>
       </div>
     </div>
   </div>
@@ -371,25 +371,25 @@ html.js .reveal.on{opacity:1;transform:none}
   <div class="wrap">
     <div class="sec-head reveal">
       <span class="gnum" aria-hidden="true">02</span>
-      <div class="idx">SEC.02 · RUNTIME MODEL</div>
-      <h2 data-i18n="rt.title">运行时怎么分：成员有独立个人运行时，项目有共享运行时</h2>
-      <p class="sub" data-i18n="rt.sub">Gateway 管理两类实例：每位用户一个个人运行时承载个人空间，每个项目一个共享运行时承载协作——两种实例都按需拉起、空闲回收。</p>
+      <div class="idx">SEC.02 · HOW IT RUNS</div>
+      <h2 data-i18n="rt.title">AI 怎么干活：每人一个独立工位，每个项目一个共享工位</h2>
+      <p class="sub" data-i18n="rt.sub">每位成员有只属于自己的 AI 工作环境，放个人任务；每个项目有一个共享的 AI 工作环境，放团队协作——两种环境没人用时自动休眠，有活儿时自动唤醒。</p>
     </div>
     <div class="runtime-in">
       <div class="rows reveal">
-        <div class="row"><span class="n">01</span><b data-i18n="rt.1t">一成员一个个人运行时</b><p data-i18n="rt.1p">每位用户分配独立的 dsh web 进程、专属端口与独立 home 目录（进程的 cwd 与 $HOME）——个人空间的会话、记忆、文档落在成员自己的目录下；目录授权还投影进成员可读写的所属项目目录（ro/rw 按成员表）。</p></div>
-        <div class="row"><span class="n">02</span><b data-i18n="rt.2t">一项目一个共享运行时</b><p data-i18n="rt.2p">项目运行时以项目目录本身为 cwd 与 home，启动时挂载协作套件与项目作用域记忆——成员在同一个共享环境里接力：会话、项目记忆与文档属于项目，而不是成员各自的副本。</p></div>
-        <div class="row"><span class="n">03</span><b data-i18n="rt.3t">按需拉起，空闲自动回收</b><p data-i18n="rt.3p">两类实例都带 starting / ready / stopping / stopped 生命周期：空闲自动停止、有操作时拉起；手动停止不会被隐式拉起；steward 维护空间常驻。</p></div>
-        <div class="row"><span class="n">04</span><b data-i18n="rt.4t">三档权限预设 + 路径级授权</b><p data-i18n="rt.4p">运行时挂载 read-only / workspace-write / danger-full-access 预设；会话按 cwd 精确授权并过滤参与者可读范围，会话可见性可选项目共享或创建者私有；项目路径不允许与任何用户目录重叠。</p></div>
-        <div class="row"><span class="n">05</span><b data-i18n="rt.5t">平台后端可替换</b><p data-i18n="rt.5p">运行时挂载 read-only / workspace-write / danger-full-access 预设；开发环境本机 spawn；Linux 生产用 systemd 用户单元 + 独立系统账号（成员 harness-&lt;user&gt;、项目独立运行时账号）+ TemporaryFileSystem 隔离——普通项目运行时只看得见自己的项目目录。</p></div>
+        <div class="row"><span class="n">01</span><b data-i18n="rt.1t">一人一个工作环境</b><p data-i18n="rt.1p">每位成员分配独立的 AI 工作环境和数据目录——个人任务的会话、记忆、文档都落在自己名下；自己参与的项目目录，按只读/可写权限映射进来。</p></div>
+        <div class="row"><span class="n">02</span><b data-i18n="rt.2t">一个项目一个共享环境</b><p data-i18n="rt.2p">项目环境直接在项目目录里工作，自带协作套件和项目记忆——成员在同一个环境里接力：会话、项目记忆和文档属于项目，不是每人一份拷贝。</p></div>
+        <div class="row"><span class="n">03</span><b data-i18n="rt.3t">按需唤醒，空闲休眠</b><p data-i18n="rt.3p">两种环境都有明确的启动/就绪/停止状态：空闲自动休眠省资源，有操作自动唤醒；管理员手动停掉的不会被悄悄拉起；运维通道常驻。</p></div>
+        <div class="row"><span class="n">04</span><b data-i18n="rt.4t">三档权限 + 目录级授权</b><p data-i18n="rt.4p">工作环境可挂只读、工作区可写、完全放开三档权限；会话按目录精确授权，并过滤掉该参与者无权查看的内容；项目目录不允许与任何人的个人目录重叠。</p></div>
+        <div class="row"><span class="n">05</span><b data-i18n="rt.5t">服务器上真隔离</b><p data-i18n="rt.5p">开发时在本地直接起进程；Linux 生产环境每个工作环境跑在独立系统账号下，文件系统互相隔离——普通项目环境只看得见自己的项目目录。</p></div>
       </div>
       <div class="reveal">
         <div class="console">
           <div class="c-head"><i></i><i></i><i></i><span>RUNTIME TOPOLOGY · LIVE</span></div>
-          <div class="c-node"><span class="p">:8899</span><div><b data-i18n="map.gw">网关 · 认证 / 路由 / 账本 / 审计</b><i data-i18n="map.gws">GATEWAY</i></div><span class="c-st ok">READY</span></div>
-          <div class="c-node"><span class="p">:42000</span><div><b data-i18n="map.rt1">成员个人运行时</b><i data-i18n="map.rt1s">每成员一个 · 独立 home · ro/rw 授权</i></div><span class="c-st ok">READY</span></div>
-          <div class="c-node"><span class="p">:42010</span><div><b data-i18n="map.rt2">项目共享运行时</b><i data-i18n="map.rt2s">每项目一个 · cwd=项目目录 · 协作套件</i></div><span class="c-st wt">STARTING</span></div>
-          <div class="c-node"><span class="p">PROJ</span><div><b data-i18n="map.pj">项目空间</b><i data-i18n="map.pjs">一个目录 + 一张成员表 · 会话可见性</i></div><span class="c-st ok">READY</span></div>
+          <div class="c-node"><span class="p">:8899</span><div><b data-i18n="map.gw">网关 · 登录 / 路由 / 账本 / 审计</b><i data-i18n="map.gws">GATEWAY</i></div><span class="c-st ok">READY</span></div>
+          <div class="c-node"><span class="p">:42000</span><div><b data-i18n="map.rt1">成员工作环境</b><i data-i18n="map.rt1s">每成员一个 · 独立目录 · 按权限映射项目</i></div><span class="c-st ok">READY</span></div>
+          <div class="c-node"><span class="p">:42010</span><div><b data-i18n="map.rt2">项目共享环境</b><i data-i18n="map.rt2s">每项目一个 · 工作在项目目录 · 协作套件</i></div><span class="c-st wt">STARTING</span></div>
+          <div class="c-node"><span class="p">PROJ</span><div><b data-i18n="map.pj">项目</b><i data-i18n="map.pjs">一个目录 + 一张成员表 · 可见性规则</i></div><span class="c-st ok">READY</span></div>
           <div class="c-foot"><span><b>4</b> NODES</span><span><b>2</b> RUNTIMES</span><span>IDLE-REAP <b>ON</b></span><span>ISOLATION <b>systemd</b></span></div>
         </div>
       </div>
@@ -402,14 +402,14 @@ html.js .reveal.on{opacity:1;transform:none}
     <div class="sec-head reveal">
       <span class="gnum" aria-hidden="true">03</span>
       <div class="idx">SEC.03 · PHILOSOPHY</div>
-      <h2 data-i18n="pr.title">协作的单位是共享的工作，不是共享的对话链接</h2>
-      <p class="sub" data-i18n="pr.sub">项目承载持续的智能体环境、成员贡献、委派关系、待决决策与可恢复的进度——浏览器关闭、单个智能体停止，工作依然在那里。</p>
+      <h2 data-i18n="pr.title">协作的单位是共享的工作，不是转发聊天记录</h2>
+      <p class="sub" data-i18n="pr.sub">项目会记住持续的 AI 工作环境、每个人的贡献、任务委派关系、待决的审批和可恢复的进度——关掉浏览器、停掉某个 AI，工作还在原地。</p>
     </div>
     <div class="rows compact reveal">
-      <div class="row"><span class="n">α</span><div class="c"><b data-i18n="pr.1t">插件装配，而非固定流程</b><p data-i18n="pr.1p">模型、工具、角色、上下文、权限、委派路径与工作流都通过插件、profile、bundle 组合，适配团队自己的工作方式。</p></div></div>
-      <div class="row"><span class="n">β</span><div class="c"><b data-i18n="pr.2t">有边界与责任的委派</b><p data-i18n="pr.2p">主智能体可把部分工作委派给专家子智能体——有明确关系、范围与责任；子任务不静默继承全部能力与权限。</p></div></div>
-      <div class="row"><span class="n">γ</span><div class="c"><b data-i18n="pr.3t">人类判断是一等工作</b><p data-i18n="pr.3p">审批授权受控操作，提问补充业务判断；一个有效参与者认领待决项，结果写入共同历史，不产生竞争结果。</p></div></div>
-      <div class="row"><span class="n">δ</span><div class="c"><b data-i18n="pr.4t">沉淀可复用的实践</b><p data-i18n="pr.4p">验证过的委派模式、评审步骤、上下文来源或工具策略，可固化为团队的下一个插件、技能、profile、bundle 或工作流。</p></div></div>
+      <div class="row"><span class="n">α</span><div class="c"><b data-i18n="pr.1t">自己组装，不被流程框死</b><p data-i18n="pr.1p">用什么模型、给 AI 什么工具、谁能批什么、任务怎么委派，都由插件和配置组合而成，贴合团队自己的工作方式。</p></div></div>
+      <div class="row"><span class="n">β</span><div class="c"><b data-i18n="pr.2t">委派有边界</b><p data-i18n="pr.2p">主 AI 可以把一部分活交给专业 AI，但要说清做什么、做到哪、负什么责——子任务不会悄悄拿到全部权限，内部细节也不会灌回主任务。</p></div></div>
+      <div class="row"><span class="n">γ</span><div class="c"><b data-i18n="pr.3t">人的判断是一等工作</b><p data-i18n="pr.3p">审批是在授权一次受控操作，提问是在补齐 AI 缺的业务判断；共享项目里，待决事项由一个有权限的人接手，结果进入共同历史，不会抢出两份答案。</p></div></div>
+      <div class="row"><span class="n">δ</span><div class="c"><b data-i18n="pr.4t">好做法沉淀成资产</b><p data-i18n="pr.4p">验证有效的委派方式、评审步骤、上下文来源或工具策略，可以固化为团队的下一个插件、技能或工作流，下次直接复用。</p></div></div>
     </div>
   </div>
 </section>
@@ -423,18 +423,18 @@ html.js .reveal.on{opacity:1;transform:none}
       <p class="sub" data-i18n="cap.sub">以下均为当前代码库中已实现的能力。</p>
     </div>
     <div class="cap-idx reveal">
-      <div class="cap-item"><b data-i18n="cap.1t">Agent 运行时</b><p data-i18n="cap.1p">Cordis 插件运行时 + 事件溯源会话：持久恢复/分叉、模型请求、审批、提问、计划、目标、待办、任务、工作流、压缩与遥测。</p></div>
-      <div class="cap-item"><b data-i18n="cap.2t">工具与执行</b><p data-i18n="cap.2p">工作区文件工具、图片读取、Shell 与持久终端、LSP、网页搜索/抓取、技能、结构化附件、沙箱与目录策略。</p></div>
-      <div class="cap-item"><b data-i18n="cap.3t">跨会话记忆</b><p data-i18n="cap.3p">个人 / 工作区 / 项目三级作用域：画像、指引、背景、资源四类条目随会话注入有界清单，支持搜索与修订。</p></div>
-      <div class="cap-item"><b data-i18n="cap.4t">会话历史检索</b><p data-i18n="cap.4p">模型可搜索、追踪、精读有权限的既有会话，并生成接续交接摘要——过去的工作成为可用的上下文。</p></div>
-      <div class="cap-item"><b data-i18n="cap.5t">文档管理</b><p data-i18n="cap.5p">命名用户文档：上传下载、附加到会话、作用域感知浏览、跨作用域复制、快照谱系与操作历史。</p></div>
-      <div class="cap-item"><b data-i18n="cap.6t">子智能体团队</b><p data-i18n="cap.6p">持久的子智能体会话、明确的委托关系、可恢复可继续的协作伙伴，报告选择性回流主任务。</p></div>
-      <div class="cap-item"><b data-i18n="cap.7t">自动化任务</b><p data-i18n="cap.7p">定时与触发器驱动的自动化：任务计划、目标管理与后台执行，工作离开浏览器也能继续。</p></div>
-      <div class="cap-item"><b data-i18n="cap.8t">Web 界面</b><p data-i18n="cap.8p">响应式浏览器应用：会话与实时历史、模型选择、命令与 @ 建议、附件、权限、目标、任务、设置、中英双语与主题。</p></div>
-      <div class="cap-item"><b data-i18n="cap.9t">MCP 与扩展生态</b><p data-i18n="cap.9p">MCP 客户端接入外部工具服务，Claude Code / Codex hook 桥接既有工作流，插件目录与 bundle 持续扩展能力面。</p></div>
-      <div class="cap-item"><b data-i18n="cap.10t">安全与凭证</b><p data-i18n="cap.10p">凭证引用让密钥不进日志；沙箱策略、目录授权、审批与权限预设，把"能做什么"钉在每次执行上。</p></div>
-      <div class="cap-item"><b data-i18n="cap.11t">多入口接入</b><p data-i18n="cap.11p">Headless、JSON-RPC、ACP 自动化协议、TypeScript / Python SDK、SSH 远程执行目标、Webhook 出站集成。</p></div>
-      <div class="cap-item"><b data-i18n="cap.12t">语音与附件</b><p data-i18n="cap.12p">语音输入转写、图片读取与结构化附件、用户文档附加到会话——输入面不只有键盘。</p></div>
+      <div class="cap-item"><b data-i18n="cap.1t">AI 工作环境</b><p data-i18n="cap.1p">插件化运行时，每次操作完整留痕：任务可暂停、恢复、分叉；模型请求、审批、计划、目标、待办、后台任务、定时提醒、工作流与用量遥测一应俱全。</p></div>
+      <div class="cap-item"><b data-i18n="cap.2t">工具与执行</b><p data-i18n="cap.2p">读写文件、跑命令和持久终端、查代码、搜网页、调技能、收图片与文档附件，外加沙箱与目录策略兜底。</p></div>
+      <div class="cap-item"><b data-i18n="cap.3t">跨任务记忆</b><p data-i18n="cap.3p">个人、工作区、项目三层记忆：AI 记住团队画像、工作约定、背景资料；每次开工自动带上该带的，可搜可改。</p></div>
+      <div class="cap-item"><b data-i18n="cap.4t">历史会话检索</b><p data-i18n="cap.4p">AI 能搜索、精读自己有权看的过往会话，并生成「接着干」的交接摘要——昨天的工作就是今天的上下文。</p></div>
+      <div class="cap-item"><b data-i18n="cap.5t">文档管理</b><p data-i18n="cap.5p">团队文档统一上传、按作用域归档、直接带进对话；有版本谱系和操作历史。</p></div>
+      <div class="cap-item"><b data-i18n="cap.6t">专业 AI 组队</b><p data-i18n="cap.6p">可长期共事的专家 AI：关系明确、可中断恢复、可继续追问，汇报什么由主任务挑。</p></div>
+      <div class="cap-item"><b data-i18n="cap.7t">自动化任务</b><p data-i18n="cap.7p">定时与触发器驱动的后台任务：计划、目标、自动执行，关了浏览器活照样跑。</p></div>
+      <div class="cap-item"><b data-i18n="cap.8t">Web 工作台</b><p data-i18n="cap.8p">浏览器直接用：会话、历史、选模型、传附件、权限、任务、设置；中英双语，深浅主题。</p></div>
+      <div class="cap-item"><b data-i18n="cap.9t">接入与扩展</b><p data-i18n="cap.9p">插件目录持续扩展能力；支持 MCP 外部工具服务，也能桥接 Claude Code、Codex 的既有流程。</p></div>
+      <div class="cap-item"><b data-i18n="cap.10t">安全与凭据</b><p data-i18n="cap.10p">API Key 以凭据引用方式使用，不进日志；沙箱、目录授权、审批与权限档位，把「AI 能做什么」钉在每次执行上。</p></div>
+      <div class="cap-item"><b data-i18n="cap.11t">多种接入方式</b><p data-i18n="cap.11p">命令行批量任务、TypeScript / Python SDK、JSON-RPC、ACP 自动化协议、SSH 远程目标、Webhook 出站。</p></div>
+      <div class="cap-item"><b data-i18n="cap.12t">语音与附件</b><p data-i18n="cap.12p">语音输入转文字、图片识别、文档与会话附件——输入不只有键盘。</p></div>
     </div>
   </div>
 </section>
@@ -445,13 +445,13 @@ html.js .reveal.on{opacity:1;transform:none}
       <span class="gnum" aria-hidden="true">05</span>
       <div class="idx">SEC.05 · SCENARIOS</div>
       <h2 data-i18n="sc2.title">从日常业务到研发协作，一个平台装下</h2>
-      <p class="sub" data-i18n="sc2.sub">以下是我们自有部署正在运行的真实项目形态。</p>
+      <p class="sub" data-i18n="sc2.sub">以下是我们自己部署中真实在跑的项目形态。</p>
     </div>
     <div class="rows compact reveal">
-      <div class="row"><span class="n">S1</span><div class="c"><b data-i18n="sc2.1t">内容生产与自媒体运营</b><p data-i18n="sc2.1p">选题、文案生成、素材整理到发布复盘的流水线——记忆让智能体记住品牌口径与风格约定。</p></div></div>
-      <div class="row"><span class="n">S2</span><div class="c"><b data-i18n="sc2.2t">客服与私信协同</b><p data-i18n="sc2.2p">客服类项目共享一个运行时：知识文档入库、会话留痕，成员和智能体在同一历史里接力。</p></div></div>
-      <div class="row"><span class="n">S3</span><div class="c"><b data-i18n="sc2.3t">监控与巡检助手</b><p data-i18n="sc2.3p">定时任务驱动的监控巡检：异常摘要、留痕报告，Webhook 把结果送出到团队的既有系统。</p></div></div>
-      <div class="row"><span class="n">S4</span><div class="c"><b data-i18n="sc2.4t">研发与内部工具</b><p data-i18n="sc2.4p">插件开发、提示词组合工具、图像生成——团队的 AI 项目在同一个边界里被管理、计量与审计。</p></div></div>
+      <div class="row"><span class="n">S1</span><div class="c"><b data-i18n="sc2.1t">内容生产与自媒体运营</b><p data-i18n="sc2.1p">选题、文案、素材到发布复盘的流水线——AI 记得住品牌口径和风格约定。</p></div></div>
+      <div class="row"><span class="n">S2</span><div class="c"><b data-i18n="sc2.2t">客服与私信协同</b><p data-i18n="sc2.2p">客服项目共享一个工作环境：知识文档入库、对话留痕，人和 AI 在同一份历史里接力。</p></div></div>
+      <div class="row"><span class="n">S3</span><div class="c"><b data-i18n="sc2.3t">监控与巡检</b><p data-i18n="sc2.3p">定时巡检产出异常摘要和留痕报告，Webhook 把结果推进团队既有系统。</p></div></div>
+      <div class="row"><span class="n">S4</span><div class="c"><b data-i18n="sc2.4t">研发与内部工具</b><p data-i18n="sc2.4p">插件开发、提示词工具、图像生成——团队的 AI 项目在同一个边界里被管理、计量与审计。</p></div></div>
     </div>
   </div>
 </section>
@@ -461,19 +461,19 @@ html.js .reveal.on{opacity:1;transform:none}
     <div class="sec-head reveal">
       <span class="gnum" aria-hidden="true">06</span>
       <div class="idx">SEC.06 · EVIDENCE</div>
-      <h2 data-i18n="sc.title">成员看到的工作台</h2>
-      <p class="sub" data-i18n="sc.sub">以下截图与演示均来自真实运行的 CoHarness 实例，非渲染示意。</p>
+      <h2 data-i18n="sc.title">成员日常看到的工作台</h2>
+      <p class="sub" data-i18n="sc.sub">以下截图与录屏均来自真实运行的 CoHarness 实例，不是效果图。</p>
     </div>
     <div class="shots">
       <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">workbench</span></div><img src="assets/demo-workbench.gif" alt="工作台新会话入口实录" data-i18n-alt="alt.workbench" loading="lazy" data-still="assets/still-workbench.jpg"></div><div class="wincap"><span data-i18n="sc.7">工作台：新会话、工作区与模式选择入口</span></div></div>
       <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">session</span></div><img src="assets/conversation.jpg" alt="会话视图实录" data-i18n-alt="alt.conversation" loading="lazy"></div><div class="wincap"><span data-i18n="sc.0">会话视图：模型回复、工具调用摘要、Token 统计与模型选择</span></div></div>
-      <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">memory</span></div><img src="assets/demo.gif" alt="记忆搜索与保存调用实录" data-i18n-alt="alt.memory" loading="lazy" data-still="assets/still-demo.jpg"></div><div class="wincap"><span data-i18n="sc.1">记忆演示：模型调用 memory_search / memory_save，条目实时进入时间线</span></div></div>
-      <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">memory · scopes</span></div><img src="assets/memory.jpg" alt="记忆侧栏实录" data-i18n-alt="alt.memoryPanel" loading="lazy"></div><div class="wincap"><span data-i18n="sc.2">记忆侧栏：个人 / 工作区 / 项目作用域、搜索、按天分组</span></div></div>
-      <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">plugins</span></div><img src="assets/demo-plugins.gif" alt="插件页开关与配置实录" data-i18n-alt="alt.plugins" loading="lazy" data-still="assets/still-plugins.jpg"></div><div class="wincap"><span data-i18n="sc.3">插件页（实录）：官方插件开关与配置项统一管理</span></div></div>
+      <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">memory</span></div><img src="assets/demo.gif" alt="记忆搜索与保存调用实录" data-i18n-alt="alt.memory" loading="lazy" data-still="assets/still-demo.jpg"></div><div class="wincap"><span data-i18n="sc.1">记忆演示：AI 调用 memory_search / memory_save，条目实时进入时间线</span></div></div>
+      <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">memory · scopes</span></div><img src="assets/memory.jpg" alt="记忆侧栏实录" data-i18n-alt="alt.memoryPanel" loading="lazy"></div><div class="wincap"><span data-i18n="sc.2">记忆侧栏：个人 / 工作区 / 项目三层作用域、搜索、按天分组</span></div></div>
+      <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">plugins</span></div><img src="assets/demo-plugins.gif" alt="插件页开关与配置实录" data-i18n-alt="alt.plugins" loading="lazy" data-still="assets/still-plugins.jpg"></div><div class="wincap"><span data-i18n="sc.3">插件页：官方插件开关与配置项统一管理</span></div></div>
       <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">documents</span></div><img src="assets/documents.jpg" alt="文档管理实录" data-i18n-alt="alt.documents" loading="lazy"></div><div class="wincap"><span data-i18n="sc.4">文档管理：按作用域浏览、回收站、上传与文件夹</span></div></div>
-      <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">project · settings</span></div><img src="assets/demo-project-settings.gif" alt="项目设置实录" data-i18n-alt="alt.projectSettings" loading="lazy" data-still="assets/still-project-settings.jpg"></div><div class="wincap"><span data-i18n="sc.8">项目设置：主题策略、运行时、成员与模型入口</span></div></div>
+      <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">project · settings</span></div><img src="assets/demo-project-settings.gif" alt="项目设置实录" data-i18n-alt="alt.projectSettings" loading="lazy" data-still="assets/still-project-settings.jpg"></div><div class="wincap"><span data-i18n="sc.8">项目设置：主题策略、工作环境、成员与模型入口</span></div></div>
       <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">automation</span></div><img src="assets/automation.jpg" alt="自动化任务页实录" data-i18n-alt="alt.automation" loading="lazy"></div><div class="wincap"><span data-i18n="sc.5">自动化任务：定时与触发器驱动的后台工作</span></div></div>
-      <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">models</span></div><img src="assets/models.jpg" alt="模型设置页实录" data-i18n-alt="alt.models" loading="lazy"></div><div class="wincap"><span data-i18n="sc.6">模型设置：成员可用的模型目录与提供方</span></div></div>
+      <div class="shot reveal"><div class="win"><div class="winbar"><i></i><i></i><i></i><span class="url">models</span></div><img src="assets/models.jpg" alt="模型设置页实录" data-i18n-alt="alt.models" loading="lazy"></div><div class="wincap"><span data-i18n="sc.6">模型设置：成员可用的模型清单与提供方</span></div></div>
     </div>
   </div>
 </section>
@@ -484,17 +484,17 @@ html.js .reveal.on{opacity:1;transform:none}
       <span class="gnum" aria-hidden="true">07</span>
       <div class="idx">SEC.07 · MOBILE</div>
       <h2 data-i18n="mb.title">手机上也是完整的工作台</h2>
-      <p class="sub" data-i18n="mb.sub">同一套 Web 应用自适应到手机：浏览器直接访问已部署的 Gateway，另有 Android（Capacitor）壳可选。</p>
+      <p class="sub" data-i18n="mb.sub">同一套 Web 应用自适应手机：浏览器直接访问已部署的系统，另有 Android 壳可选；推送通知可开。</p>
     </div>
     <div class="mobile-in">
       <ul class="mblist reveal">
-        <li data-i18n="mb.1">响应式工作台：会话、附件、模型选择在窄屏同样可用</li>
-        <li data-i18n="mb.2">可选推送通知：自动化与待决事项及时到达</li>
-        <li data-i18n="mb.3">Android 壳（Capacitor）接入已部署 Gateway，无需另起服务</li>
+        <li data-i18n="mb.1">响应式工作台：会话、附件、选模型，窄屏照样顺手</li>
+        <li data-i18n="mb.2">可选推送：自动化进度和待你审批的事，及时送达</li>
+        <li data-i18n="mb.3">Android 壳接入已部署系统，不用另起服务</li>
       </ul>
       <div class="phones reveal">
         <figure class="phone"><img src="assets/mobile.jpg" alt="手机端工作台实录" data-i18n-alt="alt.mobileWork" loading="lazy"></figure>
-        <figure class="phone"><img src="assets/demo-mobile-admin.gif" alt="手机端管理中心实录" data-i18n-alt="alt.mobileAdmin" loading="lazy" data-still="assets/still-mobile-admin.jpg"></figure>
+        <figure class="phone"><img src="assets/demo-mobile-admin.gif" alt="手机端管理后台实录" data-i18n-alt="alt.mobileAdmin" loading="lazy" data-still="assets/still-mobile-admin.jpg"></figure>
       </div>
     </div>
   </div>
@@ -505,20 +505,20 @@ html.js .reveal.on{opacity:1;transform:none}
     <div class="sec-head reveal">
       <span class="gnum" aria-hidden="true">08</span>
       <div class="idx">SEC.08 · QUICK START</div>
-      <h2 data-i18n="st.title">两条路：本机个人用，或 Gateway 团队用</h2>
+      <h2 data-i18n="st.title">两条路：先在自己机器上试，或给团队正式部署</h2>
     </div>
     <div class="paths">
       <div class="path reveal">
-        <h3><span class="n">A</span><span data-i18n="st.1t">个人 / 单机</span></h3>
-        <p data-i18n="st.1p">无需 Gateway 与 PostgreSQL，浏览器工作区 + 本地会话存储。</p>
-        <div class="step"><b>$</b> pnpm dsh --profile web</div>
-        <p class="terms" data-i18n="st.1s">→ 打开浏览器进入工作台，在 设置 → 模型 里配置 DeepSeek 或其他提供方密钥，选择工作区目录即可开始。</p>
+        <h3><span class="n">A</span><span data-i18n="st.1t">本机试用</span></h3>
+        <p data-i18n="st.1p">不需要数据库和管理后台：浏览器工作台 + 本地存储，适合先一个人体验。</p>
+        <div class="step"><b>$</b> pnpm install && pnpm run build<br><b>$</b> pnpm dsh web</div>
+        <p class="terms" data-i18n="st.1s">→ 浏览器自动打开工作台（默认 :3080）；在 设置 → 模型 里配好 DeepSeek 或其他模型服务的 Key，选择工作目录就能开始。</p>
       </div>
       <div class="path reveal">
-        <h3><span class="n">B</span><span data-i18n="st.2t">团队 / Gateway</span></h3>
-        <p data-i18n="st.2p">认证的项目边界：账号、个人空间、共享项目、模型治理、配额与审计。</p>
-        <div class="step"><b>$</b> pnpm dsh --profile gateway</div>
-        <p class="terms" data-i18n="st.2s">→ 生产部署按评估过的自托管责任对待；Linux systemd 提供更强隔离，macOS 适用于可信团队。</p>
+        <h3><span class="n">B</span><span data-i18n="st.2t">团队部署</span></h3>
+        <p data-i18n="st.2p">认证账号 + 共享项目 + 管理后台 + 审计。生产部署按仓库里的部署手册一步步走：PostgreSQL、构建产物、Linux systemd 或 macOS launchd、域名入口。</p>
+        <div class="step"><b>$</b> pnpm run build:production</div>
+        <p class="terms" data-i18n="st.2s">→ 随后按 gateway/deploy 部署手册配置数据库、凭据与系统服务；Linux 上每个工作环境跑在独立系统账号下，隔离更强。</p>
       </div>
     </div>
   </div>
@@ -528,20 +528,20 @@ html.js .reveal.on{opacity:1;transform:none}
   <div class="wrap">
     <div class="sec-head reveal">
       <span class="gnum" aria-hidden="true">09</span>
-      <div class="idx">SEC.09 · OPEN SOURCE</div>
-      <h2 data-i18n="os.title">站在 DeepSeek Harness 之上，独立演进</h2>
-      <p class="sub" data-i18n="os.sub">CoHarness 是独立衍生项目，不是上游换皮版。底层插件与运行时契约以 DeepSeek Harness / Cordis 为参照，自研并维护 Gateway、协作、管理、文档、部署与 Android 能力；与上游按行为选择性同步。</p>
+      <div class="idx">SEC.09 · OPEN &amp; SELF-HOSTED</div>
+      <h2 data-i18n="os.title">开源、自托管：代码和数据都在你手里</h2>
+      <p class="sub" data-i18n="os.sub">Apache-2.0。全部实现可审：管理后台、工作环境编排、文档与部署。所有数据落在自有基础设施——模型走你们自己的 Key，用量账本不记录密钥和聊天内容。</p>
     </div>
     <ul class="oss-list reveal">
-      <li data-i18n="os.1">全插件架构：一切都是插件，能力以 Service Definition / Provider / Consumer 接缝组合</li>
-      <li data-i18n="os.2">事件溯源会话：持久、可恢复、可分叉，会话数据遵循不可变代际规则</li>
-      <li data-i18n="os.3">中英双语文档与界面，VitePress 文档站随仓库投影</li>
-      <li data-i18n="os.4">TypeScript / Python SDK、JSON-RPC、ACP 自动化接入</li>
-      <li data-i18n="os.5">Android（Capacitor）壳可访问已部署的 Gateway</li>
-      <li data-i18n="os.6">数据主权：全部数据在自有基础设施上——BYOK 模型路由、账本不存密钥与对话内容</li>
-      <li data-i18n="os.7">Apache-2.0 开源许可证</li>
+      <li data-i18n="os.1">全插件化：平台能力由插件组合，团队可增可换</li>
+      <li data-i18n="os.2">完整操作记录：任务可恢复、可分叉、可复盘</li>
+      <li data-i18n="os.3">中英双语界面与文档，VitePress 文档站随仓库发布</li>
+      <li data-i18n="os.4">TypeScript / Python SDK 与自动化协议，接进你们自己的系统</li>
+      <li data-i18n="os.5">Android 壳可选，手机访问已部署系统</li>
+      <li data-i18n="os.6">数据主权：数据在你自己的基础设施上，模型用自己的 Key</li>
+      <li data-i18n="os.7">独立衍生自 DeepSeek Harness，保留上游版权与许可声明</li>
     </ul>
-    <div class="notice reveal" data-i18n="os.notice">预发布阶段：公开 API、配置、数据库结构与部署流程可能变化；暴露服务前请先阅读 SAFETY.md 与部署 runbook。</div>
+    <div class="notice reveal" data-i18n="os.notice">当前为预览阶段：对外接口、配置、数据库结构与部署流程可能还会调整；对外开放服务前，请先阅读仓库里的 SAFETY.md 与部署手册。</div>
   </div>
 </section>
 
@@ -550,7 +550,7 @@ html.js .reveal.on{opacity:1;transform:none}
     <div class="close-panel reveal">
       <svg class="mascot ffy" viewBox="0 0 64 64" fill="none" aria-hidden="true"><ellipse class="m-wing" cx="20" cy="26" rx="10.5" ry="5.5" transform="rotate(-28 20 26)"/><ellipse class="m-wing" cx="44" cy="20" rx="10.5" ry="5.5" transform="rotate(-36 44 20)"/><circle class="m-lamp-halo" cx="41" cy="44.5" r="13"/><circle class="m-dark" cx="29" cy="19" r="6.8"/><ellipse class="m-dark" cx="33.5" cy="30.5" rx="7" ry="10" transform="rotate(16 33.5 30.5)"/><ellipse cx="40" cy="44" rx="6.4" ry="7.2" transform="rotate(16 40 44)" fill="#ffd76a"/><circle cx="38.5" cy="42.5" r="1.8" fill="#fff" opacity=".85"/><circle class="m-spark" cx="52" cy="38.5" r="1.7"/><circle class="m-spark" cx="53.5" cy="47" r="1.3"/><circle class="m-spark" cx="47" cy="53.5" r="1.5"/><circle cx="26.6" cy="18.5" r="1.5" fill="#fff"/></svg>
       <h2 data-i18n="cl.title">读代码，就是审计它</h2>
-      <p class="sub" data-i18n="cl.sub">全部实现都在仓库里：Gateway、运行时编排、管理端、文档与部署。预发布阶段，欢迎从 issue 与 PR 开始。</p>
+      <p class="sub" data-i18n="cl.sub">管理后台、工作环境编排、文档与部署，全部在仓库里。预览阶段，欢迎 issue 与 PR。</p>
       <div class="cta-row">
         <a class="btn btn-p" href="https://github.com/jsjm1986/CoHarness" target="_blank" rel="noopener" data-i18n="cl.cta1">在 GitHub 查看</a>
         <a class="btn btn-g" href="#start" data-i18n="cl.cta2">回到快速开始</a>
@@ -561,7 +561,7 @@ html.js .reveal.on{opacity:1;transform:none}
 
 <footer>
   <div class="wrap foot-in">
-    <span>© 2026 CoHarness · <span data-i18n="ft.based">基于</span> <a href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noopener">DeepSeek Harness</a> / Cordis</span>
+    <span>© 2026 CoHarness · <span data-i18n="ft.based">衍生自</span> <a href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noopener">DeepSeek Harness</a></span>
     <div class="foot-links">
       <a href="https://github.com/jsjm1986/CoHarness" target="_blank" rel="noopener">GitHub</a>
       <a href="https://github.com/jsjm1986/CoHarness#readme" target="_blank" rel="noopener" data-i18n="ft.docs">文档</a>
@@ -573,106 +573,107 @@ html.js .reveal.on{opacity:1;transform:none}
 <script>
 const dict = {
   en: {
-    'nav.admin': 'Admin center', 'nav.runtime': 'Runtime model', 'nav.principles': 'Philosophy', 'nav.capabilities': 'Capabilities',
+    'nav.admin': 'Admin center', 'nav.runtime': 'How it runs', 'nav.principles': 'Philosophy', 'nav.capabilities': 'Capabilities',
     'nav.scenes': 'Scenarios', 'nav.screens': 'Interface', 'nav.mobile': 'Mobile', 'nav.start': 'Quick start', 'nav.oss': 'Open source', 'nav.menu': 'Menu',
+    'hero.kick': 'PREVIEW · BUILT FOR YOUR TEAM',
     'hero.title': 'Run your AI team <span class="hl">like a team</span>',
-    'hero.sub': 'CoHarness is a fully pluginized collaboration platform for small and mid-sized teams: admins govern users, projects, models, and cost from one admin center, while members share real work with agents on a single workbench — durable sessions, cross-session memory, documents, approvals, and delegation.',
+    'hero.sub': 'An AI collaboration platform for small and mid-sized teams. Admins govern accounts, projects, models, usage, and audit from one console; members and agents work side by side on one workbench — durable sessions, cross-task memory, every action on record, and work that can be handed over.',
     'hero.cta1': 'View on GitHub', 'hero.cta2': 'See the admin center',
     'hero.live': '<span><i class="g"></i>GATEWAY :8899 · READY</span><span><i class="g"></i>MEMBER :42000 · READY</span><span><i class="a"></i>PROJECT :42010 · STARTING</span>',
-    'hero.terms': 'APACHE-2.0 · SELF-HOSTED · THE LEDGER STORES NO KEYS OR CHAT CONTENT',
-    'hero.cap': 'LIVE CAPTURE · NOT A MOCKUP',
-    'map.gw': 'Gateway · auth / routing / ledger / audit', 'map.gws': 'GATEWAY',
-    'map.rt1': 'Member personal runtime', 'map.rt1s': 'one per member · own home · ro/rw grants',
-    'map.rt2': 'Project shared runtime', 'map.rt2s': 'one per project · cwd = project dir · suite',
-    'map.pj': 'Project space', 'map.pjs': 'one directory + one member list · visibility',
-    'ad.title': 'One /admin for every AI asset the team owns',
-    'ad.sub': 'The Gateway ships a complete admin surface: accounts and runtime lifecycles, model governance, usage and cost, audit and deployment — a small team does not need to assemble an ops back office.',
-    'ad.1t': 'Users & runtimes', 'ad.1p': 'Accounts, roles, sign-in state, and a dedicated Harness runtime per user — start, stop, and restart under your control.',
-    'ad.2t': 'Projects & membership', 'ad.2p': 'Admin- and member-created workspaces in one directory; ro/rw members, invitations, project-visible or creator-private conversations.',
-    'ad.3t': 'Model governance', 'ad.3p': 'One organization-wide Provider and model catalog, authorized per role, user, and project — pricing rules kept separate from personal BYOK registration.',
-    'ad.4t': 'Usage & cost', 'ad.4p': 'Token usage by user and project, cost estimates, quota alerts, and quota configuration — the ledger stores no API keys or conversation content.',
-    'ad.5t': 'Audit & operations', 'ad.5p': 'Audit records, deployment state, terminals, SSH, webhooks, desktops, and archives — the operational surface lives in the same admin.',
-    'ad.s2': 'Projects: admin/member-created workspaces with member counts', 'ad.s3': 'Model governance: assigning available models to members, live',
+    'hero.terms': 'APACHE-2.0 · OPEN &amp; SELF-HOSTED · THE USAGE LEDGER STORES NO KEYS OR CHAT CONTENT',
+    'hero.cap': 'LIVE DEPLOYMENT · NOT A MOCKUP',
+    'map.gw': 'Gateway · sign-in / routing / ledger / audit', 'map.gws': 'GATEWAY',
+    'map.rt1': 'Member workspace', 'map.rt1s': 'one per member · own directory · projects mapped by grant',
+    'map.rt2': 'Project workspace', 'map.rt2s': 'one per project · works in the project dir · team suite',
+    'map.pj': 'Project', 'map.pjs': 'one directory + one member list · visibility rules',
+    'ad.title': 'One console for every AI asset the team owns',
+    'ad.sub': 'AI tools scattered across individuals cannot be governed. CoHarness ships a complete admin console: who is using it, which models, at what cost, and what was done — visible and controlled in one place.',
+    'ad.1t': 'Accounts & workspaces', 'ad.1p': 'Member accounts, roles, sign-in state, and a dedicated AI workspace per person — start, stop, and restart under admin control.',
+    'ad.2t': 'Projects & membership', 'ad.2p': 'Admin- and member-created projects on one register; read-only or read-write members with invitations; project conversations visible to the whole project or just their creator.',
+    'ad.3t': 'Model governance', 'ad.3p': 'The company registers approved model providers and a model catalog, authorized per role, member, and project; members may also register their own keys — the two lanes never mix.',
+    'ad.4t': 'Usage & cost', 'ad.4p': 'Token usage and cost estimates per member and project, with quotas and alerts; the ledger records attribution only — no API keys or conversation content.',
+    'ad.5t': 'Audit & operations', 'ad.5p': 'Every administrative action is on record: who did what and when. Deployment state, terminals, SSH, webhooks, desktops, and archives live in the same console.',
+    'ad.s2': 'Projects: admin- and member-created workspaces with member counts', 'ad.s3': 'Model governance: assigning available models to members, live',
     'ad.s4': 'Usage: tokens, cost, quota alerts, and quota config', 'ad.s5': 'Audit: filter administrative records by event, user, and outcome',
-    'ad.s6': 'Steward space: admission rules and member grants for the resident ops channel',
+    'ad.s6': 'Steward channel: admission rules and member grants for the resident ops space',
     'ad.m1': 'USERS', 'ad.m2': 'PROJECTS', 'ad.m3': 'PLUGINS', 'ad.m4': 'MODELS', 'ad.m5': 'USAGE', 'ad.m6': 'DOCS', 'ad.m7': 'ARCHIVES',
     'ad.m8': 'TERMINALS', 'ad.m10': 'DEPLOY', 'ad.m11': 'STEWARD', 'ad.m13': 'DESKTOP', 'ad.m14': 'AUDIT',
-    'rt.title': 'How runtimes map: a personal runtime per member, a shared runtime per project',
-    'rt.sub': 'The Gateway manages two kinds of instances: one personal runtime per user for their private space, and one shared runtime per project for collaboration — both launched on demand and reaped when idle.',
-    'rt.1t': 'One personal runtime per member', 'rt.1p': 'Each user gets a dedicated dsh web process, its own port, and its own home directory (the process cwd and $HOME) — personal sessions, memory, and documents land under that member’s own directory; directory grants also project the member’s project directories in with their ro/rw mode.',
-    'rt.2t': 'One shared runtime per project', 'rt.2p': 'A project runtime uses the project directory itself as cwd and home, and mounts the collaboration suite plus project-scoped memory at launch — members continue in one shared environment: sessions, project memory, and documents belong to the project, not to per-member copies.',
-    'rt.3t': 'On-demand start, idle reaping', 'rt.3p': 'Both kinds carry a starting / ready / stopping / stopped lifecycle: idle runtimes stop automatically and relaunch on activity; a manual stop is never implicitly revived; the steward space stays resident.',
-    'rt.4t': 'Three permission presets + path-level authorization', 'rt.4p': 'Runtimes mount read-only / workspace-write / danger-full-access presets; sessions authorize by exact cwd plus participant-readable filtering, and conversation visibility is project-shared or creator-private; a project path may not overlap any user directory.',
-    'rt.5t': 'Pluggable platform backend', 'rt.5p': 'Local spawn in development; Linux production runs systemd user units with dedicated system accounts (harness-&lt;user&gt; for members, a separate account for project runtimes) and TemporaryFileSystem masking — an ordinary project runtime sees only its project directory.',
-    'pr.title': 'The unit of collaboration is shared work, not a shared chat link',
-    'pr.sub': 'A project holds a continuing agent environment, participant contributions, delegation relationships, pending decisions, and recoverable progress — the work survives a closed browser or a stopped agent.',
-    'pr.1t': 'Assembled, not prescribed', 'pr.1p': 'Models, tools, roles, context, permissions, delegation paths, and workflows compose through plugins, profiles, and bundles — fitted to how the team actually works.',
-    'pr.2t': 'Delegation with boundaries', 'pr.2p': 'A primary agent delegates part of the work to a specialist with a clear relationship, scope, and responsibility — children never silently inherit every capability or permission.',
-    'pr.3t': 'Human judgment is first-class', 'pr.3p': 'An approval authorizes a controlled action; a question supplies business judgment. One valid participant claims a pending decision, and the result joins the common history.',
-    'pr.4t': 'Practices that compound', 'pr.4p': 'A proven delegation pattern, review step, context source, or tool policy becomes the team’s next plugin, skill, profile, bundle, or workflow.',
+    'rt.title': 'How the AI works: a private desk per member, a shared desk per project',
+    'rt.sub': 'Every member gets an AI workspace of their own for personal tasks; every project gets a shared AI workspace for the team — both sleep when idle and wake on demand.',
+    'rt.1t': 'One workspace per member', 'rt.1p': 'Each member gets a dedicated AI workspace and data directory — personal sessions, memory, and documents stay under that member’s own name; project directories they belong to map in with their read-only or read-write grants.',
+    'rt.2t': 'One shared workspace per project', 'rt.2p': 'A project workspace works directly inside the project directory, with the collaboration suite and project memory built in — members continue in one shared environment: sessions, project memory, and documents belong to the project, not to per-member copies.',
+    'rt.3t': 'Wakes on demand, sleeps when idle', 'rt.3p': 'Both kinds carry a clear starting / ready / stopping / stopped lifecycle: idle workspaces sleep to save resources and wake on activity; one an admin stops is never quietly revived; the ops channel stays resident.',
+    'rt.4t': 'Three permission tiers + directory-level grants', 'rt.4p': 'Workspaces mount read-only, workspace-write, or full-access tiers; sessions authorize by exact directory and filter out what a participant may not see; a project directory may not overlap any member’s personal directory.',
+    'rt.5t': 'Real isolation on the server', 'rt.5p': 'In development, processes run locally; on Linux in production every workspace runs under its own system account with filesystem isolation — an ordinary project workspace sees only its own project directory.',
+    'pr.title': 'The unit of collaboration is shared work, not a forwarded chat link',
+    'pr.sub': 'A project remembers the running AI workspace, each participant’s contribution, delegation relationships, pending approvals, and recoverable progress — close the browser or stop an agent, and the work stays put.',
+    'pr.1t': 'Assembled your way, not a fixed pipeline', 'pr.1p': 'Which models, which tools the AI gets, who may approve what, and how work is delegated all compose through plugins and configuration — fitted to how the team actually works.',
+    'pr.2t': 'Delegation with boundaries', 'pr.2p': 'A primary agent can hand part of the job to a specialist — with a defined scope and responsibility. Subtasks never quietly inherit full permissions, and their internal detail does not flood the parent task.',
+    'pr.3t': 'Human judgment is first-class work', 'pr.3p': 'An approval authorizes a controlled action; a question supplies the business judgment the AI lacks. In a shared project one authorized participant claims a pending decision, and the outcome joins the common history — no competing answers.',
+    'pr.4t': 'Good practice becomes an asset', 'pr.4p': 'A proven delegation pattern, review step, context source, or tool policy solidifies into the team’s next plugin, skill, or workflow — ready to reuse.',
     'cap.title': 'The full people-and-agent loop, covered',
     'cap.sub': 'Everything below is implemented in the current codebase.',
-    'cap.1t': 'Agent runtime', 'cap.1p': 'Cordis plugin runtime with event-sourced sessions: durable resume/fork, model requests, approvals, questions, plans, goals, todos, jobs, workflows, compaction, telemetry.',
-    'cap.2t': 'Tools & execution', 'cap.2p': 'Workspace filesystem tools, image reading, shell and persistent terminal sessions, LSP, web search/fetch, skills, structured attachments, sandbox and directory policies.',
-    'cap.3t': 'Cross-session memory', 'cap.3p': 'Personal, workspace, and project scopes: profile, guidance, background, and resource entries injected as a bounded catalog each session — searchable and revisioned.',
-    'cap.4t': 'Session history recall', 'cap.4p': 'The model can search, trace, and read earlier sessions it is authorized to see, and produce a continue-here handoff brief — past work becomes usable context.',
-    'cap.5t': 'Documents', 'cap.5p': 'Named user documents: upload/download, attach-to-conversation, scope-aware browsing, cross-scope copies, snapshot lineage, and operation history.',
-    'cap.6t': 'Subagent teams', 'cap.6p': 'Durable child-agent sessions with explicit delegation relationships — resumable collaborators whose selected reports flow back to the parent task.',
-    'cap.7t': 'Automation', 'cap.7p': 'Timer- and trigger-driven automation: scheduled tasks, goals, and background execution keep work moving after the browser closes.',
-    'cap.8t': 'Web UI', 'cap.8p': 'Responsive browser app: sessions and live history, model selection, command and @ suggestions, attachments, permissions, goals, jobs, settings, zh/en localization, themes.',
-    'cap.9t': 'MCP & extensions', 'cap.9p': 'An MCP client brings external tool services in; Claude Code / Codex hook bridges connect existing workflows; plugin catalogs and bundles keep extending the surface.',
-    'cap.10t': 'Security & credentials', 'cap.10p': 'Credential references keep secrets out of logs; sandbox policies, directory grants, approvals, and permission presets pin down what may happen on every execution.',
-    'cap.11t': 'Many entry points', 'cap.11p': 'Headless runs, JSON-RPC, the ACP automation protocol, TypeScript / Python SDKs, SSH execution targets, and outbound webhooks.',
-    'cap.12t': 'Voice & attachments', 'cap.12p': 'Voice-input transcription, image reading, structured attachments, and user documents attached to sessions — input is more than a keyboard.',
+    'cap.1t': 'AI workspaces', 'cap.1p': 'A plugin-composed runtime with every action on record: tasks pause, resume, and fork; model requests, approvals, plans, goals, todos, background jobs, scheduled reminders, workflows, and usage telemetry included.',
+    'cap.2t': 'Tools & execution', 'cap.2p': 'Read and write files, run commands and persistent terminals, inspect code, search the web, invoke skills, accept image and document attachments — with sandbox and directory policies underneath.',
+    'cap.3t': 'Cross-task memory', 'cap.3p': 'Personal, workspace, and project memory: the AI remembers team profiles, working agreements, and background material — carried into each new task automatically, searchable and revisable.',
+    'cap.4t': 'Session history recall', 'cap.4p': 'The AI can search and read past sessions it is authorized to see, then produce a pick-up-here handoff brief — yesterday’s work becomes today’s context.',
+    'cap.5t': 'Documents', 'cap.5p': 'Team documents upload once, file by scope, and join conversations directly — with version lineage and operation history.',
+    'cap.6t': 'Specialist agents', 'cap.6p': 'Long-running expert agents with explicit relationships: resumable after interruptions, available for follow-ups, reporting back only what the parent task selects.',
+    'cap.7t': 'Automation', 'cap.7p': 'Timer- and trigger-driven background jobs: plans, goals, and autonomous execution keep working after the browser closes.',
+    'cap.8t': 'Web workbench', 'cap.8p': 'Straight from the browser: sessions and history, model selection, attachments, permissions, jobs, and settings — bilingual, light and dark themes.',
+    'cap.9t': 'Integration & extension', 'cap.9p': 'A plugin catalog keeps extending the surface; MCP brings external tool services in, and bridges connect existing Claude Code and Codex workflows.',
+    'cap.10t': 'Security & credentials', 'cap.10p': 'API keys work through credential references and never reach the logs; sandboxing, directory grants, approvals, and permission tiers pin down what the AI may do on every run.',
+    'cap.11t': 'Many entry points', 'cap.11p': 'Batch tasks from the CLI, TypeScript / Python SDKs, JSON-RPC, the ACP automation protocol, SSH remote targets, and outbound webhooks.',
+    'cap.12t': 'Voice & attachments', 'cap.12p': 'Voice input transcription, image reading, and document or session attachments — input is more than a keyboard.',
     'sc2.title': 'One platform, from daily operations to engineering',
-    'sc2.sub': 'These are the real project shapes running on our own deployment.',
-    'sc2.1t': 'Content & social-media operations', 'sc2.1p': 'Topic, copy, asset, and post-mortem pipelines — memory keeps the agent on the brand voice and style rules.',
-    'sc2.2t': 'Customer service & DMs', 'sc2.2p': 'Support projects share one runtime: knowledge documents on file, conversations on record, members and agents handing off in the same history.',
-    'sc2.3t': 'Monitoring & patrol assistants', 'sc2.3p': 'Scheduled monitoring rounds produce anomaly digests and recorded reports; webhooks push results into the team’s existing systems.',
-    'sc2.4t': 'Engineering & internal tools', 'sc2.4p': 'Plugin development, prompt-combination tools, image generation — the team’s AI projects get managed, metered, and audited inside one boundary.',
-    'sc.title': 'The workbench members see',
+    'sc2.sub': 'These are real project shapes running on our own deployment.',
+    'sc2.1t': 'Content & social-media operations', 'sc2.1p': 'Topic, copy, asset, and post-mortem pipelines — the AI keeps the brand voice and style rules in memory.',
+    'sc2.2t': 'Customer service & DMs', 'sc2.2p': 'Support projects share one workspace: knowledge documents on file, conversations on record, people and AI handing off in the same history.',
+    'sc2.3t': 'Monitoring & patrol', 'sc2.3p': 'Scheduled patrols produce anomaly digests and recorded reports; webhooks push results into the team’s existing systems.',
+    'sc2.4t': 'Engineering & internal tools', 'sc2.4p': 'Plugin development, prompt tooling, image generation — the team’s AI projects get managed, metered, and audited inside one boundary.',
+    'sc.title': 'The workbench members see every day',
     'sc.sub': 'Every capture below is from a live CoHarness instance — not a mockup.',
     'sc.0': 'Conversation: model replies, tool-call summaries, token stats, and model selection',
-    'sc.1': 'Memory demo: the model calls memory_search / memory_save; entries land on the timeline in real time',
+    'sc.1': 'Memory demo: the AI calls memory_search / memory_save; entries land on the timeline in real time',
     'sc.2': 'Memory sidebar: personal / workspace / project scopes, search, a day-grouped timeline',
-    'sc.3': 'Plugins (recorded): official plugin toggles and configuration in one place',
+    'sc.3': 'Plugins: official plugin toggles and configuration in one place',
     'sc.4': 'Documents: scope-aware browsing, recycle bin, uploads and folders',
     'sc.5': 'Automation: timer- and trigger-driven background work',
     'sc.6': 'Model settings: the model catalog and providers available to members',
     'sc.7': 'Workbench: new session, workspace, and mode entries',
-    'sc.8': 'Project settings: theme policy, runtime, members, and model entries',
+    'sc.8': 'Project settings: theme policy, workspace, members, and model entries',
     'mb.title': 'A complete workbench on the phone',
-    'mb.sub': 'The same web application adapts to phones: reach a deployed Gateway from any browser, or use the optional Android (Capacitor) shell.',
-    'mb.1': 'Responsive workbench: sessions, attachments, and model selection stay usable on narrow screens',
-    'mb.2': 'Optional push notifications keep automation and pending decisions arriving on time',
-    'mb.3': 'The Android (Capacitor) shell connects to an already-deployed Gateway — no extra service needed',
-    'st.title': 'Two paths: local personal use, or a Gateway for the team',
-    'st.1t': 'Personal / single machine', 'st.1p': 'No Gateway or PostgreSQL — a browser workspace with local session storage.',
-    'st.1s': '→ Open the workbench, configure a DeepSeek or other provider key under Settings → Models, pick a workspace directory, and start.',
-    'st.2t': 'Team / Gateway', 'st.2p': 'An authenticated project boundary: accounts, personal spaces, shared projects, model governance, quotas, and audit.',
-    'st.2s': '→ Treat production deployment as an evaluated self-hosting responsibility; Linux systemd provides stronger isolation, macOS suits trusted teams.',
-    'os.title': 'Built on DeepSeek Harness, evolved independently',
-    'os.sub': 'CoHarness is an independent derivative project, not a rebranded upstream release. Runtime contracts follow DeepSeek Harness / Cordis, while the Gateway, collaboration, administration, documents, deployment, and Android capabilities are owned here; upstream sync is selective and behavior-based.',
-    'os.notice': 'Pre-release: public APIs, configuration, database schemas, and deployment procedures may change. Read SAFETY.md and the deployment runbook before exposing a service.',
-    'os.1': 'Fully pluginized: everything is a plugin; capabilities compose as Service Definition / Provider / Consumer seams',
-    'os.2': 'Event-sourced sessions: durable, resumable, forkable, under immutable-generation rules',
-    'os.3': 'Bilingual zh/en docs and UI; a VitePress documentation site projects from the repository',
-    'os.4': 'TypeScript / Python SDKs, JSON-RPC, and ACP automation entry points',
-    'os.5': 'An Android (Capacitor) shell reaches an already-deployed Gateway',
-    'os.6': 'Data sovereignty: everything lives on your own infrastructure — BYOK model routes, and the ledger stores no keys or conversation content',
-    'os.7': 'Released under the Apache-2.0 license',
-    'cl.title': 'The code is the audit',
-    'cl.sub': 'Everything lives in the repository: the Gateway, runtime orchestration, the admin surface, docs, and deployment. Pre-release — issues and PRs welcome.',
+    'mb.sub': 'The same web application adapts to phones: reach a deployed system from any browser, or use the optional Android shell — push notifications available.',
+    'mb.1': 'Responsive workbench: sessions, attachments, and model selection stay comfortable on narrow screens',
+    'mb.2': 'Optional push keeps automation progress and pending approvals arriving on time',
+    'mb.3': 'The Android shell connects to an already-deployed system — no extra service needed',
+    'st.title': 'Two paths: try it on your own machine, or deploy it for the team',
+    'st.1t': 'Try locally', 'st.1p': 'No database or admin console needed: a browser workbench with local storage — good for a first personal look.',
+    'st.1s': '→ The browser opens the workbench automatically (default :3080). Add a DeepSeek or other provider key under Settings → Models, pick a working directory, and start.',
+    'st.2t': 'Deploy for the team', 'st.2p': 'Authenticated accounts + shared projects + the admin console + audit. Production deployment follows the repository runbook step by step: PostgreSQL, built artifacts, Linux systemd or macOS launchd, and a domain entry.',
+    'st.2s': '→ Then follow the gateway/deploy runbook to configure the database, credentials, and system services; on Linux every workspace runs under its own system account for stronger isolation.',
+    'os.title': 'Open source &amp; self-hosted: the code and the data stay with you',
+    'os.sub': 'Apache-2.0. Everything is auditable: the admin console, workspace orchestration, docs, and deployment. All data lives on your own infrastructure — models run on your own keys, and the usage ledger stores no keys or conversation content.',
+    'os.notice': 'Preview stage: public interfaces, configuration, database schemas, and deployment procedures may still change. Read SAFETY.md and the deployment runbook in the repository before opening a service to others.',
+    'os.1': 'Fully pluginized: platform capabilities compose from plugins the team can add or swap',
+    'os.2': 'Every action on record: tasks resume, fork, and replay for review',
+    'os.3': 'Bilingual UI and docs; a VitePress documentation site ships with the repository',
+    'os.4': 'TypeScript / Python SDKs and automation protocols to plug into your own systems',
+    'os.5': 'Optional Android shell for reaching a deployed system from phones',
+    'os.6': 'Data sovereignty: data on your own infrastructure, models on your own keys',
+    'os.7': 'Independently derived from DeepSeek Harness, with upstream copyright and license notices preserved',
+    'cl.title': 'Reading the code is the audit',
+    'cl.sub': 'The admin console, workspace orchestration, docs, and deployment all live in the repository. Preview stage — issues and PRs welcome.',
     'cl.cta1': 'View on GitHub', 'cl.cta2': 'Back to quick start',
-    'ft.based': 'built on', 'ft.docs': 'Docs', 'ft.safety': 'Safety notice',
-    'alt.adminUsers': 'Admin center: users and runtimes, live capture', 'alt.adminProjects': 'Admin center: project directory, live capture',
-    'alt.memberModels': 'Assigning available models to a member, live recording', 'alt.adminUsage': 'Admin center: usage and cost, live capture',
-    'alt.audit': 'Filtering the audit stream by event, user, and outcome, live recording', 'alt.steward': 'Steward space admission and member grants, live recording',
+    'ft.based': 'derived from', 'ft.docs': 'Docs', 'ft.safety': 'Safety notice',
+    'alt.adminUsers': 'Admin console: users and workspaces, live capture', 'alt.adminProjects': 'Admin console: project register, live capture',
+    'alt.memberModels': 'Assigning available models to a member, live recording', 'alt.adminUsage': 'Admin console: usage and cost, live capture',
+    'alt.audit': 'Filtering the audit stream by event, user, and outcome, live recording', 'alt.steward': 'Steward channel admission and member grants, live recording',
     'alt.workbench': 'Workbench: new session, workspace, and mode entries, live recording', 'alt.conversation': 'Conversation view with model replies and tool summaries, live capture',
     'alt.memory': 'memory_search / memory_save calls landing on the timeline, live recording', 'alt.memoryPanel': 'Memory sidebar across scopes, live capture',
     'alt.plugins': 'Plugins page: official plugin toggles and configuration, live recording', 'alt.documents': 'Document management across scopes, live capture',
-    'alt.projectSettings': 'Project settings: theme, runtime, members, models, live recording', 'alt.automation': 'Automation: timers and triggers, live capture',
-    'alt.models': 'Model settings: the catalog and providers, live capture', 'alt.mobileWork': 'Mobile workbench, live capture', 'alt.mobileAdmin': 'Mobile admin center, live recording',
+    'alt.projectSettings': 'Project settings: theme, workspace, members, models, live recording', 'alt.automation': 'Automation: timers and triggers, live capture',
+    'alt.models': 'Model settings: the catalog and providers, live capture', 'alt.mobileWork': 'Mobile workbench, live capture', 'alt.mobileAdmin': 'Mobile admin console, live recording',
   }
 }
 const zh = {}
