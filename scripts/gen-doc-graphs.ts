@@ -162,6 +162,21 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Shares profile package operations with the CLI and reports persisted and running state to Web and agent callers.',
   },
   {
+    key: 'pluginManagerCatalog',
+    pkg: 'plugin-manager',
+    title: 'Authorized plugin-management catalog',
+    mode: 'service',
+    consumers: ['client-ui-plugin-manager'],
+    note: 'Projects profile availability, bundles and optional Runtime entry metadata for Web management without a second cache or mutation owner.',
+  },
+  {
+    key: 'resourceBudget',
+    pkg: 'resource-budget',
+    title: 'Execution reservation interface',
+    mode: 'service',
+    note: 'Declares acquisition and quiescent-release obligations; the abstract definition requires a concrete provider before it can admit execution.',
+  },
+  {
     key: 'pluginMarket',
     pkg: 'plugin-market',
     title: 'Plugin market index reader',

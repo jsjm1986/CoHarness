@@ -59,7 +59,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-file-upload` | no | Agent-scoped browser file upload, streaming intake, and staged receipt service |
 | `@deepseek-ai/dsh-client-hmr` | yes | Dev-only hot-reload driver for script-loaded client entries: SSE rebuilt frames → invalidate/prefetch → fiber swap through the vendored Loader entry |
 | `@deepseek-ai/dsh-client-locale` | no | Locale plugin: Host-backed language preference, external language packs, fallback chains, snapshots, and typed namespace dictionaries |
-| `@deepseek-ai/dsh-client-modules` | no | Client module system, dual-face: node half composes the __DSH_BOOT__ entry graph (incremental dsh.client scan, bundle route, index tap, webPlugins service); browser half is the lazy-CJS module table the vendored cordis Loader consumes as its internal seam |
+| `@deepseek-ai/dsh-client-modules` | yes | Client module system, dual-face: node half composes the __DSH_BOOT__ entry graph (incremental dsh.client scan, bundle route, index tap, webPlugins service); browser half is the lazy-CJS module table the vendored cordis Loader consumes as its internal seam |
 | `@deepseek-ai/dsh-client-runtime` | no | Client core services: SlotRegistry, SessionRuntime (scope tree + object layer) |
 | `@deepseek-ai/dsh-client-shortcuts` | yes | Application keyboard command registry and physical-key routing |
 | `@deepseek-ai/dsh-client-ui-agent-preset` | no | Agent-preset surfaces: the default for later sessions, this session's seat, and the composition editor |
@@ -133,7 +133,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-agent-instructions` | yes | Workspace context loader for AGENTS.md/CLAUDE.md instruction files |
 | `@deepseek-ai/dsh-archive-gateway` | yes | Synchronizes runtime conversation archive state with the Gateway |
 | `@deepseek-ai/dsh-collaboration-context` | no | Durable participant attribution for shared project conversations |
-| `@deepseek-ai/dsh-collaboration-gateway` | no | Gateway-backed project collaboration provider for DeepSeek Harness |
+| `@deepseek-ai/dsh-collaboration-gateway` | no | Gateway-backed project collaboration provider for CoHarness |
 | `@deepseek-ai/dsh-file-reference-local` | yes | Local-filesystem ctx.fileReferences provider with bounded fuzzy indexes |
 | `@deepseek-ai/dsh-gateway-execution` | yes | Gateway-verified execution participants and live authorization for managed agents |
 | `@deepseek-ai/dsh-gateway-runtime` | no | Authenticated Gateway request context and internal runtime transport for DeepSeek Harness |
@@ -372,7 +372,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 |---|---|---|
 | `@deepseek-ai/dsh-session-checkpoint-policy` | no | Semantic session durability checkpoints before model requests and tool side effects |
 | `@deepseek-ai/dsh-session-log-deepseek` | yes | Incremental lossless session-log request extension for the official DeepSeek LLM API |
-| `@deepseek-ai/dsh-session-persistence-gateway` | yes | Gateway PostgreSQL session persistence provider for DeepSeek Harness |
+| `@deepseek-ai/dsh-session-persistence-gateway` | yes | Gateway PostgreSQL session persistence provider for CoHarness |
 | `@deepseek-ai/dsh-session-persistence-jsonl` | yes | JSONL durable session persistence backend for the DeepSeek Harness |
 | `@deepseek-ai/dsh-session-persistence-sqlite` | yes | SQLite durable session persistence with physical chunk-row packing |
 | `@deepseek-ai/dsh-session-projection` | no | Session-projection seam: the merge-extensible projection type table, the provider contract, and the ctx.sessionProjections registry serving whole current values of log-derived per-session state |
