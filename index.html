@@ -217,6 +217,7 @@ h1 .hl{background:linear-gradient(transparent 64%,rgba(37,71,224,.17) 64%,rgba(3
 
 /* footer */
 footer{border-top:1px solid var(--line);padding:34px 0;color:var(--faint);font-size:13.5px}
+.foot-note{font:11.5px var(--mono);letter-spacing:.03em;color:var(--faint);margin:0 0 18px}
 .foot-in{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}
 .foot-links{display:flex;gap:22px}
 .foot-links a{color:var(--sub);min-height:44px;display:inline-flex;align-items:center;text-decoration:none}
@@ -315,7 +316,7 @@ html.js .reveal.on{opacity:1;transform:none}
   <div class="wrap hero-in">
     <div>
       <h1 data-i18n="hero.title">把 AI 团队，<span class="hl">管成一个团队</span></h1>
-      <p class="lead" data-i18n="hero.sub">企业 AI 化不是多开几个账号，是让 AI 真正进入协作。CoHarness 给团队一套权限分级的共享工作空间：每人一个独立环境、每个项目一个共享环境，能力由插件组合；模型、用量与每一次操作都走企业级的权限与审计。这套方案，我们自己团队每天都在用。</p>
+      <p class="lead" data-i18n="hero.sub">企业 AI 化不是多开几个账号，是让 AI 真正进入协作。CoHarness 给团队一套权限分级的共享工作空间：每人一个独立环境、每个项目一个共享环境，能力由插件组合；模型、用量与每一次操作都走企业级的权限与审计。</p>
       <div class="cta-row">
         <a class="btn btn-p" href="https://github.com/jsjm1986/CoHarness" target="_blank" rel="noopener" data-i18n="hero.cta1">在 GitHub 查看</a>
         <a class="btn btn-g" href="#admin" data-i18n="hero.cta2">看看管理后台</a>
@@ -328,7 +329,7 @@ html.js .reveal.on{opacity:1;transform:none}
         <div class="winbar"><i></i><i></i><i></i><span class="url">gateway:8899/admin</span></div>
         <img src="assets/admin-users.jpg" alt="管理后台用户与工作环境页实录" data-i18n-alt="alt.adminUsers">
       </div>
-      <div class="wincap"><span data-i18n="hero.cap">我们团队真实在用的部署 · 不是效果图</span><span class="cap-r">ADMIN CENTER</span></div>
+      <div class="wincap"><span data-i18n="hero.cap">真实部署环境 · 不是效果图</span><span class="cap-r">ADMIN CENTER</span></div>
     </div>
   </div>
 </header>
@@ -566,12 +567,15 @@ html.js .reveal.on{opacity:1;transform:none}
 </section>
 
 <footer>
-  <div class="wrap foot-in">
+  <div class="wrap">
+    <p class="foot-note" data-i18n="ft.note">本项目由 CoHarness 多人协作开发 · DOGFOODED BY THE TEAM</p>
+    <div class="foot-in">
     <span>© 2026 CoHarness · <span data-i18n="ft.based">衍生自</span> <a href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noopener">DeepSeek Harness</a></span>
     <div class="foot-links">
       <a href="https://github.com/jsjm1986/CoHarness" target="_blank" rel="noopener">GitHub</a>
       <a href="https://github.com/jsjm1986/CoHarness#readme" target="_blank" rel="noopener" data-i18n="ft.docs">文档</a>
       <a href="https://github.com/jsjm1986/CoHarness/blob/master/SAFETY.md" target="_blank" rel="noopener" data-i18n="ft.safety">安全须知</a>
+    </div>
     </div>
   </div>
 </footer>
@@ -583,11 +587,11 @@ const dict = {
     'nav.scenes': 'Scenarios', 'nav.screens': 'Interface', 'nav.mobile': 'Mobile', 'nav.start': 'Quick start', 'nav.oss': 'Open source', 'nav.menu': 'Menu',
     'hero.kick': '',
     'hero.title': 'Run your AI team <span class="hl">like a team</span>',
-    'hero.sub': 'Enterprise AI adoption isn\u2019t about more AI accounts — it\u2019s about bringing AI into real collaboration. CoHarness gives a team permission-tiered shared workspaces: a private environment per member, a shared one per project, capabilities assembled from plugins, and enterprise-grade governance over models, usage, and every action. Our own team collaborates on it every day.',
+    'hero.sub': 'Enterprise AI adoption isn\u2019t about more AI accounts — it\u2019s about bringing AI into real collaboration. CoHarness gives a team permission-tiered shared workspaces: a private environment per member, a shared one per project, capabilities assembled from plugins, and enterprise-grade governance over models, usage, and every action.',
     'hero.cta1': 'View on GitHub', 'hero.cta2': 'See the admin center',
     'hero.live': '<span><i class="g"></i>GATEWAY :8899 · READY</span><span><i class="g"></i>MEMBER :42000 · READY</span><span><i class="a"></i>PROJECT :42010 · STARTING</span>',
     'hero.terms': 'PREVIEW · APACHE-2.0 · OPEN &amp; SELF-HOSTED · THE USAGE LEDGER STORES NO KEYS OR CHAT CONTENT',
-    'hero.cap': 'OUR TEAM\u2019S REAL DEPLOYMENT · NOT A MOCKUP',
+    'hero.cap': 'REAL DEPLOYMENT · NOT A MOCKUP',
     'map.gw': 'Gateway · sign-in / routing / ledger / audit', 'map.gws': 'GATEWAY',
     'map.rt1': 'Member workspace', 'map.rt1s': 'one per member · own directory · projects mapped by grant',
     'map.rt2': 'Project workspace', 'map.rt2s': 'one per project · works in the project dir · team suite',
@@ -675,6 +679,7 @@ const dict = {
     'cl.sub': 'The admin console, workspace orchestration, docs, and deployment all live in the repository. Preview stage — issues and PRs welcome.',
     'cl.cta1': 'View on GitHub', 'cl.cta2': 'Back to quick start',
     'ft.based': 'derived from', 'ft.docs': 'Docs', 'ft.safety': 'Safety notice',
+    'ft.note': 'Built with CoHarness multi-party collaboration · DOGFOODED BY THE TEAM',
     'alt.adminUsers': 'Admin console: users and workspaces, live capture', 'alt.adminProjects': 'Admin console: project register, live capture',
     'alt.memberModels': 'Assigning available models to a member, live recording', 'alt.adminUsage': 'Admin console: usage and cost, live capture',
     'alt.audit': 'Filtering the audit stream by event, user, and outcome, live recording', 'alt.steward': 'Steward channel admission and member grants, live recording',
