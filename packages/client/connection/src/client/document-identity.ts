@@ -1,8 +1,11 @@
 /** Decode the authenticated HTML input used only to pin one browser document's requests. */
 import type { ClientRuntimeTarget } from '@deepseek-ai/dsh-host-apiproxy/api'
 
-interface DocumentIdentity {
+/** Account and initial Runtime authenticated by the current HTML response. */
+export interface ConnectionDocumentIdentity {
+  /** Authenticated Gateway account; used only to pin requests and namespace browser state. */
   readonly principalId: number
+  /** Runtime selected by this HTML response, independently of later scope-cookie changes. */
   readonly runtimeTarget: ClientRuntimeTarget
 }
 
@@ -20,7 +23,7 @@ function positiveId(value: unknown): value is number {
  * @returns a detached identity for the connection fence, or undefined when the page supplied none.
  * @throws when present input has an unsupported version or invalid fields.
  */
-export function parseDocumentIdentity(value: unknown): DocumentIdentity | undefined {
+export function parseDocumentIdentity(value: unknown): ConnectionDocumentIdentity | undefined {
   if (value === undefined) return undefined
   if (!record(value) || value.version !== 1 || !positiveId(value.principalId)
     || Object.keys(value).some(key => !['version', 'principalId', 'runtimeTarget'].includes(key))) {

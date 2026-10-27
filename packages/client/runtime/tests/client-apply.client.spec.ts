@@ -99,6 +99,67 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 describe('runtime client apply', () => {
+  it.each([
+    { principalId: 7, runtimeTarget: { kind: 'personal' } as const, suffix: '7.personal', sessionId: 'personal-seven' },
+    { principalId: 7, runtimeTarget: { kind: 'project', projectId: 42 } as const, suffix: '7.project-42', sessionId: 'project-seven' },
+    { principalId: 8, runtimeTarget: { kind: 'personal' } as const, suffix: '8.personal', sessionId: 'personal-eight' },
+  ])('restores only account/Runtime $suffix while its baseline is pending', async ({ principalId, runtimeTarget, suffix, sessionId }) => {
+    const storage = new Map([
+      ['dsh.sessions.current', JSON.stringify({ sessionId: 'legacy-other-space' })],
+      ['dsh.sessions.current.v2.7.personal', JSON.stringify({ sessionId: 'personal-seven' })],
+      ['dsh.sessions.current.v2.7.project-42', JSON.stringify({ sessionId: 'project-seven' })],
+      ['dsh.sessions.current.v2.8.personal', JSON.stringify({ sessionId: 'personal-eight' })],
+    ])
+    const before = new Map(storage)
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+    })
+    let bench: Bench | undefined
+    const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    try {
+      bench = await mount({ documentIdentity: { principalId, runtimeTarget } })
+      bench.api.onList = () => list.promise
+      bench.api.onHistory = () => history.promise
+      bench.ctx.on('connection/reset', () => { bench?.ctx.get('sessions')!.beginNavigation() })
+      bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true, runtimeTarget })
+      expect(bench.api.callsOf('session.history')).toEqual([{ sessionId, maxMessages: 50, detail: 'conversation' }])
+      expect(bench.api.callsOf('session.list')).toHaveLength(1)
+      expect(bench.ctx.get('sessions')!.list.getSnapshot().current).toBeUndefined()
+      for (const [key, value] of before) {
+        if (key !== `dsh.sessions.current.v2.${suffix}`) expect(storage.get(key)).toBe(value)
+      }
+    } finally {
+      list.resolve(ok({ items: [] }))
+      history.resolve(ok({ events: [], hasMore: false }))
+      try { await bench?.ctx.fiber.dispose() }
+      finally { vi.unstubAllGlobals() }
+    }
+  })
+
+  it('leaves an unscoped saved selection untouched on the first authenticated space visit', async () => {
+    const saved = JSON.stringify({ sessionId: 'another-space' })
+    const storage = new Map([['dsh.sessions.current', saved]])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+    })
+    let bench: Bench | undefined
+    const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+    try {
+      bench = await mount({ documentIdentity: { principalId: 7, runtimeTarget: { kind: 'personal' } } })
+      bench.api.onList = () => list.promise
+      bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true, runtimeTarget: { kind: 'personal' } })
+      expect(bench.api.callsOf('session.history')).toHaveLength(0)
+      expect(storage.get('dsh.sessions.current')).toBe(saved)
+    } finally {
+      list.resolve(ok({ items: [] }))
+      try { await bench?.ctx.fiber.dispose() }
+      finally { vi.unstubAllGlobals() }
+    }
+  })
+
   it('marks only the first connection reset as initial, including for late subscribers', async () => {
     const bench = await mount()
     const initial: (boolean | undefined)[] = []

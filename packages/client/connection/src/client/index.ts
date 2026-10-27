@@ -4,7 +4,9 @@
  * controller with its sinks.
  */
 import { createBrowserIdentityFence, type BrowserIdentityFence } from './identity-fence.ts'
-import { parseDocumentIdentity } from './document-identity.ts'
+import { parseDocumentIdentity, type ConnectionDocumentIdentity } from './document-identity.ts'
+
+export type { ConnectionDocumentIdentity } from './document-identity.ts'
 import { sessionAddressApi } from './session-api.ts'
 export { clientSessionKey, parseClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 export type { ClientSessionAddress, ClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
@@ -167,6 +169,8 @@ function targetKey(target: ConnectionRuntimeTarget): string {
  * started handle the runtime pool drives instead of a second unstarted loop.
  */
 interface ConnectionShared {
+  /** Immutable page identity; target handles retain the originating document's identity. */
+  readonly documentIdentity?: ConnectionDocumentIdentity
   /** Fetch-identity fence for the page; absent in fixture or explicit-transport mode. */
   readonly identity?: BrowserIdentityFence
   root: ConnectionHandle | undefined
@@ -191,6 +195,8 @@ interface ConnectionShared {
  * is ready — connection stays consumer-agnostic).
  */
 export interface ConnectionHandle {
+  /** Authenticated HTML account and initial Runtime; absent for legacy, fixture, and explicit transports. */
+  readonly documentIdentity?: ConnectionDocumentIdentity
   /** Forwarded-event and answer participation selected at installation. */
   readonly interactions: ConnectionInteractions
   /** Shared api client (fixture or real, decided at boot from the page URL). */
@@ -362,6 +368,7 @@ function createConnectionHandle(
   })
   const handle: ConnectionHandle = {
     interactions,
+    ...(sharedState.documentIdentity === undefined ? {} : { documentIdentity: sharedState.documentIdentity }),
     wireApi: api,
     get api() { return sharedState.originalSession === undefined ? api : routedApi },
     ...(accountPreferences === undefined ? {} : { accountPreferences }),
@@ -552,7 +559,7 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
     {
       root: undefined, handles: new Map(),
       ...(identity === undefined ? {} : { identity }),
-      ...(documentIdentity === undefined ? {} : { baseTarget: documentIdentity.runtimeTarget }),
+      ...(documentIdentity === undefined ? {} : { documentIdentity, baseTarget: documentIdentity.runtimeTarget }),
     },
     undefined,
     carrier,

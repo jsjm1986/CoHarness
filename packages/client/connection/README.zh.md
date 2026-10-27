@@ -19,6 +19,8 @@ kind: "package-reference"
 
 已认证的 Gateway HTML 提供带版本的账号 ID 与 Runtime 目标，在网络初始化之前固定页面。两条事件 socket 与 `host.describe` 可以并行建立，但描述校验与两条物理连接全部成功后，业务帧和连接基线才会可见。账号或描述中的 Runtime 不一致会撤下页面。存在但畸形的输入会使插件加载失败；输入缺省时保留先描述、后建连的握手。fixture 与显式载体忽略这份 HTTP 输入。未显式指定 runtime 的请求使用该固定目标，包括项目活动分页；其他标签页更改作用域 cookie 不会重定向它们。应用生成的私有预览及下载 URL 使用 `privateResourceUrl`，让浏览器原生导航携带同样的账号与 runtime 核验；公共链接保持不变。
 
+`ConnectionHandle.documentIdentity` 提供已校验的账号与初始 Runtime，用于划分浏览器状态的存储命名空间。独立页面、fixture 与显式载体不提供该值。派生目标 handle 共享原始页面的身份，该值不授予目标访问权限。
+
 fetch 包装把原生请求拒绝标识为 `ApiTransportError`，状态为 `0`、代码为 `request-unavailable`；它保留原因且不重试。这只标识未收到 HTTP 响应，不表示已诊断为断网或已知服务端结果。已取消的请求保留 signal 的原因；身份失败和响应解码缺陷不归类为网络失败。HTTP 与 RPC 失败语义见 [fetch 传输器](../../host/apiproxy/README.zh.md)。
 
 ## 概述

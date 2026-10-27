@@ -11,6 +11,8 @@ kind: "package-reference"
 
 账户工作台在此对象层上增加惰性的 `SessionRuntimePool`。池只为当前账户聚合列表和标准 props 查询，每个目标运行时仍保留自己的 API client、ConnectionController、SessionManager、事件流和 scope 资源。目标只有在 Gateway 校验成员关系并签发绑定 generation 的 principal 后才会接入；移除面板只释放其引用，不会停止 Host 任务。独立消费方持有引用期间，目标连接继续保留。
 
+已认证的浏览器页面将引导连接的选择保存到 `dsh.sessions.current.v2.<accountId>.<target>`，其中 `<target>` 为 `personal` 或 `project-<projectId>`。每个空间在初始列表请求期间并行恢复自己的历史，账号与 Runtime 基线仍决定其可见性。没有作用域记录的首次访问沿用历史优先的默认选择。未分作用域的浏览器记录保留但不被接纳；独立 Host、fixture 和显式载体继续使用 `dsh.sessions.current`。
+
 直接读取 JSON 的浏览器消费方共用 Host carrier 的流式 reader；它会在解析前拒绝声明长度或实际分块超过默认 16 MiB 的 body。该 helper 只负责传输上限，不替代端点自己的响应校验。
 
 对于每条可到达本地根 Agent 或可继续子 Agent 的提示词，运行时都会采样浏览器当前的 `Intl.DateTimeFormat().resolvedOptions().timeZone`，并只把该值附加到这一次 Session 或 subagent 提示词 RPC。该值既不缓存，也不包含在 Session 创建或 fork 状态中，因此旅行与并发标签页都能保留消息本地的来源信息。浏览器若无法提供非空时区，会在本地拒绝该提示词，而不会悄然使用部署状态代替。

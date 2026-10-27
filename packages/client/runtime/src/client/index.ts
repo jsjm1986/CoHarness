@@ -326,9 +326,14 @@ export function apply(ctx: Context): void {
     events: new ConversationEventRegistry(ctx),
     views: new ConversationViewRegistry(ctx),
   }
+  const identity = connection.documentIdentity
+  const selectionPersistenceKey = identity === undefined ? undefined
+    : `dsh.sessions.current.v2.${String(identity.principalId)}.${identity.runtimeTarget.kind === 'personal'
+      ? 'personal' : `project-${String(identity.runtimeTarget.projectId)}`}`
   const baseSessions = new SessionRuntime(ctx, connection.wireApi ?? connection.api, ctx.remote, conversation, {
     provideService: false,
     hostDescription: connection.hostDescription,
+    ...(selectionPersistenceKey === undefined ? {} : { selectionPersistenceKey }),
   })
   const sessions = new SessionRuntimePool(ctx, baseSessions, connection, ctx.remote, conversation)
   ctx.effect(() => {

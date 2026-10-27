@@ -19,6 +19,8 @@ One document pins its verified Gateway account. Its fetch wrapper covers only sa
 
 Authenticated Gateway HTML supplies a versioned account ID and Runtime target to pin this document before network initialization. Both event sockets and `host.describe` can open in parallel, but the description and both physical connections must succeed before business frames or connected baselines become visible. A different account or described Runtime withdraws the document. Present malformed input fails plugin load; absent input keeps the describe-first handshake. Fixture and explicit carriers ignore this HTTP input. Requests without an explicit runtime use that fixed target, including project activity pages, so another tab’s scope cookie cannot redirect them. Application-generated private preview and download URLs use `privateResourceUrl` to carry the same account and runtime checks through native navigation; public links remain unchanged.
 
+`ConnectionHandle.documentIdentity` exposes the validated account and initial Runtime for namespacing browser state. It is absent for standalone pages, fixtures and explicit transports. Derived target handles share the originating document identity; it grants no target access.
+
 The fetch wrapper identifies a native request rejection as `ApiTransportError` with status `0` and code `request-unavailable`; it preserves the cause and makes no retry. This identifies failure to receive an HTTP response, not an offline diagnosis or a known server outcome. An aborted request keeps its signal reason; identity failures and response-decoding defects are not classified as network failures. See the [fetch carrier](../../host/apiproxy/README.md) for HTTP and RPC failure semantics.
 
 ## Summary

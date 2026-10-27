@@ -14,6 +14,8 @@ Status: implemented
 
 [Connection](../../../../packages/client/connection/README.zh.md) 校验 HTML 输入，并复制到页面所有的身份围栏。存在但畸形的输入使加载失败；输入缺省时保留先描述、后初始化的顺序，fixture 与显式载体忽略这份 HTTP 输入。序列化的启动值是页面输入，不是共享响应缓存，不包含凭据、断言、权限或 Host 描述。
 
+Connection handle 将已校验的页面身份作为只读数据提供。Runtime 使用其中的账号 ID 与初始目标划分引导连接选择的存储命名空间。每个空间可以在 Session 列表请求期间并行准备自己的已保存历史，不会借用其他空间的裸 ID。缺少作用域记录时沿用现有的历史优先基线策略，旧记录保留但不自动接纳。可见性、归档遮蔽、Host 准入与账号目录核验仍决定最终展示。独立 Host 与显式载体保留现有存储名。
+
 围栏将请求与 socket 固定到该账号和 Runtime，两条事件 socket 与 `host.describe` 同时建立。每个 API 请求和 upgrade 仍独立认证。预期账号 ID 只构成拒绝条件，不能授予身份；响应账号或描述中的 Runtime 不一致时，页面失效并关闭所属连接。[浏览器认证决策](2026-10-01-browser-auth-web-transport.zh.md) 继续拥有准入与用途策略。
 
 [双流载体](2026-08-04-websocket-downlink-carrier.zh.md) 仍等待描述与两条物理连接全部就绪，才发布 connected 状态或释放缓冲业务帧。既有 reset 与重放顺序保持不变。设置仍执行提前读取及订阅后的最新基线读取。页面身份固定不验证账号目录，也不授权恢复私有布局：[principal 所有的布局](2026-09-23-principal-owned-workbench-layouts.zh.md) 与[初始 Workspace 选择](../bug-fix/2026-10-24-bootstrap-runtime-initial-selection.zh.md) 决策继续约束这些行为。

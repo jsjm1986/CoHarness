@@ -271,6 +271,8 @@ describe('connection client apply', () => {
     let loop: ReturnType<ConnectionHandle['start']> | undefined
     try {
       const handle = await mount()
+      expect(handle.documentIdentity).toEqual({ principalId: 7, runtimeTarget: { kind: 'project', projectId: 42 } })
+      expect(handle.forTarget?.({ kind: 'personal' }).documentIdentity).toBe(handle.documentIdentity)
       const connected = vi.fn()
       loop = handle.start({ onConnected: connected })
       const init = await requested.promise

@@ -345,7 +345,7 @@ describe('web e2e: startup auto-selection', () => {
     }
   }, 120_000)
 
-  it.each(['local', 'account', 'account pending'] as const)('reads the saved history while the real list response is held, then presents the same opening: %s', async (composition) => {
+  it.each(['local', 'account', 'account pending', 'account scoped'] as const)('reads the saved history while the real list response is held, then presents the same opening: %s', async (composition) => {
     const accountScaffold = composition === 'local' ? undefined : await launchWebScaffold({ workbench: true })
     let accountPage: Page | undefined
     let targetPage = page
@@ -356,6 +356,13 @@ describe('web e2e: startup auto-selection', () => {
       if (accountScaffold !== undefined) targetPage = accountPage = await newEnglishPage(browser)
       const targetTripwire = accountScaffold === undefined ? tripwire : watchConsole(targetPage)
       if (accountScaffold !== undefined) {
+        if (composition === 'account scoped') {
+          await targetPage.addInitScript(() => {
+            Object.assign(globalThis, {
+              __DSH_DOCUMENT_IDENTITY__: { version: 1, principalId: 1, runtimeTarget: { kind: 'personal' } },
+            })
+          })
+        }
         // The Gateway owns account metadata; Host APIs, both WebSockets and the
         // complete Workbench/authority/persistence consumers run unchanged.
         await targetPage.route(/\/api\/host\.describe(?:\?.*)?$/, async (route) => {
@@ -390,9 +397,14 @@ describe('web e2e: startup auto-selection', () => {
       const id = await seedSession(targetScaffold, savedHistory(), SAVED_ID)
       const workspace = await targetScaffold.ctx.workspaceRegistry.create(targetScaffold.workspaceCwd)
       await workspace.attachSession(id)
-      await targetPage.evaluate((sessionId) => {
-        localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId }))
-      }, id)
+      await targetPage.evaluate(({ sessionId, scoped }) => {
+        localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId: scoped ? 'other-space' : sessionId }))
+        if (scoped) {
+          localStorage.setItem('dsh.sessions.current.v2.1.personal', JSON.stringify({ sessionId }))
+          localStorage.setItem('dsh.sessions.current.v2.1.project-42', JSON.stringify({ sessionId: 'other-project' }))
+          localStorage.setItem('dsh.sessions.current.v2.2.personal', JSON.stringify({ sessionId: 'other-account' }))
+        }
+      }, { sessionId: id, scoped: composition === 'account scoped' })
       const listGate = Promise.withResolvers<undefined>()
       const listReady = Promise.withResolvers<undefined>()
       let historyCalls = 0
@@ -442,6 +454,16 @@ describe('web e2e: startup auto-selection', () => {
         listGate.resolve(undefined)
         await targetPage.getByText(SAVED_PROMPT, { exact: true }).waitFor()
         await targetPage.getByText('The saved conversation is ready.', { exact: true }).waitFor()
+        if (composition === 'account scoped') {
+          const selections = await targetPage.evaluate(() => Object.fromEntries([
+            'dsh.sessions.current', 'dsh.sessions.current.v2.1.personal',
+            'dsh.sessions.current.v2.1.project-42', 'dsh.sessions.current.v2.2.personal',
+          ].map(key => [key, (JSON.parse(localStorage.getItem(key) ?? '{}') as { sessionId?: string }).sessionId])))
+          expect(selections).toEqual({
+            'dsh.sessions.current': 'other-space', 'dsh.sessions.current.v2.1.personal': id,
+            'dsh.sessions.current.v2.1.project-42': 'other-project', 'dsh.sessions.current.v2.2.personal': 'other-account',
+          })
+        }
         if (composition === 'account pending') {
           const composer = await captureStableAria(targetPage, '[data-composer-seat]', targetScaffold.workspaceCwd)
           expect(composer).not.toContain('Retry terminal recovery')

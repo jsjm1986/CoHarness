@@ -401,13 +401,20 @@ export class SessionRuntime implements ISessions {
     api: IApiClient,
     remote: SessionRemotes,
     conversationRuntime?: ConversationRuntime,
-    options: { persistSelection?: boolean; provideService?: boolean; hostDescription?: HostDescriptionSource } = {},
+    options: {
+      persistSelection?: boolean
+      /** Storage name for this account and Runtime; omission retains the standalone selection name. */
+      selectionPersistenceKey?: string
+      provideService?: boolean
+      hostDescription?: HostDescriptionSource
+    } = {},
   ) {
     this.hostDescription = options.hostDescription
     rootCtx.effect(() => () => { this.navigation.dispose() }, 'sessions: navigation lifetime')
     this.selection = createSnapshotStore<SessionSelection>(
       {},
-      options.persistSelection === false ? undefined : { persist: { name: 'dsh.sessions.current' } })
+      options.persistSelection === false ? undefined
+        : { persist: { name: options.selectionPersistenceKey ?? 'dsh.sessions.current' } })
     const restored = this.selection.getSnapshot()
     if (restored.subagentAddress === undefined) this.restoredHistoryId = restored.sessionId
     const conversationEvents = rootCtx.get('conversationEvents')
