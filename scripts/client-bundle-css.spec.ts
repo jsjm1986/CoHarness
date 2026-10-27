@@ -104,8 +104,10 @@ describe('client bundle stylesheet identity', () => {
   it('emits identical CSS modules for equivalent source paths in independent build roots', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-client-css-roots-'))
     try {
-      const [first, second] = await Promise.all(['checkout-a', 'checkout-b'].map(name =>
-        compiledStylesheet(join(root, name), '@deepseek-ai/dsh-client-test', 'pdf/Fixture.module.css', '.root { color: red; }\n')))
+      const compile = (checkout: string) => compiledStylesheet(
+        join(root, checkout), '@deepseek-ai/dsh-client-test', 'pdf/Fixture.module.css', '.root { color: red; }\n',
+      )
+      const [first, second] = await Promise.all([compile('checkout-a'), compile('checkout-b')])
       expect(first.output).toBe(second.output)
       expect(first.rootClass).toBe(second.rootClass)
       expect(first.watched).toEqual([first.stylesheet])
