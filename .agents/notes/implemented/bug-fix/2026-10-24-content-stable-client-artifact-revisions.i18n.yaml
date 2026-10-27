@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-content-stable-client-artifact-revisions.md
 document:
-  en: facb1f81f8eb0e98f3d3e45da6f5f15eda447062
-  zh: 37782208c09eaebdf496d4b07ed232cd47096f83
+  en: 0402fc0abd5ee048227d7347fa99c4fd2a85bedd
+  zh: 5d9d24795384c0a2290293d3ca0cefdae03fc657
 /agent-note-content-stable-client-artifact-revisions:
   en: 21f3887048087301
   zh: 27b5fbd807deabce
@@ -12,8 +12,8 @@ document:
   en: ae2afaa15b543162
   zh: 9e5125b3861f44d6
 /agent-note-content-stable-client-artifact-revisions/decision:
-  en: 6fa5545bb38d8e21
-  zh: 6800ec465905dc6e
+  en: 387196e39c3f8923
+  zh: a14b6deded869a09
 /agent-note-content-stable-client-artifact-revisions/alternatives-considered:
   en: 3b519eefd8bf2762
   zh: 6f255b17c9a25217

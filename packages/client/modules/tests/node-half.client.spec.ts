@@ -1140,6 +1140,29 @@ describe('client bundle activation', () => {
     expect((await routeRequest(route, url)).headers).toEqual(original.headers)
   })
 
+  it.each([false, true])('serves inline debug-directive strings with a real map trailer: %s', async (withMap) => {
+    const packageName = '@fixture/inline-debug-directive'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const executable = 'const comment = `//# sourceURL=` + "template.js"; module.exports = { comment };\n'
+    const code = executable + (withMap ? '//# sourceMappingURL=client.preview.js.map\n' : '')
+    writeFileSync(join(dirname(clientPath), fileName), code)
+    writeFileSync(clientPath, stampClientArtifact('module.exports = {}\n', [{ fileName, code }]))
+    const { service, route } = constructWithRoute([packageName])
+    const row = service.graph().entries[0]!
+    const response = await routeRequest(route, chunkUrl(packageName, fileName, row.chunks![fileName]!))
+    expect(response.status).toBe(200)
+    expect(response.body.toString('utf8')).toContain(executable)
+    const module = { exports: {} }
+    runInNewContext(response.body.toString('utf8'), { module })
+    expect(module.exports).toEqual({ comment: '//# sourceURL=template.js' })
+    const mapUrl = chunkUrl(packageName, fileName, row.chunks![fileName]!).replace('.js?', '.js.map?')
+    const map = JSON.parse((await routeRequest(route, mapUrl)).body.toString('utf8')) as {
+      sections: { map: { sources: string[] } }[]
+    }
+    expect(map.sections[0]!.map.sources).toEqual([`/plugins/${packageName}/${fileName}`])
+  })
+
   it('rejects old, unknown and extra-parameter chunk URLs after a completed lazy-code rebuild', async () => {
     const packageName = '@fixture/changed-published-chunk'
     const clientPath = writeBuiltPackage(packageName)

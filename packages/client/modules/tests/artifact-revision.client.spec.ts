@@ -1,6 +1,6 @@
 /** Executable content identity, including the lazy chunks published by the shared compiler. */
 import { describe, expect, it } from 'vitest'
-import { clientChunkRevision, clientChunkRevisions, clientContentRevision, stampClientArtifact } from '../src/artifact-revision.ts'
+import { clientChunkRevision, clientChunkRevisions, clientContentRevision, clientExecutableSource, stampClientArtifact } from '../src/artifact-revision.ts'
 
 const entry = 'module.exports = {}\n//# sourceMappingURL=client.js.map\n'
 const first = { fileName: 'client.first.js', code: 'exports.value = 1\n' }
@@ -76,6 +76,19 @@ describe('client artifact stamps', () => {
       '//# sourceURL=second.js\n//# sourceMappingURL=second.js.map\n',
     ]) expect(clientChunkRevision(first.code + trailers)).toBe(revision)
     expect(clientChunkRevision(first.code.trimEnd())).toBe(revision)
+  })
+
+  it.each(['sourceURL', 'sourceMappingURL'])('preserves an inline %s string through both generated debug trailers', (directive) => {
+    const code = `const comment = \`//# ${directive}=\` + 'template.js'; module.exports = { comment };\n`
+    for (const trailers of [
+      '',
+      '//# sourceMappingURL=client.preview.js.map\n',
+      '//# sourceURL=client.preview.js\n//# sourceMappingURL=client.preview.js.map\n',
+      '//# sourceMappingURL=client.preview.js.map\n//# sourceURL=client.preview.js\n',
+    ]) {
+      expect(clientExecutableSource(code + trailers)).toBe(code)
+      expect(clientChunkRevision(code + trailers)).toBe(clientChunkRevision(code))
+    }
   })
 
   it('rejects duplicate or unpublished chunk filenames from the compiler', () => {

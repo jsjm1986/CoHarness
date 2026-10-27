@@ -4,8 +4,8 @@ import { parseChunkRevisions } from './client/manifest.ts'
 
 const MARKER = '//# dsh-client-artifact='
 const CHUNKS_MARKER = '//# dsh-client-chunks='
-const SOURCE_MAP_TRAILER = /(?:\r?\n)?\/\/# sourceMappingURL=[^\r\n]*(?:\r?\n)?$/u
-const SOURCE_URL_TRAILER = /(?:\r?\n)?\/\/# sourceURL=[^\r\n]+(?:\r?\n)?$/u
+const SOURCE_MAP_TRAILER = /(?:^|\r?\n)\/\/# sourceMappingURL=[^\r\n]*(?:\r?\n)?$/u
+const SOURCE_URL_TRAILER = /(?:^|\r?\n)\/\/# sourceURL=[^\r\n]+(?:\r?\n)?$/u
 
 /** One executable sibling emitted by the client compiler. */
 export interface ClientArtifactChunk {
@@ -59,7 +59,7 @@ function declaredFooter(code: string): { start: number; end: number; chunks?: Re
 }
 
 /**
- * Remove generated debug trailers and normalize the executable's trailing newline.
+ * Remove standalone generated debug trailer lines and normalize the executable's trailing newline.
  * @param code - emitted JavaScript, including optional sourceURL and sourceMappingURL trailers.
  * @returns executable text used by chunk identity and HTTP response construction.
  */
