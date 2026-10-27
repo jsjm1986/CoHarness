@@ -3,7 +3,7 @@
 
 .dialog.dialog {
   width: min(480px, calc(100vw - 48px));
-  max-height: min(720px, calc(var(--dsw-viewport-height, 100vh) - 48px));
+  max-height: min(760px, calc(var(--dsw-viewport-height, 100vh) - 48px - var(--dsh-frame-top-clearance, 0px)));
   padding: 0;
   gap: 0;
   overflow: hidden;
@@ -53,7 +53,6 @@
   cursor: pointer;
 }
 
-.close:hover,
 .close:focus-visible {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
@@ -90,4 +89,15 @@
   .dialog.dialog {
     animation: none;
   }
+}
+
+.wide.wide { width: min(680px, calc(100vw - 48px)); }
+.bodyWithFooter { padding-bottom: var(--dsw-space-4); }
+.footer { display: flex; flex: none; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--dsw-space-2); padding: var(--dsw-space-3) var(--dsw-space-4); border-top: 0.5px solid var(--dsw-alias-border-l2); }
+.footer > button { min-height: 32px; border-radius: var(--dsw-radius-control); font-size: 13px; }
+@media (hover: hover) { .close:hover { background: var(--dsw-alias-interactive-bg-hover); } }
+@media (max-width: 767px) {
+  .wide.wide { width: calc(100vw - (2 * var(--dsw-mobile-sheet-edge))); }
+  .footer { padding-bottom: calc(var(--dsw-space-3) + var(--dsw-safe-bottom)); }
+  .footer > button { min-height: var(--dsw-touch-target); font-size: 14px; }
 }

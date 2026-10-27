@@ -1,7 +1,7 @@
 // Real Web composition and transport, with recorded LLM streams for keyless
 // concurrency/approval coverage and measured pane layouts. Workspaces and Sessions are created through
 // their production actions; the workbench receives no fixture-only UI state.
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, utimes, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page, Locator, Request } from 'playwright'
@@ -858,8 +858,11 @@ describe('web: Cordis Workspace workbench', () => {
       start(controller) { controller.enqueue(bytes); controller.close() },
     }))
     expect(stored.bytes).toBe(48)
+    // The inline preview displays mtime, so its private fixture uses a fixed file date.
+    const modifiedAt = new Date(Date.UTC(2026, 7, 17, 12))
+    await utimes(stored.path, modifiedAt, modifiedAt)
     browser = await chromium.launch()
-    page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US' })
+    page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US', timezoneId: 'UTC' })
     const tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'workbench-document-picker'))
     await page.goto(runtime.authenticatedUrl, { waitUntil: 'load' })
@@ -897,10 +900,11 @@ describe('web: Cordis Workspace workbench', () => {
     await manager.getByText(stored.name, { exact: true }).waitFor()
     const output = [await manager.getByRole('heading', { name: 'Document Manager', exact: true }).ariaSnapshot()]
     await manager.getByRole('button', { name: `Preview ${stored.name}`, exact: true }).click()
-    const preview = page.getByRole('dialog', { name: `Preview: ${stored.name}`, exact: true })
+    const preview = manager.getByRole('complementary', { name: `Preview: ${stored.name}`, exact: true })
     await expect.poll(() => preview.locator('pre').textContent()).toBe(content)
-    output.push(await captureStableAria(page, '[role="dialog"]:has(pre)', runtime.workspaceCwd))
-    await preview.getByRole('button', { name: 'Close', exact: true }).click()
+    output.push(await captureStableAria(page, 'aside:has([data-document-preview])', runtime.workspaceCwd))
+    await preview.getByRole('button', { name: 'Close preview', exact: true }).focus()
+    await page.keyboard.press('Escape')
     await preview.waitFor({ state: 'hidden' })
     await manager.getByRole('button', { name: `Add ${stored.name} to conversation`, exact: true }).click()
     await manager.waitFor({ state: 'hidden' })

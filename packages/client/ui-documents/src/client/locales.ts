@@ -3,6 +3,10 @@ export const NS = 'documents'
 
 /** Simplified-Chinese dictionary; the source of truth for the DocumentsKey union. */
 export const zh = {
+  'operation.documents': '本次操作的文档',
+  'destination.searchFolders': '搜索目标文件夹',
+  'destination.empty': '没有匹配的位置',
+  'destination.selected': '已选：{name}',
   'sort.field': '排序依据',
   'sort.direction': '排列方向',
   'sort.field.date': '修改日期',
@@ -232,6 +236,10 @@ export const zh = {
 
 /** English dictionary; every key mirrors the Simplified-Chinese source of truth. */
 export const en: Record<keyof typeof zh, string> = {
+  'operation.documents': 'Documents in this operation',
+  'destination.searchFolders': 'Search destination folders',
+  'destination.empty': 'No matching locations',
+  'destination.selected': 'Selected: {name}',
   'sort.field': 'Sort by',
   'sort.direction': 'Order',
   'sort.field.date': 'Modified',

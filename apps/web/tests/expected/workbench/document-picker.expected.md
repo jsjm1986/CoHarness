@@ -1,10 +1,26 @@
 - heading "Document Manager" [level=2]
 
-- 'dialog "Preview: workbench-library.txt"':
-  - 'heading "Preview: workbench-library.txt" [level=2]'
-  - button "Close":
+- 'complementary "Preview: workbench-library.txt"':
+  - heading "workbench-library.txt" [level=3]
+  - paragraph: "Source: Personal documents"
+  - paragraph: 48 B · 2026-08-17
+  - button "Close preview":
     - img
   - text: Workbench library selection fixture............
+  - paragraph: Add to the original conversation draft
+  - button "Add to conversation":
+    - img
+    - text: Add to conversation
+  - link "Download":
+    - /url: /api/documents/content?id=workbench-library.txt
+    - img
+    - text: Download
+  - button "Move":
+    - img
+  - button "Copy to…":
+    - img
+  - button "Delete":
+    - img
 
 - listitem "workbench-library.txt":
   - text: workbench-library.txt Ready

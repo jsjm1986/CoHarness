@@ -1,0 +1,38 @@
+- heading "Copy Document Snapshots" [level=2]
+- button "Close":
+  - img
+- paragraph: "Copy 1 documents to:"
+- list "Documents in this operation":
+  - listitem: brief.txt 21 B
+- radiogroup "Target scope":
+  - text: Target scope
+  - radio "Compiler" [checked]
+  - text: Compiler
+  - radio "客户交付资料与产品需求说明_完整的目录名称必须可以阅读_2026年10月"
+  - text: 客户交付资料与产品需求说明_完整的目录名称必须可以阅读_2026年10月
+  - paragraph: "Selected: Compiler"
+- radiogroup "Target folder":
+  - text: Target folder
+  - img
+  - textbox "Search destination folders"
+  - radio "Root folder" [checked]
+  - text: Root folder
+  - radio "Archive 0"
+  - text: Archive 0
+  - radio "Archive 1"
+  - text: Archive 1
+  - radio "Archive 2"
+  - text: Archive 2
+  - radio "Archive 3"
+  - text: Archive 3
+  - radio "Archive 4"
+  - text: Archive 4
+  - radio "Archive 5"
+  - text: Archive 5
+  - radio "客户交付资料与产品需求说明_完整的目录名称必须可以阅读_2026年10月"
+  - text: 客户交付资料与产品需求说明_完整的目录名称必须可以阅读_2026年10月
+  - paragraph: "Selected: Root folder"
+- textbox "New folder name"
+- button "New Folder" [disabled]
+- button "Cancel"
+- button "Copy Documents"

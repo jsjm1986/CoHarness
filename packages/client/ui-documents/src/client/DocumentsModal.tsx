@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent, type FC, type SyntheticEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type FC, type SyntheticEvent } from 'react'
 import {
   Button,
   IconBrowseOutline16,
+  IconCheckOutline16,
   IconChevronDownOutline14,
   IconChevronRightOutline14,
   IconCopyOutline16,
@@ -35,6 +36,7 @@ import {
   type UserDocTrashRef,
 } from './documents-client.ts'
 import { FileTypeIcon } from './FileTypeIcon.tsx'
+import { DocumentDestinationPicker } from './DocumentDestinationPicker.tsx'
 import { DocumentSortControl } from './DocumentSortControl.tsx'
 import { DocumentPreview } from './DocumentPreview.tsx'
 import { DocumentsMobileSheet } from './DocumentsMobileSheet.tsx'
@@ -1934,7 +1936,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   }
 
   const purgeTrashDocument = (document: UserDocTrashRef): void => {
-    if (!writeLocked) setPurgeTarget(document)
+    if (!writeLocked) {
+      setError('')
+      setPurgeTarget(document)
+    }
   }
 
   const confirmPurgeTrash = async () => {
@@ -2018,7 +2023,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
 
   const focusTrashReturn = (element: HTMLDivElement | null): void => {
     if (trashMode || !trashReturnFocusPending.current || element === null) return
-    const target = element.querySelector<HTMLButtonElement>(compactNavigation
+    const manager = element.closest('[role="dialog"]')
+    if (manager === null) return
+    const target = manager.querySelector<HTMLButtonElement>(compactNavigation
       ? '[data-documents-toolbar-more]'
       : '[data-documents-trash-toggle]')
     if (target === null) return
@@ -2272,10 +2279,6 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         mode: project.mode,
       })),
   ]
-  const filteredSourceOptions = sourceOptions.filter((option) => {
-    const needle = sourcePickerQuery.trim().toLowerCase()
-    return needle === '' || option.label.toLowerCase().includes(needle)
-  })
   const uploadScopeOptions: SourceOption[] = [
     { value: 'personal', label: t('copy.target.personal'), scope: { kind: 'personal' }, mode: 'rw' },
     ...(scope.projects ?? []).filter(project => project.mode === 'rw').map(project => ({
@@ -2285,10 +2288,6 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       mode: project.mode,
     })),
   ]
-  const filteredUploadScopeOptions = uploadScopeOptions.filter((option) => {
-    const needle = uploadScopePickerQuery.trim().toLowerCase()
-    return needle === '' || option.label.toLowerCase().includes(needle)
-  })
 
   const mobileViewOptions = useMemo<MobileScopeOption[]>(() => [
     {
@@ -2552,6 +2551,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       setError(t('copy.source.unavailable'))
       return
     }
+    setError('')
     setSourcePickerValue(sourceOptions[0]?.value ?? '')
     setSourcePickerQuery('')
     setSourcePickerOpen(true)
@@ -2563,6 +2563,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       setError(t('scope.upload.unavailable'))
       return
     }
+    setError('')
     if (phone) {
       setUploadScopePickerValue(uploadScopeOptions[0]?.value ?? '')
       setUploadScopePickerOpen(true)
@@ -2906,6 +2907,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     void uploadFiles(event.dataTransfer.files)
   }
 
+  const folderFormId = useId()
   const busy = uploading
   const displayedProgress = uploadBatch.current === null || visibleUploadFeedback !== null ? progress : null
   const uploadLabel = visibleUploadFeedback?.reconciling === true ? t('modal.refreshing')
@@ -3070,31 +3072,13 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     else setDeleteTargets(targets)
   }
 
-  const renderScopePickerOption = (
-    option: SourceOption,
-    selectedValue: string,
-    disabled: boolean,
-    detail: string,
-    onSelect: (value: string) => void,
-  ) => (
-    <button
-      key={option.value}
-      type="button"
-      role="option"
-      aria-selected={selectedValue === option.value}
-      className={`${css.scopePickerOption} ${selectedValue === option.value ? css.scopePickerOptionSelected : ''}`}
-      disabled={disabled}
-      onClick={() => { onSelect(option.value) }}
-    >
-      <span className={css.scopeItemIcon} aria-hidden="true">
-        {option.scope.kind === 'project' ? <IconFolderClose16 size={18} /> : <IconBrowseOutline16 size={18} />}
-      </span>
-      <span className={css.scopePickerCopy}>
-        <strong>{option.label}</strong>
-        <small>{detail}</small>
-      </span>
-      {selectedValue === option.value && <span className={css.sheetCheck} aria-hidden="true">✓</span>}
-    </button>
+  const renderOperationDocuments = (items: readonly Pick<UserDocRef, 'docId' | 'name' | 'mediaType' | 'bytes'>[]) => (
+    <ul className={css.operationFiles} aria-label={t('operation.documents')}>
+      {items.map(item => <li key={item.docId}>
+        <FileTypeIcon name={item.name} mediaType={item.mediaType} />
+        <span>{item.name}</span><small>{formatBytes(item.bytes)}</small>
+      </li>)}
+    </ul>
   )
 
   const mobileSheetContent = mobileSheet?.kind === 'scope' ? (
@@ -3111,7 +3095,6 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       </p>
       {mobileScopeOptions.length > 1 && (
         <Input
-          autoFocus
           className={css.sheetSearch as string}
           icon={<IconSearchOutline16 size={16} />}
           aria-label={t('scope.switch.search')}
@@ -3129,7 +3112,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       )}
       {error !== '' && <div className={css.sheetError} role="alert">{error}</div>}
       {overviewError !== '' && mobileSheet.mode === 'view' && <div className={css.sheetError} role="alert">{overviewError}</div>}
-      <div className={css.sheetOptions} role="listbox" aria-label={t('scope.rail.label')}>
+      <div className={css.sheetOptions} role="group" aria-label={t('scope.rail.label')}>
         {filteredMobileScopeOptions.length === 0 ? (
           <p className={css.sheetStatus}>{t('modal.noResults')}</p>
         ) : filteredMobileScopeOptions.map((option) => {
@@ -3143,8 +3126,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
             <button
               key={option.value}
               type="button"
-              role="option"
-              aria-selected={selectedOption}
+              aria-current={selectedOption ? 'true' : undefined}
               className={`${css.sheetOption} ${selectedOption ? css.sheetOptionSelected : ''}`}
               disabled={disabled}
               onClick={() => { void selectMobileScope(option.value) }}
@@ -3156,7 +3138,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                 <strong>{option.label}</strong>
                 <small>{option.description}</small>
               </span>
-              {selectedOption && <span className={css.sheetCheck} aria-hidden="true">✓</span>}
+              {selectedOption && <span className={css.sheetCheck} aria-hidden="true"><IconCheckOutline16 size={16} /></span>}
             </button>
           )
         })}
@@ -3311,7 +3293,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         <small>{mobileSheet.row.scope.label} · {formatBytes(mobileSheet.row.bytes)} · {mobileSheet.row.owner?.displayName ?? t('scope.owner.unknown')}</small>
       </div>
       <Button className={css.sheetAction} type="button" variant="outline" disabled={overviewLoading} onClick={() => { closeMobileSheet(); void openOverviewView(mobileSheet.row) }}>{t('scope.view')}</Button>
-      <Button className={css.sheetAction} type="button" variant="primary" disabled={overviewLoading} icon={<IconCopyOutline16 size={18} />} onClick={() => { closeMobileSheet(); void openOverviewCopy(mobileSheet.row) }}>{mode === 'select' && sameDocumentScope(catalogRowScope(mobileSheet.row), currentScopeDescriptor()) ? t('action.attach') : mode === 'select' ? t('scope.copyAndAttach') : t('scope.copy')}</Button>
+      <Button className={css.sheetAction} type="button" variant="soft" disabled={overviewLoading} icon={<IconCopyOutline16 size={18} />} onClick={() => { closeMobileSheet(); void openOverviewCopy(mobileSheet.row) }}>{mode === 'select' && sameDocumentScope(catalogRowScope(mobileSheet.row), currentScopeDescriptor()) ? t('action.attach') : mode === 'select' ? t('scope.copyAndAttach') : t('scope.copy')}</Button>
     </DocumentsMobileSheet>
   ) : mobileSheet?.kind === 'selection' ? (
     <DocumentsMobileSheet
@@ -3325,7 +3307,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       <p className={css.sheetDescription}>{t('selection.selected', { count: String(selected.size) })}</p>
       <div className={css.sheetActions} role="list">
         {mode === 'select' && (
-          <Button className={css.sheetAction} type="button" variant="primary" disabled={busy || onAttachDocument === undefined} icon={<IconPaperclipOutline16 size={18} />} onClick={() => { void attachSelectedDocuments() }}>{t('selection.attach')}</Button>
+          <Button className={css.sheetAction} type="button" variant="soft" disabled={busy || onAttachDocument === undefined} icon={<IconPaperclipOutline16 size={18} />} onClick={() => { void attachSelectedDocuments() }}>{t('selection.attach')}</Button>
         )}
         <Button className={css.sheetAction} type="button" variant="ghost" disabled={busy || writeLocked} icon={<IconFolderOpenOutline16 size={18} />} onClick={() => { performMobileBatchAction('move') }}>{t('selection.move')}</Button>
         <Button className={css.sheetAction} type="button" variant="ghost" disabled={busy} icon={<IconCopyOutline16 size={18} />} onClick={() => { performMobileBatchAction('copy') }}>{t('selection.copy')}</Button>
@@ -3488,7 +3470,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                           <span className={css.size}>{overviewMetaLabel(row, t)}</span>
                         </div>
                         {mode === 'select' ? (
-                          <Button className={css.overviewAttach} type="button" size="sm" variant="primary" disabled={overviewLoading} onClick={() => { void openOverviewCopy(row) }}>{sameDocumentScope(catalogRowScope(row), currentScopeDescriptor()) ? t('action.attach') : t('scope.copyAndAttach')}</Button>
+                          <Button className={css.overviewAttach} type="button" size="sm" variant="soft" disabled={overviewLoading} onClick={() => { void openOverviewCopy(row) }}>{sameDocumentScope(catalogRowScope(row), currentScopeDescriptor()) ? t('action.attach') : t('scope.copyAndAttach')}</Button>
                         ) : phone ? (
                           <Button
                             className={css.rowMore}
@@ -3606,7 +3588,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                             disabled={(loading && !listingReadyRef.current) || index === directoryTrail.length - 1}
                             onClick={() => { navigate(crumb.directoryId) }}
                           >
-                            {crumb.name}
+                            {crumb.directoryId === ROOT_DIRECTORY_ID ? t('breadcrumb.root') : crumb.name}
                           </button>
                         </span>
                       ))}
@@ -3749,7 +3731,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                     <p className={css.empty}>{t('modal.empty')}</p>
                     {!uploadLocked && (
                       <div className={css.emptyActions}>
-                        <Button type="button" variant="primary" aria-label={t('modal.upload')} disabled={busy} icon={<IconPlusOutline16 size={16} />} onClick={() => { fileInputRef.current?.click() }}>
+                        <Button type="button" variant="soft" aria-label={t('modal.upload')} disabled={busy} icon={<IconPlusOutline16 size={16} />} onClick={() => { fileInputRef.current?.click() }}>
                           {phone ? t('modal.upload.compact') : t('modal.upload')}
                         </Button>
                         <Button type="button" variant="outline" aria-label={t('folder.create')} disabled={busy} icon={<IconFolderClose16 size={16} />} onClick={openCreateDirectory}>
@@ -3878,77 +3860,81 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       </Modal>
 
       {mobileSheetContent}
-      {limitsOpen && <Modal open onClose={() => { setLimitsOpen(false) }} title={t('manager.info')} closeLabel={t('modal.close')}><p>{limitsText}</p></Modal>}
+      {limitsOpen && <DocumentsMobileSheet open onClose={() => { setLimitsOpen(false) }} kind="upload-info"
+        title={t('manager.info')} closeLabel={t('modal.close')}><p className={css.confirm}>{limitsText}</p></DocumentsMobileSheet>}
 
       {historyOpen && (
-        <Modal
+        <DocumentsMobileSheet
           open
           onClose={() => { if (!historyLoading) setHistoryOpen(false) }}
+          kind="history"
+          wide
           title={t('history.title')}
           closeLabel={t('modal.close')}
-          className={css.confirmDialog as string}
         >
-          {historyLoading ? <p className={css.status}>{t('history.loading')}</p> : historyItems.length === 0 ? <p className={css.empty}>{t('history.empty')}</p> : (
+          {historyLoading ? <p className={css.operationStatus} role="status">{t('history.loading')}</p> : historyItems.length === 0 ? <p className={css.operationStatus} role="status">{t('history.empty')}</p> : (
             <ol className={css.historyList}>
               {historyItems.map(item => (
                 <li key={item.id}>
                   <span><strong>{item.eventKind}</strong><small>{item.documentName ?? t('history.unknown')} · {item.actor?.displayName ?? t('history.system')}</small></span>
-                  <span className={css.size}>{new Date(item.createdAt).toLocaleString()}</span>
+                  <time dateTime={new Date(item.createdAt).toISOString()}>{new Date(item.createdAt).toLocaleString()}</time>
                 </li>
               ))}
             </ol>
           )}
-        </Modal>
+        </DocumentsMobileSheet>
       )}
 
       {purgeTarget !== null && (
-        <Modal
+        <DocumentsMobileSheet
           open
           onClose={() => { if (!busy) setPurgeTarget(null) }}
+          kind="purge"
           title={t('trash.purge')}
           closeLabel={t('modal.close')}
-          className={css.confirmDialog as string}
           footer={(
             <>
               <Button type="button" variant="outline" disabled={busy} onClick={() => { setPurgeTarget(null) }}>
                 {t('modal.cancel')}
               </Button>
-              <Button type="button" variant="primary" disabled={busy || writeLocked} onClick={() => { void confirmPurgeTrash() }}>
+              <Button type="button" variant="soft" className={css.dangerAction} disabled={busy || writeLocked} onClick={() => { void confirmPurgeTrash() }}>
                 {t('trash.purge')}
               </Button>
             </>
           )}
         >
           <p className={css.confirm}>{t('trash.purge.confirm')}</p>
-          <p className={css.confirm}>{purgeTarget.name}</p>
-        </Modal>
+          {renderOperationDocuments([purgeTarget])}
+          {error !== '' && <div className={css.error} role="alert">{error}</div>}
+        </DocumentsMobileSheet>
       )}
 
       {deleteTargets !== null && deleteTargets.length > 0 && (
-        <Modal
+        <DocumentsMobileSheet
           open
           onClose={closeDelete}
+          kind="delete"
           title={t('delete.confirm.title')}
           closeLabel={t('modal.close')}
-          className={css.confirmDialog as string}
           footer={(
             <>
               <Button type="button" variant="outline" onClick={closeDelete}>
                 {t('modal.cancel')}
               </Button>
-              <Button type="button" variant="primary" disabled={busy || writeLocked} onClick={() => { void handleDelete() }}>
+              <Button type="button" variant="soft" className={css.dangerAction} disabled={busy || writeLocked} onClick={() => { void handleDelete() }}>
                 {t('delete.confirm.button')}
               </Button>
             </>
           )}
         >
           {modalError !== '' && <div className={css.error} role="alert">{modalError}</div>}
+          {renderOperationDocuments(deleteTargets)}
           <p className={css.confirm}>{confirmMessage}</p>
-        </Modal>
+        </DocumentsMobileSheet>
       )}
 
       {folderEditor !== null && (
-        <Modal
+        <DocumentsMobileSheet
           open
           onClose={() => {
             if (!busy) {
@@ -3956,38 +3942,42 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               setModalError('')
             }
           }}
+          footer={(<>
+
+            <Button type="button" variant="outline" disabled={busy} onClick={() => {
+              setFolderEditor(null)
+              setModalError('')
+            }}>
+              {t('modal.cancel')}
+            </Button>
+            <Button form={folderFormId} type="submit" variant="soft" disabled={busy || writeLocked || folderName.trim() === ''}>
+              {t(folderEditor.mode === 'create' ? 'folder.create.confirm' : 'folder.rename.confirm')}
+            </Button>
+
+          </>)}
+          kind="folder-editor"
           title={t(folderEditor.mode === 'create' ? 'folder.create.title' : 'folder.rename.title')}
           closeLabel={t('modal.close')}
-          className={css.confirmDialog as string}
         >
-          <form className={css.form} onSubmit={(event) => { void handleFolderSubmit(event) }}>
+          <form id={folderFormId} className={css.form} onSubmit={(event) => { void handleFolderSubmit(event) }}>
             {modalError !== '' && <div className={css.error} role="alert">{modalError}</div>}
             <label className={css.formLabel} htmlFor="documents-folder-name">{t('folder.name')}</label>
             <Input
               id="documents-folder-name"
+              className={css.operationInput as string}
               value={folderName}
               onChange={(event) => { setFolderName(event.target.value) }}
-              autoFocus
+              data-modal-autofocus={phone ? undefined : true}
               maxLength={255}
               required
             />
-            <div className={css.formActions}>
-              <Button type="button" variant="outline" disabled={busy} onClick={() => {
-                setFolderEditor(null)
-                setModalError('')
-              }}>
-                {t('modal.cancel')}
-              </Button>
-              <Button type="submit" variant="primary" disabled={busy || writeLocked || folderName.trim() === ''}>
-                {t(folderEditor.mode === 'create' ? 'folder.create.confirm' : 'folder.rename.confirm')}
-              </Button>
-            </div>
+
           </form>
-        </Modal>
+        </DocumentsMobileSheet>
       )}
 
       {deleteDirectory !== null && (
-        <Modal
+        <DocumentsMobileSheet
           open
           onClose={() => {
             if (!busy) {
@@ -3995,9 +3985,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               setModalError('')
             }
           }}
+          kind="delete-folder"
           title={t('folder.delete.title')}
           closeLabel={t('modal.close')}
-          className={css.confirmDialog as string}
           footer={(
             <>
               <Button type="button" variant="outline" disabled={busy} onClick={() => {
@@ -4006,7 +3996,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               }}>
                 {t('modal.cancel')}
               </Button>
-              <Button type="button" variant="primary" disabled={busy || writeLocked} onClick={() => { void handleDeleteDirectory() }}>
+              <Button type="button" variant="soft" className={css.dangerAction} disabled={busy || writeLocked} onClick={() => { void handleDeleteDirectory() }}>
                 {t('folder.delete.confirm')}
               </Button>
             </>
@@ -4014,11 +4004,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         >
           {modalError !== '' && <div className={css.error} role="alert">{modalError}</div>}
           <p className={css.confirm}>{t('folder.delete.message', { name: deleteDirectory.name })}</p>
-        </Modal>
+        </DocumentsMobileSheet>
       )}
 
       {moveTargets !== null && moveTargets.length > 0 && (
-        <Modal
+        <DocumentsMobileSheet
           open
           onClose={() => {
             if (!busy) {
@@ -4026,9 +4016,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               setModalError('')
             }
           }}
+          kind="move"
           title={t('move.title')}
           closeLabel={t('modal.close')}
-          className={css.confirmDialog as string}
           footer={(
             <>
               <Button type="button" variant="outline" disabled={busy} onClick={() => {
@@ -4039,7 +4029,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               </Button>
               <Button
                 type="button"
-                variant="primary"
+                variant="soft"
                 disabled={busy || writeLocked || moveLoading || moveOptions.length === 0 || moveDirectoryId === currentDirectoryId}
                 onClick={() => { void handleMove() }}
               >
@@ -4051,31 +4041,24 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
           <div className={css.form}>
             {modalError !== '' && <div className={css.error} role="alert">{modalError}</div>}
             <p className={css.confirm}>{t('move.message', { count: String(moveTargets.length) })}</p>
+            {renderOperationDocuments(moveTargets)}
             {moveLoading ? (
-              <p className={css.status}>{t('move.loading')}</p>
+              <p className={css.operationStatus} role="status">{t('move.loading')}</p>
             ) : moveOptions.length === 0 ? (
-              <p className={css.status}>{t('move.noDestinations')}</p>
+              <p className={css.operationStatus} role="status">{t('move.noDestinations')}</p>
             ) : (
-              <>
-                <label className={css.formLabel} htmlFor="documents-move-destination">{t('move.destination')}</label>
-                <select
-                  id="documents-move-destination"
-                  className={`${css.select} ${css.moveSelect}`}
-                  value={moveDirectoryId}
-                  onChange={(event) => { setMoveDirectoryId(event.currentTarget.value as UserDocDirectoryIdType) }}
-                >
-                  {moveOptions.map(option => (
-                    <option key={option.directoryId || 'root'} value={option.directoryId}>{option.name}</option>
-                  ))}
-                </select>
-              </>
+              <DocumentDestinationPicker label={t('move.destination')}
+                options={moveOptions.map(option => ({ value: option.directoryId, label: option.name }))}
+                value={moveDirectoryId} onChange={(value) => { setMoveDirectoryId(value as UserDocDirectoryIdType) }}
+                searchPlaceholder={t('destination.searchFolders')} emptyLabel={t('destination.empty')}
+                selectedLabel={name => t('destination.selected', { name })} />
             )}
           </div>
-        </Modal>
+        </DocumentsMobileSheet>
       )}
 
       {copyTargets !== null && (
-        <Modal
+        <DocumentsMobileSheet
           open
           onClose={() => {
             if (!busy) {
@@ -4084,9 +4067,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               setModalError('')
             }
           }}
+          kind="copy"
+          wide
           title={t('copy.title')}
           closeLabel={t('modal.close')}
-          className={css.confirmDialog as string}
           footer={(
             <>
               <Button type="button" variant="outline" disabled={busy} onClick={() => {
@@ -4096,7 +4080,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               }}>
                 {t('modal.cancel')}
               </Button>
-              <Button type="button" variant="primary" disabled={busy || copyTarget === ''} onClick={() => { void handleCopy() }}>
+              <Button type="button" variant="soft" disabled={busy || copyTarget === ''} onClick={() => { void handleCopy() }}>
                 {t('copy.confirm')}
               </Button>
             </>
@@ -4105,43 +4089,34 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
           {modalError !== '' && <div className={css.error} role="alert">{modalError}</div>}
           <div className={css.form}>
             <p className={css.confirm}>{t('copy.message', { count: String(overviewCopyRow !== null || singleCopyDocument !== null ? 1 : selected.size) })}</p>
-            <label className={css.formLabel} htmlFor="documents-copy-target">{t('copy.target')}</label>
-            <select
-              id="documents-copy-target"
-              className={`${css.select} ${css.moveSelect}`}
-              value={copyTarget}
-              onChange={(event) => { setCopyTarget(event.currentTarget.value) }}
-            >
-              {copyTargets.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-            <label className={css.formLabel} htmlFor="documents-copy-directory">{t('copy.directory')}</label>
-            {copyDirectoryLoading ? <p className={css.status}>{t('copy.directory.loading')}</p> : (
-              <select
-                id="documents-copy-directory"
-                className={`${css.select} ${css.moveSelect}`}
-                value={copyDirectory}
-                onChange={(event) => { setCopyDirectory(event.currentTarget.value as UserDocDirectoryIdType) }}
-                disabled={busy}
-              >
-                <option value="">{t('breadcrumb.root')}</option>
-                {copyDirectories.map(directory => (
-                  <option key={directory.directoryId} value={directory.directoryId}>{directory.name}</option>
-                ))}
-              </select>
-            )}
+            {renderOperationDocuments(overviewCopyRow !== null
+              ? [overviewCopyRow.row] : singleCopyDocument !== null ? [singleCopyDocument] : selectedDocumentList())}
+            <div className={css.destinationColumns}>
+              <DocumentDestinationPicker label={t('copy.target')}
+                options={copyTargets.map(option => ({ value: option.value, label: option.label, kind: 'scope' as const }))}
+                value={copyTarget} onChange={setCopyTarget} searchPlaceholder={t('scope.switch.search')}
+                emptyLabel={t('destination.empty')} selectedLabel={name => t('destination.selected', { name })} />
+              {copyDirectoryLoading ? <p className={css.operationStatus} role="status">{t('copy.directory.loading')}</p> : (
+                <DocumentDestinationPicker key={copyTarget} label={t('copy.directory')}
+                  options={[{ value: '', label: t('breadcrumb.root') }, ...copyDirectories.map(directory => ({ value: directory.directoryId, label: directory.name }))]}
+                  value={copyDirectory} onChange={(value) => { setCopyDirectory(value as UserDocDirectoryIdType) }} disabled={busy}
+                  searchPlaceholder={t('destination.searchFolders')} emptyLabel={t('destination.empty')}
+                  selectedLabel={name => t('destination.selected', { name })} />
+              )}
+            </div>
             {typeof userDocs.current.createScopeDirectory === 'function' && (
               <div className={css.inlineForm}>
-                <Input value={copyFolderName} placeholder={t('copy.directory.new')} onChange={(event) => { setCopyFolderName(event.target.value) }} disabled={copyFolderCreating || busy} />
+                <Input className={css.operationInput as string} aria-label={t('copy.directory.new')} value={copyFolderName} placeholder={t('copy.directory.new')} onChange={(event) => { setCopyFolderName(event.target.value) }} disabled={copyFolderCreating || busy} />
                 <Button type="button" variant="outline" disabled={copyFolderCreating || busy || copyFolderName.trim() === ''} onClick={() => { void createCopyFolder() }}>{t('folder.create')}</Button>
               </div>
             )}
-            {copyLoading && <p className={css.status}>{t('copy.loading')}</p>}
+            {copyLoading && <p className={css.operationStatus} role="status">{t('copy.loading')}</p>}
             {failedCopyItems.length > 0 && (
               <div className={css.failedCopies}>
                 <span className={css.formLabel}>{t('copy.retry.title')}</span>
                 {failedCopyItems.map(item => (
                   <div key={item.docId} className={css.failedCopyRow}>
-                    <span className={css.name} title={item.name}>{item.name}</span>
+                    <span className={css.failedCopyName}>{item.name}</span>
                     <Button type="button" size="sm" variant="outline" disabled={copyLoading || retryingCopyId !== null} onClick={() => { void retryCopy(item) }}>
                       {retryingCopyId === item.docId ? t('copy.retry.loading') : t('copy.retry.button')}
                     </Button>
@@ -4150,24 +4125,24 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               </div>
             )}
           </div>
-        </Modal>
+        </DocumentsMobileSheet>
       )}
 
       {sourcePickerOpen && (
-        <Modal
+        <DocumentsMobileSheet
           open
           onClose={() => {
             if (!sourcePickerLoading) setSourcePickerOpen(false)
           }}
+          kind="source"
           title={t('copy.source.title')}
           closeLabel={t('modal.close')}
-          className={css.confirmDialog as string}
           footer={(
             <>
               <Button type="button" variant="outline" disabled={sourcePickerLoading} onClick={() => { setSourcePickerOpen(false) }}>
                 {t('modal.cancel')}
               </Button>
-              <Button type="button" variant="primary" disabled={sourcePickerLoading || sourcePickerValue === ''} onClick={() => { void browseSource() }}>
+              <Button type="button" variant="soft" disabled={sourcePickerLoading || sourcePickerValue === ''} onClick={() => { void browseSource() }}>
                 {t('copy.source.open')}
               </Button>
             </>
@@ -4175,45 +4150,32 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         >
           <div className={css.form}>
             <p className={css.confirm}>{t('copy.source.message')}</p>
-            <label className={css.formLabel} htmlFor="documents-source-scope-search">{t('copy.source.label')}</label>
-            {sourceOptions.length > 1 && (
-              <Input
-                id="documents-source-scope-search"
-                icon={<IconSearchOutline16 size={16} />}
-                placeholder={t('scope.switch.search')}
-                value={sourcePickerQuery}
-                onChange={(event) => { setSourcePickerQuery(event.target.value) }}
-              />
-            )}
-            <div className={css.scopePickerOptions} role="listbox" aria-label={t('copy.source.label')}>
-              {filteredSourceOptions.length === 0 ? (
-                <p className={css.status}>{t('modal.noResults')}</p>
-              ) : filteredSourceOptions.map(option => renderScopePickerOption(
-                option,
-                sourcePickerValue,
-                sourcePickerLoading,
-                `${option.mode === 'rw' ? t('scope.project.mode.editable') : t('scope.project.mode.readOnly')} · ${t('scope.source.readOnly')}`,
-                setSourcePickerValue,
-              ))}
-            </div>
-            {sourcePickerLoading && <p className={css.status}>{t('copy.source.loading')}</p>}
+            {error !== '' && <div className={css.error} role="alert">{error}</div>}
+            <DocumentDestinationPicker label={t('copy.source.label')}
+              options={sourceOptions.map(option => ({ value: option.value, label: option.label, kind: 'scope' as const,
+                description: `${option.mode === 'rw' ? t('scope.project.mode.editable') : t('scope.project.mode.readOnly')} · ${t('scope.source.readOnly')}` }))}
+              value={sourcePickerValue} onChange={setSourcePickerValue} disabled={sourcePickerLoading}
+              query={sourcePickerQuery} onQueryChange={setSourcePickerQuery} searchable={sourceOptions.length > 1}
+              searchPlaceholder={t('scope.switch.search')} emptyLabel={t('destination.empty')}
+              selectedLabel={name => t('destination.selected', { name })} />
+            {sourcePickerLoading && <p className={css.operationStatus} role="status">{t('copy.source.loading')}</p>}
           </div>
-        </Modal>
+        </DocumentsMobileSheet>
       )}
 
       {uploadScopePickerOpen && !phone && (
-        <Modal
+        <DocumentsMobileSheet
           open
           onClose={() => { if (!busy) setUploadScopePickerOpen(false) }}
+          kind="upload-scope"
           title={t('scope.upload.choose')}
           closeLabel={t('modal.close')}
-          className={css.confirmDialog as string}
           footer={(
             <>
               <Button type="button" variant="outline" disabled={busy} onClick={() => { setUploadScopePickerOpen(false) }}>
                 {t('modal.cancel')}
               </Button>
-              <Button type="button" variant="primary" disabled={busy || uploadScopePickerValue === ''} onClick={() => { void chooseUploadScope() }}>
+              <Button type="button" variant="soft" disabled={busy || uploadScopePickerValue === ''} onClick={() => { void chooseUploadScope() }}>
                 {t('scope.upload.confirm')}
               </Button>
             </>
@@ -4221,28 +4183,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         >
           <div className={css.form}>
             <p className={css.confirm}>{t('scope.upload.root')}</p>
-            {uploadScopeOptions.length > 1 && (
-              <Input
-                autoFocus
-                icon={<IconSearchOutline16 size={16} />}
-                placeholder={t('scope.switch.search')}
-                value={uploadScopePickerQuery}
-                onChange={(event) => { setUploadScopePickerQuery(event.target.value) }}
-              />
-            )}
-            <div className={css.scopePickerOptions} role="listbox" aria-label={t('scope.upload.choose')}>
-              {filteredUploadScopeOptions.length === 0 ? (
-                <p className={css.status}>{t('scope.upload.unavailable')}</p>
-              ) : filteredUploadScopeOptions.map(option => renderScopePickerOption(
-                option,
-                uploadScopePickerValue,
-                busy,
-                `${t('scope.project.mode.editable')} · ${t('scope.upload.root')}`,
-                setUploadScopePickerValue,
-              ))}
-            </div>
+            {error !== '' && <div className={css.error} role="alert">{error}</div>}
+            <DocumentDestinationPicker label={t('scope.upload.choose')}
+              options={uploadScopeOptions.map(option => ({ value: option.value, label: option.label, kind: 'scope' as const,
+                description: `${t('scope.project.mode.editable')} · ${t('scope.upload.root')}` }))}
+              value={uploadScopePickerValue} onChange={setUploadScopePickerValue} disabled={busy}
+              query={uploadScopePickerQuery} onQueryChange={setUploadScopePickerQuery} searchable={uploadScopeOptions.length > 1}
+              searchPlaceholder={t('scope.switch.search')} emptyLabel={t('destination.empty')}
+              selectedLabel={name => t('destination.selected', { name })} />
           </div>
-        </Modal>
+        </DocumentsMobileSheet>
       )}
 
 

@@ -936,9 +936,6 @@
   line-height: 22px;
 }
 
-.confirmDialog {
-  width: min(480px, 100%);
-}
 
 .form {
   display: flex;
@@ -952,12 +949,6 @@
   line-height: 20px;
 }
 
-.formActions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--dsw-space-2);
-}
 
 .inlineForm {
   display: flex;
@@ -987,73 +978,6 @@
 
 .failedCopyRow .name {
   min-width: 0;
-}
-
-.moveSelect {
-  width: 100%;
-  max-width: none;
-}
-
-.scopePickerOptions {
-  display: flex;
-  max-height: 280px;
-  flex-direction: column;
-  gap: var(--dsw-space-1);
-  box-sizing: border-box;
-  padding-inline-end: 8px;
-  overflow-y: auto;
-  scrollbar-gutter: stable both-edges;
-}
-
-.scopePickerOption {
-  display: flex;
-  align-items: center;
-  gap: var(--dsw-space-2);
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 52px;
-  padding: var(--dsw-space-2) var(--dsw-space-3);
-  border: 1px solid transparent;
-  border-radius: var(--dsw-radius-md);
-  background: transparent;
-  color: var(--dsw-alias-label-primary);
-  text-align: left;
-  cursor: pointer;
-}
-
-.scopePickerOption:hover:not(:disabled),
-.scopePickerOption:focus-visible {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.scopePickerOptionSelected {
-  border-color: transparent;
-  background: var(--dsw-alias-bg-raised);
-  box-shadow: var(--dsw-elevation-control);
-}
-
-.scopePickerCopy {
-  display: flex;
-  min-width: 0;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.scopePickerCopy strong,
-.scopePickerCopy small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.scopePickerCopy strong {
-  font: var(--dsw-mobile-font-secondary);
-}
-
-.scopePickerCopy small {
-  color: var(--dsw-alias-label-caption);
-  font: var(--dsw-mobile-font-caption);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1180,7 +1104,6 @@
   cursor: pointer;
 }
 
-.sheetOption:hover:not(:disabled),
 .sheetOption:focus-visible {
   background: var(--dsw-alias-interactive-bg-hover);
 }
@@ -1292,8 +1215,8 @@
   text-decoration: none;
 }
 
-.sheetActionLink:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .sheetOption:hover:not(:disabled), .sheetActionLink:hover { background: var(--dsw-alias-interactive-bg-hover); }
 }
 
 .sheetDanger {
@@ -1627,9 +1550,6 @@
     padding: var(--dsw-space-2);
   }
 
-  .scopePickerOptions {
-    max-height: none;
-  }
 
   .caption {
     gap: var(--dsw-space-1);
@@ -1837,19 +1757,12 @@
     min-height: var(--dsw-touch-target);
   }
 
-  .confirmDialog.confirmDialog {
-    box-sizing: border-box;
-    width: 100%;
-    max-height: calc(var(--dsw-viewport-height, 100vh) - var(--dsw-space-8) - var(--dsw-safe-top));
-  }
 
-  .formActions,
   .inlineForm {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .formActions > *,
   .inlineForm > * {
     width: 100%;
     min-height: 40px;
@@ -2560,11 +2473,11 @@
 .scopeNotice { width: auto; min-height: 24px; padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
 .scopeNoticeCopy { flex-direction: row; flex-wrap: wrap; gap: 4px 8px; }
 .scopeNoticeCopy strong { display: none; }
-.scopeNoticeCopy small { font-size: 11px; }
+.scopeNoticeCopy small { color: var(--dsw-alias-label-secondary); font-size: 11px; }
 .toolbar { display: contents; }
 .filterGroup { grid-column: 1 / -1; grid-row: 2; display: flex; flex: 1 1 auto; min-width: 0; gap: 8px; }
 .search { min-width: 80px; flex: 1 1 auto; }
-.select { flex: 0 0 102px; max-width: 120px; }
+.filterGroup .select { flex: 0 0 102px; max-width: 120px; }
 .actionGroup { grid-column: 2; grid-row: 1; margin: 0; flex-wrap: nowrap; justify-content: flex-end; gap: 4px; }
 .actionGroup > button { min-height: var(--dsw-control-height-toolbar); }
 .desktopMore { width: 32px; padding: 0; }
@@ -2680,3 +2593,56 @@
 .crumb { font-weight: 400; color: var(--dsw-alias-label-secondary); }
 .groupDate { background: transparent; border: 0; }
 @media (max-width: 767px) { .shell > :first-child > button { right: 8px; top: 4px; width: 44px; min-height: 44px; } }
+
+/* Auxiliary tasks use the same content rhythm as the document workbench. */
+.operationFiles { flex: none; display: flex; flex-direction: column; gap: 0; min-width: 0; max-height: 128px; margin: 0; padding: 0 6px 0 0; overflow-y: auto; overscroll-behavior: contain; list-style: none; scrollbar-gutter: stable; }
+.operationFiles li { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 8px 0; font-size: 13px; line-height: 20px; }
+.operationFiles li > img { flex: none; margin-top: 1px; }
+.operationFiles li > span { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.operationFiles small { flex: none; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; }
+.destinationColumns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--dsw-space-5); }
+.confirm { overflow-wrap: anywhere; font-size: 13px; line-height: 21px; }
+.operationStatus { display: flex; flex: none; align-items: center; justify-content: center; min-height: 96px; margin: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 20px; }
+.dangerAction.dangerAction { color: var(--dsw-alias-state-error-primary); background: var(--dsw-alias-tint-error); }
+.historyList { display: flex; flex-direction: column; gap: 0; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.historyList li { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--dsw-space-4); padding: var(--dsw-space-3) 0; border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
+.historyList li > span { display: flex; flex: 1 1 auto; min-width: 0; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
+.historyList strong { font-size: 13px; font-weight: 500; line-height: 20px; }
+.historyList small, .historyList time { color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.historyList time { flex: none; max-width: 42%; font-variant-numeric: tabular-nums; }
+.failedCopyName { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 20px; }
+.sheetEntity strong, .sheetEntity small, .sheetOptionCopy strong, .sheetOptionCopy small { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+.sheetEntity small, .sheetOptionCopy small { color: var(--dsw-alias-label-secondary); }
+@media (max-width: 767px) {
+  .destinationColumns { grid-template-columns: minmax(0, 1fr); gap: var(--dsw-space-4); }
+  .form .inlineForm { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .form .inlineForm > :first-child { flex: 1 1 180px; width: auto; }
+  .form .inlineForm > button { flex: none; width: auto; min-height: var(--dsw-touch-target); border-radius: var(--dsw-radius-control); }
+  .failedCopyRow > button { min-height: var(--dsw-touch-target); }
+  .confirm, .operationFiles li, .failedCopyName { font-size: 14px; line-height: 22px; }
+  .historyList li { flex-direction: column; gap: 6px; }
+  .historyList time { max-width: none; }
+}
+
+.operationInput { min-width: 0; }
+@media (max-width: 767px) {
+  .operationInput { height: auto; min-height: var(--dsw-touch-target); }
+  .operationInput input { font-size: 16px; line-height: 24px; }
+}
+
+.search input::placeholder, .scopeSearch input::placeholder, .sheetSearch input::placeholder, .operationInput input::placeholder { color: var(--dsw-alias-label-secondary); }
+
+/* Action controls keep paint and focus clearance inside every list row. */
+.row, .overviewRow, .trashRow { padding-inline-end: var(--dsw-space-2); }
+.rowPrimaryActions { min-width: max-content; flex-shrink: 0; }
+.rowPrimaryActions > span { flex: none; }
+@media (min-width: 768px) {
+  .row { grid-template-columns: 32px minmax(0, 1fr) 62px max-content; }
+  .folderRow { grid-template-columns: 32px minmax(0, 1fr) max-content; }
+}
+@media (min-width: 768px) and (max-width: 1100px) {
+  .row:not(.folderRow) { grid-template-columns: 32px minmax(0, 1fr) max-content; }
+}
+@media (pointer: coarse) {
+  .rowMore { width: var(--dsw-touch-target); min-width: var(--dsw-touch-target); height: var(--dsw-touch-target); min-height: var(--dsw-touch-target); }
+}

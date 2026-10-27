@@ -31,3 +31,6 @@
 @media (hover: hover) { .download:hover { background: var(--dsw-alias-interactive-bg-active); } }
 
 .fileTypeIcon { flex: none; margin-top: 1px; }
+
+.body:has(> .frame) { padding: 0; overflow: hidden; scrollbar-gutter: auto; }
+.frame { min-height: 0; height: 100%; }

@@ -83,6 +83,28 @@ async function mockDocuments(page: Page, payload: typeof LIST_PAYLOAD = LIST_PAY
   })
 }
 
+
+async function assertRowActionClearance(manager: ReturnType<Page['getByRole']>, width: number): Promise<void> {
+  await manager.evaluate(async element => Promise.allSettled(element.getAnimations().map(animation => animation.finished)))
+  const controls = manager.locator('[data-documents-row-kind] button[aria-label^="More actions:"]')
+  expect(await controls.count()).toBeGreaterThan(0)
+  for (const button of await controls.all()) {
+    const name = await button.getAttribute('aria-label')
+    if (name?.startsWith('More actions:') !== true) continue
+    await button.focus()
+    if (width >= 768) await button.hover()
+    const box = await button.evaluate((element) => {
+      const row = element.closest('[data-documents-row-kind]')!
+      const a = element.getBoundingClientRect(), b = row.getBoundingClientRect()
+      return { rightClearance: b.right-a.right, leftClearance: a.left-b.left, width: a.width, height: a.height }
+    })
+    expect(box.rightClearance).toBeGreaterThanOrEqual(7.5)
+    expect(box.leftClearance).toBeGreaterThanOrEqual(0)
+    expect(box.width).toBeGreaterThanOrEqual(width === 390 ? 44 : 32)
+    expect(box.height).toBeGreaterThanOrEqual(width === 390 ? 44 : 32)
+  }
+}
+
 describe('web e2e: document manager', () => {
   let scaffold: WebScaffold
   let browser: Browser
@@ -178,7 +200,11 @@ describe('web e2e: document manager', () => {
     expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth + 1)
     const close = preview.getByRole('button', { name: compact ? 'Back to documents' : 'Close preview', exact: true })
     await close.waitFor({ state: 'visible' })
-    await close.click()
+    if (compact) await close.click()
+    else {
+      await close.focus()
+      await page.keyboard.press('Escape')
+    }
     await preview.waitFor({ state: 'detached' })
     expect(await page.locator('iframe').count()).toBe(0)
     await expect.poll(() => page.frames().length).toBe(initialFrames)
@@ -323,9 +349,11 @@ describe('web e2e: document manager', () => {
     if (target === 'project') {
       if (compact) {
         await manager.locator('[data-documents-scope-trigger]').tap()
-        await page.locator('[data-documents-sheet="scope-view"]').getByRole('option', { name: /Compiler/ }).tap()
+        await page.locator('[data-documents-sheet="scope-view"]').getByRole('button', { name: /Compiler/ }).tap()
       } else await manager.getByRole('button', { name: /Compiler/ }).click()
-      await manager.getByRole('status').getByText('Upload target: Compiler', { exact: true }).waitFor()
+      await (compact
+        ? manager.locator('[data-documents-scope-trigger]').getByText('Upload target: Compiler', { exact: true })
+        : manager.getByText('Upload target: Compiler', { exact: true }).filter({ visible: true })).waitFor()
     }
     const folderName = target === 'personal' ? `trash-return-${label}` : 'reports'
     const folder = manager.getByRole('button', { name: `Open folder ${folderName}`, exact: true })
@@ -411,7 +439,9 @@ describe('web e2e: document manager', () => {
       expect(await breadcrumb.getAttribute('aria-current')).toBe('page')
       expect(await returnTarget.evaluate(node => node === document.activeElement)).toBe(true)
       expect(await manager.count()).toBe(1)
-      if (target === 'project') await manager.getByRole('status').getByText('Upload target: Compiler', { exact: true }).waitFor()
+      if (target === 'project') await (compact
+        ? manager.locator('[data-documents-scope-trigger]').getByText('Upload target: Compiler', { exact: true })
+        : manager.getByText('Upload target: Compiler', { exact: true }).filter({ visible: true })).waitFor()
       else {
         expect((await scaffold.ctx.userDocs.listDirectory(UserDocDirectoryId(directoryId))).documents
           .some(row => row.docId === restoredFile.docId)).toBe(true)
@@ -907,7 +937,7 @@ describe('web e2e: document manager', () => {
     const scopeSnapshot = await captureStableAria(page, '[data-documents-sheet="scope-view"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(COMPACT_SCOPE_EXPECTED, scopeSnapshot, MODE)
     await scopeSheet.getByPlaceholder('Search document scopes').fill('Compiler')
-    await scopeSheet.getByRole('option', { name: /Compiler/ }).click()
+    await scopeSheet.getByRole('button', { name: /Compiler/ }).click()
     await manager.locator('[data-documents-panel]').getByText('Viewing: Compiler', { exact: true }).waitFor({ timeout: 10_000 })
     await manager.getByText('shared.txt', { exact: true }).waitFor({ timeout: 10_000 })
     expect(await page.locator('[role="dialog"]').count()).toBe(1)
@@ -964,7 +994,7 @@ describe('web e2e: document manager', () => {
     await manager.waitFor({ timeout: 10_000 })
     await manager.locator('[data-documents-scope-trigger]').click()
     const scopeSheet = page.locator('[data-documents-sheet="scope-view"]')
-    await scopeSheet.getByRole('option', { name: /All accessible documents/ }).click()
+    await scopeSheet.getByRole('button', { name: /All accessible documents/ }).click()
     await manager.getByRole('heading', { name: 'All accessible documents' }).waitFor({ timeout: 10_000 })
     await manager.locator('[class*="overviewList"]').getByText('notes.txt', { exact: true }).waitFor({ timeout: 10_000 })
     const overviewSnapshot = await captureStableAria(page, '[data-documents-panel]', scaffold.workspaceCwd)
@@ -998,6 +1028,127 @@ describe('web e2e: document manager', () => {
     expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1)
   }, 60_000)
 
+  it.each([1280, 1024, 768, 390])('secondary dialogs keep complete names, destination values and pinned actions at %ipx', async (width) => {
+    page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'en-US', hasTouch: width === 390 })
+    tripwire = watchConsole(page)
+    const out = process.env.DSH_DOCUMENT_DIALOG_SCREENSHOTS
+    const longName = '客户交付资料与产品需求说明_完整的目录名称必须可以阅读_2026年10月'
+    const folders = Array.from({ length: 7 }, (_, index) => ({ directoryId: `folder-${index}`, name: index === 6 ? longName : `Archive ${index}`, path: '', modifiedAt: 1 }))
+    const moves: string[] = []
+    const creations: string[] = []
+    await mockDocuments(page)
+    await page.route(/\/account\/api\/context(?:\?.*)?$/, route => route.fulfill({ json: {
+      scope: { kind: 'personal' }, projects: [
+        { projectId: 41, name: 'Compiler', mode: 'rw' }, { projectId: 42, name: longName, mode: 'rw' },
+      ],
+    } }))
+    await page.route(/\/api\/documents\/directories(?:\?.*)?$/, route => route.fulfill({ json: { directories: folders } }))
+    await page.route(/\/api\/documents\/transfer\/directories(?:\?.*)?$/, route => route.fulfill({
+      json: { version: 1, directories: folders },
+    }))
+    await page.route(/\/api\/documents\/move(?:\?.*)?$/, (route) => {
+      moves.push(new URL(route.request().url()).searchParams.get('directory') ?? '')
+      return route.fulfill({ status: 409, json: { error: 'Move could not be completed' } })
+    })
+    await page.route(/\/api\/documents\/folders(?:\?.*)?$/, (route) => {
+      const name = new URL(route.request().url()).searchParams.get('name') ?? ''
+      creations.push(name)
+      return route.fulfill({ json: { directoryId: 'new', name, path: '', modifiedAt: 1 } })
+    })
+    await page.route(/\/api\/documents\/history(?:\?.*)?$/, route => route.fulfill({ json: { version: 1, items: [
+      { id: 'history-1', eventKind: 'upload', documentName: longName+'.pdf', createdAt: 1, actor: { displayName: 'Design review' } },
+    ] } }))
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    if (width === 390) await page.getByRole('button', { name: 'Open sidebar' }).click()
+    await page.getByRole('button', { name: 'Documents', exact: true }).click()
+    const manager = page.getByRole('dialog', { name: 'Document Manager', exact: true })
+    await manager.getByText('brief.txt', { exact: true }).waitFor()
+    await assertRowActionClearance(manager, width)
+    if (out !== undefined) await page.screenshot({ path: join(out, `row-hover-${width}.png`) })
+    if (width >= 768) {
+      await page.route(/\/api\/documents\/content(?:\?.*)?$/, route => route.fulfill({ contentType: 'text/plain', body: 'Reading fixture' }))
+      await manager.getByRole('button', { name: 'Preview brief.txt', exact: true }).click()
+      await assertRowActionClearance(manager, width)
+      if (out !== undefined) await page.screenshot({ path: join(out, `row-hover-preview-${width}.png`) })
+      await manager.getByRole('button', { name: 'Close preview', exact: true }).click()
+    }
+    const assertFits = async (dialog: ReturnType<Page['getByRole']>) => {
+      const geometry = await dialog.evaluate(element => ({
+        x: element.getBoundingClientRect().x, right: element.getBoundingClientRect().right,
+        scroll: element.scrollWidth, client: element.clientWidth,
+      }))
+      expect(geometry.x).toBeGreaterThanOrEqual(0)
+      expect(geometry.right).toBeLessThanOrEqual(width+1)
+      expect(geometry.scroll).toBeLessThanOrEqual(geometry.client+1)
+      const footer = dialog.locator('[data-documents-dialog-actions]')
+      if (await footer.count() > 0) for (const button of await footer.getByRole('button').all()) {
+        const box = await button.boundingBox()
+        expect(box?.height).toBeGreaterThanOrEqual(width === 390 ? 44 : 32)
+      }
+    }
+    const shot = async (kind: string) => {
+      if (out !== undefined) await page.screenshot({ path: join(out, `${kind}-${width}.png`) })
+    }
+    const rowAction = async (name: string) => {
+      await manager.getByRole('button', { name: 'More actions: brief.txt', exact: true }).click()
+      if (width === 390) await page.getByRole('dialog', { name: 'More actions', exact: true }).getByRole('button', { name, exact: true }).click()
+      else await page.getByRole('menuitem', { name, exact: true }).click()
+    }
+    if (width === 390) {
+      await manager.getByRole('button', { name: 'More actions', exact: true }).click()
+      await page.getByRole('dialog', { name: 'More actions', exact: true }).getByRole('button', { name: 'New Folder', exact: true }).click()
+    } else await manager.getByRole('button', { name: 'New Folder', exact: true }).click()
+    const create = page.getByRole('dialog', { name: 'New Folder', exact: true })
+    await create.getByRole('textbox', { name: 'Folder name' }).fill('review-folder')
+    await assertFits(create)
+    await shot('create')
+    await create.getByRole('textbox', { name: 'Folder name' }).press('Enter')
+    await create.waitFor({ state: 'hidden' })
+    expect(creations).toEqual(['review-folder'])
+
+    await rowAction('Move')
+    const move = page.getByRole('dialog', { name: 'Move Documents', exact: true })
+    const group = move.getByRole('radiogroup', { name: 'Destination folder' })
+    await group.getByRole('radio', { name: longName, exact: true }).check()
+    await group.getByRole('radio', { name: longName, exact: true }).press('ArrowUp')
+    expect(await group.getByRole('radio', { name: 'Archive 5', exact: true }).isChecked()).toBe(true)
+    await group.getByRole('radio', { name: 'Archive 5', exact: true }).press('ArrowDown')
+    expect(await group.getByRole('radio', { name: longName, exact: true }).isChecked()).toBe(true)
+    await group.getByRole('textbox', { name: 'Search destination folders' }).fill('no-matching-folder')
+    expect(await group.getByText('Selected: '+longName, { exact: true }).isVisible()).toBe(true)
+    await group.getByRole('textbox', { name: 'Search destination folders' }).fill('')
+    await assertFits(move)
+    await shot('move')
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'secondary-move.expected.md'), await captureStableAria(page, '[data-documents-dialog="move"]', scaffold.workspaceCwd), MODE)
+    await move.getByRole('button', { name: 'Confirm Move', exact: true }).click()
+    await move.getByRole('alert').waitFor()
+    expect(moves).toEqual(['folder-6'])
+    await shot('move-error')
+    await move.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    await rowAction('Copy to…')
+    const copy = page.getByRole('dialog', { name: 'Copy Document Snapshots', exact: true })
+    await copy.getByRole('radiogroup', { name: 'Target folder' }).getByRole('radio', { name: 'Root folder', exact: true }).waitFor()
+    await assertFits(copy)
+    await shot('copy')
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'secondary-copy.expected.md'), await captureStableAria(page, '[data-documents-dialog="copy"]', scaffold.workspaceCwd), MODE)
+    await copy.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    if (width === 390) {
+      await manager.getByRole('button', { name: 'More actions', exact: true }).click()
+      await page.getByRole('dialog', { name: 'More actions', exact: true }).getByRole('button', { name: 'History', exact: true }).click()
+    } else if (width <= 1100) {
+      await manager.getByRole('button', { name: 'More actions', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'History', exact: true }).click()
+    } else await manager.getByRole('button', { name: 'History', exact: true }).click()
+    const history = page.getByRole('dialog', { name: 'Document operation history', exact: true })
+    await history.getByText(longName+'.pdf', { exact: false }).waitFor()
+    await assertFits(history)
+    await shot('history')
+    await history.getByRole('button', { name: 'Close', exact: true }).click()
+  }, 60_000)
+
   it('commits exactly the document-manager snapshot inventory', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, [
       'compact-actions.expected.md',
@@ -1007,6 +1158,8 @@ describe('web e2e: document manager', () => {
       'compact-scope.expected.md',
       'desktop-paged.expected.md',
       'desktop.expected.md',
+      'secondary-move.expected.md',
+      'secondary-copy.expected.md',
     ])
   })
 
