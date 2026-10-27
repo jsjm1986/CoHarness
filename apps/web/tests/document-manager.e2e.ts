@@ -351,9 +351,7 @@ describe('web e2e: document manager', () => {
         await manager.locator('[data-documents-scope-trigger]').tap()
         await page.locator('[data-documents-sheet="scope-view"]').getByRole('button', { name: /Compiler/ }).tap()
       } else await manager.getByRole('button', { name: /Compiler/ }).click()
-      await (compact
-        ? manager.locator('[data-documents-scope-trigger]').getByText('Upload target: Compiler', { exact: true })
-        : manager.getByText('Upload target: Compiler', { exact: true }).filter({ visible: true })).waitFor()
+      await manager.getByText('Upload target: Compiler', { exact: true }).filter({ visible: true }).waitFor()
     }
     const folderName = target === 'personal' ? `trash-return-${label}` : 'reports'
     const folder = manager.getByRole('button', { name: `Open folder ${folderName}`, exact: true })
@@ -439,9 +437,7 @@ describe('web e2e: document manager', () => {
       expect(await breadcrumb.getAttribute('aria-current')).toBe('page')
       expect(await returnTarget.evaluate(node => node === document.activeElement)).toBe(true)
       expect(await manager.count()).toBe(1)
-      if (target === 'project') await (compact
-        ? manager.locator('[data-documents-scope-trigger]').getByText('Upload target: Compiler', { exact: true })
-        : manager.getByText('Upload target: Compiler', { exact: true }).filter({ visible: true })).waitFor()
+      if (target === 'project') await manager.getByText('Upload target: Compiler', { exact: true }).filter({ visible: true }).waitFor()
       else {
         expect((await scaffold.ctx.userDocs.listDirectory(UserDocDirectoryId(directoryId))).documents
           .some(row => row.docId === restoredFile.docId)).toBe(true)
