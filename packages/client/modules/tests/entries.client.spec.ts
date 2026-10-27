@@ -81,6 +81,17 @@ function visible(id: string, effects: { mounted: number; disposed: number; hits:
 }
 
 describe('client manifest entries', () => {
+  it('withdraws an old chunk table when a rebuilt frame supplies only a replacement owner revision', async () => {
+    const b = await bench(graph(row('pet', '0', { chunks: { 'client.lazy.js': 'a'.repeat(64) } })), {
+      pet: () => ({ apply() {} }),
+    })
+    await b.modules.entries.reload('pet', '1')
+    await b.modules.entries.retry()
+    expect(b.modules.manifest.modules.find(row => row.id === 'pet')?.chunks).toBeUndefined()
+    await b.modules.entries.sync(graph(row('pet', '1', { chunks: { 'client.lazy.js': 'b'.repeat(64) } })))
+    expect(b.modules.manifest.modules.find(row => row.id === 'pet')?.chunks).toEqual({ 'client.lazy.js': 'b'.repeat(64) })
+  })
+
   it('adds, drains removal and re-enables one instance with styles; unrelated entries survive', async () => {
     const effects = { mounted: 0, disposed: 0, hits: 0 }
     const cleanup = deferred()

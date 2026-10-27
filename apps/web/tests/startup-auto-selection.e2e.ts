@@ -4,6 +4,8 @@
 // selection; a known-current blank retains its Hero during its own history read.
 // These Host-only scenarios make no model requests.
 import { join } from 'node:path'
+import type { Context } from '@deepseek-ai/cordis'
+import type { ClientModuleLoader, ClientModuleLoaderTarget } from '@deepseek-ai/dsh-client-modules/client'
 import { Session, SessionId, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import { createUserMessage, createAssistantMessage } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-persistence'
@@ -30,6 +32,51 @@ function recordedPhases(page: Page): Promise<string[]> {
 
 const SAVED_ID = 'startup-saved-history'
 const SAVED_PROMPT = 'Show the saved conversation.'
+
+interface StartupModelObservation {
+  ctx?: Context
+  modules?: ClientModuleLoader
+}
+
+/** Read-only Client observations without importing its Cordis merges into the Host test face. */
+interface StartupSessionReadFace {
+  readonly list: {
+    getSnapshot(): { current?: string; byId: Readonly<Record<string, { origin?: string }>> }
+  }
+  scope(id: string): unknown
+  sessionOf(ctx: unknown): { getSnapshot(): { openState: string } } | undefined
+}
+
+/** Observe the real saved root's admission and lifetime while its history response is held. */
+async function readStartupModelAdmission(page: Page, sessionId: string) {
+  return page.evaluate((id) => {
+    const observation = Reflect.get(globalThis, '__startupModelObservation') as StartupModelObservation
+    const ctx = observation.ctx
+    const modules = observation.modules
+    if (ctx === undefined || modules === undefined) throw new Error('Real Client composition was not observed')
+    const runtime = modules.loadCache.get('@deepseek-ai/dsh-client-runtime')?.exports as {
+      clientSessionKey(target: { kind: 'personal' }, originalId: string): string
+    }
+    const key = runtime.clientSessionKey({ kind: 'personal' }, id)
+    const sessions = ctx.get('sessions') as unknown as StartupSessionReadFace
+    const connection = ctx.get('connection') as unknown as {
+      readonly state: { getSnapshot(): string | undefined }
+    }
+    const policy = ctx.get('projectUiPolicy') as unknown as {
+      getSnapshot(): { verifiedAccountId?: number }
+    }
+    const list = sessions.list.getSnapshot()
+    const scope = sessions.scope(key)
+    return {
+      currentMatchesSaved: list.current === key,
+      listed: Object.hasOwn(list.byId, key),
+      retainedScope: scope !== undefined,
+      connected: connection.state.getSnapshot() === 'connected',
+      accountVerified: policy.getSnapshot().verifiedAccountId === 1,
+      historyState: scope === undefined ? null : sessions.sessionOf(scope)?.getSnapshot().openState ?? null,
+    }
+  }, sessionId)
+}
 
 /** A closed synthetic conversation restored without an Agent or model request. */
 function savedHistory(): string {
@@ -344,6 +391,159 @@ describe('web e2e: startup auto-selection', () => {
       } finally { await projectScaffold.close() }
     }
   }, 120_000)
+
+  it('prepares the saved current model directory while history is held and shares its first mounted read', async (test) => {
+    const modelScaffold = await launchWebScaffold({ workbench: true })
+    let modelPage: Page | undefined
+    const listGate = Promise.withResolvers<undefined>()
+    const listRequested = Promise.withResolvers<undefined>()
+    const historyGate = Promise.withResolvers<undefined>()
+    const historyRequested = Promise.withResolvers<undefined>()
+    const routeReads: Promise<void>[] = []
+    try {
+      const id = await seedSession(modelScaffold, savedHistory(), 'startup-model-current')
+      const otherId = await seedSession(modelScaffold, savedHistory(), 'startup-model-unselected')
+      const workspace = await modelScaffold.ctx.workspaceRegistry.create(modelScaffold.workspaceCwd)
+      await workspace.attachSession(id)
+      await workspace.attachSession(otherId)
+      modelPage = await newEnglishPage(browser)
+      const target = modelPage
+      target.setDefaultTimeout(test.task.timeout)
+      const logs = watchConsole(target)
+      const origin = new URL(modelScaffold.authenticatedUrl).origin
+      const modelRequests: string[] = []
+      let creates = 0
+      target.on('request', (request) => {
+        const url = new URL(request.url())
+        if (url.origin !== origin) return
+        if (url.pathname === '/api/session.create') creates++
+        if (url.pathname !== '/api/session.models') return
+        const body = request.postDataJSON() as { payload: { sessionId: string } }
+        modelRequests.push(body.payload.sessionId)
+      })
+      await target.addInitScript((selectedId) => {
+        if (window !== window.top) return
+        Object.assign(globalThis, {
+          __DSH_DOCUMENT_IDENTITY__: { version: 1, principalId: 1, runtimeTarget: { kind: 'personal' } },
+        })
+        localStorage.setItem('dsh.sessions.current.v2.1.personal', JSON.stringify({ sessionId: selectedId }))
+        const observation: StartupModelObservation = {}
+        Reflect.set(globalThis, '__startupModelObservation', observation)
+        Object.defineProperty(globalThis, '__ModuleLoader__', {
+          configurable: true,
+          set(target: ClientModuleLoaderTarget) {
+            Object.defineProperty(globalThis, '__ModuleLoader__', { configurable: true, writable: true, value: target })
+            const create = target.create.bind(target)
+            target.create = function (options) {
+              const modules = create(options)
+              observation.modules = modules
+              const start = modules.entries.start.bind(modules.entries)
+              modules.entries.start = (loader, manifest) => {
+                observation.ctx = loader.ctx.root
+                return start(loader, manifest)
+              }
+              return modules
+            }
+          },
+        })
+      }, id)
+      // Gateway metadata is external; module boot, admission, history and model RPCs stay real.
+      await target.route(url => url.origin === origin && url.pathname === '/api/host.describe', async (route) => {
+        const response = await route.fetch()
+        const body = await response.json() as {
+          result: { ok: true; value: { executionAuthorityRequired: boolean; runtimeTarget: { kind: 'personal' } } } | { ok: false }
+        }
+        expect(body.result.ok).toBe(true)
+        if (body.result.ok) {
+          body.result.value.executionAuthorityRequired = true
+          body.result.value.runtimeTarget = { kind: 'personal' }
+        }
+        await route.fulfill({ response, json: body })
+      })
+      await target.route(url => url.origin === origin && url.pathname === '/account/api/context', route => route.fulfill({ json: {
+        user: { id: 1, username: 'fixture', displayName: 'Fixture', role: 'admin' },
+        scope: { kind: 'personal' }, projects: [],
+      } }))
+      await target.route(url => url.origin === origin && url.pathname === '/account/api/workbench/catalog', route => route.fulfill({ json: {
+        personal: { id: 1, name: 'Fixture' }, personalComplete: true, activeRuntime: { kind: 'personal' }, projects: [],
+        items: [id, otherId].map(sessionId => ({ sessionId, runtime: { kind: 'personal' }, visibility: 'personal',
+          creatorUserId: 1, creatorDisplayName: 'Fixture', updatedAt: 1, blank: false, canWrite: true })),
+      } }))
+      await target.route(url => url.origin === origin && url.pathname === '/api/session.list', (route) => {
+        const read = (async () => {
+          const response = await route.fetch()
+          expect(response.status()).toBe(200)
+          listRequested.resolve(undefined)
+          await listGate.promise
+          await route.fulfill({ response })
+        })()
+        routeReads.push(read)
+        return read
+      })
+      await target.route(url => url.origin === origin && url.pathname === '/api/session.history', (route) => {
+        const body = route.request().postDataJSON() as { payload: { sessionId: string } }
+        if (body.payload.sessionId !== id) return route.continue()
+        const read = (async () => {
+          const response = await route.fetch()
+          expect(response.status()).toBe(200)
+          historyRequested.resolve(undefined)
+          await historyGate.promise
+          await route.fulfill({ response })
+        })()
+        routeReads.push(read)
+        return read
+      })
+      const workspaceBaseline = target.waitForResponse((response) => {
+        const url = new URL(response.url())
+        return url.origin === origin && url.pathname === '/api/workspace.list'
+      })
+      await target.goto(modelScaffold.authenticatedUrl, { waitUntil: 'domcontentloaded' })
+      await Promise.all([listRequested.promise, historyRequested.promise])
+      expect(await (await workspaceBaseline).finished()).toBeNull()
+      await expect.poll(() => readStartupModelAdmission(target, id), { timeout: test.task.timeout }).toEqual({
+        currentMatchesSaved: false, listed: false, retainedScope: false, connected: true, accountVerified: true, historyState: null,
+      })
+      expect(modelRequests).toEqual([])
+      expect(modelScaffold.ctx.agents.get(id)).toBeUndefined()
+      expect(modelScaffold.ctx.agents.get(otherId)).toBeUndefined()
+      listGate.resolve(undefined)
+      await expect.poll(() => readStartupModelAdmission(target, id), { timeout: test.task.timeout }).toEqual({
+        currentMatchesSaved: true, listed: true, retainedScope: true, connected: true, accountVerified: true, historyState: 'loading',
+      })
+      expect(await target.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
+      await expect.poll(() => modelRequests, {
+        timeout: test.task.timeout,
+        message: 'An admitted saved current root prepares its model directory before the held history response is released',
+      }).toEqual([id])
+      expect((await readStartupModelAdmission(target, id)).historyState).toBe('loading')
+      expect(await target.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
+      expect(modelScaffold.ctx.agents.get(otherId)).toBeUndefined()
+      historyGate.resolve(undefined)
+      await target.getByText(SAVED_PROMPT, { exact: true }).waitFor()
+      const model = target.getByRole('button', { name: 'Select model, current DeepSeek-V4-Flash', exact: true })
+      await model.waitFor()
+      await expect.poll(() => model.getAttribute('aria-busy'), { timeout: test.task.timeout }).not.toBe('true')
+      await compareOrRefreshGolden(
+        join(REPO_ROOT, 'apps/web/tests/expected/startup-auto-selection/saved-history.expected.md'),
+        await captureStableAria(target, '[data-conversation-scroll]', modelScaffold.workspaceCwd), webSnapshotMode())
+      expect(modelRequests).toEqual([id])
+      expect(creates).toBe(0)
+      expect(modelScaffold.ctx.agents.get(otherId)).toBeUndefined()
+      expect(logs.pageErrors).toEqual([])
+      expect(logs.warnings).toEqual([])
+    } catch (error) {
+      if (modelPage !== undefined) await saveFailureShot(modelPage, 'web-e2e-startup-model-directory-preparation')
+      throw error
+    } finally {
+      listGate.resolve(undefined)
+      historyGate.resolve(undefined)
+      try {
+        await modelPage?.unrouteAll({ behavior: 'wait' })
+        await Promise.all(routeReads)
+        await modelPage?.close()
+      } finally { await modelScaffold.close() }
+    }
+  })
 
   it.each(['local', 'account', 'account pending', 'account scoped'] as const)('reads the saved history while the real list response is held, then presents the same opening: %s', async (composition) => {
     const accountScaffold = composition === 'local' ? undefined : await launchWebScaffold({ workbench: true })

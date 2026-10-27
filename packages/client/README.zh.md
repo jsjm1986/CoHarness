@@ -58,6 +58,8 @@ dsh web GUI 的浏览器侧：shell 启动、浏览器与宿主通信、共享 U
 
 共享 [Client 构建预设](tsdown.client.ts)会移除动态 `client.js` 入口及其惰性 chunk 的空白和普通文档注释，并关闭语义压缩与标识符改名。函数和类名、模块表请求、许可证声明以及包含原始源码的 source map 均保留。Node 和静态链接库产物继续使用各自的构建设置；[构建分层决策](../../.agents/notes/implemented/architecture/2026-08-15-client-shells-and-dynamic-packages.zh.md)解释了这一适用范围。
 
+CSS Modules 作用域和样式注入键由包 id 与样式表在 `src/` 下的路径组成；`src/` 之外使用文件名。相同源码树在不同检出目录中产出相同样式，物理文件仍是监听依赖。[样式表标识决策](../../.agents/notes/implemented/bug-fix/2026-10-15-client-css-injector-dedup-key.zh.md)说明了包隔离和同名文件的处理。
+
 ## 概述
 
 `client/` 组提供 dsh web GUI 的浏览器体验，包括对话、导航、设置、批准、文件访问及其他交互功能。添加浏览器中可见的行为时，请选择本系列中的包；服务端页面交付与宿主集成则使用 [`host/`](../host/README.zh.md)。本系列同时涵盖共享浏览器基础与专门的 UI 功能，各子包 README 拥有其配置与行为说明。编写规则见 [AGENTS.md](AGENTS.md)，下方相关文档解释跨包组合方式。

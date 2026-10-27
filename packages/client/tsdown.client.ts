@@ -8,6 +8,8 @@
  * exports compiled text for a plugin-owned lifecycle effect. The virtual
  * loaders register each real stylesheet as a watch dependency. SVG, PNG, and
  * WebP imports become watched base64 data URLs inside the bundle.
+ * CSS Modules scopes and injector keys use package-scoped source paths, so
+ * equivalent checkouts emit identical styles without losing watch dependencies.
  * Non-experimental client outputs reject experimental module and stylesheet
  * inputs, including origins recorded by chained source maps.
  */
@@ -38,6 +40,13 @@ const INLINE_CSS_QUERY = '?inline'
 /** Image imports become base64 data URLs embedded in the plugin's own bundle. */
 const IMAGE_MEDIA_TYPES = new Map([['.svg', 'image/svg+xml'], ['.png', 'image/png'], ['.webp', 'image/webp']])
 
+/** Package-scoped stylesheet identity independent of the physical checkout root. */
+function stylesheetIdentity(id: string, fileId: string): string {
+  const boundary = fileId.lastIndexOf(SOURCE_MARKER)
+  const name = boundary < 0 ? basename(fileId) : fileId.slice(boundary + SOURCE_MARKER.length)
+  return `${id}/${name.split(sep).join('/')}`
+}
+
 /** Emit one plugin-owned style injector and an optional CSS Modules export. */
 function styleInjectionModule(
   id: string,
@@ -45,14 +54,9 @@ function styleInjectionModule(
   css: string,
   classMap?: Readonly<Record<string, string>>,
 ): string {
-  // Sibling directories can carry same-named stylesheets (tool/ToolDetails.module.css
-  // next to tool/components/ToolDetails.module.css); the src-relative path keeps
-  // their dedup keys distinct so neither file's rules are skipped.
-  const boundary = fileId.lastIndexOf(SOURCE_MARKER)
-  const name = boundary < 0 ? basename(fileId) : fileId.slice(boundary + SOURCE_MARKER.length)
   const source = [
     `const css = ${JSON.stringify(css)};`,
-    `const tagId = ${JSON.stringify(`${id}/${name}`)};`,
+    `const tagId = ${JSON.stringify(stylesheetIdentity(id, fileId))};`,
     'if (typeof document !== \'undefined\' && document.querySelector(\'style[data-plugin-css=\' + JSON.stringify(tagId) + \']\') === null) {',
     '  const tag = document.createElement(\'style\');',
     `  tag.dataset.plugin = ${JSON.stringify(id)};`,
@@ -606,7 +610,7 @@ function clientConfig(id: string, entry: string, clientBanner?: (fileName: strin
         this.addWatchFile(fileId)
         const source = await readFile(fileId)
         const { code, exports: cssExports } = transform({
-          filename: fileId,
+          filename: stylesheetIdentity(id, fileId),
           code: source,
           cssModules: { pattern: '[hash]_[local]' },
           minify: true,

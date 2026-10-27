@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderIndexInjections, type WebServer, type WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import * as modulesClient from '../src/client/index.ts'
 import { ClientModuleRegistry, bootInjections, orderByModuleGraph, type Config } from '../src/index.ts'
-import { stampClientArtifact } from '../src/artifact-revision.ts'
+import { clientChunkRevision, stampClientArtifact } from '../src/artifact-revision.ts'
 import type { ClientModuleLoaderTarget, WebBootEntry, WebBootGraph } from '../src/client/index.ts'
 
 const MODULES_ID = '@deepseek-ai/dsh-client-modules'
@@ -1080,6 +1080,152 @@ describe('client bundle activation', () => {
     expect(chunk.body.toString('utf8')).toContain(`sourceMappingURL=client.terminal.js.map?rev=${row.rev}`)
     expect((await routeRequest(route, url.replace('.js?', '.js.map?'))).status).toBe(200)
     expect((await routeRequest(route, url.replace(`rev=${row.rev}`, 'rev=stale'))).status).toBe(404)
+  })
+
+  it('publishes chunk identities without reading siblings or maps before their own GET', async () => {
+    const packageName = '@fixture/published-lazy-chunk'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const chunkPath = join(dirname(clientPath), fileName)
+    const code = 'module.exports = { marker: "preview" }\n//# sourceMappingURL=client.preview.js.map\n'
+    writeFileSync(clientPath, stampClientArtifact('module.exports = {}\n', [{ fileName, code }]))
+    const { service, route, context } = constructWithRoute([packageName])
+    const row = service.graph().entries[0]!
+    expect(row.chunks).toEqual({ [fileName]: clientChunkRevision(code) })
+    const url = chunkUrl(packageName, fileName, row.chunks![fileName]!)
+    expect((await routeRequest(route, url)).status).toBe(404)
+    writeFileSync(chunkPath, code)
+    mkdirSync(`${chunkPath}.map`)
+    const warn = vi.spyOn(context.logger, 'warn')
+    try {
+      expect((await routeRequest(route, url, 'HEAD')).body).toHaveLength(0)
+      const script = await routeRequest(route, url)
+      expect(script.status).toBe(200)
+      expect(script.body.toString('utf8')).toContain(`sourceMappingURL=${fileName}.map?rev=${row.chunks![fileName]}`)
+      expect(warn).not.toHaveBeenCalled()
+      rmSync(`${chunkPath}.map`, { recursive: true })
+      writeFileSync(`${chunkPath}.map`, JSON.stringify({ version: 3, names: [], mappings: 'AAAA', sources: ['src/preview.ts'] }))
+      expect(JSON.parse((await routeRequest(route, url.replace('.js?', '.js.map?'))).body.toString('utf8'))).toMatchObject({
+        sections: [{ map: { sources: [`/plugins/${packageName}/src/preview.ts`] } }],
+      })
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('retains identical chunk URLs and response bytes across an owner-only rebuild', async () => {
+    const packageName = '@fixture/chunk-content-revision'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const chunkPath = join(dirname(clientPath), fileName)
+    const code = 'module.exports = { marker: "stable preview" }\n'
+    const siblings = [{ fileName, code }]
+    writeFileSync(chunkPath, code)
+    writeFileSync(clientPath, stampClientArtifact('module.exports = { ui: 1 }\n', siblings))
+    const { service, route } = constructWithRoute([packageName])
+    const before = service.graph().entries[0]!
+    const url = chunkUrl(packageName, fileName, before.chunks![fileName]!)
+    const original = await routeRequest(route, url)
+    expect((await routeRequest(route, chunkUrl(packageName, fileName, before.rev))).body).toEqual(original.body)
+
+    writeFileSync(clientPath, stampClientArtifact('module.exports = { ui: 2 }\n', siblings))
+    const stat = statSync(clientPath)
+    utimesSync(clientPath, stat.atime, new Date(stat.mtimeMs + 1_000))
+    const revision = service.rebuilt(packageName)!
+    expect(revision).not.toBe(before.rev)
+    expect(service.graph().entries[0]!.chunks).toEqual(before.chunks)
+    expect((await routeRequest(route, url)).body).toEqual(original.body)
+    expect((await routeRequest(route, chunkUrl(packageName, fileName, revision))).body).toEqual(original.body)
+    expect((await routeRequest(route, chunkUrl(packageName, fileName, before.rev))).status).toBe(404)
+    expect((await routeRequest(route, url)).headers).toEqual(original.headers)
+  })
+
+  it('rejects old, unknown and extra-parameter chunk URLs after a completed lazy-code rebuild', async () => {
+    const packageName = '@fixture/changed-published-chunk'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const chunkPath = join(dirname(clientPath), fileName)
+    const entry = 'module.exports = {}\n'
+    const first = 'module.exports = { marker: "first" }\n'
+    writeFileSync(chunkPath, first)
+    writeFileSync(clientPath, stampClientArtifact(entry, [{ fileName, code: first }]))
+    const { service, route } = constructWithRoute([packageName])
+    const original = service.graph().entries[0]!
+    const oldUrl = chunkUrl(packageName, fileName, original.chunks![fileName]!)
+    expect((await routeRequest(route, oldUrl)).status).toBe(200)
+
+    const next = 'module.exports = { marker: "next" }\n'
+    writeFileSync(chunkPath, next)
+    writeFileSync(clientPath, stampClientArtifact(entry, [{ fileName, code: next }]))
+    const stat = statSync(clientPath)
+    utimesSync(clientPath, stat.atime, new Date(stat.mtimeMs + 1_000))
+    service.rebuilt(packageName)
+    const current = service.graph().entries[0]!
+    const url = chunkUrl(packageName, fileName, current.chunks![fileName]!)
+    expect(url).not.toBe(oldUrl)
+    expect((await routeRequest(route, url)).body.toString('utf8')).toContain('"next"')
+    for (const invalid of [
+      oldUrl, url + '&extra=1', url + '&rev=other', url.replace(/\?rev=.*/u, ''),
+      chunkUrl(packageName, 'client.unpublished.js', current.rev),
+      chunkUrl(packageName, 'client.unpublished.js', current.chunks![fileName]!),
+    ]) expect((await routeRequest(route, invalid)).status).toBe(404)
+    expect((await routeRequest(route, chunkUrl(packageName, fileName, current.rev))).status).toBe(200)
+  })
+
+  it('refuses changed on-disk chunk bytes under an already published immutable URL', async () => {
+    const packageName = '@fixture/torn-published-chunk'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const code = 'module.exports = { marker: "published" }\n'
+    writeFileSync(clientPath, stampClientArtifact('module.exports = {}\n', [{ fileName, code }]))
+    writeFileSync(join(dirname(clientPath), fileName), 'module.exports = { marker: "unpublished" }\n')
+    const { service, route } = constructWithRoute([packageName])
+    const row = service.graph().entries[0]!
+    const url = chunkUrl(packageName, fileName, row.chunks![fileName]!)
+    await expect(routeRequest(route, url)).rejects.toThrow('does not match its published chunk revision')
+  })
+
+  it('serves restored chunk bytes on the next explicit GET after a failed immutable response', async () => {
+    const packageName = '@fixture/restored-published-chunk'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const chunkPath = join(dirname(clientPath), fileName)
+    const code = 'module.exports = { marker: "published" }\n'
+    const siblings = [{ fileName, code }]
+    writeFileSync(clientPath, stampClientArtifact('module.exports = { ui: 1 }\n', siblings))
+    writeFileSync(chunkPath, 'module.exports = { marker: "unpublished" }\n')
+    const { service, route } = constructWithRoute([packageName])
+    const before = service.graph().entries[0]!
+    const url = chunkUrl(packageName, fileName, before.chunks![fileName]!)
+    await expect(routeRequest(route, url)).rejects.toThrow('does not match its published chunk revision')
+
+    writeFileSync(chunkPath, code)
+    writeFileSync(clientPath, stampClientArtifact('module.exports = { ui: 2 }\n', siblings))
+    const stat = statSync(clientPath)
+    utimesSync(clientPath, stat.atime, new Date(stat.mtimeMs + 1_000))
+    expect(service.rebuilt(packageName)).not.toBe(before.rev)
+    expect(service.graph().entries[0]!.chunks).toEqual(before.chunks)
+    const restored = await routeRequest(route, url)
+    expect(restored.status).toBe(200)
+    expect(restored.body.toString('utf8')).toContain('"published"')
+    expect(restored.body.toString('utf8')).not.toContain('"unpublished"')
+  })
+
+  it('keeps executable revisions independent of authored debug map changes', async () => {
+    const packageName = '@fixture/map-independent-chunk'
+    const clientPath = writeBuiltPackage(packageName)
+    const fileName = 'client.preview.js'
+    const chunkPath = join(dirname(clientPath), fileName)
+    const code = 'module.exports = {}\n'
+    writeFileSync(chunkPath, code)
+    const bundle = stampClientArtifact('module.exports = {}\n', [{ fileName, code }])
+    writeFileSync(clientPath, bundle)
+    const { service } = constructWithRoute([packageName])
+    const original = service.graph()
+    writeFileSync(`${chunkPath}.map`, '{"version":3,"names":[],"sources":["src/changed.ts"],"mappings":"AAAA"}')
+    expect(service.rebuilt(packageName)).toBe(original.entries[0]!.rev)
+    expect(service.graph()).toBe(original)
+    expect(construct([packageName]).graph()).toEqual(original)
   })
 
   it('publishes a new chunk revision when a completed build rewrites only the entry timestamp', async () => {

@@ -58,6 +58,8 @@ The subsystem reference is [client-modules.md](../../docs/subsystems/client-modu
 
 The shared [Client build preset](tsdown.client.ts) removes whitespace and ordinary documentation comments from dynamic `client.js` entries and their lazy chunks, with semantic compression and identifier mangling disabled. Function and class names, module-table requests, legal notices, and source maps with original source content remain available. Node and statically linked library outputs retain their own build settings; [the build-layering decision](../../.agents/notes/implemented/architecture/2026-08-15-client-shells-and-dynamic-packages.md) explains the scope.
 
+CSS Modules scopes and style-injection keys use the package id and the stylesheet path below `src/`, with the basename used outside `src/`. Equivalent source trees emit identical styles across checkout directories; physical files remain watch dependencies. The [stylesheet identity decision](../../.agents/notes/implemented/bug-fix/2026-10-15-client-css-injector-dedup-key.md) covers package isolation and same-named files.
+
 ## Summary
 
 The `client/` group provides the browser experience for the dsh web GUI, including conversation, navigation, settings, approvals, file access, and other interactive features. Choose packages from this family when adding browser-visible behavior; use [`host/`](../host/README.md) for server-side page delivery and host integration. Packages cover both the shared browser foundation and focused UI features, while each child README owns its configuration and behavior. Authoring rules live in [AGENTS.md](AGENTS.md), and the related documentation below explains cross-package composition.

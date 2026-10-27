@@ -8,7 +8,7 @@ Web 插件表：[dsh-client-modules](../../packages/client/modules) 中 client �
 
 ## wire
 
-图是 Node 半与浏览器半之间协议层的唯一真源。宿主从扫描到的包组合出 `WebBootEntry` 行与 `WebBootBatch` 描述，随后在 Vite entry 之前向结构化 index 注入表贡献 registration facade、application preload、bootstrap 脚本与图全局量。`global` 行渲染为 `globalThis["__DSH_BOOT__"]`，其中 `<` 已转义，插件可控的字符串因此无法逃出 script 元素。没有有效 manifest 的页面无法启动：浏览器解析器会拒绝畸形 row 或批次、未知成员，以及未恰好归属一个初始 combo 描述的 entry。
+图是 Node 半与浏览器半之间协议层的唯一真源。宿主从扫描到的包组合出 `WebBootEntry` 行与 `WebBootBatch` 描述，随后在 Vite entry 之前向结构化 index 注入表贡献 registration facade、application preload、bootstrap 脚本与图全局量。`global` 行渲染为 `globalThis["__DSH_BOOT__"]`，其中 `<` 已转义，插件可控的字符串因此无法逃出 script 元素。没有有效 manifest 的页面无法启动：浏览器解析器会拒绝畸形 row 或批次、未知批次成员，以及未恰好归属一个初始 combo 描述的 entry。
 
 ```ts type-equiv
 /**
@@ -26,6 +26,8 @@ interface WebBootEntry {
   url: string
   /** Opaque plugin-artifact revision used for HMR cache busting. */
   rev: string
+  /** Executable revisions of published package-local chunks; absent on legacy Hosts. */
+  chunks?: Record<string, string>
   /** Package-name dependency edges used for factory arrival and plugin composition. */
   inject?: string[]
   /** Stage-one prefetch mark: load the script for factory registration during module-face boot. */

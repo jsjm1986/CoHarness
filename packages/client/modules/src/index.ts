@@ -24,7 +24,7 @@
  */
 
 import { createHash } from 'node:crypto'
-import { clientContentRevision } from './artifact-revision.ts'
+import { clientChunkRevision, clientChunkRevisions, clientContentRevision, clientExecutableSource } from './artifact-revision.ts'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createRequire } from 'node:module'
@@ -190,8 +190,6 @@ const MAX_COMBO_URL_BYTES = 3 * 1024
 const HASH_REVISION_LENGTH = 12
 const COMBO_REVISION_PLACEHOLDER = '0'.repeat(HASH_REVISION_LENGTH)
 
-/** Source-map trailer emitted by tsdown at the end of every client bundle. */
-const SOURCE_MAP_TRAILER = /(?:\r?\n)?\/\/# sourceMappingURL=[^\r\n]*(?:\r?\n)?$/
 /** Debugger source name appended to page bundles in the WebWorker image. */
 const SOURCE_URL_TRAILER = /(?:\r?\n)?\/\/# sourceURL=([^\r\n]+)(?:\r?\n)?$/
 /** Published package-local client chunk names accepted by the on-demand route. */
@@ -248,7 +246,7 @@ function comboUrl(ids: readonly string[], rev: string, sourceMap = false): strin
   return comboPath(ids, rev, sourceMap).slice(1)
 }
 
-/** Absolute request path of one package-local chunk under the same revision as its entry. */
+/** Absolute request path of one package-local chunk under its executable or legacy owner revision. */
 function chunkPath(id: string, fileName: string, rev: string, sourceMap = false): string {
   return `/plugins/${id}/${fileName}${sourceMap ? '.map' : ''}?rev=${rev}`
 }
@@ -351,8 +349,7 @@ interface PreparedSource {
 function prepareSource(resource: ComboResource): PreparedSource {
   let source = resource.bundle.toString('utf8')
   const sourceUrl = SOURCE_URL_TRAILER.exec(source)?.[1]
-  source = source.replace(SOURCE_URL_TRAILER, '').replace(SOURCE_MAP_TRAILER, '')
-  if (!source.endsWith('\n')) source += '\n'
+  source = clientExecutableSource(source)
   const fallbackSource = sourceUrl === undefined
     ? `/plugins/${resource.id}/${resource.fileName}`
     : /^(?:[A-Za-z][A-Za-z\d+.-]*:|\/)/.test(sourceUrl) ? sourceUrl : `/${sourceUrl}`
@@ -519,11 +516,12 @@ function buildBatch(
 }
 
 /** Graph row for one bundle rev (url carries the rev as its cache-busting query). */
-function graphRow(id: string, rev: string, fields: WebBootRowFields): WebBootEntry {
+function graphRow(id: string, rev: string, fields: WebBootRowFields, chunks?: Record<string, string>): WebBootEntry {
   return {
     id,
     url: comboUrl([id], rev),
     rev,
+    ...(chunks === undefined ? {} : { chunks }),
     ...(fields.inject !== undefined ? { inject: fields.inject } : {}),
     ...(fields.immediately ? { immediately: true } : {}),
     ...(fields.external.length > 0 ? { external: fields.external } : {}),
@@ -778,7 +776,7 @@ export class ClientModuleRegistry extends Service {
     const rev = artifactRevision(baseline, bundle)
     record.baseline = baseline
     if (rev === record.entry.rev) return rev
-    record.entry = graphRow(id, rev, record.meta)
+    record.entry = graphRow(id, rev, record.meta, clientChunkRevisions(bundle))
     record.bundle = bundle
     this.composed = this.compose()
     for (const notify of this.rebuildListeners) {
@@ -1103,7 +1101,7 @@ export class ClientModuleRegistry extends Service {
     const snapshot = this.initialBundleSnapshot(packageName, source.meta.clientPath)
     const rev = artifactRevision(snapshot.baseline, snapshot.bundle)
     this.table.set(packageName, {
-      entry: graphRow(packageName, rev, source.meta),
+      entry: graphRow(packageName, rev, source.meta, clientChunkRevisions(snapshot.bundle)),
       loaderName: source.loaderName,
       sourceKey: source.sourceKey,
       meta: source.meta,
@@ -1141,12 +1139,13 @@ export class ClientModuleRegistry extends Service {
     this.notifyGraphChanged()
   }
 
-  /** Match an exact current-revision package-local chunk URL without reading its file. */
+  /** Match an exact published chunk or current owner revision without reading its file. */
   private chunkRequest(requestUrl: URL): {
     record: WebPluginRecord
     fileName: string
     sourceMap: boolean
     resourceUrl: string
+    chunkRevision: string | undefined
   } | undefined {
     const resourceUrl = `${requestUrl.pathname}${requestUrl.search}`
     for (const record of this.table.values()) {
@@ -1156,8 +1155,11 @@ export class ClientModuleRegistry extends Service {
       const sourceMap = requested.endsWith('.map')
       const fileName = sourceMap ? requested.slice(0, -'.map'.length) : requested
       if (!CLIENT_CHUNK.test(fileName)) return undefined
-      if (resourceUrl !== chunkPath(record.entry.id, fileName, record.entry.rev, sourceMap)) return undefined
-      return { record, fileName, sourceMap, resourceUrl }
+      const chunkRevision = record.entry.chunks?.[fileName]
+      if (record.entry.chunks !== undefined && chunkRevision === undefined) return undefined
+      if (resourceUrl !== chunkPath(record.entry.id, fileName, record.entry.rev, sourceMap)
+        && (chunkRevision === undefined || resourceUrl !== chunkPath(record.entry.id, fileName, chunkRevision, sourceMap))) return undefined
+      return { record, fileName, sourceMap, resourceUrl, chunkRevision }
     }
     return undefined
   }
@@ -1166,17 +1168,18 @@ export class ClientModuleRegistry extends Service {
   private chunkResponse(requestUrl: URL): LazyResponse | undefined {
     const request = this.chunkRequest(requestUrl)
     if (request === undefined) return undefined
-    const { record, fileName, sourceMap, resourceUrl } = request
+    const { record, fileName, sourceMap, resourceUrl, chunkRevision } = request
     const clientPath = join(dirname(record.meta.clientPath), fileName)
     if (!existsSync(clientPath)) return undefined
-    const mapKey = chunkPath(record.entry.id, fileName, record.entry.rev, true)
-    const resource = (): ComboResource => ({
-      id: record.entry.id,
-      rev: record.entry.rev,
-      clientPath,
-      fileName,
-      bundle: readFileSync(clientPath),
-    })
+    const revision = chunkRevision ?? record.entry.rev
+    const mapKey = chunkPath(record.entry.id, fileName, revision, true)
+    const resource = (): ComboResource => {
+      const bundle = readFileSync(clientPath)
+      if (chunkRevision !== undefined && clientChunkRevision(bundle.toString('utf8')) !== chunkRevision) {
+        throw new Error(`client-modules: ${record.entry.id}/${fileName} does not match its published chunk revision; ${CLIENT_BUNDLE_BUILD_INSTRUCTION}`)
+      }
+      return { id: record.entry.id, rev: revision, clientPath, fileName, bundle }
+    }
     const response: LazyResponse = sourceMap
       ? {
         body: lazyBody(() => buildComboSourceMap([resource()], this.readSourceMap, fileName)),
@@ -1187,6 +1190,15 @@ export class ClientModuleRegistry extends Service {
         body: lazyBody(() => buildComboScript([resource()], mapKey.slice(`/plugins/${record.entry.id}/`.length))),
         contentType: 'text/javascript; charset=utf-8',
       }
+    const materialize = response.body
+    response.body = async () => {
+      try {
+        return await materialize()
+      } catch (error) {
+        if (this.responses.get(resourceUrl) === response) this.responses.delete(resourceUrl)
+        throw error
+      }
+    }
     this.responses.set(resourceUrl, response)
     return response
   }

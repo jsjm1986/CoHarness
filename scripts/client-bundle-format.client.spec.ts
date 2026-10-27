@@ -1,13 +1,16 @@
 /** Exercises the dynamic Client preset through emitted JavaScript and the production module table. */
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { createContext, runInContext } from 'node:vm'
+import { Context } from '@deepseek-ai/cordis'
 import ts from 'typescript'
 import { build, type UserConfig } from 'tsdown'
 import { describe, expect, it } from 'vitest'
 import { clientBundle, staticLinked } from '../packages/client/tsdown.client.ts'
 import { ClientModuleSystem } from '../packages/client/modules/src/client/system.ts'
+import { ClientModuleRegistry } from '../packages/client/modules/src/index.ts'
 import { parseBootManifest, type ClientModuleLoaderTarget } from '../packages/client/modules/src/client/manifest.ts'
 import { clientContentRevision, stampClientArtifact } from '../packages/client/modules/src/artifact-revision.ts'
 
@@ -71,6 +74,75 @@ async function bundle(root: string, config: UserConfig, directory: string): Prom
 }
 
 describe('dynamic Client output formatting', () => {
+  it('reuses an actual compiled lazy URL and Host response across an entry-only rebuild', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-client-host-cache-'))
+    const ctx = new Context()
+    try {
+      await writeFile(join(root, 'package.json'), JSON.stringify({
+        name: PACKAGE_ID, type: 'module',
+        exports: { './client': './first/client.js' },
+        dsh: { client: { platform: 'web' } },
+      }))
+      await writeFile(join(root, 'fixture-host.js'), 'export default {}\n')
+      await emitSource(root, 'index', ENTRY_SOURCE)
+      await emitSource(root, 'lazy', LAZY_SOURCE)
+      await bundle(root, clientConfig(), 'first')
+      ctx.baseUrl = pathToFileURL(root).href + '/'
+      ctx.provide('loader', {
+        *entries() {
+          yield { options: { name: './fixture-host.js' }, fiber: {}, disabled: false, parent: { tree: { ctx } } }
+        },
+      })
+      const host = new ClientModuleRegistry(ctx)
+      const openLazy = async (expectedEntryValue: string): Promise<{ url: string; body: string; cache: string | null }> => {
+        const resources: { url: string; body: string; cache: string | null }[] = []
+        const target: ClientModuleLoaderTarget = {
+          mode: 'queue', pendingQueue: [],
+          load(registration) { this.pendingQueue.push(registration) },
+          create() { throw new Error('fixture constructs its module table directly') },
+        }
+        const realm = createContext({ window: { __ModuleLoader__: target } })
+        const client = new ClientModuleSystem({
+          manifest: parseBootManifest(host.graph()), staticModules: {}, registrationTarget: target,
+          bootstrapModule: { id: '@fixture/bootstrap', exports: {} },
+          async loadBundle(url) {
+            const response = await host.fetchBundle(new Request(new URL(url, 'https://fixture.invalid/')))
+            expect(response.status).toBe(200)
+            const body = await response.text()
+            resources.push({ url, body, cache: response.headers.get('cache-control') })
+            runInContext(body, realm, { filename: url })
+          },
+        })
+        const entry = await client.import(PACKAGE_ID) as {
+          NamedPlugin: () => string
+          lazy: () => Promise<{ marker: string }>
+        }
+        expect(entry.NamedPlugin()).toBe(expectedEntryValue)
+        expect((await entry.lazy()).marker).toBe('lazy-loaded')
+        const resource = resources.find(item => item.url.includes('/client.lazy.js?'))
+        if (resource === undefined) throw new Error('compiled lazy resource was not requested')
+        return resource
+      }
+      const before = host.graph().entries[0]!
+      const original = await openLazy('plugin')
+      await emitSource(root, 'index', ENTRY_SOURCE.replace('return "plugin"', 'return "updated-ui"'))
+      const changed = await bundle(root, clientConfig(), 'owner-only')
+      const activeEntry = join(root, 'first/client.js')
+      await writeFile(activeEntry, changed)
+      const current = await stat(activeEntry)
+      await utimes(activeEntry, current.atime, new Date(current.mtimeMs + 1_000))
+      expect(host.rebuilt(PACKAGE_ID)).not.toBe(before.rev)
+      const next = await openLazy('updated-ui')
+      expect(next.url).toBe(original.url)
+      expect(next.body).toBe(original.body)
+      expect(next.cache).toBe('public, max-age=31536000, immutable')
+      expect(original.cache).toBe(next.cache)
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('keeps repeated builds content-identical and revises the entry for a lazy-only edit', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-client-identity-'))
     try {
@@ -84,7 +156,7 @@ describe('dynamic Client output formatting', () => {
       expect(stampClientArtifact(original, [{ fileName: 'client.lazy.js', code: lazy }])).toBe(original)
       await emitSource(root, 'lazy', LAZY_SOURCE.replace('lazy-loaded', 'lazy-updated'))
       const changed = await bundle(root, clientConfig(), 'changed')
-      const stripStamp = (source: string) => source.replace(/^\/\/# dsh-client-artifact=.*\n/gmu, '')
+      const stripStamp = (source: string) => source.replace(/^\/\/# dsh-client-(?:artifact|chunks)=.*\n/gmu, '')
       expect(stripStamp(changed)).toBe(stripStamp(original))
       expect(clientContentRevision(Buffer.from(changed))).not.toBe(clientContentRevision(Buffer.from(original)))
     } finally {
