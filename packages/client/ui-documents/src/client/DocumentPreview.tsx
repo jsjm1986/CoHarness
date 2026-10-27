@@ -1,7 +1,9 @@
-import { useEffect, useState, type FC } from 'react'
-import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useEffect, useRef, useState, type FC, type ReactNode } from 'react'
+import { Button, IconChevronLeftOutline14, IconCloseOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ApiResponseTooLargeError, readApiResponseText } from '@deepseek-ai/dsh-client-runtime/client'
 import { createUserDocClient, type UserDocRef, type UserDocScope } from './documents-client.ts'
+import { FileTypeIcon } from './FileTypeIcon.tsx'
+import { formatBytes, getDateGroup } from './format.ts'
 import type { DocumentsKey } from './locales.ts'
 import css from './DocumentPreview.module.css'
 
@@ -9,6 +11,12 @@ export interface DocumentPreviewProps {
   /** Bind authenticated image, iframe and download navigations to their current account. */
   privateResourceUrl?: ((url: string) => string) | undefined
   doc: UserDocRef
+  /** Render alongside the manager list instead of opening a second modal. */
+  embedded?: boolean
+  /** Safe display label for the document's browsing scope. */
+  sourceLabel?: string
+  /** Existing manager actions, fixed below the media scrollport. */
+  actions?: ReactNode
   /** Optional explicit scope when previewing a non-current project. */
   scope?: UserDocScope | undefined
   maxTextBytes: number
@@ -42,9 +50,12 @@ function classifyMediaType(mediaType: string): 'image' | 'pdf' | 'text' | 'unsup
  * @param props.maxTextBytes - text files larger than this show the download fallback.
  * @param props.onClose - dismiss the preview.
  * @param props.t - localized documents dictionary.
- * @returns a dialog with image, PDF, text, or a fallback message.
+ * @returns an inline reading region or media dialog, with a download fallback.
  */
-export const DocumentPreview: FC<DocumentPreviewProps> = ({ doc, scope, maxTextBytes, onClose, t, privateResourceUrl }) => {
+export const DocumentPreview: FC<DocumentPreviewProps> = ({
+  doc, scope, maxTextBytes, onClose, t, privateResourceUrl, embedded = false, sourceLabel, actions,
+}) => {
+  const readingPosition = useRef({ id: doc.docId, top: 0 })
   const [state, setState] = useState<PreviewState>('loading')
   const [textContent, setTextContent] = useState('')
   const [userDocs] = useState(() => createUserDocClient())
@@ -91,35 +102,38 @@ export const DocumentPreview: FC<DocumentPreviewProps> = ({ doc, scope, maxTextB
 
   const contentUrl = scopedUrl(true)
 
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={t('preview.title', { name: doc.name })}
-      closeLabel={t('modal.close')}
-      className={css.dialog as string}
-      contentClassName={css.shell as string}
-    >
-      <div className={css.body}>
-        {state === 'loading' && <p className={css.status}>{t('modal.loading')}</p>}
-        {state === 'too-large' && <>
-          <p className={css.status}>{t('preview.too.large')}</p>
-          <a className={css.download} href={scopedUrl(false)} target="_blank" rel="noopener noreferrer">{t('preview.download')}</a>
-        </>}
-        {state === 'unsupported' && <>
-          <p className={css.status}>{t('preview.not.supported')}</p>
-          <a className={css.download} href={scopedUrl(false)} target="_blank" rel="noopener noreferrer">{t('preview.download')}</a>
-        </>}
-        {state === 'ready' && classifyMediaType(doc.mediaType) === 'image' && (
-          <img className={css.image} src={contentUrl} alt={doc.name} />
-        )}
-        {state === 'ready' && classifyMediaType(doc.mediaType) === 'pdf' && (
-          <iframe className={css.frame} src={contentUrl} title={doc.name} />
-        )}
-        {state === 'ready' && classifyMediaType(doc.mediaType) === 'text' && (
-          <pre className={css.text}>{textContent}</pre>
-        )}
-      </div>
-    </Modal>
-  )
+  const surface = <section className={css.surface} data-document-preview="">
+    <header className={css.header}>
+      {!embedded && <Button type="button" className={css.close} variant="ghost" aria-label={t('preview.back')} data-modal-autofocus onClick={onClose}><IconChevronLeftOutline14 size={18} /></Button>}
+      <FileTypeIcon name={doc.name} mediaType={doc.mediaType} className={css.fileTypeIcon} />
+      <div className={css.heading}><h3>{doc.name}</h3>{sourceLabel !== undefined && <p>{t('preview.source', { name: sourceLabel })}</p>}<p>{formatBytes(doc.bytes)} · {getDateGroup(doc.modifiedAt, t('date.unknown'))}</p></div>
+      {embedded && <Button type="button" className={css.close} variant="ghost" aria-label={t('preview.close')} onClick={onClose}><IconCloseOutline16 size={16} /></Button>}
+    </header>
+    <div className={css.body} ref={(element) => {
+      if (readingPosition.current.id !== doc.docId) readingPosition.current = { id: doc.docId, top: 0 }
+      if (element !== null) element.scrollTop = readingPosition.current.top
+    }} onScroll={(event) => { readingPosition.current = { id: doc.docId, top: event.currentTarget.scrollTop } }}>
+      {state === 'loading' && <div className={css.loading} role="status" aria-label={t('modal.loading')}><span /><span /><span /></div>}
+      {state === 'too-large' && <>
+        <p className={css.status}>{t('preview.too.large')}</p>
+        <a className={css.download} href={scopedUrl(false)} target="_blank" rel="noopener noreferrer">{t('preview.download')}</a>
+      </>}
+      {state === 'unsupported' && <>
+        <p className={css.status}>{t('preview.not.supported')}</p>
+        <a className={css.download} href={scopedUrl(false)} target="_blank" rel="noopener noreferrer">{t('preview.download')}</a>
+      </>}
+      {state === 'ready' && classifyMediaType(doc.mediaType) === 'image' && (
+        <img className={css.image} src={contentUrl} alt={doc.name} />
+      )}
+      {state === 'ready' && classifyMediaType(doc.mediaType) === 'pdf' && (
+        <iframe className={css.frame} src={contentUrl} title={doc.name} />
+      )}
+      {state === 'ready' && classifyMediaType(doc.mediaType) === 'text' && (
+        <pre className={css.text}>{textContent}</pre>
+      )}
+    </div>
+    {actions !== undefined && <footer className={css.actions}>{actions}</footer>}
+  </section>
+  if (embedded) return <aside className={css.inline} aria-label={t('preview.title', { name: doc.name })}>{surface}</aside>
+  return <Modal open onClose={onClose} title={t('preview.title', { name: doc.name })} headless className={css.dialog as string}>{surface}</Modal>
 }

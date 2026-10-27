@@ -182,13 +182,29 @@ function stubPhoneMedia(): void {
   }) as unknown as MediaQueryList))
 }
 
+function stubMediumWidthMedia(): void {
+  vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+    matches: query === '(max-width: 1100px)',
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => true,
+    media: query,
+    onchange: null,
+  }) as unknown as MediaQueryList))
+}
+
 function namedButton(action: 'attach' | 'preview' | 'move' | 'delete', name: string) {
   const key = action === 'preview'
     ? 'action.previewNamed'
     : action === 'attach'
       ? 'action.attachNamed'
       : action === 'move' ? 'action.moveNamed' : 'action.deleteNamed'
-  return screen.getByRole('button', { name: t(key, { name }) })
+  const direct = screen.queryByRole('button', { name: t(key, { name }) })
+  if (direct !== null) return direct
+  const existing = screen.queryByRole('menuitem', { name: t(`action.${action}`) })
+  if (existing !== null) return existing
+  fireEvent.click(screen.getByRole('button', { name: t('action.moreNamed', { name }) }))
+  return screen.getByRole('menuitem', { name: t(`action.${action}`) })
 }
 
 describe('DocumentsModal', () => {
@@ -747,7 +763,7 @@ describe('DocumentsModal', () => {
     fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
     const more = await screen.findByRole('dialog', { name: t('action.more') })
     fireEvent.change(within(more).getByLabelText(t('modal.type')), { target: { value: 'pdf' } })
-    fireEvent.change(within(more).getByLabelText(t('modal.sort')), { target: { value: 'name:asc' } })
+    fireEvent.click(within(more).getByRole('radio', { name: t('sort.field.name') }))
     expect(client.browse).toHaveBeenCalledTimes(browseCalls)
   })
 
@@ -787,13 +803,32 @@ describe('DocumentsModal', () => {
     expect(await screen.findByText('report.pdf')).toBeTruthy()
     expect(screen.getByText('2026-08-17')).toBeTruthy()
     expect(screen.getByText('2.0 KB')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: t('manager.info') }))
     expect(screen.getByText(t('modal.limits', { size: '10.0 MB', count: '5' }))).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
     expect(namedButton('attach', 'report.pdf')).toBeTruthy()
     expect(namedButton('preview', 'report.pdf')).toBeTruthy()
     expect(namedButton('delete', 'report.pdf')).toBeTruthy()
-    expect(screen.getByRole('link', { name: t('action.downloadNamed', { name: 'report.pdf' }) })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: t('action.download') })).toBeTruthy()
     expect(screen.getByRole('group', { name: t('modal.filters') })).toBeTruthy()
     expect(screen.getByRole('group', { name: t('modal.actions') })).toBeTruthy()
+  })
+
+  it('keeps preview and checkbox selection independent and closes the entire preview region', async () => {
+    createUserDocClient.mockReturnValue(makeClient())
+    renderModal()
+    await screen.findByText('report.pdf')
+    const check = screen.getByRole('checkbox', { name: 'report.pdf' }) as HTMLInputElement
+    fireEvent.click(namedButton('preview', 'report.pdf'))
+    const preview = screen.getByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })
+    expect(check.checked).toBe(false)
+    fireEvent.click(check)
+    expect(check.checked).toBe(true)
+    expect(within(preview).getByRole('button', { name: t('preview.attachOne') })).toBeTruthy()
+    fireEvent.click(within(preview).getByRole('button', { name: t('preview.close') }))
+    expect(screen.queryByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })).toBeNull()
+    expect(check.checked).toBe(true)
+    expect(document.activeElement).toBe(namedButton('preview', 'report.pdf'))
   })
 
   it('adds an existing document to the conversation and closes the manager', async () => {
@@ -843,6 +878,7 @@ describe('DocumentsModal', () => {
     renderModal()
 
     await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('button', { name: t('manager.info') }))
     expect(screen.getByText(t('modal.limits.unlimited', { count: '5' }))).toBeTruthy()
   })
 
@@ -987,7 +1023,7 @@ describe('DocumentsModal', () => {
       await waitFor(() => { expect(client.upload).toHaveBeenCalledTimes(2) })
       expect(screen.getByText('已上传 1 / 2 个文件')).toBeTruthy()
       expect(screen.queryByText(t('modal.empty'))).toBeNull()
-      expect(screen.queryByText(t('modal.count', { count: '0' }))).toBeNull()
+      expect(screen.queryByText(t('listing.entries', { folders: '0', documents: '0' }))).toBeNull()
       expect(input.disabled).toBe(true)
       expect(client.browse).toHaveBeenCalledOnce()
       expect(screen.queryByText('已上传 2 / 2 个文件')).toBeNull()
@@ -1183,7 +1219,7 @@ describe('DocumentsModal', () => {
     await screen.findByRole('alert')
     expect(screen.getByText('已上传 1 / 1 个文件')).toBeTruthy()
     expect(screen.queryByText(t('modal.empty'))).toBeNull()
-    expect(screen.queryByText(t('modal.count', { count: '0' }))).toBeNull()
+    expect(screen.queryByText(t('listing.entries', { folders: '0', documents: '0' }))).toBeNull()
     expect(input.disabled).toBe(false)
     expect(client.browse).toHaveBeenCalledTimes(2)
   })
@@ -1268,7 +1304,8 @@ describe('DocumentsModal', () => {
     await screen.findByText('keep-01.txt')
     fireEvent.change(screen.getByPlaceholderText(t('modal.search')), { target: { value: 'keep' } })
     fireEvent.change(screen.getByRole('combobox', { name: t('modal.type') }), { target: { value: 'text' } })
-    fireEvent.change(screen.getByRole('combobox', { name: t('modal.sort') }), { target: { value: 'name:asc' } })
+    fireEvent.click(screen.getByRole('button', { name: t('modal.sort') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('sort.field.name') }))
     await waitFor(() => { expect(client.browse.mock.lastCall?.[2]).toMatchObject({ query: 'keep', type: 'text', sort: 'name-asc' }) })
     await waitFor(() => { expect(screen.queryByText(t('modal.refreshing'))).toBeNull() })
     fireEvent.click(screen.getByRole('button', { name: t('pager.next') }))
@@ -1342,6 +1379,43 @@ describe('DocumentsModal', () => {
     expect(confirm.textContent).toContain(t('delete.confirm.project.extra'))
   })
 
+  it.each([false, true])('copies the named document independently of checkbox selection (%s)', async (hasSelection) => {
+    const client = makeClient()
+    const first = doc()
+    const other = doc({ docId: 'other.pdf', name: 'other.pdf' })
+    client.browse.mockResolvedValue({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [first, other], limits })
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({
+      scope: { kind: 'personal' }, projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+    }) })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    if (hasSelection) fireEvent.click(screen.getByRole('checkbox', { name: 'other.pdf' }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.moreNamed', { name: 'report.pdf' }) }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('scope.copy') }))
+    const dialog = await screen.findByRole('dialog', { name: t('copy.title') })
+    expect(within(dialog).getByText(t('copy.message', { count: '1' }))).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: 'other.pdf' })).toHaveProperty('checked', hasSelection)
+    fireEvent.click(within(dialog).getByRole('button', { name: t('copy.confirm') }))
+    await waitFor(() => { expect(client.transfer).toHaveBeenCalledOnce() })
+    expect(client.transfer).toHaveBeenCalledWith(expect.objectContaining({ documents: [{ docId: first.docId }] }))
+    await waitFor(() => { expect(screen.queryByRole('dialog', { name: t('copy.title') })).toBeNull() })
+  })
+
+  it('removes the preview actions after the previewed document is confirmed deleted', async () => {
+    const client = makeClient()
+    client.browse.mockResolvedValue({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [], limits })
+    client.browse.mockResolvedValueOnce({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [doc()], limits })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    fireEvent.click(namedButton('preview', 'report.pdf'))
+    const preview = screen.getByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })
+    fireEvent.click(within(preview).getByRole('button', { name: t('action.delete') }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: t('delete.confirm.title') })).getByRole('button', { name: t('delete.confirm.button') }))
+    await waitFor(() => { expect(screen.queryByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })).toBeNull() })
+  })
+
   it('copies selected personal documents to a writable project without attaching a foreign-scope id', async () => {
     const client = makeClient()
     const attach = vi.fn(() => true)
@@ -1412,7 +1486,8 @@ describe('DocumentsModal', () => {
     createUserDocClient.mockReturnValue(client)
     render(<DocumentsModal open onClose={() => {}} t={t} onAttachDocument={attach} />)
     await screen.findByText('report.pdf')
-    fireEvent.click(screen.getByRole('button', { name: t('copy.source') }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('copy.source') }))
     const sourceDialog = await screen.findByRole('dialog', { name: t('copy.source.title') })
     expect(sourceDialog.querySelectorAll('select')).toHaveLength(0)
     expect(within(sourceDialog).getByRole('option', { name: /Compiler/ })).toBeTruthy()
@@ -1442,11 +1517,13 @@ describe('DocumentsModal', () => {
     createUserDocClient.mockReturnValue(client)
     renderModal()
     await screen.findByText('report.pdf')
-    fireEvent.click(screen.getByRole('button', { name: t('copy.source') }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('copy.source') }))
     const sourceDialog = await screen.findByRole('dialog', { name: t('copy.source.title') })
     fireEvent.click(within(sourceDialog).getByRole('button', { name: t('copy.source.open') }))
     await screen.findByText('report.pdf')
-    fireEvent.click(screen.getByRole('button', { name: t('copy.source.current') }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('copy.source.current') }))
     await screen.findByText('report.pdf')
     expect(screen.queryByRole('button', { name: t('copy.source.current') })).toBeNull()
     expect(client.browse).toHaveBeenCalledOnce()
@@ -1482,11 +1559,16 @@ describe('DocumentsModal', () => {
   })
 
   it.each([
-    { compact: false, target: 'personal' }, { compact: false, target: 'project' },
-    { compact: true, target: 'personal' }, { compact: true, target: 'project' },
-  ] as const)('returns from $target trash to its cached folder and restores focus (compact=$compact)', async ({ compact, target }) => {
+    { compact: false, compactNavigation: false, target: 'personal' },
+    { compact: false, compactNavigation: false, target: 'project' },
+    { compact: true, compactNavigation: true, target: 'personal' },
+    { compact: true, compactNavigation: true, target: 'project' },
+    { compact: false, compactNavigation: true, target: 'personal' },
+    { compact: false, compactNavigation: true, target: 'project' },
+  ] as const)('returns from $target trash to its cached folder and restores focus (compact=$compact, compactNavigation=$compactNavigation)', async ({ compact, compactNavigation, target }) => {
     vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 23, 12))
     if (compact) stubPhoneMedia()
+    else if (compactNavigation) stubMediumWidthMedia()
     const client = makeClient()
     let restored = false
     const restoredDocument = doc({ docId: 'reports/restored.txt', name: 'restored.txt', mediaType: 'text/plain' })
@@ -1529,7 +1611,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByRole('button', { name: t('folder.openNamed', { name: 'reports' }) })
     if (target === 'project') {
-      if (compact) {
+      if (compactNavigation) {
         fireEvent.click(screen.getByTestId('documents-scope-trigger'))
         const scopes = await screen.findByRole('dialog', { name: t('scope.switch.title') })
         fireEvent.click(within(scopes).getByRole('option', { name: /Compiler/ }))
@@ -1542,10 +1624,12 @@ describe('DocumentsModal', () => {
     await waitFor(() => { expect(within(navigation).getByRole('button', { name: 'reports' }).hasAttribute('disabled')).toBe(true) })
     const before = { local: client.browse.mock.calls.length, remote: client.browseScope.mock.calls.length }
     const enterTrash = async () => {
-      if (compact) {
+      if (compactNavigation) {
         fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
-        const more = await screen.findByRole('dialog', { name: t('action.more') })
-        fireEvent.click(within(more).getByRole('button', { name: t('trash.button') }))
+        if (compact) {
+          const more = await screen.findByRole('dialog', { name: t('action.more') })
+          fireEvent.click(within(more).getByRole('button', { name: t('trash.button') }))
+        } else fireEvent.click(screen.getByRole('menuitem', { name: t('trash.button') }))
       } else fireEvent.click(screen.getByRole('button', { name: t('trash.button') }))
       return await screen.findByRole('region', { name: t('trash.title') })
     }
@@ -1554,7 +1638,7 @@ describe('DocumentsModal', () => {
     back.focus()
     fireEvent.click(back)
     await waitFor(() => { expect(screen.queryByRole('region', { name: t('trash.title') })).toBeNull() })
-    const returnTarget = screen.getByRole('button', { name: t(compact ? 'action.more' : 'trash.button') })
+    const returnTarget = screen.getByRole('button', { name: t(compactNavigation ? 'action.more' : 'trash.button') })
     expect(document.activeElement).toBe(returnTarget)
     expect(within(navigation).getByRole('button', { name: 'reports' }).hasAttribute('disabled')).toBe(true)
     expect(client.browse).toHaveBeenCalledTimes(before.local)
@@ -1570,16 +1654,16 @@ describe('DocumentsModal', () => {
       await restoredListingRequested.promise
       expect(screen.getAllByRole('status').filter(node => node.textContent === t('modal.loading'))).toHaveLength(1)
       expect(screen.queryByText(t('modal.empty'))).toBeNull()
-      expect(screen.queryByText(t('modal.count', { count: '0' }))).toBeNull()
+      expect(screen.queryByText(t('listing.entries', { folders: '0', documents: '0' }))).toBeNull()
       expect(screen.queryByText(t('modal.refreshing'))).toBeNull()
       expect(within(navigation).getByRole('button', { name: 'reports' }).hasAttribute('disabled')).toBe(true)
-      expect(document.activeElement).toBe(screen.getByRole('button', { name: t(compact ? 'action.more' : 'trash.button') }))
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: t(compactNavigation ? 'action.more' : 'trash.button') }))
     } finally { restoredListing.resolve(listing('reports' as UserDocDirectoryIdType)) }
     await screen.findByText('restored.txt')
     expect(client.browse).toHaveBeenCalledTimes(before.local + (target === 'personal' ? 1 : 0))
     expect(client.browseScope).toHaveBeenCalledTimes(before.remote + (target === 'project' ? 1 : 0))
     expect(context).toHaveBeenCalledTimes(1)
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: t(compact ? 'action.more' : 'trash.button') }))
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: t(compactNavigation ? 'action.more' : 'trash.button') }))
   })
 
   it.each(['success', 'failure'] as const)('shows loading instead of an empty result until an empty-folder refresh settles: %s', async (outcome) => {
@@ -1594,19 +1678,20 @@ describe('DocumentsModal', () => {
     createUserDocClient.mockReturnValue(client)
     renderModal()
     await screen.findByText(t('modal.empty'))
-    fireEvent.click(screen.getByRole('button', { name: t('modal.refresh') }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('modal.refresh') }))
     try {
       await requested.promise
       expect(screen.getAllByRole('status').filter(node => node.textContent === t('modal.loading'))).toHaveLength(1)
       expect(screen.queryByText(t('modal.empty'))).toBeNull()
-      expect(screen.queryByText(t('modal.count', { count: '0' }))).toBeNull()
+      expect(screen.queryByText(t('listing.entries', { folders: '0', documents: '0' }))).toBeNull()
       expect(screen.queryByText(t('modal.refreshing'))).toBeNull()
     } finally {
       if (outcome === 'success') refresh.resolve(empty)
       else refresh.reject(new Error('metadata unavailable'))
     }
     await screen.findByText(t('modal.empty'))
-    expect(screen.getByText(t('modal.count', { count: '0' }))).toBeTruthy()
+    expect(screen.getByText(t('listing.entries', { folders: '0', documents: '0' }))).toBeTruthy()
     expect(screen.queryByText(t('modal.loading'))).toBeNull()
     expect(client.browse).toHaveBeenCalledTimes(2)
     if (outcome === 'failure') expect(screen.getByRole('alert').textContent).toContain('metadata unavailable')
@@ -1653,7 +1738,7 @@ describe('DocumentsModal', () => {
     expect(alert.textContent).toContain(t('delete.error'))
   })
 
-  it('opens a text preview through the modal', async () => {
+  it('opens a text preview alongside the list', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
       directoryId: '' as UserDocDirectoryIdType,
@@ -1672,7 +1757,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('readme.md')
     fireEvent.click(namedButton('preview', 'readme.md'))
-    await waitFor(() => { expect(screen.getByRole('dialog', { name: t('preview.title', { name: 'readme.md' }) })).toBeTruthy() })
+    await waitFor(() => { expect(screen.getByRole('complementary', { name: t('preview.title', { name: 'readme.md' }) })).toBeTruthy() })
     expect(await screen.findByText('# hello')).toBeTruthy()
   })
 
@@ -1688,7 +1773,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('photo.png')
     fireEvent.click(namedButton('preview', 'photo.png'))
-    await waitFor(() => { expect(screen.getByRole('dialog', { name: t('preview.title', { name: 'photo.png' }) })).toBeTruthy() })
+    await waitFor(() => { expect(screen.getByRole('complementary', { name: t('preview.title', { name: 'photo.png' }) })).toBeTruthy() })
     expect(screen.getByRole('img', { name: 'photo.png' })).toBeTruthy()
   })
 
@@ -1704,7 +1789,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('report.pdf')
     fireEvent.click(namedButton('preview', 'report.pdf'))
-    const preview = await screen.findByRole('dialog', { name: t('preview.title', { name: 'report.pdf' }) })
+    const preview = await screen.findByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })
     expect(within(preview).getByTitle('report.pdf')).toBeTruthy()
   })
 
@@ -1720,7 +1805,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('big.txt')
     fireEvent.click(namedButton('preview', 'big.txt'))
-    await waitFor(() => { expect(screen.getByRole('dialog', { name: t('preview.title', { name: 'big.txt' }) })).toBeTruthy() })
+    await waitFor(() => { expect(screen.getByRole('complementary', { name: t('preview.title', { name: 'big.txt' }) })).toBeTruthy() })
     expect(screen.getByText(t('preview.too.large'))).toBeTruthy()
   })
 
@@ -1736,7 +1821,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('data.bin')
     fireEvent.click(namedButton('preview', 'data.bin'))
-    await waitFor(() => { expect(screen.getByRole('dialog', { name: t('preview.title', { name: 'data.bin' }) })).toBeTruthy() })
+    await waitFor(() => { expect(screen.getByRole('complementary', { name: t('preview.title', { name: 'data.bin' }) })).toBeTruthy() })
     expect(screen.getByText(t('preview.not.supported'))).toBeTruthy()
   })
 
@@ -1757,7 +1842,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('broken.txt')
     fireEvent.click(namedButton('preview', 'broken.txt'))
-    await waitFor(() => { expect(screen.getByRole('dialog', { name: t('preview.title', { name: 'broken.txt' }) })).toBeTruthy() })
+    await waitFor(() => { expect(screen.getByRole('complementary', { name: t('preview.title', { name: 'broken.txt' }) })).toBeTruthy() })
     expect(screen.getByText(t('preview.not.supported'))).toBeTruthy()
   })
 
@@ -1805,12 +1890,13 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('report.pdf')
     fireEvent.click(screen.getByRole('button', { name: t('modal.upload') }))
-    fireEvent.click(screen.getByRole('button', { name: t('modal.refresh') }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('modal.refresh') }))
     await waitFor(() => { expect(screen.getByText('report.pdf')).toBeTruthy() })
     fireEvent.click(namedButton('preview', 'report.pdf'))
-    await waitFor(() => { expect(screen.getByRole('dialog', { name: t('preview.title', { name: 'report.pdf' }) })).toBeTruthy() })
-    fireEvent.keyDown(document, { key: 'Escape' })
-    await waitFor(() => { expect(screen.queryByRole('dialog', { name: t('preview.title', { name: 'report.pdf' }) })).toBeNull() })
+    await waitFor(() => { expect(screen.getByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })).toBeTruthy() })
+    fireEvent.click(screen.getByRole('button', { name: t('preview.close') }))
+    await waitFor(() => { expect(screen.queryByRole('complementary', { name: t('preview.title', { name: 'report.pdf' }) })).toBeNull() })
     fireEvent.click(namedButton('delete', 'report.pdf'))
     const confirm = screen.getByRole('dialog', { name: t('delete.confirm.title') })
     fireEvent.click(within(confirm).getAllByRole('button', { name: t('modal.close') }).at(-1)!)
@@ -1822,7 +1908,7 @@ describe('DocumentsModal', () => {
     renderModal()
     await screen.findByText('report.pdf')
     expect(screen.getByText(t('modal.visibility.personal'))).toBeTruthy()
-    expect(screen.getByText(t('modal.count', { count: '1' }))).toBeTruthy()
+    expect(screen.getByText(t('listing.entries', { folders: '0', documents: '1' }))).toBeTruthy()
   })
 
   it('navigates folders with breadcrumbs and uploads into the current folder', async () => {
@@ -1868,13 +1954,15 @@ describe('DocumentsModal', () => {
     fireEvent.click(within(createDialog).getByRole('button', { name: t('folder.create.confirm') }))
     await waitFor(() => { expect(client.createDirectory).toHaveBeenCalledWith('', 'drafts') })
 
-    fireEvent.click(screen.getByRole('button', { name: t('folder.renameNamed', { name: 'reports' }) }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.moreFolderNamed', { name: 'reports' }) }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('folder.rename') }))
     const renameDialog = screen.getByRole('dialog', { name: t('folder.rename.title') })
     fireEvent.change(within(renameDialog).getByLabelText(t('folder.name')), { target: { value: 'archive' } })
     fireEvent.click(within(renameDialog).getByRole('button', { name: t('folder.rename.confirm') }))
     await waitFor(() => { expect(client.renameDirectory).toHaveBeenCalledWith('reports', 'archive') })
 
-    fireEvent.click(screen.getByRole('button', { name: t('folder.deleteNamed', { name: 'reports' }) }))
+    fireEvent.click(screen.getByRole('button', { name: t('action.moreFolderNamed', { name: 'reports' }) }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('folder.delete') }))
     const deleteDialog = screen.getByRole('dialog', { name: t('folder.delete.title') })
     fireEvent.click(within(deleteDialog).getByRole('button', { name: t('folder.delete.confirm') }))
     await waitFor(() => { expect(client.removeDirectory).toHaveBeenCalledWith('reports') })
@@ -2088,7 +2176,8 @@ describe('DocumentsModal', () => {
     expect(screen.getByText('alpha.png')).toBeTruthy()
     expect(screen.queryByText('beta.txt')).toBeNull()
     fireEvent.change(screen.getByRole('combobox', { name: t('modal.type') }), { target: { value: 'all' } })
-    fireEvent.change(screen.getByRole('combobox', { name: t('modal.sort') }), { target: { value: 'name:asc' } })
+    fireEvent.click(screen.getByRole('button', { name: t('modal.sort') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('sort.field.name') }))
     expect(screen.queryByRole('group', { name: `${t('listing.date')} 2026-08-18` })).toBeNull()
     const names = screen.getAllByRole('listitem').map(row => row.textContent ?? '')
     expect(names[0]).toContain('alpha.png')
@@ -2189,9 +2278,13 @@ it.each(['application/pdf', 'image/png'])('pins %s preview and download URLs to 
   const pin = (url: string): string => `${url}${url.includes('?') ? '&' : '?'}dshPrincipal=7`
   render(<DocumentsModal open onClose={() => {}} t={t} privateResourceUrl={pin} />)
   await screen.findByText(name)
-  expect(screen.getByRole('link', { name: t('action.downloadNamed', { name }) }).getAttribute('href')).toContain('dshPrincipal=7')
+  fireEvent.click(screen.getByRole('button', { name: t('action.moreNamed', { name }) }))
+  const download = vi.spyOn(window, 'open').mockImplementation(() => null)
+  fireEvent.click(screen.getByRole('menuitem', { name: t('action.download') }))
+  expect(download).toHaveBeenCalledWith(expect.stringContaining('dshPrincipal=7'), '_blank', 'noopener,noreferrer')
+  fireEvent.keyDown(document, { key: 'Escape' })
   fireEvent.click(namedButton('preview', name))
-  const preview = await screen.findByRole('dialog', { name: t('preview.title', { name }) })
+  const preview = await screen.findByRole('complementary', { name: t('preview.title', { name }) })
   const content = mediaType === 'application/pdf' ? within(preview).getByTitle(name) : within(preview).getByRole('img', { name })
   expect(content.getAttribute('src')).toContain('dshPrincipal=7')
 })

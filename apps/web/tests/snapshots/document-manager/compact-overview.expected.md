@@ -10,6 +10,8 @@
   - group "Document filters":
     - img
     - textbox "Search document name"
+    - button "More actions":
+      - img
   - list:
     - listitem:
       - text: notes.txt Personal documents · 30.0 KB · Alice

@@ -2,9 +2,11 @@
   - heading "Document Manager" [level=2]
   - button "Close":
     - img
-  - paragraph: No per-file size limit, up to 20 per upload
+  - button "Upload information":
+    - img
   - complementary "Document scopes":
-    - text: Scopes
+    - img
+    - textbox "Find a project space"
     - status:
       - text: Project scopes could not be refreshed; showing the last result
       - button "Retry"
@@ -14,8 +16,14 @@
     - button "Personal documents Private to you":
       - strong: Personal documents
       - text: Private to you
+    - text: Scopes
+    - button "Trash":
+      - img
+      - text: Trash
+    - button "History"
+  - heading "Personal documents" [level=3]
   - navigation "Document path":
-    - button "All Documents" [disabled]
+    - button "Root folder" [disabled]
   - group "Document filters":
     - img
     - textbox "Search document name"
@@ -25,39 +33,31 @@
       - option "PDF"
       - option "Text"
       - option "Other"
-    - combobox "Sort":
-      - option "Date newest" [selected]
-      - option "Date oldest"
-      - option "Name A–Z"
-      - option "Name Z–A"
-      - option "Size large–small"
-      - option "Size small–large"
+    - button "Sort":
+      - img
+      - text: Modified · Newest first
+      - img
   - group "Document actions":
-    - button "Trash"
     - button "New Folder":
       - img
       - text: New Folder
     - button "Upload Document":
       - img
       - text: Upload Document
-    - button "Refresh":
+    - button "More actions":
       - img
-    - button "History"
   - checkbox "Select this page"
-  - text: Visible only to you 21 documents
+  - text: Visible only to you 0 folders · 21 documents
   - list "Document Manager":
     - group "Upload date 2026-08-01":
       - text: 2026-08-01
       - listitem:
         - checkbox "f-01.txt"
-        - text: f-01.txt 21 B
+        - button "Preview f-01.txt": f-01.txt Text · 2026-08-01
+        - text: 21 B
         - button "Add f-01.txt to conversation": Add to conversation
-        - button "Preview f-01.txt": Preview
-        - button "Move f-01.txt": Move
-        - link "Download f-01.txt":
-          - /url: /api/documents/content?id=2026-08-01%2Ff-01.txt
-          - text: Download
-        - button "Delete f-01.txt": Delete
+        - 'button "More actions: f-01.txt"':
+          - img
   - button "Previous page"
   - text: Page 2 of 2
   - button "Next page" [disabled]

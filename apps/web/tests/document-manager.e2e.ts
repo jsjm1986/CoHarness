@@ -1,6 +1,6 @@
 /**
  * Document manager chrome through the shipped Web composition: desktop list
- * dialog, compact bottom sheet, target-scope upload, and a paged 21-file list.
+ * dialog with inline preview, compact bottom sheet, target-scope upload, and a paged 21-file list.
  * Keyless: chrome cases use fixture document lists. Trash navigation exercises
  * real personal Host storage and a controlled project broker. Upload batches
  * use real Host requests with one completion delivery held; no model turns
@@ -143,29 +143,42 @@ describe('web e2e: document manager', () => {
       await manager.getByRole('button', { name: `Preview ${previewDocument.name}`, exact: true }).click()
     }
     expect([200, 206]).toContain((await response).status())
-    const preview = page.getByRole('dialog', { name: `Preview: ${previewDocument.name}`, exact: true })
+    const preview = compact
+      ? page.getByRole('dialog', { name: `Preview: ${previewDocument.name}`, exact: true })
+      : manager.getByRole('complementary', { name: `Preview: ${previewDocument.name}`, exact: true })
     const frame = preview.locator('iframe')
     await frame.waitFor({ state: 'visible' })
-    const geometry = await frame.evaluate((element) => {
-      const body = element.parentElement!, dialog = element.closest('[role="dialog"]')!
+    const geometry = await preview.evaluate((container) => {
+      const element = container.querySelector('iframe')!
+      const body = element.parentElement!
       const box = (node: Element) => {
         const rect = node.getBoundingClientRect()
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom }
       }
-      return { frame: box(element), body: box(body), dialog: box(dialog), scrollWidth: dialog.scrollWidth, clientWidth: dialog.clientWidth }
+      const bodyBox = box(body)
+      const style = getComputedStyle(body)
+      const paddingTop = Number.parseFloat(style.paddingTop)
+      const paddingBottom = Number.parseFloat(style.paddingBottom)
+      const availableBody = {
+        height: body.clientHeight - paddingTop - paddingBottom,
+        bottom: bodyBox.y + body.clientTop + body.clientHeight - paddingBottom,
+      }
+      return {
+        frame: box(element), body: bodyBox, availableBody, container: box(container),
+        scrollWidth: container.scrollWidth, clientWidth: container.clientWidth,
+      }
     })
-    expect(geometry.body.height).toBeGreaterThan(300)
-    expect(geometry.frame.height, JSON.stringify(geometry)).toBeGreaterThanOrEqual(geometry.body.height - 2)
-    expect(geometry.frame.bottom).toBeLessThanOrEqual(geometry.body.bottom + 1)
-    expect(geometry.dialog.x).toBeGreaterThanOrEqual(-1)
-    expect(geometry.dialog.y).toBeGreaterThanOrEqual(-1)
-    expect(geometry.dialog.right).toBeLessThanOrEqual(width + 1)
-    expect(geometry.dialog.bottom).toBeLessThanOrEqual(height + 1)
+    expect(geometry.availableBody.height).toBeGreaterThan(300)
+    expect(geometry.frame.height, JSON.stringify(geometry)).toBeGreaterThanOrEqual(geometry.availableBody.height - 2)
+    expect(geometry.frame.bottom).toBeLessThanOrEqual(geometry.availableBody.bottom + 1)
+    expect(geometry.container.x).toBeGreaterThanOrEqual(-1)
+    expect(geometry.container.y).toBeGreaterThanOrEqual(-1)
+    expect(geometry.container.right).toBeLessThanOrEqual(width + 1)
+    expect(geometry.container.bottom).toBeLessThanOrEqual(height + 1)
     expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth + 1)
-    const close = preview.getByRole('button', { name: 'Close', exact: true })
+    const close = preview.getByRole('button', { name: compact ? 'Back to documents' : 'Close preview', exact: true })
     await close.waitFor({ state: 'visible' })
-    if (compact) await close.click()
-    else await page.keyboard.press('Escape')
+    await close.click()
     await preview.waitFor({ state: 'detached' })
     expect(await page.locator('iframe').count()).toBe(0)
     await expect.poll(() => page.frames().length).toBe(initialFrames)
@@ -185,6 +198,13 @@ describe('web e2e: document manager', () => {
     await dialog.getByText('brief.txt').waitFor({ timeout: 10_000 })
     await dialog.getByText('notes.txt').waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: 'Open folder reports' }).waitFor({ timeout: 10_000 })
+    await page.route(/\/api\/documents\/content(?:\?.*)?$/, async (route) => {
+      await route.fulfill({ contentType: 'text/plain', body: 'Preview fixture for the document manager.' })
+    })
+    await dialog.getByRole('button', { name: 'Preview brief.txt', exact: true }).click()
+    const preview = dialog.getByRole('complementary', { name: 'Preview: brief.txt' })
+    await preview.getByText('Preview fixture for the document manager.', { exact: true }).waitFor()
+    expect(await dialog.getByRole('checkbox', { name: 'brief.txt', exact: true }).isChecked()).toBe(false)
     const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DESKTOP_EXPECTED, snapshot, MODE)
   }, 60_000)
@@ -320,7 +340,7 @@ describe('web e2e: document manager', () => {
       if (compact) {
         await manager.locator('[data-documents-toolbar-more]').tap()
         await page.locator('[data-documents-sheet="toolbar-more"]').getByRole('button', { name: 'Trash', exact: true }).tap()
-      } else await manager.getByRole('button', { name: 'Trash', exact: true }).click()
+      } else await manager.locator('[data-documents-trash-toggle]').click()
       const trash = manager.getByRole('region', { name: 'Trash', exact: true })
       await trash.getByText(restoredFile.name, { exact: true }).waitFor()
       return trash
@@ -350,7 +370,7 @@ describe('web e2e: document manager', () => {
     await trash.waitFor({ state: 'detached' })
     await expect.poll(() => breadcrumb.getAttribute('aria-current')).toBe('page')
     const returnTarget = compact ? manager.locator('[data-documents-toolbar-more]')
-      : manager.getByRole('button', { name: 'Trash', exact: true })
+      : manager.locator('[data-documents-trash-toggle]')
     expect(await returnTarget.evaluate(node => node === document.activeElement)).toBe(true)
     expect(reads).toEqual(before)
     const restoredTrash = await enterTrash()
@@ -371,13 +391,13 @@ describe('web e2e: document manager', () => {
       else await restoredBack.click()
       await restoredTrash.waitFor({ state: 'detached' })
       await restoredListingRequested.promise
-      const loadingSelector = '[data-documents-panel] > [role="status"][aria-live="polite"]'
+      const loadingSelector = '[data-documents-browse-body] > [role="status"][aria-live="polite"]'
       const loading = manager.locator(loadingSelector)
       await loading.waitFor({ state: 'visible' })
       expect(await loading.count()).toBe(1)
       expect(await loading.innerText()).toBe('Loading documents')
       expect(await manager.getByText('No documents uploaded yet', { exact: true }).count()).toBe(0)
-      expect(await manager.getByText('0 documents', { exact: true }).count()).toBe(0)
+      expect(await manager.getByText(/\b0 documents$/u).count()).toBe(0)
       expect(await breadcrumb.getAttribute('aria-current')).toBe('page')
       expect(await returnTarget.evaluate(node => node === document.activeElement)).toBe(true)
       await compareOrRefreshGolden(LOADING_EXPECTED, await captureStableAria(page, loadingSelector, scaffold.workspaceCwd), MODE)
@@ -451,7 +471,7 @@ describe('web e2e: document manager', () => {
     await dialog.getByRole('button', { name: /Compiler/ }).waitFor({ timeout: 10_000 })
     const beforeUrl = page.url()
     await dialog.getByRole('button', { name: /Compiler/ }).click()
-    await dialog.getByRole('status').getByText('Upload target: Compiler', { exact: true }).waitFor({ timeout: 10_000 })
+    await dialog.getByRole('heading', { name: 'Compiler', exact: true }).waitFor({ timeout: 10_000 })
     await dialog.getByText('shared.txt', { exact: true }).waitFor({ timeout: 10_000 })
     expect(page.url()).toBe(beforeUrl)
     expect(await page.getByRole('dialog').count()).toBe(1)
@@ -504,7 +524,7 @@ describe('web e2e: document manager', () => {
     const dialog = page.getByRole('dialog', { name: 'Document Manager' })
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: /Compiler/ }).click()
-    await dialog.getByRole('status').getByText('Upload target: Compiler', { exact: true }).waitFor({ timeout: 10_000 })
+    await dialog.getByRole('heading', { name: 'Compiler', exact: true }).waitFor({ timeout: 10_000 })
     const beforeUrl = page.url()
     await dialog.locator('input[type="file"]').setInputFiles({ name: 'target.txt', mimeType: 'text/plain', buffer: Buffer.from('target') })
     await expect.poll(() => uploadRequests.some(request => request.startsWith('POST /api/documents/transfer/uploads?'))).toBe(true)
@@ -593,7 +613,7 @@ describe('web e2e: document manager', () => {
         expect(directoryReads).toBe(readsBefore)
         expect(await manager.getByText('Uploaded 1 of 3 files', { exact: true }).count()).toBe(1)
         expect(await manager.getByText('No documents uploaded yet', { exact: true }).count()).toBe(0)
-        expect(await manager.getByText('0 documents', { exact: true }).count()).toBe(0)
+        expect(await manager.getByText(/\b0 documents$/u).count()).toBe(0)
         expect(await input.isDisabled()).toBe(true)
         expect(await manager.getByText('Uploaded 3 of 3 files', { exact: true }).count()).toBe(0)
         if (MODE === 'refresh') await mkdir(EXPECTED_DIR, { recursive: true })
@@ -826,9 +846,10 @@ describe('web e2e: document manager', () => {
     const moreSheet = page.locator('[data-documents-sheet="toolbar-more"]')
     await moreSheet.waitFor({ timeout: 10_000 })
     expect(await moreSheet.locator('[data-documents-sheet-scrollport]').count()).toBe(1)
-    expect(await moreSheet.locator('select').count()).toBe(2)
+    expect(await moreSheet.locator('select').count()).toBe(1)
+    expect(await moreSheet.getByRole('radio').count()).toBe(5)
     await moreSheet.locator('select').nth(0).selectOption('pdf')
-    await moreSheet.locator('select').nth(1).selectOption('name:asc')
+    await moreSheet.getByRole('radio', { name: 'Name', exact: true }).check()
     expect(browseRequests).toBe(browseBeforeMore)
     for (const control of [
       moreSheet.getByRole('button', { name: 'New Folder' }),
@@ -970,7 +991,8 @@ describe('web e2e: document manager', () => {
     const dialog = page.getByRole('dialog', { name: 'Document Manager' })
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.locator('[data-documents-list] [title="brief.txt"]').waitFor({ timeout: 10_000 })
-    expect(await dialog.locator('[data-documents-scope-trigger]').count()).toBe(0)
+    expect(await dialog.locator('[data-documents-scope-trigger]').count()).toBe(1)
+    expect(await dialog.locator('aside[aria-label="Document scopes"]').isVisible()).toBe(false)
     expect(await dialog.locator('aside[aria-label="Document scopes"]').count()).toBe(1)
     const overflow = await dialog.evaluate(element => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }))
     expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1)

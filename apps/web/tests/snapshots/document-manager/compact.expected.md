@@ -2,7 +2,8 @@
   - heading "Document Manager" [level=2]
   - button "Close":
     - img
-  - paragraph: No per-file size limit, up to 20 per upload
+  - button "Upload information":
+    - img
   - button "Personal documents":
     - strong: Personal documents
     - img
@@ -10,7 +11,7 @@
     - text: Project scopes could not be refreshed; showing the last result
     - button "Retry"
   - navigation "Document path":
-    - button "All Documents" [disabled]
+    - button "Root folder" [disabled]
   - group "Document filters":
     - img
     - textbox "Search document name"
@@ -22,7 +23,7 @@
       - img
       - text: More
   - checkbox "Select this page"
-  - text: Visible only to you 2 documents
+  - text: Visible only to you 1 folders · 2 documents
   - list "Document Manager":
     - listitem:
       - button "Open folder reports": reports
@@ -32,13 +33,15 @@
       - text: 2026-08-16
       - listitem:
         - checkbox "notes.txt"
-        - text: notes.txt 30.0 KB · 2026-08-16
+        - button "Preview notes.txt": notes.txt 30.0 KB · 2026-08-16
+        - button "Add notes.txt to conversation": Add to conversation
         - 'button "More actions: notes.txt"':
           - img
     - group "Upload date 2026-08-14":
       - text: 2026-08-14
       - listitem:
         - checkbox "brief.txt"
-        - text: brief.txt 21 B · 2026-08-14
+        - button "Preview brief.txt": brief.txt 21 B · 2026-08-14
+        - button "Add brief.txt to conversation": Add to conversation
         - 'button "More actions: brief.txt"':
           - img

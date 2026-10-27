@@ -19,6 +19,9 @@ import {
   IconTrashOutline16,
   Input,
   Modal,
+  Menu,
+  MenuItemButton,
+  Tooltip,
   useMediaQuery,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
@@ -31,12 +34,15 @@ import {
   type UserDocTransferListedDocument, type UserDocTransferResponse,
   type UserDocTrashRef,
 } from './documents-client.ts'
+import { FileTypeIcon } from './FileTypeIcon.tsx'
+import { DocumentSortControl } from './DocumentSortControl.tsx'
 import { DocumentPreview } from './DocumentPreview.tsx'
 import { DocumentsMobileSheet } from './DocumentsMobileSheet.tsx'
 import { formatBytes, getDateGroup } from './format.ts'
 import {
   PAGE_SIZE,
   clampPage,
+  documentTypeBucket,
   filterDocuments,
   groupDocumentsByDate,
   pageCount,
@@ -421,6 +427,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   open, onClose, t, mode = 'manage', onAttachDocument, privateResourceUrl, attachmentScope,
 }) => {
   const phone = useMediaQuery('(max-width: 767px)')
+  const compactNavigation = useMediaQuery('(max-width: 1100px)')
   const [documents, setDocuments] = useState<UserDocRef[]>([])
   const [directories, setDirectories] = useState<UserDocDirectoryRef[]>([])
   const [currentDirectoryId, setCurrentDirectoryId] = useState<UserDocDirectoryIdType>(ROOT_DIRECTORY_ID)
@@ -463,6 +470,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const [moveDirectoryId, setMoveDirectoryId] = useState<UserDocDirectoryIdType>(ROOT_DIRECTORY_ID)
   const [moveLoading, setMoveLoading] = useState(false)
   const [copyTargets, setCopyTargets] = useState<CopyTargetOption[] | null>(null)
+  const [singleCopyDocument, setSingleCopyDocument] = useState<UserDocRef | null>(null)
   const [copyTarget, setCopyTarget] = useState<string>('personal')
   const [copyLoading, setCopyLoading] = useState(false)
   const [copyDirectories, setCopyDirectories] = useState<Array<{ directoryId: UserDocDirectoryIdType; name: string }>>([])
@@ -473,6 +481,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const [failedCopyItems, setFailedCopyItems] = useState<FailedCopyItem[]>([])
   const [retryingCopyId, setRetryingCopyId] = useState<string | null>(null)
   const [previewDoc, setPreviewDoc] = useState<UserDocRef | null>(null)
+  const [previewContext, setPreviewContext] = useState('')
+  const [rowMenuId, setRowMenuId] = useState<string | null>(null)
+  const [scopeFilter, setScopeFilter] = useState('')
+  const [limitsOpen, setLimitsOpen] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const previewTriggers = useRef(new Map<string, HTMLButtonElement>())
   const [overviewMode, setOverviewMode] = useState(false)
   const [overviewRows, setOverviewRows] = useState<UserDocCatalogRow[]>([])
   const [overviewPage, setOverviewPage] = useState(1)
@@ -2004,7 +2018,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
 
   const focusTrashReturn = (element: HTMLDivElement | null): void => {
     if (trashMode || !trashReturnFocusPending.current || element === null) return
-    const target = element.querySelector<HTMLButtonElement>(phone
+    const target = element.querySelector<HTMLButtonElement>(compactNavigation
       ? '[data-documents-toolbar-more]'
       : '[data-documents-trash-toggle]')
     if (target === null) return
@@ -2209,8 +2223,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     }
   }
 
-  const openCopy = (targets: UserDocRef[]) => {
+  const openCopy = (targets: UserDocRef[], single = false) => {
     if (targets.length === 0) return
+    setSingleCopyDocument(single ? targets[0] ?? null : null)
     const source = listingScope()
     const current = currentScopeDescriptor()
     const options: CopyTargetOption[] = (scope.projects ?? [])
@@ -2631,11 +2646,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   }
 
   const handleCopy = async () => {
-    if (copyTargets === null || (overviewCopyRow === null && selected.size === 0)) return
+    if (copyTargets === null || (overviewCopyRow === null && singleCopyDocument === null && selected.size === 0)) return
     const option = copyTargets.find(candidate => candidate.value === copyTarget)
     if (option === undefined) return
     const targets = overviewCopyRow === null
-      ? selectedDocumentList()
+      ? singleCopyDocument === null ? selectedDocumentList() : [singleCopyDocument]
       : [{
         docId: overviewCopyRow.row.docId,
         path: '',
@@ -2923,6 +2938,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     <Button
       type="button"
       variant="ghost"
+      size="toolbar"
       aria-label={t('selection.clear')}
       onClick={clearSelection}
     >
@@ -2951,204 +2967,64 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     })),
   ].filter(directory => directory.directoryId !== currentDirectoryId)
 
+  const viewContext = `${scopeCacheKey(listingScope())}:${String(currentDirectoryId)}`
+  const previewVisible = open && previewDoc !== null && previewContext === viewContext && !overviewMode && !trashMode
+    && documents.some(document => document.docId === previewDoc.docId)
+  const crossScopeAttachment = !sameDocumentScope(listingScope(), currentScopeDescriptor())
+  const attachLabel = crossScopeAttachment ? t('scope.copyAndAttach') : t('action.attach')
+  const batchAttachLabel = t(crossScopeAttachment ? 'selection.copyAttachCount' : 'selection.attachCount', { count: String(selected.size) })
+  const openPreview = (document: UserDocRef) => {
+    setPreviewContext(viewContext)
+    setPreviewDoc(document)
+    setRowMenuId(null)
+  }
+  const closePreview = () => {
+    setPreviewDoc(null)
+    if (previewDoc !== null) previewTriggers.current.get(previewDoc.docId)?.focus({ preventScroll: true })
+  }
   const renderDirectory = (directory: UserDocDirectoryRef) => (
     <div key={directory.directoryId} className={`${css.row} ${css.folderRow}`} role="listitem" data-documents-row-kind="folder">
       <span className={css.folderAlign} aria-hidden="true" />
-      <button
-        type="button"
-        className={css.folderOpen}
-        aria-label={t('folder.openNamed', { name: directory.name })}
-        onClick={() => { navigate(directory.directoryId) }}
-      >
+      <button type="button" className={css.folderOpen} aria-label={t('folder.openNamed', { name: directory.name })} onClick={() => { navigate(directory.directoryId) }}>
         <span className={css.fileIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
         <span className={css.name} title={directory.name}>{directory.name}</span>
       </button>
-      {phone ? (
-        <Button
-          className={css.rowMore}
-          data-documents-row-more="folder"
-          type="button"
-          variant="ghost"
-          aria-label={t('action.moreFolderNamed', { name: directory.name })}
-          aria-haspopup="dialog"
-          onClick={() => { setMobileSheet({ kind: 'directory', directory }) }}
-        >
-          <IconEllipsisOutline16 size={20} />
-        </Button>
-      ) : (
-        <span className={css.actions}>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            aria-label={t('folder.renameNamed', { name: directory.name })}
-            title={t('folder.rename')}
-            disabled={busy || writeLocked}
-            onClick={() => { openRenameDirectory(directory) }}
-          >
-            <span className={css.actionIcon} aria-hidden="true"><IconEditOutline16 size={16} /></span>
-            <span className={css.actionLabel}>{t('folder.rename')}</span>
-          </Button>
-          <Button
-            className={css.delete}
-            type="button"
-            size="sm"
-            variant="ghost"
-            aria-label={t('folder.deleteNamed', { name: directory.name })}
-            title={t('folder.delete')}
-            disabled={busy || writeLocked}
-            onClick={() => { setDeleteDirectory(directory) }}
-          >
-            <span className={css.actionIcon} aria-hidden="true"><IconTrashOutline16 size={16} /></span>
-            <span className={css.actionLabel}>{t('folder.delete')}</span>
-          </Button>
-        </span>
-      )}
+      {phone ? <Button className={css.rowMore} data-documents-row-more="folder" type="button" variant="ghost" aria-label={t('action.moreFolderNamed', { name: directory.name })} aria-haspopup="dialog" onClick={() => { setMobileSheet({ kind: 'directory', directory }) }}><IconEllipsisOutline16 size={16} /></Button> :
+        <Menu open={rowMenuId === `folder:${directory.directoryId}`} portal autoFocus compact align="end" onClose={() => { setRowMenuId(null) }}
+          anchor={<Button className={css.rowMore} size="toolbar" type="button" variant="ghost" aria-label={t('action.moreFolderNamed', { name: directory.name })} aria-haspopup="menu" aria-expanded={rowMenuId === `folder:${directory.directoryId}`} onClick={() => { setRowMenuId(rowMenuId === `folder:${directory.directoryId}` ? null : `folder:${directory.directoryId}`) }}><IconEllipsisOutline16 size={16} /></Button>}>
+          <MenuItemButton icon={<IconEditOutline16 size={16} />} disabled={busy || writeLocked} onSelect={() => { setRowMenuId(null); openRenameDirectory(directory) }}>{t('folder.rename')}</MenuItemButton>
+          <MenuItemButton icon={<IconTrashOutline16 size={16} />} danger disabled={busy || writeLocked} onSelect={() => { setRowMenuId(null); setDeleteDirectory(directory) }}>{t('folder.delete')}</MenuItemButton>
+        </Menu>}
     </div>
   )
 
   const renderRow = (doc: UserDocRef) => (
-    <div key={doc.docId} className={css.row} role="listitem" data-documents-row-kind="document">
-      <label className={css.check}>
-        <input
-          type="checkbox"
-          checked={selected.has(doc.docId)}
-          aria-label={doc.name}
-          onChange={() => { toggleId(doc.docId) }}
-        />
-      </label>
-      <span className={css.fileIcon} aria-hidden="true">
-        <IconBrowseOutline16 size={16} />
+    <div key={doc.docId} className={`${css.row}${selected.has(doc.docId) ? ` ${css.rowSelected}` : ''}${previewVisible && previewDoc.docId === doc.docId ? ` ${css.rowPreviewing}` : ''}`} role="listitem" data-documents-row-kind="document">
+      <label className={css.check}><input type="checkbox" checked={selected.has(doc.docId)} aria-label={doc.name} onChange={() => { toggleId(doc.docId) }} /></label>
+      <button type="button" className={css.documentName} aria-label={t('action.previewNamed', { name: doc.name })} aria-current={previewVisible && previewDoc.docId === doc.docId ? 'true' : undefined}
+        ref={(element) => {
+          if (element === null) previewTriggers.current.delete(doc.docId)
+          else previewTriggers.current.set(doc.docId, element)
+        }} onClick={() => { openPreview(doc) }}>
+        <span className={css.fileIcon} aria-hidden="true"><FileTypeIcon name={doc.name} mediaType={doc.mediaType} /></span>
+        <span className={css.meta}><span className={css.name} title={doc.name}>{doc.name}</span><span className={css.size}>{phone ? documentMetaLabel(doc, t, true) : `${t(`modal.type.${documentTypeBucket(doc.mediaType)}`)} · ${getDateGroup(doc.modifiedAt, t('date.unknown'))}`}</span></span>
+      </button>
+      <span className={css.rowBytes}>{formatBytes(doc.bytes)}</span>
+      <span className={css.rowPrimaryActions}>
+        <Button className={css.quickAttach} type="button" size="toolbar" variant="soft" aria-label={t('action.attachNamed', { name: doc.name })} disabled={busy} onClick={() => { attachDocument(doc) }}>{attachLabel}</Button>
+        {phone ? <Button className={css.rowMore} data-documents-row-more="document" type="button" variant="ghost" aria-label={t('action.moreNamed', { name: doc.name })} aria-haspopup="dialog" onClick={() => { setMobileSheet({ kind: 'document', document: doc }) }}><IconEllipsisOutline16 size={16} /></Button> :
+          <Menu open={rowMenuId === `document:${doc.docId}`} portal autoFocus compact align="end" onClose={() => { setRowMenuId(null) }}
+            anchor={<Button className={css.rowMore} size="toolbar" type="button" variant="ghost" aria-label={t('action.moreNamed', { name: doc.name })} aria-haspopup="menu" aria-expanded={rowMenuId === `document:${doc.docId}`} onClick={() => { setRowMenuId(rowMenuId === `document:${doc.docId}` ? null : `document:${doc.docId}`) }}><IconEllipsisOutline16 size={16} /></Button>}>
+            <MenuItemButton icon={<IconInspectOutline12 size={16} />} onSelect={() => { openPreview(doc) }}>{t('action.preview')}</MenuItemButton>
+            <MenuItemButton icon={<IconFolderOpenOutline16 size={16} />} disabled={busy || writeLocked} onSelect={() => { setRowMenuId(null); void openMove([doc]) }}>{t('action.move')}</MenuItemButton>
+            <MenuItemButton icon={<IconCopyOutline16 size={16} />} disabled={busy} onSelect={() => { setRowMenuId(null); openCopy([doc], true) }}>{t('scope.copy')}</MenuItemButton>
+            <MenuItemButton icon={<IconDownloadOutline16 size={16} />} onSelect={() => {
+              setRowMenuId(null)
+              window.open(documentContentUrl(doc.docId), '_blank', 'noopener,noreferrer')
+            }}>{t('action.download')}</MenuItemButton>
+            <MenuItemButton icon={<IconTrashOutline16 size={16} />} danger separatorBefore disabled={busy || writeLocked} onSelect={() => { setRowMenuId(null); setDeleteTargets([doc]) }}>{t('action.delete')}</MenuItemButton>
+          </Menu>}
       </span>
-      <div className={css.meta}>
-        <span className={css.name} title={doc.name}>{doc.name}</span>
-        <span className={css.size}>
-          {documentMetaLabel(doc, t, phone || sort.key !== 'date')}
-        </span>
-      </div>
-      {phone ? (
-        !overviewMode ? (
-          <>
-            <span className={css.mobileCoreActions}>
-              <Button
-                className={css.mobileCoreAction}
-                type="button"
-                size="sm"
-                variant="ghost"
-                aria-label={t('action.attachNamed', { name: doc.name })}
-                title={t('action.attach')}
-                disabled={busy}
-                icon={<IconPaperclipOutline16 size={18} />}
-                onClick={() => { attachDocument(doc) }}
-              >
-                <span className={css.mobileCoreLabel}>{t('action.attach')}</span>
-              </Button>
-              <Button
-                className={css.mobileCoreAction}
-                type="button"
-                size="sm"
-                variant="ghost"
-                aria-label={t('action.previewNamed', { name: doc.name })}
-                title={t('action.preview')}
-                disabled={busy}
-                icon={<IconInspectOutline12 size={18} />}
-                onClick={() => { setPreviewDoc(doc) }}
-              >
-                <span className={css.mobileCoreLabel}>{t('action.preview')}</span>
-              </Button>
-            </span>
-            <Button
-              className={css.rowMore}
-              data-documents-row-more="document"
-              type="button"
-              variant="ghost"
-              aria-label={t('action.moreNamed', { name: doc.name })}
-              aria-haspopup="dialog"
-              onClick={() => { setMobileSheet({ kind: 'document', document: doc }) }}
-            >
-              <IconEllipsisOutline16 size={20} />
-            </Button>
-          </>
-        ) : (
-          <span className={css.readOnlyBadge}>{t('scope.readOnly')}</span>
-        )
-      ) : (
-        <span className={css.actions}>
-          {!overviewMode && (
-            <>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                aria-label={t('action.attachNamed', { name: doc.name })}
-                title={t('action.attach')}
-                disabled={busy}
-                onClick={() => { attachDocument(doc) }}
-              >
-                <span className={css.actionIcon} aria-hidden="true">
-                  <IconPaperclipOutline16 size={16} />
-                </span>
-                <span className={css.actionLabel}>{t('action.attach')}</span>
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                aria-label={t('action.previewNamed', { name: doc.name })}
-                title={t('action.preview')}
-                onClick={() => { setPreviewDoc(doc) }}
-              >
-                <span className={css.actionIcon} aria-hidden="true">
-                  <IconInspectOutline12 size={16} />
-                </span>
-                <span className={css.actionLabel}>{t('action.preview')}</span>
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                aria-label={t('action.moveNamed', { name: doc.name })}
-                title={t('action.move')}
-                disabled={busy || writeLocked}
-                onClick={() => { void openMove([doc]) }}
-              >
-                <span className={css.actionIcon} aria-hidden="true">
-                  <IconFolderOpenOutline16 size={16} />
-                </span>
-                <span className={css.actionLabel}>{t('action.move')}</span>
-              </Button>
-              <a
-                className={css.download}
-                href={documentContentUrl(doc.docId)}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={t('action.downloadNamed', { name: doc.name })}
-                title={t('action.download')}
-              >
-                <span className={css.actionIcon} aria-hidden="true">
-                  <IconDownloadOutline16 size={16} />
-                </span>
-                <span className={css.actionLabel}>{t('action.download')}</span>
-              </a>
-              <Button
-                className={css.delete}
-                type="button"
-                size="sm"
-                variant="ghost"
-                aria-label={t('action.deleteNamed', { name: doc.name })}
-                title={t('action.delete')}
-                disabled={busy || writeLocked}
-                onClick={() => { setDeleteTargets([doc]) }}
-              >
-                <span className={css.actionIcon} aria-hidden="true">
-                  <IconTrashOutline16 size={16} />
-                </span>
-                <span className={css.actionLabel}>{t('action.delete')}</span>
-              </Button>
-            </>
-          )}
-        </span>
-      )}
     </div>
   )
 
@@ -3164,7 +3040,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         attachDocument(doc)
         return
       case 'preview':
-        setPreviewDoc(doc)
+        openPreview(doc)
         return
       case 'move':
         void openMove([doc])
@@ -3317,16 +3193,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
           >
             {TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
           </select>
-          <label className={css.sheetLabel} htmlFor="documents-mobile-sort">{t('modal.sort')}</label>
-          <select
-            id="documents-mobile-sort"
-            className={css.sheetSelect}
-            value={sortValue}
-            disabled={busy}
-            onChange={(event) => { setSortValue(event.currentTarget.value) }}
-          >
-            {SORT_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
-          </select>
+          <DocumentSortControl sort={sort} onChange={setSortValue} t={t} inline disabled={busy} />
         </section>
         <div className={css.sheetActions} role="list">
           <Button
@@ -3398,7 +3265,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         <small>{formatBytes(mobileSheet.document.bytes)} · {getDateGroup(mobileSheet.document.modifiedAt)}</small>
       </div>
       <div className={css.sheetActions} role="list">
-        <Button className={css.sheetAction} type="button" variant="ghost" disabled={busy} icon={<IconPaperclipOutline16 size={18} />} onClick={() => { performMobileDocumentAction('attach', mobileSheet.document) }}>{t('action.attach')}</Button>
+        <Button className={css.sheetAction} type="button" variant="ghost" disabled={busy} icon={<IconPaperclipOutline16 size={18} />} onClick={() => { performMobileDocumentAction('attach', mobileSheet.document) }}>{attachLabel}</Button>
         <Button className={css.sheetAction} type="button" variant="ghost" disabled={busy} icon={<IconInspectOutline12 size={18} />} onClick={() => { performMobileDocumentAction('preview', mobileSheet.document) }}>{t('action.preview')}</Button>
         <Button className={css.sheetAction} type="button" variant="ghost" disabled={busy || writeLocked} icon={<IconFolderOpenOutline16 size={18} />} onClick={() => { performMobileDocumentAction('move', mobileSheet.document) }}>{t('action.move')}</Button>
         <a
@@ -3411,6 +3278,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         >
           <IconDownloadOutline16 size={18} />{t('action.download')}
         </a>
+        <Button className={css.sheetAction} type="button" variant="ghost" disabled={busy} icon={<IconCopyOutline16 size={18} />} onClick={() => { const document = mobileSheet.document; closeMobileSheet(); openCopy([document], true) }}>{t('scope.copy')}</Button>
         <Button className={`${css.sheetAction} ${css.sheetDanger}`} type="button" variant="ghost" disabled={busy || writeLocked} icon={<IconTrashOutline16 size={18} />} onClick={() => { performMobileDocumentAction('delete', mobileSheet.document) }}>{t('action.delete')}</Button>
       </div>
     </DocumentsMobileSheet>
@@ -3516,9 +3384,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
           <select className={css.select} aria-label={t('modal.type')} value={typeFilter} onChange={(event) => { setTypeFilter(event.currentTarget.value as DocumentTypeFilter) }}>
             {TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
           </select>
-          <select className={css.select} aria-label={t('modal.sort')} value={sortValue} onChange={(event) => { setSortValue(event.currentTarget.value) }}>
-            {SORT_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
-          </select>
+          <DocumentSortControl sort={sort} onChange={setSortValue} t={t} disabled={busy} />
         </>
       )}
     </>
@@ -3533,12 +3399,17 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         closeLabel={t('modal.close')}
         className={css.dialog as string}
         contentClassName={css.shell as string}
+        onKeyDownCapture={(event) => {
+          if (!phone && previewVisible && event.key === 'Escape' && event.target instanceof Element && event.target.closest('[data-document-preview]') !== null) {
+            event.preventDefault(); event.stopPropagation(); closePreview()
+          }
+        }}
         {...(pager === undefined ? {} : { footer: pager })}
       >
-        {limitsText !== '' && <p className={css.limits}><IconInfoOutline16 size={14} aria-hidden="true" /><span>{limitsText}</span></p>}
-        <div className={css.workbench}>
+        {limitsText !== '' && <Tooltip label={t('manager.info')} disabled={phone}><Button className={css.infoButton} size="toolbar" type="button" variant="ghost" aria-label={t('manager.info')} onClick={() => { setLimitsOpen(true) }}><IconInfoOutline16 size={16} /></Button></Tooltip>}
+        <div className={css.workbench} ref={focusTrashReturn}>
           <aside className={css.scopeRail} aria-label={t('scope.rail.label')}>
-            <div className={css.scopeRailHeading}>{t('scope.rail.title')}</div>
+            <Input className={css.scopeSearch as string} icon={<IconSearchOutline16 size={14} />} aria-label={t('scope.search')} placeholder={t('scope.search')} value={scopeFilter} onChange={(event) => { setScopeFilter(event.currentTarget.value) }} />
             {scopeStatus === 'stale' && <div className={css.scopeStale} role="status"><span>{t('scope.stale')}</span><button type="button" onClick={() => { scopeCache.current = null; void load(ROOT_DIRECTORY_ID) }}>{t('scope.retry')}</button></div>}
             <button type="button" className={`${css.scopeItem} ${overviewMode ? css.scopeItemActive : ''}`} onClick={() => { void openOverview() }} disabled={busy || overviewLoading}>
               <span className={css.scopeItemIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
@@ -3548,17 +3419,24 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               <span className={css.scopeItemIcon} aria-hidden="true"><IconPaperclipOutline16 size={16} /></span>
               <span><strong>{t('copy.target.personal')}</strong><small>{t('scope.personal.description')}</small></span>
             </button>
-            {(scope.projects ?? []).map((project) => {
-              const isCurrent = !overviewMode && alternateSource === null && ((scopeView?.scope.kind === 'project' && scopeView.scope.projectId === project.projectId) || (scopeView === null && scope.kind === 'project' && scope.projectId === project.projectId))
-              return <button key={project.projectId} type="button" className={`${css.scopeItem} ${isCurrent ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'project', projectId: project.projectId }, project.name) }} disabled={busy || overviewLoading}>
-                <span className={css.scopeItemIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
-                <span><strong>{project.name}</strong><small>{t('scope.project.meta', { mode: projectModeLabel(project.mode, t), description: t('scope.project.description') })}</small></span>
-              </button>
-            })}
+            <div className={css.scopeRailHeading}>{t('scope.rail.title')}</div>
+            {(scope.projects ?? [])
+              .filter(project => project.name.toLowerCase().includes(scopeFilter.trim().toLowerCase()))
+              .map((project) => {
+                const isCurrent = !overviewMode && alternateSource === null && ((scopeView?.scope.kind === 'project' && scopeView.scope.projectId === project.projectId) || (scopeView === null && scope.kind === 'project' && scope.projectId === project.projectId))
+                return <button key={project.projectId} type="button" className={`${css.scopeItem} ${isCurrent ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'project', projectId: project.projectId }, project.name) }} disabled={busy || overviewLoading}>
+                  <span className={css.scopeItemIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
+                  <span><strong>{project.name}</strong><small>{t('scope.project.meta', { mode: projectModeLabel(project.mode, t), description: t('scope.project.description') })}</small></span>
+                </button>
+              })}
+            <div className={css.railBottom}>
+              <Button type="button" size="toolbar" variant="ghost" data-documents-trash-toggle="" disabled={busy || trashLoading || overviewMode} icon={<IconTrashOutline16 size={16} />} onClick={() => { if (trashMode) returnFromTrash(); else void openTrash() }}>{trashMode ? t('trash.back') : t('trash.button')}</Button>
+              <Button type="button" size="toolbar" variant="ghost" disabled={busy || historyLoading || overviewMode} onClick={() => { void openHistory() }}>{t('history.button')}</Button>
+            </div>
           </aside>
           <div className={css.workbenchContent}>
             {mode === 'select' && <div className={css.selectionModeNotice} role="status">{t('selection.mode.hint')}</div>}
-            {phone && (
+            {compactNavigation && (
               <>
                 <button
                   type="button"
@@ -3599,12 +3477,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                       <Button size="toolbar" type="button" variant="ghost" icon={<IconRefreshOutline16 size={16} />} disabled={overviewLoading || busy} onClick={() => { void openOverview(true) }}>{t('modal.refresh')}</Button>
                     </div>
                   </header>
-                  <div className={css.overviewToolbar} role="group" aria-label={t('modal.filters')}>{filterControls}</div>
+                  <div className={css.overviewToolbar} role="group" aria-label={t('modal.filters')}>{filterControls}{phone && <Button className={css.rowMore} size="toolbar" type="button" variant="ghost" aria-label={t('action.more')} onClick={() => { setMobileSheet({ kind: 'more' }) }}><IconEllipsisOutline16 size={16} /></Button>}</div>
                   {overviewError !== '' && <div className={css.error} role="alert">{overviewError}</div>}
                   {overviewLoading ? <p className={css.status}>{t('scope.all.loading')}</p> : overviewFiltered.length === 0 ? <p className={css.empty}>{t('scope.all.empty')}</p> : (
                     <div className={css.overviewList} role="list" data-documents-scrollport="overview">
                       {overviewPageRows.map(row => <div key={row.catalogId} className={css.overviewRow} role="listitem">
-                        <span className={css.fileIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
+                        <span className={css.fileIcon} aria-hidden="true"><FileTypeIcon name={row.name} mediaType={row.mediaType} /></span>
                         <div className={css.meta}>
                           <span className={css.name} title={row.name}>{row.name}</span>
                           <span className={css.size}>{overviewMetaLabel(row, t)}</span>
@@ -3663,7 +3541,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                   <header className={css.trashHeader} data-documents-trash-header="">
                     <div><h2>{t('trash.title')}</h2><p>{visibleScope}</p></div>
                     <div className={css.trashActions}>
-                      <Button type="button" variant="outline" disabled={busy || trashLoading} onClick={returnFromTrash}>
+                      <Button type="button" variant="soft" disabled={busy || trashLoading} onClick={returnFromTrash}>
                         {t('trash.back')}
                       </Button>
                       <Button type="button" variant="ghost" disabled={busy || trashLoading} onClick={() => { void openTrash() }}>
@@ -3675,7 +3553,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                     <div className={css.trashList} role="list">
                       {trashDocuments.map(document => (
                         <div key={document.docId} className={css.trashRow} role="listitem">
-                          <span className={css.fileIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
+                          <span className={css.fileIcon} aria-hidden="true"><FileTypeIcon name={document.name} mediaType={document.mediaType} /></span>
                           <div className={css.meta}>
                             <span className={css.name} title={document.name}>{document.name}</span>
                             <span className={css.size}>{formatBytes(document.bytes)} · {trashMetaLabel(document, t)}</span>
@@ -3704,61 +3582,63 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               )}
 
               <div className={css.directoryChrome}>
-                <div className={css.breadcrumbBar}>
-                  {currentDirectoryId !== ROOT_DIRECTORY_ID && (
-                    <button
-                      type="button"
-                      className={css.parentBack}
-                      disabled={loading && !listingReadyRef.current}
-                      onClick={() => { navigate(parentDirectory(currentDirectoryId)) }}
-                    >
-                      {t('breadcrumb.parent')}
-                    </button>
-                  )}
-                  <nav className={css.breadcrumbs} aria-label={t('breadcrumb.label')}>
-                    {directoryTrail.map((crumb, index) => (
-                      <span key={crumb.directoryId || 'root'} className={css.crumbSeat}>
-                        {index > 0 && <IconChevronRightOutline14 size={12} className={css.crumbChevron} />}
-                        <button
-                          type="button"
-                          className={css.crumb}
-                          aria-current={index === directoryTrail.length - 1 ? 'page' : undefined}
-                          disabled={(loading && !listingReadyRef.current) || index === directoryTrail.length - 1}
-                          onClick={() => { navigate(crumb.directoryId) }}
-                        >
-                          {crumb.name}
-                        </button>
+                <div className={css.locationIdentity}>
+                  {!compactNavigation && <h3 className={css.locationHeading}>{mobileScopeLabel}</h3>}
+                  <div className={css.breadcrumbBar}>
+                    {currentDirectoryId !== ROOT_DIRECTORY_ID && (
+                      <button
+                        type="button"
+                        className={css.parentBack}
+                        disabled={loading && !listingReadyRef.current}
+                        onClick={() => { navigate(parentDirectory(currentDirectoryId)) }}
+                      >
+                        {t('breadcrumb.parent')}
+                      </button>
+                    )}
+                    <nav className={css.breadcrumbs} aria-label={t('breadcrumb.label')}>
+                      {directoryTrail.map((crumb, index) => (
+                        <span key={crumb.directoryId || 'root'} className={css.crumbSeat}>
+                          {index > 0 && <IconChevronRightOutline14 size={12} className={css.crumbChevron} />}
+                          <button
+                            type="button"
+                            className={css.crumb}
+                            aria-current={index === directoryTrail.length - 1 ? 'page' : undefined}
+                            disabled={(loading && !listingReadyRef.current) || index === directoryTrail.length - 1}
+                            onClick={() => { navigate(crumb.directoryId) }}
+                          >
+                            {crumb.name}
+                          </button>
+                        </span>
+                      ))}
+                    </nav>
+                  </div>
+
+                  {scopeView !== null && (
+                    <div className={`${css.scopeNotice} ${scopeView.canUpload ? css.scopeNoticeTarget : css.scopeNoticeReadOnly}`} role="status">
+                      <span className={css.scopeNoticeIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
+                      <span className={css.scopeNoticeCopy}>
+                        <strong>{scopeView.canUpload
+                          ? t('scope.upload.target', { name: scopeView.label })
+                          : scopeView.label}</strong>
+                        <small>{scopeView.canUpload ? t('scope.manage.editable') : t('scope.upload.readOnly', { name: scopeView.label })}</small>
                       </span>
-                    ))}
-                  </nav>
+                    </div>
+                  )}
+                  {alternateSource !== null && (
+                    <div className={`${css.scopeNotice} ${alternateSource.mode === 'rw' ? css.scopeNoticeTarget : css.scopeNoticeReadOnly}`} role="status">
+                      <span className={css.scopeNoticeIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
+                      <span className={css.scopeNoticeCopy}>
+                        <strong>{alternateSource.label}</strong>
+                        <small>{alternateSource.mode === 'rw' ? t('scope.manage.editable') : t('scope.source.readOnly')}</small>
+                      </span>
+                    </div>
+                  )}
+
                 </div>
-
-                {scopeView !== null && (
-                  <div className={`${css.scopeNotice} ${scopeView.canUpload ? css.scopeNoticeTarget : css.scopeNoticeReadOnly}`} role="status">
-                    <span className={css.scopeNoticeIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
-                    <span className={css.scopeNoticeCopy}>
-                      <strong>{scopeView.canUpload
-                        ? t('scope.upload.target', { name: scopeView.label })
-                        : scopeView.label}</strong>
-                      <small>{scopeView.canUpload ? t('scope.manage.editable') : t('scope.upload.readOnly', { name: scopeView.label })}</small>
-                    </span>
-                  </div>
-                )}
-                {alternateSource !== null && (
-                  <div className={`${css.scopeNotice} ${alternateSource.mode === 'rw' ? css.scopeNoticeTarget : css.scopeNoticeReadOnly}`} role="status">
-                    <span className={css.scopeNoticeIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
-                    <span className={css.scopeNoticeCopy}>
-                      <strong>{alternateSource.label}</strong>
-                      <small>{alternateSource.mode === 'rw' ? t('scope.manage.editable') : t('scope.source.readOnly')}</small>
-                    </span>
-                  </div>
-                )}
-
                 <div className={css.toolbar}>
                   <div className={css.filterGroup} role="group" aria-label={t('modal.filters')}>{filterControls}</div>
                   <div
                     className={`${css.actionGroup}${phone ? ` ${css.mobileActionGroup}` : ''}`}
-                    ref={focusTrashReturn}
                     role="group"
                     aria-label={t('modal.actions')}
                   >
@@ -3804,67 +3684,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                       </>
                     ) : (
                       <>
-                        <Button size="toolbar"
-                          className={css.trashToggle}
-                          data-documents-trash-toggle=""
-                          type="button"
-                          variant="ghost"
-                          disabled={busy || trashLoading}
-                          onClick={() => { if (trashMode) returnFromTrash(); else void openTrash() }}
-                        >
-                          {trashMode ? t('trash.back') : t('trash.button')}
-                        </Button>
-                        {!trashMode && scopeView === null && alternateSource === null && sourceOptions.length > 0 && (
-                          <Button size="toolbar"
-                            className={css.sourceAction}
-                            type="button"
-                            variant="ghost"
-                            disabled={busy}
-                            icon={<IconBrowseOutline16 size={16} />}
-                            onClick={openSourcePicker}
-                          >
-                            {t('copy.source')}
-                          </Button>
-                        )}
-                        {!trashMode && (scopeView !== null || alternateSource !== null) && (
-                          <Button size="toolbar"
-                            className={css.sourceAction}
-                            type="button"
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() => { void load(ROOT_DIRECTORY_ID) }}
-                          >
-                            {t('copy.source.current')}
-                          </Button>
-                        )}
-                        {!trashMode && <Button size="toolbar"
-                          className={css.newFolder}
-                          type="button"
-                          variant="ghost"
-                          disabled={busy || writeLocked}
-                          icon={<IconFolderClose16 size={16} />}
-                          onClick={openCreateDirectory}
-                        >
-                          {t('folder.create')}
-                        </Button>}
+                        {!trashMode && <Button size="toolbar" className={css.newFolder} type="button" variant="ghost" disabled={busy || writeLocked} icon={<IconPlusOutline16 size={16} />} onClick={openCreateDirectory}>{t('folder.create')}</Button>}
                         {!trashMode && alternateSource === null && !overviewMode && uploadButton}
-                        {!trashMode && <Button size="toolbar"
-                          className={css.refresh}
-                          type="button"
-                          variant="ghost"
-                          aria-label={t('modal.refresh')}
-                          disabled={busy}
-                          icon={<IconRefreshOutline16 size={16} />}
-                          onClick={() => { void refreshDisplayed() }}
-                        />}
-                        {!trashMode && <Button size="toolbar"
-                          type="button"
-                          variant="ghost"
-                          disabled={busy || historyLoading || overviewMode}
-                          onClick={() => { void openHistory() }}
-                        >
-                          {t('history.button')}
-                        </Button>}
+                        <Menu open={toolsOpen} onClose={() => { setToolsOpen(false) }} portal compact autoFocus align="end"
+                          anchor={<Button size="toolbar" className={css.desktopMore} data-documents-toolbar-more="" type="button" variant="ghost" aria-label={t('action.more')} aria-haspopup="menu" aria-expanded={toolsOpen} disabled={busy} onClick={() => { setToolsOpen(!toolsOpen) }}><IconEllipsisOutline16 size={16} /></Button>}>
+                          {compactNavigation && <MenuItemButton icon={<IconTrashOutline16 size={16} />} disabled={busy || trashLoading} onSelect={() => { setToolsOpen(false); if (trashMode) returnFromTrash(); else void openTrash() }}>{trashMode ? t('trash.back') : t('trash.button')}</MenuItemButton>}
+                          {!trashMode && scopeView === null && alternateSource === null && sourceOptions.length > 0 && <MenuItemButton icon={<IconBrowseOutline16 size={16} />} disabled={busy} onSelect={() => { setToolsOpen(false); openSourcePicker() }}>{t('copy.source')}</MenuItemButton>}
+                          {!trashMode && (scopeView !== null || alternateSource !== null) && <MenuItemButton disabled={busy} onSelect={() => { setToolsOpen(false); void load(ROOT_DIRECTORY_ID) }}>{t('copy.source.current')}</MenuItemButton>}
+                          <MenuItemButton icon={<IconRefreshOutline16 size={16} />} disabled={busy} onSelect={() => { setToolsOpen(false); void refreshDisplayed() }}>{t('modal.refresh')}</MenuItemButton>
+                          {compactNavigation && <MenuItemButton disabled={busy || historyLoading || overviewMode} onSelect={() => { setToolsOpen(false); void openHistory() }}>{t('history.button')}</MenuItemButton>}
+                        </Menu>
                       </>
                     )}
                   </div>
@@ -3890,23 +3719,110 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                     )}
                     {refreshing && !emptyReadPending && visibleUploadFeedback === null && <span className={css.refreshingStatus} role="status" aria-live="polite">{pendingScopeLabel === '' ? t('modal.refreshing') : t('scope.switch.loading', { name: pendingScopeLabel })}</span>}
                   </span>
-                  {!loading && !emptyReadPending && !emptyUploadPending && <span>{t('modal.count', { count: String(totalDocuments ?? filtered.length) })}</span>}
+                  {!loading && !emptyReadPending && !emptyUploadPending && <span>{t('listing.entries', { folders: String(filteredDirectories.length), documents: String(totalDocuments ?? filtered.length) })}</span>}
                 </div>
 
               </div>
 
+              {displayedProgress !== null && (
+                <div
+                  className={css.progress}
+                  role="progressbar"
+                  aria-label={uploadLabel}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={displayedProgress.percent}
+                >
+                  <span style={{ width: `${String(displayedProgress.percent)}%` }} />
+                </div>
+              )}
+
+              <div className={css.browseBody} data-documents-browse-body="">
+                {emptyUploadPending ? null : emptyReadPending ? (
+                  <div className={css.loadingState} role="status" aria-live="polite">
+                    <span className={css.visuallyHidden}>{t('modal.loading')}</span>
+                    {[0, 1, 2].map(index => <span key={index} className={css.loadingRow} aria-hidden="true" />)}
+                  </div>
+                ) : !hasEntries ? (
+                  <div className={css.emptyState}>
+                    <span className={css.emptyIcon} aria-hidden="true"><IconBrowseOutline16 size={24} /></span>
+                    <p className={css.empty}>{t('modal.empty')}</p>
+                    {!uploadLocked && (
+                      <div className={css.emptyActions}>
+                        <Button type="button" variant="primary" aria-label={t('modal.upload')} disabled={busy} icon={<IconPlusOutline16 size={16} />} onClick={() => { fileInputRef.current?.click() }}>
+                          {phone ? t('modal.upload.compact') : t('modal.upload')}
+                        </Button>
+                        <Button type="button" variant="outline" aria-label={t('folder.create')} disabled={busy} icon={<IconFolderClose16 size={16} />} onClick={openCreateDirectory}>
+                          {phone ? t('folder.create.compact') : t('folder.create')}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : !hasVisibleEntries ? (
+                  <div className={css.emptyState}>
+                    <span className={css.emptyIcon} aria-hidden="true"><IconSearchOutline16 size={24} /></span>
+                    <p className={css.empty}>{t('modal.noResults')}</p>
+                    <Button type="button" variant="ghost" onClick={() => {
+                      setQuery('')
+                      setTypeFilter('all')
+                      setSortValue('date:desc')
+                    }}>
+                      {t('modal.clearFilters')}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className={css.list} role="list" aria-label={t('modal.title')} data-documents-list="" data-documents-scrollport="list">
+                    {currentPage === 1 && filteredDirectories.map(renderDirectory)}
+                    {groups === null
+                      ? pageDocs.map(renderRow)
+                      : groups.map(group => (
+                        <div
+                          key={group.date}
+                          className={css.group}
+                          role="group"
+                          aria-label={`${t('listing.date')} ${group.date}`}
+                        >
+                          <div className={css.groupDate}>{group.date}</div>
+                          {group.documents.map(renderRow)}
+                        </div>
+                      ))}
+                  </div>
+                )}
+                {previewVisible && <DocumentPreview
+                  doc={previewDoc}
+                  privateResourceUrl={privateResourceUrl}
+                  {...((scopeView?.scope ?? alternateSource?.scope) === undefined
+                    ? {} : { scope: scopeView?.scope ?? alternateSource?.scope })}
+                  maxTextBytes={MAX_PREVIEW_TEXT_BYTES}
+                  embedded={!phone}
+                  sourceLabel={mobileScopeLabel}
+                  onClose={closePreview}
+                  t={t}
+                  actions={<>
+                    <p className={css.previewTarget}>{t('preview.destination')}{selected.size > 0 && <><br />{t('preview.singleHint')}</>}</p>
+                    <Button className={css.previewAttach} size="toolbar" type="button" variant="soft" disabled={busy} icon={<IconPaperclipOutline16 size={16} />} onClick={() => { attachDocument(previewDoc) }}>{selected.size > 0 ? t(crossScopeAttachment ? 'preview.copyAttachOne' : 'preview.attachOne') : attachLabel}</Button>
+                    <div className={css.previewSecondary}>
+                      <a href={documentContentUrl(previewDoc.docId)} target="_blank" rel="noopener noreferrer"><IconDownloadOutline16 size={16} />{t('action.download')}</a>
+                      <Tooltip label={t('action.move')} disabled={phone}><Button size="toolbar" type="button" variant="ghost" aria-label={t('action.move')} disabled={busy || writeLocked} onClick={() => { void openMove([previewDoc]) }}><IconFolderOpenOutline16 size={16} /></Button></Tooltip>
+                      <Tooltip label={t('scope.copy')} disabled={phone}><Button size="toolbar" type="button" variant="ghost" aria-label={t('scope.copy')} disabled={busy} onClick={() => { openCopy([previewDoc], true) }}><IconCopyOutline16 size={16} /></Button></Tooltip>
+                      <Tooltip label={t('action.delete')} disabled={phone}><Button className={css.delete} size="toolbar" type="button" variant="ghost" aria-label={t('action.delete')} disabled={busy || writeLocked} onClick={() => { setDeleteTargets([previewDoc]) }}><IconTrashOutline16 size={16} /></Button></Tooltip>
+                    </div>
+                  </>}
+                />}
+              </div>
               {selected.size > 0 && (
                 <div className={`${css.selectionBar} ${css.desktopSelectionBar}`}>
                   <span>{selectionLabel}</span>
                   {clearSelectionButton}
-                  {mode === 'select' && (
+                  {onAttachDocument !== undefined && (
                     <Button
                       type="button"
-                      variant="primary"
-                      disabled={busy || onAttachDocument === undefined}
+                      variant="soft"
+                      size="toolbar"
+                      disabled={busy}
                       onClick={() => { void attachSelectedDocuments() }}
                     >
-                      {t('selection.attach')}
+                      {batchAttachLabel}
                     </Button>
                   )}
                   <Button
@@ -3928,7 +3844,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                   <Button
                     className={css.selectionDelete}
                     type="button"
-                    variant="primary"
+                    variant="ghost"
                     disabled={busy || writeLocked}
                     onClick={() => {
                       setDeleteTargets(selectedDocumentList())
@@ -3939,76 +3855,14 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                 </div>
               )}
 
-              {displayedProgress !== null && (
-                <div
-                  className={css.progress}
-                  role="progressbar"
-                  aria-label={uploadLabel}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={displayedProgress.percent}
-                >
-                  <span style={{ width: `${String(displayedProgress.percent)}%` }} />
-                </div>
-              )}
-
-              {emptyUploadPending ? null : emptyReadPending ? (
-                <div className={css.loadingState} role="status" aria-live="polite">
-                  <span className={css.visuallyHidden}>{t('modal.loading')}</span>
-                  {[0, 1, 2].map(index => <span key={index} className={css.loadingRow} aria-hidden="true" />)}
-                </div>
-              ) : !hasEntries ? (
-                <div className={css.emptyState}>
-                  <span className={css.emptyIcon} aria-hidden="true"><IconBrowseOutline16 size={24} /></span>
-                  <p className={css.empty}>{t('modal.empty')}</p>
-                  {!uploadLocked && (
-                    <div className={css.emptyActions}>
-                      <Button type="button" variant="primary" aria-label={t('modal.upload')} disabled={busy} icon={<IconPlusOutline16 size={16} />} onClick={() => { fileInputRef.current?.click() }}>
-                        {phone ? t('modal.upload.compact') : t('modal.upload')}
-                      </Button>
-                      <Button type="button" variant="outline" aria-label={t('folder.create')} disabled={busy} icon={<IconFolderClose16 size={16} />} onClick={openCreateDirectory}>
-                        {phone ? t('folder.create.compact') : t('folder.create')}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ) : !hasVisibleEntries ? (
-                <div className={css.emptyState}>
-                  <span className={css.emptyIcon} aria-hidden="true"><IconSearchOutline16 size={24} /></span>
-                  <p className={css.empty}>{t('modal.noResults')}</p>
-                  <Button type="button" variant="ghost" onClick={() => {
-                    setQuery('')
-                    setTypeFilter('all')
-                    setSortValue('date:desc')
-                  }}>
-                    {t('modal.clearFilters')}
-                  </Button>
-                </div>
-              ) : (
-                <div className={css.list} role="list" aria-label={t('modal.title')} data-documents-list="" data-documents-scrollport="list">
-                  {currentPage === 1 && filteredDirectories.map(renderDirectory)}
-                  {groups === null
-                    ? pageDocs.map(renderRow)
-                    : groups.map(group => (
-                      <div
-                        key={group.date}
-                        className={css.group}
-                        role="group"
-                        aria-label={`${t('listing.date')} ${group.date}`}
-                      >
-                        <div className={css.groupDate}>{group.date}</div>
-                        {group.documents.map(renderRow)}
-                      </div>
-                    ))}
-                </div>
-              )}
               {phone && selected.size > 0 && (
                 <div className={css.mobileSelectionBar} data-documents-batch-bar="" data-testid="documents-batch-bar">
                   <span className={css.mobileSelectionCount}>{selectionLabel}</span>
                   {clearSelectionButton}
+                  {onAttachDocument !== undefined && <Button type="button" variant="soft" className={css.mobileBatchAttach} disabled={busy} onClick={() => { void attachSelectedDocuments() }}>{batchAttachLabel}</Button>}
                   <Button
                     type="button"
-                    variant="primary"
+                    variant="ghost"
                     aria-label={t('selection.actions')}
                     aria-haspopup="dialog"
                     onClick={() => { setMobileSheet({ kind: 'selection' }) }}
@@ -4024,6 +3878,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       </Modal>
 
       {mobileSheetContent}
+      {limitsOpen && <Modal open onClose={() => { setLimitsOpen(false) }} title={t('manager.info')} closeLabel={t('modal.close')}><p>{limitsText}</p></Modal>}
 
       {historyOpen && (
         <Modal
@@ -4249,7 +4104,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         >
           {modalError !== '' && <div className={css.error} role="alert">{modalError}</div>}
           <div className={css.form}>
-            <p className={css.confirm}>{t('copy.message', { count: String(overviewCopyRow === null ? selected.size : 1) })}</p>
+            <p className={css.confirm}>{t('copy.message', { count: String(overviewCopyRow !== null || singleCopyDocument !== null ? 1 : selected.size) })}</p>
             <label className={css.formLabel} htmlFor="documents-copy-target">{t('copy.target')}</label>
             <select
               id="documents-copy-target"
@@ -4390,18 +4245,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         </Modal>
       )}
 
-      {previewDoc && (
-        <DocumentPreview
-          doc={previewDoc}
-          privateResourceUrl={privateResourceUrl}
-          {...((scopeView?.scope ?? alternateSource?.scope) === undefined
-            ? {}
-            : { scope: scopeView?.scope ?? alternateSource?.scope })}
-          maxTextBytes={MAX_PREVIEW_TEXT_BYTES}
-          onClose={() => { setPreviewDoc(null) }}
-          t={t}
-        />
-      )}
+
     </>
   )
 }
