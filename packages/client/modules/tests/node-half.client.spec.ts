@@ -1140,11 +1140,15 @@ describe('client bundle activation', () => {
     expect((await routeRequest(route, url)).headers).toEqual(original.headers)
   })
 
-  it.each([false, true])('serves inline debug-directive strings with a real map trailer: %s', async (withMap) => {
+  it.each([
+    ['inline', false], ['inline', true], ['multiline', false], ['multiline', true],
+  ] as const)('serves %s debug-directive strings with a real map trailer: %s', async (literalKind, withMap) => {
     const packageName = '@fixture/inline-debug-directive'
     const clientPath = writeBuiltPackage(packageName)
     const fileName = 'client.preview.js'
-    const executable = 'const comment = `//# sourceURL=` + "template.js"; module.exports = { comment };\n'
+    const executable = literalKind === 'inline'
+      ? 'const comment = `//# sourceURL=` + "template.js"; module.exports = { comment };\n'
+      : 'const comment = `first\n//# sourceURL=template.js`; module.exports = { comment };\n'
     const code = executable + (withMap ? '//# sourceMappingURL=client.preview.js.map\n' : '')
     writeFileSync(join(dirname(clientPath), fileName), code)
     writeFileSync(clientPath, stampClientArtifact('module.exports = {}\n', [{ fileName, code }]))
@@ -1155,7 +1159,7 @@ describe('client bundle activation', () => {
     expect(response.body.toString('utf8')).toContain(executable)
     const module = { exports: {} }
     runInNewContext(response.body.toString('utf8'), { module })
-    expect(module.exports).toEqual({ comment: '//# sourceURL=template.js' })
+    expect(module.exports).toEqual({ comment: (literalKind === 'inline' ? '' : 'first\n') + '//# sourceURL=template.js' })
     const mapUrl = chunkUrl(packageName, fileName, row.chunks![fileName]!).replace('.js?', '.js.map?')
     const map = JSON.parse((await routeRequest(route, mapUrl)).body.toString('utf8')) as {
       sections: { map: { sources: string[] } }[]

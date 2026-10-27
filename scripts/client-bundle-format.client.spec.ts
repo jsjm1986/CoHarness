@@ -31,6 +31,7 @@ const LAZY_SOURCE = [
   'export const names = [LazyPlugin.name, LazyService.name, LazyArrow.name]',
   'export const marker = "lazy-loaded"',
   'export const debugComment = "//# sourceURL=ordinary-lazy-string"',
+  'export const debugMultiline = `first\n//# sourceURL=ordinary-lazy-string`',
 ].join('\n')
 
 async function emitSource(root: string, name: string, source: string): Promise<void> {
@@ -116,12 +117,13 @@ describe('dynamic Client output formatting', () => {
         })
         const entry = await client.import(PACKAGE_ID) as {
           NamedPlugin: () => string
-          lazy: () => Promise<{ marker: string; debugComment: string }>
+          lazy: () => Promise<{ marker: string; debugComment: string; debugMultiline: string }>
         }
         expect(entry.NamedPlugin()).toBe(expectedEntryValue)
         const lazy = await entry.lazy()
         expect(lazy.marker).toBe('lazy-loaded')
         expect(lazy.debugComment).toBe('//# sourceURL=ordinary-lazy-string')
+        expect(lazy.debugMultiline).toBe('first\n//# sourceURL=ordinary-lazy-string')
         const resource = resources.find(item => item.url.includes('/client.lazy.js?'))
         if (resource === undefined) throw new Error('compiled lazy resource was not requested')
         return resource

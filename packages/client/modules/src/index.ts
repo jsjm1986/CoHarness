@@ -191,7 +191,7 @@ const HASH_REVISION_LENGTH = 12
 const COMBO_REVISION_PLACEHOLDER = '0'.repeat(HASH_REVISION_LENGTH)
 
 /** Debugger source name appended to page bundles in the WebWorker image. */
-const SOURCE_URL_TRAILER = /(?:^|\r?\n)\/\/# sourceURL=([^\r\n]+)(?:\r?\n)?$/
+const SOURCE_URL_TRAILER = /(?:^|\r?\n)\/\/# sourceURL=([^\s"'`\\*]+)(?:\r?\n)?$/
 /** Published package-local client chunk names accepted by the on-demand route. */
 const CLIENT_CHUNK = /^client\.[A-Za-z0-9][A-Za-z0-9._-]*\.js$/
 

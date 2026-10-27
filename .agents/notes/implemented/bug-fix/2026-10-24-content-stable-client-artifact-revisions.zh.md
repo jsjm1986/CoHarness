@@ -12,7 +12,7 @@ Status: implemented
 
 共享 Client 编译器在该包所有输出写完后，向每个入口附加一个 `dsh-client-artifact=v1` 尾注。SHA-256 摘要覆盖按文件名排序、以长度分帧的可执行兄弟文件名及精确 JavaScript 字节。调试 map 文件不参与可执行内容身份。构建记录在接受工作区输出前拒绝缺失、格式错误和不一致的标记。
 
-位于其前的版本化 `dsh-client-chunks` 表记录排除生成的独立调试尾注行后的各 chunk 可执行摘要。行内类似指令的字符串仍属于可执行字节；摘要计算与 HTTP 组装均保留它们。Host 将捕获的表投影为可选图行元数据，并在首次懒读取时核对可执行字节。chunk 脚本与 map 尾注使用 chunk revision，同时继续接受当前 owner revision URL，兼容旧 Client。旧 Host 和无表产物继续使用 owner revision URL。未知、过时或不精确的 URL 会被拒绝，未完成的磁盘重写不能把新可执行字节发布到旧 immutable URL。chunk body 失败时，只移除 registry 仍持有的同一个响应计划；后续显式请求可读取已恢复的字节，成功响应保持不可变，不执行自动重试。
+位于其前的版本化 `dsh-client-chunks` 表记录排除生成的独立调试尾注行后的各 chunk 可执行摘要。类似指令的字符串、块注释及可执行代码行分隔符仍属于可执行字节；摘要计算与 HTTP 组装均保留它们。尾部识别排除生成 URL 中的空白、引号、反引号、反斜杠和星号，因此不会吞掉多行字面量或注释的闭合语法。未识别的尾部保持原字节。Host 将捕获的表投影为可选图行元数据，并在首次懒读取时核对可执行字节。chunk 脚本与 map 尾注使用 chunk revision，同时继续接受当前 owner revision URL，兼容旧 Client。旧 Host 和无表产物继续使用 owner revision URL。未知、过时或不精确的 URL 会被拒绝，未完成的磁盘重写不能把新可执行字节发布到旧 immutable URL。chunk body 失败时，只移除 registry 仍持有的同一个响应计划；后续显式请求可读取已恢复的字节，成功响应保持不可变，不执行自动重试。
 
 Client Modules 对已捕获的入口字节（包含尾注）求哈希，生成 row 的 revision。Host 启动时不发现或读取懒加载兄弟文件。stat 基线继续检测 HMR 候选变化，并跳过未变文件。元数据变化而带标记字节相同时，只刷新基线，不替换响应 body、不重组图、不发布重建。入口与懒加载代码变化都会推进 revision。
 

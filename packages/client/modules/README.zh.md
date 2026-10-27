@@ -83,7 +83,7 @@ Node 半侧会在发布前快照每个 `client.js` 入口，并在不构建响�
 
 编译器在所有输出完成后，向现有 `dsh-client-artifact=v1` 尾注前写入版本化 chunk revision 表。Host 从入口快照读取该表，不扫描或预加载兄弟文件。精确的 `/plugins/<package>/client.<name>.js?rev=<rev>` 请求会读取并缓存脚本；首次 `GET` 会核对可执行字节与已发布 chunk revision。带表的 row 使用各 chunk 的可执行 revision 生成 URL 和文件名相对的 `client.<name>.js.map?rev=<rev>` 尾注，因此仅修改入口时可保留未变的预览资源。路由也接受当前 owner revision，兼容旧 Client。没有表的 Host 或产物继续使用 owner revision 的 chunk URL。未发布的 chunk、过时 revision 和额外查询参数返回 404；磁盘可执行字节不匹配时会明确失败，不发布该内容。chunk body 失败时只移除自己的响应计划，让后续显式请求重新核对已恢复的字节，不自动重试；成功的 body 仍会缓存。map 仍等到自己的 URL 被请求后才计算；每个 combo 或 chunk map 都是 Indexed Source Map v3，可用时使用作者提供的 section，否则生成 identity section。
 
-首次发布与 HMR 从捕获的入口字节及尾注派生带标记产物的 revision，因此仅入口代码或仅 chunk 代码变化都会推进所属插件 revision。相同可执行输出跨复制、重建和 Host 重启保持 revision。未带标记的第三方产物保留 mtime、ctime 和大小策略；保留标记或表格式错误会导致激活失败。HMR 对未变元数据跳过内容读取，带标记字节相同时只刷新基线、不发布变化。调试 map 字节不参与可执行内容身份，独立 chunk revision 也排除生成的独立调试尾注行，保留可执行代码中类似指令的字符串。combo revision 从有序 row revision 派生。已公告的 combo 响应与已请求的 chunk 响应会跨无关图重组保持不可变。
+首次发布与 HMR 从捕获的入口字节及尾注派生带标记产物的 revision，因此仅入口代码或仅 chunk 代码变化都会推进所属插件 revision。相同可执行输出跨复制、重建和 Host 重启保持 revision。未带标记的第三方产物保留 mtime、ctime 和大小策略；保留标记或表格式错误会导致激活失败。HMR 对未变元数据跳过内容读取，带标记字节相同时只刷新基线、不发布变化。调试 map 字节不参与可执行内容身份，独立 chunk revision 也排除生成的独立调试尾注行。识别的 URL 不含空白、引号、反引号、反斜杠或星号；其它尾部保持原字节，保留类似指令的字符串与可执行代码行分隔符。combo revision 从有序 row revision 派生。已公告的 combo 响应与已请求的 chunk 响应会跨无关图重组保持不可变。
 
 浏览器只对匹配的 owner revision 使用 chunk 表。仅含重建信息、不含完整图的帧会撤销旧表，并继续使用 owner revision URL，直到下一张图提供当前 chunk 身份。每个在途 chunk 独立拥有一次结算，由所有等待者共享；owner 失效后，同一 chunk 的新 factory 必须等待该结算完成才能被采用。过时结算只丢弃自己的 factory 一次，恢复执行的调用者不会删除较新的 factory 或已物化导出。
 

@@ -91,6 +91,22 @@ describe('client artifact stamps', () => {
     }
   })
 
+  it.each(['sourceURL', 'sourceMappingURL'])('preserves final-line %s markers inside executable text', (directive) => {
+    for (const code of [
+      `module.exports = \`first\n//# ${directive}=ordinary\`;\n`,
+      `module.exports = true; /* first\n//# ${directive}=ordinary*/\n`,
+      `module.exports = 1;\n//# ${directive}=ordinary\u2028module.exports = 2;\n`,
+      `module.exports = 1;\n//# ${directive}=ordinary\u2029module.exports = 2;\n`,
+    ]) {
+      for (const trailers of [
+        '',
+        '//# sourceMappingURL=client.preview.js.map\n',
+        '//# sourceURL=client.preview.js\n//# sourceMappingURL=client.preview.js.map\n',
+        '//# sourceMappingURL=client.preview.js.map\n//# sourceURL=client.preview.js\n',
+      ]) expect(clientExecutableSource(code + trailers)).toBe(code)
+    }
+  })
+
   it('rejects duplicate or unpublished chunk filenames from the compiler', () => {
     expect(() => stampClientArtifact(entry, [first, first])).toThrow('duplicate client artifact chunk')
     expect(() => stampClientArtifact(entry, [{ ...first, fileName: '../client.first.js' }])).toThrow('chunks')
