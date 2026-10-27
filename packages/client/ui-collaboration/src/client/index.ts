@@ -95,8 +95,14 @@ export function apply(ctx: ClientContext): void {
       collaboration.dispose()
     }
   }, 'ui-collaboration: account context')
+  ctx.on('connection/will-reset', (initialConnection) => {
+    if (!initialConnection) collaboration.invalidateContext()
+  })
   ctx.on('connection/reset', (initialConnection) => {
-    if (initialConnection === true && collaboration.getSnapshot().contextVerified) return
+    if (initialConnection === true) {
+      if (!collaboration.getSnapshot().contextVerified) void collaboration.load()
+      return
+    }
     collaboration.invalidateContext()
     void collaboration.refresh()
   })

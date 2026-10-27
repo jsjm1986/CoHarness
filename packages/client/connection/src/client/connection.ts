@@ -132,6 +132,12 @@ class HandshakeRpcError extends Error {
 export interface ConnectionSinks {
   onMuxEnvelope?: (envelope: RpcRequest<MuxFrame>) => void
   onHostEnvelope?: (envelope: RpcRequest<HostFrame>) => void
+  /** After each readiness handshake, including first connect, synchronously
+   * withdraw prior-generation state before connected state or the Host description
+   * is published. Buffered frames remain held until onConnected returns.
+   * @param description - validated description for the ready generation.
+   */
+  onBeforeConnected?: (description: HostDescription) => void
   /** After each connection generation is established (both streams open + describe succeeded),
    * first connect included; buffered frames are released after this callback returns. */
   onConnected?: (description: HostDescription) => void
@@ -329,28 +335,31 @@ export class ConnectionController {
           throw new Error('Managed Host did not declare its runtime identity')
         }
         if (ac.signal.aborted) throw new Error('generation aborted during readiness handshake')
-        this.attempt = 0
-        connectedAt = performance.now()
-        this.emitState('connected')
-        // A state sink may synchronously stop this controller. Do not publish
-        // a description for a generation that no longer exists afterward.
+        this.callSink(() => { this.sinks.onBeforeConnected?.(descriptionResult.value) })
         if (this.isGenerationActive(ac, token)) {
-          // Open the live generation before invoking onConnected so its
-          // synchronous baseline pulls are not held behind the replay gate.
-          // `releasing` keeps any re-entrant stream delivery ordered until the
-          // callback has returned and the captured replay is flushed.
-          ready = true
-          releasing = true
-          this.callSink(() => { this.sinks.onConnected?.(descriptionResult.value) })
-          releasing = false
+          this.attempt = 0
+          connectedAt = performance.now()
+          this.emitState('connected')
+          // A state sink may synchronously stop this controller. Do not publish
+          // a description for a generation that no longer exists afterward.
           if (this.isGenerationActive(ac, token)) {
-            for (const item of buffered.splice(0)) {
-              if (!this.isGenerationActive(ac, token)) {
-                buffered.length = 0
-                break
+            // Open the live generation before invoking onConnected so its
+            // synchronous baseline pulls are not held behind the replay gate.
+            // `releasing` keeps any re-entrant stream delivery ordered until the
+            // callback has returned and the captured replay is flushed.
+            ready = true
+            releasing = true
+            this.callSink(() => { this.sinks.onConnected?.(descriptionResult.value) })
+            releasing = false
+            if (this.isGenerationActive(ac, token)) {
+              for (const item of buffered.splice(0)) {
+                if (!this.isGenerationActive(ac, token)) {
+                  buffered.length = 0
+                  break
+                }
+                if (item.kind === 'mux') dispatchMux(item.envelope)
+                else dispatchHost(item.envelope)
               }
-              if (item.kind === 'mux') dispatchMux(item.envelope)
-              else dispatchHost(item.envelope)
             }
           }
         }

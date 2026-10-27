@@ -445,12 +445,21 @@ describe('connection client apply', () => {
     const handle = await mount()
     const descriptions: Array<boolean | undefined> = []
     const reconnectSnapshots: Array<boolean | undefined> = []
+    const preparationSnapshots: unknown[] = []
+    const order: string[] = []
     const stopDescription = handle.hostDescription.subscribe(() => {
       descriptions.push(handle.hostDescription.getSnapshot()?.canOpenPath)
+      order.push(`description:${String(handle.hostDescription.getSnapshot()?.canOpenPath)}`)
     })
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const loop = handle.start({
+      onBeforeConnected: () => {
+        preparationSnapshots.push([handle.state.getSnapshot(), handle.hostDescription.getSnapshot()])
+        order.push('before-connected')
+      },
+      onConnected: () => { order.push('connected') },
       onStateChange: (state) => {
+        order.push(`state:${state}`)
         if (state === 'reconnecting') {
           reconnectSnapshots.push(handle.hostDescription.getSnapshot()?.canOpenPath)
         }
@@ -469,6 +478,12 @@ describe('connection client apply', () => {
       await vi.waitFor(() => { expect(reconnectSnapshots).toEqual([undefined]) })
       await vi.waitFor(() => { expect(descriptions).toEqual([true, undefined, true]) })
       expect(handle.hostDescription.getSnapshot()?.canOpenPath).toBe(true)
+      expect(preparationSnapshots).toEqual([[undefined, undefined], ['reconnecting', undefined]])
+      expect(order).toEqual([
+        'before-connected', 'state:connected', 'description:true', 'connected',
+        'description:undefined', 'state:reconnecting',
+        'before-connected', 'state:connected', 'description:true', 'connected',
+      ])
     } finally {
       stopDescription()
       loop.stop()

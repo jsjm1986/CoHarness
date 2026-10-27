@@ -160,19 +160,40 @@ describe('runtime client apply', () => {
     }
   })
 
-  it('marks only the first connection reset as initial, including for late subscribers', async () => {
+  it('prepares each description publication before resetting with the same initial flag, including for late subscribers', async () => {
     const bench = await mount()
-    const initial: (boolean | undefined)[] = []
-    const late: (boolean | undefined)[] = []
+    const order: string[] = []
+    const late: string[] = []
     const connected = { version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true }
+    const connection = bench.ctx.get('connection') as ConnectionHandle
+    const stopDescription = connection.hostDescription.subscribe(() => { order.push('description') })
     try {
-      bench.ctx.on('connection/reset', (value) => { initial.push(value) })
+      bench.ctx.on('connection/will-reset', (value) => {
+        order.push(`will-reset:${String(value)}`)
+        expect(connection.hostDescription.getSnapshot()).toBeUndefined()
+      })
+      bench.ctx.on('connection/reset', (value) => {
+        order.push(`reset:${String(value)}`)
+        expect(connection.hostDescription.getSnapshot()).toBe(connected)
+      })
+      bench.sinks?.onBeforeConnected?.(connected)
+      expect(order).toEqual(['will-reset:true'])
+      expect(bench.api.callsOf('workspace.list')).toHaveLength(0)
+      expect(bench.api.callsOf('session.list')).toHaveLength(0)
+      bench.publishDescription(connected)
       bench.sinks?.onConnected?.(connected)
-      bench.ctx.on('connection/reset', (value) => { late.push(value) })
+      expect(order).toEqual(['will-reset:true', 'description', 'reset:true'])
+      bench.ctx.on('connection/will-reset', (value) => { late.push(`will-reset:${String(value)}`) })
+      bench.ctx.on('connection/reset', (value) => { late.push(`reset:${String(value)}`) })
+      bench.publishDescription(undefined)
+      order.length = 0
+      bench.sinks?.onBeforeConnected?.(connected)
+      expect(order).toEqual(['will-reset:false'])
+      bench.publishDescription(connected)
       bench.sinks?.onConnected?.(connected)
-      expect(initial).toEqual([true, false])
-      expect(late).toEqual([false])
-    } finally { await bench.ctx.fiber.dispose() }
+      expect(order).toEqual(['will-reset:false', 'description', 'reset:false'])
+      expect(late).toEqual(['will-reset:false', 'reset:false'])
+    } finally { stopDescription(); await bench.ctx.fiber.dispose() }
   })
 
   it('withdraws prior connection state before preparing the saved history and fresh baselines', async () => {

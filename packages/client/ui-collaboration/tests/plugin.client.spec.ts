@@ -41,7 +41,7 @@ function conversationDetail(sessionId: string, visibility: 'project' | 'private'
   }
 }
 
-async function bench(context: CollaborationContext) {
+async function bench(context: CollaborationContext, initialResponse?: Promise<Response>) {
   const ctx = new Context()
   const policy = new ProjectUiPolicyRuntime()
   ctx.provide('projectUiPolicy', policy)
@@ -58,7 +58,7 @@ async function bench(context: CollaborationContext) {
     },
   } as never, () => null)
   const originalFetch = globalThis.fetch
-  const fetcher = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+  const fetcher = vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
     const path = typeof input === 'string'
       ? input
       : input instanceof URL ? input.href : input.url
@@ -71,6 +71,7 @@ async function bench(context: CollaborationContext) {
     }
     return Promise.resolve(new Response(null, { status: 204 }))
   })
+  if (initialResponse !== undefined) fetcher.mockReturnValueOnce(initialResponse)
   globalThis.fetch = fetcher
   const fiber = ctx.plugin({ inject: [...inject], apply })
   try {
@@ -78,10 +79,15 @@ async function bench(context: CollaborationContext) {
     const scopeEntry = ctx.slots.entries('sidebar.footer.action')
       .find(entry => entry.component === ScopeControl)!
     const scope = (scopeEntry.inject as unknown as () => ScopeControlInjected)()
-    await vi.waitFor(() => { expect(scope.hooks.collaboration.getSnapshot().status).toBe('ready') })
+    if (initialResponse === undefined) {
+      await vi.waitFor(() => { expect(scope.hooks.collaboration.getSnapshot().status).toBe('ready') })
+    } else {
+      await vi.waitFor(() => { expect(fetcher).toHaveBeenCalledOnce() })
+    }
     return { ctx, policy, fiber, fetcher, scope, restore: () => { globalThis.fetch = originalFetch } }
   } catch (error) {
-    globalThis.fetch = originalFetch
+    try { await fiber.dispose() }
+    finally { globalThis.fetch = originalFetch }
     throw error
   }
 }
@@ -90,12 +96,17 @@ describe('ui-collaboration apply', () => {
   it('keeps fresh account proof on the first handshake and withdraws it on reconnect', async () => {
     const b = await bench(baseContext)
     try {
+      b.ctx.emit('connection/will-reset', true)
       b.ctx.emit('connection/reset', true)
       expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(true)
       expect(b.policy.getSnapshot().verifiedAccountId).toBe(baseContext.user.id)
       expect(b.fetcher).toHaveBeenCalledTimes(1)
 
       b.fetcher.mockResolvedValueOnce(new Response(null, { status: 401 }))
+      b.ctx.emit('connection/will-reset', false)
+      expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(false)
+      expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
+      expect(b.fetcher).toHaveBeenCalledTimes(1)
       b.ctx.emit('connection/reset', false)
       expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(false)
       expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
@@ -108,6 +119,63 @@ describe('ui-collaboration apply', () => {
     } finally {
       await b.fiber.dispose()
       b.restore()
+    }
+  })
+
+  it('joins a pending initial account request without aborting it at the first handshake', async () => {
+    const pending = Promise.withResolvers<Response>()
+    const b = await bench(baseContext, pending.promise)
+    const signal = b.fetcher.mock.calls[0]?.[1]?.signal
+    try {
+      expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(false)
+      b.ctx.emit('connection/will-reset', true)
+      b.ctx.emit('connection/reset', true)
+      expect(signal?.aborted).toBe(false)
+      expect(b.fetcher).toHaveBeenCalledOnce()
+      expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
+      pending.resolve(Response.json(baseContext))
+      await vi.waitFor(() => { expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(true) })
+      expect(b.policy.getSnapshot().verifiedAccountId).toBe(baseContext.user.id)
+      expect(b.fetcher).toHaveBeenCalledOnce()
+    } finally {
+      pending.resolve(Response.json(baseContext))
+      try { await b.fiber.dispose() }
+      finally { b.restore() }
+    }
+  })
+
+  it('aborts pre-publication account reads and requires a new verified result after reconnect reset', async () => {
+    const b = await bench(baseContext)
+    const old = Promise.withResolvers<Response>()
+    const fresh = Promise.withResolvers<Response>()
+    b.fetcher.mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise)
+    const previous = b.scope.hooks.collaboration.load()
+    try {
+      await vi.waitFor(() => { expect(b.fetcher).toHaveBeenCalledTimes(2) })
+      const oldSignal = b.fetcher.mock.calls[1]?.[1]?.signal
+      b.ctx.emit('connection/will-reset', false)
+      expect(oldSignal?.aborted).toBe(true)
+      expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(false)
+      expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
+      expect(b.policy.getSnapshot().accountPermissions).toBe('unknown')
+      expect(b.fetcher).toHaveBeenCalledTimes(2)
+
+      b.ctx.emit('connection/reset', false)
+      await vi.waitFor(() => { expect(b.fetcher).toHaveBeenCalledTimes(3) })
+      expect(b.fetcher.mock.calls[2]?.[1]?.signal?.aborted).toBe(false)
+      old.resolve(Response.json({ ...baseContext, user: { ...baseContext.user, id: 11 } }))
+      await previous
+      expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(false)
+      expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
+      fresh.resolve(Response.json(baseContext))
+      await vi.waitFor(() => { expect(b.scope.hooks.collaboration.getSnapshot().contextVerified).toBe(true) })
+      expect(b.policy.getSnapshot().verifiedAccountId).toBe(baseContext.user.id)
+      expect(b.fetcher).toHaveBeenCalledTimes(3)
+    } finally {
+      old.resolve(Response.json(baseContext))
+      fresh.resolve(Response.json(baseContext))
+      try { await b.fiber.dispose() }
+      finally { b.restore() }
     }
   })
 

@@ -88,6 +88,107 @@ describe('connection lifecycle', () => {
     }
   })
 
+  it.each(['describe', 'mux', 'host'] as const)('keeps preparation and replay behind the final %s prerequisite', async (last) => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const api = new FakeApiClient()
+    const description = deferred<Awaited<ReturnType<FakeApiClient['onDescribe']>>>()
+    const muxOpen = deferred<() => void>()
+    const hostOpen = deferred<() => void>()
+    api.onDescribe = () => description.promise
+    const openMux = api.events.mux
+    const openHost = api.events.host
+    api.events.mux = (payload, signal, onOpen) => openMux(payload, signal, () => {
+      muxOpen.resolve(() => { onOpen?.() })
+    })
+    api.events.host = (payload, signal, onOpen) => openHost(payload, signal, () => {
+      hostOpen.resolve(() => { onOpen?.() })
+    })
+    const value = { version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true }
+    const order: string[] = []
+    const controller = new ConnectionController(api, {
+      onBeforeConnected: (next) => { expect(next).toBe(value); order.push('before-connected') },
+      onStateChange: state => order.push(`state:${state}`),
+      onConnected: () => { order.push('connected') },
+      onMuxEnvelope: envelope => order.push(envelope.payload.type),
+    }, FAST)
+    controller.start()
+    try {
+      const releases = {
+        describe: () => { description.resolve(ok(value)) },
+        mux: await muxOpen.promise,
+        host: await hostOpen.promise,
+      }
+      api.pushMux(subscribedFrame())
+      for (const prerequisite of ['describe', 'mux', 'host'] as const) {
+        if (prerequisite !== last) releases[prerequisite]()
+      }
+      await vi.advanceTimersByTimeAsync(0)
+      expect(order).toEqual([])
+      releases[last]()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(order).toEqual(['before-connected', 'state:connected', 'connected', 'session/subscribed'])
+    } finally {
+      controller.stop()
+      await vi.advanceTimersByTimeAsync(0)
+      vi.useRealTimers()
+    }
+  })
+
+  it('publishes neither connected state nor buffered frames when preparation stops the controller', async () => {
+    const api = new FakeApiClient()
+    const description = deferred<Awaited<ReturnType<FakeApiClient['onDescribe']>>>()
+    api.onDescribe = () => description.promise
+    const beforeConnected = vi.fn(() => { controller.stop() })
+    const connected = vi.fn()
+    const state = vi.fn()
+    const frame = vi.fn()
+    const controller = new ConnectionController(api, {
+      onBeforeConnected: beforeConnected,
+      onConnected: connected,
+      onStateChange: state,
+      onMuxEnvelope: frame,
+    }, FAST)
+    controller.start()
+    try {
+      await vi.waitFor(() => { expect(api.openMuxCount).toBe(1) })
+      api.pushMux(subscribedFrame())
+      description.resolve(ok({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true }))
+      await vi.waitFor(() => { expect(api.openMuxCount).toBe(0) })
+      expect(beforeConnected).toHaveBeenCalledOnce()
+      expect(connected).not.toHaveBeenCalled()
+      expect(state).not.toHaveBeenCalled()
+      expect(frame).not.toHaveBeenCalled()
+    } finally { controller.stop() }
+  })
+
+  it('discards a generation replaced during preparation before announcing its successor', async () => {
+    const api = new FakeApiClient()
+    const description = deferred<Awaited<ReturnType<FakeApiClient['onDescribe']>>>()
+    api.onDescribe = () => description.promise
+    const order: string[] = []
+    let preparations = 0
+    const controller = new ConnectionController(api, {
+      onBeforeConnected: () => {
+        preparations++
+        order.push(`before:${preparations}`)
+        if (preparations === 1) controller.reconnect()
+      },
+      onStateChange: state => order.push(`state:${state}`),
+      onConnected: () => { order.push('connected') },
+      onMuxEnvelope: envelope => order.push(envelope.payload.type),
+    }, FAST)
+    controller.start()
+    try {
+      await vi.waitFor(() => { expect(api.openMuxCount).toBe(1) })
+      api.pushMux(subscribedFrame())
+      description.resolve(ok({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true }))
+      await vi.waitFor(() => { expect(order).toEqual(['before:1', 'state:reconnecting', 'before:2', 'state:connected', 'connected']) })
+      expect(api.callsOf('host.describe')).toHaveLength(2)
+      api.pushMux(subscribedFrame())
+      await vi.waitFor(() => { expect(order.at(-1)).toBe('session/subscribed') })
+    } finally { controller.stop() }
+  })
+
   it('stops releasing a buffered generation when a sink stops the controller', async () => {
     const api = new FakeApiClient()
     const describe = deferred<Awaited<ReturnType<FakeApiClient['onDescribe']>>>()
@@ -264,6 +365,7 @@ describe('connection lifecycle', () => {
     let connected = 0
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const controller = new ConnectionController(api, {
+      onBeforeConnected: () => { throw new Error('preparation subscriber bug') },
       onMuxEnvelope: (envelope) => {
         seen.push(envelope.payload.type)
         throw new Error('business layer bug')
@@ -277,6 +379,8 @@ describe('connection lifecycle', () => {
       api.pushMux(subscribedFrame(2))
       await vi.waitFor(() => { expect(seen).toHaveLength(2) }) // second frame still pumped
       expect(connected).toBe(1) // no reconnect triggered by the sink throw
+      expect(errorSpy).toHaveBeenCalledTimes(3)
+      expect(api.callsOf('host.describe')).toHaveLength(1)
     } finally {
       controller.stop()
       errorSpy.mockRestore()
@@ -465,16 +569,20 @@ it('does not publish buffered Session frames when a managed Host omits its runti
   const description = deferred<Awaited<ReturnType<FakeApiClient['onDescribe']>>>()
   api.onDescribe = () => description.promise
   const connected = vi.fn()
+  const beforeConnected = vi.fn()
   const frame = vi.fn()
   const failure = vi.fn()
   const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
-  const controller = new ConnectionController(api, { onConnected: connected, onMuxEnvelope: frame, onFailure: failure }, FAST)
+  const controller = new ConnectionController(api, {
+    onBeforeConnected: beforeConnected, onConnected: connected, onMuxEnvelope: frame, onFailure: failure,
+  }, FAST)
   controller.start()
   try {
     await vi.waitFor(() => { expect(api.openMuxCount).toBe(1) })
     api.pushMux(subscribedFrame())
     description.resolve(ok({ version: '0', cwd: '/project', home: '/home', attachedSessions: 0, canOpenPath: false, executionAuthorityRequired: true }))
     await vi.waitFor(() => { expect(failure).toHaveBeenCalled() })
+    expect(beforeConnected).not.toHaveBeenCalled()
     expect(connected).not.toHaveBeenCalled()
     expect(frame).not.toHaveBeenCalled()
   } finally { controller.stop(); warning.mockRestore() }

@@ -282,6 +282,7 @@ export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
   'connection/authenticate': 'Host Connection deployment-authentication bail — docs/subsystems/collaboration.md owns the API',
   'workspace/resource-open': 'client-face file preview request — packages/client/ui-workbench/README.md owns the API',
   'connection/reset': 'client-face transport signal — packages/client/runtime/README.md owns the API',
+  'connection/will-reset': 'client-face pre-publication transport signal — packages/client/runtime/README.md owns the API',
   'locale/change': 'client-face locale switch signal — packages/client/locale/README.md owns the API',
   'slash/input-begin-command': 'client-face slash-input protocol — packages/client/ui-input-trigger/README.md owns the API',
   'slash/input-consume-token': 'client-face slash-input protocol — packages/client/ui-input-trigger/README.md owns the API',

@@ -253,6 +253,13 @@ declare module '@deepseek-ai/cordis' {
      */
     'slots/changed'(key: string): void
     /**
+     * A ready connection generation is about to publish its Host description.
+     * Listeners synchronously withdraw prior-generation client state before description consumers run.
+     * @mode emit
+     * @param initialConnection - true only before this runtime's first connected callback.
+     */
+    'connection/will-reset'(initialConnection: boolean): void
+    /**
      * A connection generation was (re-)established. Wire-derived caches must
      * treat their state as stale and repull (commands directory; the queue
      * mirrors reset themselves through the session resync path).
@@ -384,6 +391,7 @@ export function apply(ctx: Context): void {
         if (frame.event === 'permission-presets/catalog-changed') permissionCatalog.invalidateFor(connection)
       }
     },
+    onBeforeConnected: () => { ctx.emit('connection/will-reset', initialConnection) },
     onConnected: (description) => {
       // Authority withdrawal can cancel pending navigation, including an
       // unshown saved-history window. Finish it before preparing fresh reads.
