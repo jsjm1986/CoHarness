@@ -28,6 +28,8 @@ The first-generation client loader (`createClientLoader`) hand-wrote both layers
 
 The [client shell layering note](2026-08-15-client-shells-and-dynamic-packages.md) defines the current static and dynamic package sets and the import rules between them. The loading machinery treats every `dsh.client` package as a host-graph row with one ordinary `lib/client.js` factory bundle. Its declaration carries Cordis `inject` edges, synchronous module-table `external` requests, and the optional `immediately` prefetch mark; the composing app owns only the mounted roster.
 
+Generated Remote artifacts pass only `{ strictObject: z.strictObject }` to the pure protocol factory. The generated parameter and result factories retain their own Zod imports and validation rules; the protocol factory needs only the named-argument object constructor. Keeping the full Zod namespace out of this function argument lets independent client builds remove unused library exports without sharing third-party dependency versions between plugins.
+
 The web kernel remains framework-free and imports no dynamic package value. Modules is itself a dynamic row, but the host parser delivers its ordinary factory before the Vite main module. The HTML-installed `__ModuleLoader__` facade uses that factory to construct the module system when the kernel calls `create()`. Runtime arrives through the same pending queue; static React, Cordis, and UI library identities come from the shell seed.
 
 ### One module system, one plugin governor

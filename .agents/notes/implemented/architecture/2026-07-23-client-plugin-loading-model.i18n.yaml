@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-23-client-plugin-loading-model.md
 document:
-  en: c490cdb92791d4328909d12057df991c8f69b247
-  zh: fe05a9e21268897a7d9ad2ae7111b7cded8e3d8a
+  en: 3601f07a0c1402a82d6928bb7d7181678b415a9f
+  zh: 469a4e55168f3ecb9d670de06407e7bc2c03a320
 /agent-note-client-plugin-loading-lazy-factories-cordis-lifecycle-and-hot-reload:
   en: 874618fd5ad1d06a
   zh: a5e4bfad490fab34
@@ -15,8 +15,8 @@ document:
   en: a15c7c13f167e5ac
   zh: a15c7c13f167e5ac
 /agent-note-client-plugin-loading-lazy-factories-cordis-lifecycle-and-hot-reload/decision/package-membership-and-module-requests:
-  en: c675772bc19717c3
-  zh: 279ab6bdd10bdad6
+  en: 238966ff90b0f212
+  zh: 9e3656764c83ac80
 /agent-note-client-plugin-loading-lazy-factories-cordis-lifecycle-and-hot-reload/decision/one-module-system-one-plugin-governor:
   en: 92db25ee4e417a97
   zh: 03ebca90a09dd9b3

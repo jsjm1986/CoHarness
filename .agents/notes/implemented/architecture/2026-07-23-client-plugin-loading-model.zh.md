@@ -28,6 +28,8 @@ host 侧，cordis 插件装载站在 Node 的模块机制之上——require cac
 
 [Client 外壳分层 Note](2026-08-15-client-shells-and-dynamic-packages.zh.md)定义当前的静态、动态包集合及其 import 规则。装载机件把每个 `dsh.client` 包视为一个 host graph row，且每个包只有一个普通 `lib/client.js` factory bundle。包声明携带 Cordis `inject` 边、同步模块表 `external` 请求，以及可选的 `immediately` 预取标记；负责组合的 app 只拥有挂载名册。
 
+生成的 Remote 产物只把 `{ strictObject: z.strictObject }` 传给纯协议 factory。生成的参数和结果 factory 保留各自的 Zod 导入及校验规则；协议 factory 只需要命名参数对象的构造器。函数参数不携带完整 Zod 命名空间，独立 client 构建就能删除未使用的库导出，同时保留各插件自己的第三方依赖版本。
+
 Web 内核保持不依赖框架，也不 import 任何动态包实体。Modules 本身是动态图 row，但 host parser 会在 Vite 主模块前送达其普通 factory。内核调用 `create()` 时，由 HTML 安装的 `__ModuleLoader__` facade 使用该 factory 构造模块系统。Runtime 经同一个 pending queue 到达；React、Cordis 与静态 UI 库的身份由外壳 seed 提供。
 
 ### 一套模块系统，一个插件治理器

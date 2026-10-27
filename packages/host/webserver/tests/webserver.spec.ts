@@ -9,15 +9,17 @@
 
  */
 
-import { generateKeyPairSync, X509Certificate } from 'node:crypto'
+import { createHash, generateKeyPairSync, X509Certificate } from 'node:crypto'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { once } from 'node:events'
+import { request as httpRequest } from 'node:http'
 import { Agent, request as httpsRequest } from 'node:https'
 import { connect, createServer as createTcpServer, type AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { Duplex } from 'node:stream'
 import { pathToFileURL } from 'node:url'
+import { brotliDecompressSync } from 'node:zlib'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, FiberState } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
@@ -89,6 +91,7 @@ async function loadComposition(
   compression: false | 'gzip' | 'auto' = false,
   host = '127.0.0.1',
   tls?: Partial<TlsConfig> | null,
+  brotliWindowBits = 22,
 ): Promise<Context> {
   const root = await mkdtemp(join(tmpdir(), 'dsh-webserver-loader-'))
 
@@ -113,6 +116,7 @@ async function loadComposition(
         `    compression: ${compression}`,
         '    compressionLevel: 1',
         '    compressionBrotliQuality: 5',
+        `    compressionBrotliWindowBits: ${String(brotliWindowBits)}`,
         '    compressionThresholdBytes: 16',
       ]
       : []),
@@ -321,6 +325,7 @@ describe('real Loader composition', () => {
       compression: 'none',
       compressionLevel: 1,
       compressionBrotliQuality: 4,
+      compressionBrotliWindowBits: 22,
       compressionThresholdBytes: 1024,
     })
     expect(() => HttpServer.Config({
@@ -425,6 +430,8 @@ describe('real Loader composition', () => {
     })
     for (const [accepted, expected] of [
       ['br, gzip, deflate', 'br'],
+      ['gzip, deflate, br, zstd', 'br'],
+      ['identity, gzip, br', 'br'],
       ['br;q=0.2, gzip;q=0.8', 'gzip'],
       ['br;q=0, gzip', 'gzip'],
       ['br;q=0, gzip;q=0', null],
@@ -456,6 +463,40 @@ describe('real Loader composition', () => {
       })
       expect(response.headers.get('content-encoding')).toBe(path === '/encoded' ? 'gzip' : null)
     }
+  })
+
+  it('applies the configured Brotli window without changing decoded response bytes', async (test) => {
+    for (const window of [9, 10.5, 25]) {
+      expect(() => HttpServer.Config({ host: '127.0.0.1', port: 0, compressionBrotliWindowBits: window })).toThrow()
+    }
+    for (const window of [10, 24]) {
+      expect(HttpServer.Config({ host: '127.0.0.1', port: 0, compressionBrotliWindowBits: window }).compressionBrotliWindowBits).toBe(window)
+    }
+    const block = Array.from({ length: 512 }, (_, index) => createHash('sha256').update(String(index)).digest('hex')).join('')
+    const body = Buffer.from(block.repeat(3))
+    const sizes: number[] = []
+    for (const window of [10, 19]) {
+      const loaded = await loadComposition(0, 'auto', '127.0.0.1', undefined, window)
+      loaded.webServer.register({ kind: 'exact', path: '/text', handler: (_req, res) => {
+        res.writeHead(200, { 'content-type': 'text/plain', 'content-length': String(body.length) })
+        res.end(body)
+      } })
+      const response = await new Promise<{ encoding: string | undefined; body: Buffer }>((resolve, reject) => {
+        const req = httpRequest({ host: '127.0.0.1', port: boundPort(loaded.webServer.port), path: '/text', agent: false,
+          signal: test.signal, headers: { 'accept-encoding': 'gzip, deflate, br, zstd' } }, (res) => {
+          const chunks: Buffer[] = []
+          res.on('data', (chunk: Buffer) => { chunks.push(chunk) })
+          res.once('error', reject)
+          res.once('end', () => { resolve({ encoding: res.headers['content-encoding'], body: Buffer.concat(chunks) }) })
+        })
+        req.once('error', reject)
+        req.end()
+      })
+      expect(response.encoding).toBe('br')
+      expect(brotliDecompressSync(response.body)).toEqual(body)
+      sizes.push(response.body.length)
+    }
+    expect(sizes[0]).toBeGreaterThan(sizes[1]!)
   })
 
   it.for(['application/x-ndjson; charset=utf-8', 'text/event-stream; charset=utf-8'])(
@@ -645,6 +686,7 @@ describe('real Loader composition', () => {
       compression: 'none',
       compressionLevel: 1,
       compressionBrotliQuality: 4,
+      compressionBrotliWindowBits: 22,
       compressionThresholdBytes: 1024,
     })
 

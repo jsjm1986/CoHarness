@@ -1665,6 +1665,8 @@ export interface Config {
   compressionLevel?: number
   /** Brotli quality from 0 through 11 when auto selects Brotli. @default 4 */
   compressionBrotliQuality?: number
+  /** Brotli sliding-window bits from 10 through 24 when auto selects Brotli. @default 22 */
+  compressionBrotliWindowBits?: number
   /** Minimum known response length eligible for compression; eligible media types with unknown lengths may compress. @default 1024 */
   compressionThresholdBytes?: number
 }

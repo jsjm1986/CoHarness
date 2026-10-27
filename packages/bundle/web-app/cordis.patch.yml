@@ -151,6 +151,7 @@
         compression: auto
         compressionLevel: 6
         compressionBrotliQuality: 5
+        compressionBrotliWindowBits: 19
         compressionThresholdBytes: 1024
 
     # Web glue owned by this bundle: resolves the built frontend dist (an

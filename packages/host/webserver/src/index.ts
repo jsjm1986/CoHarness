@@ -103,6 +103,8 @@ export interface Config {
   compressionLevel?: number
   /** Brotli quality from 0 through 11 when auto selects Brotli. @default 4 */
   compressionBrotliQuality?: number
+  /** Brotli sliding-window bits from 10 through 24 when auto selects Brotli. @default 22 */
+  compressionBrotliWindowBits?: number
   /** Minimum known response length eligible for compression; eligible media types with unknown lengths may compress. @default 1024 */
   compressionThresholdBytes?: number
 }
@@ -110,12 +112,14 @@ export interface Config {
 const DEFAULT_COMPRESSION = 'none' as const
 const DEFAULT_COMPRESSION_LEVEL = 1
 const DEFAULT_COMPRESSION_BROTLI_QUALITY = 4
+const DEFAULT_COMPRESSION_BROTLI_WINDOW_BITS = 22
 const DEFAULT_COMPRESSION_THRESHOLD_BYTES = 1024
 
 interface ResolvedConfig extends Config {
   compression: 'none' | 'gzip' | 'auto'
   compressionLevel: number
   compressionBrotliQuality: number
+  compressionBrotliWindowBits: number
   compressionThresholdBytes: number
 }
 
@@ -227,7 +231,10 @@ function createResponseCompression(config: ResolvedConfig): NodeMiddleware {
   // node:http request and response members supplied here.
   const middleware = compressionMiddleware({
     level: config.compressionLevel,
-    brotli: { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: config.compressionBrotliQuality } },
+    brotli: { params: {
+      [zlibConstants.BROTLI_PARAM_QUALITY]: config.compressionBrotliQuality,
+      [zlibConstants.BROTLI_PARAM_LGWIN]: config.compressionBrotliWindowBits,
+    } },
     threshold: config.compressionThresholdBytes,
     filter(request, response) {
       if (response.getHeader('content-range') !== undefined) return false
@@ -244,7 +251,14 @@ function createResponseCompression(config: ResolvedConfig): NodeMiddleware {
       next()
       return
     }
-    const encoding = new Negotiator(req).encoding(config.compression === 'auto' ? ['br', 'gzip', 'identity'] : ['gzip', 'identity'])
+    // @types/negotiator omits the maintained 1.0 encoding-preference option.
+    const negotiator = new Negotiator(req) as Negotiator & {
+      encoding(available: readonly string[], options?: { preferred: readonly string[] }): string | undefined
+    }
+    const encoding = negotiator.encoding(
+      config.compression === 'auto' ? ['br', 'gzip', 'identity'] : ['gzip', 'identity'],
+      config.compression === 'auto' ? { preferred: ['br', 'gzip'] } : undefined,
+    )
     const compressionRequest = Object.create(req) as IncomingMessage
     Object.defineProperty(compressionRequest, 'headers', {
       value: { ...req.headers, 'accept-encoding': encoding ?? 'identity' },
@@ -302,6 +316,7 @@ export class WebServer extends Service {
     compression: z.union([z.const('none'), z.const('gzip'), z.const('auto')]).default(DEFAULT_COMPRESSION),
     compressionLevel: z.number().step(1).min(0).max(9).default(DEFAULT_COMPRESSION_LEVEL),
     compressionBrotliQuality: z.number().step(1).min(0).max(11).default(DEFAULT_COMPRESSION_BROTLI_QUALITY),
+    compressionBrotliWindowBits: z.number().step(1).min(10).max(24).default(DEFAULT_COMPRESSION_BROTLI_WINDOW_BITS),
     compressionThresholdBytes: z.natural().default(DEFAULT_COMPRESSION_THRESHOLD_BYTES),
   })
 

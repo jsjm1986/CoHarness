@@ -290,7 +290,7 @@ export class FaceModelEmitter {
       ...packageModel.invocations.map(invocation =>
         `    ${quote(`${invocation.namespace}/${invocation.method}`)}: ${indent(this.invocationLiteral(invocation, schemas), 4).trimStart()},`),
       '  },',
-      '}, z)',
+      '}, { strictObject: z.strictObject })',
     ].join('\n')
   }
 

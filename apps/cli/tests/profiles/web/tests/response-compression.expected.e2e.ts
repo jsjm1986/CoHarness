@@ -40,7 +40,7 @@ it('negotiates Brotli or gzip for the shipped PDF viewer with identical decoded 
     expect(identity.encoding).toBeUndefined()
     expect(identity.body.length).toBeGreaterThan(1024)
 
-    const brotli = await asset(path, cookie!, 'br, gzip', test.signal)
+    const brotli = await asset(path, cookie!, 'gzip, deflate, br, zstd', test.signal)
     expect(brotli.status).toBe(200)
     expect(brotli.encoding).toBe('br')
     expect(brotli.vary).toContain('Accept-Encoding')
