@@ -93,6 +93,45 @@ describe('web e2e: authorized Office preview', () => {
     expect(tripwire.pageErrors).toEqual([])
   })
 
+  it.each(['docx', 'xlsx'] as const)('downloads the selected %s viewer before metadata completes', async (extension) => {
+    if (scaffold === undefined || browser === undefined) throw new Error('Web scaffold is unavailable')
+    const previewPage = await newEnglishPage(browser)
+    const release = Promise.withResolvers<undefined>()
+    const requests: string[] = []
+    let workerStarts = 0
+    previewPage.on('request', request => requests.push(new URL(request.url()).pathname))
+    previewPage.on('worker', () => { workerStarts += 1 })
+    try {
+      onTestFailed(() => saveFailureShot(previewPage, `workspace-viewer-before-stat-${extension}`))
+      await previewPage.route('**/api/workspaceFiles.stat*', async (route) => {
+        await release.promise
+        await route.continue()
+      })
+      await previewPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      await previewPage.getByRole('button', { name: `Preview ${extension}`, exact: true }).click()
+      await expect.poll(() => requests.includes('/api/workspaceFiles.stat')).toBe(true)
+      const selected = extension === 'docx' ? '/client.pdf.js' : '/client.excel.js'
+      const other = extension === 'docx' ? '/client.excel.js' : '/client.pdf.js'
+      await expect.poll(() => requests.filter(path => path.endsWith(selected)).length).toBe(1)
+      expect(requests.some(path => path.endsWith(other))).toBe(false)
+      expect(requests.some(path => /\/api\/workspaceFiles\.(?:readBytes|renderOffice)$/u.test(path))).toBe(false)
+      expect(workerStarts).toBe(0)
+      release.resolve(undefined)
+      const preview = previewPage.getByRole('region', { name: `preview.${extension}`, exact: true })
+      const content = preview.locator(extension === 'docx' ? '[data-pdf-text]' : '#luckysheet-functionbox-cell')
+      await expect.poll(async () => (await content.allTextContents()).join(''), { timeout: 60_000 }).toContain('Office preview')
+      expect(workerStarts).toBeGreaterThan(0)
+      if (extension === 'docx') {
+        await compareOrRefreshGolden(GOLDEN,
+          await captureStableAria(previewPage, '[data-pdf-preview]', scaffold.workspaceCwd), webSnapshotMode())
+      }
+    } finally {
+      release.resolve(undefined)
+      try { await previewPage.unrouteAll({ behavior: 'wait' }) }
+      finally { await previewPage.close() }
+    }
+  })
+
   it.each(['docx', 'xlsx'] as const)('keeps the %s viewer through an authorized reread of identical bytes', async (extension) => {
     if (scaffold === undefined || browser === undefined) throw new Error('Web scaffold is unavailable')
     const fixture = scaffold

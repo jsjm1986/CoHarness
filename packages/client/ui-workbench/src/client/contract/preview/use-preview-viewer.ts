@@ -3,11 +3,11 @@ import { lazy, useEffect, useMemo } from 'react'
 import type { ComponentType, LazyExoticComponent } from 'react'
 
 /**
- * Download the selected viewer while authorized metadata starts the content read.
+ * Download the selected viewer alongside metadata and the authorized content read.
  * An import cannot be cancelled, but its completion mounts no content or Worker;
  * the caller renders the returned component only after its read succeeds.
  * @param load - stable loader for this preview's renderer, excluding all other document types.
- * @param ready - metadata permits the preview's content read to start.
+ * @param ready - the selected preview is mounted and access has not been denied.
  * @returns a lazy component sharing this mounted preview's preload result, including import failures.
  */
 export function usePreviewViewer<P extends object>(

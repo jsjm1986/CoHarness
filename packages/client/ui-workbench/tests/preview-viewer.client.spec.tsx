@@ -34,7 +34,7 @@ vi.mock('../src/client/excel/excel.tsx', async () => {
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
-it('starts only the selected viewer while its authorized read is pending and discards late imports after closing', async () => {
+it('downloads only the selected viewer before metadata and discards late imports after closing', async () => {
   const sessionId = 'viewer-session' as SessionId
   const request = (path: string): WorkspaceResourceOpenRequest => ({ sessionId, path, address: workspaceResourceAddress(sessionId, path), runtimeTarget: { kind: 'base' } })
   const resource: WorkspacePreviewResource = {
@@ -46,16 +46,25 @@ it('starts only the selected viewer while its authorized read is pending and dis
   const readDocument = vi.fn(() => documentBytes.promise)
   const readExcel = vi.fn(() => excelBytes.promise)
   const labels = { close: 'Close', reload: 'Reload', reconnecting: 'Reload · reconnecting', ...previewRecoveryLabels, changed: 'Changed' }
-  const pdf = render(<WorkspaceDocumentPreview request={request('report.docx')} resource={resource} read={readDocument}
+  const pendingResource: WorkspacePreviewResource = { ...resource, metadata: { status: 'loading', accessDenied: false } }
+  const documentRequest = request('report.docx')
+  const excelRequest = request('budget.xlsx')
+  const pdf = render(<WorkspaceDocumentPreview request={documentRequest} resource={pendingResource} read={readDocument}
     pdfT={makeTranslate(pdfEn)} officeT={makeTranslate(officeEn)} close={vi.fn()} view={{ page: 1 }} labels={labels} />)
   try {
-    await waitFor(() => { expect(readDocument).toHaveBeenCalledOnce() })
     await waitFor(() => { expect(imports.pdf.started).toHaveBeenCalledOnce() })
+    expect(readDocument).not.toHaveBeenCalled()
     expect(imports.excel.started).not.toHaveBeenCalled()
-    const excel = render(<WorkspaceExcelPreview request={request('budget.xlsx')} resource={resource} read={readExcel}
+    const excel = render(<WorkspaceExcelPreview request={excelRequest} resource={pendingResource} read={readExcel}
       excelT={makeTranslate(excelEn)} limits={Config({}).excel} close={vi.fn()} labels={labels} />)
-    await waitFor(() => { expect(readExcel).toHaveBeenCalledOnce() })
     await waitFor(() => { expect(imports.excel.started).toHaveBeenCalledOnce() })
+    expect(readExcel).not.toHaveBeenCalled()
+    pdf.rerender(<WorkspaceDocumentPreview request={documentRequest} resource={resource} read={readDocument}
+      pdfT={makeTranslate(pdfEn)} officeT={makeTranslate(officeEn)} close={vi.fn()} view={{ page: 1 }} labels={labels} />)
+    excel.rerender(<WorkspaceExcelPreview request={excelRequest} resource={resource} read={readExcel}
+      excelT={makeTranslate(excelEn)} limits={Config({}).excel} close={vi.fn()} labels={labels} />)
+    await waitFor(() => { expect(readDocument).toHaveBeenCalledOnce() })
+    await waitFor(() => { expect(readExcel).toHaveBeenCalledOnce() })
     expect(pdf.queryByTestId('pdf-viewer')).toBeNull()
     expect(excel.queryByTestId('excel-viewer')).toBeNull()
     pdf.unmount()

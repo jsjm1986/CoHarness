@@ -51,7 +51,7 @@ export function WorkspaceDocumentPreview({ request, resource, read, pdfT, office
     read({ resource: request, version: next.version, bytes: next.bytes }, signal), [read, request])
   const state = useWorkspacePreviewRead({ request, resource, input, read: readDocument })
   const { result, error, denied, lifetime } = state
-  const PdfBody = usePreviewViewer(loadPdfBody, input !== undefined && !denied)
+  const PdfBody = usePreviewViewer(loadPdfBody, !denied)
   const bytes = result?.bytes
   const data = useMemo(() => bytes === undefined ? undefined : workspaceFileBytes(bytes), [bytes])
   const code = (error as { code?: unknown } | undefined)?.code

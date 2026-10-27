@@ -39,7 +39,7 @@ export function WorkspaceExcelPreview({ request, resource, read, excelT, limits,
     read({ resource: request, version: next.version, maxBytes: next.maxBytes }, signal), [read, request])
   const state = useWorkspacePreviewRead({ request, resource, input, read: readFile })
   const { result, error, denied } = state
-  const ExcelBody = usePreviewViewer(loadExcelBody, input !== undefined && !denied)
+  const ExcelBody = usePreviewViewer(loadExcelBody, !denied)
   const bytes = result?.bytes
   const data = useMemo(() => bytes === undefined ? undefined : workspaceFileBytes(bytes), [bytes])
   const failure = error ?? resource.metadata.error
