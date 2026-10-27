@@ -1,9 +1,10 @@
 /** Real Office conversion and PDF rendering through the shipped authorized Workspace preview. */
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, type Browser, type Page, type Response } from 'playwright'
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type {} from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-office-to-pdf'
@@ -90,6 +91,80 @@ describe('web e2e: authorized Office preview', () => {
     }
     expect(resourceRequests).toHaveLength(3)
     expect(tripwire.pageErrors).toEqual([])
+  })
+
+  it.each(['docx', 'xlsx'] as const)('keeps the %s viewer through an authorized reread of identical bytes', async (extension) => {
+    if (scaffold === undefined || browser === undefined) throw new Error('Web scaffold is unavailable')
+    const fixture = scaffold
+    const file = join(fixture.workspaceCwd, `preview.${extension}`)
+    const original = await readFile(file)
+    const replacement = join(fixture.workspaceCwd, `reload-replacement.${extension}`)
+    const release = Promise.withResolvers<undefined>()
+    const endpoint = extension === 'docx' ? '/api/workspaceFiles.renderOffice' : '/api/workspaceFiles.readBytes'
+    const reloadPage = await newEnglishPage(browser)
+    let workerStarts = 0
+    try {
+      onTestFailed(() => saveFailureShot(reloadPage, `workspace-unchanged-${extension}`))
+      await reloadPage.goto(fixture.authenticatedUrl, { waitUntil: 'load' })
+      reloadPage.on('worker', () => { workerStarts += 1 })
+      await reloadPage.getByRole('button', { name: `Preview ${extension}`, exact: true }).click()
+      const preview = reloadPage.getByRole('region', { name: `preview.${extension}`, exact: true })
+      const content = preview.locator(extension === 'docx' ? '[data-pdf-text]' : '#luckysheet-functionbox-cell')
+      const text = async (): Promise<string> => (await content.allTextContents()).join('')
+      await expect.poll(text, { timeout: 60_000 }).toContain('Office preview')
+      const canvas = preview.locator('canvas').first()
+      await canvas.waitFor({ state: 'visible' })
+      const initialCanvas = await canvas.elementHandle()
+      if (initialCanvas === null) throw new Error('Rendered canvas is unavailable')
+      const initialWorkers = workerStarts
+      expect(initialWorkers).toBeGreaterThan(0)
+      const reload = preview.getByRole('button', { name: 'Reload', exact: true })
+      await reloadPage.route(`**${endpoint}*`, async (route) => {
+        await release.promise
+        await route.continue()
+      })
+      const reread = await Promise.allSettled([
+        reloadPage.waitForRequest(request => new URL(request.url()).pathname === endpoint),
+        reload.click(),
+      ])
+      for (const outcome of reread) if (outcome.status === 'rejected') throw outcome.reason
+      expect(await reload.isEnabled()).toBe(false)
+      expect(await initialCanvas.isVisible()).toBe(true)
+      release.resolve(undefined)
+      await expect.poll(() => reload.isEnabled()).toBe(true)
+      expect(await preview.getByRole('alert').count()).toBe(0)
+      await expect.poll(text).toContain('Office preview')
+      await canvas.waitFor({ state: 'visible' })
+      expect(await initialCanvas.evaluate(element => element.isConnected)).toBe(true)
+      expect(workerStarts).toBe(initialWorkers)
+      await reloadPage.unrouteAll({ behavior: 'wait' })
+      if (extension === 'docx') {
+        await compareOrRefreshGolden(GOLDEN,
+          await captureStableAria(reloadPage, '[data-pdf-preview]', fixture.workspaceCwd), webSnapshotMode())
+      }
+
+      const part = extension === 'docx' ? 'word/document.xml' : 'xl/worksheets/sheet1.xml'
+      const files = unzipSync(original)
+      const updated = strFromU8(files[part]!).replace('Office preview 中文文档', 'Updated preview content')
+      expect(updated).not.toBe(strFromU8(files[part]!))
+      files[part] = strToU8(updated)
+      await writeFile(replacement, zipSync(files), { flag: 'wx' })
+      await rename(replacement, file)
+      await reload.click()
+      await expect.poll(text, { timeout: 60_000 }).toContain('Updated preview content')
+      await expect.poll(() => reload.isEnabled()).toBe(true)
+      expect(await initialCanvas.evaluate(element => element.isConnected)).toBe(false)
+      expect(workerStarts).toBeGreaterThan(initialWorkers)
+    } finally {
+      release.resolve(undefined)
+      try { await reloadPage.unrouteAll({ behavior: 'wait' }) }
+      finally {
+        try {
+          await writeFile(file, original)
+          await rm(replacement, { force: true })
+        } finally { await reloadPage.close() }
+      }
+    }
   })
 
   it.each(FORMATS)('previews %s with the installed surface and selectable content', async (extension) => {

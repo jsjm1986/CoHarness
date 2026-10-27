@@ -73,7 +73,7 @@ export function WorkspaceHtmlPreview({ request, resource, read, htmlT, renderHtm
     read({ resource: request, version, maxBytes: MAX_TOTAL_BYTES }, signal), [read, request])
   const state = useWorkspacePreviewRead({ request, resource, input, read: readFile })
   const { result, error, denied, lifetime } = state
-  const data = useMemo(() => result === undefined ? undefined : workspaceFileBytes(result), [result])
+  const data = useMemo(() => result === undefined ? undefined : workspaceFileBytes(result.bytes), [result])
   const failure = error ?? resource.metadata.error
   return <WorkspacePreviewChrome request={request} resource={resource} state={state}
     className={css.filePreview} message={failure?.message} hasContent={data !== undefined}

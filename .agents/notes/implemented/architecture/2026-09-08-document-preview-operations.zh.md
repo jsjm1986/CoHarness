@@ -26,6 +26,8 @@ Status: implemented
 
 Markdown 通过累积的分页文本复用增量渲染原语。HTML 与 PDF 读取完整 `Uint8Array` 数据；Host 传输保持 base64。发布后的缓冲区只读借用，绝不持久化进布局或 Session JSON。PDF.js 在自有 Worker 中运行，字体和解码数据以相同版本随包发布，转移输入前先复制，以保留 Preview 的缓冲区。HTML 在 Blob iframe 中运行，仅设 `sandbox="allow-scripts"`，不授予同源、弹窗、表单、下载或顶层导航权限；替换或卸载预览即吊销外层 Blob URL。浏览器保持正常的外部网络规则。有上限的静态本地 JS/CSS 读取由父页面负责；不透明源 iframe 创建自己的资源 Blob，因为它不能加载父源创建的 Blob。PNG、JPEG、GIF、WebP、AVIF 和 SVG 经 `data:` URL 在 `<img>` 静态图片上下文中渲染，SVG 标记因此绝不进入应用 DOM，其脚本保持不可执行。
 
+已挂载的 PDF 或表格预览在授权重读期间仅对相同 Base64 正文解码一次。读取仍在发布前检查元数据、授权和源版本；复用的只有已解码缓冲区的身份，因此未变字节不会重新启动渲染或解析 Worker。字节变化会替换缓冲区，访问拒绝或卸载会释放正文。各解析器在向 Worker 转移前复制借用的输入。即使根 HTML 字节未变，HTML 刷新仍重新打包相对依赖。
+
 PDF.js 官方 TextLayerBuilder 在适配宽度的 canvas 上负责选择边界和复制规范化，共享页面清理，并使用由组件拥有的 resize observer。响应式尺寸适配使用独立的 CSS `scale` 属性，与 PDF.js 的页面旋转和平移变换组合。其内容结束标记和堆叠规则限制空白区域中的选择；换行高亮被抑制。逐页取消使用 builder 的清理操作，而不 abort 第一页的信号，因为官方选择监听器跨页面共享。
 
 ## 考虑过的替代方案

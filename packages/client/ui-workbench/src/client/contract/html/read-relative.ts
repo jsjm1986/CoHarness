@@ -32,11 +32,11 @@ export type ReadWorkspaceFileData = (
 
 /**
  * Decode the reader's complete Base64 payload into bytes for the private parser or packer.
- * @param data - one completed workspace file read.
+ * @param encoded - complete file contents in Base64.
  * @returns the decoded bytes.
  */
-export function workspaceFileBytes(data: WorkspaceFileData): Uint8Array<ArrayBuffer> {
-  const binary = atob(data.bytes)
+export function workspaceFileBytes(encoded: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(encoded)
   const bytes = new Uint8Array(binary.length)
   for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
   return bytes
@@ -95,6 +95,6 @@ export function createReadHtmlRelative(
     }
     const file = await read({ resource, maxBytes: MAX_ASSET_BYTES }, combined)
     combined.throwIfAborted()
-    return workspaceFileBytes(file)
+    return workspaceFileBytes(file.bytes)
   }
 }

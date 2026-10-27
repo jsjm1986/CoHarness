@@ -9,6 +9,7 @@ import { ZoomViewport, zoomSurfaceClass } from '../contract/zoom/ZoomViewport.ts
 import type { ZoomPreference } from '../contract/zoom/types.ts'
 import { useWorkspacePreviewRead } from '../contract/preview/use-preview-read.ts'
 import { usePreviewViewer } from '../contract/preview/use-preview-viewer.ts'
+import { workspaceFileBytes } from '../contract/html/read-relative.ts'
 import type { WorkspacePreviewActionLabels, WorkspacePreviewResource } from '../contract/preview/use-preview-read.ts'
 import { WorkspacePreviewChrome } from './WorkspacePreviewChrome.tsx'
 import css from './Workbench.module.css'
@@ -51,7 +52,8 @@ export function WorkspaceDocumentPreview({ request, resource, read, pdfT, office
   const state = useWorkspacePreviewRead({ request, resource, input, read: readDocument })
   const { result, error, denied, lifetime } = state
   const PdfBody = usePreviewViewer(loadPdfBody, input !== undefined && !denied)
-  const data = useMemo(() => result === undefined ? undefined : Uint8Array.from(atob(result.bytes), c => c.charCodeAt(0)), [result])
+  const bytes = result?.bytes
+  const data = useMemo(() => bytes === undefined ? undefined : workspaceFileBytes(bytes), [bytes])
   const code = (error as { code?: unknown } | undefined)?.code
   const failure = error === undefined ? resource.metadata.error : { message: error.message, code: typeof code === 'string' ? code : undefined }
   const message = failure === undefined ? undefined : describeFailure(failure, officeT)
