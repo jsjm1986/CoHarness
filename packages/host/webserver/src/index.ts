@@ -1,6 +1,6 @@
 /**
  * @deepseek-ai/dsh-host-webserver — node:http route registration — node:https
- * when `tls` names a certificate and key — with optional gzip, index injection,
+ * when `tls` names a certificate and key — with optional compression, index injection,
  * and one fallback seat. It knows no harness concepts and serves no files; the
  * composing application owns dist serving. Electron uses file:// plus IPC
  * instead, and this package never prints the URL.
@@ -14,6 +14,7 @@ import { createServer as createSecureServer } from 'node:https'
 import { isIP, type AddressInfo } from 'node:net'
 import { resolve } from 'node:path'
 import type { Duplex } from 'node:stream'
+import { constants as zlibConstants } from 'node:zlib'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import compressionMiddleware from 'compression'
@@ -96,21 +97,25 @@ export interface Config {
    * over plain HTTP.
    */
   tls?: TlsConfig
-  /** Response compression for socket-backed HTTP requests. @default 'none' */
-  compression?: 'none' | 'gzip'
+  /** Socket HTTP encoding policy: auto negotiates Brotli, gzip, or identity; gzip excludes Brotli. @default 'none' */
+  compression?: 'none' | 'gzip' | 'auto'
   /** Gzip DEFLATE level from 0 through 9. @default 1 */
   compressionLevel?: number
-  /** Minimum known response length eligible for gzip; unknown-length streams are eligible. @default 1024 */
+  /** Brotli quality from 0 through 11 when auto selects Brotli. @default 4 */
+  compressionBrotliQuality?: number
+  /** Minimum known response length eligible for compression; eligible media types with unknown lengths may compress. @default 1024 */
   compressionThresholdBytes?: number
 }
 
 const DEFAULT_COMPRESSION = 'none' as const
 const DEFAULT_COMPRESSION_LEVEL = 1
+const DEFAULT_COMPRESSION_BROTLI_QUALITY = 4
 const DEFAULT_COMPRESSION_THRESHOLD_BYTES = 1024
 
 interface ResolvedConfig extends Config {
-  compression: 'none' | 'gzip'
+  compression: 'none' | 'gzip' | 'auto'
   compressionLevel: number
+  compressionBrotliQuality: number
   compressionThresholdBytes: number
 }
 
@@ -216,17 +221,19 @@ export function bindUrlHost(host: string): string | undefined {
   return isIP(text) === 6 ? `[${text}]` : text
 }
 
-/** Build the maintained gzip middleware without exposing response policy to route owners. */
-function createGzipMiddleware(config: ResolvedConfig): NodeMiddleware {
+/** Build maintained compression middleware without exposing response policy to route owners. */
+function createResponseCompression(config: ResolvedConfig): NodeMiddleware {
   // `compression` is typed for Express, but its runtime uses only the
   // node:http request and response members supplied here.
   const middleware = compressionMiddleware({
     level: config.compressionLevel,
+    brotli: { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: config.compressionBrotliQuality } },
     threshold: config.compressionThresholdBytes,
     filter(request, response) {
       if (response.getHeader('content-range') !== undefined) return false
       const contentType = response.getHeader('content-type')
-      if (typeof contentType === 'string' && contentType.toLowerCase().startsWith('text/event-stream')) return false
+      const mediaType = typeof contentType === 'string' ? contentType.split(';', 1)[0]?.trim().toLowerCase() : undefined
+      if (mediaType === 'text/event-stream' || mediaType === 'application/x-ndjson') return false
       return compressionMiddleware.filter(request, response)
     },
   }) as unknown as NodeMiddleware
@@ -237,12 +244,12 @@ function createGzipMiddleware(config: ResolvedConfig): NodeMiddleware {
       next()
       return
     }
-    const encoding = new Negotiator(req).encoding(['gzip', 'identity'])
-    const gzipRequest = Object.create(req) as IncomingMessage
-    Object.defineProperty(gzipRequest, 'headers', {
-      value: { ...req.headers, 'accept-encoding': encoding === 'gzip' ? 'gzip' : 'identity' },
+    const encoding = new Negotiator(req).encoding(config.compression === 'auto' ? ['br', 'gzip', 'identity'] : ['gzip', 'identity'])
+    const compressionRequest = Object.create(req) as IncomingMessage
+    Object.defineProperty(compressionRequest, 'headers', {
+      value: { ...req.headers, 'accept-encoding': encoding ?? 'identity' },
     })
-    middleware(gzipRequest, res, next)
+    middleware(compressionRequest, res, next)
   }
 }
 
@@ -292,8 +299,9 @@ export class WebServer extends Service {
       certFile: z.string().required(),
       keyFile: z.string().required(),
     }).default(undefined as never),
-    compression: z.union([z.const('none'), z.const('gzip')]).default(DEFAULT_COMPRESSION),
+    compression: z.union([z.const('none'), z.const('gzip'), z.const('auto')]).default(DEFAULT_COMPRESSION),
     compressionLevel: z.number().step(1).min(0).max(9).default(DEFAULT_COMPRESSION_LEVEL),
+    compressionBrotliQuality: z.number().step(1).min(0).max(11).default(DEFAULT_COMPRESSION_BROTLI_QUALITY),
     compressionThresholdBytes: z.natural().default(DEFAULT_COMPRESSION_THRESHOLD_BYTES),
   })
 
@@ -313,7 +321,7 @@ export class WebServer extends Service {
   private fallback: WebRoute['handler'] | undefined
   private server!: Server
   private listenedPort: number | undefined
-  private readonly gzip: NodeMiddleware | undefined
+  private readonly compressResponse: NodeMiddleware | undefined
   private readonly tlsConfig: TlsConfig | undefined
 
   constructor(ctx: Context, private config: Config) {
@@ -321,7 +329,7 @@ export class WebServer extends Service {
     const resolved = config as ResolvedConfig
     // Schemastery passes an explicit `tls: null` through; only a real object serves TLS.
     this.tlsConfig = resolved.tls ?? undefined
-    this.gzip = resolved.compression === 'gzip' ? createGzipMiddleware(resolved) : undefined
+    this.compressResponse = resolved.compression === 'none' ? undefined : createResponseCompression(resolved)
   }
 
   /** The listening port (the OS-assigned value when config.port is 0), or `undefined` before `listen` binds. */
@@ -452,8 +460,8 @@ export class WebServer extends Service {
           res.end()
         })
       }
-      if (this.gzip === undefined) next()
-      else this.gzip(req, res, next)
+      if (this.compressResponse === undefined) next()
+      else this.compressResponse(req, res, next)
     }
     const tls = this.tlsConfig
     // Disposal waits for in-flight acquisition and closes any listener it produces.

@@ -86,7 +86,7 @@ async function tlsFixture(): Promise<TlsFixture> {
  */
 async function loadComposition(
   port = 0,
-  gzip = false,
+  compression: false | 'gzip' | 'auto' = false,
   host = '127.0.0.1',
   tls?: Partial<TlsConfig> | null,
 ): Promise<Context> {
@@ -108,10 +108,11 @@ async function loadComposition(
           ...(tls.keyFile === undefined ? [] : [`      keyFile: '${tls.keyFile}'`]),
         ]),
 
-    ...(gzip
+    ...(compression
       ? [
-        '    compression: gzip',
+        `    compression: ${compression}`,
         '    compressionLevel: 1',
+        '    compressionBrotliQuality: 5',
         '    compressionThresholdBytes: 16',
       ]
       : []),
@@ -319,13 +320,14 @@ describe('real Loader composition', () => {
       port: 0,
       compression: 'none',
       compressionLevel: 1,
+      compressionBrotliQuality: 4,
       compressionThresholdBytes: 1024,
     })
     expect(() => HttpServer.Config({
       host: '127.0.0.1', port: 0, compressionLevel: 10,
     })).toThrow()
 
-    const loaded = await loadComposition(0, true)
+    const loaded = await loadComposition(0, 'gzip')
     const server = loaded.webServer
     const body = 'compressible response '.repeat(8)
     server.register({
@@ -404,6 +406,98 @@ describe('real Loader composition', () => {
     expect((await request(server.port, '/range', { headers: { 'accept-encoding': 'gzip' } }))
       .headers.get('content-encoding')).toBeNull()
   })
+
+  it('negotiates only accepted encodings and preserves response-owned headers in auto mode', async () => {
+    for (const quality of [-1, 1.5, 12]) {
+      expect(() => HttpServer.Config({ host: '127.0.0.1', port: 0, compressionBrotliQuality: quality })).toThrow()
+    }
+    for (const quality of [0, 11]) {
+      expect(HttpServer.Config({ host: '127.0.0.1', port: 0, compressionBrotliQuality: quality }).compressionBrotliQuality).toBe(quality)
+    }
+    const loaded = await loadComposition(0, 'auto')
+    const body = 'negotiated response '.repeat(8)
+    loaded.webServer.register({
+      kind: 'exact', path: '/text', handler: (req, res) => {
+        expect(req.headers['accept-encoding']).toContain('br')
+        res.writeHead(200, { 'content-type': 'text/plain', 'content-length': String(Buffer.byteLength(body)), vary: 'Origin' })
+        res.end(body)
+      },
+    })
+    for (const [accepted, expected] of [
+      ['br, gzip, deflate', 'br'],
+      ['br;q=0.2, gzip;q=0.8', 'gzip'],
+      ['br;q=0, gzip', 'gzip'],
+      ['br;q=0, gzip;q=0', null],
+      ['br;q=0.5, gzip;q=0.5, identity;q=1', null],
+      ['deflate, br;q=0, gzip;q=0', null],
+    ] as const) {
+      const response = await request(loaded.webServer.port, '/text', { headers: { 'accept-encoding': accepted } })
+      expect(response.status).toBe(200)
+      expect(response.body).toBe(body.slice(0, 80))
+      expect(response.headers.get('content-encoding')).toBe(expected)
+      expect(response.headers.get('vary')).toBe('Origin, Accept-Encoding')
+      if (expected !== null) expect(response.headers.get('content-length')).toBeNull()
+    }
+    for (const [path, headers] of [
+      ['/range', { 'content-type': 'text/plain', 'content-range': 'bytes 0-15/160' }],
+      ['/archive', { 'content-type': 'application/gzip' }],
+      ['/zip', { 'content-type': 'application/zip' }],
+      ['/no-transform', { 'content-type': 'text/plain', 'cache-control': 'no-transform' }],
+      ['/encoded', { 'content-type': 'text/plain', 'content-encoding': 'gzip' }],
+      ['/small', { 'content-type': 'text/plain', 'content-length': '5' }],
+    ] as const) {
+      loaded.webServer.register({ kind: 'exact', path, handler: (_req, res) => {
+        res.writeHead(path === '/range' ? 206 : 200, headers)
+        res.end(path === '/small' ? 'small' : body)
+      } })
+      // The already-encoded fixture is inspected with HEAD to avoid decoding its placeholder body.
+      const response = await request(loaded.webServer.port, path, {
+        method: path === '/encoded' ? 'HEAD' : 'GET', headers: { 'accept-encoding': 'br, gzip' },
+      })
+      expect(response.headers.get('content-encoding')).toBe(path === '/encoded' ? 'gzip' : null)
+    }
+  })
+
+  it.for(['application/x-ndjson; charset=utf-8', 'text/event-stream; charset=utf-8'])(
+    'delivers the first %s frame while the producer is still waiting', async (contentType, test) => {
+      const loaded = await loadComposition(0, 'auto')
+      const release = Promise.withResolvers<undefined>()
+      let finished = false
+      test.onTestFinished(() => { release.resolve(undefined) })
+      loaded.webServer.register({ kind: 'exact', path: '/progress', handler: async (_req, res) => {
+        res.writeHead(200, { 'content-type': contentType })
+        res.write('first\n')
+        await release.promise
+        res.end('last\n')
+        finished = true
+      } })
+      try {
+        const response = await fetch(new URL('/progress', loaded.webServer.getOrigin()), {
+          headers: { 'accept-encoding': 'br, gzip' }, signal: test.signal,
+        })
+        expect(response.headers.get('content-encoding')).toBeNull()
+        const reader = response.body!.getReader()
+        try {
+          const first = await reader.read()
+          expect(Buffer.from(first.value!).toString()).toBe('first\n')
+          expect(first.done).toBe(false)
+          expect(finished).toBe(false)
+          release.resolve(undefined)
+          let rest = ''
+          for (;;) {
+            const chunk = await reader.read()
+            if (chunk.done) break
+            rest += Buffer.from(chunk.value).toString()
+          }
+          expect(rest).toBe('last\n')
+          expect(finished).toBe(true)
+        } finally {
+          release.resolve(undefined)
+          await reader.cancel()
+        }
+      } finally { release.resolve(undefined) }
+    },
+  )
 
   // Real-Loader composition resolves workspace packages through tsx at test
   // time; first resolution after the host/client program split is slow enough
@@ -550,6 +644,7 @@ describe('real Loader composition', () => {
       tls,
       compression: 'none',
       compressionLevel: 1,
+      compressionBrotliQuality: 4,
       compressionThresholdBytes: 1024,
     })
 

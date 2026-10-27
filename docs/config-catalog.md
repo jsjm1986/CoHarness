@@ -1631,7 +1631,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-host-webserver`
 
-- `source`: [`packages/host/webserver/src/index.ts:77`](../packages/host/webserver/src/index.ts)
+- `source`: [`packages/host/webserver/src/index.ts:78`](../packages/host/webserver/src/index.ts)
 
 ```ts config-catalog
 /** Web server listen, TLS, and response-compression config. */
@@ -1657,11 +1657,13 @@ export interface Config {
    * over plain HTTP.
    */
   tls?: TlsConfig
-  /** Response compression for socket-backed HTTP requests. @default 'none' */
-  compression?: 'none' | 'gzip'
+  /** Socket HTTP encoding policy: auto negotiates Brotli, gzip, or identity; gzip excludes Brotli. @default 'none' */
+  compression?: 'none' | 'gzip' | 'auto'
   /** Gzip DEFLATE level from 0 through 9. @default 1 */
   compressionLevel?: number
-  /** Minimum known response length eligible for gzip; unknown-length streams are eligible. @default 1024 */
+  /** Brotli quality from 0 through 11 when auto selects Brotli. @default 4 */
+  compressionBrotliQuality?: number
+  /** Minimum known response length eligible for compression; eligible media types with unknown lengths may compress. @default 1024 */
   compressionThresholdBytes?: number
 }
 

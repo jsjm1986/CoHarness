@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-06-web-shell-dist-chunk-layout.md
 document:
-  en: 1c7b4273dc243685317b149e2fd7fddf2a6c18d1
-  zh: d1435215d3c077efc3afaac7b3a7a1c2e2ffdae7
+  en: 7cf25c14ff7bb8bdc9b92c6b7e3cf699565e20f7
+  zh: 30fd7b89ee623e759b8346fe8b9bfa4db2c13fe5
 /agent-note-web-shell-dist-chunk-split-and-directory-layout:
   en: 66e4e679b16bb003
   zh: 41f4553f85b364cd
@@ -21,5 +21,5 @@ document:
   en: 1d0ed67863c4ed08
   zh: ee3b061c20f4723d
 /agent-note-web-shell-dist-chunk-split-and-directory-layout/consequences:
-  en: cd4aad2f948502e3
-  zh: e35185dbd7099338
+  en: 8fd5938a42eb778a
+  zh: 7b10ebf8729c272a

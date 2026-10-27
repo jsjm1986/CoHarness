@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-24-web-config-tree-boot-and-transport-layering.md
 document:
-  en: 4498da69a065e48204a733f05c9390400de105d7
-  zh: 294d6e533db27198b1029a5fb218c64d2f071ca2
+  en: f9b563de560de48ebac5a431312f77e62dec0096
+  zh: 4d28f52d40276da5c45d49dc606911f60f45f695
 /agent-note-dsh-web-config-tree-boot-and-the-web-transport-layering:
   en: 2d06ffcaaeb373e7
   zh: 01822cfd7339167f
@@ -12,11 +12,11 @@ document:
   en: e5d603f77bff9dd7
   zh: c9e9a64f0a4db3c9
 /agent-note-dsh-web-config-tree-boot-and-the-web-transport-layering/decision:
-  en: bfe703fa9bc62d0a
-  zh: 953436efee60a792
+  en: fa91bc57d81ca8be
+  zh: 5083c5ca58732f73
 /agent-note-dsh-web-config-tree-boot-and-the-web-transport-layering/consequences:
   en: ee4ee63c3b4ffe9a
   zh: b31d785979e75027
 /agent-note-dsh-web-config-tree-boot-and-the-web-transport-layering/alternatives-considered:
-  en: 3ec3cfaaddd10d3c
-  zh: 7858318acac2c609
+  en: 5cbf017c2fe18c34
+  zh: 9074c21f00ce1c83

@@ -47,4 +47,4 @@ apps/web 的壳此前打成单一约 1.2 MB（minified）的 index 分片，其�
 - 壳代码改动只重哈希 index（约为产物三分之一）；vendor（约三分之二）跨壳版本缓存稳定，仅依赖升级时失效。
 - `dist/assets/` 可导航：根两对 js/css，`langs/` 按需语法，`fonts/` 字体。
 - 维护成本：workspace 代码新增对某渲染家族门面包的直接 import 时需同步 `VENDOR_PACKAGES`（漏列仅稀释 index，不致坏）；在 highlight.ts 扩 boot 语法集而未同步 `BOOT_GRAMMAR_FILES` 时，该语法静默落入 index，仅产物审计可见。
-- webserver 静态面尚无压缩，gzip 体积收益仍有待实现；传输层压缩是另一项独立决策。
+- [HTTP 响应压缩](2026-07-24-web-config-tree-boot-and-transport-layering.zh.md) 独立于 dist 分块布局减少传输字节。

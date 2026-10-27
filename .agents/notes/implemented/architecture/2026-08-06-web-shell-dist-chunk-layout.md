@@ -47,4 +47,4 @@ The audit tool ships with the repository: `node scripts/attribute-chunk-bytes.mj
 - A shell code change rehashes only index (about one third of the dist output); vendor (about two thirds) stays cache-stable across shell releases and is invalidated only by dependency upgrades.
 - `dist/assets/` is navigable: two js/css pairs at the root, on-demand grammars in `langs/`, fonts in `fonts/`.
 - Maintenance cost: when workspace code adds a direct import of a rendering family's facade package, `VENDOR_PACKAGES` must be updated alongside (an omission merely dilutes index, nothing breaks); when the boot grammar set grows in highlight.ts without `BOOT_GRAMMAR_FILES` following, that grammar silently lands in index, visible only to a dist audit.
-- The webserver's static surface has no compression yet, so the gzip size win is still on the table; transport-layer compression is a separate, independent decision.
+- [HTTP response compression](2026-07-24-web-config-tree-boot-and-transport-layering.md) reduces transfer bytes independently of the dist chunk layout.
