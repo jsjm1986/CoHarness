@@ -8,7 +8,7 @@ import { ConversationShareAction, type ConversationShareInjected } from '../src/
 import { LogoutButton } from '../src/client/LogoutButton.tsx'
 import { ReadOnlyComposer } from '../src/client/ReadOnlyComposer.tsx'
 import { ScopeControl, type ScopeControlInjected } from '../src/client/ScopeControl.tsx'
-import type { CollaborationContext } from '../src/client/collaboration-client.ts'
+import { CollaborationClient, type CollaborationContext } from '../src/client/collaboration-client.ts'
 import { apply, inject } from '../src/client/index.ts'
 
 const baseContext: CollaborationContext = {
@@ -149,8 +149,10 @@ describe('ui-collaboration apply', () => {
     const old = Promise.withResolvers<Response>()
     const fresh = Promise.withResolvers<Response>()
     b.fetcher.mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise)
-    const previous = b.scope.hooks.collaboration.load()
     try {
+      const collaboration = b.scope.hooks.collaboration
+      if (!(collaboration instanceof CollaborationClient)) throw new Error('Fixture does not own the collaboration client')
+      const previous = collaboration.load()
       await vi.waitFor(() => { expect(b.fetcher).toHaveBeenCalledTimes(2) })
       const oldSignal = b.fetcher.mock.calls[1]?.[1]?.signal
       b.ctx.emit('connection/will-reset', false)
