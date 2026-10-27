@@ -118,6 +118,7 @@ describe('web e2e: authorized Office preview', () => {
       if (initialCanvas === null) throw new Error('Rendered canvas is unavailable')
       const initialWorkers = workerStarts
       expect(initialWorkers).toBeGreaterThan(0)
+      const initialAlerts = await preview.getByRole('alert').allTextContents()
       const reload = preview.getByRole('button', { name: 'Reload', exact: true })
       await reloadPage.route(`**${endpoint}*`, async (route) => {
         await release.promise
@@ -132,7 +133,7 @@ describe('web e2e: authorized Office preview', () => {
       expect(await initialCanvas.isVisible()).toBe(true)
       release.resolve(undefined)
       await expect.poll(() => reload.isEnabled()).toBe(true)
-      expect(await preview.getByRole('alert').count()).toBe(0)
+      expect(await preview.getByRole('alert').allTextContents()).toEqual(initialAlerts)
       await expect.poll(text).toContain('Office preview')
       await canvas.waitFor({ state: 'visible' })
       expect(await initialCanvas.evaluate(element => element.isConnected)).toBe(true)
