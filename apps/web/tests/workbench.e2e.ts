@@ -8,6 +8,7 @@ import type { Browser, Page, Locator, Request } from 'playwright'
 import { chromium } from 'playwright'
 import { afterEach, describe, expect, it, onTestFailed } from 'vitest'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-workspace'
 import { pdfResourceFixture } from '../../../packages/client/ui-workbench/tests/pdf-resource-fixture.ts'
 import {
@@ -29,8 +30,8 @@ const TRACK_SCENARIOS = [
   { name: 'preview-equal', count: 2, width: 1567, mode: 'preview', unequal: false },
   { name: 'preview-unequal', count: 2, width: 1567, mode: 'preview', unequal: true },
   { name: 'phone-unequal', count: 2, width: 1567, mode: 'phone', unequal: true },
-  { name: 'stacked-three', count: 3, width: 1920, mode: 'stacked', unequal: false },
-  { name: 'stacked-four-unequal', count: 4, width: 2160, mode: 'stacked', unequal: true },
+  { name: 'horizontal-three', count: 3, width: 1920, mode: 'horizontal', unequal: false },
+  { name: 'horizontal-four-unequal', count: 4, width: 2160, mode: 'horizontal', unequal: true },
   { name: 'collapsed-neighbor-unequal', count: 2, width: 1567, mode: 'collapsed', unequal: true },
 ] as const
 
@@ -299,9 +300,10 @@ describe('web: Cordis Workspace workbench', () => {
         await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) => element.width)).toBeGreaterThan(0)
       } else if (scenario.mode === 'phone') {
         await page.setViewportSize({ width: 390, height: 844 })
-      } else if (scenario.mode === 'stacked') {
+      } else if (scenario.mode === 'horizontal') {
         await page.setViewportSize({ width: 1280, height: 1000 })
       } else {
+        await panes.last().locator('[data-workbench-pane-header]').hover()
         await panes.last().getByRole('button', { name: 'Collapse pane', exact: true }).click()
         await expect.poll(() => panes.last().getAttribute('data-collapsed')).toBe('true')
       }
@@ -315,12 +317,13 @@ describe('web: Cordis Workspace workbench', () => {
         await expect.poll(() => panes.first().locator('textarea').first().inputValue()).toBe(draftFor(0))
       } else {
         await expect.poll(() => root.getAttribute('data-tabbed')).toBeNull()
-        await expect.poll(() => root.locator('[data-workbench-row]').count()).toBe(scenario.mode === 'stacked' ? 2 : 1)
+        await expect.poll(() => root.locator('[data-workbench-row]').count()).toBe(1)
         expect(await panes.count()).toBe(scenario.count)
       }
       const target = await observeRows('transition')
-      if (scenario.mode === 'stacked') {
-        expect(target.rows.map(row => row.panes.length)).toEqual(scenario.count === 3 ? [2, 1] : [2, 2])
+      if (scenario.mode === 'horizontal') {
+        expect(target.rows.map(row => row.panes.length)).toEqual([scenario.count])
+        expect(await root.locator('[data-workbench-grid]').evaluate(node => node.scrollWidth > node.clientWidth)).toBe(scenario.count === 4)
       }
       const failures: unknown[] = []
       let transitionAria: string | undefined
@@ -940,6 +943,109 @@ describe('web: Cordis Workspace workbench', () => {
     await compareOrRefreshGolden(join(SELECTION_EXPECTED_DIR, 'document-picker.expected.md'), output.join('\n\n'), MODE)
   })
 
+  it.skipIf(MODE === 'record')('collapses empty workbench chrome and restores session plugin tools without clipping', async () => {
+    try {
+      scaffold = await launchWebScaffold({ workbench: true, openInApp: false })
+      const runtime = scaffold
+      const seed = await readFile(SEED, 'utf8')
+      const hostIds = []
+      for (const name of ['header-one', 'header-two', 'header-three', 'header-four']) {
+        const path = join(runtime.workspaceCwd, name)
+        await mkdir(join(path, 'workspace'), { recursive: true })
+        const workspace = await runtime.ctx.workspaceRegistry.create(path)
+        const id = await seedSession(runtime, seed, name, undefined, path)
+        await workspace.attachSession(id)
+        await runtime.ctx.agents.resume({ resumeSessionId: id, setup: ctx => runtime.ctx.agentPresets.mount(ctx).then(() => undefined) })
+        hostIds.push(id)
+      }
+      browser = await chromium.launch()
+      page = await browser.newPage({ viewport: { width: 2160, height: 900 }, locale: 'en-US' })
+      const tripwire = watchConsole(page)
+      onTestFailed(() => saveFailureShot(page, 'workbench-header-tools'))
+      await page.goto(runtime.authenticatedUrl, { waitUntil: 'load' })
+      const toolbar = page.locator('[data-workbench-toolbar]')
+      await toolbar.waitFor({ timeout: 30_000 })
+      await toolbar.getByRole('button', { name: 'Select workbench' }).click()
+      await page.getByRole('menuitem', { name: /My workbench/ }).click()
+      await page.locator('[data-workbench-empty-content]').waitFor()
+      for (const name of ['header-one', 'header-two', 'header-three', 'header-four']) {
+        await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).click()
+        const picker = page.getByRole('dialog', { name: 'Add conversation', exact: true })
+        await picker.locator('button').filter({ hasText: name }).first().click()
+        await picker.waitFor({ state: 'hidden' })
+      }
+      const panes = page.locator('[data-session-pane]')
+      const headers = panes.locator('[data-slot="conversation.session.header"] > header')
+      const opener = panes.first().getByRole('button', { name: 'Open right sidebar', exact: true })
+      await opener.click()
+      await opener.waitFor({ state: 'hidden' })
+      const expectedDir = fileURLToPath(new URL('./expected/workbench/header-tools/', import.meta.url))
+      if (MODE === 'refresh') await mkdir(expectedDir, { recursive: true })
+      const codingView = async (enabled: boolean): Promise<void> => {
+        await page.getByRole('button', { name: 'Settings', exact: true }).click()
+        const dialog = page.getByRole('dialog', { name: 'Settings', exact: true })
+        const toggle = dialog.getByRole('switch', { name: 'Show coding view', exact: true })
+        await expect.poll(() => toggle.isEnabled()).toBe(true)
+        if ((await toggle.getAttribute('aria-checked') === 'true') !== enabled) await toggle.click()
+        await expect.poll(() => toggle.getAttribute('aria-checked')).toBe(String(enabled))
+        await page.keyboard.press('Escape')
+        await dialog.waitFor({ state: 'hidden' })
+      }
+      await codingView(true)
+      await expect.poll(() => panes.last().getByRole('tab').count()).toBe(2)
+      await compareOrRefreshGolden(join(expectedDir, 'coding-view.expected.md'),
+        await captureStableAria(page, '[data-session-pane]:last-child [data-slot="conversation.session.header"]', runtime.workspaceCwd), MODE)
+      await codingView(false)
+      await expect.poll(() => headers.first().evaluate(node => node.getBoundingClientRect().height === 0)).toBe(true)
+      expect(await panes.locator('[data-workbench-pane-header]').evaluateAll(nodes => nodes.every(node => node.getBoundingClientRect().height <= 52))).toBe(true)
+      const originalToolHeight = await headers.last().evaluate(node => node.getBoundingClientRect().height)
+      const agent = runtime.ctx.agents.get(hostIds[3]!)
+      if (agent === undefined) throw new Error('The header fixture Session has no live Agent')
+      await runtime.ctx.tools.execute({
+        signal: new AbortController().signal, callId: ToolCallId('workbench-header-job'), name: 'bash',
+        arguments: { command: 'sleep 300', description: 'Verify workbench job controls', run_in_background: true }, agent,
+      })
+      const trigger = panes.last().getByRole('button', { name: '1 background job running', exact: true })
+      await trigger.waitFor({ timeout: 15_000 })
+      expect(await headers.last().isVisible()).toBe(true)
+      await compareOrRefreshGolden(join(expectedDir, 'job-tools.expected.md'),
+        await captureStableAria(page, '[data-session-pane]:last-child [data-slot="conversation.session.header"]', runtime.workspaceCwd), MODE)
+      await trigger.focus()
+      await page.keyboard.press('Enter')
+      const menu = page.getByRole('list', { name: 'Background jobs', exact: true })
+      await menu.waitFor()
+      await panes.last().getByRole('button', { name: 'Collapse pane', exact: true }).focus()
+      await page.keyboard.press('Space')
+      await menu.waitFor({ state: 'hidden' })
+      await panes.last().getByRole('button', { name: 'Expand pane', exact: true }).click()
+      await panes.last().locator('[data-workbench-pane-header]').click()
+      await trigger.click()
+      await menu.waitFor()
+      for (const width of [1566, 1024, 390]) {
+        await page.setViewportSize({ width, height: 900 })
+        await expect.poll(() => menu.evaluate((node) => {
+          const rect = node.getBoundingClientRect()
+          const hit = document.elementFromPoint(rect.right - 8, rect.top + rect.height / 2)
+          return rect.left >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight && hit !== null && node.contains(hit)
+        })).toBe(true)
+      }
+      await menu.getByRole('button', { name: 'Stop task sleep 300', exact: true }).click()
+      await menu.getByRole('button', { name: 'Click again to confirm', exact: true }).click()
+      await panes.last().getByRole('button', { name: '1 background job', exact: true }).waitFor({ timeout: 20_000 })
+      await menu.getByRole('button', { name: 'Clear', exact: true }).click()
+      await page.setViewportSize({ width: 2160, height: 900 })
+      await expect.poll(() => headers.last().evaluate(node => node.getBoundingClientRect().height)).toBe(originalToolHeight)
+      await expect.poll(() => headers.first().evaluate(node => node.getBoundingClientRect().height)).toBe(0)
+      expect(tripwire.pageErrors).toEqual([])
+    } catch (error) {
+      if (page !== undefined) {
+        await saveFailureShot(page, 'workbench-header-tools')
+        console.info('[workbench-header-state]', (await page.locator('body').ariaSnapshot()).slice(0, 12000))
+      }
+      throw error
+    }
+  }, 180_000)
+
   it.skipIf(MODE === 'record')('isolates four panes, concurrent streams, approval, draft recovery, and background completion', async () => {
     scaffold = await launchWebScaffold({
       workbench: true,
@@ -1022,6 +1128,50 @@ describe('web: Cordis Workspace workbench', () => {
     }
     const panes = page.locator('[data-session-pane]')
     expect(await panes.count()).toBe(4)
+    const firstHeader = panes.first().locator('[data-workbench-pane-header]')
+    const lastHeader = panes.last().locator('[data-workbench-pane-header]')
+    const firstActions = firstHeader.locator('[class*="paneActions"]')
+    const lastActions = lastHeader.locator('[class*="paneActions"]')
+    await toolbar.hover()
+    await expect.poll(() => firstActions.evaluate(node => getComputedStyle(node).opacity)).toBe('0')
+    await expect.poll(() => lastActions.evaluate(node => getComputedStyle(node).opacity)).toBe('1')
+    const titleBounds = await firstHeader.locator('strong').boundingBox()
+    await firstHeader.hover()
+    await expect.poll(() => firstActions.evaluate(node => getComputedStyle(node).opacity)).toBe('1')
+    expect(await firstHeader.locator('strong').boundingBox()).toEqual(titleBounds)
+    await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).focus()
+    await toolbar.hover()
+    await expect.poll(() => firstActions.evaluate(node => getComputedStyle(node).opacity)).toBe('0')
+    await page.keyboard.press('Tab')
+    await expect.poll(() => firstHeader.evaluate(node => node.contains(document.activeElement))).toBe(true)
+    await expect.poll(() => firstActions.evaluate(node => getComputedStyle(node).opacity)).toBe('1')
+    await firstHeader.getByRole('button', { name: 'More pane actions', exact: true }).click()
+    await page.getByRole('menu').hover()
+    expect(await firstActions.evaluate(node => getComputedStyle(node).opacity)).toBe('1')
+    await page.keyboard.press('Escape')
+    for (const [width, visiblePanes] of [[1566, 4], [1024, 4], [600, 1], [375, 1], [1920, 4]] as const) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect.poll(() => panes.count()).toBe(visiblePanes)
+      expect(await page.locator('[data-workbench-row]').count()).toBe(1)
+      await expect.poll(() => page.locator('[data-workbench-row]').evaluateAll(rows => rows.every((row) => {
+        const bounds = row.getBoundingClientRect()
+        const first = row.firstElementChild!.getBoundingClientRect()
+        const last = row.lastElementChild!.getBoundingClientRect()
+        return Math.abs(first.left - bounds.left) < 1 && Math.abs(last.right - bounds.right) < 1
+          && Math.abs(bounds.height - row.parentElement!.clientHeight) < 1
+      }))).toBe(true)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      if (width === 1024) {
+        const roster = page.getByRole('list', { name: 'Panes', exact: true }).locator('[class*="sidebarPaneFocus"]')
+        await roster.first().click()
+        await expect.poll(() => page.locator('[data-workbench-grid]').evaluate(node => node.scrollLeft)).toBe(0)
+        await roster.last().click()
+        await expect.poll(() => page.locator('[data-workbench-grid]').evaluate((node) => {
+          const pane = node.querySelector('[data-session-pane][data-active]')!
+          return pane.getBoundingClientRect().right <= node.getBoundingClientRect().right + 1
+        })).toBe(true)
+      }
+    }
     const ids = await panes.evaluateAll(nodes => nodes.map(node => node.getAttribute('data-session-pane')!))
     const [a, b, c, d] = ids.map(id => page.locator(`[data-session-pane="${id}"]`)) as [Locator, Locator, Locator, Locator]
     await d.locator('textarea').first().fill('Delta draft survives pane changes')

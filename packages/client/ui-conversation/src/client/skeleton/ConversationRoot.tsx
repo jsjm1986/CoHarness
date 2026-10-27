@@ -496,7 +496,7 @@ export function ConversationContent({
   return (
     <div
       ref={rootResizeRef}
-      className={clsx(css.root, workbench && css.workbenchPane, variant === 'embedded' && css.embeddedBody)}
+      className={clsx(css.root, workbench && css.workbenchContent, variant === 'embedded' && css.embeddedBody)}
       data-phase={phase}
       data-chat-fill={displaySettings.chatFullWidth || undefined}
     >
@@ -613,15 +613,26 @@ export function ConversationRoot(props: ConversationRootProps) {
   const paneIds = (tabbed || maximized !== undefined) && focusedPane !== undefined ? [focusedPane] : viewport.paneIds
   const collapsed = new Set(viewport.collapsedIds)
   const expandedCount = viewport.paneIds.filter(id => !collapsed.has(id)).length
-  const columns = tabbed || maximized !== undefined ? 1
-    : width === undefined || width >= viewport.paneIds.length * 364 ? Math.max(1, paneIds.length) : 2
+  const minimumPaneWidth = 280
+  const columns = Math.max(1, paneIds.length)
   const rows = Array.from({ length: Math.ceil(paneIds.length / columns) }, (_, row) => paneIds.slice(row * columns, (row + 1) * columns))
+  useEffect(() => {
+    if (!workbench || tabbed) return
+    const scroller = root.current?.querySelector<HTMLElement>('[data-workbench-grid]')
+    if (scroller === undefined || scroller === null || scroller.scrollWidth <= scroller.clientWidth) return
+    const pane = scroller.querySelector<HTMLElement>('[data-session-pane][data-active]')
+    if (pane === null) return
+    const area = scroller.getBoundingClientRect()
+    const bounds = pane.getBoundingClientRect()
+    if (bounds.left < area.left) scroller.scrollLeft += bounds.left - area.left
+    else if (bounds.right > area.right) scroller.scrollLeft += bounds.right - area.right
+  }, [activePane, tabbed, width, maximized, workbench, viewport.paneIds, viewport.collapsedIds])
   const resize = (index: number, ratios: readonly number[], delta: number, rowWidth: number, rowTotal: number): void => {
     const next = [...ratios]
     const left = next[index] ?? 0
     const right = next[index + 1] ?? 0
     const total = left + right
-    const minimum = Math.min(360 / Math.max(1, rowWidth) * rowTotal, total / 2)
+    const minimum = Math.min(minimumPaneWidth / Math.max(1, rowWidth) * rowTotal, total / 2)
     next[index] = Math.max(minimum, Math.min(total - minimum, left + delta))
     next[index + 1] = total - next[index]
     props.onViewportRatios(next)
@@ -685,17 +696,17 @@ export function ConversationRoot(props: ConversationRootProps) {
             const ratioStart = rowIndex * columns
             const ratios = row.map((_, index) => viewport.paneRatios[ratioStart + index] ?? 1)
             const total = ratios.reduce((sum, ratio) => sum + ratio, 0)
+            const expandedTotal = row.reduce((sum, id, index) => sum + (collapsed.has(id) ? 0 : (ratios[index] ?? 1)), 0)
             const expandedInRow = row.filter(id => !collapsed.has(id)).length
-            const expandedWeight = row.reduce((sum, id, column) =>
-              sum + (collapsed.has(id) ? 0 : ratios[column] ?? 1), 0)
             return (
               <div
                 key={rowIndex}
                 className={css.workbenchRow}
                 data-workbench-row=""
-                style={{ gridTemplateColumns: row.map((id, column) => collapsed.has(id)
-                  ? '46px'
-                  : `minmax(${expandedInRow > 1 ? 360 : 0}px, ${(ratios[column] ?? 1) / expandedWeight * expandedInRow}fr)`).join(' ') }}
+                style={{ minWidth: expandedInRow > 1 ? row.reduce((sum, id) => sum + (collapsed.has(id) ? 46 : minimumPaneWidth), 0) : 0,
+                  gridTemplateColumns: row.map((id, column) => collapsed.has(id)
+                    ? '46px'
+                    : `minmax(${expandedInRow > 1 ? minimumPaneWidth : 0}px, ${(ratios[column] ?? 1) / expandedTotal}fr)`).join(' ') }}
               >
                 {row.map((id, column) => {
                   const index = ratioStart + column

@@ -53,7 +53,8 @@ it('downloads only the selected viewer before metadata and discards late imports
     pdfT={makeTranslate(pdfEn)} officeT={makeTranslate(officeEn)} close={vi.fn()} view={{ page: 1 }} labels={labels} />)
   try {
     await waitFor(() => { expect(imports.pdf.started).toHaveBeenCalledOnce() })
-    expect(readDocument).not.toHaveBeenCalled()
+    expect(readDocument).toHaveBeenCalledOnce()
+    expect(pdf.queryByTestId('pdf-viewer')).toBeNull()
     expect(imports.excel.started).not.toHaveBeenCalled()
     const excel = render(<WorkspaceExcelPreview request={excelRequest} resource={pendingResource} read={readExcel}
       excelT={makeTranslate(excelEn)} limits={Config({}).excel} close={vi.fn()} labels={labels} />)

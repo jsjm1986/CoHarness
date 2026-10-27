@@ -1,8 +1,9 @@
 /** Office and PDF previews share the existing authorized Workspace resource lifetime. */
-import { Suspense, useMemo } from 'react'
+import { Suspense, useEffect, useMemo } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import { FontNotice } from '../contract/office/FontNotice.tsx'
+import { InitialOfficeRead } from '../contract/office/initial-office-read.ts'
 import type {} from '../office/locales.ts'
 import type {} from '../pdf/locales.ts'
 import { ZoomViewport, zoomSurfaceClass } from '../contract/zoom/ZoomViewport.tsx'
@@ -18,9 +19,9 @@ const loadPdfBody = async () => ({ default: (await import('../pdf/pdf.tsx')).Pdf
 
 /** One complete authorized result; bytes remain local to this mounted preview. */
 export interface WorkspaceDocumentBytes { bytes: string; version: string; missingFonts: string[] }
-/** Read or convert an exact revision on its owning runtime. */
+/** Read an exact revision, or prepare an initial Office conversion on its owning runtime. */
 export type ReadWorkspaceDocument = (
-  request: { resource: WorkspaceResourceOpenRequest; version: string; bytes: number | undefined }, signal: AbortSignal,
+  request: { resource: WorkspaceResourceOpenRequest; version?: string; bytes: number | undefined }, signal: AbortSignal,
 ) => Promise<WorkspaceDocumentBytes>
 
 /** @param path - workspace-relative filename. @returns whether the PDF or Office conversion renderer handles its content. */
@@ -43,14 +44,28 @@ export function WorkspaceDocumentPreview({ request, resource, read, pdfT, office
   view: { page: number; zoom?: ZoomPreference }
   labels: WorkspacePreviewActionLabels & { changed: string }
 }) {
+  const office = !request.path.toLowerCase().endsWith('.pdf')
+  const initial = useMemo(() => new InitialOfficeRead<WorkspaceDocumentBytes>(
+    (version, bytes, signal) => read({ resource: request, ...(version === undefined ? {} : { version }), bytes }, signal),
+    resource.revoke,
+  ), [read, request, resource.revoke])
   const input = useMemo((): DocumentRead | undefined => {
     const value = resource.metadata.value
     return value?.version === undefined ? undefined : { version: value.version, bytes: value.bytes }
   }, [resource.metadata.value?.version, resource.metadata.value?.bytes])
-  const readDocument = useMemo(() => (next: DocumentRead, signal: AbortSignal) =>
-    read({ resource: request, version: next.version, bytes: next.bytes }, signal), [read, request])
+  const readDocument = useMemo(() => (next: DocumentRead, signal: AbortSignal) => office
+    ? initial.read(next.version, next.bytes, signal)
+    : read({ resource: request, version: next.version, bytes: next.bytes }, signal), [initial, office, read, request])
   const state = useWorkspacePreviewRead({ request, resource, input, read: readDocument })
   const { result, error, denied, lifetime } = state
+  useEffect(() => () => { initial.discard() }, [initial, lifetime])
+  useEffect(() => {
+    const metadata = resource.metadata
+    if (denied || metadata.status === 'failed') { initial.discard(); return }
+    if (office && metadata.value === undefined && (metadata.status === 'none' || metadata.status === 'loading')) {
+      initial.prepare(lifetime.signal)
+    }
+  }, [denied, initial, lifetime, office, resource.metadata])
   const PdfBody = usePreviewViewer(loadPdfBody, !denied)
   const bytes = result?.bytes
   const data = useMemo(() => bytes === undefined ? undefined : workspaceFileBytes(bytes), [bytes])

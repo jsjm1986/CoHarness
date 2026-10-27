@@ -78,10 +78,11 @@ describe('explicit reload under a held metadata stat', () => {
   it('keeps the displayed document and reads once for the new revision', async () => {
     const request = fileRequest('report.docx')
     const h = heldResource(request)
-    const calls: { version: string; bytes: number | undefined }[] = []
+    const calls: { version: string | undefined; bytes: number | undefined }[] = []
     const read = vi.fn<ReadWorkspaceDocument>(async ({ version, bytes }) => {
       calls.push({ version, bytes })
-      return { bytes: btoa(`PDF ${version}`), version, missingFonts: [] }
+      const currentVersion = version ?? 'v1'
+      return { bytes: btoa(`PDF ${currentVersion}`), version: currentVersion, missingFonts: [] }
     })
     const view = render(<PreviewResourceBinding resources={h.resources} request={request}>{resource =>
       <WorkspaceDocumentPreview request={request} resource={resource} read={read}
@@ -90,7 +91,7 @@ describe('explicit reload under a held metadata stat', () => {
     }</PreviewResourceBinding>)
     try {
       await waitFor(() => { expect(view.getByTestId('pdf').textContent).toBe('PDF v1') })
-      expect(calls).toEqual([{ version: 'v1', bytes: 10 }])
+      expect(calls).toEqual([{ version: undefined, bytes: undefined }])
       act(() => { h.holdChange({ version: 'v2', bytes: 30 }) })
       await waitFor(() => { expect(view.getByText('File changed')).toBeTruthy() })
       fireEvent.click(view.getByRole('button', { name: 'Reload' }))
@@ -102,7 +103,7 @@ describe('explicit reload under a held metadata stat', () => {
       expect(read).toHaveBeenCalledTimes(1)
       act(() => { h.stat.resolve({ sessionId: id, path: request.path, type: 'file', version: 'v2', bytes: 30, changed: false }) })
       await waitFor(() => { expect(view.getByTestId('pdf').textContent).toBe('PDF v2') })
-      expect(calls).toEqual([{ version: 'v1', bytes: 10 }, { version: 'v2', bytes: 30 }])
+      expect(calls).toEqual([{ version: undefined, bytes: undefined }, { version: 'v2', bytes: 30 }])
       expect(view.queryByText('File changed')).toBeNull()
     } finally {
       h.stat.resolve({ sessionId: id, path: request.path, type: 'file', version: 'v2', bytes: 30, changed: false })

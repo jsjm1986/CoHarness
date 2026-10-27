@@ -217,11 +217,10 @@ export function WorkbenchToolbar({
           { id: '__delete', label: t('deleteWorkbench'), icon: <IconTrashOutline16 />, danger: true, disabled: viewport.pendingIdentity === true },
           { type: 'separator' as const, id: 'workbench-exit-separator' },
           { id: '__exit', label: t('exitWorkbench'), icon: <IconLogoutOutline16 /> },
-        ]} selectedId={viewport.mode === 'workbench' ? currentWorkbench?.()?.id : undefined} anchor={<button type="button" className={css.workbenchTrigger} aria-label={t('select')} aria-haspopup="menu" aria-expanded={workbenchMenuOpen} onClick={() => { actions.toggleWorkbenchMenu() }}>{viewport.mode === 'workbench' ? currentWorkbench?.()?.name || t('defaultWorkbenchName') : t('mode')} <IconChevronDownOutline14 /></button>} />
+        ]} selectedId={viewport.mode === 'workbench' ? currentWorkbench?.()?.id : undefined} anchor={<button type="button" className={css.workbenchTrigger} aria-label={t('select')} aria-haspopup="menu" aria-expanded={workbenchMenuOpen} onClick={() => { actions.toggleWorkbenchMenu() }}><span className={css.workbenchTriggerLabel}>{viewport.mode === 'workbench' ? currentWorkbench?.()?.name || t('defaultWorkbenchName') : t('mode')}</span><IconChevronDownOutline14 /></button>} />
         {viewport.mode === 'workbench' && (
-          <span className={css.seatDots} role="img" aria-label={t('seatCount', { used: viewport.paneIds.length, total: 4 })} title={t('seatCount', { used: viewport.paneIds.length, total: 4 })}>
-            {[0, 1, 2, 3].map(seat =>
-              <span key={seat} className={css.seatDot} data-filled={seat < viewport.paneIds.length || undefined} />)}
+          <span className={css.toolbarCapacity} role="img" aria-label={t('seatCount', { used: viewport.paneIds.length, total: 4 })} title={t('seatCount', { used: viewport.paneIds.length, total: 4 })}>
+            <span aria-hidden="true">{viewport.paneIds.length}<span className={css.capacityTotal}> / 4</span></span>
           </span>
         )}
       </div>
@@ -277,7 +276,7 @@ export function WorkbenchToolbar({
           </button>
         )}
         {viewport.mode === 'workbench' && (
-          <Button size="sm" variant="toolbar" disabled={viewport.pendingIdentity === true} icon={<IconPlusOutline16 />} onClick={() => { setError(undefined); actions.openPicker() }}>
+          <Button size="sm" variant="primary" className={css.addConversation} disabled={viewport.pendingIdentity === true} icon={<IconPlusOutline16 />} onClick={() => { setError(undefined); actions.openPicker() }}>
             {t('add')}
           </Button>
         )}

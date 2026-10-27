@@ -3,7 +3,7 @@ import { useState } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   IconCloseOutline16, IconEllipsisOutline16, IconFolderOpenOutline16, IconMaximizeOutline16,
-  IconMinimizeOutline16, IconRestoreOutline16, Menu, StateDot,
+  IconMinimizeOutline16, IconRestoreOutline16, Menu, StateDot, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ProjectUiPolicySnapshot, SessionId, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
@@ -29,7 +29,7 @@ export function stateOf(summary: SessionListState['byId'][SessionId] | undefined
   return 'done'
 }
 
-/** Render one pane header: space identity, status capsule, hover actions — or the collapsed strip. */
+/** Render one pane header with identity, status, compact actions, or the collapsed strip. */
 export function WorkbenchPaneHeader({
   sessionId, active, onFocus, onClose, maximized, onMaximize, collapsed = false, collapsible = false,
   onToggleCollapse, solo = false, onSolo, replacePane, movePane,
@@ -87,15 +87,17 @@ export function WorkbenchPaneHeader({
         <ScopeTile name={identity.scopeName} tone={identity.tone} />
         <div className={css.paneLead}>
           <strong title={summary?.displayTitle}>{identity.title}</strong>
-          <span title={subtitle}>{subtitle}</span>
+          <div className={css.paneMeta}>
+            <span className={css.paneState} data-tone={status}>
+              {status === 'newReply'
+                ? <span className={css.receiptDot} aria-hidden />
+                : <StateDot state={state} size={8} />}
+              <span>{t(status)}</span>
+            </span>
+            <span className={css.paneSubtitle} title={subtitle}>{subtitle}</span>
+          </div>
         </div>
       </div>
-      <span className={css.paneState} data-tone={status}>
-        {status === 'newReply'
-          ? <span className={css.receiptDot} aria-hidden />
-          : <StateDot state={state} size={8} />}
-        <span>{t(status)}</span>
-      </span>
       <span className={css.paneActions}>
         {collapsible && (
           <button
@@ -108,15 +110,17 @@ export function WorkbenchPaneHeader({
             <IconMinimizeOutline16 />
           </button>
         )}
-        <button
-          type="button"
-          className={css.iconAction}
-          aria-label={t(maximized ? 'restore' : 'maximize')}
-          title={t(maximized ? 'restore' : 'maximize')}
-          onClick={(event) => { event.stopPropagation(); onMaximize() }}
-        >
-          {maximized ? <IconRestoreOutline16 /> : <IconMaximizeOutline16 />}
-        </button>
+        <Tooltip label={t(maximized ? 'restore' : 'maximize')} side="bottom" delayMs={500}>
+          <button
+            type="button"
+            className={css.iconAction}
+            aria-label={t(maximized ? 'restore' : 'maximize')}
+            title={t(maximized ? 'restore' : 'maximize')}
+            onClick={(event) => { event.stopPropagation(); onMaximize() }}
+          >
+            {maximized ? <IconRestoreOutline16 /> : <IconMaximizeOutline16 />}
+          </button>
+        </Tooltip>
         <Menu open={menuOpen} onClose={() => { setMenuOpen(false) }} align="end" portal dense
           items={[
             ...(showFiles ? [
@@ -141,15 +145,17 @@ export function WorkbenchPaneHeader({
           }}
           anchor={<button type="button" className={css.iconAction} aria-label={t('more')} title={t('more')} onClick={(event) => { event.stopPropagation(); setMenuOpen(open => !open) }}><IconEllipsisOutline16 /></button>}
         />
-        <button
-          type="button"
-          className={css.iconAction}
-          aria-label={t('close')}
-          title={t('close')}
-          onClick={(event) => { event.stopPropagation(); onClose() }}
-        >
-          <IconCloseOutline16 />
-        </button>
+        <Tooltip label={t('close')} side="bottom" delayMs={500}>
+          <button
+            type="button"
+            className={css.iconAction}
+            aria-label={t('close')}
+            title={t('close')}
+            onClick={(event) => { event.stopPropagation(); onClose() }}
+          >
+            <IconCloseOutline16 />
+          </button>
+        </Tooltip>
       </span>
     </header>
   )

@@ -72,12 +72,22 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
 }
 
 describe('workbench grid', () => {
+  it('fills the tabbed row without rewriting the stored split proportions', () => {
+    const { view, store, calls, toolbarOwner } = grid([A, B, C])
+    const ratios = store.getSnapshot().paneRatios
+    act(() => { (toolbarOwner()?.onSelectLayout as (preset: string) => void)('tabbed') })
+    expect((view.container.querySelector('[data-workbench-row]') as HTMLElement).style.gridTemplateColumns).toBe('minmax(0px, 1fr)')
+    expect(store.getSnapshot().paneRatios).toEqual(ratios)
+    expect(calls.ratios).not.toHaveBeenCalled()
+  })
+
   it('renders exactly the live panes for any 1-4 count, never ghost cells', () => {
     for (const count of [1, 2, 3, 4]) {
       cleanup()
       const ids = [A, B, C, 'd' as SessionId].slice(0, count)
       const { view } = grid(ids)
       expect(view.container.querySelectorAll('[data-session-pane]').length).toBe(count)
+      expect(view.container.querySelectorAll('[data-workbench-row]').length).toBe(1)
       expect(view.container.querySelectorAll('[data-pane-empty]').length).toBe(0)
     }
   })

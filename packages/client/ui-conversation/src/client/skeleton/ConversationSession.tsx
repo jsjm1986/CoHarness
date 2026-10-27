@@ -129,6 +129,7 @@ export function ConversationSessionHeader({
                     <button
                       type="button"
                       className={clsx(css.crumb, last && css.crumbCurrent)}
+                      data-workbench-duplicate-title={ancestry.length === 1 && !summary.subagent ? '' : undefined}
                       disabled={last}
                       onClick={() => { open(summary.id) }}
                     >
@@ -162,7 +163,7 @@ export function ConversationSessionHeader({
                     </span>
                   )
                 })}
-                {ancestry.length === 0 && <span className={css.crumbCurrent}>{sessionId}</span>}
+                {ancestry.length === 0 && <span className={css.crumbCurrent} data-workbench-duplicate-title="">{sessionId}</span>}
               </nav>
               <div className={css.titleMeta}>
                 {renderSlot('conversation.session.header.titleMeta', { compact })}

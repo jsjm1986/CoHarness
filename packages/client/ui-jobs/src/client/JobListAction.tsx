@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { parseClientSessionKey, runtimeTargetKey, type JobView, type ObservedJob } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import {
   IconChevronDownOutline14, IconStopFill16, MobileSheetBackdrop, StateDot, TerminalBlock,
-  useDismissOnOutsidePointer, useMediaQuery,
+  useAnchoredPosition, useDismissOnOutsidePointer, useMediaQuery,
   type StateDotState, type TerminalBlockLabels,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
@@ -331,9 +332,13 @@ export function JobListAction({ sessionId, useSessions, observe, killJob, t }: J
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLUListElement>(null)
-  // Horizontal shift applied to the trigger-anchored popover so it stays
-  // inside the viewport (the stylesheet alone cannot see the anchor offset).
-  const [menuShift, setMenuShift] = useState(0)
+  const menuPosition = useAnchoredPosition({
+    open: open && !phone,
+    anchorRef: triggerRef,
+    panelRef: menuRef,
+    gap: 5,
+    margin: VIEWPORT_MARGIN,
+  })
 
   const rows = useMemo(() => ordered(jobs), [jobs])
   const liveRows = useMemo(() => rows.filter(isLive), [rows])
@@ -344,7 +349,19 @@ export function JobListAction({ sessionId, useSessions, observe, killJob, t }: J
   const settledExpanded = settledOpen ?? liveRows.length === 0
   const visibleCount = liveRows.length + settledRows.length
 
-  useDismissOnOutsidePointer(rootRef, open, setOpen)
+  useDismissOnOutsidePointer(rootRef, open, setOpen, menuRef)
+
+  // A collapsed conversation keeps its plugin instances mounted. A floating
+  // menu must leave when its trigger stops occupying the page.
+  useEffect(() => {
+    const trigger = triggerRef.current
+    if (!open || trigger === null || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      if (trigger.getClientRects().length === 0) setOpen(false)
+    })
+    observer.observe(trigger)
+    return () => { observer.disconnect() }
+  }, [open])
 
   // The clock only runs while an open list is showing something that moves.
   useEffect(() => {
@@ -353,33 +370,6 @@ export function JobListAction({ sessionId, useSessions, observe, killJob, t }: J
     const timer = setInterval(() => { setNow(Date.now()) }, 1_000)
     return () => { clearInterval(timer) }
   }, [open, liveRows.length])
-
-  // Fit the open popover to the viewport: shift left when the anchored width
-  // would cross the right edge, never past the left margin. Phone sheets are
-  // edge-anchored instead, so the shift only applies to the anchored menu.
-  useLayoutEffect(() => {
-    if (!open || phone) {
-      setMenuShift(0)
-      return
-    }
-    const fit = (): void => {
-      const root = rootRef.current
-      const menu = menuRef.current
-      /* v8 ignore next -- both refs are attached while the open popover renders. */
-      if (root === null || menu === null) return
-      const width = menu.offsetWidth
-      // Unlaid-out nodes (and jsdom) measure 0: keep the pure CSS anchor.
-      if (width === 0) return
-      const anchorLeft = root.getBoundingClientRect().left
-      setMenuShift(Math.max(
-        VIEWPORT_MARGIN - anchorLeft,
-        Math.min(0, window.innerWidth - VIEWPORT_MARGIN - width - anchorLeft),
-      ))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => { window.removeEventListener('resize', fit) }
-  }, [open, phone])
 
   // Observation follows visibility: the poller starts when an observable
   // panel expands and stops when it collapses, unmounts, or the popover
@@ -514,13 +504,13 @@ export function JobListAction({ sessionId, useSessions, observe, killJob, t }: J
         <IconChevronDownOutline14 className={open ? css.triggerOpen : undefined} />
       </button>
       {open
-        ? (
+        ? createPortal(
           <>
             {phone && <MobileSheetBackdrop onClose={() => { setOpen(false) }} />}
             <ul
               ref={menuRef}
               className={css.menu}
-              style={phone ? undefined : { left: menuShift }}
+              style={phone ? undefined : menuPosition ?? { visibility: 'hidden' }}
               aria-label={t('list.aria')}
             >
               {liveRows.length > 0
@@ -547,7 +537,8 @@ export function JobListAction({ sessionId, useSessions, observe, killJob, t }: J
                 : null}
               {settledExpanded ? settledRows.map(item) : null}
             </ul>
-          </>
+          </>,
+          document.body,
         )
         : null}
     </div>

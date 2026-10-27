@@ -242,6 +242,16 @@
   margin-right: var(--dsw-space-2);
 }
 
+.frame:not([data-viewport='compact']):has([data-workbench]) .centerCol {
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.frame:not([data-viewport='compact']):has([data-workbench]) .sidebarCol {
+  border-right: 0.5px solid var(--dsw-alias-border-l1);
+}
+
 /* Home-indicator clearance for the bottom-pinned composer; zero elsewhere. */
 .frame[data-viewport='compact'] .centerCol {
   padding-bottom: var(--dsw-safe-bottom);

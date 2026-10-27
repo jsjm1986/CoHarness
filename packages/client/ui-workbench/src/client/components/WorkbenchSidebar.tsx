@@ -62,90 +62,92 @@ export function WorkbenchSidebar({
       <div className={css.sidebarHeader}>
         <span className={css.sidebarTitle}>{t('mode')}</span>
       </div>
-      <div className={css.sidebarSection}>
-        <div className={css.sidebarSectionTitle}>
-          <span>{t('panes')}</span>
-          <span className={css.sidebarCount}>{paneIds.length}/4</span>
-        </div>
-        <div className={css.sidebarPanes} role="list" aria-label={t('panes')}>
-          {paneIds.length === 0 && <p className={css.sidebarEmpty}>{t('panesEmpty')}</p>}
-          {paneIds.map((id, index) => {
-            const summary = sessions.byId[id]
-            const state = stateOf(summary)
-            const status = summary === undefined ? 'notLoaded' : state === 'warning' ? 'waiting' : state === 'ongoing' ? 'running' : 'ready'
-            const identity = paneIdentity(id, summary, workspaces, policy, t('personal'), t('untitled'))
-            const active = viewport.activePaneId === id
-            const attention = summary?.pendingInteraction !== undefined
-            const receipt = !active && summary?.completed === true
-            const { unit, n } = relativeTime(summary?.updatedAt ?? now, now)
-            const ago = unit === 'now' ? t('time.now') : t(`time.${unit}`, { n })
-            const workspace = identity.workspaceName === '' ? '' : ` · ${identity.workspaceName}`
-            const statusTone = receipt ? 'reply' : state === 'warning' ? 'warn' : undefined
-            return (
-              <div key={id} className={css.sidebarPaneRow} data-active={active || undefined} data-attention={attention || undefined} role="listitem">
-                <button
-                  type="button"
-                  className={css.sidebarPaneFocus}
-                  aria-current={active || undefined}
-                  title={t('focusPaneN', { n: index + 1 })}
-                  onClick={() => { focusPane(id) }}
-                >
-                  <span className={css.sidebarPaneIndex} aria-hidden="true">
-                    <span className={css.sidebarPaneNum}>{index + 1}</span>
-                    <span className={css.sidebarPaneKey}>⌘{index + 1}</span>
-                  </span>
-                  <ScopeTile name={identity.scopeName} tone={identity.tone} />
-                  <span className={css.sidebarPaneText}>
-                    <span className={css.sidebarPaneLine}>
-                      <span className={css.sidebarPaneTitle}>{identity.title}</span>
-                      <span className={css.sidebarPaneAgo}>{ago}</span>
-                    </span>
-                    <span className={css.sidebarPaneStatus} data-tone={statusTone}>
-                      {receipt ? <span className={css.sidebarReplyDot} aria-hidden="true" /> : <StateDot state={state} size={7} />}
-                      <span className={css.sidebarPaneStatusWord}>{receipt ? t('newReply') : t(status)}</span>
-                      <span aria-hidden="true">·</span>
-                      <span className={css.sidebarPaneScope}>{identity.scopeName}{workspace}</span>
-                    </span>
-                  </span>
-                </button>
-                <Tooltip label={t('close')} side="bottom" delayMs={500}>
+      <div className={css.sidebarBody}>
+        <div className={css.sidebarSection}>
+          <div className={css.sidebarSectionTitle}>
+            <span>{t('panes')}</span>
+            <span className={css.sidebarCount}>{paneIds.length}/4</span>
+          </div>
+          <div className={css.sidebarPanes} role="list" aria-label={t('panes')}>
+            {paneIds.length === 0 && <p className={css.sidebarEmpty}>{t('panesEmpty')}</p>}
+            {paneIds.map((id, index) => {
+              const summary = sessions.byId[id]
+              const state = stateOf(summary)
+              const status = summary === undefined ? 'notLoaded' : state === 'warning' ? 'waiting' : state === 'ongoing' ? 'running' : 'ready'
+              const identity = paneIdentity(id, summary, workspaces, policy, t('personal'), t('untitled'))
+              const active = viewport.activePaneId === id
+              const attention = summary?.pendingInteraction !== undefined
+              const receipt = !active && summary?.completed === true
+              const { unit, n } = relativeTime(summary?.updatedAt ?? now, now)
+              const ago = unit === 'now' ? t('time.now') : t(`time.${unit}`, { n })
+              const workspace = identity.workspaceName === '' ? '' : ` · ${identity.workspaceName}`
+              const statusTone = receipt ? 'reply' : state === 'warning' ? 'warn' : undefined
+              return (
+                <div key={id} className={css.sidebarPaneRow} data-active={active || undefined} data-attention={attention || undefined} role="listitem">
                   <button
                     type="button"
-                    className={css.sidebarPaneClose}
-                    aria-label={t('close')}
-                    onClick={() => { removePane(id) }}
+                    className={css.sidebarPaneFocus}
+                    aria-current={active || undefined}
+                    title={t('focusPaneN', { n: index + 1 })}
+                    onClick={() => { focusPane(id) }}
                   >
-                    <IconCloseOutline16 />
+                    <span className={css.sidebarPaneIndex} aria-hidden="true">
+                      <span className={css.sidebarPaneNum}>{index + 1}</span>
+                      <span className={css.sidebarPaneKey}>⌘{index + 1}</span>
+                    </span>
+                    <ScopeTile name={identity.scopeName} tone={identity.tone} />
+                    <span className={css.sidebarPaneText}>
+                      <span className={css.sidebarPaneLine}>
+                        <span className={css.sidebarPaneTitle}>{identity.title}</span>
+                        <span className={css.sidebarPaneAgo}>{ago}</span>
+                      </span>
+                      <span className={css.sidebarPaneStatus} data-tone={statusTone}>
+                        {receipt ? <span className={css.sidebarReplyDot} aria-hidden="true" /> : <StateDot state={state} size={7} />}
+                        <span className={css.sidebarPaneStatusWord}>{receipt ? t('newReply') : t(status)}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className={css.sidebarPaneScope}>{identity.scopeName}{workspace}</span>
+                      </span>
+                    </span>
                   </button>
-                </Tooltip>
-              </div>
-            )
-          })}
-          <button
-            type="button"
-            className={css.sidebarAdd}
-            disabled={paneIds.length >= 4 || viewport.pendingIdentity === true}
-            onClick={() => { actions.openPicker() }}
-          >
-            <span className={css.sidebarAddPlus} aria-hidden="true"><IconPlusOutline16 /></span>
-            <span>{t('add')}</span>
-          </button>
-          <div className={css.sidebarCapacity}>
-            <span>{t('capacityLine', { used: paneIds.length, left: seatsLeft })}</span>
+                  <Tooltip label={t('close')} side="bottom" delayMs={500}>
+                    <button
+                      type="button"
+                      className={css.sidebarPaneClose}
+                      aria-label={t('close')}
+                      onClick={() => { removePane(id) }}
+                    >
+                      <IconCloseOutline16 />
+                    </button>
+                  </Tooltip>
+                </div>
+              )
+            })}
             <button
               type="button"
-              className={css.sidebarEqualize}
-              disabled={paneIds.length < 2 || viewport.pendingIdentity === true}
-              onClick={() => { setPaneRatios(paneIds.map(() => 1)) }}
+              className={css.sidebarAdd}
+              disabled={paneIds.length >= 4 || viewport.pendingIdentity === true}
+              onClick={() => { actions.openPicker() }}
             >
-              {t('equalize')}
+              <span className={css.sidebarAddPlus} aria-hidden="true"><IconPlusOutline16 /></span>
+              <span>{t('add')}</span>
             </button>
+            <div className={css.sidebarCapacity}>
+              <span>{t('capacityLine', { used: paneIds.length, left: seatsLeft })}</span>
+              <button
+                type="button"
+                className={css.sidebarEqualize}
+                disabled={paneIds.length < 2 || viewport.pendingIdentity === true}
+                onClick={() => { setPaneRatios(paneIds.map(() => 1)) }}
+              >
+                {t('equalize')}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-      <div className={css.sidebarSection}>
-        <div className={css.sidebarSectionTitle}><span>{t('display')}</span></div>
-        {renderSlot('conversation.workbench.display', {})}
+        <div className={css.sidebarSection}>
+          <div className={css.sidebarSectionTitle}><span>{t('display')}</span></div>
+          {renderSlot('conversation.workbench.display', {})}
+        </div>
       </div>
       <div className={css.sidebarFooter}>
         <button

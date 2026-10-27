@@ -93,13 +93,17 @@ describe('web e2e: authorized Office preview', () => {
     expect(tripwire.pageErrors).toEqual([])
   })
 
-  it.each(['docx', 'xlsx'] as const)('downloads the selected %s viewer before metadata completes', async (extension) => {
+  it.each(['docx', 'xlsx'] as const)('prepares the selected %s preview while metadata is pending', async (extension) => {
     if (scaffold === undefined || browser === undefined) throw new Error('Web scaffold is unavailable')
     const previewPage = await newEnglishPage(browser)
     const release = Promise.withResolvers<undefined>()
     const requests: string[] = []
+    const conversions: Response[] = []
     let workerStarts = 0
     previewPage.on('request', request => requests.push(new URL(request.url()).pathname))
+    previewPage.on('response', (response) => {
+      if (new URL(response.url()).pathname === '/api/workspaceFiles.renderOffice') conversions.push(response)
+    })
     previewPage.on('worker', () => { workerStarts += 1 })
     try {
       onTestFailed(() => saveFailureShot(previewPage, `workspace-viewer-before-stat-${extension}`))
@@ -114,7 +118,18 @@ describe('web e2e: authorized Office preview', () => {
       const other = extension === 'docx' ? '/client.excel.js' : '/client.pdf.js'
       await expect.poll(() => requests.filter(path => path.endsWith(selected)).length).toBe(1)
       expect(requests.some(path => path.endsWith(other))).toBe(false)
-      expect(requests.some(path => /\/api\/workspaceFiles\.(?:readBytes|renderOffice)$/u.test(path))).toBe(false)
+      if (extension === 'docx') {
+        await expect.poll(() => requests.filter(path => path === '/api/workspaceFiles.renderOffice').length).toBe(1)
+        await expect.poll(() => conversions.length, { timeout: 60_000 }).toBe(1)
+        const response = conversions[0]!
+        expect(response.ok()).toBe(true)
+        expect(await response.finished()).toBeNull()
+        const body = await response.json() as { result: { ok: boolean } }
+        expect(body.result.ok).toBe(true)
+        expect(await previewPage.locator('[data-pdf-preview]').count()).toBe(0)
+      } else {
+        expect(requests.some(path => /\/api\/workspaceFiles\.(?:readBytes|renderOffice)$/u.test(path))).toBe(false)
+      }
       expect(workerStarts).toBe(0)
       release.resolve(undefined)
       const preview = previewPage.getByRole('region', { name: `preview.${extension}`, exact: true })
@@ -122,6 +137,7 @@ describe('web e2e: authorized Office preview', () => {
       await expect.poll(async () => (await content.allTextContents()).join(''), { timeout: 60_000 }).toContain('Office preview')
       expect(workerStarts).toBeGreaterThan(0)
       if (extension === 'docx') {
+        expect(requests.filter(path => path === '/api/workspaceFiles.renderOffice')).toHaveLength(1)
         await compareOrRefreshGolden(GOLDEN,
           await captureStableAria(previewPage, '[data-pdf-preview]', scaffold.workspaceCwd), webSnapshotMode())
       }

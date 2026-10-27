@@ -1,0 +1,5 @@
+- button "1 background job running":
+  - text: 1 background job running
+  - img
+- button "Open right sidebar":
+  - img

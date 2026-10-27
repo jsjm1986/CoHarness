@@ -22,8 +22,8 @@
 .control {
   display: flex;
   min-width: 0;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
   gap: var(--dsw-space-2);
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
@@ -37,8 +37,8 @@
 /* Width presets: quiet text segments; the active one inverts to a filled chip. */
 .segmented {
   position: relative;
-  display: inline-flex;
-  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: center;
   gap: 2px;
   padding: 2px;
@@ -69,18 +69,20 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 20px;
+  min-width: 0;
+  min-height: 28px;
   border: 0;
   border-radius: var(--dsw-radius-sm);
   corner-shape: round;
-  padding: 0 var(--dsw-space-2);
+  padding: var(--dsw-space-1) 2px;
   background: transparent;
   color: var(--dsw-alias-label-caption);
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 18px;
   font-weight: 500;
   cursor: pointer;
-  white-space: nowrap;
+  white-space: normal;
   /* The chip inverts on selection; easing the paint hand-off plus a press
      settle gives the state change weight without a measured indicator. */
   transition: background-color var(--dsw-motion-duration-micro, 0.14s)
@@ -103,7 +105,7 @@
 /* The sliding thumb paints the active fill; the segment only marks its text. */
 .segment[data-on] {
   color: var(--dsw-alias-label-primary-inverted);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .segment:disabled {
@@ -115,6 +117,12 @@
   outline: 2px solid var(--dsw-alias-border-l3);
   outline-offset: -1px;
 }
+
+@media (pointer: coarse) {
+  .segment { min-height: 44px; }
+}
+
+:global([data-viewport='compact']) .segment { min-height: 44px; }
 
 @media (prefers-reduced-motion: reduce) {
   .segmentThumb,

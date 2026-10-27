@@ -1,0 +1,5 @@
+- tablist:
+  - tab "Chat" [selected]
+  - tab "Trajectory"
+- button "Open right sidebar":
+  - img

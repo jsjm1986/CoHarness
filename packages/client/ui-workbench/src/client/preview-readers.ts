@@ -1,4 +1,4 @@
-/** Versioned file reads on the request's explicit connection target. */
+/** Authorized file reads on the request's explicit connection target. */
 import { WorkspaceResourceError } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
@@ -24,12 +24,14 @@ export function createWorkspacePreviewReaders(connection: ConnectionHandle | und
       if (target === undefined) throw new WorkspaceResourceError('access-revoked', 'Workspace runtime is unavailable')
       if (path.toLowerCase().endsWith('.pdf')) {
         if (bytes === undefined || bytes === 0) throw new Error('PDF preview requires a non-empty file with a known size.')
+        if (version === undefined) throw new Error('PDF preview requires a source version.')
         const response = await target.api.workspaceFiles.readBytes({ sessionId, path, offset: 0, length: bytes, version }, signal)
         if (!response.result.ok) throw new WorkspaceResourceError(response.result.error.code, response.result.error.message)
         if (!response.result.value.eof) throw new Error('PDF preview requires the complete file contents.')
         return { version: response.result.value.version, bytes: response.result.value.bytes, missingFonts: [] }
       }
-      const response = await target.api.workspaceFiles.renderOffice({ sessionId, path, version, priority: 'foreground' }, signal)
+      const response = await target.api.workspaceFiles.renderOffice({ sessionId, path,
+        ...(version === undefined ? {} : { version }), priority: 'foreground' }, signal)
       if (!response.result.ok) {
         const error = response.result.error
         throw new WorkspaceResourceError(error.code === 'document-error' ? `office/${error.details.reason}` : error.code, error.message)
