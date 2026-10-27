@@ -19,7 +19,7 @@
 <meta name="twitter:title" content="CoHarness — 把 AI 团队，管成一个团队">
 <meta name="twitter:description" content="一个后台管住团队的全部 AI 资产；员工和 AI 共享真实的工作。开源，可自托管。">
 <meta name="twitter:image" content="https://jsjm1986.github.io/CoHarness/assets/conversation.jpg">
-<link rel="icon" href="assets/favicon-coharness.svg" type="image/svg+xml">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <script>document.documentElement.classList.add('js')</script>
 <style>
 :root{
@@ -271,7 +271,7 @@ html.js .reveal.on{opacity:1;transform:none}
 <nav>
   <div class="wrap nav-in">
     <a class="brand" href="#top">
-      <img class="mascot" src="assets/favicon-coharness.svg" alt="" width="30" height="30">
+      <img class="mascot" src="assets/favicon.svg" alt="" width="30" height="30">
       COHARNESS
       <span class="nav-dot" title="live"></span>
     </a>
@@ -315,7 +315,7 @@ html.js .reveal.on{opacity:1;transform:none}
   <div class="wrap hero-in">
     <div>
       <h1 data-i18n="hero.title">把 AI 团队，<span class="hl">管成一个团队</span></h1>
-      <p class="lead" data-i18n="hero.sub">AI 已经进了团队，却还没有工号和台账——谁在用、花多少、碰了什么，常常说不清。CoHarness 把 AI 当成正式成员管起来：管理员一个后台管住账号、模型、用量和审计；员工和 AI 在同一个工作台接力干活，任务不丢、有记忆、留痕可查。</p>
+      <p class="lead" data-i18n="hero.sub">企业 AI 化不是多开几个账号，是让 AI 真正进入协作。CoHarness 给团队一套权限分级的共享工作空间：每人一个独立环境、每个项目一个共享环境，能力由插件组合；模型、用量与每一次操作都走企业级的权限与审计。这套方案，我们自己团队每天都在用。</p>
       <div class="cta-row">
         <a class="btn btn-p" href="https://github.com/jsjm1986/CoHarness" target="_blank" rel="noopener" data-i18n="hero.cta1">在 GitHub 查看</a>
         <a class="btn btn-g" href="#admin" data-i18n="hero.cta2">看看管理后台</a>
@@ -328,7 +328,7 @@ html.js .reveal.on{opacity:1;transform:none}
         <div class="winbar"><i></i><i></i><i></i><span class="url">gateway:8899/admin</span></div>
         <img src="assets/admin-users.jpg" alt="管理后台用户与工作环境页实录" data-i18n-alt="alt.adminUsers">
       </div>
-      <div class="wincap"><span data-i18n="hero.cap">真实部署截图 · 不是效果图</span><span class="cap-r">ADMIN CENTER</span></div>
+      <div class="wincap"><span data-i18n="hero.cap">我们团队真实在用的部署 · 不是效果图</span><span class="cap-r">ADMIN CENTER</span></div>
     </div>
   </div>
 </header>
@@ -553,7 +553,7 @@ html.js .reveal.on{opacity:1;transform:none}
 <section class="closing">
   <div class="wrap">
     <div class="close-panel reveal">
-      <svg class="mascot ffy" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M16.875 7.125a8.25 8.25 0 1 0 0 9.75" stroke="#dbe4f4" stroke-width="2.6" stroke-linecap="round"/><path d="M7.5 12h7.1" stroke="#7ea2ff" stroke-width="2.6" stroke-linecap="round"/><circle cx="16.6" cy="12" r="2.2" fill="#7ea2ff"/></svg>
+      <img class="mascot ffy" src="assets/favicon-light.svg" alt="" width="44" height="44">
       <h2 data-i18n="cl.title">读代码，就是审计它</h2>
       <p class="sub" data-i18n="cl.sub">管理后台、工作环境编排、文档与部署，全部在仓库里。预览阶段，欢迎 issue 与 PR。</p>
       <div class="cta-row">
@@ -582,11 +582,11 @@ const dict = {
     'nav.scenes': 'Scenarios', 'nav.screens': 'Interface', 'nav.mobile': 'Mobile', 'nav.start': 'Quick start', 'nav.oss': 'Open source', 'nav.menu': 'Menu',
     'hero.kick': '',
     'hero.title': 'Run your AI team <span class="hl">like a team</span>',
-    'hero.sub': 'AI is already on your team — but without an account or a ledger, nobody can say who used what, what it cost, or what it touched. CoHarness manages AI like a real team member: admins run accounts, models, spend, and audit from one console; people and AI share one workbench where tasks persist, memory carries over, and every action is on record.',
+    'hero.sub': 'Enterprise AI adoption isn\u2019t more AI accounts — it\u2019s AI inside real collaboration. CoHarness gives a team permission-tiered shared workspaces: a private environment per member, a shared one per project, capabilities assembled from plugins, and enterprise-grade governance over models, usage, and every action. Our own team runs on it every day.',
     'hero.cta1': 'View on GitHub', 'hero.cta2': 'See the admin center',
     'hero.live': '<span><i class="g"></i>GATEWAY :8899 · READY</span><span><i class="g"></i>MEMBER :42000 · READY</span><span><i class="a"></i>PROJECT :42010 · STARTING</span>',
     'hero.terms': 'PREVIEW · APACHE-2.0 · OPEN &amp; SELF-HOSTED · THE USAGE LEDGER STORES NO KEYS OR CHAT CONTENT',
-    'hero.cap': 'LIVE DEPLOYMENT · NOT A MOCKUP',
+    'hero.cap': 'OUR TEAM\u2019S REAL DEPLOYMENT · NOT A MOCKUP',
     'map.gw': 'Gateway · sign-in / routing / ledger / audit', 'map.gws': 'GATEWAY',
     'map.rt1': 'Member workspace', 'map.rt1s': 'one per member · own directory · projects mapped by grant',
     'map.rt2': 'Project workspace', 'map.rt2s': 'one per project · works in the project dir · team suite',
