@@ -25,6 +25,7 @@ import { SessionInputShell } from '../src/client/input/facade.ts'
 import { en, zh } from '../src/client/locales.ts'
 import { ConversationContent as ConversationRoot } from '../src/client/skeleton/ConversationRoot.tsx'
 import { ConversationSession, ConversationSessionHeader } from '../src/client/skeleton/ConversationSession.tsx'
+import type { ConversationSessionHeaderOwnerProps } from '../src/client/contract/slots.ts'
 import { HeroShell } from '../src/client/skeleton/EmptyHero.tsx'
 import type { HeroShellProps } from '../src/client/skeleton/EmptyHero.tsx'
 import { InputBar } from '../src/client/skeleton/InputBar.tsx'
@@ -188,6 +189,7 @@ function mount(
     if (key === 'conversation.session.header') {
       return (
         <ConversationSessionHeader
+          {...owner as ConversationSessionHeaderOwnerProps}
           sessionId={SID}
           SessionProvider={({ children }) => children(SID)}
           useSession={useSession}
@@ -320,7 +322,10 @@ function mount(
   return {
     view, chat, sink, retargetWorkspace, session, slotCalls, seatOwners, open, displaySettings, workspaces,
     pickerOwner: () => pickerOwner,
-    rerender: () => { view.rerender(<ConversationRoot {...props} />) },
+    rerender: (overrides: Partial<ConversationRootProps> = {}) => {
+      Object.assign(props, overrides)
+      view.rerender(<ConversationRoot {...props} />)
+    },
   }
 }
 
@@ -342,6 +347,32 @@ describe('Hero chrome', () => {
 })
 
 describe('ConversationRoot resident composer', () => {
+  it('keeps Session-owned header controls mounted while shared tools change focus', () => {
+    const host = document.createElement('div')
+    host.id = 'selected-session-tools'
+    document.body.append(host)
+    try {
+      const b = mount(conversationSnapshot(), undefined, undefined, { summaryOrigin: 'subagent' })
+      b.rerender({ toolsHostId: host.id, active: true })
+      const ancestor = within(host).getByRole('button', { name: 'Root' })
+      const header = host.querySelector('header')!
+      expect(within(host).getByText('当前')).toBeTruthy()
+      b.rerender({ active: false })
+      expect(header.hidden).toBe(true)
+      expect(host.contains(ancestor)).toBe(true)
+      b.rerender({ active: true })
+      expect(header.hidden).toBe(false)
+      expect(within(host).getByRole('button', { name: 'Root' })).toBe(ancestor)
+      fireEvent.click(ancestor)
+      expect(b.open).toHaveBeenCalledWith(sid('root'))
+      b.rerender({ toolsHostId: undefined })
+      expect(host.childElementCount).toBe(0)
+      expect(b.view.container.querySelector('header')).not.toBeNull()
+    } finally {
+      cleanup()
+      host.remove()
+    }
+  })
   const rootOf = (b: ReturnType<typeof mount>): HTMLElement =>
     b.view.container.firstElementChild as HTMLElement
   const mockColumn = (root: HTMLElement, width: number): void => {

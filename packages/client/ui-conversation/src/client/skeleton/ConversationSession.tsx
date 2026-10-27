@@ -1,9 +1,11 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import clsx from 'clsx'
 import { StateDot, type StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
+import { parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId, SessionListState, SessionSummary } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationSessionHeaderSlotProps, ConversationSessionSlotProps,
@@ -82,20 +84,33 @@ function sessionDotState(list: SessionListState, id: SessionId): StateDotState |
  */
 export function ConversationSessionHeader({
   sessionId, useSession, useSessions, useStore, actions,
-  renderSlot, views, open, t, compact = false, leading,
+  renderSlot, views, open, t, compact = false, leading, toolsHostId, toolsActive = true,
 }: ConversationSessionHeaderProps) {
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
+  const workspaceName = useSessions(s => s.byId[sessionId]?.workspaceName)
+  const runtime = parseClientSessionKey(sessionId)?.runtime
+  const scopeLabel = workspaceName ?? (runtime?.kind === 'project'
+    ? t('viewport.project', { id: runtime.projectId }) : t('viewport.personal'))
   const dotState = useSessions(s => sessionDotState(s, sessionId))
   const composerPhase = useSession(s => s.composerPhase)
   const blank = useSession(s => s.blank)
   const hideChrome = blank && composerPhase === 'blank'
+  const [toolsHost, setToolsHost] = useState<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    setToolsHost(toolsHostId === undefined ? null : document.getElementById(toolsHostId))
+  }, [toolsHostId])
+  const shared = toolsHostId !== undefined && toolsHost !== null
 
-  return (
-    <header className={clsx(css.header, hideChrome && css.headerBlank)}>
+  const header = (
+    <header
+      className={clsx(css.header, hideChrome && css.headerBlank, shared && css.sharedHeader)}
+      data-workbench-session-tools={shared ? sessionId : undefined}
+      hidden={shared && !toolsActive}
+    >
       {hideChrome && (
         <div className={css.headerCorner} data-conversation-header-corner="">
           {renderSlot('conversation.session.header.corner', {})}
@@ -105,6 +120,8 @@ export function ConversationSessionHeader({
         <>
           <div className={css.titleRow}>
             {leading}
+            {shared && <span className={css.toolsContext}>{t('viewport.currentTools')}</span>}
+            {shared && <span className={css.toolsScope} title={scopeLabel}>{scopeLabel}</span>}
             <div className={css.titleCluster}>
               {dotState === undefined ? null : (
                 <span className={css.sessionDot} data-session-state={dotState} title={t(dotState === 'warning' ? 'session.status.waiting' : 'session.status.running')}>
@@ -208,6 +225,7 @@ export function ConversationSessionHeader({
       )}
     </header>
   )
+  return toolsHostId === undefined ? header : toolsHost === null ? null : createPortal(header, toolsHost)
 }
 
 /**

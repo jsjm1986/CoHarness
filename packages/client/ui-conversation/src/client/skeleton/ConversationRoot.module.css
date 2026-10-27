@@ -125,6 +125,25 @@
 }
 .workbenchContent [data-composer-card] { border-radius: var(--dsw-radius-lg); box-shadow: var(--dsw-elevation-stroke); }
 
+/* Each header stays under its Session provider while its DOM occupies the
+   shared toolbar. Hidden peers retain their plugin and menu ownership. */
+.sharedHeader { flex: 1; min-width: 0; padding: 0; border: 0; }
+.sharedHeader[hidden] { display: none; }
+.sharedHeader::after { display: none; }
+.sharedHeader .titleRow { min-height: 32px; flex-wrap: wrap; gap: var(--dsw-space-1) var(--dsw-space-2); }
+.sharedHeader .titleCluster { flex: 1 1 140px; justify-content: flex-start; }
+.sharedHeader .crumbs { flex: 0 1 auto; max-width: 220px; }
+.sharedHeader .crumbSeg { flex: 0 1 auto; }
+.sharedHeader .crumb { padding: var(--dsw-space-1) 0; font-size: 12px; font-weight: 500; }
+.sharedHeader .crumbCurrent { color: var(--dsw-alias-state-business-primary); }
+.sharedHeader .headerActions,
+.sharedHeader .headerUtilities { flex-wrap: wrap; min-width: 0; }
+.sharedHeader :is(.titleMeta, .headerActions, .headerUtilities, .headerCorner):has(> [data-slot]:empty) { display: none; }
+.sharedHeader .tabs { min-height: 28px; padding: 0; background: transparent; }
+.sharedHeader .headerCorner { margin-left: 0; }
+.toolsContext { flex: none; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; }
+.toolsScope { flex: 0 1 auto; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; }
+
 @media (hover: hover) and (pointer: fine) {
   /* A lone sidebar opener shares the identity row. Other contributed tools
      retain the wrapping Session toolbar and their own display conditions. */

@@ -65,7 +65,7 @@ function conversationDisplayName(item: WorkbenchConversation, untitled: string):
  * @returns the toolbar and its controlled picker dialog.
  */
 export function WorkbenchToolbar({
-  viewport, tabbed, inline = false, layout, onSelectLayout, useStore, actions, useSessions, useWorkspaces, useCatalogRestore,
+  viewport, tabbed, inline = false, layout, onSelectLayout, toolsHostId, useStore, actions, useSessions, useWorkspaces, useCatalogRestore,
   chooseSession, focusSession, createSession, hydrateCatalog, catalogUnavailable, setMode, loadCatalog,
   listWorkbenches, currentWorkbench, switchWorkbench, createWorkbench, renameWorkbench,
   duplicateWorkbench, deleteWorkbench,
@@ -224,6 +224,7 @@ export function WorkbenchToolbar({
           </span>
         )}
       </div>
+      {toolsHostId !== undefined && <div id={toolsHostId} className={css.sessionTools} data-workbench-tools-host="" />}
       <div className={css.toolbarActions}>
         {attentionPanes.length > 0 && (
           <button

@@ -1,5 +1,9 @@
-- button "1 background job running":
-  - text: 1 background job running
-  - img
-- button "Open right sidebar":
-  - img
+- banner:
+  - text: Current Personal
+  - navigation "Session hierarchy":
+    - button "Use the read tool twice" [disabled]
+  - button "1 background job running":
+    - text: 1 background job running
+    - img
+  - button "Open right sidebar":
+    - img

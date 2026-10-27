@@ -65,6 +65,8 @@ The conversation viewport stores mode, named layouts, Session ids, active panes,
 
 Desktop keeps the panes in one horizontal row with equal or ratio-adjusted columns. Expanded panes keep a 280px minimum width; the row scrolls horizontally when necessary and reveals the active pane on selection. Separators support pointer, touch, and arrow-key resizing; each pane can be maximized or moved through its menu. The toolbar lets users select an existing conversation or create one in an explicitly chosen Workspace, reports failures, and requires an explicit replacement when the pane limit is reached. Users can return to the existing single-session mode. Narrow viewports render one active pane at a time while the other staged Session objects continue receiving their normal runtime updates. Closing a pane removes it from the workbench and never stops its Session.
 
+Desktop multi-pane workbenches keep the active Session's tools in one shared toolbar. Each Session retains its own header and plugin controls in that toolbar; inactive headers are hidden without changing their Session bindings. Compact and tabbed views keep their local headers. Menus and popovers close when their owning header becomes hidden.
+
 In tabbed mode, the Workbench title and primary actions share the first toolbar row. Conversation tabs occupy a separate full-width second row, which scrolls horizontally when the tabs exceed its width.
 
 Choosing a pane from the Workbench toolbar or sidebar reveals Conversation, including when that pane is already active. Exiting the sidebar Workbench returns to the existing single-session view without creating a Session.

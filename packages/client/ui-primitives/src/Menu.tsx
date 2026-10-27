@@ -22,6 +22,7 @@ import { MenuSurface } from './MenuSurface.tsx'
 import { MobileSheetBackdrop } from './MobileSheetBackdrop.tsx'
 import { useSheetSwipeDismiss } from './useSheetSwipeDismiss.ts'
 import { usePointerGrace } from './pointer-grace.ts'
+import { useDismissOnHiddenOwner } from './useDismissOnHiddenOwner.ts'
 import css from './Menu.module.css'
 
 /** Selectable row (optionally with a nested submenu). */
@@ -133,7 +134,7 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * @param props.selectedId - row shown as selected.
  * @param props.selectedIds - rows shown as selected when a menu contains independent option groups.
  * @param props.onSelect - row click callback (not called for disabled rows or submenu parents that only open children).
- * @param props.onClose - invoked on outside click or Escape.
+ * @param props.onClose - invoked on outside click, Escape, or a hidden owning region.
  * @param props.align - list alignment against the anchor (default 'start').
  * @param props.side - open below (`bottom`, default) or above (`top`) the anchor.
  * @param props.portal - render the list into document.body, fixed-positioned
@@ -187,6 +188,7 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
   className?: string | undefined
 }) {
   const rootRef = useRef<HTMLSpanElement>(null)
+  useDismissOnHiddenOwner(rootRef, open, onClose)
   const listRef = useRef<HTMLDivElement>(null)
   /** Index the arrow walk last focused, the resume point when focus left the rows. */
   const walkIndex = useRef<number | null>(null)

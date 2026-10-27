@@ -455,6 +455,10 @@ export interface ConversationHeaderActionOwnerProps {
 
 /** Owner share of the strict session header. */
 export interface ConversationSessionHeaderOwnerProps {
+  /** DOM host for Session-owned tools in the desktop Workbench toolbar. */
+  toolsHostId?: string | undefined
+  /** Whether this Session's tools are visible in the shared host. */
+  toolsActive?: boolean | undefined
   /** Optional root-owned navigation rendered beside the session title. */
   leading?: ReactNode
   /** Whether the shell is using the compact phone presenter. */
@@ -893,6 +897,10 @@ export interface HeroBrandMarkOwnerProps {
  */
 /** Host-supplied input for one reusable Conversation content occurrence. */
 export interface ConversationContentInputProps {
+  /** DOM host for this Session's header in the desktop Workbench toolbar. */
+  toolsHostId?: string | undefined
+  /** Whether this pane supplies the visible shared tools, including a maximized pane. */
+  toolsActive?: boolean | undefined
   /** Presentation variant: the resident/workbench panes are `main`; embedded hosts pass `embedded`. */
   variant?: 'main' | 'embedded'
   /** Optional root-owned navigation for the session header. */
@@ -916,6 +924,8 @@ export type WorkbenchLayoutPreset = 'equal' | 'lead' | 'trail' | 'tabbed'
 
 /** Owner share for the root-level workbench toolbar. */
 export interface ConversationWorkbenchToolbarOwnerProps {
+  /** DOM id of the host for the selected Session's header tools. */
+  toolsHostId?: string | undefined
   /** Fit the controls into an existing session title row. */
   inline?: boolean
   /** Current viewport state, supplied as immutable render data. */
@@ -942,6 +952,8 @@ export interface ConversationWorkbenchDisplayOwnerProps {
 
 /** Owner share for one workbench pane header. */
 export interface ConversationWorkbenchPaneHeaderOwnerProps {
+  /** Use a single identity row while Session tools occupy the shared toolbar. */
+  condensed?: boolean | undefined
   /** Whether this pane has focus. */
   active: boolean
   /** Focus this pane. */

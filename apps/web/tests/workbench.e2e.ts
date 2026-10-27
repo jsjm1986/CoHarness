@@ -943,7 +943,7 @@ describe('web: Cordis Workspace workbench', () => {
     await compareOrRefreshGolden(join(SELECTION_EXPECTED_DIR, 'document-picker.expected.md'), output.join('\n\n'), MODE)
   })
 
-  it.skipIf(MODE === 'record')('collapses empty workbench chrome and restores session plugin tools without clipping', async () => {
+  it.skipIf(MODE === 'record')('shares the focused Session tools without clipping or changing action ownership', async () => {
     try {
       scaffold = await launchWebScaffold({ workbench: true, openInApp: false })
       const runtime = scaffold
@@ -975,10 +975,10 @@ describe('web: Cordis Workspace workbench', () => {
         await picker.waitFor({ state: 'hidden' })
       }
       const panes = page.locator('[data-session-pane]')
-      const headers = panes.locator('[data-slot="conversation.session.header"] > header')
-      const opener = panes.first().getByRole('button', { name: 'Open right sidebar', exact: true })
-      await opener.click()
-      await opener.waitFor({ state: 'hidden' })
+      const tools = page.locator('[data-workbench-tools-host]')
+      const header = tools.locator('[data-workbench-session-tools]:not([hidden])')
+      const opener = tools.getByRole('button', { name: 'Open right sidebar', exact: true })
+      await opener.waitFor()
       const expectedDir = fileURLToPath(new URL('./expected/workbench/header-tools/', import.meta.url))
       if (MODE === 'refresh') await mkdir(expectedDir, { recursive: true })
       const codingView = async (enabled: boolean): Promise<void> => {
@@ -992,27 +992,47 @@ describe('web: Cordis Workspace workbench', () => {
         await dialog.waitFor({ state: 'hidden' })
       }
       await codingView(true)
-      await expect.poll(() => panes.last().getByRole('tab').count()).toBe(2)
+      await expect.poll(() => tools.getByRole('tab').count()).toBe(2)
       await compareOrRefreshGolden(join(expectedDir, 'coding-view.expected.md'),
-        await captureStableAria(page, '[data-session-pane]:last-child [data-slot="conversation.session.header"]', runtime.workspaceCwd), MODE)
+        await captureStableAria(page, '[data-workbench-tools-host]', runtime.workspaceCwd), MODE)
       await codingView(false)
-      await expect.poll(() => headers.first().evaluate(node => node.getBoundingClientRect().height === 0)).toBe(true)
-      expect(await panes.locator('[data-workbench-pane-header]').evaluateAll(nodes => nodes.every(node => node.getBoundingClientRect().height <= 52))).toBe(true)
-      const originalToolHeight = await headers.last().evaluate(node => node.getBoundingClientRect().height)
+      await expect.poll(() => header.count()).toBe(1)
+      expect(await panes.locator('[data-slot="conversation.session.header"] > header').count()).toBe(0)
+      expect(await panes.locator('[data-workbench-pane-header]').evaluateAll(nodes => nodes.every(node => node.getBoundingClientRect().height <= 36))).toBe(true)
+      const originalToolHeight = await toolbar.evaluate(node => node.getBoundingClientRect().height)
+      expect(originalToolHeight).toBeLessThanOrEqual(44)
       const agent = runtime.ctx.agents.get(hostIds[3]!)
       if (agent === undefined) throw new Error('The header fixture Session has no live Agent')
       await runtime.ctx.tools.execute({
         signal: new AbortController().signal, callId: ToolCallId('workbench-header-job'), name: 'bash',
         arguments: { command: 'sleep 300', description: 'Verify workbench job controls', run_in_background: true }, agent,
       })
-      const trigger = panes.last().getByRole('button', { name: '1 background job running', exact: true })
+      const otherAgent = runtime.ctx.agents.get(hostIds[0]!)
+      if (otherAgent === undefined) throw new Error('The first fixture Session has no live Agent')
+      await runtime.ctx.tools.execute({
+        signal: new AbortController().signal, callId: ToolCallId('workbench-other-job'), name: 'bash',
+        arguments: { command: 'sleep 301', description: 'Verify separate Session ownership', run_in_background: true }, agent: otherAgent,
+      })
+      const trigger = tools.getByRole('button', { name: '1 background job running', exact: true })
       await trigger.waitFor({ timeout: 15_000 })
-      expect(await headers.last().isVisible()).toBe(true)
+      expect(await header.isVisible()).toBe(true)
       await compareOrRefreshGolden(join(expectedDir, 'job-tools.expected.md'),
-        await captureStableAria(page, '[data-session-pane]:last-child [data-slot="conversation.session.header"]', runtime.workspaceCwd), MODE)
+        await captureStableAria(page, '[data-workbench-tools-host]', runtime.workspaceCwd), MODE)
       await trigger.focus()
       await page.keyboard.press('Enter')
       const menu = page.getByRole('list', { name: 'Background jobs', exact: true })
+      await menu.waitFor()
+      expect(await menu.getByRole('button', { name: 'Stop task sleep 300', exact: true }).count()).toBe(1)
+      expect(await menu.getByRole('button', { name: 'Stop task sleep 301', exact: true }).count()).toBe(0)
+      await panes.first().locator('[data-workbench-pane-header]').click()
+      await menu.waitFor({ state: 'hidden' })
+      await trigger.click()
+      await menu.waitFor()
+      expect(await menu.getByRole('button', { name: 'Stop task sleep 301', exact: true }).count()).toBe(1)
+      expect(await menu.getByRole('button', { name: 'Stop task sleep 300', exact: true }).count()).toBe(0)
+      await panes.last().getByRole('button', { name: 'Collapse pane', exact: true }).focus()
+      await menu.waitFor({ state: 'hidden' })
+      await trigger.click()
       await menu.waitFor()
       await panes.last().getByRole('button', { name: 'Collapse pane', exact: true }).focus()
       await page.keyboard.press('Space')
@@ -1021,7 +1041,7 @@ describe('web: Cordis Workspace workbench', () => {
       await panes.last().locator('[data-workbench-pane-header]').click()
       await trigger.click()
       await menu.waitFor()
-      for (const width of [1566, 1024, 390]) {
+      for (const width of [1566, 1024]) {
         await page.setViewportSize({ width, height: 900 })
         await expect.poll(() => menu.evaluate((node) => {
           const rect = node.getBoundingClientRect()
@@ -1031,11 +1051,15 @@ describe('web: Cordis Workspace workbench', () => {
       }
       await menu.getByRole('button', { name: 'Stop task sleep 300', exact: true }).click()
       await menu.getByRole('button', { name: 'Click again to confirm', exact: true }).click()
-      await panes.last().getByRole('button', { name: '1 background job', exact: true }).waitFor({ timeout: 20_000 })
+      await tools.getByRole('button', { name: '1 background job', exact: true }).waitFor({ timeout: 20_000 })
       await menu.getByRole('button', { name: 'Clear', exact: true }).click()
+      await page.setViewportSize({ width: 390, height: 900 })
+      await expect.poll(() => page.locator('[data-workbench-tools-host]').count()).toBe(0)
+      await expect.poll(() => panes.count()).toBe(1)
+      expect(await panes.locator('[data-slot="conversation.session.header"] > header').count()).toBe(1)
       await page.setViewportSize({ width: 2160, height: 900 })
-      await expect.poll(() => headers.last().evaluate(node => node.getBoundingClientRect().height)).toBe(originalToolHeight)
-      await expect.poll(() => headers.first().evaluate(node => node.getBoundingClientRect().height)).toBe(0)
+      await expect.poll(() => toolbar.evaluate(node => node.getBoundingClientRect().height)).toBe(originalToolHeight)
+      await expect.poll(() => header.count()).toBe(1)
       expect(tripwire.pageErrors).toEqual([])
     } catch (error) {
       if (page !== undefined) {

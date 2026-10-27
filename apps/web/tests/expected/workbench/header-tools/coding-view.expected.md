@@ -1,5 +1,9 @@
-- tablist:
-  - tab "Chat" [selected]
-  - tab "Trajectory"
-- button "Open right sidebar":
-  - img
+- banner:
+  - text: Current Personal
+  - navigation "Session hierarchy":
+    - button "Use the read tool twice" [disabled]
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - button "Open right sidebar":
+    - img

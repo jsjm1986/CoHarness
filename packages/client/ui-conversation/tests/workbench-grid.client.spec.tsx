@@ -33,6 +33,7 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
   // Header owner shares arrive in pane order; the session scope binds the id
   // outside the owner share, so the harness aligns capture order to paneIds.
   const headerOwners: Record<string, unknown>[] = []
+  const contentOwners: Record<string, unknown>[] = []
   let toolbarOwner: Record<string, unknown> | undefined
   const renderSlot = ((key: string, owner: object) => {
     if (key === 'conversation.workbench.toolbar') { toolbarOwner = owner as Record<string, unknown>; return <div data-testid="wb-toolbar" /> }
@@ -50,7 +51,7 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
     useStore={bindSnapshotSelector(store)}
     actions={store.actions}
     renderSlot={renderSlot}
-    renderFactorySlot={(() => null) as ConversationRootProps['renderFactorySlot']}
+    renderFactorySlot={((_key: string, owner: Record<string, unknown>) => { contentOwners.push(owner); return null }) as ConversationRootProps['renderFactorySlot']}
     useViewportAvailable={bindSnapshotSelector({ getSnapshot: () => true, subscribe: () => () => {} })}
     useSessions={bindSnapshotSelector(createSnapshotStore<SessionListState>(
       { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
@@ -68,10 +69,19 @@ function grid(paneIds: SessionId[] = [A, B], collapsed: SessionId[] = []) {
     t={t}
   />)
   const headers = (): Record<string, unknown>[] => headerOwners.slice(-store.getSnapshot().paneIds.length)
-  return { view, store, calls, headers, toolbarOwner: () => toolbarOwner }
+  return { view, store, calls, headers, toolbarOwner: () => toolbarOwner, lastContent: () => contentOwners.at(-1) }
 }
 
 describe('workbench grid', () => {
+  it('keeps the visible maximized pane tools available when another pane receives selection', () => {
+    const b = grid([A, B])
+    act(() => { (b.headers()[0]?.onMaximize as () => void)() })
+    act(() => { b.store.actions.replace({ ...b.store.getSnapshot(), activePaneId: B }) })
+    expect(b.view.container.querySelector('[data-session-pane]')?.getAttribute('data-session-pane')).toBe(A)
+    expect(b.lastContent()).toMatchObject({ active: false, toolsActive: true, toolsHostId: b.toolbarOwner()?.toolsHostId })
+    act(() => { (b.toolbarOwner()?.onSelectLayout as (preset: string) => void)('tabbed') })
+    expect(b.lastContent()).toMatchObject({ active: true, toolsActive: true, toolsHostId: undefined })
+  })
   it('fills the tabbed row without rewriting the stored split proportions', () => {
     const { view, store, calls, toolbarOwner } = grid([A, B, C])
     const ratios = store.getSnapshot().paneRatios

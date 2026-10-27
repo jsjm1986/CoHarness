@@ -2,6 +2,12 @@
   - text: My workbench
   - img
 - img "3 of 4 panes in use"
+- banner:
+  - text: Current Personal
+  - navigation "Session hierarchy":
+    - button "Use the read tool twice" [disabled]
+  - button "Open right sidebar":
+    - img
 - button "Layout":
   - img
 - button "Workspace files":

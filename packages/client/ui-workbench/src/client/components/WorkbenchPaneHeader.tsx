@@ -31,7 +31,7 @@ export function stateOf(summary: SessionListState['byId'][SessionId] | undefined
 
 /** Render one pane header with identity, status, compact actions, or the collapsed strip. */
 export function WorkbenchPaneHeader({
-  sessionId, active, onFocus, onClose, maximized, onMaximize, collapsed = false, collapsible = false,
+  sessionId, active, onFocus, onClose, maximized, onMaximize, condensed = false, collapsed = false, collapsible = false,
   onToggleCollapse, solo = false, onSolo, replacePane, movePane,
   filesAvailable, openFiles, useSessions, useWorkspaces, useProjectPolicy, t,
 }: Props) {
@@ -77,12 +77,12 @@ export function WorkbenchPaneHeader({
   }
 
   return (
-    <header className={css.paneHeader} data-workbench-pane-header="" data-active={active || undefined} onClick={onFocus}>
+    <header className={css.paneHeader} data-workbench-pane-header="" data-active={active || undefined} data-condensed={condensed || undefined} onClick={onFocus}>
       <div
         className={css.paneIdentity}
         data-pane-drag=""
         draggable
-        title={t('dragReorder')}
+        title={condensed ? `${identity.title}\n${subtitle}\n${t('dragReorder')}` : t('dragReorder')}
       >
         <ScopeTile name={identity.scopeName} tone={identity.tone} />
         <div className={css.paneLead}>

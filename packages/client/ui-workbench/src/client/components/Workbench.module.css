@@ -1,4 +1,5 @@
 .toolbar {
+  box-sizing: border-box;
   display: flex;
   flex: none;
   align-items: center;
@@ -7,6 +8,17 @@
   min-height: 44px;
   padding: var(--dsw-space-1) var(--dsw-space-4);
   background: var(--dsw-alias-bg-layer-1);
+}
+
+.toolbar:has(.sessionTools) { flex-wrap: wrap; gap: var(--dsw-space-1) var(--dsw-space-3); }
+.toolbar:has(.sessionTools) .toolbarTitle { flex: 0 1 auto; max-width: 220px; }
+.sessionTools {
+  display: flex;
+  flex: 1 1 280px;
+  align-items: center;
+  min-width: 0;
+  padding-left: var(--dsw-space-3);
+  border-left: 0.5px solid var(--dsw-alias-border-l1);
 }
 
 .toolbarTitle,
@@ -64,6 +76,20 @@
   cursor: pointer;
 }
 .paneHeader[data-active] .paneLead strong { color: var(--dsw-alias-state-business-primary); }
+.paneHeader[data-condensed] { min-height: 36px; }
+.paneHeader[data-condensed] .paneIdentity { align-items: center; }
+.paneHeader[data-condensed] .paneLead { flex-direction: row; align-items: center; gap: var(--dsw-space-2); }
+.paneHeader[data-condensed] .paneLead strong { flex: 1; font-size: 13px; line-height: 20px; }
+.paneHeader[data-condensed] .paneMeta { flex: none; min-height: 0; }
+.paneHeader[data-condensed] .paneSubtitle,
+.paneHeader[data-condensed] .paneState[data-tone='ready'] > span:last-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .paneHeader .paneIdentity { align-items: flex-start; }
 .paneHeader .scopeTile { margin-top: 0; }
 .scopeTile {
