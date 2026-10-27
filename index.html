@@ -409,7 +409,7 @@ html.js .reveal.on{opacity:1;transform:none}
       <div class="row"><span class="n">α</span><div class="c"><b data-i18n="pr.1t">自己组装，不被流程框死</b><p data-i18n="pr.1p">用什么模型、给 AI 什么工具、谁能批什么、任务怎么委派，都由插件和配置组合而成，贴合团队自己的工作方式。</p></div></div>
       <div class="row"><span class="n">β</span><div class="c"><b data-i18n="pr.2t">委派有边界</b><p data-i18n="pr.2p">主 AI 可以把一部分活交给专业 AI，但要说清做什么、做到哪、负什么责——子任务不会悄悄拿到全部权限，内部细节也不会灌回主任务。</p></div></div>
       <div class="row"><span class="n">γ</span><div class="c"><b data-i18n="pr.3t">人的判断是一等工作</b><p data-i18n="pr.3p">审批是在授权一次受控操作，提问是在补齐 AI 缺的业务判断；共享项目里，待决事项由一个有权限的人接手，结果进入共同历史，不会抢出两份答案。</p></div></div>
-      <div class="row"><span class="n">δ</span><div class="c"><b data-i18n="pr.4t">好做法沉淀成资产</b><p data-i18n="pr.4p">验证有效的委派方式、评审步骤、上下文来源或工具策略，可以固化为团队的下一个插件、技能或工作流，下次直接复用。</p></div></div>
+      <div class="row"><span class="n">δ</span><div class="c"><b data-i18n="pr.4t">协作成果沉淀为企业资产</b><p data-i18n="pr.4p">验证有效的做法固化为插件、技能或工作流，下次直接复用；会话、记忆、文档留在自己的基础设施里。AI 协作的成果沉淀为企业资产，而不是散落在第三方工具里——私有化部署的 harness 本身就是资产，随团队快速迭代进化。</p></div></div>
     </div>
   </div>
 </section>
@@ -544,7 +544,8 @@ html.js .reveal.on{opacity:1;transform:none}
       <li data-i18n="os.4">TypeScript / Python SDK 与自动化协议，接进你们自己的系统</li>
       <li data-i18n="os.5">Android 壳可选，手机访问已部署系统</li>
       <li data-i18n="os.6">数据主权：数据在你自己的基础设施上，模型用自己的 Key</li>
-      <li data-i18n="os.7">独立衍生自 DeepSeek Harness，保留上游版权与许可声明</li>
+      <li data-i18n="os.7">独立部署、自主演进：harness 本身是你的资产，随团队需求快速迭代</li>
+      <li data-i18n="os.8">独立衍生自 DeepSeek Harness，保留上游版权与许可声明</li>
     </ul>
     <div class="notice reveal" data-i18n="os.notice">当前为预览阶段：对外接口、配置、数据库结构与部署流程可能还会调整；对外开放服务前，请先阅读仓库里的 SAFETY.md 与部署手册。</div>
   </div>
@@ -582,7 +583,7 @@ const dict = {
     'nav.scenes': 'Scenarios', 'nav.screens': 'Interface', 'nav.mobile': 'Mobile', 'nav.start': 'Quick start', 'nav.oss': 'Open source', 'nav.menu': 'Menu',
     'hero.kick': '',
     'hero.title': 'Run your AI team <span class="hl">like a team</span>',
-    'hero.sub': 'Enterprise AI adoption isn\u2019t more AI accounts — it\u2019s AI inside real collaboration. CoHarness gives a team permission-tiered shared workspaces: a private environment per member, a shared one per project, capabilities assembled from plugins, and enterprise-grade governance over models, usage, and every action. Our own team runs on it every day.',
+    'hero.sub': 'Enterprise AI adoption isn\u2019t about more AI accounts — it\u2019s about bringing AI into real collaboration. CoHarness gives a team permission-tiered shared workspaces: a private environment per member, a shared one per project, capabilities assembled from plugins, and enterprise-grade governance over models, usage, and every action. Our own team collaborates on it every day.',
     'hero.cta1': 'View on GitHub', 'hero.cta2': 'See the admin center',
     'hero.live': '<span><i class="g"></i>GATEWAY :8899 · READY</span><span><i class="g"></i>MEMBER :42000 · READY</span><span><i class="a"></i>PROJECT :42010 · STARTING</span>',
     'hero.terms': 'PREVIEW · APACHE-2.0 · OPEN &amp; SELF-HOSTED · THE USAGE LEDGER STORES NO KEYS OR CHAT CONTENT',
@@ -617,7 +618,7 @@ const dict = {
     'pr.1t': 'Assembled your way, not a fixed pipeline', 'pr.1p': 'Which models, which tools the AI gets, who may approve what, and how work is delegated all compose through plugins and configuration — fitted to how the team actually works.',
     'pr.2t': 'Delegation with boundaries', 'pr.2p': 'A primary agent can hand part of the job to a specialist — with a defined scope and responsibility. Subtasks never quietly inherit full permissions, and their internal detail does not flood the parent task.',
     'pr.3t': 'Human judgment is first-class work', 'pr.3p': 'An approval authorizes a controlled action; a question supplies the business judgment the AI lacks. In a shared project one authorized participant claims a pending decision, and the outcome joins the common history — no competing answers.',
-    'pr.4t': 'Good practice becomes an asset', 'pr.4p': 'A proven delegation pattern, review step, context source, or tool policy solidifies into the team’s next plugin, skill, or workflow — ready to reuse.',
+    'pr.4t': 'Collaboration compounds into company assets', 'pr.4p': 'Proven practices solidify into plugins, skills, or workflows for direct reuse; sessions, memory, and documents stay on your own infrastructure. AI collaboration output becomes a company asset instead of scattering across third-party tools — a privately deployed harness is itself an asset that iterates and evolves with the team.',
     'cap.title': 'The full people-and-agent loop, covered',
     'cap.sub': 'Everything below is implemented in the current codebase.',
     'cap.1t': 'AI workspaces', 'cap.1p': 'A plugin-composed runtime with every action on record: tasks pause, resume, and fork; model requests, approvals, plans, goals, todos, background jobs, scheduled reminders, workflows, and usage telemetry included.',
@@ -668,7 +669,8 @@ const dict = {
     'os.4': 'TypeScript / Python SDKs and automation protocols to plug into your own systems',
     'os.5': 'Optional Android shell for reaching a deployed system from phones',
     'os.6': 'Data sovereignty: data on your own infrastructure, models on your own keys',
-    'os.7': 'Independently derived from DeepSeek Harness, with upstream copyright and license notices preserved',
+    'os.7': 'Independently deployed, free to evolve: the harness itself is your asset, iterating fast with the team',
+    'os.8': 'Independently derived from DeepSeek Harness, with upstream copyright and license notices preserved',
     'cl.title': 'Reading the code is the audit',
     'cl.sub': 'The admin console, workspace orchestration, docs, and deployment all live in the repository. Preview stage — issues and PRs welcome.',
     'cl.cta1': 'View on GitHub', 'cl.cta2': 'Back to quick start',
