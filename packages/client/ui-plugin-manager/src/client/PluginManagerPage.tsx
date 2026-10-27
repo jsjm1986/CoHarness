@@ -68,20 +68,20 @@ function AddPluginMenu({ t, title, disabled, openInstall, renderSlot }: {
   const onDismiss = (): void => { setOpen(false) }
   return (
     <span className={css.addGroup} role="group" aria-label={t('addPlugin')}>
-      <Button variant="primary" size="sm" className={css.addPrimary} icon={<IconPlusOutline16 size={13} />}
+      <Button variant="soft" size="toolbar" className={css.addPrimary} icon={<IconPlusOutline16 />}
         disabled={disabled} {...title === undefined ? {} : { title }} onClick={() => { onDismiss(); openInstall() }}>
         {t('addPlugin')}
       </Button>
       <Menu open={open} onClose={onDismiss} align="end" portal autoFocus listClassName={css.addMenu}
         anchor={(
-          <Button variant="primary" size="sm" className={css.addMore}
+          <Button variant="soft" size="toolbar" className={css.addMore}
             disabled={disabled} {...title === undefined ? {} : { title }}
             aria-label={t('chooseAddMethod')} aria-haspopup="menu" aria-expanded={open}
             onClick={() => { setOpen(value => !value) }}
             onKeyDown={(event) => {
               if (!open && event.key === 'ArrowDown') { event.preventDefault(); setOpen(true) }
             }}>
-            <IconChevronDownOutline14 size={12} aria-hidden="true" />
+            <IconChevronDownOutline14 size={14} aria-hidden="true" />
           </Button>
         )}>
         <MenuItemButton icon={<IconDownloadOutline16 size={14} />} onSelect={() => { onDismiss(); openInstall() }}>
@@ -1807,7 +1807,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
                     disabled={!loaded || !canManage} openInstall={props.openInstall} renderSlot={renderSlot} />
                 )
                 : (
-                  <Button variant="primary" size="sm" className={css.addButton} icon={<IconPlusOutline16 size={13} />}
+                  <Button variant="soft" size="toolbar" icon={<IconPlusOutline16 />}
                     title={!canManage ? t('managementDenied') : undefined}
                     disabled={!loaded || !canManage} onClick={props.openInstall}>
                     {t('installViewTask')}

@@ -1510,7 +1510,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
               {refreshing ? <StateDot state="ongoing" size={18} /> : <IconRefreshOutline16 />}
             </span>
           </button>
-          <Button variant="primary" size="sm" icon={<IconPlusOutline16 size={13} />} disabled={!loaded} onClick={props.openInstall}>{t(state.install.requestId === undefined ? 'addPlugin' : 'installViewTask')}</Button>
+            <Button variant="soft" size="toolbar" icon={<IconPlusOutline16 />} disabled={!loaded} onClick={props.openInstall}>{t(state.install.requestId === undefined ? 'addPlugin' : 'installViewTask')}</Button>
         </div>
       </header>
       {state.status === 'loading' ? <ListSkeleton label={t('loading')} /> : null}

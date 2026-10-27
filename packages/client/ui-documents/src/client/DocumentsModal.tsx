@@ -2906,7 +2906,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     <Button
       className={css.upload}
       type="button"
-      variant="primary"
+      variant="soft"
+      size="toolbar"
       disabled={busy || uploadLocked}
       aria-label={uploading ? uploadLabel : t('modal.upload')}
       title={scopeView !== null && !scopeView.canUpload ? t('scope.upload.readOnly', { name: scopeView.label }) : undefined}
@@ -3594,8 +3595,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                   <header className={css.overviewHeader}>
                     <div><h2>{t('scope.all')}</h2><p>{t('scope.all.description')}</p></div>
                     <div className={css.overviewActions}>
-                      <Button type="button" variant="primary" icon={<IconPlusOutline16 size={16} />} disabled={overviewLoading || busy} onClick={openUploadScopePicker}>{t('scope.upload.choose')}</Button>
-                      <Button type="button" variant="ghost" icon={<IconRefreshOutline16 size={16} />} disabled={overviewLoading || busy} onClick={() => { void openOverview(true) }}>{t('modal.refresh')}</Button>
+                      <Button size="toolbar" type="button" variant="soft" icon={<IconPlusOutline16 size={16} />} disabled={overviewLoading || busy} onClick={openUploadScopePicker}>{t('scope.upload.choose')}</Button>
+                      <Button size="toolbar" type="button" variant="ghost" icon={<IconRefreshOutline16 size={16} />} disabled={overviewLoading || busy} onClick={() => { void openOverview(true) }}>{t('modal.refresh')}</Button>
                     </div>
                   </header>
                   <div className={css.overviewToolbar} role="group" aria-label={t('modal.filters')}>{filterControls}</div>
@@ -3776,21 +3777,21 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                     {phone ? (
                       <>
                         {trashMode ? (
-                          <Button
+                          <Button size="toolbar"
                             className={css.trashToggle}
                             type="button"
-                            variant="outline"
+                            variant="ghost"
                             disabled={busy || trashLoading}
                             onClick={returnFromTrash}
                           >
                             {t('trash.back')}
                           </Button>
                         ) : alternateSource === null && !overviewMode && uploadButton}
-                        <Button
+                        <Button size="toolbar"
                           className={css.mobileMore}
                           data-documents-toolbar-more=""
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                           aria-label={t('action.more')}
                           aria-haspopup="dialog"
                           aria-expanded={mobileSheet?.kind === 'more'}
@@ -3803,21 +3804,21 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                       </>
                     ) : (
                       <>
-                        <Button
+                        <Button size="toolbar"
                           className={css.trashToggle}
                           data-documents-trash-toggle=""
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                           disabled={busy || trashLoading}
                           onClick={() => { if (trashMode) returnFromTrash(); else void openTrash() }}
                         >
                           {trashMode ? t('trash.back') : t('trash.button')}
                         </Button>
                         {!trashMode && scopeView === null && alternateSource === null && sourceOptions.length > 0 && (
-                          <Button
+                          <Button size="toolbar"
                             className={css.sourceAction}
                             type="button"
-                            variant="outline"
+                            variant="ghost"
                             disabled={busy}
                             icon={<IconBrowseOutline16 size={16} />}
                             onClick={openSourcePicker}
@@ -3826,20 +3827,20 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                           </Button>
                         )}
                         {!trashMode && (scopeView !== null || alternateSource !== null) && (
-                          <Button
+                          <Button size="toolbar"
                             className={css.sourceAction}
                             type="button"
-                            variant="outline"
+                            variant="ghost"
                             disabled={busy}
                             onClick={() => { void load(ROOT_DIRECTORY_ID) }}
                           >
                             {t('copy.source.current')}
                           </Button>
                         )}
-                        {!trashMode && <Button
+                        {!trashMode && <Button size="toolbar"
                           className={css.newFolder}
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                           disabled={busy || writeLocked}
                           icon={<IconFolderClose16 size={16} />}
                           onClick={openCreateDirectory}
@@ -3847,7 +3848,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                           {t('folder.create')}
                         </Button>}
                         {!trashMode && alternateSource === null && !overviewMode && uploadButton}
-                        {!trashMode && <Button
+                        {!trashMode && <Button size="toolbar"
                           className={css.refresh}
                           type="button"
                           variant="ghost"
@@ -3856,7 +3857,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                           icon={<IconRefreshOutline16 size={16} />}
                           onClick={() => { void refreshDisplayed() }}
                         />}
-                        {!trashMode && <Button
+                        {!trashMode && <Button size="toolbar"
                           type="button"
                           variant="ghost"
                           disabled={busy || historyLoading || overviewMode}

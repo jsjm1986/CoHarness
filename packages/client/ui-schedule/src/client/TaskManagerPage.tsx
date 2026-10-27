@@ -117,7 +117,7 @@ export function TaskManagerPage(props: TaskManagerPageProps) {
             <div className={css.pageHeading}>
               <h1 ref={headingRef} tabIndex={-1}>{t('title')}</h1>
               <div className={css.creationActions}>
-                <Button variant="primary" size="sm" className={css.newButton} icon={<IconPlusOutline16 size={13} />} onClick={onNewTask}>{t('new.action')}</Button>
+                <Button variant="soft" size="toolbar" icon={<IconPlusOutline16 />} onClick={onNewTask}>{t('new.action')}</Button>
               </div>
             </div>
             <div className={css.filters}>

@@ -73,6 +73,7 @@
     "apps/web/tests/project-activity.e2e.ts",
     "apps/web/tests/project-progress.e2e.ts",
     "apps/web/tests/document-manager.e2e.ts",
+    "apps/web/tests/toolbar-buttons.e2e.ts",
     "apps/web/tests/chat-sender-attribution.e2e.ts",
     "apps/web/tests/stats-paged-history.e2e.ts",
     "apps/web/tests/lossless-history-wire.e2e.ts",

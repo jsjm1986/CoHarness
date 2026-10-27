@@ -691,24 +691,24 @@
 
 .upload {
   flex: none;
-  min-height: 36px;
+  min-height: var(--dsw-control-height-toolbar);
 }
 
 .newFolder {
   flex: none;
-  min-height: 36px;
+  min-height: var(--dsw-control-height-toolbar);
 }
 
 .refresh {
   flex: none;
-  min-height: 36px;
+  min-height: var(--dsw-control-height-toolbar);
 }
 
 /* Keep scope navigation available on compact screens without squeezing the
    primary upload and refresh actions into unreadable capsules. */
 .sourceAction {
   flex: none;
-  min-height: 36px;
+  min-height: var(--dsw-control-height-toolbar);
 }
 
 .list {
@@ -1986,8 +1986,8 @@
 }
 
 .actionGroup > button {
-  min-height: 36px;
-  border-radius: 10px;
+  min-height: var(--dsw-control-height-toolbar);
+  border-radius: var(--dsw-radius-control);
 }
 
 .caption {
@@ -2421,17 +2421,10 @@
   }
 
   .search,
-  .select,
-  .actionGroup > button,
-  .overviewActions > button {
-    height: 32px;
-    min-height: 32px;
-    border-radius: 6px;
-  }
-
-  .actionGroup > button {
-    padding-inline: 10px;
-    font-size: 13px;
+  .filterGroup .select {
+    height: var(--dsw-control-height-toolbar);
+    min-height: var(--dsw-control-height-toolbar);
+    border-radius: var(--dsw-radius-control);
   }
 
   .actionGroup {
@@ -2522,6 +2515,13 @@
 }
 
 @media (max-width: 767px), (pointer: coarse) {
+  .search,
+  .filterGroup .select {
+    height: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+    border-radius: var(--dsw-radius-control);
+  }
+
   .parentBack {
     min-height: var(--dsw-touch-target);
   }

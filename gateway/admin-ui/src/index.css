@@ -50,6 +50,11 @@
   --dsw-safe-top: 0px;
   --dsw-safe-bottom: 0px;
   --dsw-touch-target: 44px;
+  --dsw-radius-control: 8px;
+  --dsw-control-height-toolbar: 32px;
+  --dsw-control-font-size-toolbar: 13px;
+  --dsw-control-line-height-toolbar: 20px;
+  --dsw-control-gap-toolbar: 6px;
   --dsw-mask-blur: blur(2px);
   --dsw-shadow-lv3: var(--shadow-dialog);
   --dsw-alias-bg-layer-1: var(--surface);
@@ -74,6 +79,9 @@
   --dsw-focus-ring-color: var(--accent);
   --dsw-alias-button-primary-fill: var(--accent);
   --dsw-alias-button-primary-hover: var(--accent-hover);
+  --dsw-alias-button-soft-fill: var(--surface-strong);
+  --dsw-alias-button-soft-hover: color-mix(in srgb, var(--surface-strong) 92%, var(--text));
+  --dsw-alias-button-soft-active: color-mix(in srgb, var(--surface-strong) 84%, var(--text));
   --dsw-alias-button-tool-bar-fill: var(--surface-strong);
   --dsw-alias-button-tool-bar-hover: var(--border-strong);
   --dsw-alias-interactive-bg-active: var(--accent-soft);

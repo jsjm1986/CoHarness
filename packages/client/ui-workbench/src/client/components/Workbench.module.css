@@ -62,7 +62,7 @@
 .attentionPill:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
 .toolbarActions { flex: none; gap: var(--dsw-space-1); }
 .toolbarActions > .iconAction { width: 32px; height: 32px; }
-.addConversation { min-height: 32px; }
+.addConversation { min-height: var(--dsw-control-height-toolbar); }
 
 .paneHeader {
   position: relative;

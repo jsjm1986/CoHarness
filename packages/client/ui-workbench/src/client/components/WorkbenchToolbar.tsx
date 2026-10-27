@@ -277,7 +277,7 @@ export function WorkbenchToolbar({
           </button>
         )}
         {viewport.mode === 'workbench' && (
-          <Button size="sm" variant="primary" className={css.addConversation} disabled={viewport.pendingIdentity === true} icon={<IconPlusOutline16 />} onClick={() => { setError(undefined); actions.openPicker() }}>
+          <Button size="toolbar" variant="soft" className={css.addConversation} disabled={viewport.pendingIdentity === true} icon={<IconPlusOutline16 />} onClick={() => { setError(undefined); actions.openPicker() }}>
             {t('add')}
           </Button>
         )}
