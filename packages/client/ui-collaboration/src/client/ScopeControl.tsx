@@ -4,7 +4,7 @@ import {
   IconCheckOutline16, IconChevronLeftOutline14, IconChevronRightOutline14, IconCloseFill14, IconGlobeOutline14,
   IconSearchOutline16, IconPlusOutline16, IconSettingsOutline16, IconShieldOutline16, IconUserOutline16,
   IconUsersOutline16, IconWarningOutline16,
-  Menu, type MenuEntry,
+  Button, focusWithoutRing, Menu, SegmentedTabs, Tooltip, useMediaQuery, useModalLayer, type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {
@@ -99,10 +99,14 @@ export function ScopeControl({
 }: ScopeControlProps) {
   const state = useCollaboration(snapshot => snapshot)
   const [open, setOpen] = useState(false)
-  // The page stacks one level deep: the root lists spaces plus the settings
-  // group, and the visibility picker pushes in from the root's disclosure
-  // row. `pageNav` only steers the remount animation direction.
+  // Visibility is a nested page within the management tab.
   const [pageView, setPageView] = useState<'root' | 'visibility'>('root')
+  const [hubTab, setHubTab] = useState<'list' | 'manage'>('list')
+  const pageRef = useRef<HTMLDivElement>(null)
+  const pageHeading = useRef<HTMLHeadingElement>(null)
+  const previousPage = useRef(pageView)
+  const compact = useMediaQuery('(max-width: 767px)')
+  const [lastTarget, setLastTarget] = useState<{ kind: 'personal' } | { kind: 'project'; projectId: number; name: string }>()
   const [pageNav, setPageNav] = useState<'push' | 'pop'>('push')
   const pageId = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -122,6 +126,8 @@ export function ScopeControl({
     return () => { observer.disconnect() }
   }, [])
   const [managerMode, setManagerMode] = useState<ProjectManagerMode>()
+  const [managerScope, setManagerScope] = useState<'current' | 'all'>('current')
+  const [managerView, setManagerView] = useState<'received' | 'sent' | 'compose'>('received')
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false)
   const [invitationCount, setInvitationCount] = useState(0)
   const [projectQuery, setProjectQuery] = useState('')
@@ -131,26 +137,38 @@ export function ScopeControl({
     ? context?.projects ?? []
     : context.projects.filter(project => project.name.toLowerCase().includes(normalizedProjectQuery))
 
-  // The grant flag answers "what differs from your usual access": the tier
-  // that dominates the roster — admin or plain read-write — carries no
-  // information, so it renders unflagged and only the minority tier (plus
-  // personal, read-only, and steward) keeps a mark. A tie suppresses admin,
-  // the visually heavier label. The tally reads the full roster, never the
-  // filtered view, so searching cannot flip which tier stays quiet.
-  const adminGrantCount = context === undefined ? 0
-    : context.projects.filter(project => project.kind !== 'steward' && project.canManage === true).length
-  const rwGrantCount = context === undefined ? 0
-    : context.projects.filter(project => project.kind !== 'steward' && project.canManage !== true && project.mode === 'rw').length
-  const suppressedGrant: 'admin' | 'rw' = adminGrantCount >= rwGrantCount ? 'admin' : 'rw'
   const grantText = (project: ProjectMembership): string => (
-    project.kind === 'steward'
-      ? t('scope.steward')
-      : project.canManage === true
-        ? (suppressedGrant === 'admin' ? '' : t('scope.admin'))
-        : project.mode === 'ro'
-          ? t('scope.readOnly')
-          : (suppressedGrant === 'rw' ? '' : t('scope.readWrite'))
+    project.kind === 'steward' ? t('scope.steward')
+      : project.mode === 'ro' && project.canManage !== true ? t('scope.readOnly') : ''
   )
+  const goBack = (): void => {
+    if (pageView === 'visibility') {
+      setPageNav('pop')
+      setPageView('root')
+      setHubTab('manage')
+      return
+    }
+    setOpen(false)
+  }
+  const available = state.status === 'ready' && context !== undefined
+    && (context.scope.kind === 'project' || context.projects.length > 0
+      || createProject !== undefined || listInvitations !== undefined)
+  useModalLayer(pageRef, open && wide && available, goBack)
+  useLayoutEffect(() => {
+    if (!open || !wide) return
+    if (pageView === 'visibility' && pageHeading.current !== null) focusWithoutRing(pageHeading.current)
+    else if (previousPage.current === 'visibility') {
+      const target = pageRef.current?.querySelector<HTMLElement>('[data-scope-visibility]')
+      if (target !== null && target !== undefined) focusWithoutRing(target)
+    }
+    previousPage.current = pageView
+  }, [open, wide, pageView])
+  useEffect(() => {
+    if (state.scopeError === undefined || state.scopeBusy || lastTarget === undefined) return
+    setHubTab('list')
+    setPageView('root')
+    setOpen(true)
+  }, [state.scopeError, state.scopeBusy, lastTarget])
 
   useEffect(() => {
     if (getInvitationCount === undefined) return
@@ -168,23 +186,11 @@ export function ScopeControl({
   useEffect(() => {
     if (!open) {
       setPageView('root')
+      setHubTab('list')
+      previousPage.current = 'root'
       setPageNav('push')
     }
   }, [open])
-  useEffect(() => {
-    if (!open || !wide) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      if (pageView === 'visibility') {
-        setPageNav('pop')
-        setPageView('root')
-        return
-      }
-      setOpen(false)
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => { document.removeEventListener('keydown', onKeyDown) }
-  }, [open, pageView, wide])
   if (state.status !== 'ready' || context === undefined
     || (context.scope.kind === 'personal' && context.projects.length === 0
       && createProject === undefined && listInvitations === undefined)) return null
@@ -194,6 +200,21 @@ export function ScopeControl({
   const currentScopeId = projectScope === undefined
     ? 'scope:personal'
     : `scope:project:${projectScope.projectId}`
+  const selectScope = (scope: { kind: 'personal' } | { kind: 'project'; projectId: number }): void => {
+    const selected = scope.kind === 'personal' ? projectScope === undefined
+      : projectScope?.projectId === scope.projectId
+    if (selected || state.scopeBusy) return
+    setLastTarget(scope.kind === 'personal' ? scope : {
+      ...scope, name: context.projects.find(project => project.projectId === scope.projectId)?.name ?? '',
+    })
+    setOpen(false)
+    void switchScope(scope)
+  }
+  const openManager = (scope: 'current' | 'all', view: 'received' | 'sent' | 'compose'): void => {
+    setManagerScope(scope)
+    setManagerView(view)
+    setManagerMode('members')
+  }
   /** The current scope's identity tile, shared by the hub card and the trigger. */
   const currentTile = (size: number, large = false): ReactNode => (
     projectScope === undefined
@@ -338,15 +359,6 @@ export function ScopeControl({
   const scopeTitle = state.scopeError === undefined
     ? state.scopeBusy ? t('scope.switching') : t('scope.aria')
     : t('scope.failed')
-  const currentMeta = state.scopeError !== undefined
-    ? t('scope.failed')
-    : state.scopeBusy
-      ? t('scope.switching')
-      : projectScope === undefined
-        ? t('visibility.private')
-        : projectScope.steward === true
-          ? t('scope.steward')
-          : projectScope.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')
   const searchField = context.projects.length > 0 && (
     <div className={css.menuSearch}>
       <span className={css.menuSearchIcon} aria-hidden="true">
@@ -414,223 +426,158 @@ export function ScopeControl({
       )}
     </button>
   )
-  const pageCheck = (
-    <span className={css.pageCheck} aria-hidden="true"><IconCheckOutline16 size={16} /></span>
-  )
+  const pageCheck = <span className={css.pageCheck} aria-hidden="true"><IconCheckOutline16 size={16} /></span>
   const pageDisclose = <IconChevronRightOutline14 className={css.pageDisclose} size={14} />
-  const goBack = (): void => {
-    if (pageView === 'visibility') {
-      setPageNav('pop')
-      setPageView('root')
-      return
-    }
-    setOpen(false)
-  }
+  const currentSource = projectScope === undefined ? t('visibility.private')
+    : projectScope.steward === true ? t('scope.stewardSource')
+      : currentProject?.origin === 'admin' ? t('scope.adminSource')
+        : currentProject?.origin === 'user'
+          ? t('scope.userSource', { name: currentProject.owner?.id === context.user.id
+            ? t('scope.you') : currentProject.owner?.displayName || currentProject.owner?.username || t('project.ownerUnknown') })
+          : t('scope.projects')
   return (
     <>
       {/* The rail renders its trigger through the Menu anchor; wide owns the
           trigger row plus the pushed page. */}
       {wide && trigger}
       {open && wide && (
-        /* The page stacks one level deep: the root carries the hero, the
-           settings group, and the roster; visibility pushes in as the second
-           level. CSS scopes the surface — whole drawer on compact, the
-           browsing region on wider layouts. */
-        <div id={pageId} className={css.scopePage} role="group" aria-label={t('scope.aria')}>
-          <div className={css.pageNav}>
-            <button
-              type="button"
-              className={css.pageBack}
-              aria-label={t('manager.close')}
-              onClick={goBack}
-            >
-              <IconChevronLeftOutline14 size={16} />
-            </button>
-            <span className={css.pageTitle}>
-              {pageView === 'visibility' ? t('newConversation.label') : t('scope.menuTitle')}
-            </span>
-          </div>
-          <div key={pageView} className={`${css.pageScroll} ${pageNav === 'pop' ? css.pagePop : css.pagePush}`}>
-            {pageView === 'visibility' ? (
-              <>
-                <button
-                  type="button"
-                  className={css.pageRow}
-                  onClick={() => { stageVisibility('project') }}
-                >
-                  <span className={css.pageIcon} aria-hidden="true"><IconGlobeOutline14 size={16} /></span>
-                  <span className={css.pageRowText}>
-                    <span className={css.pageRowName}>{t('visibility.project')}</span>
-                    <span className={css.pageRowMeta}>{t('visibility.project.description')}</span>
-                  </span>
-                  {state.stagedVisibility === 'project' && pageCheck}
-                </button>
-                <button
-                  type="button"
-                  className={css.pageRow}
-                  onClick={() => { stageVisibility('private') }}
-                >
-                  <span className={css.pageIcon} aria-hidden="true"><IconUserOutline16 size={16} /></span>
-                  <span className={css.pageRowText}>
-                    <span className={css.pageRowName}>{t('visibility.private')}</span>
-                    <span className={css.pageRowMeta}>{t('visibility.private.description')}</span>
-                  </span>
-                  {state.stagedVisibility === 'private' && pageCheck}
-                </button>
-              </>
-            ) : (
-              <>
-                <div className={css.pageHero}>
-                  {state.scopeError === undefined
-                    ? currentTile(15, true)
-                    : <IconWarningOutline16 size={18} />}
-                  <span className={css.pageHeroBody}>
-                    <span className={css.pageHeroName}>{currentLabel}</span>
-                    <span className={css.pageHeroMeta}>{currentMeta}</span>
-                  </span>
-                  {settingsAvailable && (
-                    <button
-                      type="button"
-                      className={css.pageManage}
-                      onClick={() => {
-                        setOpen(false)
-                        setProjectSettingsOpen(true)
-                      }}
-                    >
-                      {t('scope.manage')}
-                      {pageDisclose}
-                    </button>
-                  )}
-                </div>
-                {(projectScope?.mode === 'rw' || listInvitations !== undefined || settingsAvailable) && (
-                  <div className={css.pageGroup}>{t('scope.settingsGroup')}</div>
-                )}
-                {projectScope?.mode === 'rw' && (
-                  <button
-                    type="button"
-                    className={css.pageRow}
-                    onClick={() => {
-                      setPageNav('push')
-                      setPageView('visibility')
-                    }}
-                  >
-                    <span className={css.pageRowName}>{t('newConversation.label')}</span>
-                    <span className={css.pageValue}>
-                      {state.stagedVisibility === 'project' ? t('visibility.project') : t('visibility.private')}
-                    </span>
-                    {pageDisclose}
-                  </button>
-                )}
-                {listInvitations !== undefined && (
-                  <button
-                    type="button"
-                    className={css.pageRow}
-                    onClick={() => {
-                      setOpen(false)
-                      setManagerMode('members')
-                    }}
-                  >
-                    <span className={css.pageRowName}>
-                      {currentProject?.canManage === true
-                        ? t('manager.membersAction')
-                        : t('manager.invitationsAction')}
-                    </span>
-                    {invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}
-                    {pageDisclose}
-                  </button>
-                )}
-                {settingsAvailable && (
-                  <button
-                    type="button"
-                    className={css.pageRow}
-                    onClick={() => {
-                      setOpen(false)
-                      setProjectSettingsOpen(true)
-                    }}
-                  >
-                    <span className={css.pageRowName}>{t('manager.settingsAction')}</span>
-                    {pageDisclose}
-                  </button>
-                )}
-                <div className={css.pageGroup}>
-                  {t('scope.allSpaces')} · {context.projects.length + 1}
-                </div>
-                {context.projects.length > 4 && (
-                  <div className={css.pageSearch}>{searchField}</div>
-                )}
-                <button
-                  type="button"
-                  className={`${css.pageRow}${currentScopeId === 'scope:personal' ? ` ${css.pageRowCurrent}` : ''}`}
-                  aria-current={currentScopeId === 'scope:personal' ? 'true' : undefined}
-                  disabled={state.scopeBusy}
-                  onClick={() => {
-                    setOpen(false)
-                    void switchScope({ kind: 'personal' })
-                  }}
-                >
-                  <span className={`${css.tile} ${css.tileRound} ${css.tileBlue}`} aria-hidden="true">
-                    <IconUserOutline16 size={11} />
-                  </span>
-                  <span className={css.pageRowName}>{t('scope.personal')}</span>
-                  <span className={css.pageValue}>{t('scope.personalFlag')}</span>
-                  {currentScopeId === 'scope:personal' && pageCheck}
-                </button>
-                {visibleProjects.map((project) => {
-                  const id = `scope:project:${project.projectId}`
-                  const selected = id === currentScopeId
-                  const modeText = grantText(project)
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      className={`${css.pageRow}${selected ? ` ${css.pageRowCurrent}` : ''}`}
-                      aria-current={selected ? 'true' : undefined}
-                      disabled={state.scopeBusy}
-                      onClick={() => {
-                        setOpen(false)
-                        void switchScope({ kind: 'project', projectId: project.projectId })
-                      }}
-                    >
-                      {project.kind === 'steward'
-                        ? (
-                          <span className={`${css.tile} ${css.tileWarn}`} aria-hidden="true">
-                            <IconShieldOutline16 size={11} />
-                          </span>
-                        )
-                        : (
-                          <span className={`${css.tile} ${tileTone(project.name)}`} aria-hidden="true">
-                            {tileGlyph(project.name)}
-                          </span>
-                        )}
-                      <span className={css.pageRowName}>{project.name}</span>
-                      {modeText !== '' && (
-                        <span className={project.kind === 'steward' ? css.pageValueWarn : css.pageValue}>
-                          {modeText}
-                        </span>
-                      )}
-                      {selected && pageCheck}
-                    </button>
-                  )
-                })}
-                {visibleProjects.length === 0 && normalizedProjectQuery !== '' && (
-                  <div className={css.pageLabel}>{t('scope.searchEmpty')}</div>
-                )}
-                {createProject !== undefined && (
-                  <button
-                    type="button"
-                    className={`${css.pageRow} ${css.pageCreate}`}
-                    onClick={() => {
-                      setOpen(false)
-                      setManagerMode('create')
-                    }}
-                  >
-                    <span className={css.pageIcon} aria-hidden="true"><IconPlusOutline16 size={16} /></span>
-                    <span className={css.pageRowName}>{t('manager.createAction')}</span>
-                  </button>
-                )}
-              </>
+        <div ref={pageRef} id={pageId} className={css.scopePage} role="group" tabIndex={-1}
+          aria-label={t('scope.aria')}
+          onKeyDownCapture={(event) => {
+            if (event.key !== 'Escape' || event.defaultPrevented || event.nativeEvent.isComposing
+              || event.ctrlKey || event.altKey || event.metaKey) return
+            event.preventDefault()
+            event.stopPropagation()
+            goBack()
+          }}>
+          <header className={css.pageNav}>
+            <Tooltip label={pageView === 'visibility' ? t('scope.backManage') : t('scope.returnWorkbench')}
+              side="bottom" portal disabled={compact}>
+              <button type="button" className={css.pageBack} onClick={goBack}
+                aria-label={pageView === 'visibility' ? t('scope.backManage') : t('scope.returnWorkbench')}>
+                <IconChevronLeftOutline14 size={16} />
+              </button>
+            </Tooltip>
+            <h2 ref={pageHeading} tabIndex={-1} className={css.pageTitle}>
+              {pageView === 'visibility' ? t('newConversation.label') : t('scope.centerTitle')}
+            </h2>
+            {pageView === 'root' && createProject !== undefined && (
+              <Tooltip label={t('manager.createAction')} side="bottom" portal disabled={compact}>
+                <button type="button" className={css.pageBack} aria-label={t('manager.createAction')}
+                  onClick={() => { setManagerMode('create') }}><IconPlusOutline16 size={16} /></button>
+              </Tooltip>
             )}
-          </div>
+          </header>
+          {pageView === 'visibility' ? (
+            <div className={`${css.pageScroll} ${pageNav === 'pop' ? css.pagePop : css.pagePush}`}>
+              <p className={css.pageHint}>{t('scope.visibilityHint')}</p>
+              <fieldset className={css.visibilityOptions} aria-label={t('newConversation.label')}>
+                {(['project', 'private'] as const).map(value => (
+                  <label key={value} className={css.visibilityOption} data-selected={state.stagedVisibility === value}>
+                    <input type="radio" name={`${pageId}-visibility`} value={value}
+                      checked={state.stagedVisibility === value} onChange={() => { stageVisibility(value) }} />
+                    <span><strong>{t(`visibility.${value}`)}</strong><small>{t(`visibility.${value}.description`)}</small></span>
+                  </label>
+                ))}
+              </fieldset>
+              <p className={css.pageHint}>{t('scope.visibilityLifetime')}</p>
+            </div>
+          ) : (
+            <>
+              <div className={css.pageHero}>
+                {state.scopeError === undefined ? currentTile(16, true) : <IconWarningOutline16 size={18} />}
+                <span className={css.pageHeroBody}>
+                  <span className={css.pageHeroMeta}>{currentSource}</span>
+                  <span className={css.pageHeroName}>{currentLabel}</span>
+                </span>
+                {settingsAvailable && (
+                  <Tooltip label={t('manager.settingsAction')} side="bottom" portal disabled={compact}>
+                    <button type="button" className={css.pageBack} aria-label={t('manager.settingsAction')}
+                      onClick={() => { setProjectSettingsOpen(true) }}><IconSettingsOutline16 size={16} /></button>
+                  </Tooltip>
+                )}
+              </div>
+              <SegmentedTabs<'list' | 'manage'> variant="underline" className={css.hubTabs} value={hubTab} onChange={setHubTab} label={t('scope.centerTitle')}
+                items={[
+                  { value: 'list', label: t('scope.switchTab'), id: `${pageId}-list-tab`, panelId: `${pageId}-list` },
+                  { value: 'manage', label: t('scope.manageTab'), id: `${pageId}-manage-tab`, panelId: `${pageId}-manage` },
+                ]} />
+              {hubTab === 'list' ? (
+                <>
+                  {state.scopeError !== undefined && (
+                    <div className={css.pageError} role="alert">
+                      <span>{lastTarget?.kind === 'project' ? t('scope.failedTarget', { name: lastTarget.name }) : t('scope.failed')}</span>
+                      {lastTarget !== undefined && <Button size="sm" onClick={() => { selectScope(lastTarget) }}>{t('scope.retry')}</Button>}
+                    </div>
+                  )}
+                  <div className={css.pageSearch}>{searchField}</div>
+                  <div className={css.listHeading}><span>{t('scope.allSpaces')}</span><span role="status">
+                    {normalizedProjectQuery === '' ? t('scope.totalCount', { count: context.projects.length + 1 })
+                      : t('scope.matchCount', { count: visibleProjects.length })}
+                  </span></div>
+                  <div className={css.pageScroll} id={`${pageId}-list`} role="tabpanel" aria-labelledby={`${pageId}-list-tab`}>
+                    <button type="button" className={`${css.pageRow}${projectScope === undefined ? ` ${css.pageRowCurrent}` : ''}`}
+                      aria-current={projectScope === undefined ? 'true' : undefined} disabled={state.scopeBusy}
+                      onClick={() => { selectScope({ kind: 'personal' }) }}>
+                      <span className={`${css.tile} ${css.tileRound} ${css.tileBlue}`} aria-hidden="true"><IconUserOutline16 size={14} /></span>
+                      <span className={css.pageRowName}>{t('scope.personal')}</span>{projectScope === undefined && pageCheck}
+                    </button>
+                    <div className={css.rosterDivider} />
+                    {visibleProjects.map((project) => {
+                      const selected = projectScope?.projectId === project.projectId
+                      const flag = grantText(project)
+                      return <button key={project.projectId} type="button"
+                        className={`${css.pageRow}${selected ? ` ${css.pageRowCurrent}` : ''}`}
+                        aria-current={selected ? 'true' : undefined} disabled={state.scopeBusy}
+                        onClick={() => { selectScope({ kind: 'project', projectId: project.projectId }) }}>
+                        {project.kind === 'steward'
+                          ? <span className={`${css.tile} ${css.tileWarn}`} aria-hidden="true"><IconShieldOutline16 size={14} /></span>
+                          : <span className={`${css.tile} ${tileTone(project.name)}`} aria-hidden="true">{tileGlyph(project.name)}</span>}
+                        <span className={css.pageRowName}>{project.name}</span>
+                        {flag !== '' && <span className={project.kind === 'steward' ? css.pageValueWarn : css.pageValue}>{flag}</span>}
+                        {selected && pageCheck}
+                      </button>
+                    })}
+                    {visibleProjects.length === 0 && normalizedProjectQuery !== '' && (
+                      <div className={css.emptySearch}><p>{t('scope.searchEmpty')}</p><Button onClick={() => { setProjectQuery('') }}>{t('scope.searchClear')}</Button></div>
+                    )}
+                  </div>
+                  <footer className={css.pageFooter}>
+                    <span>{t('scope.reloadHint')}</span>
+                    {listInvitations !== undefined && <Button size="sm" onClick={() => { openManager('all', 'received') }}>
+                      <IconUsersOutline16 size={14} />{t('scope.invitationsShort')}{invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}
+                    </Button>}
+                  </footer>
+                </>
+              ) : (
+                <div className={css.pageScroll} id={`${pageId}-manage`} role="tabpanel" aria-labelledby={`${pageId}-manage-tab`}>
+                  <div className={css.currentFacts}><span>{t('scope.currentSpace')}</span><strong>{currentLabel}</strong><small>{currentSource}</small></div>
+                  {projectScope !== undefined && <div className={css.pageGroup}>{t('scope.currentProject')}</div>}
+                  {settingsAvailable && <button type="button" className={css.managementRow} onClick={() => { setProjectSettingsOpen(true) }}>
+                    <IconSettingsOutline16 size={16} /><span><strong>{t('manager.settingsAction')}</strong><small>{t('scope.configurationHint')}</small></span>{pageDisclose}
+                  </button>}
+                  {listInvitations !== undefined && projectScope !== undefined && <button type="button" className={css.managementRow}
+                    onClick={() => {
+                      if (projectScope.steward === true) setProjectSettingsOpen(true)
+                      else openManager('current', currentProject?.canManage === true ? 'sent' : 'received')
+                    }}>
+                    <IconUsersOutline16 size={16} /><span><strong>{t('project.membersTitle')}</strong><small>{projectScope.steward === true ? t('scope.stewardInviteHint') : t('scope.projectInviteHint')}</small></span>{pageDisclose}
+                  </button>}
+                  {projectScope?.mode === 'rw' && <button type="button" className={css.managementRow} data-scope-visibility
+                    onClick={() => { setPageNav('push'); setPageView('visibility') }}>
+                    <IconGlobeOutline14 size={16} /><span><strong>{t('newConversation.label')}</strong><small>{state.stagedVisibility === 'project' ? t('visibility.project') : t('visibility.private')}</small></span>{pageDisclose}
+                  </button>}
+                  <div className={css.pageGroup}>{t('scope.otherActions')}</div>
+                  {listInvitations !== undefined && <button type="button" className={css.managementRow} onClick={() => { openManager('all', 'received') }}>
+                    <IconUsersOutline16 size={16} /><span><strong>{t('manager.invitationCenter')}</strong><small>{t('scope.inviteCenterHint')}</small></span>{invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}{pageDisclose}
+                  </button>}
+                  {createProject !== undefined && <button type="button" className={css.managementRow} onClick={() => { setManagerMode('create') }}>
+                    <IconPlusOutline16 size={16} /><span><strong>{t('manager.createAction')}</strong><small>{t('scope.createOwnerHint')}</small></span>{pageDisclose}
+                  </button>}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
       {!wide && (
@@ -652,11 +599,11 @@ export function ScopeControl({
           onSelect={(id) => {
             setOpen(false)
             if (id === 'scope:personal') {
-              void switchScope({ kind: 'personal' })
+              selectScope({ kind: 'personal' })
               return
             }
             if (id.startsWith('scope:project:')) {
-              void switchScope({ kind: 'project', projectId: Number(id.slice('scope:project:'.length)) })
+              selectScope({ kind: 'project', projectId: Number(id.slice('scope:project:'.length)) })
               return
             }
             if (id === 'project:create') {
@@ -664,7 +611,7 @@ export function ScopeControl({
               return
             }
             if (id === 'project:members') {
-              setManagerMode('members')
+              openManager('current', currentProject?.canManage === true ? 'sent' : 'received')
               return
             }
             if (id === 'project:settings') {
@@ -678,10 +625,14 @@ export function ScopeControl({
           anchor={trigger}
         />
       )}
-      <ProjectManagerModal
-        open={managerMode !== undefined}
-        mode={managerMode ?? 'create'}
+      {managerMode !== undefined && <ProjectManagerModal
+        open
+        mode={managerMode}
         currentUserId={context.user.id}
+        projectName={currentProject?.name}
+        initialScope={managerScope}
+        initialView={managerView}
+        steward={currentProject?.kind === 'steward'}
         t={t}
         {...projectScope === undefined ? {} : { projectId: projectScope.projectId }}
         {...currentProject?.canManage === true ? { canManage: true } : {}}
@@ -695,7 +646,7 @@ export function ScopeControl({
           void switchScope({ kind: 'project', projectId })
         }}
         onClose={() => { setManagerMode(undefined) }}
-      />
+      />}
       {projectScope !== undefined && currentProject !== undefined
         && loadProjectConfiguration !== undefined && setProjectThemePolicy !== undefined ? (
           <ProjectSettingsModal
@@ -708,7 +659,7 @@ export function ScopeControl({
             {...shareProjectSshTarget === undefined ? {} : { shareSshTarget: shareProjectSshTarget }}
             onMembers={() => {
               setProjectSettingsOpen(false)
-              setManagerMode('members')
+              openManager('current', currentProject.canManage === true ? 'sent' : 'received')
             }}
             onClose={() => { setProjectSettingsOpen(false) }}
           />

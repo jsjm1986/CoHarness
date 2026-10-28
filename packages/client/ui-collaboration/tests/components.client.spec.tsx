@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -159,15 +159,16 @@ describe('ScopeControl', () => {
     // non-default scopes, so a read-write project carries none.
     expect(trigger.textContent).not.toContain('可编辑')
     fireEvent.click(trigger)
-    // Visibility staging lives one level down; the root row shows the value.
+    fireEvent.click(screen.getByRole('tab', { name: '空间管理' }))
     fireEvent.click(screen.getByRole('button', { name: /新对话可见范围/ }))
-    fireEvent.click(screen.getByRole('button', { name: /仅自己/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /仅自己/ }))
     expect(stageVisibility).toHaveBeenCalledWith('private')
     // Staging keeps the picker open; Escape pops back to the root view.
-    expect(screen.getByRole('button', { name: /项目公开/ })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: /项目公开/ })).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.getByRole('button', { name: /新对话可见范围/ })).toBeTruthy()
 
+    fireEvent.click(screen.getByRole('tab', { name: '切换空间' }))
     fireEvent.click(screen.getByRole('button', { name: /个人空间/ }))
     expect(switchScope).toHaveBeenCalledWith({ kind: 'personal' })
 
@@ -180,34 +181,22 @@ describe('ScopeControl', () => {
     expect(screen.queryByText(/所有空间/)).toBeNull()
   })
 
-  it('presents the wide surface as a push page: hero, settings group, and member entry', async () => {
-    const getInvitationCount = vi.fn().mockResolvedValue({ pending: 2 })
-    const loadProjectConfiguration = vi.fn().mockResolvedValue({
-      project: { id: 9, name: '支付重构', themePolicy: 'follow-user' },
-      canManage: true,
-      capabilities: {
-        themePolicy: true, runtimeSettings: false, projectModels: false, members: true, filesystem: false,
-      },
-    })
+  it('keeps switching separate from management and exposes the global invitation count', async () => {
     render(<ScopeControl {...scopeProps(snapshot(), {
-      getInvitationCount,
+      getInvitationCount: vi.fn().mockResolvedValue({ pending: 2 }),
       listInvitations: vi.fn().mockResolvedValue([]),
-      loadProjectConfiguration,
-      setProjectThemePolicy: vi.fn(),
     })} />)
-    const trigger = screen.getByRole('button', { name: '切换个人或项目空间' })
-    fireEvent.click(trigger)
-    // The page carries a back control, the settings group, and the roster.
-    expect(screen.getByText('空间设置')).toBeTruthy()
-    expect(screen.getByText(/所有空间/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
-    expect(screen.queryByText('空间设置')).toBeNull()
-    fireEvent.click(trigger)
-    // Pending invitations keep their badge on the member row.
-    const invite = await screen.findByRole('button', { name: /邀请与待处理事项/ })
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+    expect(screen.getByRole('tab', { name: '切换空间' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.queryByRole('button', { name: /新对话可见范围/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '返回工作台' }))
+    expect(screen.queryByRole('tab', { name: '切换空间' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+    fireEvent.click(screen.getByRole('tab', { name: '空间管理' }))
+    const invite = await screen.findByRole('button', { name: /邀请中心/ })
     expect(invite.textContent).toContain('2')
     fireEvent.click(invite)
-    expect(await screen.findByText('项目成员与邀请')).toBeTruthy()
+    expect(await screen.findByRole('dialog', { name: '邀请中心' })).toBeTruthy()
   })
 
   it('filters a growing project roster without hiding personal scope or pinned actions', () => {
@@ -229,7 +218,7 @@ describe('ScopeControl', () => {
     const search = screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索项目空间' })
     expect(search.placeholder).toBe('搜索项目空间')
     expect(screen.getByRole('button', { name: /个人空间/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /新建项目空间/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '新建项目空间' })).toBeTruthy()
 
     fireEvent.change(search, { target: { value: '审计' } })
     expect(screen.getByRole('button', { name: /审计平台/ })).toBeTruthy()
@@ -237,7 +226,7 @@ describe('ScopeControl', () => {
 
     fireEvent.change(search, { target: { value: '不存在' } })
     expect(screen.getByText('没有匹配的项目空间')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '清除项目空间搜索' }))
+    fireEvent.click(screen.getAllByRole('button', { name: '清除项目空间搜索' })[0]!)
     expect(search.value).toBe('')
     expect(screen.getByRole('button', { name: '项目 1' })).toBeTruthy()
 
@@ -279,9 +268,7 @@ describe('ScopeControl', () => {
     expect(tile?.textContent).toBe('支')
   })
 
-  it('flags only the minority grant tier: the dominant tier renders unflagged', () => {
-    // Admin-dominant roster: admin rows go quiet, the plain read-write row
-    // keeps its flag, and personal/read-only always answer.
+  it('keeps administrator and writable rows quiet while marking read-only access', () => {
     const adminHeavy: CollaborationContext = {
       ...projectContext,
       projects: [
@@ -297,10 +284,10 @@ describe('ScopeControl', () => {
     expect(screen.getByRole('button', { name: /支付重构/ }).textContent).not.toContain('管理员')
     expect(screen.getByRole('button', { name: /提示词组合/ }).textContent).not.toContain('管理员')
     expect(screen.getByRole('button', { name: /审计平台/ }).textContent).toContain('只读')
-    expect(screen.getByRole('button', { name: /数据看板/ }).textContent).toContain('可编辑')
+    expect(screen.getByRole('button', { name: /数据看板/ }).textContent).not.toContain('可编辑')
   })
 
-  it('flags admin rows when read-write dominates the roster', () => {
+  it('keeps administrator rows quiet regardless of the roster composition', () => {
     const rwHeavy: CollaborationContext = {
       ...projectContext,
       projects: [
@@ -311,7 +298,7 @@ describe('ScopeControl', () => {
     }
     render(<ScopeControl {...scopeProps(snapshot({ context: rwHeavy }))} />)
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
-    expect(screen.getByRole('button', { name: /支付重构/ }).textContent).toContain('管理员')
+    expect(screen.getByRole('button', { name: /支付重构/ }).textContent).not.toContain('管理员')
     expect(screen.getByRole('button', { name: /数据看板/ }).textContent).not.toContain('可编辑')
     expect(screen.getByRole('button', { name: /插件开发/ }).textContent).not.toContain('可编辑')
   })
@@ -346,15 +333,16 @@ describe('ScopeControl', () => {
     )
     // Root view: hero, the settings group, the roster, and create.
     expect(screen.getByRole('button', { name: /个人空间/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /新对话可见范围/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /新对话可见范围/ })).toBeNull()
     expect(screen.getByRole('button', { name: '新建项目空间' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /支付重构/ }).getAttribute('aria-current')).toBe('true')
-    // The visibility row pushes the second level rather than expanding inline.
+    fireEvent.click(screen.getByRole('tab', { name: '空间管理' }))
     fireEvent.click(screen.getByRole('button', { name: /新对话可见范围/ }))
     expect(screen.getByText('只有创建者可以查看')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '新建项目空间' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+    fireEvent.click(screen.getByRole('button', { name: '返回空间管理' }))
     expect(screen.getByRole('button', { name: '新建项目空间' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: '切换空间' }))
     // Tapping a scope row selects it and dismisses the page.
     fireEvent.click(screen.getByRole('button', { name: /审计平台/ }))
     expect(switchScope).toHaveBeenCalledWith({ kind: 'project', projectId: 10 })
@@ -362,7 +350,7 @@ describe('ScopeControl', () => {
     // The head toggles the same page back open at its root view.
     fireEvent.click(trigger)
     expect(screen.getByRole('button', { name: '新建项目空间' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /新对话可见范围/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '切换空间' }).getAttribute('aria-selected')).toBe('true')
   })
 
   it('keeps project settings discoverable for a read-only member and explains the owner boundary', async () => {
@@ -379,7 +367,8 @@ describe('ScopeControl', () => {
       setProjectThemePolicy,
     })} />)
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
-    fireEvent.click(screen.getByRole('button', { name: '项目设置' }))
+    fireEvent.click(screen.getByRole('button', { name: '项目配置' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '界面主题' }))
     expect(await screen.findByText('只有项目 owner 或组织管理员可以修改项目策略。')).toBeTruthy()
     expect(loadProjectConfiguration).toHaveBeenCalledWith(9)
     expect(setProjectThemePolicy).not.toHaveBeenCalled()

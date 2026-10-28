@@ -1,0 +1,45 @@
+- dialog "Project settings":
+  - banner:
+    - heading "Project settings" [level=2]
+    - paragraph: Payments migration
+    - button "Close":
+      - img
+  - region "Project overview":
+    - heading "Project overview" [level=3]
+    - paragraph: Manage project-level UI and runtime policies here. Server directories and lifecycle remain in the admin console.
+    - term: Project name
+    - definition: Payments migration
+    - term: Created through
+    - definition: Admin-created
+    - term: Owner
+    - definition: Organization administrators
+    - term: Your access
+    - definition: Can manage project settings
+    - button "Appearance The default follows each member’s account preference; a forced theme applies only in this project.":
+      - img
+      - strong: Appearance
+      - text: The default follows each member’s account preference; a forced theme applies only in this project.
+      - img
+    - button "Runtime and Agent Plugins and Agent presets":
+      - img
+      - strong: Runtime and Agent
+      - text: Plugins and Agent presets
+      - img
+    - button "Models and Providers Model configuration for this project":
+      - img
+      - strong: Models and Providers
+      - text: Model configuration for this project
+      - img
+    - button "Members and invitations Invite members and view invitations":
+      - img
+      - strong: Members and invitations
+      - text: Invite members and view invitations
+      - img
+    - button "SSH execution targets View and change targets shared with the project":
+      - img
+      - strong: SSH execution targets
+      - text: View and change targets shared with the project
+      - img
+  - contentinfo:
+    - text: Server directories, imported paths, and project deletion are available only in /admin.
+    - button "Done"

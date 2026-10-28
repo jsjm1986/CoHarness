@@ -24,6 +24,7 @@ interface ModalBaseProps {
   shortcutModal?: string
   onKeyDownCapture?: KeyboardEventHandler<HTMLDivElement>
   backdropBlur?: boolean
+  mobilePresentation?: 'sheet' | 'page'
 }
 
 type ModalProps = ModalBaseProps & (
@@ -44,6 +45,7 @@ type ModalProps = ModalBaseProps & (
  * @param props.footer - action row (Cancel / Create).
  * @param props.contentClassName - optional class for a scrollable content region.
  * @param props.backdropBlur - disable when the caller already blurs the page; defaults to true.
+ * @param props.mobilePresentation - sheets support pull-down dismissal; full-screen pages use explicit navigation.
  * @param props.shortcutModal - command scope allowed by shortcut owners; unnamed
  * dialogs block application commands unless their owner allows the "other" scope.
  * @param props.onKeyDownCapture - handle a nested dialog's keys before the document Escape listeners.
@@ -51,7 +53,7 @@ type ModalProps = ModalBaseProps & (
  */
 export function Modal({
   open, onClose, title, closeLabel, description, children, footer, className, contentClassName,
-  onKeyDownCapture, headless = false, backdropBlur = true, shortcutModal,
+  onKeyDownCapture, headless = false, backdropBlur = true, shortcutModal, mobilePresentation = 'sheet',
 }: ModalProps) {
   const dialog = useRef<HTMLDivElement>(null)
   useModalLayer(dialog, open, onClose)
@@ -62,7 +64,7 @@ export function Modal({
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
   const dismiss = useCallback(() => { onCloseRef.current() }, [])
-  useSheetSwipeDismiss(dialog, open, dismiss)
+  useSheetSwipeDismiss(dialog, open && mobilePresentation === 'sheet', dismiss)
 
   if (!open) return null
 

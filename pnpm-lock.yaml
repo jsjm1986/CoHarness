@@ -3273,6 +3273,9 @@ importers:
       '@types/react':
         specifier: ~19.2.7
         version: 19.2.18
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       react:
         specifier: ^19.3.0
         version: 19.3.0

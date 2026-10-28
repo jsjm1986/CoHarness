@@ -18,6 +18,8 @@ Runtime credential requests call the selected governance method through its serv
 
 The administrator console remains the authority for server directories, mounts, lifecycle, quotas, organization model governance, and membership overrides. Its project detail page shows configuration ownership and a safe link that enters the user frontend in the selected project scope; it does not duplicate project logic settings. Project credentials and policy writes acquire the project configuration lock before provider-row locks, keeping concurrent edits, credential rotation, and deletion ordered.
 
+The configuration panel separates overview, theme, runtime, models, invitations, and SSH targets. Desktop uses category navigation; phones push from the overview into full-screen detail pages with return focus. Creation source and owner are identity facts, not permission shortcuts: administrator-created projects have organization management, while frontend-created projects retain their creator as owner, including administrator creators. Invitation history remains inspectable separately from mutation eligibility; reserved maintenance spaces explain dedicated qualification instead of offering ordinary invitations.
+
 ## Alternatives considered
 
 **Make every project setting writable to `rw` members.** Directory write access does not imply authority over a shared runtime or credentials, so this would let any contributor change behavior for every member. Explicit namespace ownership keeps the permission grant narrow.

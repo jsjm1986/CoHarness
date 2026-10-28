@@ -26,7 +26,7 @@ describe('ScopeControl.module.css', () => {
     expect(dots).toContain('currentcolor')
     for (const flag of ['.modeFlagWarn', '.scopeFlagWarn']) {
       const rule = css.match(new RegExp(`\\${flag}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
-      expect(rule).toContain('var(--dsw-alias-state-warn-primary)')
+      expect(rule).toMatch(/var\(--dsw-alias-state-warn-(?:primary|label)\)/)
       expect(rule).not.toContain('background')
     }
   })
@@ -44,43 +44,14 @@ describe('ScopeControl.module.css', () => {
     expect(css).toContain('min-height: var(--dsw-touch-target)')
   })
 
-  it('covers the drawer on phones and the browsing region on wider surfaces', () => {
-    // The compact drawer keeps the edge-to-edge page; wider layouts align
-    // the page to the region box the sidebar column publishes.
+  it('keeps page content scrollable within the shell-owned browsing region', () => {
     const page = css.match(/\.scopePage\s*\{([^}]*)\}/)?.[1] ?? ''
     expect(page).toContain('position: absolute')
     expect(page).toContain('inset: 0')
-    expect(page).toContain('flex-direction: column')
-    expect(page).toContain('background: var(--dsw-specific-sidebar-fill)')
+    expect(page).toContain('min-height: 0')
     expect(css).toMatch(/@media \(min-width: 768px\)[\s\S]*\.scopePage\s*\{[^}]*top:\s*var\(--dsh-sidebar-region-top/)
     expect(css).toMatch(/@media \(min-width: 768px\)[\s\S]*\.scopePage\s*\{[^}]*height:\s*var\(--dsh-sidebar-region-height/)
-    // The nav bar is pinned above the scrolling view.
-    const nav = css.match(/\.pageNav\s*\{([^}]*)\}/)?.[1] ?? ''
-    expect(nav).toContain('flex: none')
-    expect(nav).toContain('border-bottom: 0.5px solid var(--dsw-alias-border-l2)')
     expect(css).toMatch(/\.pageScroll\s*\{[^}]*overflow-y:\s*auto/)
-    // The push reads as navigation: the page and its views slide in.
-    expect(page).toContain('animation: scope-page-in')
-    expect(css).toMatch(/@keyframes scope-page-in/)
-    expect(css).toMatch(/\.pagePush\s*\{[^}]*animation:\s*scope-view-in/)
-    expect(css).toMatch(/\.pagePop\s*\{[^}]*animation:\s*scope-view-out/)
-  })
-
-  it('lays the page rows as flat hairline leaves with one primary row', () => {
-    // Rows are full-bleed buttons — no card surface inside the page; the
-    // hairline lands only between neighbours, never above a group label.
-    const row = css.match(/\.pageRow\s*\{([^}]*)\}/)?.[1] ?? ''
-    expect(row).toContain('border: 0')
-    expect(row).toContain('min-height: 40px')
-    expect(row).toContain('background: transparent')
-    expect(css).toMatch(/\.pageRow \+ \.pageRow\s*\{[^}]*border-top:\s*0\.5px solid var\(--dsw-alias-border-l2\)/)
-    expect(css).toMatch(/@media \(pointer: coarse\)[\s\S]*\.pageRow\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\)/)
-    // The current scope is the single primary row: brand-blue tint and label.
-    const current = css.match(/\.pageRowCurrent[^{]*\{([^}]*)\}/)?.[1] ?? ''
-    expect(current).toMatch(/background:\s*color-mix\(in srgb, var\(--dsw-alias-state-business-primary\)/)
-    expect(current).toContain('color: var(--dsw-alias-state-business-primary)')
-    // The settings group and roster carry their section labels.
-    expect(css).toMatch(/\.pageGroup\s*\{[^}]*color:\s*var\(--dsw-alias-label-caption\)/)
   })
 
   it('caps the rail menu and keeps its search controls tappable on phones', () => {
