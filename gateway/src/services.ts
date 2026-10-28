@@ -40,6 +40,7 @@ import type {
   ProjectDetail,
   ProjectInvitation,
   ProjectRow,
+  ProjectScopeMetadata,
   ProjectThemePolicy,
   UserProjectMembership,
 } from './projects.ts'
@@ -112,6 +113,12 @@ export interface GatewayProjectService {
   getById(id: number): Awaitable<ProjectDetail | null>
   /** Batch detail lookup used by account catalog pages to avoid N+1 queries. */
   getByIds?(ids: readonly number[]): Awaitable<ProjectDetail[]>
+  /**
+   * Read active node-local scope metadata without member lists or counts.
+   * @param ids - public project ids already authorized by the caller.
+   * @returns Available owner, origin and theme fields for those projects.
+   */
+  getScopeMetadataByIds?(ids: readonly number[]): Awaitable<ProjectScopeMetadata[]>
   /**
    * Seed the reserved steward space once or return the existing row. The
    * steward project has no member rows; admission comes from the steward

@@ -19,6 +19,7 @@ import {
   type ProjectOrigin,
   type ProjectThemePolicy,
   type ProjectRow,
+  type ProjectScopeMetadata,
   type UserProjectMembership,
 } from '../projects.ts'
 import { transaction, type Queryable } from './database.ts'
@@ -66,6 +67,23 @@ interface InvitationSelectRow {
   expires_at: Date | null
   created_at: Date
   responded_at: Date | null
+}
+
+interface ScopeMetadataRow {
+  public_id: string
+  origin: ProjectOrigin
+  ui_theme_policy: ProjectThemePolicy
+  owner_id: string | null
+  owner_public_id: string | null
+  owner_username: string | null
+  owner_display_name: string | null
+}
+
+/** Map the nullable owner join shared by scope metadata and project details. */
+function projectOwner(row: ScopeMetadataRow): ProjectScopeMetadata['owner'] {
+  return row.owner_id === null ? null : {
+    id: publicNumber(row.owner_public_id!, 'user'), username: row.owner_username!, displayName: row.owner_display_name!,
+  }
 }
 
 /** PostgreSQL-backed project catalog and node-local mounts for one organization. */
@@ -306,23 +324,37 @@ export class PostgresProjectService {
     }))
   }
 
+  /**
+   * Read scope metadata for already-authorized public ids on this node.
+   * @param ids - authorized public project ids.
+   * @returns Active mounted projects without member materialization.
+   */
+  async getScopeMetadataByIds(ids: readonly number[]): Promise<ProjectScopeMetadata[]> {
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return []
+    const result = await this.context.pool.query<ScopeMetadataRow>(`SELECT p.public_id::text,p.origin,p.ui_theme_policy,
+      owner.id owner_id,owner.public_id::text owner_public_id,owner.username::text owner_username,owner.display_name owner_display_name
+      FROM harness.projects p
+      JOIN harness.project_mounts pm ON pm.project_id=p.id AND pm.organization_id=p.organization_id
+        AND pm.node_id=$2 AND pm.status='active'
+      LEFT JOIN harness.users owner ON owner.id=p.owner_user_id AND owner.organization_id=p.organization_id
+      WHERE p.organization_id=$1 AND p.public_id=ANY($3::bigint[]) AND p.status='active'
+      ORDER BY p.public_id`, [this.context.organizationId, this.context.nodeId, uniqueIds])
+    return result.rows.map(row => ({
+      id: publicNumber(row.public_id, 'project'), origin: row.origin, owner: projectOwner(row), uiThemePolicy: row.ui_theme_policy,
+    }))
+  }
+
   async getByIds(ids: readonly number[]): Promise<ProjectDetail[]> {
     const uniqueIds = [...new Set(ids)]
     if (uniqueIds.length === 0) return []
-    const project = await this.context.pool.query<{
+    const project = await this.context.pool.query<ScopeMetadataRow & {
       internal_id: string
-      public_id: string
       name: string
       path: string
       member_count: string
-      origin: ProjectOrigin
       kind: ProjectKind
       model_access_default_allowed: boolean
-      ui_theme_policy: ProjectThemePolicy
-      owner_id: string | null
-      owner_public_id: string | null
-      owner_username: string | null
-      owner_display_name: string | null
       creator_public_id: string | null
       creator_username: string | null
       creator_display_name: string | null
@@ -364,9 +396,7 @@ export class PostgresProjectService {
       kind: row.kind,
       modelAccessDefaultAllowed: row.model_access_default_allowed,
       uiThemePolicy: row.ui_theme_policy,
-      owner: row.owner_id === null ? null : {
-        id: publicNumber(row.owner_public_id!, 'user'), username: row.owner_username!, displayName: row.owner_display_name!,
-      },
+      owner: projectOwner(row),
       createdBy: row.creator_public_id === null ? null : {
         id: publicNumber(row.creator_public_id, 'user'), username: row.creator_username!, displayName: row.creator_display_name!,
       },

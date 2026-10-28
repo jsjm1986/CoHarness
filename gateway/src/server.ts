@@ -1172,19 +1172,17 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (pathname === '/account/api/context' && req.method === 'GET') {
       res.setHeader('cache-control', 'no-store')
       const scopes = await deps.collaboration?.projectsForUser(user.id) ?? []
-      // `projectsForUser` already establishes the membership set. Use one
-      // scoped batch detail query for owner flags instead of scanning the
-      // organization catalog or issuing one detail query per membership.
+      // Membership resolution supplies the authorized ids for owner and theme metadata.
       const scopedIds = scopes.map(scope => scope.projectId)
-      const scopedDetails = deps.projects.getByIds === undefined
-        ? (scopedIds.length === 0 ? [] : await deps.projects.list())
-        : await deps.projects.getByIds(scopedIds)
+      const scopedDetails = deps.projects.getScopeMetadataByIds !== undefined
+        ? await deps.projects.getScopeMetadataByIds(scopedIds)
+        : deps.projects.getByIds === undefined
+          ? (scopedIds.length === 0 ? [] : await deps.projects.list())
+          : await deps.projects.getByIds(scopedIds)
       const details = new Map(scopedDetails.map(project => [project.id, project]))
       const projects = await Promise.all(scopes.map(async (scope) => {
         const detail = details.get(scope.projectId)
-        // Older in-process project catalogs may omit owner metadata. Preserve
-        // the previous detail lookup only for those rows; production project
-        // services include `owner` in every catalog row and stay one-query.
+        // In-process catalogs without owner metadata use the complete detail lookup.
         const owner = detail?.owner !== undefined
           ? detail.owner
           : (await deps.projects.getById(scope.projectId))?.owner

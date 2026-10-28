@@ -167,7 +167,7 @@ Gateway 按认证用户保存 Android Token，只在持久化 completed turn 后
 
 账户运行在个人 scope 或一个可访问项目 scope 中。个人 scope 保留每用户运行时及其持久化；每个项目使用一个覆盖项目路径的共享运行时。scope 选择端点会先启动并等待目标运行时就绪，再写入新的 scope Cookie；启动失败会保留当前 scope，成功后的页面重载会直接连接已就绪进程。代理重试响应禁止缓存并声明两秒后重试，HTML 等待页把自动刷新元数据放在文档 head 中。Gateway 为所选运行时签发短期请求 principal，并在每次代理的 HTTP/WebSocket 操作中转发。长时间 HTTP/WebSocket 工作会持有串行 runtime lease；idle 回收会重新检查 lease 准入，若停止操作赢得竞态则使用新 generation 重试，而不会转发过期端口。运行时会在 Host 代码观察请求前验证组织、用户、scope、运行时 id 和 generation。私有运行时凭据与协作端点只允许 loopback 访问。完整决策见[项目协作对话](../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.zh.md)。
 
-账户上下文响应复用当前 HTTP 请求已经验证的作用域。项目权限读取同时返回管理权限和主题元数据，不加载成员名单；代理准入和事件流续租分别重新检查当前权限。成员关系和管理标记遵循[上下文读取规则](../.agents/notes/implemented/bug-fix/2026-08-26-project-scope-switch-performance.zh.md)。
+账户上下文响应复用当前 HTTP 请求已经验证的作用域。PostgreSQL 解析可访问项目后，批量读取其 owner、来源和主题元数据，不加载或计数成员名单。项目权限读取同时返回管理权限和主题元数据；代理准入和事件流续租分别重新检查当前权限。成员关系和管理标记遵循[上下文读取规则](../.agents/notes/implemented/bug-fix/2026-08-26-project-scope-switch-performance.zh.md)。
 
 活动的 `/api/events.mux` 与 `/api/events.host` socket 将原登录会话、nonce、身份/权限快照、scope 和 Runtime generation 保留在 Gateway 所有的登记表中。携带私有运行时 bearer 的请求只有在同步访问监控并只读检查登录资格及成员身份后，才能续租这些仍活动的登记。续租不更新登录活动，也不延长任何登录期限；权限变化、监控中断、socket 关闭或 generation 替换都会终止连接。每份替代签名的有效期仍不超过 30 秒。普通 HTTP 断言保持固定到期。禁用续租或丢失响应都不会给 Runtime 增加有效期；事件流在最后一次验证的期限到达时关闭。设置通过下一次私有启动凭据交付给 Runtime。见[事件 principal 决策](../.agents/notes/implemented/architecture/2026-10-23-event-stream-principal-renewal.zh.md)。
 

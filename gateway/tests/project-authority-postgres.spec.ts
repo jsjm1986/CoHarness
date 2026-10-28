@@ -114,7 +114,10 @@ describePg('fresh PostgreSQL project authority', () => {
       + (cookieScope ? '' : '?dshTarget=project:' + String(publicId)), {
       headers: { cookie: `${SESSION_COOKIE}=${actors[role].token}` + (cookieScope ? `; hgw_scope=project:${String(publicId)}` : '') },
     })
-    return { organizationId, actors, project, publicId, root, projects, collaboration, request }
+    const contextRequest = (role: Role, target = 'personal') => fetch(base + '/account/api/context?dshTarget=' + encodeURIComponent(target), {
+      headers: { cookie: `${SESSION_COOKIE}=${actors[role].token}` },
+    })
+    return { organizationId, actors, project, publicId, root, projects, collaboration, request, contextRequest }
   }
 
   it.each([4, 300])('constructs a %i-member project scope with one authority SELECT and no roster read', async members => {
@@ -181,5 +184,80 @@ describePg('fresh PostgreSQL project authority', () => {
     const f = await fixture()
     const list = await f.collaboration.projectsForUser(f.actors.owner.publicId)
     expect(list).toEqual([{ projectId: f.publicId, name: 'Owned', path: f.root, mode: 'rw', kind: 'standard' }])
+  })
+
+  it.each([4, 300])('builds the %i-member account catalog without member lists or counts', async members => {
+    const f = await fixture(members)
+    const full = vi.spyOn(f.projects, 'getByIds').mockRejectedValue(new Error('Account context requires only scope metadata'))
+    const single = vi.spyOn(f.projects, 'getById').mockRejectedValue(new Error('Owner metadata must not need a full detail fallback'))
+    const queryable: Queryable = pool
+    const query: Queryable['query'] = queryable.query.bind(queryable)
+    const statements: string[] = []
+    vi.spyOn(queryable, 'query').mockImplementation(async <R extends QueryResultRow>(text: string, values?: readonly unknown[]) => {
+      if (text.includes('JOIN harness.projects p') || text.includes('FROM harness.projects p') || text.includes('FROM harness.project_members m')) statements.push(text)
+      return query<R>(text, values)
+    })
+    const response = await f.contextRequest('owner')
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ scope: { kind: 'personal' }, projects: [{
+      projectId: f.publicId, name: 'Owned', path: f.root, mode: 'rw', kind: 'standard', canManage: true,
+      origin: 'user', owner: { id: f.actors.owner.publicId, username: 'owner', displayName: 'owner' }, uiThemePolicy: 'follow-user',
+    }] })
+    expect(statements).toHaveLength(2)
+    expect(statements.every(text => !text.includes('COUNT(m.user_id)') && !text.includes('FROM harness.project_members m'))).toBe(true)
+    expect(full).not.toHaveBeenCalled()
+    expect(single).not.toHaveBeenCalled()
+  })
+
+  it.each(['follow-user', 'light', 'dark'] as const)('keeps %s context owner, mode, theme and management fields unchanged', async policy => {
+    const f = await fixture()
+    await f.projects.setThemePolicy(f.publicId, policy)
+    for (const [role, mode, canManage] of [
+      ['owner', 'rw', true], ['writer', 'rw', false], ['reader', 'ro', false], ['administrator', 'rw', true],
+    ] as const) {
+      for (const target of ['personal', 'project:' + String(f.publicId)]) {
+        const response = await f.contextRequest(role, target)
+        expect(response.status).toBe(200)
+        const body = await response.json() as { projects: unknown[] }
+        expect(body.projects).toEqual([{
+          projectId: f.publicId, name: 'Owned', path: f.root, mode, kind: 'standard',
+          ...(canManage ? { canManage: true } : {}), origin: 'user',
+          owner: { id: f.actors.owner.publicId, username: 'owner', displayName: 'owner' }, uiThemePolicy: policy,
+        }])
+      }
+    }
+    const outsider = await f.contextRequest('outsider')
+    expect(outsider.status).toBe(200)
+    expect(await outsider.json()).toMatchObject({ scope: { kind: 'personal' }, projects: [] })
+  })
+
+  it('filters scope metadata by active node mounts and reflects owner and theme changes', async () => {
+    const f = await fixture()
+    const full = (await f.projects.getByIds([f.publicId]))[0]!
+    expect(await f.projects.getScopeMetadataByIds([f.publicId, f.publicId])).toEqual([{
+      id: full.id, origin: full.origin, owner: full.owner, uiThemePolicy: full.uiThemePolicy,
+    }])
+    expect(await f.projects.getScopeMetadataByIds([])).toEqual([])
+    await pool.query('UPDATE harness.projects SET owner_user_id=$2,ui_theme_policy=$3 WHERE id=$1',
+      [f.project.id, f.actors.writer.id, 'dark'])
+    expect(await f.projects.getScopeMetadataByIds([f.publicId])).toEqual([{
+      id: f.publicId, origin: 'user', owner: { id: f.actors.writer.publicId, username: 'writer', displayName: 'writer' }, uiThemePolicy: 'dark',
+    }])
+    await pool.query("UPDATE harness.projects SET origin='admin',owner_user_id=NULL WHERE id=$1", [f.project.id])
+    expect(await f.projects.getScopeMetadataByIds([f.publicId])).toEqual([{
+      id: f.publicId, origin: 'admin', owner: null, uiThemePolicy: 'dark',
+    }])
+    for (const role of ['owner', 'administrator'] as const) {
+      const response = await f.contextRequest(role)
+      expect(response.status).toBe(200)
+      expect(await response.json()).toMatchObject({ projects: [{
+        origin: 'admin', owner: null, ...(role === 'administrator' ? { canManage: true } : {}),
+      }] })
+    }
+    await pool.query("UPDATE harness.projects SET status='archived' WHERE id=$1", [f.project.id])
+    expect(await f.projects.getScopeMetadataByIds([f.publicId])).toEqual([])
+    await pool.query("UPDATE harness.projects SET status='active' WHERE id=$1", [f.project.id])
+    await pool.query("UPDATE harness.project_mounts SET status='missing' WHERE project_id=$1", [f.project.id])
+    expect(await f.projects.getScopeMetadataByIds([f.publicId])).toEqual([])
   })
 })
