@@ -1,0 +1,12 @@
+diff --git a/lib/index.js b/lib/index.js
+index 17eb488f907f6ff01bf1497fe8b2c071ce17823e..de41c875a88fdb4acc5a1828975a6815f9d9b1e7 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -8,7 +8,6 @@ import { spawn } from "node:child_process";
+ import { createHash, randomUUID } from "node:crypto";
+ import { createInterface } from "node:readline";
+ import { zlibSync } from "fflate";
+-import "fontkit";
+ import { fileURLToPath } from "node:url";
+ //#region lib/types/errors.js
+ /** Stable render failure categories shared across the Node worker and native helper transports. */

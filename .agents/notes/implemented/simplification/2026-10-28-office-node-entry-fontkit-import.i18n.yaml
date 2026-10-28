@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-28-office-node-entry-fontkit-import.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-10-28-office-node-entry-fontkit-import.md
+document:
+  en: cbe281c51f818a3b54be5d08f8d6e150309b842f
+  zh: bcb06aed1bc2b8992268fb1f272ee3e6f9dfcf9e
+/agent-note-office-node-entry-fontkit-loading:
+  en: 4d7d9c9af14984ad
+  zh: 39d1735abad73ef4
+/agent-note-office-node-entry-fontkit-loading/problem:
+  en: f783f64a48ffb45d
+  zh: c2a0feeab39d3c54
+/agent-note-office-node-entry-fontkit-loading/decision:
+  en: 32713261154363a7
+  zh: 4d9c60fb2d9e0cfc
+/agent-note-office-node-entry-fontkit-loading/alternatives-considered:
+  en: 97d316e6e5e961cc
+  zh: 8b51bba2efb8ae7e
+/agent-note-office-node-entry-fontkit-loading/consequences:
+  en: 9ca75178a9fda64e
+  zh: 78213f2466abe80b

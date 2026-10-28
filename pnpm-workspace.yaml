@@ -134,6 +134,7 @@ minimumReleaseAgeExclude:
   - w3c-xmlserializer@6.0.0
 
 patchedDependencies:
+  '@deepseek-ai/libreoffice-kit@0.1.1': patches/@deepseek-ai__libreoffice-kit@0.1.1.patch
   '@earendil-works/pi-ai@1.1.0': patches/@earendil-works__pi-ai@1.1.0.patch
   '@fortune-sheet/core@1.0.4': patches/@fortune-sheet__core@1.0.4.patch
   '@fortune-sheet/react@1.0.4': patches/@fortune-sheet__react@1.0.4.patch

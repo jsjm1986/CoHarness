@@ -66,6 +66,8 @@ The defaults retain 8 PDFs/128 MiB and 64 source aliases, admit 32 readers and 8
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+Workspace installations apply the [Node-entry import patch](../../../.agents/notes/implemented/simplification/2026-10-28-office-node-entry-fontkit-import.md) to kit `0.1.1`. Provider imports omit an unused main-thread font parser; conversion Workers retain their parser imports.
+
 Invalid engine metadata, missing required assets, and conversion errors reject the request instead of switching engines. The shared WASM engine uses LibreOffice's CPU image filter. Native conversion uses its separate platform engine.
 
 The ApiProxy file reader owns request authorization and cancellation; the converter owns admitted reads, conversion, cache, and engine teardown. Source-read failures pass through, and conversion failures expose a classified reason without engine diagnostics.
