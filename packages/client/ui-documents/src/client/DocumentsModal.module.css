@@ -2646,3 +2646,10 @@
 @media (pointer: coarse) {
   .rowMore { width: var(--dsw-touch-target); min-width: var(--dsw-touch-target); height: var(--dsw-touch-target); min-height: var(--dsw-touch-target); }
 }
+
+@media (max-width: 1100px) {
+  .scopeTriggerCopy { display: flex; flex-direction: column; gap: 1px; }
+  .scopeTriggerCopy small { display: none; }
+}
+
+.row button:focus-visible, .overviewRow button:focus-visible, .trashRow button:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: -2px; }

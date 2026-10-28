@@ -84,7 +84,7 @@ async function mockDocuments(page: Page, payload: typeof LIST_PAYLOAD = LIST_PAY
 }
 
 
-async function assertRowActionClearance(manager: ReturnType<Page['getByRole']>, width: number): Promise<void> {
+async function assertRowActionClearance(page: Page, manager: ReturnType<Page['getByRole']>, width: number): Promise<void> {
   await manager.evaluate(async element => Promise.allSettled(element.getAnimations().map(animation => animation.finished)))
   const controls = manager.locator('[data-documents-row-kind] button[aria-label^="More actions:"]')
   expect(await controls.count()).toBeGreaterThan(0)
@@ -92,12 +92,17 @@ async function assertRowActionClearance(manager: ReturnType<Page['getByRole']>, 
     const name = await button.getAttribute('aria-label')
     if (name?.startsWith('More actions:') !== true) continue
     await button.focus()
+    await button.press('Tab')
+    await page.keyboard.press('Shift+Tab')
     if (width >= 768) await button.hover()
     const box = await button.evaluate((element) => {
       const row = element.closest('[data-documents-row-kind]')!
       const a = element.getBoundingClientRect(), b = row.getBoundingClientRect()
-      return { rightClearance: b.right-a.right, leftClearance: a.left-b.left, width: a.width, height: a.height }
+      return { rightClearance: b.right-a.right, leftClearance: a.left-b.left, width: a.width, height: a.height,
+        outlineOffset: getComputedStyle(element).outlineOffset, focusVisible: element.matches(':focus-visible') }
     })
+    expect(box.focusVisible).toBe(true)
+    expect(Number.parseFloat(box.outlineOffset)).toBeLessThanOrEqual(0)
     expect(box.rightClearance).toBeGreaterThanOrEqual(7.5)
     expect(box.leftClearance).toBeGreaterThanOrEqual(0)
     expect(box.width).toBeGreaterThanOrEqual(width === 390 ? 44 : 32)
@@ -1060,12 +1065,12 @@ describe('web e2e: document manager', () => {
     await page.getByRole('button', { name: 'Documents', exact: true }).click()
     const manager = page.getByRole('dialog', { name: 'Document Manager', exact: true })
     await manager.getByText('brief.txt', { exact: true }).waitFor()
-    await assertRowActionClearance(manager, width)
+    await assertRowActionClearance(page, manager, width)
     if (out !== undefined) await page.screenshot({ path: join(out, `row-hover-${width}.png`) })
     if (width >= 768) {
       await page.route(/\/api\/documents\/content(?:\?.*)?$/, route => route.fulfill({ contentType: 'text/plain', body: 'Reading fixture' }))
       await manager.getByRole('button', { name: 'Preview brief.txt', exact: true }).click()
-      await assertRowActionClearance(manager, width)
+      await assertRowActionClearance(page, manager, width)
       if (out !== undefined) await page.screenshot({ path: join(out, `row-hover-preview-${width}.png`) })
       await manager.getByRole('button', { name: 'Close preview', exact: true }).click()
     }

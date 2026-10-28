@@ -49,8 +49,10 @@ it.skipIf(MODE === 'record')('aligns routine toolbar entries across themes while
   browser = await chromium.launch()
   const page = await browser.newPage({ viewport: { width: 1566, height: 900 }, locale: 'en-US' })
   const tripwire = watchConsole(page)
+  let documentReads = 0
   await page.route(/\/api\/documents(?:\?.*)?$/, async (route) => {
     if (route.request().method() !== 'GET') { await route.continue(); return }
+    documentReads += 1
     await route.fulfill({ json: {
       limits: {
         maxFileBytes: null, maxFilesPerMessage: 20, maxMessageBytes: 100, maxInlineTextBytes: 256,
@@ -99,13 +101,18 @@ it.skipIf(MODE === 'record')('aligns routine toolbar entries across themes while
     expect(folderMetrics.height).toBe(uploadMetrics.height)
     const search = documents.getByPlaceholder('Search document name')
     const type = documents.getByRole('combobox', { name: 'Type', exact: true })
-    const refresh = documents.getByRole('button', { name: 'Refresh', exact: true })
-    const controls = await Promise.all([search.locator('..'), type, refresh].map(control => control.evaluate((element) => {
+    const more = documents.getByRole('button', { name: 'More actions', exact: true })
+    const controls = await Promise.all([search.locator('..'), type, more].map(control => control.evaluate((element) => {
       const rect = element.getBoundingClientRect()
       return { height: rect.height, radius: getComputedStyle(element).borderTopLeftRadius }
     })))
     expect(controls).toEqual(Array.from({ length: 3 }, () => ({ height: 32, radius: '8px' })))
-    expect(await refresh.evaluate(element => element.getBoundingClientRect().width)).toBe(32)
+    expect(await more.evaluate(element => element.getBoundingClientRect().width)).toBe(32)
+    const readsBeforeRefresh = documentReads
+    await more.click()
+    await page.getByRole('menuitem', { name: 'Refresh', exact: true }).click()
+    await expect.poll(() => documentReads).toBe(readsBeforeRefresh + 1)
+    expect(await documents.isVisible()).toBe(true)
 
     expect(uploadMetrics.contrast).toBeGreaterThanOrEqual(4.5)
     const chooser = page.waitForEvent('filechooser')
