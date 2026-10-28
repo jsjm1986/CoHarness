@@ -408,6 +408,7 @@ describe('web e2e: startup auto-selection', () => {
       await workspace.attachSession(otherId)
       modelPage = await newEnglishPage(browser)
       const target = modelPage
+      const historyPrompt = target.locator('[data-conversation-scroll]').getByText(SAVED_PROMPT, { exact: true })
       target.setDefaultTimeout(test.task.timeout)
       const logs = watchConsole(target)
       const origin = new URL(modelScaffold.authenticatedUrl).origin
@@ -510,16 +511,16 @@ describe('web e2e: startup auto-selection', () => {
       await expect.poll(() => readStartupModelAdmission(target, id), { timeout: test.task.timeout }).toEqual({
         currentMatchesSaved: true, listed: true, retainedScope: true, connected: true, accountVerified: true, historyState: 'loading',
       })
-      expect(await target.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
+      expect(await historyPrompt.count()).toBe(0)
       await expect.poll(() => modelRequests, {
         timeout: test.task.timeout,
         message: 'An admitted saved current root prepares its model directory before the held history response is released',
       }).toEqual([id])
       expect((await readStartupModelAdmission(target, id)).historyState).toBe('loading')
-      expect(await target.getByText(SAVED_PROMPT, { exact: true }).count()).toBe(0)
+      expect(await historyPrompt.count()).toBe(0)
       expect(modelScaffold.ctx.agents.get(otherId)).toBeUndefined()
       historyGate.resolve(undefined)
-      await target.getByText(SAVED_PROMPT, { exact: true }).waitFor()
+      await historyPrompt.waitFor()
       const model = target.getByRole('button', { name: 'Select model, current DeepSeek-V4-Flash', exact: true })
       await model.waitFor()
       await expect.poll(() => model.getAttribute('aria-busy'), { timeout: test.task.timeout }).not.toBe('true')
