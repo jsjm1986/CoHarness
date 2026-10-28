@@ -162,9 +162,9 @@ describe('Gateway local document broker', () => {
       },
       collaboration: {
         projectForUser: async (projectId: number) => projectId === 41
-          ? { projectId, name: 'Compiler', path: projectPath, mode: 'rw' as const, administrator: false }
+          ? { projectId, name: 'Compiler', path: projectPath, mode: 'rw' as const, administrator: false, canManage: false }
           : projectId === 42
-            ? { projectId, name: 'Read only', path: readOnlyPath, mode: 'ro' as const, administrator: false }
+            ? { projectId, name: 'Read only', path: readOnlyPath, mode: 'ro' as const, administrator: false, canManage: false }
             : null,
       },
       principals: new GatewayPrincipalSigner(privateKey, 'acme', 60_000),

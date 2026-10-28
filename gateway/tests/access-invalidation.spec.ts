@@ -19,7 +19,7 @@ import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import type { PostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
 import { PostgresUserService } from '../src/postgres/user-service.ts'
 import { createProxyHandlers } from '../src/proxy.ts'
-import { GatewayPrincipalSigner } from '../src/principal.ts'
+import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { barrier } from './barrier.ts'
 
@@ -43,6 +43,7 @@ async function listen(server: Server): Promise<string> {
 async function fixture(options: {
   runtime?: (req: IncomingMessage, res: ServerResponse) => boolean
   wrapDocumentScope?: (handler: GatewayDocumentScopeHandler) => GatewayDocumentScopeHandler
+  includePrincipal?: boolean
 } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'hgw-access-'))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
@@ -89,6 +90,11 @@ async function fixture(options: {
   }
   const runtime = createServer((req, res) => {
     if (options.runtime?.(req, res) === true) return
+    if (options.includePrincipal) {
+      res.setHeader('content-type', 'application/json')
+      res.end(JSON.stringify({ principal: req.headers[PRINCIPAL_HEADER] }))
+      return
+    }
     if (req.url?.startsWith('/api/hold')) { res.write('authorized-prefix'); return }
     if (req.url?.startsWith('/api/register-document')) {
       void registerDocument().then(() => { res.end('registered') }, () => { res.writeHead(500); res.end() })
@@ -98,8 +104,8 @@ async function fixture(options: {
   })
   const runtimeBase = await listen(runtime)
   const webSockets = new WebSocketServer({ server: runtime })
-  webSockets.on('connection', (socket) => {
-    socket.send('ready')
+  webSockets.on('connection', (socket, req) => {
+    socket.send(options.includePrincipal ? JSON.stringify({ principal: req.headers[PRINCIPAL_HEADER] }) : 'ready')
     socket.on('message', data => { socket.send(data) })
   })
   cleanup.push(() => {
@@ -133,7 +139,7 @@ async function fixture(options: {
         stop, stopAll: async () => {}, withStopped: async (_target, operation) => operation(),
       },
     }
-    const proxy = createProxyHandlers(deps)
+    const proxy = createProxyHandlers(deps, options.includePrincipal ? principals : undefined)
     const documentScope = createGatewayDocumentScopeHandler({
       instances: deps.instances, users, projects: deps.projects, collaboration: deps.collaboration!, principals,
     })
@@ -167,7 +173,7 @@ async function fixture(options: {
   const revision = async () => (await pool.query<{ revision: string }>(
     'SELECT access_revision::text AS revision FROM harness.organizations WHERE id=$1', [organizationId],
   )).rows[0]!.revision
-  return { gateways, organizationId, projects, project, projectId, alice, aliceId, bob, aliceCookie, bobCookie, target, socket, revision }
+  return { gateways, organizationId, projects, project, projectId, alice, aliceId, bob, aliceCookie, bobCookie, target, socket, revision, principals }
 }
 
 describePg('cross-Gateway access invalidation', () => {
@@ -177,6 +183,46 @@ describePg('cross-Gateway access invalidation', () => {
     await runMigrations(pool, migrations)
   })
   afterAll(async () => { await pool?.end() })
+
+  it.each([
+    { policy: 'follow-user' as const, projectPublicId: 1701 },
+    { policy: 'light' as const, projectPublicId: 1702 },
+    { policy: 'dark' as const, projectPublicId: 1703 },
+  ])('signs fresh $policy owner/member HTTP and event scopes without full project details', async ({ policy, projectPublicId }) => {
+    const f = await fixture({ includePrincipal: true })
+    const first = f.gateways[0]!
+    await pool.query('UPDATE harness.projects SET owner_user_id=$2 WHERE id=$1', [f.projectId, f.aliceId])
+    await f.projects.setThemePolicy(f.project.id, policy)
+    await first.monitor.synchronize()
+    const detail = vi.spyOn(first.deps.projects, 'getById').mockRejectedValue(new Error('Project authority must not fetch a full member roster'))
+    cleanup.push(() => { detail.mockRestore() })
+    const transcript: Array<{ actor: string; http: unknown; websocket: unknown }> = []
+    for (const [actor, cookie, canManage] of [['owner', f.aliceCookie, true], ['member', f.bobCookie, false]] as const) {
+      const response = await fetch(first.base + '/api/echo' + f.target, { headers: { cookie } })
+      expect(response.status).toBe(200)
+      const body = await response.json() as { principal: string }
+      const http = f.principals.verify(body.principal).scope
+      expect(http).toEqual({ kind: 'project', projectId: f.project.id, projectName: 'project', mode: 'rw', canManage, uiThemePolicy: policy })
+      const socket = new WebSocket(first.base.replace('http:', 'ws:') + '/api/events.host' + f.target, { headers: { cookie, origin: first.base } })
+      cleanup.push(async () => {
+        if (socket.readyState === WebSocket.CLOSED) return
+        const closed = once(socket, 'close')
+        socket.terminate()
+        await closed
+      })
+      const [message] = await once(socket, 'message', { signal: AbortSignal.timeout(5_000) })
+      const greeting = JSON.parse(String(message)) as { principal: string }
+      const websocket = f.principals.verify(greeting.principal).scope
+      expect(websocket).toEqual(http)
+      transcript.push({ actor,
+        http: { ...http, projectId: projectPublicId },
+        websocket: { ...websocket, projectId: projectPublicId },
+      })
+    }
+    expect(detail).not.toHaveBeenCalled()
+    await expect(JSON.stringify(transcript, null, 2) + '\n')
+      .toMatchFileSnapshot(join(import.meta.dirname, `snapshots/project-authority/signed-${policy}.expected.json`))
+  })
 
   it('cancels another Gateway HTTP/WS traffic on committed membership removal, preserving other users', async () => {
     const f = await fixture()

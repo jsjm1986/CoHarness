@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-26-project-scope-switch-performance.md
 document:
-  en: d6eec75a03f99dc1d68454bae4e8b9e5f3e9734c
-  zh: 42f5f2a72d4638b6dd47a2e876aa22304ee2f700
+  en: 1372be308747e8c5e029309c8c87df7bba8ece80
+  zh: ebbafe5fcafeaf075b8ba05085e2a1877b0b456c
 /agent-note-keep-repeated-project-scope-reloads-cheap:
   en: 8a6fbf587db16e7c
   zh: 627743b9104fce15
@@ -12,11 +12,11 @@ document:
   en: adbaadfc2ae162d3
   zh: 583f4fc900665b03
 /agent-note-keep-repeated-project-scope-reloads-cheap/decision:
-  en: 1186dfffb62cf979
-  zh: d16b44a6bf1dfed9
+  en: 8baa3420af0edc2c
+  zh: 3a082ad46865c232
 /agent-note-keep-repeated-project-scope-reloads-cheap/alternatives-considered:
-  en: a255a5d983e471c5
-  zh: 6bef0f0ef4c2ca3c
+  en: e5c91802dd403d75
+  zh: fae916b44ed55558
 /agent-note-keep-repeated-project-scope-reloads-cheap/consequences:
-  en: bfaf51eabfd6743d
-  zh: 1c956417242b72de
+  en: 7f75d746c7c46073
+  zh: dbaacbdee6f7a73c

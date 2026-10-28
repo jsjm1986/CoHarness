@@ -6,6 +6,7 @@ import {
   type ConversationCollaborationView,
   type ProjectAuthorityView,
   type ProjectScopeView,
+  type ProjectThemePolicy,
 } from '../collaboration.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
 import { publicNumber } from './runtime-context.ts'
@@ -126,12 +127,16 @@ export class PostgresCollaborationService {
       path: string
       access_mode: 'ro' | 'rw'
       administrator: boolean
+      can_manage: boolean
+      ui_theme_policy: ProjectThemePolicy
       kind: 'standard' | 'steward'
     }>(`SELECT p.public_id::text,p.name::text,pm.local_path path,p.kind,
       CASE WHEN p.kind='steward' THEN 'rw'::text
         WHEN membership.role='admin' THEN 'rw'::text
         WHEN membership.role='member' THEN member.access_mode ELSE NULL END access_mode,
-      membership.role='admin' administrator
+      membership.role='admin' administrator,
+      membership.role='admin' OR COALESCE(p.owner_user_id=actor.id,false) can_manage,
+      p.ui_theme_policy
       FROM harness.users actor
       JOIN harness.memberships membership ON membership.organization_id=actor.organization_id
         AND membership.user_id=actor.id AND membership.status='active'
@@ -158,12 +163,16 @@ export class PostgresCollaborationService {
       path: row.path,
       mode: row.access_mode,
       administrator: row.administrator,
+      canManage: row.can_manage,
+      uiThemePolicy: row.ui_theme_policy,
       kind: row.kind,
     }))
   }
 
   async projectsForUser(userId: number): Promise<ProjectScopeView[]> {
-    return (await this.projectAuthorities(userId)).map(({ administrator: _, ...project }) => project)
+    return (await this.projectAuthorities(userId)).map(({ projectId, name, path, mode, kind }) => ({
+      projectId, name, path, mode, kind,
+    }))
   }
 
   async projectForUser(projectId: number, userId: number): Promise<ProjectAuthorityView | null> {

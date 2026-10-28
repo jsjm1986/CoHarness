@@ -58,10 +58,13 @@ function installProjectCollaboration(deps: GatewayDeps): void {
     if (project === null || user === null || user.status !== 'active') return null
     if (user.role === 'admin') return {
       projectId, name: project.name, path: project.path, mode: 'rw' as const, administrator: true,
+      canManage: true, ...(project.uiThemePolicy === undefined ? {} : { uiThemePolicy: project.uiThemePolicy }),
     }
     const member = project.members.find(candidate => candidate.userId === userId)
     return member === undefined ? null : {
       projectId, name: project.name, path: project.path, mode: member.mode, administrator: false,
+      canManage: project.owner?.id === userId,
+      ...(project.uiThemePolicy === undefined ? {} : { uiThemePolicy: project.uiThemePolicy }),
     }
   }
   deps.collaboration = {
@@ -547,7 +550,7 @@ describe('gateway server', () => {
     } as NonNullable<GatewayDeps['governance']>
     deps.collaboration = {
       projectForUser: (projectId, userId) => projectId === 42 && userId === 1
-        ? { projectId, name: 'Shared project', path: '/shared', mode: 'rw' }
+        ? { projectId, name: 'Shared project', path: '/shared', mode: 'rw', administrator: true, canManage: true }
         : null,
     } as NonNullable<GatewayDeps['collaboration']>
     const cookie = await login(base, 'root-admin', 'pw-12345678')
@@ -571,7 +574,7 @@ describe('gateway server', () => {
     deps.collaboration = {
       projectsForUser: () => [{ projectId: project.id, name: project.name, path: project.path, mode: 'rw' }],
       projectForUser: () => ({
-        projectId: project.id, name: project.name, path: project.path, mode: 'rw', administrator: true,
+        projectId: project.id, name: project.name, path: project.path, mode: 'rw', administrator: true, canManage: true,
       }),
       access: () => { throw new Error('not implemented in context test') },
       listConversations: () => [],
@@ -597,7 +600,7 @@ describe('gateway server', () => {
     })
     expect(list).toHaveBeenCalledTimes(1)
     expect(membership).toHaveBeenCalledTimes(selection === 'personal' ? 0 : 1)
-    expect(detail).toHaveBeenCalledTimes(selection === 'personal' ? 0 : 1)
+    expect(detail).not.toHaveBeenCalled()
   })
 
   it('serves an ACL-filtered account conversation catalog for the workbench', async () => {
@@ -605,7 +608,7 @@ describe('gateway server', () => {
     const project = await deps.projects.create({ name: 'workbench-project', createdBy: 1 })
     deps.collaboration = {
       projectsForUser: () => [{ projectId: project.id, name: project.name, path: project.path, mode: 'ro' }],
-      projectForUser: () => ({ projectId: project.id, name: project.name, path: project.path, mode: 'ro', administrator: false }),
+      projectForUser: () => ({ projectId: project.id, name: project.name, path: project.path, mode: 'ro', administrator: false, canManage: false }),
       listAccountConversations: () => [{
         sessionId: 'project-session',
         runtime: { kind: 'project', projectId: project.id, projectName: project.name },
@@ -649,7 +652,7 @@ describe('gateway server', () => {
     const project = await deps.projects.create({ name: 'target-project', createdBy: 1 })
     installProjectCollaboration(deps)
     deps.collaboration!.projectForUser = async (projectId, userId) => projectId === project.id && userId === 1
-      ? { projectId, name: project.name, path: project.path, mode: 'ro', administrator: false }
+      ? { projectId, name: project.name, path: project.path, mode: 'ro', administrator: false, canManage: false }
       : null
     const cookie = await login(base, 'root-admin', 'pw-12345678')
     const response = await fetch(`${base}/api/session.list?dshTarget=project:${String(project.id)}`, { headers: { cookie } })
@@ -671,7 +674,7 @@ describe('gateway server', () => {
     deps.collaboration = {
       projectsForUser: () => [{ projectId: project.id, name: project.name, path: project.path, mode: 'rw' }],
       projectForUser: () => ({
-        projectId: project.id, name: project.name, path: project.path, mode: 'rw', administrator: true,
+        projectId: project.id, name: project.name, path: project.path, mode: 'rw', administrator: true, canManage: true,
       }),
       access: () => { throw new Error('not implemented in legacy context test') },
       listConversations: () => [],
@@ -702,6 +705,7 @@ describe('gateway server', () => {
             path: '/shared',
             mode: 'rw',
             administrator: true,
+            canManage: true,
           }
         : null)
     const ensureRunning = vi.spyOn(deps.instances, 'ensureRunning').mockResolvedValue({ port: 43200, generation: 1 })
@@ -737,6 +741,7 @@ describe('gateway server', () => {
       path: '/shared',
       mode: 'rw',
       administrator: true,
+      canManage: true,
     })
     vi.spyOn(deps.instances, 'ensureRunning').mockRejectedValue(new Error('runtime failed'))
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})

@@ -555,8 +555,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (!Number.isSafeInteger(projectId)) throw new InvalidRuntimeTargetError()
       const project = await deps.collaboration?.projectForUser(projectId, user.id)
       if (project === undefined || project === null) throw new CollaborationDeniedError('not-member')
-      const detail = await deps.projects.getById(projectId)
-      const canManage = user.role === 'admin' || project.administrator || detail?.owner?.id === user.id
+      const canManage = user.role === 'admin' || project.administrator || project.canManage
       const steward = project.kind === 'steward'
       return {
         context: {
@@ -564,7 +563,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           scope: {
             kind: 'project', projectId, projectName: project.name, mode: project.mode, canManage,
             ...(steward ? { steward: true } : {}),
-            ...(detail?.uiThemePolicy === undefined ? {} : { uiThemePolicy: detail.uiThemePolicy }),
+            ...(project.uiThemePolicy === undefined ? {} : { uiThemePolicy: project.uiThemePolicy }),
           },
           runtime: { kind: 'project', id: projectId, name: project.name, path: project.path, steward },
         },
@@ -584,8 +583,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (project === null) {
       return { context: { user, scope: { kind: 'personal' }, runtime: user }, resetScope: true }
     }
-    const detail = await deps.projects.getById(projectId)
-    const canManage = user.role === 'admin' || project.administrator || detail?.owner?.id === user.id
+    const canManage = user.role === 'admin' || project.administrator || project.canManage
     const steward = project.kind === 'steward'
     return {
       context: {
@@ -593,7 +591,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         scope: {
           kind: 'project', projectId, projectName: project.name, mode: project.mode, canManage,
           ...(steward ? { steward: true } : {}),
-          ...(detail?.uiThemePolicy === undefined ? {} : { uiThemePolicy: detail.uiThemePolicy }),
+          ...(project.uiThemePolicy === undefined ? {} : { uiThemePolicy: project.uiThemePolicy }),
         },
         runtime: { kind: 'project', id: projectId, name: project.name, path: project.path, steward },
       },

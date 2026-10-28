@@ -53,11 +53,11 @@ function fixture() {
   const principals = new GatewayPrincipalSigner(privateKey, 'acme', 60_000)
   const audit = vi.fn(async () => {})
   const projectForUser = vi.fn(async (projectId: number) => projectId === 41
-    ? { projectId, name: 'Compiler', path: '/tmp/compiler', mode: 'rw' as const, administrator: false }
+    ? { projectId, name: 'Compiler', path: '/tmp/compiler', mode: 'rw' as const, administrator: false, canManage: false }
     : projectId === 42
-      ? { projectId, name: 'Read only', path: '/tmp/readonly', mode: 'ro' as const, administrator: false }
+      ? { projectId, name: 'Read only', path: '/tmp/readonly', mode: 'ro' as const, administrator: false, canManage: false }
       : projectId === 43
-        ? { projectId, name: 'Runtime', path: '/tmp/runtime', mode: 'rw' as const, administrator: false }
+        ? { projectId, name: 'Runtime', path: '/tmp/runtime', mode: 'rw' as const, administrator: false, canManage: false }
       : null)
   const ensureRunning = vi.fn(async (subject: UserRow | { kind: 'project'; id: number; name: string; path: string }) =>
     'username' in subject ? { port: 41001, generation: 1 } : { port: subject.id === 41 ? 41041 : 41042, generation: 2 })

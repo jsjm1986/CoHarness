@@ -165,7 +165,7 @@ function fixture() {
         const administrator = userId === ADMIN_ID
         const mode = administrator ? 'rw' : modes.get(userId)
         return projectId === PROJECT_ID && mode !== undefined
-          ? { projectId, name: 'Shared', path: '/tmp/shared', mode, administrator }
+          ? { projectId, name: 'Shared', path: '/tmp/shared', mode, administrator, canManage: administrator }
           : null
       }),
       readableSessionIds: vi.fn(async () => []),

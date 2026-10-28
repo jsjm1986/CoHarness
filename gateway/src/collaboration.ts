@@ -22,6 +22,8 @@ export interface ProjectScopeView {
 export interface ProjectAuthorityView extends ProjectScopeView {
   /** True when the current organization role grants implicit project authority. */
   administrator: boolean
+  /** Current owner or administrator management authority from the authorized project read. */
+  canManage: boolean
 }
 
 export interface ConversationParticipantView {

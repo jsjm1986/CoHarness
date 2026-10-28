@@ -127,12 +127,11 @@ export function createProxyHandlers(
     if (context.scope.kind === 'personal') return { ...current, scope: { kind: 'personal' } }
     const project = await deps.collaboration?.projectForUser(context.scope.projectId, current.user.id)
     if (project === undefined || project === null || 'username' in context.runtime || project.path !== context.runtime.path) return null
-    const detail = await deps.projects.getById(project.projectId)
     return { ...current, scope: {
       kind: 'project', projectId: project.projectId, projectName: project.name, mode: project.mode,
-      canManage: current.user.role === 'admin' || project.administrator || detail?.owner?.id === current.user.id,
+      canManage: current.user.role === 'admin' || project.administrator || project.canManage,
       ...(project.kind === 'steward' ? { steward: true } : {}),
-      ...(detail?.uiThemePolicy === undefined ? {} : { uiThemePolicy: detail.uiThemePolicy }),
+      ...(project.uiThemePolicy === undefined ? {} : { uiThemePolicy: project.uiThemePolicy }),
     } }
   }
   const streamPrincipals = principalSigner === undefined || !cfg.streamPrincipalRenewal.enabled ? undefined : new StreamPrincipalLeases({
@@ -168,10 +167,9 @@ export function createProxyHandlers(
     if (context.scope.kind === 'project') {
       const project = await deps.collaboration?.projectForUser(context.scope.projectId, user.id)
       if (project === undefined || project === null || 'username' in context.runtime || project.path !== context.runtime.path) return false
-      const detail = await deps.projects.getById(project.projectId)
       context.scope = {
         ...context.scope, mode: project.mode,
-        canManage: user.role === 'admin' || project.administrator || detail?.owner?.id === user.id,
+        canManage: user.role === 'admin' || project.administrator || project.canManage,
       }
     } else if (user.homePath !== context.user.homePath || user.role !== context.user.role) {
       return false

@@ -32,9 +32,9 @@ async function setup() {
     const row = await projects.getById(projectId)
     const user = await users.getById(userId)
     if (row === null || user === null) return null
-    if (user.role === 'admin') return { projectId, name: row.name, path: row.path, mode: 'rw' as const, administrator: true }
+    if (user.role === 'admin') return { projectId, name: row.name, path: row.path, mode: 'rw' as const, administrator: true, canManage: true }
     const entry = row.members.find(candidate => candidate.userId === userId)
-    return entry === undefined ? null : { projectId, name: row.name, path: row.path, mode: entry.mode, administrator: false }
+    return entry === undefined ? null : { projectId, name: row.name, path: row.path, mode: entry.mode, administrator: false, canManage: row.owner?.id === userId }
   }
   const collaboration: GatewayCollaborationService = {
     projectForUser: authority,

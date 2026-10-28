@@ -37,7 +37,7 @@ const rows = (list: unknown[], rowCount?: number): { rows: unknown[]; rowCount: 
   ({ rows: list, rowCount: rowCount ?? list.length })
 
 const authority = (mode: 'rw' | 'ro', administrator = false) => ({
-  projectId: 9, name: 'P', path: '/p', mode, administrator,
+  projectId: 9, name: 'P', path: '/p', mode, administrator, canManage: administrator,
 })
 
 const POLICY = {

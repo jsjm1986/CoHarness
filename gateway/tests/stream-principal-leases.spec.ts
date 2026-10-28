@@ -78,7 +78,7 @@ describe('registered event principal renewal', () => {
     } finally { f.registry.close() }
   })
 
-  it.each(['unchanged', 'mode', 'manage', 'name'] as const)('retains only the original project permission snapshot: %s', async change => {
+  it.each(['unchanged', 'mode', 'manage', 'name', 'theme'] as const)('retains only the original project permission snapshot: %s', async change => {
     vi.useFakeTimers(); vi.setSystemTime(10_000)
     const signer = new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'synthetic-org', 30_000)
     const scope = { kind: 'project' as const, projectId: 19, projectName: 'Synthetic', mode: 'rw' as const,
@@ -86,7 +86,8 @@ describe('registered event principal renewal', () => {
     const context: GatewayRequestContext = { user, scope, runtime: { kind: 'project', id: 19, name: 'Synthetic', path: '/synthetic/project' } }
     const currentScope = change === 'mode' ? { ...scope, mode: 'ro' as const }
       : change === 'manage' ? { ...scope, canManage: true }
-        : change === 'name' ? { ...scope, projectName: 'Renamed' } : { ...scope }
+        : change === 'name' ? { ...scope, projectName: 'Renamed' }
+          : change === 'theme' ? { ...scope, uiThemePolicy: 'light' as const } : { ...scope }
     const registry = new StreamPrincipalLeases({ signer, maxBatchSize: 2, synchronize: async () => {},
       qualify: async () => ({ user, scope: currentScope, expiresAt: 100_000 }) })
     const source = new AbortController()

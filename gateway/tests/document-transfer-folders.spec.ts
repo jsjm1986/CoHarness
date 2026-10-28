@@ -76,7 +76,7 @@ async function withFixture(
     const projects = { getById: async (id: number) => id === PROJECT_ID ? project : null }
     const collaboration = {
       projectForUser: async (id: number, actorId: number) => id === PROJECT_ID && actorId === user.id
-        ? { projectId: PROJECT_ID, name: project.name, path: projectPath, mode: 'rw' as const, administrator: false }
+        ? { projectId: PROJECT_ID, name: project.name, path: projectPath, mode: 'rw' as const, administrator: false, canManage: false }
         : null,
     }
     const { privateKey } = generateKeyPairSync('ed25519')
