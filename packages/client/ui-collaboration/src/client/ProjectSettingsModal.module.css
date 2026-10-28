@@ -3,6 +3,7 @@
 .navigation { display: flex; flex: none; flex-direction: column; gap: var(--dsw-space-1); width: 180px; padding: var(--dsw-space-4) var(--dsw-space-3); border-right: 0.5px solid var(--dsw-alias-border-l2); }
 .navigation button { display: flex; align-items: center; gap: var(--dsw-space-2); min-height: 40px; padding: var(--dsw-space-2) var(--dsw-space-3); border: 0; border-radius: var(--dsw-radius-md); color: var(--dsw-alias-label-secondary); background: transparent; text-align: left; font: inherit; font-size: 13px; cursor: pointer; }
 .navigation button[aria-current] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); font-weight: 500; }
+.navigation button:disabled, .categoryLinks button:disabled { cursor: wait; }
 .navigation button:focus-visible, .categoryLinks button:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color); outline-offset: -2px; }
 .main { flex: 1; min-width: 0; padding: var(--dsw-space-6); overflow: auto; overscroll-behavior: contain; }
 .sectionHeading { margin-bottom: var(--dsw-space-5); }
@@ -30,11 +31,12 @@
 .description, .notice { color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 22px; overflow-wrap: anywhere; }
 .notice { margin: var(--dsw-space-4) 0 0; }
 .error { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--dsw-space-2); margin: 0 0 var(--dsw-space-4); padding: var(--dsw-space-3); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-state-error-secondary); color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 22px; }
+.error > button { flex: none; }
 .queryStatus { display: flex; align-items: center; gap: var(--dsw-space-2); color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 22px; }
 .queryStatus svg, .busy svg { animation: spin 1s linear infinite; }
 .footerHint { flex: 1; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (hover: hover) { .navigation button:hover, .categoryLinks button:hover { background: var(--dsw-alias-interactive-bg-hover); } }
+@media (hover: hover) { .navigation button:hover:not(:disabled), .categoryLinks button:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); } }
 @media (pointer: coarse) { .navigation button { min-height: var(--dsw-touch-target); } }
 @media (max-width: 767px) {
   .dialogBody { padding: 0; }

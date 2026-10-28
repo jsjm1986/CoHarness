@@ -4,7 +4,7 @@ import {
   IconCheckOutline16, IconChevronLeftOutline14, IconChevronRightOutline14, IconCloseFill14, IconGlobeOutline14,
   IconSearchOutline16, IconPlusOutline16, IconSettingsOutline16, IconShieldOutline16, IconUserOutline16,
   IconUsersOutline16, IconWarningOutline16,
-  Button, focusWithoutRing, Menu, SegmentedTabs, Tooltip, useMediaQuery, useModalLayer, type MenuEntry,
+  Button, focusWithoutRing, Menu, SegmentedTabs, Tooltip, useDismissOnOutsidePointer, useMediaQuery, useModalLayer, type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {
@@ -139,7 +139,7 @@ export function ScopeControl({
 
   const grantText = (project: ProjectMembership): string => (
     project.kind === 'steward' ? t('scope.steward')
-      : project.mode === 'ro' && project.canManage !== true ? t('scope.readOnly') : ''
+      : project.mode === 'ro' ? t('scope.readOnly') : ''
   )
   const goBack = (): void => {
     if (pageView === 'visibility') {
@@ -154,6 +154,8 @@ export function ScopeControl({
     && (context.scope.kind === 'project' || context.projects.length > 0
       || createProject !== undefined || listInvitations !== undefined)
   useModalLayer(pageRef, open && wide && available, goBack)
+  const childDialogOpen = managerMode !== undefined || projectSettingsOpen
+  useDismissOnOutsidePointer(pageRef, open && wide && available && !childDialogOpen, setOpen, triggerRef)
   useLayoutEffect(() => {
     if (!open || !wide) return
     if (pageView === 'visibility' && pageHeading.current !== null) focusWithoutRing(pageHeading.current)
@@ -205,10 +207,11 @@ export function ScopeControl({
       : projectScope?.projectId === scope.projectId
     if (selected || state.scopeBusy) return
     setLastTarget(scope.kind === 'personal' ? scope : {
-      ...scope, name: context.projects.find(project => project.projectId === scope.projectId)?.name ?? '',
+      ...scope, name: context.projects.find(project => project.projectId === scope.projectId)?.name
+        ?? (lastTarget?.kind === 'project' && lastTarget.projectId === scope.projectId ? lastTarget.name : t('scope.projects')),
     })
     setOpen(false)
-    void switchScope(scope)
+    void switchScope(scope.kind === 'personal' ? { kind: 'personal' } : { kind: 'project', projectId: scope.projectId })
   }
   const openManager = (scope: 'current' | 'all', view: 'received' | 'sent' | 'compose'): void => {
     setManagerScope(scope)
@@ -441,7 +444,8 @@ export function ScopeControl({
           trigger row plus the pushed page. */}
       {wide && trigger}
       {open && wide && (
-        <div ref={pageRef} id={pageId} className={css.scopePage} role="group" tabIndex={-1}
+        <div ref={pageRef} id={pageId} className={css.scopePage} role="dialog" tabIndex={-1}
+          aria-modal={childDialogOpen ? undefined : true} aria-hidden={childDialogOpen ? true : undefined}
           aria-label={t('scope.aria')}
           onKeyDownCapture={(event) => {
             if (event.key !== 'Escape' || event.defaultPrevented || event.nativeEvent.isComposing
@@ -641,8 +645,10 @@ export function ScopeControl({
         {...inviteMember === undefined ? {} : { inviteMember }}
         {...acceptInvitation === undefined ? {} : { acceptInvitation }}
         {...listUsers === undefined ? {} : { listUsers }}
-        onCreated={(projectId) => {
+        onCreated={(projectId, name) => {
           setManagerMode(undefined)
+          setLastTarget({ kind: 'project', projectId, name })
+          setOpen(false)
           void switchScope({ kind: 'project', projectId })
         }}
         onClose={() => { setManagerMode(undefined) }}

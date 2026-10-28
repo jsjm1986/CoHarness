@@ -1,4 +1,4 @@
-- group "Switch personal or project scope":
+- dialog "Switch personal or project scope":
   - banner:
     - button "Return to workbench":
       - img
