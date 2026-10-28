@@ -1,27 +1,29 @@
 - group "Switch personal or project scope":
-  - button "Close":
-    - img
-  - text: Switch space Payments migration Can edit
-  - button "Manage":
-    - text: Manage
-    - img
-  - text: Space settings
-  - button "New conversation visibility Shared with project":
-    - text: New conversation visibility Shared with project
-    - img
-  - button "Invitations and tasks":
-    - text: Invitations and tasks
-    - img
+  - banner:
+    - button "Return to workbench":
+      - img
+    - heading "Space center" [level=2]
+    - button "New project space":
+      - img
+  - text: Projects Payments migration
   - button "Project settings":
-    - text: Project settings
     - img
-  - text: All spaces · 7
+  - tablist "Space center":
+    - tab "Switch space" [selected]
+    - tab "Manage spaces"
   - searchbox "Search project spaces"
-  - button "Personal Personal"
-  - button "Payments migration"
-  - button "Audit platform Read only"
-  - button "Archive space 1"
-  - button "Archive space 2"
-  - button "Archive space 3"
-  - button "Archive space 4"
-  - button "New project space"
+  - text: All spaces
+  - status: 7 spaces
+  - tabpanel "Switch space":
+    - button "Personal"
+    - button "Payments migration"
+    - button "Audit platform Read only"
+    - button "Archive space 1"
+    - button "Archive space 2"
+    - button "Archive space 3"
+    - button "Archive space 4"
+  - contentinfo:
+    - text: Switching reloads the workbench
+    - button "Invitations":
+      - img
+      - text: Invitations

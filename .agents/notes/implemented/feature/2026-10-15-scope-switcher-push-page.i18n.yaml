@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-scope-switcher-push-page.md
 document:
-  en: 0df5e82a34e859152b28e0069bb9233f23c93239
-  zh: 50807bd800a21ed268b958576d49ff8a6a7d4c96
+  en: 1f43fea05d1ad7398b0cdfaa3535c471a973f1d7
+  zh: 2626f3dc1f06c2958ada168f2d4e7dc4cb3e56a3
 /agent-note-scope-switcher-pushes-a-takeover-page-into-the-sidebar-column:
   en: 50be87b614162869
   zh: f2d8a6ffe0fbb0a5
@@ -12,8 +12,8 @@ document:
   en: e81aa0404e565dff
   zh: 33ad1a97b1eed6e4
 /agent-note-scope-switcher-pushes-a-takeover-page-into-the-sidebar-column/decision:
-  en: 732c22821ddcd203
-  zh: 5699c4a8df5b081e
+  en: 07ae7832d7167944
+  zh: 9d6c13a555d3fbdb
 /agent-note-scope-switcher-pushes-a-takeover-page-into-the-sidebar-column/alternatives-considered:
   en: c5c8d895a6501ae3
   zh: f119a5d75f9b6333
@@ -21,5 +21,5 @@ document:
   en: 5b7d8933bcca24fa
   zh: d5200bbb7a254505
 /agent-note-scope-switcher-pushes-a-takeover-page-into-the-sidebar-column/testing:
-  en: 395a62df96602f0d
-  zh: 76c1eb316340d2dc
+  en: 7b3d74081b2b6fea
+  zh: 60b59e613f5e6836
