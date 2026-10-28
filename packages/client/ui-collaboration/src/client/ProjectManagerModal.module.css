@@ -1,4 +1,5 @@
 .form { display: flex; flex-direction: column; gap: var(--dsw-space-3); }
+.form input::placeholder, .memberHeader input::placeholder { color: var(--dsw-alias-label-secondary); opacity: 1; }
 .description { margin: 0 0 var(--dsw-space-2); color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 22px; }
 .label { color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 500; line-height: 20px; }
 .fieldMeta { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--dsw-space-3); color: var(--dsw-alias-label-secondary); font-size: 11px; line-height: 18px; }
@@ -31,6 +32,7 @@
 .empty p { max-width: 42ch; margin: 0; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; }
 .notice, .error { margin: 0; padding: var(--dsw-space-3); border-radius: var(--dsw-radius-md); color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-module-platform); font-size: 13px; line-height: 22px; overflow-wrap: anywhere; }
 .error { display: flex; align-items: center; justify-content: space-between; gap: var(--dsw-space-3); background: var(--dsw-alias-state-error-secondary); }
+.error > button { flex: none; }
 .target { display: flex; align-items: center; gap: var(--dsw-space-3); padding-bottom: var(--dsw-space-5); margin-bottom: var(--dsw-space-2); border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
 .target > svg { flex: none; color: var(--dsw-alias-label-secondary); }
 .target > span { min-width: 0; }
@@ -62,6 +64,7 @@
 @media (prefers-reduced-motion: reduce) { .queryStatus svg { animation: none; } }
 @media (max-width: 767px) {
  .form { gap: var(--dsw-space-4); }
+ .textField { height: auto; min-height: var(--dsw-touch-target); }
  .form input:not([type='radio']), .memberHeader input { min-height: var(--dsw-touch-target); font-size: 16px; line-height: 24px; }
  .description { font-size: 14px; line-height: 22px; }
  .label, .permissionOptions legend { font-size: 14px; line-height: 22px; }

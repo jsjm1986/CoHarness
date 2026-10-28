@@ -110,6 +110,21 @@ async function assertRowActionClearance(page: Page, manager: ReturnType<Page['ge
   }
 }
 
+async function assertTooltipInsideManager(page: Page, manager: ReturnType<Page['getByRole']>, label: string): Promise<void> {
+  await manager.getByRole('button', { name: label, exact: true }).hover()
+  const tooltip = page.getByRole('tooltip', { name: label, exact: true })
+  await tooltip.waitFor({ state: 'visible' })
+  const bubble = await tooltip.boundingBox()
+  const bounds = await manager.boundingBox()
+  if (bubble === null || bounds === null) throw new Error('Document tooltip geometry unavailable')
+  expect(bubble.x).toBeGreaterThanOrEqual(bounds.x)
+  expect(bubble.y).toBeGreaterThanOrEqual(bounds.y)
+  expect(bubble.x + bubble.width).toBeLessThanOrEqual(bounds.x + bounds.width)
+  expect(bubble.y + bubble.height).toBeLessThanOrEqual(bounds.y + bounds.height)
+  await page.mouse.move(0, 0)
+  await tooltip.waitFor({ state: 'hidden' })
+}
+
 describe('web e2e: document manager', () => {
   let scaffold: WebScaffold
   let browser: Browser
@@ -216,6 +231,24 @@ describe('web e2e: document manager', () => {
     expect(await manager.count()).toBe(1)
   })
 
+  it.each([768, 1280, 1440])('keeps upload information inside the document dialog at %ipx', async (width) => {
+    page = await browser.newPage({ viewport: { width, height: 800 }, locale: 'en-US', reducedMotion: 'reduce' })
+    tripwire = watchConsole(page)
+    onTestFailed(() => saveFailureShot(page, `web-e2e-document-tooltip-${String(width)}`))
+    await mockDocuments(page)
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await page.getByRole('button', { name: 'Documents', exact: true }).click()
+    const manager = page.getByRole('dialog', { name: 'Document Manager', exact: true })
+    await manager.getByText('brief.txt', { exact: true }).waitFor()
+    await assertTooltipInsideManager(page, manager, 'Upload information')
+    await manager.getByRole('button', { name: 'Upload information', exact: true }).click()
+    const information = page.getByRole('dialog', { name: 'Upload information', exact: true })
+    await information.waitFor()
+    await information.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect.poll(() => manager.isVisible()).toBe(true)
+  }, 60_000)
+
   it('desktop: lists folders and date groups with named row actions in a centered dialog', async () => {
     page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: 'en-US' })
     tripwire = watchConsole(page)
@@ -236,6 +269,7 @@ describe('web e2e: document manager', () => {
     const preview = dialog.getByRole('complementary', { name: 'Preview: brief.txt' })
     await preview.getByText('Preview fixture for the document manager.', { exact: true }).waitFor()
     expect(await dialog.getByRole('checkbox', { name: 'brief.txt', exact: true }).isChecked()).toBe(false)
+    for (const label of ['Move', 'Copy to…', 'Delete']) await assertTooltipInsideManager(page, dialog, label)
     const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DESKTOP_EXPECTED, snapshot, MODE)
   }, 60_000)

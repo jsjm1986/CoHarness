@@ -14,7 +14,7 @@ Both wide surfaces render the switcher as an absolutely positioned **push page**
 
 - **Navigation and focus.** Switching and management occupy separate tabs within the root page. Management pushes a nested visibility page; Back or Escape returns to its invoking row, while Escape at the root closes and restores the trigger. Search remains unfocused on entry so phones do not open the keyboard. Modals retain the underlying page and return to their invoking controls.
 - **Information hierarchy.** The current identity and creation source sit above the tabs. Switching owns the search and flat roster; administrator and writable memberships stay quiet regardless of roster composition, with read-only and maintenance exceptions explicit. Management owns project configuration, invitations, staged visibility, the all-visible invitation center, and user-created projects. This keeps repeated administrator labels from overwhelming the scan.
-- **Semantics follow the surface.** The page is a labeled `role="group"`, rows are plain buttons, and the selected scope carries `aria-current`. Scope rows switch and close; visibility rows stage `stagedVisibility` without closing — a staged preference is not a selection.
+- **Semantics follow focus ownership.** The page is a labeled modal dialog within the sidebar region. Outside pointers dismiss it; nested dialogs hide the retained parent from assistive navigation. Rows are plain buttons, and the selected scope carries `aria-current`. Scope rows switch and close; visibility rows stage `stagedVisibility` without closing.
 - **`Menu` keeps only the rail path** (`!wide`), unchanged: portalled floating list, measured width, full item set. Modals still portal to `document.body` and layer above the page.
 - The identity-tile grammar is inherited intact: `tileGlyph`/`tileTone` rows, surrogate-pair-safe initial, steward shield tile, and the circular personal-scope tile.
 
@@ -28,9 +28,9 @@ Both wide surfaces render the switcher as an absolutely positioned **push page**
 
 ## Consequences
 
-- `Menu` no longer owns the wide path: there are no `menu`/`menuitem` roles, no `ResizeObserver` width tracking, and no portalled list on either wide surface. Tests must query page rows (buttons inside the `group`), not menuitems; the rail keeps the menu roles.
+- `Menu` owns only the rail path. Wide surfaces use inline dialog rows, and the rail retains its measured, portalled menu.
 - `.root` is now a containing block — future absolute content inside the column scopes to it, and the region-geometry variables are a shell-owned contract any column-scoped overlay may read. The measurement contract lives in `SidebarRoot`; packages consuming the variables only read CSS.
-- While the page is open on desktop it covers only the session browser — channel rows, brand, and the trigger itself stay visible, so the page reads as the region swapping content rather than a modal takeover. On compact it still covers the drawer's whole column, including the foot.
+- On desktop the page covers only the session browser; channel rows, brand, and the trigger remain visible. On compact it covers the drawer's whole column, including the foot. Modal focus ownership prevents background conversation shortcuts while either page is open.
 - The visibility `menuitem` ids exist only on the rail path; the staged value surfaces on the root page's visibility row value and the subpage's checked row.
 - Supersedes [the space-hub takeover](../../archived/feature/2026-10-13-scope-hub-sidebar-takeover.md) and [the in-card drawer](../../archived/feature/2026-10-13-scope-switcher-in-card-drawer.md), both archived; the rail's measured floating list remains described by [the adaptive panel menu](2026-10-03-scope-control-panel-menu.md).
 

@@ -61,15 +61,23 @@ export function ProjectSettingsModal({
   const [sshError, setSshError] = useState<string>()
   const sectionHeading = useRef<HTMLHeadingElement>(null)
   const categoryLinks = useRef<Partial<Record<Category, HTMLButtonElement | null>>>({})
+  const navigation = useRef<HTMLElement>(null)
   const previousCategory = useRef<Category>('overview')
+  const previousCompact = useRef(compact)
 
   useEffect(() => { if (open) setCategory('overview') }, [open, project.projectId])
   useLayoutEffect(() => {
-    if (open && compact && previousCategory.current !== category) {
-      const target = category === 'overview' ? categoryLinks.current[previousCategory.current] : sectionHeading.current
+    const categoryChanged = previousCategory.current !== category
+    const viewportChanged = previousCompact.current !== compact
+    const active = document.activeElement
+    const focusNeedsRecovery = active === document.body || active === null || navigation.current?.contains(active) === true
+    if (open && ((compact && categoryChanged) || (viewportChanged && focusNeedsRecovery))) {
+      const target = compact && category === 'overview' && categoryChanged
+        ? categoryLinks.current[previousCategory.current] : sectionHeading.current
       if (target != null) focusWithoutRing(target)
     }
     previousCategory.current = category
+    previousCompact.current = compact
   }, [open, compact, category])
 
   useEffect(() => {
@@ -97,6 +105,7 @@ export function ProjectSettingsModal({
   const canManageModels = isManager && capabilities !== undefined && capabilities.projectModels
   const canManageSsh = isManager && capabilities !== undefined && capabilities.sshTargets
     && listSshTargets !== undefined && shareSshTarget !== undefined
+  const busy = saving || sshBusy !== undefined
 
   useEffect(() => {
     if (!open || !canManageSsh) return
@@ -149,15 +158,16 @@ export function ProjectSettingsModal({
 
   return (
     <CollaborationDialog open={open} title={compact && category !== 'overview' ? t(selected.title) : t('project.settingsTitle')}
-      description={projectName} closeLabel={t('manager.close')} onClose={onClose} wide
+      description={projectName} closeLabel={t('manager.close')} onClose={onClose} busy={busy} wide
       bodyClassName={css.dialogBody}
       {...compact && category !== 'overview' ? { onBack: () => { setCategory('overview') }, backLabel: t('project.backOverview') } : {}}
-      footer={<><span className={css.footerHint}>{category === 'theme' ? t('project.autoSave') : t('project.filesystemNote')}</span>
-        <Button onClick={onClose}>{t('project.done')}</Button></>}>
+      footer={<><span className={css.footerHint} aria-live="polite">{busy ? t('project.savingChanges')
+        : category === 'theme' ? t('project.autoSave') : t('project.filesystemNote')}</span>
+      <Button disabled={busy} onClick={onClose}>{t('project.done')}</Button></>}>
       <div className={css.layout}>
-        <nav className={css.navigation} aria-label={t('project.settingsTitle')}>
+        <nav ref={navigation} className={css.navigation} aria-label={t('project.settingsTitle')}>
           {CATEGORIES.map(({ id: value, title, Icon }) => <button key={value} type="button" aria-current={category === value ? 'page' : undefined}
-            onClick={() => { setCategory(value) }}><Icon size={16} /><span>{t(title)}</span></button>)}
+            disabled={busy} onClick={() => { setCategory(value) }}><Icon size={16} /><span>{t(title)}</span></button>)}
         </nav>
         <div className={css.main}>
           {loading && <p className={css.queryStatus} role="status"><IconLoadingOutline16 size={16} />{t('project.loading')}</p>}
@@ -174,7 +184,8 @@ export function ProjectSettingsModal({
                 {configuration !== undefined && <div><dt>{t('project.accessLabel')}</dt><dd>{access}</dd></div>}
               </dl>
               <div className={css.categoryLinks}>{CATEGORIES.filter(value => value.id !== 'overview').map(({ id: value, title, hint, Icon }) => (
-                <button key={value} type="button" ref={(node) => { categoryLinks.current[value] = node }} onClick={() => { setCategory(value) }}>
+                <button key={value} type="button" disabled={busy} ref={(node) => { categoryLinks.current[value] = node }}
+                  onClick={() => { setCategory(value) }}>
                   <span className={css.categoryIcon}><Icon size={18} /></span>
                   <span><strong>{t(title)}</strong><small>{t(hint)}</small></span>
                   <IconChevronRightOutline14 />
@@ -189,7 +200,8 @@ export function ProjectSettingsModal({
                 </label>)}
               </div>
               {saving && <p className={css.queryStatus} role="status"><IconLoadingOutline16 size={16} />{t('project.savingTheme')}</p>}
-              {themeFailed && <p className={css.error} role="alert">{t('project.themeFailed')}</p>}
+              {themeFailed && <div className={css.error} role="alert">{t('project.themeFailed')}
+                <Button size="sm" onClick={() => { setReload(value => value + 1) }}>{t('project.reloadSettings')}</Button></div>}
               {unavailable(capabilities?.themePolicy, 'project.themeUnavailable') !== undefined && <p className={css.notice}>{unavailable(capabilities?.themePolicy, 'project.themeUnavailable')}</p>}
             </> : category === 'runtime' ? <>
               <p className={css.description}>{t('project.runtimeDescription')}</p>
@@ -205,7 +217,7 @@ export function ProjectSettingsModal({
             </> : category === 'members' ? <>
               <p className={css.description}>{t('project.membersDescription')}</p>
               {project.kind === 'steward' && <p className={css.notice}>{t('manager.stewardNotice')}</p>}
-              <div className={css.actions}><Button variant="outline" onClick={onMembers}><IconUserOutline16 size={16} />
+              <div className={css.actions}><Button variant="outline" disabled={busy} onClick={onMembers}><IconUserOutline16 size={16} />
                 {isManager && capabilities?.members === true && project.kind !== 'steward' ? t('manager.membersAction') : t('manager.invitationsAction')}
               </Button></div>
               <p className={css.notice}>{t('project.memberAdminNote')}</p>
@@ -218,7 +230,7 @@ export function ProjectSettingsModal({
                     disabled={!target.enabled || sshBusy !== undefined}
                     onChange={(event) => { toggleSshTarget(target, event.currentTarget.checked) }} />
                   <span><strong>{target.name}</strong><small>{target.host}{target.enabled ? '' : ` · ${t('project.sshDisabled')}`}</small></span>
-                  {sshBusy === target.publicId && <span className={css.busy} role="status" aria-label={t('manager.loading')}><IconLoadingOutline16 size={16} /></span>}
+                  {sshBusy === target.publicId && <span className={css.busy} role="status" aria-label={t('project.savingChanges')}><IconLoadingOutline16 size={16} /></span>}
                 </label>)}
                 {sshTargets?.length === 0 && <p className={css.notice}>{t('project.sshEmpty')}</p>}
               </div>}

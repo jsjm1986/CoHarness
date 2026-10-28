@@ -399,6 +399,8 @@
 .visibilityOption small { display: block; margin-top: var(--dsw-space-1); color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; }
 .pageError { display: flex; flex: none; align-items: center; gap: var(--dsw-space-2); margin: 0 var(--dsw-space-4) var(--dsw-space-3); padding: var(--dsw-space-3); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-state-error-secondary); color: var(--dsw-alias-label-primary); font-size: 12px; line-height: 18px; }
 .pageError > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pageError > button { flex: none; }
+.pageError > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .pageError button { flex: none; }
 .pageBack:focus-visible, .pageRow:focus-visible, .managementRow:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color); outline-offset: -1px; }
 

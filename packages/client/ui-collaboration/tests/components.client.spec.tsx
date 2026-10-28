@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -213,7 +213,7 @@ describe('ScopeControl', () => {
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
 
     // The wide surface is the push page, not the rail's floating menu.
-    const page = screen.getByRole('group', { name: '切换个人或项目空间' })
+    const page = screen.getByRole('dialog', { name: '切换个人或项目空间' })
     expect(page.className.split(/\s+/)).toContain(css.scopePage)
     const search = screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索项目空间' })
     expect(search.placeholder).toBe('搜索项目空间')
@@ -231,7 +231,7 @@ describe('ScopeControl', () => {
     expect(screen.getByRole('button', { name: '项目 1' })).toBeTruthy()
 
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(screen.queryByRole('group', { name: '切换个人或项目空间' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: '切换个人或项目空间' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
     expect(screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索项目空间' }).value).toBe('')
     view.unmount()
@@ -273,7 +273,7 @@ describe('ScopeControl', () => {
       ...projectContext,
       projects: [
         { projectId: 9, name: '支付重构', path: '/srv/pay', mode: 'rw', canManage: true },
-        { projectId: 10, name: '审计平台', path: '/srv/audit', mode: 'ro' },
+        { projectId: 10, name: '审计平台', path: '/srv/audit', mode: 'ro', canManage: true },
         { projectId: 11, name: '提示词组合', path: '/srv/prompt', mode: 'rw', canManage: true },
         { projectId: 12, name: '数据看板', path: '/srv/data', mode: 'rw' },
       ],
@@ -368,8 +368,8 @@ describe('ScopeControl', () => {
     })} />)
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
     fireEvent.click(screen.getByRole('button', { name: '项目配置' }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '界面主题' }))
-    expect(await screen.findByText('只有项目 owner 或组织管理员可以修改项目策略。')).toBeTruthy()
+    fireEvent.click(within(screen.getByRole('dialog', { name: '项目配置' })).getByRole('button', { name: '界面主题' }))
+    expect(await screen.findByText('只有项目所有者或组织管理员可以修改项目设置。')).toBeTruthy()
     expect(loadProjectConfiguration).toHaveBeenCalledWith(9)
     expect(setProjectThemePolicy).not.toHaveBeenCalled()
   })
@@ -380,6 +380,47 @@ describe('ScopeControl', () => {
     expect(screen.getByRole('button', { name: '切换个人或项目空间' }).hasAttribute('disabled')).toBe(true)
     view.rerender(<ScopeControl {...scopeProps(snapshot({ scopeError: 'switch-failed' }))} />)
     expect(screen.getByRole('button', { name: '切换个人或项目空间' }).getAttribute('title')).toBe('空间切换失败，请重试')
+  })
+
+  it('dismisses its modal focus layer on an outside pointer without toggling the trigger twice', () => {
+    render(<><button type="button">其他操作</button><ScopeControl {...scopeProps(snapshot())} /></>)
+    const trigger = screen.getByRole('button', { name: '切换个人或项目空间' })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('dialog', { name: '切换个人或项目空间' }).getAttribute('aria-modal')).toBe('true')
+    fireEvent.pointerDown(trigger)
+    expect(screen.getByRole('dialog', { name: '切换个人或项目空间' })).toBeTruthy()
+    fireEvent.click(trigger)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(trigger)
+    fireEvent.pointerDown(screen.getByRole('button', { name: '其他操作' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('keeps the newly created project as the retry target after a switch failure', async () => {
+    let state = snapshot()
+    const props = scopeProps(state, {
+      useCollaboration: selector => selector(state),
+      createProject: vi.fn().mockResolvedValue(20),
+    })
+    const view = render(<ScopeControl {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+    fireEvent.click(screen.getByRole('button', { name: /审计平台/ }))
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+    fireEvent.click(screen.getByRole('button', { name: '新建项目空间' }))
+    const parent = view.container.querySelector(`.${css.scopePage}`)!
+    expect(parent.getAttribute('aria-hidden')).toBe('true')
+    fireEvent.pointerDown(screen.getByRole('dialog', { name: '新建项目空间' }))
+    expect(parent.isConnected).toBe(true)
+    const name = screen.getByRole('textbox', { name: '项目名称' })
+    fireEvent.change(name, { target: { value: '新业务空间' } })
+    fireEvent.submit(name.closest('form')!)
+    await waitFor(() => { expect(props.switchScope).toHaveBeenLastCalledWith({ kind: 'project', projectId: 20 }) })
+    state = snapshot({ scopeError: 'switch-failed' })
+    view.rerender(<ScopeControl {...props} />)
+    expect(await screen.findByText('未能进入「新业务空间」，当前空间没有变化')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '重试' }))
+    expect(props.switchScope).toHaveBeenLastCalledWith({ kind: 'project', projectId: 20 })
+    expect(props.createProject).toHaveBeenCalledExactlyOnceWith('新业务空间')
   })
 
   it('shows a non-dismissible target and progress status while switching', () => {

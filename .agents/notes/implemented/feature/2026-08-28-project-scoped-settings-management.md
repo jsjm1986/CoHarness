@@ -20,6 +20,8 @@ The administrator console remains the authority for server directories, mounts, 
 
 The configuration panel separates overview, theme, runtime, models, invitations, and SSH targets. Desktop uses category navigation; phones push from the overview into full-screen detail pages with return focus. Creation source and owner are identity facts, not permission shortcuts: administrator-created projects have organization management, while frontend-created projects retain their creator as owner, including administrator creators. Invitation history remains inspectable separately from mutation eligibility; reserved maintenance spaces explain dedicated qualification instead of offering ordinary invitations.
 
+Pending theme and SSH writes retain the dialog and selected category until completion, keeping failure feedback visible. An uncertain theme update offers a read-only reload to confirm the stored value. Responsive navigation recovers focus when its previous control becomes hidden. Invitation read failures remain separate from confirmed writes, and retry refreshes records without resending the operation.
+
 ## Alternatives considered
 
 **Make every project setting writable to `rw` members.** Directory write access does not imply authority over a shared runtime or credentials, so this would let any contributor change behavior for every member. Explicit namespace ownership keeps the permission grant narrow.

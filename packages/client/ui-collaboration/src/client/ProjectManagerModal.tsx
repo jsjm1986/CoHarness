@@ -1,5 +1,5 @@
-import { useEffect, useId, useState, type SyntheticEvent } from 'react'
-import { Button, Input, Menu, SegmentedTabs, IconChevronDownOutline14, IconFolderOpenOutline16, IconLoadingOutline16, IconPlusOutline16, IconUsersOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type SyntheticEvent } from 'react'
+import { Button, focusWithoutRing, Input, Menu, SegmentedTabs, IconChevronDownOutline14, IconFolderOpenOutline16, IconLoadingOutline16, IconPlusOutline16, IconUsersOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ProjectInvitation, UserSummary } from './collaboration-client.ts'
 import type { CollaborationKey } from './locales.ts'
 import { CollaborationDialog } from './CollaborationDialog.tsx'
@@ -25,11 +25,12 @@ export interface ProjectManagerModalProps {
   inviteMember?: (projectId: number, username: string, mode: 'ro' | 'rw') => Promise<ProjectInvitation>
   acceptInvitation?: (id: string) => Promise<void>
   listUsers?: () => Promise<UserSummary[]>
-  onCreated: (projectId: number) => void
+  /** Enter the confirmed project and retain its name for switch recovery. */
+  onCreated: (projectId: number, name: string) => void
   onClose: () => void
 }
 
-function errorText(error: unknown, t: ProjectManagerModalProps['t']): string {
+function errorText(error: unknown, t: ProjectManagerModalProps['t'], fallback: CollaborationKey = 'manager.failed'): string {
   if (error instanceof Error && error.message !== '') {
     const known: Record<string, CollaborationKey> = {
       'invitation-already-pending': 'manager.invitationPending',
@@ -51,7 +52,7 @@ function errorText(error: unknown, t: ProjectManagerModalProps['t']): string {
     const key = known[error.message]
     if (key !== undefined) return t(key)
   }
-  return t('manager.failed')
+  return t(fallback)
 }
 
 /**
@@ -85,6 +86,12 @@ export function ProjectManagerModal({
   const [pendingOnly, setPendingOnly] = useState(true)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [userQuery, setUserQuery] = useState('')
+  const [outcome, setOutcome] = useState<CollaborationKey>()
+  const memberSearch = useRef<HTMLInputElement>(null)
+  const keyboardPicker = useRef(false)
+  const readSequence = useRef(0)
+  const actionFocus = useRef<Element | null>(null)
+  const memberContent = useRef<HTMLDivElement>(null)
   const canInvite = canManage && !steward && projectId !== undefined && inviteMember !== undefined
   const queryProjectId = scope === 'current' ? projectId : undefined
   const hasLoadedScope = loadedScope === (queryProjectId ?? 'all')
@@ -101,16 +108,33 @@ export function ProjectManagerModal({
     setPendingOnly(true)
     setPickerOpen(false)
     setUserQuery('')
+    setOutcome(undefined)
   }, [open, mode, projectId, initialScope, initialView])
+  useEffect(() => {
+    if (!pickerOpen || !keyboardPicker.current) return
+    // Portaled menus cannot receive focus until their initial placement is visible.
+    const frame = requestAnimationFrame(() => { memberSearch.current?.focus() })
+    return () => { cancelAnimationFrame(frame) }
+  }, [pickerOpen])
+  useLayoutEffect(() => {
+    if (outcome !== undefined && actionFocus.current !== null && !actionFocus.current.isConnected
+      && document.activeElement === document.body) {
+      const target = memberContent.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+      if (target != null) focusWithoutRing(target)
+    }
+  }, [outcome])
   useEffect(() => {
     if (!open || mode !== 'members' || listInvitations === undefined) return
     let active = true
+    const sequence = ++readSequence.current
     setLoadingInvitations(true)
     setLoadError(undefined)
     void listInvitations(queryProjectId)
-      .then((next) => { if (active) { setInvitations(next); setLoadedScope(queryProjectId ?? 'all') } })
-      .catch((cause: unknown) => { if (active) setLoadError(errorText(cause, t)) })
-      .finally(() => { if (active) setLoadingInvitations(false) })
+      .then((next) => { if (active && sequence === readSequence.current) { setInvitations(next); setLoadedScope(queryProjectId ?? 'all') } })
+      .catch((cause: unknown) => {
+        if (active && sequence === readSequence.current) setLoadError(errorText(cause, t, 'manager.invitationReadFailed'))
+      })
+      .finally(() => { if (active && sequence === readSequence.current) setLoadingInvitations(false) })
     return () => { active = false }
   }, [open, mode, listInvitations, queryProjectId, reload, t])
   useEffect(() => {
@@ -125,13 +149,30 @@ export function ProjectManagerModal({
     return () => { active = false }
   }, [open, mode, canInvite, listUsers, usersReload])
 
+  const refreshAfterMutation = async (scopeId: number | undefined, failure: CollaborationKey): Promise<void> => {
+    if (listInvitations === undefined) return
+    const sequence = ++readSequence.current
+    setLoadingInvitations(true)
+    setLoadError(undefined)
+    try {
+      const next = await listInvitations(scopeId)
+      if (sequence !== readSequence.current) return
+      setInvitations(next)
+      setLoadedScope(scopeId ?? 'all')
+    } catch {
+      if (sequence === readSequence.current) setLoadError(t(failure))
+    } finally {
+      if (sequence === readSequence.current) setLoadingInvitations(false)
+    }
+  }
+
   const submitCreate = async (event: SyntheticEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
     if (busy || createProject === undefined || name.trim() === '') return
     setBusy(true)
     setError(undefined)
     try {
-      onCreated(await createProject(name.trim()))
+      onCreated(await createProject(name.trim()), name.trim())
     } catch (nextError) {
       setError(errorText(nextError, t))
     } finally {
@@ -144,13 +185,17 @@ export function ProjectManagerModal({
     if (busy || projectId === undefined || inviteMember === undefined || username.trim() === '') return
     setBusy(true)
     setError(undefined)
+    setOutcome(undefined)
     try {
-      await inviteMember(projectId, username.trim(), memberMode)
+      const sent = await inviteMember(projectId, username.trim(), memberMode)
       setUsername('')
-      if (listInvitations !== undefined) { setInvitations(await listInvitations(projectId)); setLoadedScope(projectId) }
+      setInvitations(current => [...current.filter(row => row.projectId === projectId && row.id !== sent.id), sent])
+      setLoadedScope(projectId)
+      await refreshAfterMutation(projectId, 'manager.inviteRefreshFailed')
       setDirection('sent')
       setScope('current')
       setView('list')
+      setOutcome('manager.invitationSent')
     } catch (nextError) {
       setError(errorText(nextError, t))
     } finally {
@@ -162,9 +207,13 @@ export function ProjectManagerModal({
     if (busy || acceptInvitation === undefined) return
     setBusy(true)
     setError(undefined)
+    setOutcome(undefined)
+    actionFocus.current = document.activeElement
     try {
       await acceptInvitation(id)
-      if (listInvitations !== undefined) setInvitations(await listInvitations(queryProjectId))
+      setInvitations(current => current.map(row => row.id === id ? { ...row, status: 'accepted' } : row))
+      setOutcome('manager.invitationAccepted')
+      await refreshAfterMutation(queryProjectId, 'manager.acceptRefreshFailed')
     } catch (nextError) {
       setError(errorText(nextError, t))
     } finally {
@@ -174,7 +223,9 @@ export function ProjectManagerModal({
 
   const invitedMemberIds = new Set<number>()
   for (const invitation of invitations) {
-    if (invitation.invitee.id !== currentUserId) invitedMemberIds.add(invitation.invitee.id)
+    if (hasLoadedScope && invitation.projectId === projectId && invitation.invitee.id !== currentUserId) {
+      invitedMemberIds.add(invitation.invitee.id)
+    }
   }
   const normalizedUserQuery = userQuery.trim().toLowerCase()
   const matchedUsers = users.filter(user => user.id !== currentUserId && !invitedMemberIds.has(user.id)
@@ -184,13 +235,14 @@ export function ProjectManagerModal({
     (direction === 'received' ? invitation.invitee.id === currentUserId : invitation.invitee.id !== currentUserId)
     && (!pendingOnly || invitation.status === 'pending')
   ))
-  const backToList = (): void => { setPickerOpen(false); setError(undefined); setView('list') }
-  const compose = (): void => { setScope('current'); setPickerOpen(false); setError(undefined); setView('compose') }
+  const backToList = (): void => { setPickerOpen(false); setError(undefined); setOutcome(undefined); setView('list') }
+  const compose = (): void => { setScope('current'); setPickerOpen(false); setError(undefined); setOutcome(undefined); setView('compose') }
   const inviteReason = steward ? t('manager.stewardNotice')
     : projectId === undefined ? t('manager.chooseProject') : t('project.managedByOwner')
   const title = mode === 'create' ? t('manager.createTitle')
     : view === 'compose' ? t('manager.composeTitle') : t('manager.invitationCenter')
   const fieldBlocked = busy || loadingUsers || loadingInvitations || usersError
+    || (listInvitations !== undefined && (!hasLoadedScope || scope !== 'current' || loadError !== undefined))
 
   return (
     <CollaborationDialog open={open} title={title} busy={busy} onClose={onClose}
@@ -219,9 +271,9 @@ export function ProjectManagerModal({
         <form id={`${id}-create`} className={css.form} onSubmit={(event) => { void submitCreate(event) }}>
           <p className={css.description}>{t('manager.createDescription')}</p>
           <label className={css.label} htmlFor={`${id}-name`}>{t('manager.nameLabel')}</label>
-          <Input id={`${id}-name`} value={name} onChange={(event) => { setName(event.target.value) }}
-            placeholder={t('manager.namePlaceholder')} maxLength={120} required disabled={busy} />
-          <div className={css.fieldMeta}><span>{t('manager.nameHelp')}</span><span>{name.length} / 120</span></div>
+          <Input className={css.textField as string} id={`${id}-name`} value={name} onChange={(event) => { setName(event.target.value) }}
+            placeholder={t('manager.namePlaceholder')} aria-describedby={`${id}-name-help`} maxLength={120} required disabled={busy} />
+          <div id={`${id}-name-help`} className={css.fieldMeta}><span>{t('manager.nameHelp')}</span><span>{name.length} / 120</span></div>
           <dl className={css.creationFacts}><div><dt>{t('manager.creationOrigin')}</dt><dd>{t('manager.userCreated')}</dd></div>
             <div><dt>{t('manager.ownerLabel')}</dt><dd>{t('scope.you')}</dd></div></dl>
           <p className={css.pathNote}><IconFolderOpenOutline16 size={16} /><span>{t('manager.folderNote')}</span></p>
@@ -231,14 +283,24 @@ export function ProjectManagerModal({
         canInvite ? (
           <form id={`${id}-invite`} className={css.form} onSubmit={(event) => { void submitInvite(event) }}>
             <div className={css.target}><IconUsersOutline16 size={20} /><span><small>{t('manager.inviteTo')}</small><strong>{projectName}</strong></span></div>
-            <label className={css.label} id={`${id}-member-label`}>{t('manager.usernameLabel')}</label>
+            <label className={css.label} id={`${id}-member-label`} htmlFor={`${id}-member`}>{t('manager.usernameLabel')}</label>
             <Menu open={pickerOpen} onClose={() => { setPickerOpen(false) }} portal side="bottom" align="start"
+              autoFocus={!keyboardPicker.current}
               listClassName={css.memberMenu} selectedIds={username === '' ? [] : [username]}
               header={<div className={css.memberHeader}><strong>{t('manager.usernameLabel')}</strong>
-                <Input type="search" aria-label={t('manager.searchUsers')} placeholder={t('manager.searchUsers')}
+                <Input className={css.textField as string} ref={memberSearch} type="search"
+                  aria-label={t('manager.searchUsers')} placeholder={t('manager.searchUsers')}
                   value={userQuery} onChange={(event) => { setUserQuery(event.target.value) }} /></div>}
-              anchor={<button type="button" className={css.userTrigger} aria-labelledby={`${id}-member-label ${id}-chosen`}
-                aria-haspopup="menu" aria-expanded={pickerOpen} disabled={fieldBlocked} onClick={() => { setPickerOpen(value => !value) }}>
+              anchor={<button id={`${id}-member`} type="button" className={css.userTrigger} aria-labelledby={`${id}-member-label ${id}-chosen`}
+                aria-haspopup="menu" aria-expanded={pickerOpen} disabled={fieldBlocked}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'ArrowDown') return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  keyboardPicker.current = true
+                  setPickerOpen(true)
+                }}
+                onClick={(event) => { keyboardPicker.current = event.detail === 0; setPickerOpen(value => !value) }}>
                 <span id={`${id}-chosen`}>{selectedUser?.displayName ?? t('manager.usernamePlaceholder')}</span><IconChevronDownOutline14 />
               </button>}
               items={matchedUsers.length === 0 ? [{ type: 'label', id: 'empty', text: t('manager.noEligibleUsers') }]
@@ -263,7 +325,8 @@ export function ProjectManagerModal({
           </form>
         ) : <p className={css.notice}>{inviteReason}</p>
       ) : (
-        <div className={css.members}>
+        <div ref={memberContent} className={css.members}>
+          {outcome !== undefined && <p className={css.queryStatus} role="status">{t(outcome)}</p>}
           <div className={css.filters}>
             {projectId !== undefined ? <div className={css.scopeFilters} aria-label={t('manager.invitationScope')}>
               <Button size="sm" variant={scope === 'current' ? 'soft' : 'ghost'} aria-pressed={scope === 'current'} disabled={busy}

@@ -3388,7 +3388,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         }}
         {...(pager === undefined ? {} : { footer: pager })}
       >
-        {limitsText !== '' && <Tooltip label={t('manager.info')} disabled={phone}><Button className={css.infoButton} size="toolbar" type="button" variant="ghost" aria-label={t('manager.info')} onClick={() => { setLimitsOpen(true) }}><IconInfoOutline16 size={16} /></Button></Tooltip>}
+        {limitsText !== '' && <Tooltip label={t('manager.info')} side="bottom" align="end" portal disabled={phone}><Button className={css.infoButton} size="toolbar" type="button" variant="ghost" aria-label={t('manager.info')} onClick={() => { setLimitsOpen(true) }}><IconInfoOutline16 size={16} /></Button></Tooltip>}
         <div className={css.workbench} ref={focusTrashReturn}>
           <aside className={css.scopeRail} aria-label={t('scope.rail.label')}>
             <Input className={css.scopeSearch as string} icon={<IconSearchOutline16 size={14} />} aria-label={t('scope.search')} placeholder={t('scope.search')} value={scopeFilter} onChange={(event) => { setScopeFilter(event.currentTarget.value) }} />
@@ -3785,9 +3785,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                     <Button className={css.previewAttach} size="toolbar" type="button" variant="soft" disabled={busy} icon={<IconPaperclipOutline16 size={16} />} onClick={() => { attachDocument(previewDoc) }}>{selected.size > 0 ? t(crossScopeAttachment ? 'preview.copyAttachOne' : 'preview.attachOne') : attachLabel}</Button>
                     <div className={css.previewSecondary}>
                       <a href={documentContentUrl(previewDoc.docId)} target="_blank" rel="noopener noreferrer"><IconDownloadOutline16 size={16} />{t('action.download')}</a>
-                      <Tooltip label={t('action.move')} disabled={phone}><Button size="toolbar" type="button" variant="ghost" aria-label={t('action.move')} disabled={busy || writeLocked} onClick={() => { void openMove([previewDoc]) }}><IconFolderOpenOutline16 size={16} /></Button></Tooltip>
-                      <Tooltip label={t('scope.copy')} disabled={phone}><Button size="toolbar" type="button" variant="ghost" aria-label={t('scope.copy')} disabled={busy} onClick={() => { openCopy([previewDoc], true) }}><IconCopyOutline16 size={16} /></Button></Tooltip>
-                      <Tooltip label={t('action.delete')} disabled={phone}><Button className={css.delete} size="toolbar" type="button" variant="ghost" aria-label={t('action.delete')} disabled={busy || writeLocked} onClick={() => { setDeleteTargets([previewDoc]) }}><IconTrashOutline16 size={16} /></Button></Tooltip>
+                      <Tooltip label={t('action.move')} side="bottom" align="end" portal disabled={phone}><Button size="toolbar" type="button" variant="ghost" aria-label={t('action.move')} disabled={busy || writeLocked} onClick={() => { void openMove([previewDoc]) }}><IconFolderOpenOutline16 size={16} /></Button></Tooltip>
+                      <Tooltip label={t('scope.copy')} side="bottom" align="end" portal disabled={phone}><Button size="toolbar" type="button" variant="ghost" aria-label={t('scope.copy')} disabled={busy} onClick={() => { openCopy([previewDoc], true) }}><IconCopyOutline16 size={16} /></Button></Tooltip>
+                      <Tooltip label={t('action.delete')} side="bottom" align="end" portal disabled={phone}><Button className={css.delete} size="toolbar" type="button" variant="ghost" aria-label={t('action.delete')} disabled={busy || writeLocked} onClick={() => { setDeleteTargets([previewDoc]) }}><IconTrashOutline16 size={16} /></Button></Tooltip>
                     </div>
                   </>}
                 />}
