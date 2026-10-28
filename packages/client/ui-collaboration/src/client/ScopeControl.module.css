@@ -402,6 +402,16 @@
 .pageError button { flex: none; }
 .pageBack:focus-visible, .pageRow:focus-visible, .managementRow:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color); outline-offset: -1px; }
 
+@media (min-width: 768px) {
+  .pageNav { box-sizing: border-box; min-height: 44px; }
+  .pageHero { padding-bottom: var(--dsw-space-2); }
+  .scopePage .hubTabs { padding-block: 0; margin-bottom: var(--dsw-space-2); }
+  .pageSearch { padding-bottom: var(--dsw-space-2); }
+  .listHeading { padding-bottom: var(--dsw-space-1); }
+  .rosterDivider { margin-block: var(--dsw-space-1); }
+  .pageFooter { box-sizing: border-box; min-height: 44px; }
+}
+
 @media (hover: hover) {
   .trigger:hover:not(:disabled), .menuSearchClear:hover, .pageBack:hover, .managementRow:hover, .pageRow:hover:not(:disabled):not(.pageRowCurrent) { background: var(--dsw-alias-interactive-bg-hover); }
 }
