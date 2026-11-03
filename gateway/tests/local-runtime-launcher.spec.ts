@@ -158,7 +158,9 @@ describe.skipIf(process.platform === 'win32')('recoverable LocalLauncher', () =>
     const original = await readFile(f.store.recordPath, 'utf8')
     const record = JSON.parse(original) as { url: string }
     // Port 0 cannot name an allocated listener; no unrelated host port is acquired.
-    await writeFile(f.store.recordPath, JSON.stringify({ ...record, phase, url: 'http://127.0.0.1:0/' }))
+    // The record claims process-group containment: a native slice claim would hand
+    // termination a kernel-authoritative path that needs no reachable endpoint.
+    await writeFile(f.store.recordPath, JSON.stringify({ ...record, phase, url: 'http://127.0.0.1:0/', nativeRange: undefined }))
     try {
       await expect(new LocalRuntimeControl(f.store, 100).terminate(0)).rejects.toThrow('capacity remains occupied')
       expect(await (await fetch(`http://127.0.0.1:${runtime.port}`)).text()).toBe('owned-runtime')

@@ -114,9 +114,6 @@
   "apps/web/tests/personal-computers-fixture.ts": {
     "04bc8a44533574365dfedf563e2356458bcf95f990a00906938c977c1d683356": 1
   },
-  "apps/web/tests/personal-computers.e2e.ts": {
-    "04bc8a44533574365dfedf563e2356458bcf95f990a00906938c977c1d683356": 1
-  },
   "apps/web/tests/ptc-round.e2e.ts": {
     "12d85a27bfdf2b871e46d4f1750c5ef1789d7a8df1a27658b2475272cb6bad53": 1
   },

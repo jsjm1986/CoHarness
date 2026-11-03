@@ -7889,9 +7889,6 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
-      punycode:
-        specifier: 2.3.1
-        version: 2.3.1
       tsx:
         specifier: ^4.19.2
         version: 4.23.12

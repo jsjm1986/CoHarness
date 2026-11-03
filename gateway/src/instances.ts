@@ -767,7 +767,11 @@ export class InstanceManager {
   }
 
   async stateOf(target: RuntimeTargetInput): Promise<string> {
-    return this.repository.stateOf(await this.address(target))
+    try { return this.repository.stateOf(await this.address(target)) }
+    catch (error) {
+      if (error instanceof RuntimeStartBlockedError && error.reason === 'unavailable') return 'stopped'
+      throw error
+    }
   }
 
   /**
