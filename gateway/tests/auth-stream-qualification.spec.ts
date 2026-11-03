@@ -112,10 +112,10 @@ describe('SQLite stream login qualification', () => {
     expect(f.auth.validate(TOKEN)).toMatchObject({ username: 'stream-user', mustChangePassword: true })
   })
 
-  it('preserves ordinary validation at its inclusive deadline while stream qualification refuses that deadline', () => {
+  it('refuses ordinary validation and stream qualification at the exact deadline', () => {
     const f = fixture()
     f.db.prepare('UPDATE auth_sessions SET expires_at=?,absolute_expires_at=?').run(NOW, NOW)
     expect(f.auth.qualifyForStream(TOKEN)).toBeNull()
-    expect(f.auth.validate(TOKEN)?.username).toBe('stream-user')
+    expect(f.auth.validate(TOKEN)).toBeNull()
   })
 })

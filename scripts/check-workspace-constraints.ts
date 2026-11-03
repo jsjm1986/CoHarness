@@ -271,6 +271,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
     'lib/runner.js',
     'lib/runner-*.js',
     'lib/output.js',
+    'lib/output-*.js',
     'scripts/ensure-spawn-helper.mjs',
   ],
   // tsdown shares the repository/pack code between the lib entry and the bin
