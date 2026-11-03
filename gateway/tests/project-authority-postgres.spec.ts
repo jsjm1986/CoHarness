@@ -74,12 +74,16 @@ describePg('fresh PostgreSQL project authority', () => {
       await pool.query(`INSERT INTO harness.auth_sessions(organization_id,user_id,token_hash,created_at,expires_at,absolute_expires_at,last_seen_at)
         VALUES($1,$2,$3,now(),now()+interval '1 hour',now()+interval '2 hours',now())`,
       [organizationId, row.id, createHash('sha256').update(token).digest()])
+      await pool.query(`INSERT INTO harness.instances(organization_id,user_id,assigned_node_id,port,storage_layout)
+        VALUES($1,$2,$3,$4,'isolated')`, [organizationId, row.id, context.nodeId, 48000 + roles.indexOf(role)])
     }
     const project = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.projects(
       organization_id,name,created_by,owner_user_id,origin) VALUES($1,'Owned',$2,$2,'user') RETURNING id,public_id::text`,
     [organizationId, actors.owner.id])).rows[0]!
     await pool.query(`INSERT INTO harness.project_mounts(organization_id,project_id,node_id,local_path,canonical_path)
       VALUES($1,$2,$3,$4,$4)`, [organizationId, project.id, context.nodeId, root])
+    await pool.query('INSERT INTO harness.instances(organization_id,project_id,assigned_node_id,port) VALUES($1,$2,$3,$4)',
+      [organizationId, project.id, context.nodeId, 49000])
     for (const role of ['owner', 'writer', 'reader'] as const) {
       await pool.query('INSERT INTO harness.project_members(organization_id,project_id,user_id,access_mode) VALUES($1,$2,$3,$4)',
         [organizationId, project.id, actors[role].id, role === 'reader' ? 'ro' : 'rw'])

@@ -207,7 +207,9 @@ export class PostgresCollaborationService {
   }
 
   async projectsForUser(userId: number): Promise<ProjectScopeView[]> {
-    return (await this.projectAuthorities(userId, undefined, true)).map(({ administrator: _, ...project }) => project)
+    return (await this.projectAuthorities(userId, undefined, true)).map(
+      ({ administrator: _, canManage: _c, uiThemePolicy: _t, nodeId: _n, nodeName: _m, origin: _o, owner: _w, ...project }) => project,
+    )
   }
 
   async projectForUser(projectId: number, userId: number): Promise<ProjectAuthorityView | null> {
