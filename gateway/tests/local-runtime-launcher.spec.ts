@@ -173,6 +173,9 @@ describe.skipIf(process.platform === 'win32')('recoverable LocalLauncher', () =>
     await handle.terminate(0)
     await absent(runtime.pid)
     const record = (await f.store.read())!
+    // The scenario exercises process-group containment: strip the native slice
+    // claim so stop evidence cannot take the kernel-authoritative systemctl path.
+    await writeFile(f.store.recordPath, JSON.stringify({ ...record, nativeRange: undefined }))
     const recovered = new LocalRuntimeControl(f.store, 200)
     const original = process.kill
     let denied = 0
