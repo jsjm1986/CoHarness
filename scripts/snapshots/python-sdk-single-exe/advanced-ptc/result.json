@@ -118,7 +118,7 @@
         "content": [
           {
             "type": "text",
-            "text": "Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: \"{{cwd}}\".\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
+            "text": "Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: \"{{cwd}}\".\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically \u2014 do not request sandbox escalation (do not set `sandbox_permissions`)."
           }
         ],
         "source": {
@@ -135,7 +135,7 @@
             },
             {
               "name": "approval:policy",
-              "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
+              "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically \u2014 do not request sandbox escalation (do not set `sandbox_permissions`)."
             }
           ]
         },
@@ -161,7 +161,7 @@
             "maxTokens": true
           },
           "tools": [
-            "run_code"
+            "{{tools}}"
           ]
         },
         "reason": "initial"
@@ -343,11 +343,11 @@
       "seq": 17,
       "time": 0,
       "data": {
-        "jobId": "snapshot-abc8d261d4094d94",
+        "jobId": "{{id:1}}",
         "owner": "{{parent}}",
         "kind": "snapshot",
         "label": "snapshot_double",
-        "startedAt": 1793722276879,
+        "startedAt": 0,
         "toolCall": {
           "callId": "advanced-code:ptc:1",
           "rootCallId": "advanced-code"
@@ -359,16 +359,16 @@
       "seq": 18,
       "time": 0,
       "data": {
-        "jobId": "snapshot-abc8d261d4094d94",
+        "jobId": "{{id:1}}",
         "owner": "{{parent}}",
         "kind": "snapshot",
         "label": "snapshot_double",
-        "startedAt": 1793722276879,
+        "startedAt": 0,
         "toolCall": {
           "callId": "advanced-code:ptc:1",
           "rootCallId": "advanced-code"
         },
-        "finishedAt": 1793722276879,
+        "finishedAt": 0,
         "status": "completed",
         "cause": "producer",
         "producerReported": true
@@ -986,7 +986,7 @@
             "content": [
               {
                 "type": "text",
-                "text": "Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: \"{{cwd}}\".\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
+                "text": "Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: \"{{cwd}}\".\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically \u2014 do not request sandbox escalation (do not set `sandbox_permissions`)."
               }
             ],
             "source": {
@@ -1003,7 +1003,7 @@
                 },
                 {
                   "name": "approval:policy",
-                  "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
+                  "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically \u2014 do not request sandbox escalation (do not set `sandbox_permissions`)."
                 }
               ]
             },
@@ -1035,7 +1035,7 @@
                 "maxTokens": true
               },
               "tools": [
-                "run_code"
+                "{{tools}}"
               ]
             },
             "reason": "initial"
@@ -1253,11 +1253,11 @@
           "seq": 17,
           "time": 0,
           "data": {
-            "jobId": "snapshot-abc8d261d4094d94",
+            "jobId": "{{id:1}}",
             "owner": "{{parent}}",
             "kind": "snapshot",
             "label": "snapshot_double",
-            "startedAt": 1793722276879,
+            "startedAt": 0,
             "toolCall": {
               "callId": "advanced-code:ptc:1",
               "rootCallId": "advanced-code"
@@ -1275,16 +1275,16 @@
           "seq": 18,
           "time": 0,
           "data": {
-            "jobId": "snapshot-abc8d261d4094d94",
+            "jobId": "{{id:1}}",
             "owner": "{{parent}}",
             "kind": "snapshot",
             "label": "snapshot_double",
-            "startedAt": 1793722276879,
+            "startedAt": 0,
             "toolCall": {
               "callId": "advanced-code:ptc:1",
               "rootCallId": "advanced-code"
             },
-            "finishedAt": 1793722276879,
+            "finishedAt": 0,
             "status": "completed",
             "cause": "producer",
             "producerReported": true

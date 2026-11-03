@@ -2709,13 +2709,14 @@ def normalize_snapshot_value(
     tokens = dict(replacements)
     next_by_kind: dict[str, int] = {}
     uuid = re.compile(r"^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$", re.I)
+    short_job_id = re.compile(r"-[0-9a-f]{16}$", re.I)
     canonical = re.compile(r"^\{\{([a-z]+):([1-9][0-9]*)\}\}$")
     fields = {
         "sessionId": "session", "parentSessionId": "session", "rootSessionId": "session",
         "messageId": "message", "participantId": "principal", "principalId": "principal",
         "projectId": "project", "runtimeId": "runtime", "executionTargetId": "target",
         "resourceId": "resource", "commandId": "command", "rpcId": "rpc",
-        "retryId": "retry", "runId": "workflow",
+        "retryId": "retry", "runId": "workflow", "jobId": "id",
     }
 
     def reserve(item: object) -> None:
@@ -2736,7 +2737,7 @@ def normalize_snapshot_value(
             return
         if canonical.fullmatch(item):
             tokens[item] = item
-        elif always or uuid.fullmatch(item) or item in ("{{messageId}}", "{{sessionId}}"):
+        elif always or uuid.fullmatch(item) or short_job_id.search(item) or item in ("{{messageId}}", "{{sessionId}}"):
             ordinal = next_by_kind.get(kind, 0) + 1
             next_by_kind[kind] = ordinal
             tokens[item] = "{{" + kind + ":" + str(ordinal) + "}}"
@@ -2789,6 +2790,11 @@ def normalize_snapshot_value(
         if isinstance(result.get("type"), str) and isinstance(data, dict):
             if "seq" in result and "time" in result:
                 result["time"] = 0
+            if result["type"] in ("job/registered", "job/settled"):
+                if "startedAt" in data:
+                    data["startedAt"] = 0
+                if "finishedAt" in data:
+                    data["finishedAt"] = 0
             if result["type"] == "subagent/catalog" and "childCreatedAt" in data:
                 data["childCreatedAt"] = 0
             if result["type"] in ("assistant/message", "assistant/attempt"):

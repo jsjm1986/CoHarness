@@ -84,6 +84,9 @@ describePg('archive Runtime namespace migration', () => {
       expect(await history(true)).toEqual(before)
       expect(await runMigrations(db, through97)).toEqual({ applied: [], current: 97 })
     } finally { await rm(through97, { recursive: true, force: true }) }
+    // The service runs against the current schema: later namespace migrations add the
+    // generated `runtime_namespace` columns its detail reads join on.
+    await runMigrations(db, migrations)
     const legacy = (await db.query<{ archive_id: ConversationArchiveId; root_session_id: string; runtime_id: RuntimeId | null }>('SELECT archive_id,root_session_id,runtime_id FROM harness.conversation_archive_records ORDER BY root_session_id')).rows
     expect(new Set(legacy.map(row => row.archive_id)).size).toBe(3)
     expect(legacy.find(row => row.root_session_id === 'legacy-owned')?.runtime_id).toBe(runtimeId)

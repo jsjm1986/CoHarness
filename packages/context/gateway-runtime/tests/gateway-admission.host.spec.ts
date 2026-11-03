@@ -148,7 +148,7 @@ describe('gateway runtime admission', () => {
         expect(() => gateway.ctx.webServer.collectIndexInjections(lastRequest)).toThrow(/principal assertion/)
         lastRequest.headers[GATEWAY_PRINCIPAL_HEADER] = gateway.issue({ purpose: 'archive-read', user: adminUser })
         expect(() => gateway.ctx.webServer.collectIndexInjections(lastRequest))
-          .toThrow('Purpose assertions permit only their declared HTTP operations.')
+          .toThrow('Archive assertions permit only the archive read endpoint.')
       } finally { lastRequest.headers = originalHeaders }
       const entry = [...gateway.ctx.loader.entries()].find(candidate => candidate.options.name === '@deepseek-ai/dsh-gateway-runtime')
       if (entry === undefined) throw new Error('GatewayRuntime Loader entry is missing')

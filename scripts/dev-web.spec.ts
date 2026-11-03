@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { TsdownBundle } from 'tsdown'
+import { stampClientArtifact } from '../packages/client/modules/src/artifact-revision.ts'
 import { writeClientBuildRecord } from './client-build-environment.ts'
 import {
   devWebBuildEnvironment,
@@ -115,14 +116,14 @@ it('samples one local environment at startup without validating watcher outputs'
     await mkdir(join(root, 'packages/client/example/lib'), { recursive: true })
     await writeFile(join(root, 'package.json'), JSON.stringify({ version: '1.2.3' }))
     await writeFile(join(root, 'apps/web/dist/index.html'), '<main></main>')
-    await writeFile(join(root, 'packages/client/example/lib/client.js'), 'module.exports = {}\n')
+    await writeFile(join(root, 'packages/client/example/lib/client.js'), stampClientArtifact('module.exports = {}\n', []))
     writeClientBuildRecord(root, {
       DSH_CLIENT_BUILD_PROFILE: 'official',
       DSH_CLIENT_COMMIT_HASH: 'fffffff',
       DSH_CLIENT_TITLE: 'DeepSeek Harness',
       DSH_CLIENT_VERSION: '1.2.2',
     })
-    await writeFile(join(root, 'packages/client/example/lib/client.js'), 'module.exports = { changed: true }\n')
+    await writeFile(join(root, 'packages/client/example/lib/client.js'), stampClientArtifact('module.exports = { changed: true }\n', []))
 
     expect(devWebBuildEnvironment(root, {
       PATH: '/bin',

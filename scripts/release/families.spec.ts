@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { stampClientArtifact } from '../../packages/client/modules/src/artifact-revision.ts'
 import { coharnessClientBuildEnvironment, writeClientBuildRecord } from '../client-build-environment.ts'
 import { releaseFamily, type ReleaseMember } from './families.ts'
 import { compareVersions, nextVendorVersion, planShared, reachesPayload } from './bump.ts'
@@ -31,7 +32,7 @@ function buildFixture(environment: Record<string, string>): string {
   roots.push(root)
   write(join(root, 'package.json'), `${JSON.stringify({ version: environment.DSH_CLIENT_VERSION ?? '0.0.1' })}\n`)
   write(join(root, 'apps/web/dist/index.html'), '<main></main>')
-  write(join(root, 'packages/client/example/lib/client.js'), 'module.exports = {}\n')
+  write(join(root, 'packages/client/example/lib/client.js'), stampClientArtifact('module.exports = {}\n', []))
   writeClientBuildRecord(root, environment)
   return root
 }
@@ -160,7 +161,7 @@ describe('release families', () => {
     expect(() => { dsh.verifyBuildArtifacts(missing) }).toThrow(/record.*missing/)
     expect(() => { vendor.verifyBuildArtifacts(missing) }).not.toThrow()
 
-    write(join(official, 'packages/client/example/lib/client.js'), 'module.exports = { changed: true }\n')
+    write(join(official, 'packages/client/example/lib/client.js'), stampClientArtifact('module.exports = { changed: true }\n', []))
     expect(() => { dsh.verifyBuildArtifacts(official) }).toThrow(/artifacts differ/)
   })
 

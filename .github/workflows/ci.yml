@@ -544,7 +544,7 @@ jobs:
 
       - name: Link the compiled Gateway's runtime packages
         if: needs.pr-scope.outputs.gateway_mode == 'full'
-        run: tsx scripts/gateway-runtime-packages.ts
+        run: pnpm exec tsx scripts/gateway-runtime-packages.ts
 
       - name: Test Gateway execution through Loader and PostgreSQL
         id: gateway-execution

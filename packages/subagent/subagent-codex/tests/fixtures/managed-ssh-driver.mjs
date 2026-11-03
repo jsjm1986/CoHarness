@@ -24,8 +24,16 @@ const nullResult = { parse(value) { assert.equal(value, null); return null } }
 const root = process.cwd(), quote = value => `'${value.replaceAll("'", "'\\''")}'`
 const bootEntry = process.env.DSH_SSH_CODEX_BOOT_ENTRY
 assert.ok(bootEntry)
-const helper = fileURLToPath(new URL('../../../../ssh/ssh/lib/helper.js', import.meta.url))
-const carrier = fileURLToPath(new URL('../../../../ssh/ssh/tests/fixtures/local-ssh-carrier.mjs', import.meta.url))
+const exampleMode = process.env.DSH_EXAMPLE_MODE ?? 'src'
+const helper = fileURLToPath(new URL(`../../../../ssh/ssh/${exampleMode === 'src' ? 'src/helper-entry.ts' : 'lib/helper.js'}`, import.meta.url))
+let carrierSource = await readFile(new URL('../../../../ssh/ssh/tests/fixtures/local-ssh-carrier.mjs', import.meta.url), 'utf8')
+if (exampleMode === 'src') {
+  const launch = "['--disable-sigusr1', helper]"
+  assert.ok(carrierSource.includes(launch))
+  carrierSource = carrierSource.replace(launch, `['--disable-sigusr1', '--import', ${JSON.stringify(import.meta.resolve('tsx/esm'))}, helper]`)
+}
+const carrier = join(root, 'ssh-carrier.mjs')
+await writeFile(carrier, carrierSource)
 const manifestPath = createRequire(import.meta.url).resolve('@openai/codex/package.json')
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
 assert.equal(manifest.version, '0.153.4')
