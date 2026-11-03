@@ -4,6 +4,7 @@ import { lstat, readFile } from 'node:fs/promises'
 import { isAbsolute, join, resolve } from 'node:path'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
+import { privateFileState, tightenPrivateFileAcl } from './node-private-file.ts'
 import { DOCUMENT_PERMISSION_DENIED_CODE, DOCUMENT_STORE_UNAVAILABLE_CODE, UserDocError, UserDocRootId } from '@deepseek-ai/dsh-userdoc'
 import { z } from 'zod'
 
@@ -51,7 +52,9 @@ async function privateJson(path: string): Promise<unknown | undefined> {
     throw error
   })
   if (info === undefined) return undefined
-  if (!info.isFile() || info.isSymbolicLink() || info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0 || info.size > DOCUMENT_SCOPE_RECORD_MAX_BYTES) {
+  // POSIX privacy comes from uid+mode on the stat; Windows resolves the same
+  // owner-only verdict through the file's ACL inside privateFileState.
+  if (info.isSymbolicLink() || await privateFileState(path, info, DOCUMENT_SCOPE_RECORD_MAX_BYTES) !== 'private') {
     throw new Error('Document scope records require bounded owner-only regular files.')
   }
   const value: unknown = JSON.parse(await readFile(path, 'utf8'))

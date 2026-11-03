@@ -5,6 +5,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import type { GatewayConfig } from './config.ts'
 import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { documentScopeStorageKey, type DocumentIdentityScope } from './document-scope-storage.ts'
+import { privateDirectoryState, protectedDirectoryState, tightenPrivateFileAcl } from './node-private-file.ts'
 import { runGatewayChildCommand } from './child-command.ts'
 
 interface DocumentIdentityLocations {
@@ -19,6 +20,7 @@ interface DirectoryIdentity {
   readonly device: number
   readonly mode: number
   readonly uid: number
+  readonly stat: { isDirectory(): boolean; mode: number; uid: number }
 }
 
 function inside(parent: string, child: string): boolean {
@@ -29,14 +31,24 @@ function inside(parent: string, child: string): boolean {
 async function directory(path: string): Promise<DirectoryIdentity> {
   const entry = await lstat(path)
   if (!entry.isDirectory() || entry.isSymbolicLink()) throw new Error('Document storage requires real directories.')
-  return { device: entry.dev, mode: entry.mode, uid: entry.uid }
+  return { device: entry.dev, mode: entry.mode, uid: entry.uid, stat: entry }
 }
 
-async function privateDirectory(path: string, owner: number): Promise<void> {
+async function privateDirectory(path: string, owner: number | undefined): Promise<void> {
   try { await mkdir(path, { mode: 0o700 }) } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
   }
   const entry = await directory(path)
+  // A fresh Windows directory inherits its parent's grants, so the ACL is
+  // rebuilt to the owner/OS boundary before the private verdict is read —
+  // tightening only restricts, which matches the 0700 refusal boundary.
+  if (process.platform === 'win32') {
+    await tightenPrivateFileAcl(path)
+    if (await privateDirectoryState(path, entry.stat) !== 'private') {
+      throw new Error('Gateway document identity storage must be ACL-private to its owner on Windows.')
+    }
+    return
+  }
   if (entry.uid !== owner || (entry.mode & 0o077) !== 0) {
     throw new Error('Gateway document identity storage must be owned by Gateway and owner-only.')
   }
@@ -53,8 +65,12 @@ async function privateDirectory(path: string, owner: number): Promise<void> {
 export async function documentIdentityLocations(
   cfg: Pick<GatewayConfig, 'stateRoot'>, runtimeRoot: string, documentRoot: string, scope: DocumentIdentityScope,
 ): Promise<DocumentIdentityLocations> {
+  // Windows has no POSIX owner uid; ownership verdicts come from ACL probes
+  // anchored on the object's owner SID instead of the process account.
   const owner = process.getuid?.()
-  if (owner === undefined) throw new Error('Gateway document identity storage requires a POSIX process owner.')
+  if (process.platform !== 'win32' && owner === undefined) {
+    throw new Error('Gateway document identity storage requires a POSIX process owner.')
+  }
   const [canonicalRuntime, stateRoot] = await Promise.all([realpath(runtimeRoot), realpath(cfg.stateRoot)])
   const rootEntry = await lstat(documentRoot).catch((error: unknown) => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
@@ -69,7 +85,10 @@ export async function documentIdentityLocations(
     throw new Error('The public document root must be inside its runtime mount.')
   }
   const stateInfo = await directory(stateRoot)
-  if (stateInfo.uid !== owner || (stateInfo.mode & 0o077) !== 0) {
+  const statePrivate = process.platform === 'win32'
+    ? await privateDirectoryState(stateRoot, stateInfo.stat) === 'private'
+    : stateInfo.uid === owner && (stateInfo.mode & 0o077) === 0
+  if (!statePrivate) {
     throw new Error('Gateway state storage must be owner-only before document identities are initialized.')
   }
   const rootParent = dirname(documentRoot)
@@ -77,7 +96,10 @@ export async function documentIdentityLocations(
   let privateParent = dirname(canonicalRuntime)
   for (;;) {
     const candidate = await directory(privateParent)
-    if (candidate.device === documentDevice && candidate.uid === owner && (candidate.mode & 0o022) === 0) break
+    const protected_ = candidate.device === documentDevice && (process.platform === 'win32'
+      ? await protectedDirectoryState(privateParent, candidate.stat) === 'protected'
+      : candidate.uid === owner && (candidate.mode & 0o022) === 0)
+    if (protected_) break
     const parent = dirname(privateParent)
     if (parent === privateParent) throw new Error('No Gateway-owned protected directory shares the document filesystem.')
     privateParent = parent

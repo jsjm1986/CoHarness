@@ -73,12 +73,16 @@ async function persistentObject(path: string, expected: StorageObject): Promise<
 }
 
 function recordedObject(value: unknown, expected: StorageObject, persistent: boolean): boolean {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    && 'device' in value && typeof value.device === 'string' && /^(?:0|[1-9][0-9]*)$/u.test(value.device)
-    && 'inode' in value && value.inode === expected.inode
-    && (persistent && 'volume' in value
-      ? typeof value.volume === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(value.volume) && value.volume === expected.volume
-      : value.device === expected.device)
+  // Volume identity only exists where the platform reports it — Windows markers
+  // carry device+inode alone, so the volume comparison engages whenever either
+  // side has one rather than only when the record happens to include it.
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  if (!('device' in value) || typeof value.device !== 'string' || !/^(?:0|[1-9][0-9]*)$/u.test(value.device)) return false
+  if (!('inode' in value) || value.inode !== expected.inode) return false
+  if (!persistent || expected.volume === undefined && !('volume' in value)) return value.device === expected.device
+  const recorded = (value as { volume?: unknown }).volume
+  return typeof recorded === 'string'
+    && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(recorded) && recorded === expected.volume
 }
 
 async function containsDirectory(path: string, expected: StorageObject): Promise<boolean> {

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-04-windows-document-storage-userdoc.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-04-windows-document-storage-userdoc.md
+document:
+  en: ec3f9e5a9c3717c475056d97ab95e397eb1cab65
+  zh: 3ea8e911c383f4cb948c1f2cf558f618dc9d1ac6
+/agent-note-windows-document-storage-and-userdocs-runtime-path:
+  en: 9e200c22ba6a8f60
+  zh: f7e045d88adec073
+/agent-note-windows-document-storage-and-userdocs-runtime-path/problem:
+  en: c02c8ea766232421
+  zh: 57154ac97b87a0ba
+/agent-note-windows-document-storage-and-userdocs-runtime-path/changes:
+  en: 3f2194b3c582d9ff
+  zh: 3578f864d82e9b61
+/agent-note-windows-document-storage-and-userdocs-runtime-path/deployment-findings-that-source-changes-cannot-express:
+  en: 86750f174783e278
+  zh: b86f54c898010053
+/agent-note-windows-document-storage-and-userdocs-runtime-path/verified-end-to-end-on-windows:
+  en: b9ac2461b0701fb1
+  zh: 7e4becf9a9617a32
+/agent-note-windows-document-storage-and-userdocs-runtime-path/remaining-gaps:
+  en: bf8c57a699efc09a
+  zh: d9baf17be0133042

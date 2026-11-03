@@ -151,7 +151,10 @@ export class LocalLauncher implements Launcher {
         cwd: runtime.homePath, dshHome: runtime.dshHome, credential: runtime.gatewayCredential,
         logCapBytes: this.cfg.runtimeLogCapBytes, controlTimeoutMs: this.cfg.upstreamTimeoutMs,
         env: {
+          // os.homedir() reads USERPROFILE on Windows and HOME elsewhere; both
+          // are set so `~/documents` and friends resolve to the runtime owner.
           ...scrubbedGatewayChildEnv(), HOME: runtime.homePath, DSH_HOME: runtime.dshHome,
+          ...(process.platform === 'win32' ? { USERPROFILE: runtime.homePath } : {}),
           DSH_DIRECTORY_GRANTS: join(runtime.dshHome, 'directory-grants.json'),
           DSH_MANAGED_DATA_MANIFEST: join(runtime.dshHome, 'managed-data.jsonl'), DSH_GATEWAY_CREDENTIAL_FD: '3',
           TSX_TSCONFIG_PATH: join(this.cfg.dshRepoRoot, 'tsconfig.base.json'),
