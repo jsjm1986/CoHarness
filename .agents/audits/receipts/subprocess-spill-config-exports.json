@@ -1,0 +1,14 @@
+{
+  "name": "subprocess-spill-config-exports",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-cordis-config.ts",
+  "startedAt": "2026-10-25T10:55:54.537779+00:00",
+  "seconds": 3.308,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9d2035b35906dc0791d0720ab2822b93ffb889bca8148d7a9b7dba0638b8512c",
+  "inputsAfter": "9d2035b35906dc0791d0720ab2822b93ffb889bca8148d7a9b7dba0638b8512c",
+  "postgresToolDirectory": null,
+  "outputSha256": "0887273b4007296eb40b3a252b1f013a1661c8de819d9b9a8d6974d24b3acdfa",
+  "outputTail": "verify-cordis-config: 411 config files passed.\n"
+}

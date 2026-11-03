@@ -246,8 +246,20 @@ export class TestSessions implements ISessions {
     this.list.subscribe(() => { this.channel.publishCurrent() })
   }
 
-  beginNavigation(): AbortSignal {
-    return this.navigation.begin()
+  beginNavigation(options?: { readonly blockInputFor?: SessionId | undefined }): AbortSignal {
+    const signal = this.navigation.begin(options?.blockInputFor)
+    this.publishNavigation()
+    return signal
+  }
+
+  finishNavigation(signal: AbortSignal): void {
+    if (this.navigation.finish(signal)) this.publishNavigation()
+  }
+
+  private publishNavigation(): void {
+    const { navigationBlockedSessionId: _previous, ...state } = this.list.getSnapshot()
+    const blocked = this.navigation.blockedSessionId
+    this.list.set({ ...state, ...(blocked === undefined ? {} : { navigationBlockedSessionId: blocked }) })
   }
 
   retain(target: SessionTarget, options: SessionRetainOptions): SessionReference {

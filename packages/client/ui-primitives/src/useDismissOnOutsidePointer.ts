@@ -4,6 +4,7 @@
  */
 import { useEffect } from 'react'
 import type { RefObject } from 'react'
+import { useDismissOnHiddenOwner } from './useDismissOnHiddenOwner.ts'
 
 /**
  * Close an open popover when a pointerdown lands outside its root element.
@@ -18,6 +19,7 @@ export function useDismissOnOutsidePointer(
   setOpen: (open: boolean) => void,
   portal?: RefObject<HTMLElement | null>,
 ): void {
+  useDismissOnHiddenOwner(root, open, () => { setOpen(false) })
   useEffect(() => {
     if (!open) return
     const closeOutside = (event: PointerEvent): void => {

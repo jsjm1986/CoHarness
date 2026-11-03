@@ -1,0 +1,8 @@
+- id: base
+  name: '@deepseek-ai/cordis-plugin-include'
+  config:
+    path: ./memory.cordis.snapshot.yml
+    patches:
+      - insert:
+          - id: memory-observer-failure
+            name: './tests/fixtures/memory-observer-failure.ts'

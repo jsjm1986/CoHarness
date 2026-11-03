@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-cordis-catalog",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-cordis-catalog.ts --check",
+  "startedAt": "2026-10-25T10:27:06.182384+00:00",
+  "seconds": 10.197,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "796b292af8022f51d6932e70b74c52ece82bbe22e2ab4fff4061a8309bd9b75d",
+  "inputsAfter": "796b292af8022f51d6932e70b74c52ece82bbe22e2ab4fff4061a8309bd9b75d",
+  "postgresToolDirectory": null,
+  "outputSha256": "db362aad98d4f9bd44e4f96b12c192ae7eb8e4872d94df8936fa94d35ca46564",
+  "outputTail": "gen-cordis-catalog: 127 generated file(s)/region(s) are up to date.\n"
+}

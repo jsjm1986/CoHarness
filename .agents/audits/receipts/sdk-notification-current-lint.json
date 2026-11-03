@@ -1,0 +1,14 @@
+{
+  "name": "sdk-notification-current-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/sdk/client/src/client.ts packages/sdk/client/src/types.ts packages/sdk/client/src/launch.ts packages/sdk/client/tests/sdk-client.spec.ts packages/sdk/client/tests/fake-runtime.ts examples/headless-agent/tests/sdk-session-lineage.snapshot.ts examples/headless-agent/tests/fixtures/sdk-session-lineage/plugin.mjs examples/headless-agent/tests/fixtures/sdk-session-lineage/prepare.mjs",
+  "startedAt": "2026-10-24T11:19:59.183455+00:00",
+  "seconds": 3.705,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1e7a22f7fb853cd96d7e1db67af28495db0662314227d9d3392c5b55b8a8bd20",
+  "inputsAfter": "1e7a22f7fb853cd96d7e1db67af28495db0662314227d9d3392c5b55b8a8bd20",
+  "postgresToolDirectory": null,
+  "outputSha256": "aec2e30fee6221ebe2006c48c7639af8af0b181b138f2258ada5cde82cee65b0",
+  "outputTail": "packages/sdk/client/src/client.ts:488:1: error @stylistic(max-len): This line has a length of 145. Maximum allowed is 140.\npackages/sdk/client/tests/sdk-client.spec.ts:724:95: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\nexamples/headless-agent/tests/sdk-session-lineage.snapshot.ts:12:9: error eslint(prefer-const): `tree` is never reassigned. help: Use `const` instead.\nexamples/headless-agent/tests/sdk-session-lineage.snapshot.ts:13:9: error eslint(prefer-const): `sink` is never reassigned. help: Use `const` instead.\nexamples/headless-agent/tests/sdk-session-lineage.snapshot.ts:14:9: error eslint(prefer-const): `closed` is never reassigned. help: Use `const` instead.\nexamples/headless-agent/tests/sdk-session-lineage.snapshot.ts:26:40: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/sdk/client/tests/sdk-client.spec.ts:782:16: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\n"
+}

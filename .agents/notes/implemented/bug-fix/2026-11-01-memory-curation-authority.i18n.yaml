@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-memory-curation-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-memory-curation-authority.md
+document:
+  en: be96a890086516dde398d297b24dae55bfc717f6
+  zh: 90661dce5d09dfc690c31b5fed6b34f953ddadac
+/agent-note-curation-retains-its-issuer-through-dispatch-and-cursor-admission:
+  en: 23f60507b867fafb
+  zh: 9c4e2e4b2f35bb24
+/agent-note-curation-retains-its-issuer-through-dispatch-and-cursor-admission/problem:
+  en: 8ebc4d2e4b56bcf0
+  zh: 4bb0c0bf31600025
+/agent-note-curation-retains-its-issuer-through-dispatch-and-cursor-admission/decision:
+  en: cf121f498e6defef
+  zh: 26d372e22f31c948
+/agent-note-curation-retains-its-issuer-through-dispatch-and-cursor-admission/alternatives-considered:
+  en: 573eda3844e137e7
+  zh: b4faafcd528e70d9
+/agent-note-curation-retains-its-issuer-through-dispatch-and-cursor-admission/consequences:
+  en: ea8f4fc8640486fa
+  zh: fc5db5887606a834
+/agent-note-curation-retains-its-issuer-through-dispatch-and-cursor-admission/verification:
+  en: 3432e41abd90e6ee
+  zh: 7a0e973623883e5e

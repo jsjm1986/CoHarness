@@ -1,0 +1,12 @@
+{"label":"own-local-primary","status":200,"inserted":true,"foreignRuntimeRefused":false,"addedUsageRows":1}
+{"label":"own-local-secondary","status":200,"inserted":true,"foreignRuntimeRefused":false,"addedUsageRows":1}
+{"label":"own-remote","status":200,"inserted":true,"foreignRuntimeRefused":false,"addedUsageRows":1}
+{"label":"same-computer-borrows-primary","status":400,"inserted":false,"foreignRuntimeRefused":true,"addedUsageRows":0}
+{"label":"same-computer-borrows-secondary","status":400,"inserted":false,"foreignRuntimeRefused":true,"addedUsageRows":0}
+{"label":"remote-borrows-local","status":400,"inserted":false,"foreignRuntimeRefused":true,"addedUsageRows":0}
+{"label":"forged-body-runtime","status":400,"inserted":false,"foreignRuntimeRefused":true,"addedUsageRows":0}
+{"label":"wrong-computer-token","status":401,"inserted":false,"foreignRuntimeRefused":false,"addedUsageRows":0}
+{"label":"non-session-owner-usage","status":200,"inserted":true,"foreignRuntimeRefused":false,"addedUsageRows":1}
+{"label":"own-delayed-after-revocation","status":200,"inserted":true,"foreignRuntimeRefused":false,"addedUsageRows":1}
+{"label":"foreign-delayed-after-revocation","status":400,"inserted":false,"foreignRuntimeRefused":true,"addedUsageRows":0}
+{"label":"shared-account-billing","calls":5,"tokens":15,"sameOwner":true}

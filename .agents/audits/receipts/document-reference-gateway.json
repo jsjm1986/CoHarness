@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-gateway",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/vitest run --config gateway/vitest.config.ts gateway/tests/document-transfer.spec.ts",
+  "startedAt": "2026-10-26T22:49:08.980551+00:00",
+  "seconds": 1.391,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ea91e64c9c278e488d8317cd7de552a4602f07172484828fbf7c1a70ff5fd396",
+  "inputsAfter": "ea91e64c9c278e488d8317cd7de552a4602f07172484828fbf7c1a70ff5fd396",
+  "postgresToolDirectory": null,
+  "outputSha256": "6746dd290083f7b68da3f2c189963fc7b3555e72e94a027b7399ce64de9bfd03",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\nNo test files found, exiting with code 1\n\nfilter: gateway/tests/document-transfer.spec.ts\ninclude: tests/**/*.spec.ts\nexclude:  **/node_modules/**, **/.git/**\n\n"
+}

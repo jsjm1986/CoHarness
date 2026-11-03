@@ -1,0 +1,14 @@
+{
+  "name": "document-catalog-fixture-residue-cleanup",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node --import tsx/esm .agents/audits/.local/cleanup-catalog-fixtures.mjs",
+  "startedAt": "2026-10-26T21:19:38.560769+00:00",
+  "seconds": 2.537,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "55106eac52c480d0bc432b23e51467b67a142fdf7bccf5aac3d7aa81871e8e80",
+  "inputsAfter": "55106eac52c480d0bc432b23e51467b67a142fdf7bccf5aac3d7aa81871e8e80",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "3f9fb50749e403a6921b63eaf965fe867e399084a6e7bb55ca12ac717f9c9ab6",
+  "outputTail": "Removed 1 owned failed-case catalog namespace(s).\n"
+}

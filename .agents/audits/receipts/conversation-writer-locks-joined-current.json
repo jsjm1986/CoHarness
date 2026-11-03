@@ -1,0 +1,14 @@
+{
+  "name": "conversation-writer-locks-joined-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-service-postgres.spec.ts -t rechecks --no-file-parallelism",
+  "startedAt": "2026-10-24T00:46:32.226091+00:00",
+  "seconds": 7.984,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9ee0ee07bdf74a68cf0241351be7b2eaba85639c3b57f349e0fa6e610025d0d2",
+  "inputsAfter": "9ee0ee07bdf74a68cf0241351be7b2eaba85639c3b57f349e0fa6e610025d0d2",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "f823271bef10ccdf72e97bfb27e2f8adfc42be139bf9bf7268d00b952c9e6608",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  8 passed | 22 skipped (30)\n   Start at  08:46:34\n   Duration  5.18s (transform 2.42s, setup 0ms, import 3.10s, tests 1.95s, environment 0ms)\n\n"
+}

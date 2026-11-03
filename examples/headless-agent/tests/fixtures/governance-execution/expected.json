@@ -1,0 +1,442 @@
+{
+  "preparation/same": {
+    "phase": "preparation",
+    "change": "same",
+    "primary": 2,
+    "compactionEntries": 0,
+    "compactionPhysical": 0,
+    "summaries": 0,
+    "closed": 1,
+    "failed": 1,
+    "replacementsDuringCompaction": 0,
+    "seedRetained": true,
+    "admissions": 3,
+    "released": 3,
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "compaction",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "failed"
+      }
+    ]
+  },
+  "preparation/different": {
+    "phase": "preparation",
+    "change": "different",
+    "primary": 2,
+    "compactionEntries": 0,
+    "compactionPhysical": 0,
+    "summaries": 0,
+    "closed": 1,
+    "failed": 1,
+    "replacementsDuringCompaction": 0,
+    "seedRetained": true,
+    "admissions": 3,
+    "released": 3,
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "assistant",
+        "actor": 8,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000008"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "compaction",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "failed"
+      }
+    ]
+  },
+  "grant/same": {
+    "phase": "grant",
+    "change": "same",
+    "primary": 2,
+    "compactionEntries": 0,
+    "compactionPhysical": 0,
+    "summaries": 0,
+    "closed": 1,
+    "failed": 1,
+    "replacementsDuringCompaction": 0,
+    "seedRetained": true,
+    "admissions": 3,
+    "released": 3,
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "compaction",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "failed"
+      }
+    ]
+  },
+  "grant/different": {
+    "phase": "grant",
+    "change": "different",
+    "primary": 2,
+    "compactionEntries": 0,
+    "compactionPhysical": 0,
+    "summaries": 0,
+    "closed": 1,
+    "failed": 1,
+    "replacementsDuringCompaction": 0,
+    "seedRetained": true,
+    "admissions": 3,
+    "released": 3,
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "assistant",
+        "actor": 8,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000008"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "compaction",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "failed"
+      }
+    ]
+  },
+  "authorization/same": {
+    "phase": "authorization",
+    "change": "same",
+    "primary": 2,
+    "compactionEntries": 0,
+    "compactionPhysical": 0,
+    "summaries": 0,
+    "closed": 1,
+    "failed": 1,
+    "replacementsDuringCompaction": 0,
+    "seedRetained": true,
+    "admissions": 3,
+    "released": 3,
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "compaction",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "failed"
+      }
+    ]
+  },
+  "authorization/different": {
+    "phase": "authorization",
+    "change": "different",
+    "primary": 2,
+    "compactionEntries": 0,
+    "compactionPhysical": 0,
+    "summaries": 0,
+    "closed": 1,
+    "failed": 1,
+    "replacementsDuringCompaction": 0,
+    "seedRetained": true,
+    "admissions": 3,
+    "released": 3,
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "assistant",
+        "actor": 8,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000008"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "compaction",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "failed"
+      }
+    ]
+  },
+  "physical/same": {
+    "phase": "physical",
+    "change": "same",
+    "primary": 2,
+    "compactionEntries": 1,
+    "compactionPhysical": 0,
+    "summaries": 0,
+    "closed": 1,
+    "failed": 1,
+    "replacementsDuringCompaction": 0,
+    "seedRetained": true,
+    "admissions": 3,
+    "released": 3,
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "compaction",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "failed"
+      }
+    ]
+  },
+  "physical/different": {
+    "phase": "physical",
+    "change": "different",
+    "primary": 2,
+    "compactionEntries": 1,
+    "compactionPhysical": 0,
+    "summaries": 0,
+    "closed": 1,
+    "failed": 1,
+    "replacementsDuringCompaction": 0,
+    "seedRetained": true,
+    "admissions": 3,
+    "released": 3,
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "assistant",
+        "actor": 8,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000008"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "compaction",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "failed"
+      }
+    ]
+  },
+  "grant/inputs": {
+    "phase": "grant",
+    "change": "inputs",
+    "primary": 2,
+    "compactionEntries": 0,
+    "compactionPhysical": 0,
+    "summaries": 0,
+    "closed": 1,
+    "failed": 1,
+    "replacementsDuringCompaction": 0,
+    "seedRetained": true,
+    "admissions": 3,
+    "released": 3,
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000008"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "compaction",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "failed"
+      }
+    ]
+  },
+  "grant/primary": {
+    "phase": "grant",
+    "change": "primary",
+    "primary": 2,
+    "compactionEntries": 0,
+    "compactionPhysical": 0,
+    "summaries": 0,
+    "closed": 1,
+    "failed": 1,
+    "replacementsDuringCompaction": 0,
+    "seedRetained": true,
+    "admissions": 3,
+    "released": 3,
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "assistant",
+        "actor": 8,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "compaction",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "failed"
+      }
+    ]
+  },
+  "none/none": {
+    "phase": "none",
+    "change": "none",
+    "primary": 2,
+    "compactionEntries": 1,
+    "compactionPhysical": 1,
+    "summaries": 1,
+    "closed": 1,
+    "failed": 0,
+    "replacementsDuringCompaction": 0,
+    "seedRetained": false,
+    "admissions": 3,
+    "released": 3,
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      },
+      {
+        "purpose": "compaction",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "status": "succeeded"
+      }
+    ]
+  }
+}

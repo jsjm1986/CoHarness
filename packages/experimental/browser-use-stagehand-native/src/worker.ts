@@ -1,9 +1,11 @@
-/** Isolated browser runtime configures native inference in Stagehand's extension. */
+/** Isolated browser operations delegate every extension inference request to the host. */
 
 import { parentPort, workerData } from 'node:worker_threads'
+import { ClientLLMSchema } from '@browserbasehq/stagehand'
+import type { ClientLLM } from '@browserbasehq/stagehand'
 import { z } from 'zod'
 import { browserInputs, openNativeBrowser, stagehandModelSchema } from './native.ts'
-import { answer } from './worker-rpc.ts'
+import { answer, request } from './worker-rpc.ts'
 
 const port = parentPort
 if (port === null) throw new Error('Stagehand attachment requires a Worker parent')
@@ -18,11 +20,17 @@ const { extensionId, cdpEndpoint, executablePath, ...config } = z.object({
   shutdownGraceMs: z.number().int().positive(),
 }).parse(workerData)
 const methodSchema = z.enum(Object.keys(browserInputs) as [keyof typeof browserInputs, ...Array<keyof typeof browserInputs>])
+const generate = ClientLLMSchema.shape.generate.implementAsync(async (input) => {
+  // The public SDK wrapper validates the host reply before publishing it to the extension.
+  return await request(port, 'model', input) as Awaited<ReturnType<ClientLLM['generate']>>
+})
 const opening = openNativeBrowser(
   {
     ...config, ...extensionId === undefined ? {} : { extensionId },
     ...cdpEndpoint === undefined ? {} : { cdpEndpoint },
     ...executablePath === undefined ? {} : { executablePath },
+  }, {
+    generate: async input => await generate(input),
   },
 )
 // Initialization failure stays observable through the host's ready request.

@@ -3,7 +3,6 @@
   - option "文件 file" [selected]
   - option "目标 goal 设置或查看长期任务目标"
   - option "计划 plan 进入或退出计划模式"
-  - option "反馈 feedback 发送关于当前会话的反馈"
   - text: 指令
   - option "压缩 compact 压缩以上对话内容"
   - option "权限 permission 切换权限预设（沙箱模式与审批策略）"

@@ -1,0 +1,14 @@
+{
+  "name": "trash-safety-lint-final",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/trash.ts packages/attachment/userdoc-local/tests/trash-integrity.spec.ts packages/attachment/userdoc-local/tests/trash-publication.spec.ts examples/headless-agent/tests/fixtures/userdoc-migration-driver.ts examples/headless-agent/tests/userdoc-migration.snapshot.ts",
+  "startedAt": "2026-10-24T04:50:07.544874+00:00",
+  "seconds": 4.214,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "358d3f0387c3158e368b51de6329f647be264f5a667e176580fc15b676c356da",
+  "inputsAfter": "358d3f0387c3158e368b51de6329f647be264f5a667e176580fc15b676c356da",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

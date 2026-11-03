@@ -63,7 +63,7 @@ export function apply(ctx: ClientContext): void {
   const accountMirror = new AccountPreferencesMirror(connection.accountPreferences)
   ctx.effect(() => {
     const disposers = [
-      (ctx.get('remote') as ClientContext['remote']).$on('settings/document-updated', () => { void mirror.load() }),
+      (ctx.get('remote') as ClientContext['remote']).$forTarget().$on('settings/document-updated', () => { void mirror.load() }),
       ctx.on('connection/reset', () => { void mirror.load() }),
       ctx.on('connection/reset', () => { void accountMirror.load(true) }),
     ]

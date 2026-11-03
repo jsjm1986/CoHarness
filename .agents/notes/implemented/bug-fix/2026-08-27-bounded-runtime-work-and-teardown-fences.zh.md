@@ -16,6 +16,8 @@ Gateway 与 SDK 传输、提供方流、持久化写入器和文档 broker 可�
 
 运行时 lease 的接纳、活动 touch 和 idle 回收共享每个 runtime 的串行队列。若停止操作先赢得竞态，新 lease 会返回可重试拒绝；代理调用方仅在允许自动启动时启动新 generation，文档和归档 broker 则在不转发过期端口的情况下失败。idle 回收会通过按 runtime 建立索引的谓词重新检查每个候选项，不再为每个候选项重复扫描完整的 idle 目录；lease 接纳会在按 generation 保存的引用映射之外维护每个 runtime 的 O(1) 汇总。Gateway 关闭时通过固定 worker pool 停止本地 runtime，不会一次为每个进程启动拆卸任务。Gateway 与 SDK 中由计时器驱动的配置会拒绝超过 Node 最大延迟的值。共享 Host fetch 截止时间只在定时器句柄提供 `unref` 时调用它，因此浏览器数字句柄与 Node 超时对象使用相同的取消路径。
 
+Gateway 关闭会等待每个清理阶段的全部成员结束，再推进到依赖资源。拒绝和同步失败会被收集，后续阶段仍会尝试监听器、写者、运行时、连接池及监测资源的清理。强制退出定时器在全部阶段结束前保持引用；即使只有 promise 仍待定，进程也不能在强制失败截止时间前以成功状态离开。清理完成后会清除定时器；只要收集到失败，就以失败状态报告全部原因。
+
 JSONL 元数据读取会限制 header 字节数，并同时按重试次数与经过时间限制修订稳定性重试。Zstandard raw、load 与恢复读取会执行解压明文字节总预算；header 探测会按几何增长扩展输入缓冲区，而不是对每个分片重复拼接。
 
 Workspace 归档枚举会先索引持久化 ID、谱系根和保留位置，再匹配已归档会话。运行时归档投影使用带 revision 的批次，并分别限制会话 ID、搜索记录、搜索字节数和每条索引文本；一个谱系跨批次时，最终根会话汇总会保留聚合消息数量，同时不改变文本记录。并发触发会合并为一次后续同步，命令响应会分页并持续取完，dispose 会中止并等待活动请求结束。清理成功后，被删除的会话树会在后续投影前从持久化归档集合移除，因此陈旧 ID 不会造成永久同步失败。Workspace 与 PostgreSQL 归档变更只接受非负安全整数 revision；到达 `Number.MAX_SAFE_INTEGER` 时拒绝变更，而不会发布重复值。个人归档读取器会在同步期间缓存标题，因此后续请求可以把每会话序号下限传给持久化，而不必重新读取所有前缀。Gateway 会话读取会在一个只读 `REPEATABLE READ` 事务内读取会话头、revision 和事件。
@@ -58,7 +60,7 @@ gateway-runtime 现在为内部 Consumer 提供统一的有字节预算 JSON rea
 
 Web 搜索提供方和 DeepSeek Files 客户端对成功及错误 JSON body 使用同一套严格字节计数，因此声明长度过大或分块增长的响应在解析前都不能超过配置上限。每个提供方都通过已校验的配置公开自己的响应预算。
 
-Host API fetch 载体会在 envelope 和 value schema 解析前，对一元 JSON 响应施加 16 MiB（或调用方选择的）预算；其 SSE 分片预算保持独立。Gateway Admin 私有浏览器 API 也会对直接 JSON 调用施加相同的默认上限。
+Host API fetch 载体会在 envelope 和 value schema 解析前，对一元 JSON 响应施加 16 MiB（或调用方选择的）预算；其 SSE 分片预算保持独立。Gateway Admin 私有浏览器 API 也会对直接 JSON 调用施加相同的默认上限。 已知 HTTP 拒绝和流开启回调失败的报告不等待响应体取消确认：另一个响应分支或延迟的传输清理不能阻塞该结果。报告失败不证明传输已静止，也不触发模型自动重试。
 
 Gateway 推送发送方会在 Token 分类前把 FCM 和 JPush 错误 body 限制为 64 KiB，避免提供方失败保留无界诊断数据。
 
@@ -91,3 +93,5 @@ Gateway 推送发送方会在 Token 分类前把 FCM 和 JPush 错误 body 限�
 ## Verification
 
 聚焦测试覆盖 PTC mode 调度器故障与队列准入、settings watcher 停稳与机密脱敏、动态 runner 超时与迟到条目移除、本地进程树终止、Gateway readiness 与响应预算、串行实例 lease、文档传输 lease 与回收站保留、有界浏览器上传元数据、JSON-RPC 与 SDK 队列／超时上限、DeepSeek 流与 wire 结构预算、持久化写入上限和按 id revision、带 revision 的模型治理、有界客户端血缘遍历、分离历史缓存校验、安全整数归档 revision 耗尽、可继续 Activation 配额的准入与释放、分批归档同步与读取序号下限，以及可重复读会话加载。TypeScript typecheck、合同 lint 和对应包测试均针对最新源码树执行。
+
+Gateway 关闭故障注入覆盖各个清理阶段，以及多个独立失败同时发生的情况。真实文档 broker、TCP 监听器和自有 Node 子进程验证文档清理报错后仍能关闭资源。隔离 Node 进程验证没有活跃句柄的待定清理仍会触发强制失败截止时间。同一关闭函数分别通过源码和编译产物运行。

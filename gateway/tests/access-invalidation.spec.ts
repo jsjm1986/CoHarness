@@ -1,3 +1,4 @@
+import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { generateKeyPairSync, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { mkdtemp, mkdir, rm } from 'node:fs/promises'
@@ -24,7 +25,7 @@ import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { barrier } from './barrier.ts'
 
 // This suite owns a disposable PostgreSQL database, like postgres.spec.ts.
-const databaseUrl = process.env.HGW_TEST_DATABASE_URL
+const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
 const migrations = resolve(import.meta.dirname, '../deploy/postgres/migrations')
 let pool: Pool
@@ -64,6 +65,8 @@ async function fixture(options: {
   const users = new PostgresUserService(context, cfg)
   const alice = await users.create({ username: 'alice', password: 'password-123' })
   const bob = await users.create({ username: 'bob', password: 'password-123' })
+  await pool.query(`INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled)
+    SELECT organization_id,$2,id,true FROM harness.users WHERE organization_id=$1`, [organizationId, contexts[1]!.nodeId])
   await users.changeOwnPassword(alice.id, 'password-123')
   await users.changeOwnPassword(bob.id, 'password-123')
   const projects = new PostgresProjectService(context, cfg)
@@ -84,8 +87,8 @@ async function fixture(options: {
   const aliceId = aliceInternal.rows[0]!.id
   const registerDocument = async (): Promise<void> => {
     await pool.query(`INSERT INTO harness.document_catalog(organization_id,scope_kind,scope_project_id,
-      runtime_doc_id,name,bytes,media_type,modified_at_ms,owner_user_id)
-      VALUES($1,'project',$2,$3,'new upload',1,'text/plain',1,$4)`, [organizationId, projectId, randomUUID(), aliceId])
+      runtime_doc_id,name,bytes,media_type,modified_at_ms,owner_user_id,node_id)
+      VALUES($1,'project',$2,$3,'new upload',1,'text/plain',1,$4,$5)`, [organizationId, projectId, randomUUID(), aliceId, context.nodeId])
   }
   const runtime = createServer((req, res) => {
     if (options.runtime?.(req, res) === true) return
@@ -126,7 +129,8 @@ async function fixture(options: {
       instances: {
         stopReasonOf: async () => null,
         portOf: async () => port, generationOf: async () => 1, stateOf: async () => 'ready',
-        isLive: async () => true, touch: async () => {}, wsRef: async () => {},
+        isLive: async () => true, liveEndpoint: async target => ({ port, generation: 1, target: typeof target === 'number' ? { kind: 'user', id: target } : target }),
+        touch: async () => {}, wsRef: async () => {},
         operationRef: vi.fn<NonNullable<GatewayDeps['instances']['operationRef']>>(async () => {}),
         ensureRunning: async () => ({ port, generation: 1 }), reapIdle: async () => 0,
         startRequest: () => ({ admission: Promise.resolve(), completion: Promise.resolve({ port, generation: 1 }) }),
@@ -173,7 +177,6 @@ async function fixture(options: {
 describePg('cross-Gateway access invalidation', () => {
   beforeAll(async () => {
     pool = createPostgresPool(databaseUrl!, { max: 10 })
-    await pool.query('DROP SCHEMA IF EXISTS harness CASCADE')
     await runMigrations(pool, migrations)
   })
   afterAll(async () => { await pool?.end() })
@@ -285,15 +288,18 @@ describePg('cross-Gateway access invalidation', () => {
       session_format_version,created_at,updated_at,visibility,root_session_id)
       VALUES($1,$2,$3,$4,1,now(),now(),'project',$1)`, [sessionId, f.organizationId, f.aliceId, f.projectId])
     await pool.query(`INSERT INTO harness.conversation_archive_records(organization_id,root_session_id,runtime_kind,
-      runtime_public_id,project_id,creator_user_id) VALUES($1,$2,'project',$3,$4,$5)`,
+      runtime_public_id,project_id,creator_user_id,runtime_id,node_id)
+      SELECT $1,$2,'project',$3,$4,$5,session.runtime_id,runtime.node_id
+      FROM harness.conversation_sessions session JOIN harness.runtime_environments runtime ON runtime.organization_id=session.organization_id AND runtime.id=session.runtime_id
+      WHERE session.organization_id=$1 AND session.id=$2`,
     [f.organizationId, sessionId, f.project.id, f.projectId, f.aliceId])
     await pool.query(`INSERT INTO harness.document_catalog(organization_id,scope_kind,scope_project_id,
-      runtime_doc_id,name,bytes,media_type,modified_at_ms) VALUES($1,'project',$2,$3,'document',1,'text/plain',1)`,
-    [f.organizationId, f.projectId, randomUUID()])
+      runtime_doc_id,name,bytes,media_type,modified_at_ms,node_id) VALUES($1,'project',$2,$3,'document',1,'text/plain',1,$4)`,
+    [f.organizationId, f.projectId, randomUUID(), f.gateways[0]!.owner.nodeId])
     for (const statement of [
       "UPDATE harness.conversation_sessions SET visibility='private' WHERE organization_id=$1",
       "UPDATE harness.conversation_archive_records SET state='trash' WHERE organization_id=$1",
-      "UPDATE harness.document_catalog SET state='trash' WHERE organization_id=$1",
+      "UPDATE harness.document_catalog SET state='trash',trash_action_id=gen_random_uuid(),trashed_at=now(),purge_after=now()+interval '30 days' WHERE organization_id=$1",
     ]) {
       await pool.query(statement, [f.organizationId])
       await gateway.monitor.synchronize()
@@ -525,6 +531,9 @@ describePg('cross-Gateway access invalidation', () => {
     } })
     const gateway = f.gateways[1]!
     const admin = await gateway.deps.users.create({ username: 'carol', password: 'password-123', role: 'admin' })
+    await pool.query(`INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled)
+      SELECT u.organization_id,n.id,u.id,true FROM harness.users u JOIN harness.compute_nodes n ON n.organization_id=u.organization_id
+      WHERE u.organization_id=$1 AND u.public_id=$2 ON CONFLICT DO NOTHING`, [f.organizationId, admin.id])
     await gateway.deps.users.changeOwnPassword(admin.id, 'password-123')
     const login = await gateway.deps.auth.login('carol', 'password-123', '127.0.0.1', 'test')
     if (typeof login === 'string') throw new Error(login)

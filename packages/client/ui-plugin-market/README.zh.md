@@ -11,6 +11,8 @@ kind: "package-reference"
 
 「发现」是**插件**页的第二个标签页，位于**已安装**之后。它列出插件市场索引提供的组合包（bundle）；用户可以管理索引源、在插件市场之间切换、搜索、按分类和标签筛选、排序、打开条目页面，并在确认后安装条目。Host 的 [`pluginMarket`](../../boot/plugin-market/README.zh.md) 服务负责获取和校验索引；本包只负责展示。
 
+发现页的安装操作与 Host 刷新事件保留当前文档的启动 profile；选择其他电脑上的对话不改变正在管理的 profile。
+
 ## 目录
 
 - [使用本包](#use-this-package)

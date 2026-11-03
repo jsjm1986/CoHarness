@@ -1,5 +1,8 @@
 /** Test-only IPC assertions over real Creator presets and profile management. */
-export const inject = ['agents', 'agentPresets', 'tools', 'pluginManager', 'permissionPresets']
+import { loadOptionalPatches } from '@deepseek-ai/dsh-app-boot'
+import { writeFile } from 'node:fs/promises'
+
+export const inject = ['agents', 'agentPresets', 'tools', 'pluginManager', 'permissionPresets', 'hmr']
 
 export function apply(ctx, config) {
   const receive = message => {
@@ -47,13 +50,36 @@ export function apply(ctx, config) {
       const other = names(second)
       const ping = await ctx.tools.execute({ name: 'mcp__demo__ping', arguments: {}, agent: first,
         callId: `${phase}-ping`, signal: new AbortController().signal })
+      const configuration = phase === 'initial' ? await resetConfiguration() : undefined
       const removed = phase === 'restart'
         ? JSON.parse((await manage({ action: 'remove_bundle', target: '@test/creator-mcp' })).value) : undefined
-      return { approvals, permission: ctx.permissionPresets.current(first.session), before, denied, afterDenied, bundlesAfterDenied, result, after, other, ping, removed, remaining: names(first) }
+      return { approvals, permission: ctx.permissionPresets.current(first.session), before, denied, afterDenied, bundlesAfterDenied, result, after, other, ping, configuration, removed, remaining: names(first) }
     } finally {
       disposeApproval()
       activeSession?.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
       await Promise.all(handles.map(handle => handle.dispose()))
+    }
+  }
+
+  async function resetConfiguration() {
+    const row = (await ctx.pluginManager.listPlugins()).find(row => row.patchId === 'demo')
+    if (row === undefined) throw new Error('installed MCP entry is missing')
+    const { config: base } = await ctx.pluginManager.describePluginConfig(row.entryId)
+    const profile = ctx.get('profileContext')
+    await ctx.hmr.runExclusive(async () => {
+      const patches = loadOptionalPatches('creator-profile', profile.patchPath) ?? []
+      patches.push(
+        { id: 'demo', config: { ...base, serverName: 'older' } },
+        { id: 'demo', name: row.moduleName, config: { ...base, serverName: 'newer' } },
+      )
+      await writeFile(profile.patchPath, JSON.stringify(patches) + '\n')
+    })
+    const result = await ctx.pluginManager.setPluginConfig(row.entryId, null)
+    const current = await ctx.pluginManager.describePluginConfig(row.entryId)
+    return {
+      application: result.application,
+      configuredName: current.config.serverName,
+      tools: ctx.tools.schemas().map(tool => tool.name).filter(name => name.startsWith('mcp__')),
     }
   }
 }

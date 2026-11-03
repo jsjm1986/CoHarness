@@ -11,6 +11,8 @@ Synchronizes the durable Workspace archive state of a Gateway-launched runtime w
 
 Every `commandPollMs` (default 5000 milliseconds), the live runtime checks for its own pending commands. An empty queue triggers no history read or full projection. A pending command enters the existing serialized synchronization and acknowledgement flow, including requests written through another Gateway. Probes never overlap, retry after failure, and are cancelled and joined on disposal; background delivery does not start a stopped runtime.
 
+Refused snapshot, command-acknowledgement and probe responses cancel their unused bodies. Cancellation acknowledgement does not delay the HTTP failure or replace its status; subsequent synchronization retains the existing retry rules.
+
 One synchronization request carries at most 1,000 session IDs, 5,000 search rows, and 4 MiB of search text. Search content is capped at 64 KiB per row for the index; the transcript remains unchanged. A root split across requests receives a final aggregate message count, repeated triggers while a synchronization is running collapse into one follow-up pass, and disposal aborts and joins the active request. A response carries at most 1,000 pending commands; applying a non-empty command page schedules another pass until the queue is empty.
 
 Session title, message-count, and search projections use a 32 MiB LRU cache. A contiguous live `session/event` is appended to its cached projection in O(1) queue work; a sequence gap, title event, or read race invalidates only that session and falls back to a complete read. This keeps frequent archive updates from rereading unchanged logs while preserving revision consistency. Cache insertion is generation-fenced against an event arriving during the read, and invalidation tokens are removed with sessions and LRU evictions, so churn cannot leave a second unbounded roster behind the byte-bounded values.
@@ -57,6 +59,6 @@ None; the package never assembles or sends provider requests.
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-None.
+The package build uses the aggregate `tsconfig.json` and its project references; the repository bundle consumes its emitted `lib/types` files.
 
 </details>

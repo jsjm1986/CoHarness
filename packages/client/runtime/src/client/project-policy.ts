@@ -11,7 +11,7 @@ export interface ProjectUiPolicySnapshot {
   revision: number
   /** Derived current-account choice eligibility; never a Host catalog mutation. */
   accountPermissions: AccountPermissionAvailability
-  /** Verified Gateway account for private UI persistence; absent while identity is unverified. */
+  /** Document-confirmed Gateway account for private UI persistence; transport renewal does not revoke it. */
   verifiedAccountId?: number
   /** Active project id, display name, and management capability, when in project scope. */
   projectId?: number
@@ -59,7 +59,7 @@ export class ProjectUiPolicyRuntime {
   }
 
   /** Publish or revoke the verified account used to scope private UI state.
-   * @param accountId - Gateway-confirmed identity; undefined revokes the current proof.
+   * @param accountId - Gateway-confirmed document identity; undefined revokes its private persistence ownership.
    */
   setVerifiedAccountId(accountId: number | undefined): void {
     if (this.snapshot.verifiedAccountId === accountId) return

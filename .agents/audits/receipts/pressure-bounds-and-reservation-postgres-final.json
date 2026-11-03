@@ -1,0 +1,14 @@
+{
+  "name": "pressure-bounds-and-reservation-postgres-final",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/node-resource-budget-postgres.spec.ts tests/runtime-resource-api.spec.ts tests/runtime-resource-provider.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-23T23:26:11.230625+00:00",
+  "seconds": 16.843,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "db403eea453e8c54f768e1d1faeb21561ae099de7b96d5ee39548dcd2f41d381",
+  "inputsAfter": "db403eea453e8c54f768e1d1faeb21561ae099de7b96d5ee39548dcd2f41d381",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "3de532f728ad94bcd1378ecf3e38880f647773f5940ce26ea0af0a3e26018fea",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  68 passed (68)\n   Start at  07:26:14\n   Duration  13.88s (transform 1.69s, setup 0ms, import 2.39s, tests 11.20s, environment 0ms)\n\n"
+}

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/memory/tool-memory/README.md
 document:
-  en: 76893cc565a6748189ca391a3e6b4c656f7fde64
-  zh: 533f9f9d4f3a37305e26afab2501e98047b7560b
+  en: ee5fc996a9ee6298b087a85f4bcbaa3221aef269
+  zh: 7d4cac7a7d07beb0e10598ff65d1f8aa1fdff6bc
 /:
   en: 24cc2c34c6781e30
   zh: 20738bb3f3e2ef5e
@@ -21,14 +21,14 @@ document:
   en: 97d18c8e485c7640
   zh: 6ae6c3af1bf9b897
 /deepseek-ai-dsh-tool-memory/scope-resolution:
-  en: f23b59d6e2fd6232
-  zh: 26e33a205f951892
+  en: 65f712da1cc0a714
+  zh: 1f218944e199d68b
 /deepseek-ai-dsh-tool-memory/refusal-codes:
   en: 41bfc199821d406e
   zh: ae1557a298627a24
 /deepseek-ai-dsh-tool-memory/invariants:
-  en: 1341c11a78b7dc33
-  zh: 5f0e4818e7944520
+  en: 6059df0bc1d33e2a
+  zh: 43dff8aec57eced1
 /deepseek-ai-dsh-tool-memory/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

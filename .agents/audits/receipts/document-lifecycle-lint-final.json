@@ -1,0 +1,14 @@
+{
+  "name": "document-lifecycle-lint-final",
+  "cwd": "gateway",
+  "command": "npx oxlint --deny-warnings src/postgres/document-catalog-service.ts tests/admin-business-postgres.spec.ts tests/server.spec.ts",
+  "startedAt": "2026-10-24T03:06:06.909663+00:00",
+  "seconds": 1.456,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a70398d648d57c9fb5278debab17b7375e28ad6f2687daea2c468f095545e09e",
+  "inputsAfter": "a70398d648d57c9fb5278debab17b7375e28ad6f2687daea2c468f095545e09e",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

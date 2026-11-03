@@ -1,0 +1,14 @@
+{
+  "name": "document-reuse-real-catalog-built-characterization",
+  "cwd": "gateway",
+  "command": "node ../.agents/audits/.local/document-reuse-probe.mjs",
+  "startedAt": "2026-10-25T01:36:32.546235+00:00",
+  "seconds": 2.257,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8301c9c40da476c684889e5bb0624131e29af5978697ce921d4542e728ad0a5f",
+  "inputsAfter": "8301c9c40da476c684889e5bb0624131e29af5978697ce921d4542e728ad0a5f",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "1ab37489f7468cdf5f68000f2b4025d5afe7cc191ff927d1a48ece86a5d418b6",
+  "outputTail": "file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/documents-local.js:368\n            throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document service returned invalid JSON.');\n                  ^\n\nDocumentTransferError: The document service returned invalid JSON.\n    at LocalDocumentBroker.jsonResponse (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/documents-local.js:368:19)\n    at LocalDocumentBroker.serveScope (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/documents-local.js:415:25)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/.agents/audits/.local/document-reuse-probe.mjs:66:34 {\n  code: 'DOCUMENT_TRANSFER_FAILED',\n  status: 502\n}\n\nNode.js v25.8.1\n"
+}

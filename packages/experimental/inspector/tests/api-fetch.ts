@@ -11,6 +11,10 @@ import type { HostConnectionService } from '@deepseek-ai/dsh-client-connection'
  * @returns Fetch-shaped response once the streaming handler completes.
  */
 export function httpFetch(connection: HostConnectionService, request: Request): Promise<Response> {
+  if (request.signal.aborted) {
+    const reason: unknown = request.signal.reason
+    return Promise.reject(reason instanceof Error ? reason : new DOMException('The operation was aborted', 'AbortError'))
+  }
   const req = new PassThrough() as PassThrough & IncomingMessage
   req.method = request.method
   req.url = new URL(request.url).pathname + new URL(request.url).search
@@ -40,15 +44,20 @@ export function httpFetch(connection: HostConnectionService, request: Request): 
     },
   })
   const signal = request.signal
-  if (signal.aborted) queueMicrotask(() => { req.destroy() })
-  else signal.addEventListener('abort', () => { req.destroy() }, { once: true })
+  const abort = (): void => {
+    req.destroy()
+    res.destroy(signal.reason instanceof Error ? signal.reason : new DOMException('The operation was aborted', 'AbortError'))
+  }
+  signal.addEventListener('abort', abort, { once: true })
   return (async () => {
-    const matched = await connection.dispatchHttp(req, res)
-    if (!matched) return new Response('not found', { status: 404 })
-    const payload = await complete
-    return new Response(new Uint8Array(payload), {
-      status: status === 0 ? 200 : status,
-      headers: Object.fromEntries(headers),
-    })
+    try {
+      const matched = await connection.dispatchHttp(req, res)
+      if (!matched) return new Response('not found', { status: 404 })
+      const payload = await complete
+      return new Response(new Uint8Array(payload), {
+        status: status === 0 ? 200 : status,
+        headers: Object.fromEntries(headers),
+      })
+    } finally { signal.removeEventListener('abort', abort) }
   })()
 }

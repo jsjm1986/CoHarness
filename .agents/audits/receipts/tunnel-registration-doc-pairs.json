@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-registration-doc-pairs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write gateway/README.md .agents/notes/implemented/bug-fix/2026-10-25-gateway-tunnel-lifecycle.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/gateway-tunnel-lifecycle/guide.md",
+  "startedAt": "2026-10-24T22:45:49.272297+00:00",
+  "seconds": 2.484,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "92684c44fd3e9688d2d1d6d1e5765abf31b0e3e0a504dfc23576f8c876c108e6",
+  "inputsAfter": "e1f9794d8d055e10a5b2c8e3c992fa74ab15383e0c557ef9801c85742ad35df7",
+  "postgresToolDirectory": null,
+  "outputSha256": "774b1eee1cbf0a87d9c888796abcf67d50dbe9c53cc91d52dc71c9e637e7b989",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-25-gateway-tunnel-lifecycle.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/gateway-tunnel-lifecycle/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 3 record(s) written; run the check to validate the pairs.\n"
+}

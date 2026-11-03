@@ -1,6 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type Database from 'better-sqlite3'
 import type { UserRow } from './auth.ts'
+import { CollaborationDeniedError } from './collaboration.ts'
+import { requireSqliteAdministrator } from './administrator-authority.ts'
+import { clearSqliteUserQuotaAliases } from './sqlite-user-quota.ts'
+import type { RuntimeId } from './runtime-catalog.ts'
 
 export type CredentialClass = 'company' | 'personal' | 'unknown'
 export type UsageStatus = 'succeeded' | 'failed' | 'cancelled' | 'missing-usage' | 'denied'
@@ -184,6 +188,9 @@ export interface OrganizationCredentialView {
 
 /** Durable owner charged for one model-usage record. */
 export type ModelUsageSubject = { kind: 'user'; id: number } | { kind: 'project'; id: number }
+
+/** Reporting credentials may identify a Runtime; billing and model quotas retain their account/project owner. */
+export type ModelIntakeSubject = ModelUsageSubject & { runtimeId?: RuntimeId }
 
 export interface ModelRow {
   provider: string
@@ -447,6 +454,14 @@ function monthOf(time: number, timeZone: string): string {
 export class ModelGovernanceService {
   private configurationRevisionValue = 0
 
+  /** Retain current administration and synchronous writes in one immediate transaction. */
+  private administration<T>(actorUserId: number | undefined, operation: () => T): T {
+    return this.db.transaction(() => {
+      if (actorUserId !== undefined) requireSqliteAdministrator(this.db, actorUserId)
+      return operation()
+    }).immediate()
+  }
+
   constructor(private readonly db: Database.Database, private readonly timeZone = 'Asia/Shanghai') {
     new Intl.DateTimeFormat('en-US', { timeZone }).format()
   }
@@ -479,7 +494,7 @@ export class ModelGovernanceService {
     }))
   }
 
-  upsertProvider(_input: ModelProviderInput): void {
+  upsertProvider(_input: ModelProviderInput, _actorUserId?: number): void {
     throw new Error('SQLite model governance has no organization Provider support')
   }
 
@@ -491,7 +506,7 @@ export class ModelGovernanceService {
     throw new Error('SQLite model governance has no organization settings support')
   }
 
-  mutateOrganizationModelSettings(_ops: ModelSettingsPathOp[], _expectedRevision?: number): OrganizationModelSettingsView {
+  mutateOrganizationModelSettings(_ops: ModelSettingsPathOp[], _expectedRevision?: number, _actorUserId?: number): OrganizationModelSettingsView {
     throw new Error('SQLite model governance has no organization settings support')
   }
 
@@ -499,15 +514,15 @@ export class ModelGovernanceService {
     throw new Error('SQLite model governance has no organization credential support')
   }
 
-  setOrganizationCredential(_ref: string, _value: string): void {
+  setOrganizationCredential(_ref: string, _value: string, _actorUserId?: number): void {
     throw new Error('SQLite model governance has no organization credential support')
   }
 
-  unsetOrganizationCredential(_ref: string): void {
+  unsetOrganizationCredential(_ref: string, _actorUserId?: number): void {
     throw new Error('SQLite model governance has no organization credential support')
   }
 
-  discoverOrganizationModels(_request: { provider?: string; baseURL?: string; api?: string; apiKey?: string }): Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }> {
+  discoverOrganizationModels(_request: { actorUserId?: number; provider?: string; baseURL?: string; api?: string; apiKey?: string }): Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }> {
     throw new Error('SQLite model governance has no organization model discovery support')
   }
 
@@ -537,11 +552,11 @@ export class ModelGovernanceService {
     }))
   }
 
-  upsertModel(input: Omit<ModelRow, 'adminAllowed' | 'userAllowed'> & { adminAllowed?: boolean; userAllowed?: boolean }): void {
+  upsertModel(input: Omit<ModelRow, 'adminAllowed' | 'userAllowed'> & { adminAllowed?: boolean; userAllowed?: boolean }, actorUserId?: number): void {
     const provider = nonEmpty(input.provider, 'provider')
     const model = nonEmpty(input.model, 'model')
     const now = Date.now()
-    const apply = this.db.transaction(() => {
+    this.administration(actorUserId, () => {
       this.db.prepare(`INSERT INTO model_catalog(provider, model, display_name, enabled, created_at, updated_at)
         VALUES(?,?,?,?,?,?) ON CONFLICT(provider,model) DO UPDATE SET display_name=excluded.display_name,
         enabled=excluded.enabled, updated_at=excluded.updated_at`)
@@ -560,23 +575,23 @@ export class ModelGovernanceService {
         output_micros_per_million,cache_read_micros_per_million,cache_write_micros_per_million)
         VALUES(?,?,?,?,?,?,?)`).run(provider, model, effectiveAt, ...prices)
     })
-    apply()
     this.bumpConfigurationRevision()
   }
 
-  setUserAccess(userId: number, provider: string, model: string, allowed: boolean | null): void {
+  setUserAccess(userId: number, provider: string, model: string, allowed: boolean | null, actorUserId?: number): void {
     provider = nonEmpty(provider, 'provider')
     model = nonEmpty(model, 'model')
-    if (this.db.prepare(`SELECT 1 FROM model_catalog WHERE provider=? AND model=?`).get(provider, model) === undefined) {
-      throw new Error(`unknown model ${provider}/${model}`)
-    }
-    if (allowed === null) {
-      this.db.prepare(`DELETE FROM model_user_access WHERE user_id=? AND provider=? AND model=?`).run(userId, provider, model)
-      this.bumpConfigurationRevision()
-      return
-    }
-    this.db.prepare(`INSERT INTO model_user_access(user_id,provider,model,allowed) VALUES(?,?,?,?)
-      ON CONFLICT(user_id,provider,model) DO UPDATE SET allowed=excluded.allowed`).run(userId, provider, model, allowed ? 1 : 0)
+    this.administration(actorUserId, () => {
+      if (this.db.prepare('SELECT 1 FROM users WHERE id=? AND deleted_at IS NULL').get(userId) === undefined) {
+        throw new Error(`unknown user ${String(userId)}`)
+      }
+      if (this.db.prepare(`SELECT 1 FROM model_catalog WHERE provider=? AND model=?`).get(provider, model) === undefined) {
+        throw new Error(`unknown model ${provider}/${model}`)
+      }
+      if (allowed === null) this.db.prepare(`DELETE FROM model_user_access WHERE user_id=? AND provider=? AND model=?`).run(userId, provider, model)
+      else this.db.prepare(`INSERT INTO model_user_access(user_id,provider,model,allowed) VALUES(?,?,?,?)
+        ON CONFLICT(user_id,provider,model) DO UPDATE SET allowed=excluded.allowed`).run(userId, provider, model, allowed ? 1 : 0)
+    })
     this.bumpConfigurationRevision()
   }
 
@@ -591,11 +606,12 @@ export class ModelGovernanceService {
     _provider: string,
     _model: string,
     _allowed: boolean | null,
+    _actorUserId?: number,
   ): void {
     throw new Error('SQLite model governance has no project runtime support')
   }
 
-  setAllProjectAccess(_projectId: number, _allowed: true | null): void {
+  setAllProjectAccess(_projectId: number, _allowed: true | null, _actorUserId?: number): void {
     throw new Error('SQLite model governance has no project runtime support')
   }
 
@@ -617,22 +633,27 @@ export class ModelGovernanceService {
   }
 
   policyFor(user: UserRow): RuntimeModelPolicy {
-    const rows = this.db.prepare(`SELECT m.provider,m.model,m.enabled,
-      COALESCE(x.allowed,r.allowed,CASE WHEN ?='admin' THEN 1 ELSE 0 END) AS allowed
-      FROM model_catalog m
-      LEFT JOIN model_role_access r ON r.role=? AND r.provider=m.provider AND r.model=m.model
-      LEFT JOIN model_user_access x ON x.user_id=? AND x.provider=m.provider AND x.model=m.model
-      ORDER BY m.provider,m.model`).all(user.role, user.role, user.id) as Array<{
+    return this.db.transaction((): RuntimeModelPolicy => {
+      const account = this.db.prepare("SELECT role FROM users WHERE id=? AND status='active' AND deleted_at IS NULL").get(user.id) as
+        { role: UserRow['role'] } | undefined
+      if (account === undefined) throw new CollaborationDeniedError('forbidden')
+      const rows = this.db.prepare(`SELECT m.provider,m.model,m.enabled,
+        COALESCE(x.allowed,r.allowed,CASE WHEN ?='admin' THEN 1 ELSE 0 END) AS allowed
+        FROM model_catalog m
+        LEFT JOIN model_role_access r ON r.role=? AND r.provider=m.provider AND r.model=m.model
+        LEFT JOIN model_user_access x ON x.user_id=? AND x.provider=m.provider AND x.model=m.model
+        ORDER BY m.provider,m.model`).all(account.role, account.role, user.id) as Array<{
         provider: string; model: string; enabled: number; allowed: number
       }>
-    return {
-      version: this.configurationRevisionValue,
-      // The catalog is the sole authorization source for every role; unlisted
-      // routes fall through to the plugin's user-declared allowance instead.
-      defaultAllowed: false,
-      models: rows.map(row => ({ provider: row.provider, model: row.model, allowed: row.enabled === 1 && row.allowed === 1 })),
-      providers: [],
-    }
+      return {
+        version: this.configurationRevisionValue,
+        // The catalog is the sole authorization source for every role; unlisted
+        // routes fall through to the plugin's user-declared allowance instead.
+        defaultAllowed: false,
+        models: rows.map(row => ({ provider: row.provider, model: row.model, allowed: row.enabled === 1 && row.allowed === 1 })),
+        providers: [],
+      }
+    })()
   }
 
   policyForProject(_projectId: number): RuntimeModelPolicy {
@@ -644,7 +665,8 @@ export class ModelGovernanceService {
     return subject.id
   }
 
-  issueIntakeToken(subject: ModelUsageSubject): string {
+  issueIntakeToken(subject: ModelIntakeSubject): string {
+    if (subject.runtimeId !== undefined) throw new Error('Runtime-scoped model reporting requires PostgreSQL assignments')
     const userId = this.userId(subject)
     const token = randomBytes(32).toString('base64url')
     this.db.prepare(`INSERT INTO model_intake_tokens(user_id,token_hash,created_at) VALUES(?,?,?)
@@ -664,6 +686,7 @@ export class ModelGovernanceService {
     subjectId: string,
     tokenLimit: number | null | 'inherit',
     costLimit: number | null | 'inherit',
+    actorUserId?: number,
   ): void {
     subjectId = nonEmpty(subjectId, 'subjectId')
     if (subjectType === 'project') throw new Error('SQLite model governance has no project runtime support')
@@ -674,15 +697,21 @@ export class ModelGovernanceService {
     }
     const stored = (value: number | null | 'inherit', name: string): number | null =>
       value === 'inherit' ? -1 : value === null ? null : nonnegative(value, name)
-    if (subjectType === 'user' && tokenLimit === 'inherit' && costLimit === 'inherit') {
-      this.db.prepare(`DELETE FROM model_quotas WHERE subject_type='user' AND subject_id=?`).run(subjectId)
-      this.bumpConfigurationRevision()
-      return
-    }
-    this.db.prepare(`INSERT INTO model_quotas(subject_type,subject_id,token_limit,company_cost_micros_limit)
-      VALUES(?,?,?,?) ON CONFLICT(subject_type,subject_id) DO UPDATE SET token_limit=excluded.token_limit,
-      company_cost_micros_limit=excluded.company_cost_micros_limit`)
-      .run(subjectType, subjectId, stored(tokenLimit, 'tokenLimit'), stored(costLimit, 'companyCostMicrosLimit'))
+    this.administration(actorUserId, () => {
+      if (subjectType === 'user') {
+        subjectId = String(Number(subjectId))
+        if (this.db.prepare('SELECT 1 FROM users WHERE id=? AND deleted_at IS NULL').get(Number(subjectId)) === undefined) {
+          throw new Error(`unknown user ${subjectId}`)
+        }
+        clearSqliteUserQuotaAliases(this.db, Number(subjectId))
+      }
+      if (subjectType === 'user' && tokenLimit === 'inherit' && costLimit === 'inherit') {
+        this.db.prepare(`DELETE FROM model_quotas WHERE subject_type='user' AND subject_id=?`).run(subjectId)
+      } else this.db.prepare(`INSERT INTO model_quotas(subject_type,subject_id,token_limit,company_cost_micros_limit)
+        VALUES(?,?,?,?) ON CONFLICT(subject_type,subject_id) DO UPDATE SET token_limit=excluded.token_limit,
+        company_cost_micros_limit=excluded.company_cost_micros_limit`)
+        .run(subjectType, subjectId, stored(tokenLimit, 'tokenLimit'), stored(costLimit, 'companyCostMicrosLimit'))
+    })
     this.bumpConfigurationRevision()
   }
 

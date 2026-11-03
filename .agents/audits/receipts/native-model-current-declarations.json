@@ -1,0 +1,14 @@
+{
+  "name": "native-model-current-declarations",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/web/web-search-deepseek/tsconfig.json",
+  "startedAt": "2026-10-24T07:32:09.059036+00:00",
+  "seconds": 2.026,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "inputsAfter": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

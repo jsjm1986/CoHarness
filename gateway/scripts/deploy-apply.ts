@@ -7,6 +7,7 @@
  */
 import { readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
+import { restoreGatewayDocumentBackup } from '../src/document-backups.ts'
 import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { loadConfig } from '../src/config.ts'
@@ -294,10 +295,12 @@ try {
       if (mismatched.length > 0) {
         throw new DeploymentCommandError(`restore left managed files inconsistent: ${mismatched.join(',')}`)
       }
+      const restoredDocumentDomains = await restoreGatewayDocumentBackup(manifest, filesDir, restoring.signal)
       await maintenance.completeRestore(null, backupId, {
         dumpPath,
         filesDir,
         managedFiles: manifest.files.length,
+        restoredDocumentDomains,
         driftBefore: mismatchedBefore,
         mismatchedAfter: mismatched,
         protectionId,

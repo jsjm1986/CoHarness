@@ -1,9 +1,11 @@
 /** Host file-upload service: streamed intake and Session-owned staged receipts. */
 
 import { randomUUID } from 'node:crypto'
-import type { Context } from '@deepseek-ai/cordis'
+import { symbols, type Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type { AttachmentStore, FileAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import { addAbortSignal, Readable } from 'node:stream'
+import { CollaborationError, collaborationOf, collaborationRemoteRefusal } from '@deepseek-ai/dsh-collaboration'
 import type {} from '@deepseek-ai/dsh-api-remotes'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type { CommandFileReceiptResolver } from '@deepseek-ai/dsh-commands'
@@ -26,6 +28,17 @@ interface StagedFileUpload {
   readonly file: FileAttachmentRef
   /** Prompt that accepted this receipt; absent until successful admission. */
   requestId?: string
+}
+
+interface UploadAdmission {
+  readonly signal: AbortSignal
+  assertActive(): void
+  authorize(): Promise<void>
+}
+
+/** Compare Cordis providers independently of the caller's traced proxy. */
+function originalService<T extends object>(value: T | undefined): T | undefined {
+  return value === undefined ? undefined : (value as T & { [symbols.original]?: T })[symbols.original] ?? value
 }
 
 /** Prompt receipt binding that restores its previous owners unless delivery commits it. */
@@ -55,10 +68,22 @@ export class FileUploads extends TypertRemoteService {
   static inject = ['agents', 'attachments', 'commands', 'connection']
 
   private readonly stagedFiles = new WeakMap<Session, Map<FileUploadReceiptId, StagedFileUpload>>()
+  private readonly lifetime = new AbortController()
+  private readonly active = new Set<Promise<FileUploadValue>>()
+  private readonly pendingAgents = new WeakMap<Agent, number>()
 
   /** @param ctx - Host context carrying Agent, attachment, command, and Connection services. */
   constructor(ctx: Context) {
     super(ctx, 'fileUploads')
+    const stop = (): void => { this.lifetime.abort(new RemoteError('gateway/internal', 'File uploads are unavailable.', {})) }
+    ctx.on('internal/plugin', (fiber) => { if (fiber === ctx.fiber && fiber.uid === null) stop() })
+    ctx.effect(function* (this: FileUploads) {
+      yield ctx.on('agent/idle-release-check', ({ agent }) => this.pendingAgents.has(agent) ? 'busy' : undefined, { global: true })
+      yield async () => {
+        stop()
+        await Promise.allSettled([...this.active])
+      }
+    }.bind(this), 'file-upload: accepted operations')
     const resolve: CommandFileReceiptResolver = (agent, receiptId) =>
       this.resolve(agent, receiptId as FileUploadReceiptId)
     ctx.effect(
@@ -78,23 +103,24 @@ export class FileUploads extends TypertRemoteService {
   }
 
   /**
-   * Persist one encoded upload and stage it under the Agent receiver selected by Typert.
+   * Persist one encoded upload and stage it after the captured caller retains Session write permission.
    * @param agent - receiving Agent resolved from the Remote Agent scope.
    * @param request - canonical base64 bytes and optional display name.
-   * @param signal - caller cancellation before storage begins.
+   * @param signal - caller cancellation; completed immutable bytes may remain after cancellation.
    * @returns the staged receipt and durable file reference.
    */
   @Remote('upload')
-  upload(agent: Agent, request: EncodedFileUploadRequest, signal: AbortSignal): Promise<FileUploadValue> {
-    signal.throwIfAborted()
-    return this.commit(agent, async () => this.ctx.attachments.admitEncodedFile({
+  async upload(agent: Agent, request: EncodedFileUploadRequest, signal: AbortSignal): Promise<FileUploadValue> {
+    const admission = this.captureAdmission(agent.id, signal)
+    return this.track(this.commit(agent, admission, async store => store.admitEncodedFile({
       data: request.data,
       ...(request.name === undefined ? {} : { name: request.name }),
-    }))
+    })))
   }
 
   /**
-   * Persist raw chunks for one Session without aggregating the upload.
+   * Persist raw chunks after Session write authorization and recheck before returning a receipt.
+   * Active storage retains the exact Agent; cancellation closes Node streams and joins storage cleanup.
    * @param request - Session identity, ordered bytes, cancellation, and optional display name.
    * @returns the staged receipt and durable file reference.
    */
@@ -104,12 +130,17 @@ export class FileUploads extends TypertRemoteService {
     readonly signal?: AbortSignal
     readonly name?: string
   }): Promise<FileUploadValue> {
-    const agent = await this.resolveAgent(request.sessionId)
-    return this.commit(agent, async () => this.ctx.attachments.saveFileStream({
-      data: request.data,
-      ...(request.signal === undefined ? {} : { signal: request.signal }),
-      ...(request.name === undefined ? {} : { name: request.name }),
-    }))
+    const admission = this.captureAdmission(request.sessionId, request.signal)
+    return this.track((async () => {
+      await admission.authorize()
+      admission.assertActive()
+      const agent = await this.resolveAgent(request.sessionId)
+      return this.commit(agent, admission, async store => store.saveFileStream({
+        data: request.data instanceof Readable ? addAbortSignal(admission.signal, request.data) : request.data,
+        signal: admission.signal,
+        ...(request.name === undefined ? {} : { name: request.name }),
+      }))
+    })())
   }
 
   /**
@@ -159,13 +190,71 @@ export class FileUploads extends TypertRemoteService {
     this.retire(agent.session, requestId)
   }
 
-  private async commit(agent: Agent, save: () => Promise<FileAttachmentRef>): Promise<FileUploadValue> {
+  private captureAdmission(sessionId: SessionId, caller?: AbortSignal): UploadAdmission {
+    this.lifetime.signal.throwIfAborted()
+    caller?.throwIfAborted()
+    try {
+      const provider = collaborationOf(this.ctx), authority = provider?.capture()
+      const signal = AbortSignal.any([this.lifetime.signal,
+        ...caller === undefined ? [] : [caller], ...authority === undefined ? [] : [authority.signal]])
+      const assertActive = (): void => {
+        this.lifetime.signal.throwIfAborted()
+        caller?.throwIfAborted()
+        try {
+          if (authority?.signal.aborted === true
+            || originalService(collaborationOf(this.ctx)) !== originalService(provider)) {
+            throw new CollaborationError('gateway-unavailable', 'File upload authorization changed.')
+          }
+        } catch (error) { throw collaborationRemoteRefusal(error, 'write', sessionId) }
+      }
+      return { signal, assertActive, authorize: async () => {
+        assertActive()
+        try { await authority?.authorize(sessionId, 'write') }
+        catch (error) { assertActive(); throw collaborationRemoteRefusal(error, 'write', sessionId) }
+        assertActive()
+      } }
+    } catch (error) { throw collaborationRemoteRefusal(error, 'write', sessionId) }
+  }
+
+  private track(operation: Promise<FileUploadValue>): Promise<FileUploadValue> {
+    this.active.add(operation)
+    const retire = (): void => { this.active.delete(operation) }
+    void operation.then(retire, retire)
+    return operation
+  }
+
+  private assertCurrentAgent(agent: Agent): void {
+    if (this.ctx.agents.get(agent.id) !== agent) {
+      throw new RemoteError('session/not-found', `session "${agent.id}" is no longer active`, { sessionId: agent.id })
+    }
+  }
+
+  private retainAgent(agent: Agent): Disposable {
+    this.pendingAgents.set(agent, (this.pendingAgents.get(agent) ?? 0) + 1)
+    return { [Symbol.dispose]: () => {
+      const remaining = (this.pendingAgents.get(agent) as number) - 1
+      if (remaining === 0) this.pendingAgents.delete(agent)
+      else this.pendingAgents.set(agent, remaining)
+    } }
+  }
+
+  private async commit(
+    agent: Agent, admission: UploadAdmission, save: (store: AttachmentStore) => Promise<FileAttachmentRef>,
+  ): Promise<FileUploadValue> {
+    admission.assertActive()
+    using _use = this.ctx.agents.reserveUse([agent.id])
+    using _idle = this.retainAgent(agent)
+    await admission.authorize()
+    admission.assertActive()
+    this.assertCurrentAgent(agent)
     this.assertOrdinaryAgent(agent)
+    const store = this.ctx.attachments
     let file: FileAttachmentRef
     try {
-      file = await save()
+      file = await save(store)
     } catch (error) {
-      if (this.ctx.attachments.isAttachmentError(error)) {
+      admission.assertActive()
+      if (store.isAttachmentError(error)) {
         throw new RemoteError('session/attachment-invalid', error.message, { reason: error.code })
       }
       throw new RemoteError(
@@ -175,13 +264,9 @@ export class FileUploads extends TypertRemoteService {
         { cause: error },
       )
     }
-    if (this.ctx.agents.get(agent.id) !== agent) {
-      throw new RemoteError(
-        'session/not-found',
-        `session "${agent.id}" was disposed before its file upload completed`,
-        { sessionId: agent.id },
-      )
-    }
+    await admission.authorize()
+    admission.assertActive()
+    this.assertCurrentAgent(agent)
     let staged = this.stagedFiles.get(agent.session)
     if (staged === undefined) {
       staged = new Map()

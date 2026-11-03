@@ -1,3 +1,4 @@
+import { parseConversationArchiveId } from '../src/archive-identity.ts'
 import { mkdtemp, mkdir, stat, writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -10,9 +11,15 @@ const context = {
   pool: undefined as unknown as Pool,
 }
 
+const archiveId = parseConversationArchiveId('22000000-0000-4000-8000-000000000022')!
+const missingArchiveId = parseConversationArchiveId('22000000-0000-4000-8000-000000000023')!
+
+const runtimeUUID = '11000000-0000-4000-8000-000000000011'
+
 const archiveRow = {
+  archive_id: archiveId,
   root_session_id: 'session-1', title: 'Archive', creator_public_id: '2', creator_display_name: 'Worker',
-  project_public_id: null, project_name: null, runtime_kind: 'user', runtime_public_id: '2',
+  project_public_id: null, project_name: null, runtime_kind: 'user', runtime_public_id: '2', runtime_id: runtimeUUID, node_id: context.nodeId,
   workspace_path: '/tmp/workspace', workspace_title: 'Workspace', workspace_position: 0,
   state: 'archived', archived_at_ms: '1000', restored_at_ms: null, trashed_at_ms: null, purge_after_ms: null,
   sync_state: 'synced', last_sync_error: null, child_count: '1', message_count: '4', updated_at_ms: '2000',
@@ -26,13 +33,15 @@ afterEach(async () => {
 
 describe('ConversationArchiveService', () => {
   it('checks indexed pending commands under the organization and exact runtime identity', async () => {
-    const query = vi.fn().mockResolvedValueOnce({ rows: [{ '?column?': 1 }] }).mockResolvedValueOnce({ rows: [] })
+    const query = vi.fn().mockResolvedValueOnce({ rows: [{ runtime_id: runtimeUUID }] })
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] }).mockResolvedValueOnce({ rows: [{ runtime_id: runtimeUUID }] })
+      .mockResolvedValueOnce({ rows: [] })
     const service = new ConversationArchiveService({ ...context, pool: { query } as unknown as Pool })
     expect(await service.hasPendingCommands({ kind: 'user', id: 2 })).toBe(true)
     expect(await service.hasPendingCommands({ kind: 'project', id: 3 })).toBe(false)
-    expect(query.mock.calls[0]?.[1]).toEqual(['org-1', 'user', 2])
-    expect(query.mock.calls[1]?.[1]).toEqual(['org-1', 'project', 3])
-    expect(query.mock.calls[0]?.[0]).toContain("c.status='pending' LIMIT 1")
+    expect(query.mock.calls[1]?.[1]).toEqual(['org-1', 'user', 2, runtimeUUID])
+    expect(query.mock.calls[3]?.[1]).toEqual(['org-1', 'project', 3, runtimeUUID])
+    expect(query.mock.calls[1]?.[0]).toContain("c.status='pending' AND a.runtime_id=$4 LIMIT 1")
   })
 
   it('projects bounded administrator list rows', async () => {
@@ -43,7 +52,7 @@ describe('ConversationArchiveService', () => {
       state: 'archived', childCount: 1, messageCount: 4,
     })])
     expect(query).toHaveBeenCalledTimes(1)
-    expect((query.mock.calls[0] as unknown as [string, unknown[]])[1]).toEqual(['org-1', '%Archive%', 10, 0])
+    expect((query.mock.calls[0] as unknown as [string, unknown[]])[1]).toEqual(['org-1', '%Archive%', ['%Archive%'], 10, 0])
   })
 
   it('sanitizes stored titles and skips injected search rows in list projections', async () => {
@@ -62,9 +71,9 @@ describe('ConversationArchiveService', () => {
       .mockResolvedValueOnce({ rows: [], rowCount: 0 })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 })
     const service = new ConversationArchiveService({ ...context, pool: { query } as unknown as Pool })
-    await service.detail('session-1')
+    await service.detail(archiveId)
     const text = (query.mock.calls[1] as unknown as [string])[0]
-    expect(text).toContain('harness.human_session_title(title) title')
+    expect(text).toContain('harness.human_session_title(s.title) title')
   })
 
   it('returns a root detail with descendants and a bounded event page', async () => {
@@ -76,7 +85,7 @@ describe('ConversationArchiveService', () => {
         { session_id: 'session-1', seq: '1', event_type: 'assistant/message', occurred_at_ms: '1001', event: { content: 'world' } },
       ], rowCount: 2 })
     const service = new ConversationArchiveService({ ...context, pool: { query } as unknown as Pool })
-    await expect(service.detail('session-1', 0, 1)).resolves.toMatchObject({
+    await expect(service.detail(archiveId, 0, 1)).resolves.toMatchObject({
       record: { rootSessionId: 'session-1' }, descendants: [{ sessionId: 'session-1' }],
       events: [{ seq: 0, type: 'user/message', data: { content: 'hello' } }], hasMore: true,
     })
@@ -92,7 +101,7 @@ describe('ConversationArchiveService', () => {
         rowCount: 10_001,
       })
     const service = new ConversationArchiveService({ ...context, pool: { query } as unknown as Pool })
-    await expect(service.detail('session-1')).rejects.toMatchObject({
+    await expect(service.detail(archiveId)).rejects.toMatchObject({
       code: 'ARCHIVE_TOO_LARGE', status: 413,
     })
     expect(query).toHaveBeenCalledTimes(2)
@@ -111,11 +120,11 @@ describe('ConversationArchiveService', () => {
       hasMore: false,
     }))
     service.setRuntimeReader(reader)
-    await expect(service.detail('session-1')).resolves.toMatchObject({
+    await expect(service.detail(archiveId)).resolves.toMatchObject({
       record: { title: '来自运行时' },
       events: [{ data: { content: 'runtime' } }],
     })
-    expect(reader).toHaveBeenCalledWith({ kind: 'user', id: 2 }, 'session-1', 0, 200)
+    expect(reader).toHaveBeenCalledWith({ kind: 'user', id: 2, runtimeId: runtimeUUID, nodeId: context.nodeId }, 'session-1', 0, 200, undefined)
   })
 
   it('keeps the indexed detail when a runtime returns an oversized page', async () => {
@@ -132,7 +141,7 @@ describe('ConversationArchiveService', () => {
       })),
       hasMore: true,
     }))
-    await expect(service.detail('session-1')).resolves.toMatchObject({
+    await expect(service.detail(archiveId)).resolves.toMatchObject({
       record: { title: 'Archive', syncState: 'unavailable' },
       events: [],
     })
@@ -142,6 +151,7 @@ describe('ConversationArchiveService', () => {
     const calls: Array<[string, unknown[] | undefined]> = []
     const client = {
       query: vi.fn(async (text: string, values?: unknown[]) => {
+        if (text.startsWith('SELECT i.runtime_id')) return { rows: [{ runtime_id: runtimeUUID }], rowCount: 1 }
         calls.push([text, values])
         if (text.includes('SELECT id FROM harness.projects')) return { rows: [{ id: 'project-internal' }], rowCount: 1 }
         if (text.includes('SELECT s.id')) return {
@@ -150,9 +160,10 @@ describe('ConversationArchiveService', () => {
             { id: 'root', root_session_id: 'root', owned: true },
           ], rowCount: 2,
         }
-        if (text.includes('SELECT state,runtime_kind')) return { rows: [], rowCount: 0 }
-        if (text.includes('INSERT INTO harness.conversation_archive_records')) return { rows: [], rowCount: 1 }
+        if (text.includes('SELECT archive_id,state,sync_revision')) return { rows: [], rowCount: 0 }
+        if (text.includes('INSERT INTO harness.conversation_archive_records')) return { rows: [{ archive_id: archiveId }], rowCount: 1 }
         if (text.includes('SELECT c.id::text')) return { rows: [], rowCount: 0 }
+        if (text.includes('INSERT INTO harness.conversation_archive_search')) return { rows: [], rowCount: (values?.[3] as string[] | undefined)?.length ?? 0 }
         return { rows: [], rowCount: 0 }
       }),
       release: vi.fn(),
@@ -179,14 +190,18 @@ describe('ConversationArchiveService', () => {
     expect(searchInsert?.[1]).toEqual(expect.arrayContaining([['child'], [0], ['user'], ['hello'], [10]]))
     const pending = calls.find(([text]) => text.includes('SELECT c.id::text'))
     expect(pending?.[0]).toContain('LIMIT $4')
-    expect(pending?.[1]?.at(-1)).toBe(1_000)
+    expect(pending?.[1]?.[3]).toBe(1_000)
+    expect(pending?.[1]?.[4]).toBe(runtimeUUID)
   })
 
   it('rejects unsafe runtime revisions and refuses to wrap a stored revision', async () => {
     const client = {
       query: vi.fn(async (text: string) => {
+        if (text.includes("FROM harness.organizations WHERE id=$1 AND status='active' FOR SHARE")) return { rows: [{ present: 1 }], rowCount: 1 }
+        if (text.includes('FROM harness.users u JOIN harness.memberships')) return { rows: [{ role: 'admin', user_status: 'active', membership_status: 'active' }], rowCount: 1 }
+        if (text.startsWith('SELECT i.runtime_id')) return { rows: [{ runtime_id: runtimeUUID }], rowCount: 1 }
         if (text.includes('SELECT id FROM harness.users')) return { rows: [{ id: 'user-internal' }], rowCount: 1 }
-        if (text.includes('SELECT state,runtime_kind')) {
+        if (text.includes('SELECT state,runtime_kind,runtime_public_id::text,sync_revision::text')) {
           return {
             rows: [{
               state: 'archived', runtime_kind: 'user', runtime_public_id: '2',
@@ -207,13 +222,14 @@ describe('ConversationArchiveService', () => {
     })).rejects.toThrow(/invalid runtime archive revision/)
     expect(pool.connect).not.toHaveBeenCalled()
 
-    await expect(service.setState('session-1', 'trash', 2)).rejects.toThrow(/revision.*exhausted/)
+    await expect(service.setState(archiveId, 'trash', 2)).rejects.toThrow(/revision.*exhausted/)
     expect(client.query.mock.calls.some(([text]) => String(text).startsWith('UPDATE harness.conversation_archive_records')))
       .toBe(false)
   })
 
   it('rejects an explicit lineage root that disagrees with PostgreSQL', async () => {
     const query = vi.fn(async (text: string) => {
+        if (text.startsWith('SELECT i.runtime_id')) return { rows: [{ runtime_id: runtimeUUID }], rowCount: 1 }
       if (text.includes('SELECT id FROM harness.projects')) return { rows: [{ id: 'project-internal' }], rowCount: 1 }
       if (text.includes('SELECT s.id')) return {
         rows: [
@@ -235,6 +251,7 @@ describe('ConversationArchiveService', () => {
 
   it('rejects a snapshot that claims a session owned by another scope', async () => {
     const query = vi.fn(async (text: string) => {
+        if (text.startsWith('SELECT i.runtime_id')) return { rows: [{ runtime_id: runtimeUUID }], rowCount: 1 }
       if (text.includes('SELECT id FROM harness.users')) return { rows: [{ id: 'user-internal' }], rowCount: 1 }
       if (text.includes('SELECT s.id')) return {
         rows: [{ id: 'foreign', root_session_id: 'foreign', owned: false }], rowCount: 1,
@@ -254,8 +271,11 @@ describe('ConversationArchiveService', () => {
     const calls: Array<[string, unknown[] | undefined]> = []
     const client = {
       query: vi.fn(async (text: string, values?: unknown[]) => {
+        if (text.startsWith('SELECT i.runtime_id')) return { rows: [{ runtime_id: runtimeUUID }], rowCount: 1 }
         calls.push([text, values])
         if (text.includes('SELECT id FROM harness.users')) return { rows: [{ id: 'user-internal' }], rowCount: 1 }
+        if (text.includes('INSERT INTO harness.conversation_archive_records')) return { rows: [{ archive_id: archiveId }], rowCount: 1 }
+        if (text.includes('INSERT INTO harness.conversation_archive_search')) return { rows: [], rowCount: (values?.[3] as string[] | undefined)?.length ?? 0 }
         return { rows: [], rowCount: 0 }
       }),
       release: vi.fn(),
@@ -279,22 +299,25 @@ describe('ConversationArchiveService', () => {
     const calls: Array<[string, unknown[] | undefined]> = []
     const client = {
       query: vi.fn(async (text: string, values?: unknown[]) => {
+        if (text.startsWith('SELECT i.runtime_id')) return { rows: [{ runtime_id: runtimeUUID }], rowCount: 1 }
         calls.push([text, values])
-        if (text.includes('SELECT state,sync_revision::text,sync_state FROM harness.conversation_archive_records')) {
+        if (text.includes('SELECT state,sync_revision::text,sync_state FROM') && text.includes('conversation_archive_records')) {
           return { rows: [{ state: 'trash', sync_revision: '5', sync_state: 'pending' }], rowCount: 1 }
         }
         if (text.includes("FROM harness.conversation_archive_commands") && text.includes("status='pending'")) {
           return { rows: [{ id: 'command-1', action: 'purge' }], rowCount: 1 }
         }
         if (text.includes('SELECT DISTINCT f.local_path')) return { rows: [], rowCount: 0 }
-        if (text.includes('SELECT a.root_session_id,')) return { rows: [archiveRow], rowCount: 1 }
+        if (text.includes('SELECT a.archive_id,a.root_session_id,')) return { rows: [archiveRow], rowCount: 1 }
+        if (text.includes('INSERT INTO harness.conversation_archive_records')) return { rows: [{ archive_id: archiveId }], rowCount: 1 }
+        if (text.includes('INSERT INTO harness.conversation_archive_search')) return { rows: [], rowCount: (values?.[3] as string[] | undefined)?.length ?? 0 }
         return { rows: [], rowCount: 0 }
       }),
       release: vi.fn(),
     }
     const pool = { connect: vi.fn(async () => client), query: client.query } as unknown as Pool
     const service = new ConversationArchiveService({ ...context, pool })
-    await expect(service.settle('session-1')).resolves.not.toBeNull()
+    await expect(service.settle(archiveId)).resolves.not.toBeNull()
     expect(calls.some(([text]) => text.includes('DELETE FROM harness.conversation_sessions'))).toBe(true)
     const commandUpdate = calls.find(([text]) => text.includes('UPDATE harness.conversation_archive_commands'))
     expect(commandUpdate?.[0]).toContain("WHEN action='purge' AND $3::boolean THEN 'applied'")
@@ -307,21 +330,24 @@ describe('ConversationArchiveService', () => {
     const calls: Array<[string, unknown[] | undefined]> = []
     const client = {
       query: vi.fn(async (text: string, values?: unknown[]) => {
+        if (text.startsWith('SELECT i.runtime_id')) return { rows: [{ runtime_id: runtimeUUID }], rowCount: 1 }
         calls.push([text, values])
-        if (text.includes('SELECT state,sync_revision::text,sync_state FROM harness.conversation_archive_records')) {
+        if (text.includes('SELECT state,sync_revision::text,sync_state FROM') && text.includes('conversation_archive_records')) {
           return { rows: [{ state: 'archived', sync_revision: '5', sync_state: 'pending' }], rowCount: 1 }
         }
         if (text.includes("FROM harness.conversation_archive_commands") && text.includes("status='pending'")) {
           return { rows: [{ id: 'command-1', action: 'restore' }], rowCount: 1 }
         }
-        if (text.includes('SELECT a.root_session_id,')) return { rows: [archiveRow], rowCount: 1 }
+        if (text.includes('SELECT a.archive_id,a.root_session_id,')) return { rows: [archiveRow], rowCount: 1 }
+        if (text.includes('INSERT INTO harness.conversation_archive_records')) return { rows: [{ archive_id: archiveId }], rowCount: 1 }
+        if (text.includes('INSERT INTO harness.conversation_archive_search')) return { rows: [], rowCount: (values?.[3] as string[] | undefined)?.length ?? 0 }
         return { rows: [], rowCount: 0 }
       }),
       release: vi.fn(),
     }
     const pool = { connect: vi.fn(async () => client), query: client.query } as unknown as Pool
     const service = new ConversationArchiveService({ ...context, pool })
-    await expect(service.settle('session-1')).resolves.not.toBeNull()
+    await expect(service.settle(archiveId)).resolves.not.toBeNull()
     expect(calls.some(([text]) => text.includes('DELETE FROM harness.conversation_sessions'))).toBe(false)
     const recordUpdate = calls.find(([text]) => text.includes("sync_state=CASE WHEN state='purged'"))
     expect(recordUpdate).toBeDefined()
@@ -334,7 +360,7 @@ describe('ConversationArchiveService', () => {
     }
     const pool = { connect: vi.fn(async () => client), query: client.query } as unknown as Pool
     const service = new ConversationArchiveService({ ...context, pool })
-    await expect(service.settle('session-missing')).resolves.toBeNull()
+    await expect(service.settle(missingArchiveId)).resolves.toBeNull()
     expect(client.query.mock.calls.some(([text]) => String(text).includes('conversation_archive_commands'))).toBe(false)
   })
 
@@ -342,10 +368,13 @@ describe('ConversationArchiveService', () => {
     const calls: Array<[string, unknown[] | undefined]> = []
     const client = {
       query: vi.fn(async (text: string, values?: unknown[]) => {
+        if (text.startsWith('SELECT i.runtime_id')) return { rows: [{ runtime_id: runtimeUUID }], rowCount: 1 }
         calls.push([text, values])
-        if (text.includes('SELECT state,runtime_kind')) {
-          return { rows: [{ state: 'purged', runtime_kind: 'user', runtime_public_id: '2', sync_revision: '7' }], rowCount: 1 }
+        if (text.includes('SELECT archive_id,state,sync_revision')) {
+          return { rows: [{ archive_id: archiveId, state: 'purged', runtime_kind: 'user', runtime_public_id: '2', runtime_id: runtimeUUID, sync_revision: '7' }], rowCount: 1 }
         }
+        if (text.includes('INSERT INTO harness.conversation_archive_records')) return { rows: [{ archive_id: archiveId }], rowCount: 1 }
+        if (text.includes('INSERT INTO harness.conversation_archive_search')) return { rows: [], rowCount: (values?.[3] as string[] | undefined)?.length ?? 0 }
         return { rows: [], rowCount: 0 }
       }),
       release: vi.fn(),
@@ -356,7 +385,7 @@ describe('ConversationArchiveService', () => {
     const insert = calls.find(([text]) => text.includes('INSERT INTO harness.conversation_archive_commands'))
     expect(insert?.[0]).toContain("'purge'")
     expect(insert?.[0]).toContain("status='pending'")
-    expect(insert?.[1]).toEqual(['org-1', 'session-1', 7])
+    expect(insert?.[1]).toEqual(['org-1', archiveId, 7])
     expect(calls.some(([text]) => text.includes('INSERT INTO harness.conversation_archive_records'))).toBe(false)
   })
 
@@ -369,14 +398,15 @@ describe('ConversationArchiveService', () => {
     await mkdir(directory)
     const client = {
       query: vi.fn(async (text: string) => {
+        if (text.startsWith('SELECT i.runtime_id')) return { rows: [{ runtime_id: runtimeUUID }], rowCount: 1 }
         if (text.includes('SELECT state,sync_revision')) return { rows: [{ state: 'archived', sync_revision: '0', sync_state: 'synced' }], rowCount: 1 }
-        if (text.includes('FOR UPDATE OF a')) return { rows: [{ root_session_id: 'session-1' }], rowCount: 1 }
-        if (text.includes('root_session_id,desired_revision::text,status,action')) {
-          return { rows: [{ root_session_id: 'session-1', desired_revision: '1', status: 'pending', action: 'purge' }], rowCount: 1 }
+        if (text.includes('FOR UPDATE OF a')) return { rows: [{ archive_id: archiveId }], rowCount: 1 }
+        if (text.includes('archive_id,desired_revision::text,status,action')) {
+          return { rows: [{ archive_id: archiveId, desired_revision: '1', status: 'pending', action: 'purge' }], rowCount: 1 }
         }
-        if (text.includes('SELECT id::text,root_session_id,local_path,attempts')) return {
-          rows: [{ id: 'file-cleanup', root_session_id: 'session-1', local_path: file, attempts: 1 },
-            { id: 'directory-cleanup', root_session_id: 'session-1', local_path: directory, attempts: 1 }], rowCount: 2,
+        if (text.includes('SELECT id::text,archive_id,local_path,attempts')) return {
+          rows: [{ id: 'file-cleanup', archive_id: archiveId, local_path: file, attempts: 1 },
+            { id: 'directory-cleanup', archive_id: archiveId, local_path: directory, attempts: 1 }], rowCount: 2,
         }
         if (text.includes('SELECT DISTINCT f.local_path')) return { rows: [{ local_path: file }, { local_path: directory }], rowCount: 2 }
         return { rows: [], rowCount: 0 }
@@ -385,7 +415,7 @@ describe('ConversationArchiveService', () => {
     }
     const pool = Object.assign(new Pool(), { connect: vi.fn(async () => client), query: client.query })
     const service = new ConversationArchiveService({ ...context, pool })
-    await expect(service.purge('session-1')).resolves.toBe(true)
+    await expect(service.purge(archiveId)).resolves.toBe(true)
     await expect(stat(file)).resolves.toBeDefined()
     await expect(service.acknowledgeCommand('command', 1)).resolves.toBe(true)
     await expect(service.cleanupDue()).resolves.toBe(1)
@@ -400,6 +430,7 @@ describe('ConversationArchiveService', () => {
     await writeFile(file, 'content')
     const client = {
       query: vi.fn(async (text: string) => {
+        if (text.startsWith('SELECT i.runtime_id')) return { rows: [{ runtime_id: runtimeUUID }], rowCount: 1 }
         if (text.includes('SELECT state,sync_revision')) return { rows: [{ state: 'archived', sync_revision: '0' }], rowCount: 1 }
         if (text.includes('SELECT DISTINCT f.local_path')) return { rows: [{ local_path: file }], rowCount: 1 }
         if (text.includes('SELECT local_path')) return { rows: [{ local_path: file }], rowCount: 1 }
@@ -409,7 +440,7 @@ describe('ConversationArchiveService', () => {
     }
     const pool = Object.assign(new Pool(), { connect: vi.fn(async () => client), query: client.query })
     const service = new ConversationArchiveService({ ...context, pool })
-    await expect(service.purge('session-1')).resolves.toBe(true)
+    await expect(service.purge(archiveId)).resolves.toBe(true)
     await expect(stat(file)).resolves.toBeDefined()
   })
 
@@ -418,8 +449,9 @@ describe('ConversationArchiveService', () => {
     temporaryRoots.push(root)
     const client = {
       query: vi.fn(async (text: string) => {
-        if (text.includes('SELECT id::text,root_session_id,local_path,attempts')) {
-          return { rows: [{ id: '00000000-0000-4000-8000-000000000001', root_session_id: 'session-1', local_path: root, attempts: 0 }], rowCount: 1 }
+        if (text.startsWith('SELECT i.runtime_id')) return { rows: [{ runtime_id: runtimeUUID }], rowCount: 1 }
+        if (text.includes('SELECT id::text,archive_id,local_path,attempts')) {
+          return { rows: [{ id: '00000000-0000-4000-8000-000000000001', archive_id: archiveId, local_path: root, attempts: 0 }], rowCount: 1 }
         }
         return { rows: [], rowCount: 0 }
       }),

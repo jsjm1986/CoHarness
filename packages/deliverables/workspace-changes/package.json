@@ -28,10 +28,10 @@
   },
   "license": "Apache-2.0",
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/types/**/*.js",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "dependencies": {
     "@deepseek-ai/dsh-brand": "workspace:*",

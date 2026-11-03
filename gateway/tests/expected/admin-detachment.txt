@@ -1,0 +1,4 @@
+Admin detachment with a live connection
+native refusal: 409 node-service/busy
+电脑仍有 Runtime、传输或连接使用中，请先停止 Runtime，并关闭这台电脑的工作台、管理页面及传输后重试
+computer identity and lease revision preserved

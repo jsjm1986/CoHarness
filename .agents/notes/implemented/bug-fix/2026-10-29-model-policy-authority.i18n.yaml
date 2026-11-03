@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-29-model-policy-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-29-model-policy-authority.md
+document:
+  en: 393a0a902a452f4129aac0f49b18cc626068aa4d
+  zh: 5ca3bd1f023cc77f1c03781e3d98817f9ecf46ee
+/agent-note-model-projections-retain-current-account-authority:
+  en: 460a3570ebaa12f2
+  zh: f05de7425c72b342
+/agent-note-model-projections-retain-current-account-authority/problem:
+  en: 6c806d9ef92491d2
+  zh: 5f5188002fa8fbb5
+/agent-note-model-projections-retain-current-account-authority/decision:
+  en: be595b0d41006cb2
+  zh: ba1f8f192d544d13
+/agent-note-model-projections-retain-current-account-authority/alternatives-considered:
+  en: 8691aa02bcf78d35
+  zh: 9e3c48b169534d8d
+/agent-note-model-projections-retain-current-account-authority/consequences:
+  en: 1d0ffbcce90d3b7a
+  zh: f8b60b4e3fe8468c
+/agent-note-model-projections-retain-current-account-authority/verification:
+  en: 0950aa3faf102099
+  zh: ab90957c3203f857

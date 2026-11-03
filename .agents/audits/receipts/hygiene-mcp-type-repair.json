@@ -1,0 +1,13 @@
+{
+  "name": "hygiene-mcp-type-repair",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 ./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T20:04:16.590831+00:00",
+  "seconds": 117.592,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "545c1664c25ed58a62e1ce4b1dec112ccf333a8f7aa21d11abb04fde09a8e71a",
+  "inputsAfter": "0696183ad66880508bfd3ae460c3c518c36f2f930e1bf67f2c4a4e7af1f95e0a",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

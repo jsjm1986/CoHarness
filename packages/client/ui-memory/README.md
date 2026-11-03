@@ -19,6 +19,8 @@ The `/client` exports are the plugin body (`apply`/`inject`), the source factory
 
 The Web GUI gains a Memory right-Sidebar tab where a member browses, searches, and — where the service reports the scope writable — edits durable memory in both personal and project spaces, plus a Plugins-page card that switches the whole feature off.
 
+The tab captures its conversation’s Runtime for scope discovery, reads, writes and source-conversation links. Its configuration card keeps the document’s bootstrap settings owner. Another computer’s invalidations cannot retarget the tab.
+
 ## Table of Contents
 
 - [Invariants](#invariants)

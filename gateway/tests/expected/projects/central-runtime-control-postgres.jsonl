@@ -1,0 +1,14 @@
+{"label":"body cannot select control policy","status":400,"state":"ready","generation":1,"stops":0,"starts":0,"dataRetained":true,"operations":0}
+{"label":"exact central stop without data qualification","status":200,"state":"stopped","generation":1,"stops":1,"starts":0,"dataRetained":true,"operations":0}
+{"label":"stale exact stop","status":409,"state":"stopped","generation":1,"stops":1,"starts":0,"dataRetained":true,"operations":0}
+{"label":"exact central start","status":200,"state":"ready","generation":2,"stops":1,"starts":1,"dataRetained":true,"operations":0}
+{"label":"stale restart","status":409,"state":"ready","generation":2,"stops":1,"starts":1,"dataRetained":true,"operations":0}
+{"label":"exact central restart","status":200,"state":"ready","generation":3,"stops":2,"starts":2,"dataRetained":true,"operations":0}
+{"label":"project cannot retire","status":400,"state":"ready","generation":3,"stops":2,"starts":2,"dataRetained":true,"operations":0}
+{"label":"central deletion remains protected","status":409,"state":"ready","stops":2,"starts":2,"dataRetained":true}
+{"label":"revoked administrator stop","status":403,"state":"ready","generation":3,"stops":2,"starts":2,"dataRetained":true,"operations":0}
+{"label":"legacy central stop","status":204,"state":"stopped","generation":3,"stops":3,"starts":2,"dataRetained":true,"operations":0}
+{"label":"idempotent exact central stop","status":200,"state":"stopped","generation":3,"stops":3,"starts":2,"dataRetained":true,"operations":0}
+{"label":"start before late withdrawal","status":200,"state":"ready","generation":4,"stops":3,"starts":3,"dataRetained":true,"operations":0}
+{"label":"restart withdrawal after approved stop","status":403,"state":"stopped","generation":4,"stops":4,"starts":3,"dataRetained":true,"operations":0}
+{"label":"personal retirement keeps destructive policy and data","status":200,"retired":true,"stops":4,"starts":3,"dataRetained":true,"operations":0}

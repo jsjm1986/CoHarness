@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.md
 document:
-  en: 0fa7f7ce8ca5214260d99e3df8e1b11a83654ed2
-  zh: 380bb97a8f6819037ecc555c091585570b94e5ae
+  en: cb0cf265dd3cc786dd959cf85af88bfd61c4c7fc
+  zh: dfca6af9ea03fe126ed8a57c0b3b0cb07f1e087f
 /agent-note-gateway-logical-user-deletion:
   en: ab1550fdf4c2c852
   zh: 1fabcb741e2e16e7
@@ -12,14 +12,20 @@ document:
   en: 15099af42b10b070
   zh: fb1f756d7f7fbdc0
 /agent-note-gateway-logical-user-deletion/decision:
-  en: b1255309cee416be
-  zh: 8d0be29a0a1b9cad
+  en: 56f885e88c82d7ff
+  zh: 319d59b22acae9a6
+/agent-note-gateway-logical-user-deletion/decision/concurrent-project-mutations-and-grant-projection:
+  en: 0c0df8e4a598a5db
+  zh: 4ee5ad55b79e08d9
+/agent-note-gateway-logical-user-deletion/decision/model-configuration-and-historical-usage:
+  en: d18960e9c32b86b7
+  zh: bd0fbf162cb01326
 /agent-note-gateway-logical-user-deletion/consequences:
   en: 991391150cdc2aae
   zh: 993fd54972b7b4b3
 /agent-note-gateway-logical-user-deletion/verification:
-  en: 15b33298e735de3b
-  zh: 06fcbb76be858e4c
+  en: 56ef28f32d919030
+  zh: 62b903597af56d26
 /agent-note-gateway-logical-user-deletion/alternatives-considered:
   en: bd87e89d62555426
   zh: e093a1a459a1e6aa

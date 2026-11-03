@@ -1,0 +1,287 @@
+{
+  "finding": "B360",
+  "status": "fixed_named_desktop_http_authorization_scope",
+  "updatedAt": "2026-10-30T17:38:27.869409+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z",
+  "sourcePaths": [
+    "packages/host/open-in-app/src/index.ts",
+    "packages/host/open-in-app/src/resolver.ts",
+    "packages/host/open-in-app/tests/host-routes.spec.ts",
+    "packages/host/open-in-app/tests/resolver.spec.ts",
+    "packages/host/open-in-app/tests/authentication.spec.ts",
+    "packages/host/open-in-app/tests/fixtures/authentication.mjs",
+    "packages/host/open-in-app/tests/expected/authentication.jsonl",
+    "packages/host/open-in-app/README.md",
+    "packages/host/open-in-app/README.zh.md",
+    "packages/host/open-in-app/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-desktop-request-authorization.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-desktop-request-authorization.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-desktop-request-authorization.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/desktop-request-authorization/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/desktop-request-authorization/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/desktop-request-authorization/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/host/open-in-app/src/index.ts": "12005f1bc7f5cc6588b9d1392f56ac96b85e5f28cb7005cf307a2021550aeb26",
+    "packages/host/open-in-app/src/resolver.ts": "6d50e784713de605747c02e8e5826e0a9871ae759eb36c1a23ce6d4985ac3ca5",
+    "packages/host/open-in-app/tests/host-routes.spec.ts": "0b4cdb01a0cf46e897d1f8cdfa4aab9371610edf2d130ca7816ad69de41413e4",
+    "packages/host/open-in-app/tests/resolver.spec.ts": "879660434b1b875ec99de0d16a38a785093b204c32ea71b3ce98264655911091",
+    "packages/host/open-in-app/tests/authentication.spec.ts": "61ee60eaa6992e5261db4e3324c46b311b567651631eb4bdd333b05cf56e1628",
+    "packages/host/open-in-app/tests/fixtures/authentication.mjs": "2616936cedfc829e9557ce87c763a8e4765f064a2be98ca8a3078a67fbbff74b",
+    "packages/host/open-in-app/tests/expected/authentication.jsonl": "0aba3b8c0446305f20c062d2bc48f69126a1aa44eb6f8f9605331f1a148fa80f",
+    "packages/host/open-in-app/README.md": "662bd5c44d88c3a361366b5be1229303959c59024632efecea291ae6f40b9571",
+    "packages/host/open-in-app/README.zh.md": "3a925985725840465bf3c5a8e7d89e62b82636c956efa07fa940ec34e460b9e0",
+    "packages/host/open-in-app/README.i18n.yaml": "e98ce5de2cc69eb76a88a4ef55c4ca1eee78603010fa81bb54e728a96da0cd01",
+    ".agents/notes/implemented/bug-fix/2026-10-31-desktop-request-authorization.md": "b8378e332ad96b07c7b13e982c954bfa39cbfb6115fd3bdfdb04d93a2b1ec4c7",
+    ".agents/notes/implemented/bug-fix/2026-10-31-desktop-request-authorization.zh.md": "12ff259840f80d5dafee9c494fea1608b178e4748c98c58cc03eec076de20435",
+    ".agents/notes/implemented/bug-fix/2026-10-31-desktop-request-authorization.i18n.yaml": "9c9ee28cf1672801ff183a42a8f7338b81a49e6401e803be9b122c8d568cd9d3",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/desktop-request-authorization/guide.md": "12de637dcdb57c0d1bbb98098d3040a1dc34c934843b5eb3bd9780111ad587c3",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/desktop-request-authorization/guide.zh.md": "a0d7094299ce5854454dd7014488b2e0674f3b405ee771e623cecdfe7583a2aa",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/desktop-request-authorization/guide.i18n.yaml": "661a6c99401bda020a8b42e44b0538b84d09dcc7312b26da6bbbfae25cc704dc"
+  },
+  "compiledHashes": {
+    "packages/host/open-in-app/lib/index.js": "44a00cf137ac6c746099e3784301b54a4fac7c4bc37d8691056516202958e994",
+    "packages/host/open-in-app/lib/types/index.d.ts": "128685758e824da324488463f681809ab9e73b56fbab55c13ef9132495fe3814",
+    "packages/host/open-in-app/lib/types/resolver.d.ts": "4a183c7a73f6497f7d9620ccb7e560b8c9e8b2bdd43c57060d226426e01f2a4c"
+  },
+  "repair": "Connection is mandatory before desktop route registration. A per-activation admission lifetime invalidates old handlers on unload. Metadata and icon publication recheck current authentication after asynchronous reads. Request bodies, directory reads and refreshed resolutions retain current qualification; every primary/fallback/refreshed physical handoff runs a current authorization callback. Refusal is an explicit launch outcome, separate from a failed launcher. Existing committed OS applications retain their independent lifetime.",
+  "causalEvidence": {
+    "desktop-auth-http-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T17:23:53.994872+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/host/open-in-app/tests/authentication.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T17:23:56.401655+00:00"
+    },
+    "desktop-auth-built-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T17:31:31.644530+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/host/open-in-app/tests/authentication.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T17:31:34.391314+00:00"
+    },
+    "desktop-auth-queued-causal-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T17:27:22.194710+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/host/open-in-app/tests/host-routes.spec.ts",
+        "-t",
+        "withdrawal",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T17:27:24.193560+00:00"
+    },
+    "desktop-auth-queued-launch-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T17:28:34.337055+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/host/open-in-app/tests/host-routes.spec.ts",
+        "-t",
+        "refuses 'open' after 'authentication'",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T17:28:37.230187+00:00"
+    }
+  },
+  "verification": {
+    "sourceCases": 84,
+    "sourceFiles": 5,
+    "uniqueRunnablePrograms": 1,
+    "goldenStages": 5,
+    "compiledNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "repeatedExecutionsAreNotNewCases": true,
+    "sourceCausalOverlapCases": 9,
+    "nativeLaunchAdapterObservedAfterOldAuthorityWithdrawal": true,
+    "physicalDesktopApplicationsOpened": 0,
+    "coverage": {
+      "index.ts": {
+        "statements": "177/177",
+        "branches": "87/87",
+        "functions": "25/25",
+        "lines": "152/152"
+      },
+      "resolver.ts": {
+        "statements": "255/255",
+        "branches": "197/197",
+        "functions": "49/49",
+        "lines": "216/216"
+      }
+    },
+    "standardPerFileThresholdsUnchanged": true,
+    "coveredProductionModules": 2,
+    "newCoverageExemptions": 0,
+    "buildGates": 8,
+    "docQuickGates": 20,
+    "checks": {
+      "desktop-auth-final-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:34:21.603365+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "packages/host/open-in-app/tests",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/host/open-in-app/src/index.ts",
+          "--coverage.include=packages/host/open-in-app/src/resolver.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z/desktop-auth-final-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:36:03.045646+00:00"
+      },
+      "desktop-auth-production-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:34:21.603351+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/build.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:34:40.201115+00:00"
+      },
+      "desktop-auth-final-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:34:21.603578+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "./node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:34:30.668009+00:00"
+      },
+      "desktop-auth-final-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:34:21.603360+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/host/open-in-app/src/index.ts",
+          "packages/host/open-in-app/src/resolver.ts",
+          "packages/host/open-in-app/tests/authentication.spec.ts",
+          "packages/host/open-in-app/tests/host-routes.spec.ts",
+          "packages/host/open-in-app/tests/resolver.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:34:24.258515+00:00"
+      },
+      "desktop-auth-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:34:21.603352+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:36:10.783042+00:00"
+      },
+      "desktop-auth-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:35:24.058497+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/open-in-app/tests/authentication.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:35:25.658178+00:00"
+      },
+      "desktop-auth-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:37:12.731156+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/open-in-app/tests/authentication.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:37:13.733371+00:00"
+      },
+      "desktop-auth-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:34:43.050468+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:34:47.540436+00:00"
+      }
+    }
+  },
+  "documentation": {
+    "pairedStems": 3,
+    "upgradeGuideAdded": true,
+    "newActiveDecision": ".agents/notes/implemented/bug-fix/2026-10-31-desktop-request-authorization.md",
+    "relatedNotesRetained": [
+      "2026-10-04-open-in-app-local-runtime-gate",
+      "2026-09-08-upstream-alpha2-selective-sync"
+    ],
+    "supersession": "Those records still own browser Runtime selection and cloud composition. No full supersession or archive edit."
+  },
+  "limits": [
+    "The complete real Connection lifecycle program uses an actual ephemeral local HTTP server, real Loader and a synthetic credential-record store/cookie. The controlled overlap cases use fake platform command/launch adapters and real temporary filesystem data; they do not certify physical Windows/Linux desktop opening or a WAN host.",
+    "Only the two modified production modules have100percent measured coverage. Other modules, raw allocation lifetimes, resource fairness and all12original domains remain under review; B04/B25 remain in progress.",
+    "Existing bounded catalog probes may complete after authorization withdrawal; their results cannot publish or authorize a new handoff. A previously committed application is intentionally not killed by plugin unload.",
+    "The first fixture barrier was registered after route publication and timed out. A separate first catalog barrier targeted a macOS-unused PATH resolver and timed out. Neither is causal evidence. Accepted negatives settle normally and observe actual HTTP data and launch-adapter effects.",
+    "Package-manager startup was delayed; the original coverage/docs commands passed unchanged. A direct diagnostic coverage replay is redundant, not additional cases. No product failure was bypassed.",
+    "Root changed no live deployment, production database or peer-owned runtime ownership files. Real paid model success and public push remain human-deferred."
+  ]
+}

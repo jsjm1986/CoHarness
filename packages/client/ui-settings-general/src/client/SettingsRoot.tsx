@@ -72,6 +72,12 @@ function SettingsPanel({ rows, renderSlot, t, activeId, onSelect, onClose, setti
   const titleId = useId()
   const panelRef = useRef<HTMLDivElement | null>(null)
   const navRefs = useRef(new Map<string, HTMLButtonElement>())
+  // Release the background before the modal layer restores its invoking focus.
+  useLayoutEffect(() => {
+    const appRoot = document.getElementById('root')
+    if (appRoot === null) return
+    return holdInert(appRoot)
+  }, [])
   useModalLayer(panelRef, true, onClose)
 
   useEffect(() => {
@@ -81,16 +87,6 @@ function SettingsPanel({ rows, renderSlot, t, activeId, onSelect, onClose, setti
     if (button === undefined || typeof scrollIntoView !== 'function') return
     scrollIntoView.call(button, { block: 'nearest', inline: 'center' })
   }, [active])
-
-  // The overlay portals to document.body so a compact drawer `transform`
-  // cannot become the containing block of this `position: fixed` layer.
-  // `#root` stays inert for exactly the panel lifetime; restore the previous
-  // flag so an onboarding takeover that already held it is not cleared.
-  useEffect(() => {
-    const appRoot = document.getElementById('root')
-    if (appRoot === null) return
-    return holdInert(appRoot)
-  }, [])
 
   return createPortal((
     <div className={css.overlay} role="presentation">

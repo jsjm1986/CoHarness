@@ -80,10 +80,10 @@
     "@deepseek-ai/dsh-brand": "workspace:*"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "dependencies": {
     "picomatch": "^4.0.4",

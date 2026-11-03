@@ -27,6 +27,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../../context/resource-budget"
+    },
+    {
       "path": "../../core/session"
     },
     {

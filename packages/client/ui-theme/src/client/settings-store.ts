@@ -75,11 +75,13 @@ export interface FontRowState {
   fontFamilies: FontFamilies
   /** Service revision; -1 until first sync so revision 0 lands as a change. */
   revision: number
+  /** Provider availability and the latest font write outcome. */
+  settings: SettingsControlState
 }
 
 /** Declared action shape giving the exported factory a stable return type. */
 type FontRowActions = {
-  sync: (draft: FontRowState, fontSizes: FontSizes, fontFamilies: FontFamilies, revision: number) => void
+  sync: (draft: FontRowState, fontSizes: FontSizes, fontFamilies: FontFamilies, revision: number, settings?: SettingsControlState) => void
 }
 
 /**
@@ -88,13 +90,16 @@ type FontRowActions = {
  */
 export function createFontRowStore(): EngineStoreHandle<FontRowState, FontRowActions> {
   return defineStore({
-    init: (): FontRowState => ({ fontSizes: DEFAULT_FONT_SIZES, fontFamilies: { text: '', code: '', terminal: '' }, revision: -1 }),
+    init: (): FontRowState => ({ fontSizes: DEFAULT_FONT_SIZES, fontFamilies: { text: '', code: '', terminal: '' }, revision: -1,
+      settings: { status: 'loading', writable: false, writableReason: undefined, write: { status: 'idle' } } }),
     actions: {
-      sync: (d, fontSizes: FontSizes, fontFamilies: FontFamilies, revision: number) => {
-        if (revision <= d.revision) return
-        d.fontSizes = fontSizes
-        d.fontFamilies = fontFamilies
-        d.revision = revision
+      sync: (d, fontSizes: FontSizes, fontFamilies: FontFamilies, revision: number, settings: SettingsControlState = LOCAL_SETTINGS) => {
+        if (revision > d.revision) {
+          d.fontSizes = fontSizes
+          d.fontFamilies = fontFamilies
+          d.revision = revision
+        }
+        d.settings = settings
       },
     },
   })

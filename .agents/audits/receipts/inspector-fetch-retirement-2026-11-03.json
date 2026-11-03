@@ -1,0 +1,125 @@
+{
+  "id": "inspector-fetch-retirement-2026-11-03",
+  "findings": [
+    "B484"
+  ],
+  "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+  "verifiedAt": "2026-11-02T18:32:49.876921+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T181943Z",
+  "delivery": {
+    "findings": [
+      "B484"
+    ],
+    "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T181943Z/B484-inspector-fetch-retirement.delta.tar.gz",
+    "archiveSha256": "85ae97da917124fafcfb654d1e4a814b143d6176cbdce637ed8a7b1bb79d84f0",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T181943Z/B484-inspector-fetch-retirement-capsule-ygd0f4h9",
+    "manifestSha256": "97ef6cb8de18e757034a23ad92c1accd7cb798df7d04d6efeb493d1408d97e90",
+    "ownedChanges": 11,
+    "verification": {
+      "normalNamedCases": 100,
+      "normalCompleteEntryCoverage": {
+        "total": {
+          "lines": {
+            "total": 103,
+            "covered": 103,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 117,
+            "covered": 117,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 21,
+            "covered": 21,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 53,
+            "covered": 53,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/experimental/inspector/src/host/inspection/network.ts": {
+          "lines": {
+            "total": 103,
+            "covered": 103,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 21,
+            "covered": 21,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 117,
+            "covered": 117,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 53,
+            "covered": 53,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      },
+      "normalBuiltNode24NativeExamples": 2,
+      "repeatedBuiltCasesNotAdded": true,
+      "acceptedCounterproofs": [
+        "Nine of ten held-state/permutation cases fail before repair; reverse-order disposal positive case passes.",
+        "Real independent Loader/Web/native Worker example fails exact fetch restoration after its successful reverse-order control."
+      ],
+      "sourceAndNormalBuiltNativeWorkerClosure": "passed",
+      "finalRuntimeBundlesByteIdenticalToEarlierNativeVerifiedBuild": true,
+      "fullHostTypes": "passed",
+      "scopedLint": "passed",
+      "ownedBilingualPairs": "two consistent",
+      "documentationLeaves": {
+        "passed": 11,
+        "failedOutsideOwnedPaths": [
+          "peer-owned packages/client/ui-workbench/README.md model-experience format; no owned Inspector or note diagnostic"
+        ]
+      },
+      "newDependencies": false,
+      "newConfiguration": false,
+      "wireOrSessionFormatChanged": false,
+      "paidModelApiCalls": 0,
+      "productionAcceptance": "Not claimed; frozen independent source/build handoff only."
+    },
+    "wholeProjectComplete": false
+  },
+  "checks": {
+    "normalCases": 100,
+    "completeChangedFileFourMetricCoverage": "100%",
+    "normalBuiltNode24Examples": 2,
+    "builtRepeatsNotAdded": true,
+    "fullHostTypes": "passed",
+    "normalBuild": "passed",
+    "scopedLint": "passed",
+    "ownedPairs": "two consistent",
+    "documentationLeaves": "11passed; ui-workbench model-experience failure outside owned changes remains separate"
+  },
+  "counterproof": "Nine deterministic original failures and a real Loader/native Worker exact-restoration failure; reverse-order control passes.",
+  "limitations": [
+    "Only the named Inspector capture/cleanup scope is verified, not all diagnostic consumers or the complete project.",
+    "The scope adds no GUI change or GUI/browser acceptance.",
+    "No production write, deployment, paid model request or official Responses validation."
+  ],
+  "wholeProjectComplete": false,
+  "all12DomainsComplete": false
+}

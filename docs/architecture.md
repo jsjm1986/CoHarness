@@ -97,6 +97,8 @@ turn/end
 
 `turn/*`, `step/*`, `user/message`, `assistant/*`, and `tool/*` are durable session events; the rest are live extension points across three domains. `agent/pre-step`, `agent/request`, `llm/stream`, and the three `tools/*` events are waterfalls, whose listeners must call `next()` to delegate; `agent/turn-stopping` is serial and has no `next()`.
 
+Each LLM service records [requests assembled by its loops](../packages/llm/llm/README.md#understand-the-implementation). External orchestration adapters use `llm/orchestration` for the outer step. Each physical model request inside that turn uses its own model waterfall, authorization, capacity and usage attribution; [LLM streaming](subsystems/llm-streaming.md) defines registration kinds.
+
 Input reaches the driver through one inbox. Some messages wake it immediately; injected context waits in the inbox until another message does.
 
 `agent/pre-step` decides what the model sees. Listeners may rewrite the claimed messages or reject them outright; a rejected or empty first claim still closes a durable turn that spent no step, so the log records the attempt. Each step reads the prompt sections and tool schemas that plugins registered, and each request-admission attempt refreshes registered runtime context — the accepted assembly's sections, schemas, and variables stay bound while provider-supplied context text is re-evaluated and committed as a fresh snapshot.

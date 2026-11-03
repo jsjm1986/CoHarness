@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-29-browser-runtime-and-document-location.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-29-browser-runtime-and-document-location.md
+document:
+  en: 0ee10db8a1f49c96c2359428ac760ecf9709597d
+  zh: 62adff17b5dc11e18b405f4955e31900f16dbe30
+/agent-note-browser-runtime-identity-and-document-locations:
+  en: 34d12bea9ec8e696
+  zh: 8ef8bca9f9871942
+/agent-note-browser-runtime-identity-and-document-locations/problem:
+  en: d1b80aa559df60c4
+  zh: 6613013a7394c2b6
+/agent-note-browser-runtime-identity-and-document-locations/decision:
+  en: 080812b377fe1d2b
+  zh: 7b7513c9b5ed81c7
+/agent-note-browser-runtime-identity-and-document-locations/consequences:
+  en: 2d5b9b2d31e9e7c0
+  zh: 1cb2f0945298cb8c
+/agent-note-browser-runtime-identity-and-document-locations/alternatives-considered:
+  en: 41d38905e0e374f7
+  zh: 2ae1ef2edf1bac8d
+/agent-note-browser-runtime-identity-and-document-locations/verification:
+  en: 921a6449448c64da
+  zh: ed57bc4d7f57e762

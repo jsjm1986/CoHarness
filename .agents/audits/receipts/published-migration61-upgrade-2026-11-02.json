@@ -1,0 +1,81 @@
+{
+  "finding": "B348",
+  "kind": "peer_fix_independent_verification",
+  "status": "fixed_verified_released_migration_identities_and_schema61_to103_owned_postgres_upgrade_production_acceptance_open",
+  "updatedAt": "2026-11-02T05:35:15.734302+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "verifiedAt": "2026-11-02T05:35:15.734302+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T052539Z/published-migration-latest-fetch.json",
+    "workingTreePreserved": true
+  },
+  "scope": "Independent verification of the peer-owned correction; no Gateway product files were changed.",
+  "verification": {
+    "actualOwnedPostgresUpgrade": {
+      "schemaBefore": 61,
+      "schemaAfter": 103,
+      "publishedMigrationIdentitiesPreserved": true,
+      "legacyJournalPreserved": true,
+      "legacyResourceLimitsPreserved": true,
+      "uncertainResourceRetained": true,
+      "stalePressureCreditsCleared": true,
+      "repeatedMigrationNoop": true,
+      "checksumDriftRejected": true
+    },
+    "selectedExistingPostgresCasesPassed": 2,
+    "otherCasesExcludedByName": 41,
+    "wholeSuiteClaimed": false,
+    "checks": [
+      {
+        "name": "released61-upgrade",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T052539Z/released61-upgrade.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T052539Z/run-pg-check.mjs",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T052539Z/released61-upgrade.mjs"
+        ],
+        "status": "passed"
+      },
+      {
+        "name": "published-migration-contracts-absolute",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T052539Z/published-migration-contracts-absolute.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T052539Z/run-pg-check.mjs",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--root",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+          "--config",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/vitest.config.ts",
+          "tests/postgres.spec.ts",
+          "-t",
+          "preserves published journal and resource-budget migration identities|rejects changed or unknown applied migrations",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T052539Z/published-migration-contracts-absolute-cases.json"
+        ],
+        "status": "passed"
+      }
+    ],
+    "readOnlySourceManifest": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T052539Z/readonly-source-manifest.json",
+    "frozenReadOnlyPaths": 106,
+    "sourceDeltaPaths": [],
+    "ownedDisposableDatabasesDropped": 3,
+    "configurationRetry": "The first named-suite launch used a duplicated relative config directory and ran no cases; the unchanged suite passed with absolute root/config paths."
+  },
+  "wholeProjectComplete": false,
+  "productionAcceptanceClaimed": false,
+  "officialResponsesDeferredByUser": true
+}

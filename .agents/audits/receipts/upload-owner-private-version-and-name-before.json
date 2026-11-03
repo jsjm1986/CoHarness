@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-private-version-and-name-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests/upload.spec.ts -t 'actor|ownerless|manifest versions' --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T10:06:38.550701+00:00",
+  "seconds": 3.324,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9f26ee1ba7ae3ef1b764bfe07b4104606be88ec090ea4bb3c0a46b205b3c51f2",
+  "inputsAfter": "9f26ee1ba7ae3ef1b764bfe07b4104606be88ec090ea4bb3c0a46b205b3c51f2",
+  "postgresToolDirectory": null,
+  "outputSha256": "6738ab79e35ca5411141c8b82c632fe39e243179cd64e9d039d944f6cd3df237",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/attachment/userdoc-local/tests/upload.spec.ts (26 tests | 1 failed | 13 skipped) 46ms\n     × reserves separate names for concurrent actors with the same browser file fingerprint 5ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/attachment/userdoc-local/tests/upload.spec.ts > resumable local document uploads > reserves separate names for concurrent actors with the same browser file fingerprint\nAssertionError: expected 'shared.txt' not to be 'shared.txt' // Object.is equality\n ❯ packages/attachment/userdoc-local/tests/upload.spec.ts:103:24\n    101|     const a = await value.beginUpload(input, first)\n    102|     const b = await value.beginUpload(input, second)\n    103|     expect(b.name).not.toBe(a.name)\n       |                        ^\n    104|     for (const [session, actor, byte] of [[a, first, 65], [b, second, …\n    105|       const bytes = Uint8Array.of(byte)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 12 passed | 13 skipped (26)\n   Start at  18:06:41\n   Duration  249ms (transform 107ms, setup 27ms, import 107ms, tests 46ms, environment 0ms)\n\n"
+}

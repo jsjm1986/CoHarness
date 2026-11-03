@@ -1,0 +1,14 @@
+{
+  "name": "document-identity-mutation-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/attachment/userdoc-local",
+  "startedAt": "2026-10-25T16:44:39.640870+00:00",
+  "seconds": 1.086,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "713499a0cb1be9eaff35eb3d58132e640a7482d129b812855f728a35cf3ad8e2",
+  "inputsAfter": "713499a0cb1be9eaff35eb3d58132e640a7482d129b812855f728a35cf3ad8e2",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

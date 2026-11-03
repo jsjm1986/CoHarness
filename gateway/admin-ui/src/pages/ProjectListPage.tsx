@@ -1,3 +1,4 @@
+import { usePendingEdits } from '../pending-edits.tsx'
 import { ArrowUpRight, CheckCircle2, Folder, FolderKanban, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
@@ -33,6 +34,7 @@ export function ProjectListPage() {
   const [name, setName] = useState('')
   const [createMode, setCreateMode] = useState<'managed' | 'existing'>('managed')
   const [selectedPath, setSelectedPath] = useState<string>()
+  usePendingEdits(pending || createOpen && (name !== '' || selectedPath !== undefined))
 
   const reload = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true)
@@ -93,7 +95,7 @@ export function ProjectListPage() {
       <PageHeader
         title={t('pageTitle')}
         description={t('pageDescription')}
-        meta={loading ? undefined : t('projectCount', { count: String(projects.length) })}
+        meta={loading || (projects.length === 0 && error !== '') ? undefined : t('projectCount', { count: String(projects.length) })}
         actions={<Button variant="primary" icon={Plus} onClick={openCreate}>{t('createProject')}</Button>}
       />
       <ErrorBanner message={error} />
@@ -102,8 +104,8 @@ export function ProjectListPage() {
         <button type="button" aria-pressed={originFilter === 'admin'} onClick={() => setOriginFilter('admin')}>{t('originAdmin')}</button>
         <button type="button" aria-pressed={originFilter === 'user'} onClick={() => setOriginFilter('user')}>{t('originUser')}</button>
       </div>
-      <Section flush className="responsiveSection" title={t('sectionTitle')} meta={loading ? undefined : t('recordCount', { count: String(projects.length) })}>
-        {loading ? <LoadingState label={t('loadingProjects')} /> : projects.length === 0 ? (
+      <Section flush className="responsiveSection" title={t('sectionTitle')} meta={loading || (projects.length === 0 && error !== '') ? undefined : t('recordCount', { count: String(projects.length) })}>
+        {loading ? <LoadingState label={t('loadingProjects')} /> : projects.length === 0 && error !== '' ? null : projects.length === 0 ? (
           <EmptyState
             icon={FolderKanban}
             title={t('emptyTitle')}

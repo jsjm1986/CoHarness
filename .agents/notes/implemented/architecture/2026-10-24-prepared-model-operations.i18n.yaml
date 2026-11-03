@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-prepared-model-operations.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.md
+document:
+  en: 163db83ebb6d058a602353efdabf708404644330
+  zh: 50f23be8eac04e4b802ff5323ce64b8bfe0f37b0
+/agent-note-native-model-operations-retain-ordinary-model-policy:
+  en: 1dd23ec0ac63efb1
+  zh: 1784368522ea2782
+/agent-note-native-model-operations-retain-ordinary-model-policy/problem:
+  en: 1f7f88c4014811bd
+  zh: c03f124d6c1984b3
+/agent-note-native-model-operations-retain-ordinary-model-policy/decision:
+  en: 650718cb5a6fc8ad
+  zh: ddb19b2c4477a55a
+/agent-note-native-model-operations-retain-ordinary-model-policy/alternatives-considered:
+  en: 1c3571a39e3dd082
+  zh: 2d16a5b5ea1f3080
+/agent-note-native-model-operations-retain-ordinary-model-policy/consequences:
+  en: 8746c44a23b080db
+  zh: 813897b658c40914
+/agent-note-native-model-operations-retain-ordinary-model-policy/verification:
+  en: bc2a6af4de10fe7f
+  zh: f76c52feabdb36d3

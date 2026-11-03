@@ -1,0 +1,14 @@
+{
+  "name": "model-account-release-units-final",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/macos-release-control.spec.ts tests/model-governance-integration.spec.ts tests/model-governance.spec.ts",
+  "startedAt": "2026-10-24T00:23:58.325012+00:00",
+  "seconds": 16.509,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "624fad0c381495b5fa1798f728e38f296835106be05ea7b8c51e55557fbf1e62",
+  "inputsAfter": "624fad0c381495b5fa1798f728e38f296835106be05ea7b8c51e55557fbf1e62",
+  "postgresToolDirectory": null,
+  "outputSha256": "62476868ab367ada8fa5becab05e7e2b5d3cc7cd76a6e0438a3132f363f6dd5d",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  71 passed (71)\n   Start at  08:23:59\n   Duration  14.89s (transform 1.24s, setup 0ms, import 1.62s, tests 17.75s, environment 0ms)\n\n"
+}

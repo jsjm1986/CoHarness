@@ -1,0 +1,159 @@
+{
+  "at": "2026-10-31T08:40:17.419075+00:00",
+  "finding": "B397",
+  "title": "Independent Messages and Sonar search dispatch after resource or model-policy ownership changes during admission or credential waits",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "paths": [
+    "packages/web/web/src/model-search.ts",
+    "packages/web/web-search-deepseek/src/admission.ts",
+    "packages/web/web-search-perplexity/src/index.ts",
+    "packages/web/web-search-deepseek/tests/admission.spec.ts",
+    "packages/web/web-search-perplexity/tests/admission.spec.ts",
+    "packages/llm/llm-pi-ai/tests/search-operation.spec.ts",
+    "packages/llm/llm-pi-ai/package.json",
+    "pnpm-lock.yaml",
+    "packages/web/web/tests/fixtures/model-search-owner.mjs",
+    "snapshots/session/model-search-owner.snapshot.ts",
+    "snapshots/session/model-search-owner/expected.jsonl",
+    "packages/web/web/README.md",
+    "packages/web/web/README.zh.md",
+    "packages/web/web/README.i18n.yaml",
+    "packages/web/web-search-deepseek/README.md",
+    "packages/web/web-search-deepseek/README.zh.md",
+    "packages/web/web-search-deepseek/README.i18n.yaml",
+    "packages/web/web-search-perplexity/README.md",
+    "packages/web/web-search-perplexity/README.zh.md",
+    "packages/web/web-search-perplexity/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-model-search-dispatch-ownership.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-model-search-dispatch-ownership.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-model-search-dispatch-ownership.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-search-dispatch-owner/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-search-dispatch-owner/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-search-dispatch-owner/guide.i18n.yaml"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T080842Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T080842Z/search-owner-final-coverage.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T080842Z/search-owner-source-snapshot.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T080842Z/search-owner-build.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T080842Z/search-owner-docs.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T080842Z/search-owner-built-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T080842Z/search-owner-built-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T080842Z/search-owner-lint-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T080842Z/search-owner-catalog.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T080842Z/search-owner-export-jsdoc.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T080842Z/search-owner-origin-fetch.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T080842Z/search-owner-pairing.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T080842Z/search-owner-frozen-workspace-lock.json"
+  ],
+  "causalEvidence": "Ten initial public-provider regressions dispatch successfully on original source. A complete private old three-package graph sends twelve stale native HTTP requests and records their input across admission/credential waits. Updated source and Node22/24 Loader/Agent/file-credential/native-HTTP transcripts refuse all twelve cases, preserve four managed/independent positives, retain the initiating Session, return original permits, and complete fresh retries without logging secrets.",
+  "behavior": "Capture the original resource provider and Session before admission. Recheck resource identity and independent-mode authorization after admission and immediately before native HTTP after credential resolution. Pass a synchronous guard through the implementation interface and invoke it before/after request recording. Preserve ordinary governed dispatch and required per-user default-route denial.",
+  "verification": {
+    "uniqueRelatedCases": 215,
+    "sourceCases": 214,
+    "applicationSnapshots": 1,
+    "snapshotRows": 16,
+    "standardCoverage": {
+      "packages/web/web-search-deepseek/src/admission.ts": {
+        "statements": [
+          10,
+          10
+        ],
+        "branches": [
+          0,
+          0
+        ],
+        "functions": [
+          8,
+          8
+        ],
+        "lines": [
+          8,
+          8
+        ]
+      },
+      "packages/web/web-search-perplexity/src/index.ts": {
+        "statements": [
+          24,
+          24
+        ],
+        "branches": [
+          35,
+          35
+        ],
+        "functions": [
+          9,
+          9
+        ],
+        "lines": [
+          24,
+          24
+        ]
+      },
+      "packages/web/web/src/model-search.ts": {
+        "statements": [
+          104,
+          104
+        ],
+        "branches": [
+          84,
+          84
+        ],
+        "functions": [
+          18,
+          18
+        ],
+        "lines": [
+          86,
+          86
+        ]
+      }
+    },
+    "coverageLimits": "Three named modules at all four 100% metrics; no new source exclusions or thresholds changed.",
+    "defaultModelAuthorization": "An actual default governed Sonar route with required user policy absent performs no credential resolution or HTTP. Governed routes with/without initiating Sessions retain attribution.",
+    "buildGates": 8,
+    "quickDocumentationGates": 20,
+    "guideEnglishWords": 161,
+    "workspace": "Two workspace test-only dependencies enable real native governed Web integration; frozen offline lockfile validation and its supply-chain gate pass. Published peer/runtime dependency requirements are unchanged.",
+    "documentation": "Five bilingual pairs, budgets, catalog freshness and public export JSDoc pass; full doc-sync is not claimed.",
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "evidenceSetupCorrection": "An initial general offline lockfile regeneration lacked cached jsdom metadata. The two local workspace test links were added narrowly and the complete frozen offline lockfile was then validated successfully. The dependencies are dev-only. A captured HTTP body was narrowed to JSON text before parsing for lint.",
+  "noteReview": {
+    "owner": ".agents/notes/implemented/bug-fix/2026-10-31-model-search-dispatch-ownership.md",
+    "decision": "One focused independent-transport decision, with ordinary/prepared LLM streams linked to their existing guide. No archived or unrelated active decisions are changed."
+  },
+  "baseline": {
+    "at": "2026-10-31T08:31:29.275537+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "at": "2026-10-31T08:40:17.419075+00:00",
+    "source": "Peer direct operational messages; not root production acceptance.",
+    "serving": "Peer reports R12 serving epoch89/schema102 on A/B with B393/B394 included and B395/B396 awaiting its next candidate. Existing UID993/project29 files and retained A drafts remain intact.",
+    "qaTransport": "Peer attributed A browser latency to its private HTTP/1.1 QA proxy queue, replaced that proxy with transparent HTTP/2, and reports improved actual browser timing. Product service/config did not change. PrincipalSignal expiry is intended authorization expiry, not an established proxyTimeout bug.",
+    "realAcceptance": "Peer reports real invitation acceptance and read-only task access, plus separate usage-grant and membership-revocation refusals. The full state-transition matrix and B remote PostgreSQL/start/PTY delays remain open.",
+    "authorization": "The user confirmed ordinary-user models remain authorized per user; do not broaden configured default models.",
+    "merge": "Apply only the twenty-six current source paths, preserving current peer Local/Gateway/UI and pending B395/B396 changes. Rebuild matching web, web-search-deepseek and web-search-perplexity main artifacts. Merge only the two new test dependency records in llm-pi-ai package.json and lockfile; preserve any newer shared metadata. Older cumulative reference artifacts must not replace newer merged outputs."
+  },
+  "externalSourceChangesExcluded": {
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "7a54b9e99352908283ee973e2dcd7707c9d7a7ba312ad9761311219172a47569",
+    "packages/subprocess/subprocess-local/README.md": "223b3dfcdc9732041ea508d9d131b9505e98abca53ea60dbb098851bd2c74629",
+    "packages/subprocess/subprocess-local/README.zh.md": "f13592bad150012aaa31e62226119ed4f22772b4bca5174936f988e1ae0cd407"
+  },
+  "externalArtifactChangesExcluded": {
+    "packages/subprocess/subprocess-local/lib/index.js": "5fbdc054c9a1ef7799f7da80b030e5db88ffdb3639b5e5b0f2a908d5e183e950"
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Review native browser Worker resource ownership, Chromium launch waits and authority-only SDK composition.",
+    "Continue shared-runtime debug endpoint authority, remote pipes, resource-only remote execution and nonconflicting business permissions.",
+    "Peer owns current multi-computer operational acceptance and R12 Local/Gateway/UI changes. Preserve per-user model authorization and default-model denial.",
+    "Paid API verification stays deferred. No root deployment, production database or physical Linux/Windows acceptance is claimed."
+  ]
+}

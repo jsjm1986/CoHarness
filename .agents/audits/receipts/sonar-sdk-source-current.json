@@ -1,0 +1,14 @@
+{
+  "name": "sonar-sdk-source-current",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=src node_modules/.bin/vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/governed-native-model.snapshot.ts --retry=0",
+  "startedAt": "2026-10-24T09:13:04.480343+00:00",
+  "seconds": 8.572,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2a0bef74a1b139467317e6eb7e0270abae956a913180f74f21421cf2726210eb",
+  "inputsAfter": "2a0bef74a1b139467317e6eb7e0270abae956a913180f74f21421cf2726210eb",
+  "postgresToolDirectory": null,
+  "outputSha256": "5b44a56d86043d25d8541f00d9c848f46510ccc07dc1b9771e819dbc3fd22a11",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  17:13:06\n   Duration  6.93s (transform 1.10s, setup 50ms, import 1.49s, tests 5.25s, environment 0ms)\n\n"
+}

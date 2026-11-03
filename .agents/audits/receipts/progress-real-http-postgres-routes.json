@@ -1,0 +1,13 @@
+{
+  "name": "progress-real-http-postgres-routes",
+  "cwd": "gateway",
+  "command": "npm exec vitest run tests/project-progress-postgres.spec.ts -- --no-file-parallelism",
+  "startedAt": "2026-10-23T21:13:49.262162+00:00",
+  "seconds": 5.853,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b3fbea7ddbc1450a5b1abe94107327fd7095c27d0f3de9dc4ce733e94a6ee52c",
+  "inputsAfter": "b3fbea7ddbc1450a5b1abe94107327fd7095c27d0f3de9dc4ce733e94a6ee52c",
+  "outputSha256": "38c47eb89c2f58fe15e7488df0bd31dff6c8df63d207bb7e544ece761c16675c",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/project-progress-postgres.spec.ts (10 tests | 2 failed) 3245ms\n     × rechecks writer-revoked after a queued grant 258ms\n     × rechecks project-archived after a queued grant 302ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/project-progress-postgres.spec.ts > project digest governed model path > rechecks writer-revoked after a queued grant\nError: owner-must-be-rw\n ❯ src/postgres/project-service.ts:434:73\n    432|         [this.context.organizationId, project],\n    433|       )\n    434|       if (owner.rows[0]?.owner_user_id === user && mode !== 'rw') thro…\n       |                                                                         ^\n    435|       await client.query(`INSERT INTO harness.project_members(\n    436|         organization_id,project_id,user_id,access_mode\n ❯ transaction src/postgres/database.ts:381:20\n ❯ PostgresProjectService.setMember src/postgres/project-service.ts:424:5\n ❯ tests/project-progress-postgres.spec.ts:156:38\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  tests/project-progress-postgres.spec.ts > project digest governed model path > rechecks project-archived after a queued grant\nError: unknown project 571169323\n ❯ PostgresModelGovernanceService.projectSummaryWith src/postgres/model-governance-service.ts:2009:39\n    2007|       WHERE organization_id=$1 AND public_id=$2 AND status='active'`, …\n    2008|     const identity = project.rows[0]\n    2009|     if (identity === undefined) throw new Error(`unknown project ${Str…\n       |                                       ^\n    2010|     const row = await this.usageTotals(queryable, { kind: 'project', i…\n    2011|     const quota = await queryable.query<{ token_limit: string | null; …\n ❯ tests/project-progress-postgres.spec.ts:167:15\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n\n  Snapshots  5 written\n Test Files  1 failed (1)\n      Tests  2 failed | 8 passed (10)\n   Start at  05:13:51\n   Duration  4.02s (transform 450ms, setup 0ms, import 666ms, tests 3.25s, environment 0ms)\n\n"
+}

@@ -459,3 +459,33 @@ it('reads the saved default depth at each delegation without remounting the tool
     await ctx.fiber.dispose()
   }
 })
+
+
+it('keeps one shared-preset installation when policy publication reenters tool reconciliation', async () => {
+  const ctx = await boot(false)
+  try {
+    await ctx.settings.update(SUBAGENT_MODEL_SELECTION_SETTINGS_NAMESPACE, { enabled: true, allowedModels: ALLOWED_MODELS })
+    const preset = createScope(ctx, { preset: 'reentrant-model-selection' })
+    const handle = await ctx.agents.create({ sessionId: SessionId('reentrant-model-selection'), setup: (agentCtx) => {
+      bindScopeParent(scopeOf(agentCtx)!, scopeOf(preset.ctx)!)
+    } })
+    let notifications = 0
+    ctx.on('session/event', (session, event) => {
+      if (session !== handle.agent.session || event.type !== 'subagent/model-selection-policy') return
+      notifications++
+      ctx.emit(scopeTarget({}, scopeOf(preset.ctx)), 'tools/change')
+    }, { global: true })
+    const failures = vi.spyOn(ctx.logger, 'error').mockImplementation(() => {})
+    try {
+      await preset.ctx.plugin(tool, { provider: 'spawn', modelSelectionSettings: true, backgroundMode: 'continuable' })
+      await vi.waitFor(() => { expect(selectable(ctx, handle.agent)).toBe(true) })
+      const schemas = ctx.tools.schemas(handle.agent)
+      expect(schemas.filter(entry => entry.name === 'subagent')).toHaveLength(1)
+      expect(schemas.filter(entry => entry.name === 'list_subagent_models')).toHaveLength(1)
+      expect(notifications).toBe(1)
+      expect(handle.agent.session.snapshotEvents().filter(event => event.type === 'subagent/model-selection-policy')).toHaveLength(1)
+      expect(failures).not.toHaveBeenCalled()
+    } finally { failures.mockRestore() }
+    await handle.dispose()
+  } finally { await ctx.fiber.dispose() }
+})

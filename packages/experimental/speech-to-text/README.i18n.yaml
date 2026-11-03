@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/speech-to-text/README.md
 document:
-  en: 72ab417c3db4adfd7bb0b5ba34d08cbb8f89e4a1
-  zh: 7ea3c657221671e3f683982ab28d1708f3dc311d
+  en: 6b8147c642fb936b61bd7103f9fed58ec4b939db
+  zh: 65ea52556895ec09f09f8fb04162c19aa2985034
 /:
   en: 22f9a7932dfa9329
   zh: c8cb8d78a0dba75d
@@ -21,8 +21,8 @@ document:
   en: faf7c49d8870eaad
   zh: 9c1c42eba9660f75
 /deepseek-ai-dsh-experimental-speech-to-text/understand-the-implementation:
-  en: a21fad6ca878245a
-  zh: 94460ab6cf8c0739
+  en: 4307e4522cd3a309
+  zh: 246b266ccf602ea5
 /deepseek-ai-dsh-experimental-speech-to-text/further-exploration:
   en: 5c64426add9d79d6
   zh: 4e06aa2ead8d2ccd

@@ -6,17 +6,20 @@
  * sends after scrubbing the browser's cookie.
  */
 
-import { randomBytes } from 'node:crypto'
-import { request as httpRequest } from 'node:http'
+import { createHmac, randomBytes } from 'node:crypto'
+import { createServer, request as httpRequest, type ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import type { GatewayPrincipalClaims } from '../src/index.ts'
 import {
   GATEWAY_PRINCIPAL_HEADER,
   GATEWAY_READINESS_PATH,
+  GATEWAY_READINESS_NONCE_HEADER,
+  GATEWAY_READINESS_REQUEST_HEADER,
   GATEWAY_WEBHOOK_DISPATCH_PATH,
 } from '../src/index.ts'
 import { loadGatewayComposition } from './fixtures/gateway-admission.fixture.ts'
+import GatewayResourceBudget from '../src/resource-budget.ts'
 
 interface ProbeResponse {
   readonly status: number
@@ -41,6 +44,16 @@ function call(
     if (body !== undefined) req.write(body)
     req.end()
   })
+}
+
+function readinessProof(
+  credential: { token: string; runtime: { kind: string; id: unknown; generation: unknown } },
+  nonce: string,
+): (kind: string) => string {
+  return kind => createHmac('sha256', credential.token).update([
+    'dsh-gateway-readiness-v1', kind, nonce, credential.runtime.kind,
+    String(credential.runtime.id), String(credential.runtime.generation),
+  ].join('\u0000')).digest('base64url')
 }
 
 /** Drive the real WebSocket upgrade handshake; owns the request and socket to close. */
@@ -216,38 +229,53 @@ describe('gateway runtime admission', () => {
   it('confines every purpose assertion to HTTP and its declared endpoints', async () => {
     const gateway = await loadGatewayComposition()
     try {
-      const purposes: Array<[GatewayPrincipalClaims['purpose'], string | undefined]> = [
-        ['terminal-admin', '/api/terminal/adminList'],
-        ['plugin-admin', '/api/pluginManager/listPlugins'],
-        ['webhook-dispatch', GATEWAY_WEBHOOK_DISPATCH_PATH],
-        // Archive and document purposes carry no declared HTTP endpoint of
-        // their own; ordinary HTTP admission stays unrestricted for them.
-        ['archive-read', '/api/session.open'],
-        ['document-admin', '/api/session.open'],
+      const purposes: Array<[NonNullable<GatewayPrincipalClaims['purpose']>, string, string]> = [
+        ['terminal-admin', 'POST', '/api/terminal/adminList'],
+        ['plugin-admin', 'POST', '/api/pluginManager/listPlugins'],
+        ['webhook-dispatch', 'POST', GATEWAY_WEBHOOK_DISPATCH_PATH],
+        ['archive-read', 'GET', '/api/internal/archive/read'],
+        ['document-admin', 'POST', '/api/documents/trash'],
+        ['document-admin', 'POST', '/api/documents/restore'],
+        ['document-admin', 'DELETE', '/api/documents/purge'],
       ]
-      for (const [purpose, permittedPath] of purposes) {
+      for (const [purpose, method, permittedPath] of purposes) {
         const headers = principalHeaders(gateway.origin, gateway.issue({
-          ...(purpose === undefined ? {} : { purpose }),
+          purpose,
           user: adminUser,
         }))
-        const permitted = await call(gateway.origin, permittedPath!, {
+        const permitted = await call(gateway.origin, permittedPath, {
           ...headers,
           'content-type': 'application/json',
-        }, 'POST', '{}')
+        }, method, method === 'POST' ? '{}' : undefined)
         expect([purpose, permitted.status]).toEqual([purpose, 404])
         expect([purpose, (await call(gateway.origin, '/', headers)).status]).toEqual([purpose, 401])
         expect(await wsUpgrade(gateway.port, headers)).not.toEqual({ upgraded: true })
       }
-      // The three pinned purposes also refuse unrelated HTTP endpoints.
-      for (const purpose of ['terminal-admin', 'plugin-admin', 'webhook-dispatch'] as const) {
+      for (const purpose of ['terminal-admin', 'plugin-admin', 'webhook-dispatch', 'archive-read', 'document-admin'] as const) {
         const headers = principalHeaders(gateway.origin, gateway.issue({
-          ...(purpose === undefined ? {} : { purpose }),
+          purpose,
           user: adminUser,
         }))
+        expect([purpose, (await call(gateway.origin, '/api/probe/ping', {
+          ...headers, 'content-type': 'application/json',
+        }, 'POST', '{}')).status]).toEqual([purpose, 401])
         expect([purpose, (await call(gateway.origin, '/api/session.open', {
           ...headers,
           'content-type': 'application/json',
         }, 'POST', '{}')).status]).toEqual([purpose, 401])
+      }
+      for (const [purpose, method, pathname] of [
+        ['archive-read', 'POST', '/api/internal/archive/read'],
+        ['archive-read', 'GET', '/api/internal/archive/read/'],
+        ['document-admin', 'GET', '/api/documents/trash'],
+        ['document-admin', 'POST', '/api/documents/purge'],
+        ['document-admin', 'DELETE', '/api/documents/restore'],
+        ['document-admin', 'POST', '/api/documents/uploads'],
+        ['document-admin', 'GET', '/api/documents/content'],
+      ] as const) {
+        const headers = principalHeaders(gateway.origin, gateway.issue({ purpose, user: adminUser }))
+        expect([purpose, method, pathname, (await call(gateway.origin, pathname, headers, method)).status])
+          .toEqual([purpose, method, pathname, 401])
       }
       expect(await wsUpgrade(gateway.port, principalHeaders(gateway.origin, gateway.issue())))
         .toEqual({ upgraded: true })
@@ -270,6 +298,102 @@ describe('gateway runtime admission', () => {
         [GATEWAY_PRINCIPAL_HEADER]: gateway.issue(),
       })).status).toBe(403)
     } finally {
+      await gateway.dispose()
+    }
+  })
+
+  it('reports readiness only while the registered resource provider is available', async () => {
+    const registration = Promise.withResolvers<ServerResponse>()
+    const external = createServer((request, response) => {
+      request.resume()
+      if (request.url !== '/internal/runtime/resources/register') { response.writeHead(404).end(); return }
+      registration.resolve(response)
+    })
+    onTestFinished(async () => {
+      if (!external.listening) return
+      external.closeAllConnections()
+      await new Promise<void>((resolve, reject) => {
+        external.close((error) => {
+          if (error === undefined) resolve()
+          else reject(error)
+        })
+      })
+    })
+    await new Promise<void>(resolve => external.listen(0, '127.0.0.1', resolve))
+    const address = external.address()
+    if (address === null || typeof address === 'string') throw new Error('expected a loopback listener')
+    const gateway = await loadGatewayComposition({ gatewayUrl: `http://127.0.0.1:${String(address.port)}` })
+    const nonce = 'resource-readiness'
+    const proof = readinessProof(gateway.credential, nonce)
+    const headers = { host: new URL(gateway.origin).host,
+      [GATEWAY_READINESS_NONCE_HEADER]: nonce, [GATEWAY_READINESS_REQUEST_HEADER]: proof('request') }
+    const ready = () => call(gateway.origin, GATEWAY_READINESS_PATH, headers)
+    const pending = gateway.ctx.plugin(GatewayResourceBudget, { requestTimeoutMs: 2000, cleanupTimeoutMs: 5000 })
+    const reply = { nextSequence: 1, policy: {
+      sampleMs: 20, staleMs: 500, cpuTarget: 0.85, eventLoopTargetMs: 100, linuxMemoryReserveRatio: 0.1,
+      maxQueued: 16, maxQueuedPerUser: 8, maxQueuedPerProject: 8, maxQueuedBytes: 64 * 1024, maxWaitMs: 10_000,
+    } }
+    let response: ServerResponse | undefined
+    try {
+      response = await registration.promise
+      expect((await ready()).status).toBe(503)
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(reply))
+      const fiber = await pending
+      const admitted = await ready()
+      expect(admitted.status).toBe(200)
+      expect(JSON.parse(admitted.body)).toMatchObject({ runtime: gateway.credential.runtime, proof: proof('response') })
+      await fiber.dispose()
+      expect((await ready()).status).toBe(503)
+      expect(gateway.ctx.get('resourceBudgetRequired')).toBe(true)
+    } finally {
+      if (response !== undefined && !response.writableEnded) response.writeHead(200).end(JSON.stringify(reply))
+      await Promise.allSettled([pending])
+      await gateway.dispose()
+    }
+  })
+
+  it('requires each configured policy plugin to activate and withdraws readiness while it is disabled', async () => {
+    const external = createServer((request, response) => {
+      request.resume()
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ nextSequence: 1, policy: {
+        sampleMs: 20, staleMs: 500, cpuTarget: 0.85, eventLoopTargetMs: 100, linuxMemoryReserveRatio: 0.1,
+        maxQueued: 16, maxQueuedPerUser: 8, maxQueuedPerProject: 8, maxQueuedBytes: 64 * 1024, maxWaitMs: 10_000,
+      } }))
+    })
+    onTestFinished(async () => {
+      external.closeAllConnections()
+      await new Promise<void>((resolve, reject) => { external.close(error => error === undefined ? resolve() : reject(error)) })
+    })
+    await new Promise<void>(resolve => external.listen(0, '127.0.0.1', resolve))
+    const address = external.address()
+    if (address === null || typeof address === 'string') throw new Error('expected a loopback listener')
+    const gateway = await loadGatewayComposition({ gatewayUrl: `http://127.0.0.1:${String(address.port)}`, requiredPlugins: ['managed-policy'] })
+    const loading = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    let pending: Promise<unknown> | undefined
+    try {
+      await gateway.ctx.plugin(GatewayResourceBudget, { requestTimeoutMs: 2000, cleanupTimeoutMs: 5000 })
+      const nonce = 'policy-readiness'
+      const proof = readinessProof(gateway.credential, nonce)
+      const headers = { host: new URL(gateway.origin).host,
+        [GATEWAY_READINESS_NONCE_HEADER]: nonce, [GATEWAY_READINESS_REQUEST_HEADER]: proof('request') }
+      const ready = () => call(gateway.origin, GATEWAY_READINESS_PATH, headers)
+      expect((await ready()).status).toBe(503)
+      gateway.ctx.loader.builtins.policyReadiness = { name: 'policy-readiness', async apply() { loading.resolve(undefined); await release.promise } }
+      pending = gateway.ctx.loader.root.update([...gateway.ctx.loader.root.data, { id: 'managed-policy', name: 'cordis:policyReadiness' }])
+      await loading.promise
+      expect((await ready()).status).toBe(503)
+      release.resolve(undefined)
+      await pending
+      expect((await ready()).status).toBe(200)
+      await gateway.ctx.loader.update('managed-policy', { disabled: true })
+      expect((await ready()).status).toBe(503)
+      await gateway.ctx.loader.update('managed-policy', { disabled: false })
+      expect((await ready()).status).toBe(200)
+      gateway.ctx.loader.remove('managed-policy')
+      expect((await ready()).status).toBe(503)
+    } finally {
+      release.resolve(undefined)
+      await pending
       await gateway.dispose()
     }
   })

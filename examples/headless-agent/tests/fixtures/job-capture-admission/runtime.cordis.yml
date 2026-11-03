@@ -1,0 +1,12 @@
+- id: jobs
+  config:
+    maxConcurrentJobsPerOwner: 1
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, jobCaptureReady]
+- insert:
+    - id: job-capture-runtime
+      name: './runtime.mjs'
+    - id: job-capture-model
+      name: './model.mjs'

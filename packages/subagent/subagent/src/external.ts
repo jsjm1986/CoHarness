@@ -153,12 +153,22 @@ export interface ExternalExecutionIdentity {
   readonly target: string
 }
 
+/** Model authority selected before an external member is published. */
+export type ExternalModelSelection =
+  | { readonly mode: 'native' }
+  | { readonly mode: 'managed'; readonly provider: string; readonly model: string }
+
 const recordBase = z.object({ v: z.literal(1), child: z.string().min(1) }).strict()
+const modelSelectionSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('native') }).strict(),
+  z.object({ mode: z.literal('managed'), provider: z.string().min(1), model: z.string().min(1) }).strict(),
+])
 const storeRecordSchema = z.discriminatedUnion('kind', [
   recordBase.extend({ kind: z.literal('bind'), externalId: z.string().min(1) }),
   recordBase.extend({ kind: z.literal('pending'), prompt: z.string(), throughMessageId: z.string().min(1), externalTurnId: z.string().optional() }),
   recordBase.extend({ kind: z.literal('consumed'), messageId: z.string() }),
   recordBase.extend({ kind: z.literal('execution'), cwd: z.string().min(1), target: z.string().regex(/^(?:local|ssh:[1-9][0-9]*)$/u) }),
+  recordBase.extend({ kind: z.literal('model'), selection: modelSelectionSchema }),
 ])
 type StoreRecord = z.infer<typeof storeRecordSchema>
 
@@ -179,6 +189,7 @@ export interface ExternalPromptWindow {
 export class ExternalBindingStore {
   private bindings = new Map<string, ExternalMemberBinding>()
   private executions = new Map<string, ExternalExecutionIdentity>()
+  private models = new Map<string, ExternalModelSelection>()
   private loaded = false
 
   /**
@@ -196,6 +207,34 @@ export class ExternalBindingStore {
   binding(child: SessionId): ExternalMemberBinding | undefined {
     this.ensureLoaded()
     return this.bindings.get(child)
+  }
+
+  /**
+   * Read the member's immutable native authentication or managed upstream selection.
+   * @param child - durable member Session identity.
+   * @returns a detached selection, or undefined for an unprepared or legacy member.
+   */
+  modelSelection(child: SessionId): ExternalModelSelection | undefined {
+    this.ensureLoaded()
+    const current = this.models.get(child)
+    return current === undefined ? undefined : { ...current }
+  }
+
+  /**
+   * Persist model authority before publication; existing native bindings cannot acquire a new selection.
+   * @param child - durable member Session identity.
+   * @param selection - native authentication or the exact registered upstream route.
+   */
+  selectModel(child: SessionId, selection: ExternalModelSelection): void {
+    this.ensureLoaded()
+    const current = this.models.get(child)
+    if (current !== undefined) {
+      if (!sameModelSelection(current, selection)) throw new Error('External member model selection changed')
+      return
+    }
+    if (this.bindings.has(child)) throw new Error('Legacy external member binding has no verified model selection; create a new member')
+    this.append({ v: 1, kind: 'model', child, selection })
+    this.models.set(child, { ...selection })
   }
 
   /**
@@ -291,11 +330,21 @@ export class ExternalBindingStore {
     }
     const bindings = new Map<string, ExternalMemberBinding>()
     const executions = new Map<string, ExternalExecutionIdentity>()
+    const models = new Map<string, ExternalModelSelection>()
     for (const line of raw.split('\n')) {
       if (line === '') continue
       const record = storeRecordSchema.parse(JSON.parse(line) as unknown)
       const current = bindings.get(record.child)
       switch (record.kind) {
+        case 'model': {
+          const previous = models.get(record.child)
+          if (previous !== undefined && !sameModelSelection(previous, record.selection)) {
+            throw new Error('External member store contains conflicting model selections')
+          }
+          if (previous === undefined && current !== undefined) throw new Error('External member model selection follows its binding')
+          models.set(record.child, record.selection)
+          break
+        }
         case 'execution': {
           const previous = executions.get(record.child)
           if (previous !== undefined && (previous.cwd !== record.cwd || previous.target !== record.target)) {
@@ -330,9 +379,15 @@ export class ExternalBindingStore {
     }
     this.bindings = bindings
     this.executions = executions
+    this.models = models
     this.loaded = true
   }
 
+}
+
+function sameModelSelection(left: ExternalModelSelection, right: ExternalModelSelection): boolean {
+  return left.mode === 'native' ? right.mode === 'native'
+    : right.mode === 'managed' && left.provider === right.provider && left.model === right.model
 }
 
 /**

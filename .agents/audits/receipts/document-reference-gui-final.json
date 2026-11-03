@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-gui-final",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 pnpm run test:gui --maxWorkers=3",
+  "startedAt": "2026-10-26T22:58:40.482476+00:00",
+  "seconds": 160.92,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "inputsAfter": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "postgresToolDirectory": null,
+  "outputSha256": "83c829b322692438f7fa35fe9e576bea26c6a915e3e93eeb78f2a762456fd26f",
+  "outputTail": "$ pnpm run build:native-system && vitest run packages/client packages/host --maxWorkers=3\n$ tsx native/system/scripts/build.ts --host-addon-only\nbuild: built darwin-arm64/bin/system.node\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\nNot implemented: navigation to another Document\nWarning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\n\n Test Files  608 passed (608)\n      Tests  9888 passed | 1 skipped (9889)\n   Start at  06:58:46\n   Duration  154.93s (transform 16.94s, setup 6.19s, import 161.09s, tests 151.67s, environment 96.30s)\n\n"
+}

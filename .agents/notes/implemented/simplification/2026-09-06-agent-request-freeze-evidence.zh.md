@@ -12,7 +12,7 @@ Status: implemented
 
 每个 `ReactLoopAgent` 拥有私有 WeakSet<Message>，其中只记录该实例中完整 `deepFreeze` 调用成功的对象身份。每个未见消息先原地深冻结，再加入集合。后续请求复用该证明。新循环会重新证明每个对象；消息 id 相等不能证明对象身份相同。弱引用不会增加对已压缩历史的所有权。
 
-循环每次请求都深冻结较小的本地规范化 header。`canonicalHeader` 共享嵌套值，`Session.append` 冻结的是独立快照：两者都不能证明本地 tools 或 `NO_ADAPTER` 回退中的 stop 数组不可变。循环分别冻结新消息数组与请求封装，保留 `markAgentLoopRequest`，并保持实时 `AbortSignal` 可变。恢复消息的对象身份及其外围事件包装对象的可变性保持不变。
+循环每次请求都深冻结较小的本地规范化 header。`canonicalHeader` 共享嵌套值，`Session.append` 冻结的是独立快照：两者都不能证明本地 tools 或 `NO_ADAPTER` 回退中的 stop 数组不可变。循环分别冻结新消息数组与请求封装，通过派发请求的 `LlmRuntime.markAgentLoopRequest` 记录归属（[归属决策](../bug-fix/2026-11-02-scoped-model-request-origin.zh.md)），并保持实时 `AbortSignal` 可变。恢复消息的对象身份及其外围事件包装对象的可变性保持不变。
 
 该决策专门优化请求构造，不改变 Session 所有权或通用 `deepFreeze` 行为。`Session.deriveMessages` 与 `fromRestore` 保持不变。LLM（大语言模型）的文件、图像和回放投影保留各自的冻结，因为它们新生成的值没有循环本地证明。[可重建请求决策](../architecture/2026-07-05-reconstructable-requests.zh.md)继续拥有可观察的不可变性与基于日志的请求重建规则。
 

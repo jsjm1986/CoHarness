@@ -1,0 +1,10 @@
+{"operation":"ordinary-part","name":"archive.part","recursive":true,"directory":true,"text":"finished bytes"}
+{"operation":"staging-name","hidden":true,"userNameSuffixed":true,"userFileVisible":true}
+{"operation":"invalid-upload-state","code":"DOCUMENT_UPLOAD_NOT_FOUND","bytesIntact":true}
+{"operation":"private-aliases","readDenials":6,"directoryDenials":6,"bytesIntact":true}
+{"operation":"private-destinations","fileRejected":true,"directoryRejected":true}
+{"operation":"source-cleanup-error","bothCausesRetained":true,"published":false}
+{"operation":"staging-collision","foreignBytesIntact":true,"published":false}
+{"operation":"directory-target-race","code":"DOCUMENT_DIRECTORY_CONFLICT","emptyTargetPreserved":true,"sourceBytesPreserved":true,"retryRenamed":true,"directoryObjectPreserved":true}
+{"operation":"replaced-root","readRejected":true,"saveRejected":true,"outsideIntact":true}
+{"operation":"dispose-uploads","saveCancelled":true,"published":false,"chunkCancelled":true,"acknowledgedBytes":0}

@@ -1,0 +1,441 @@
+{
+  "finding": "B468",
+  "status": "fixed_verified_exact_agent_admission_and_idle_release_230_cases_global_review_open",
+  "updatedAt": "2026-11-02T03:10:19.304702+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "verifiedAt": "2026-11-02T03:06:34.813349+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-latest-fetch.json",
+    "workingTreePreserved": true
+  },
+  "problem": "Command attachment admission can outlive its exact Agent. Actual forced disposal, same-id replacement and automatic idle retirement can leave a late handler acting on a detached Agent. Cancelled UI waits can also finish before handler cleanup.",
+  "fix": "Retain each accepted command against its exact Agent before Session publication, keep idle disposal vetoed through actual handler settlement, and recheck the captured Agent registry before handler entry. Cancellation of UI waiting does not release real handler work. Independent compositions without a registry remain supported.",
+  "compatibility": {
+    "serviceSignaturesChanged": false,
+    "sessionEventsChanged": false,
+    "sessionFormatChanged": false,
+    "newConfiguration": false,
+    "agentLoopChanged": false,
+    "newRetirementEvent": false,
+    "existingIdleReleaseCheckUsed": true,
+    "peerOwnedUiOrTransportEdited": false
+  },
+  "verification": {
+    "differentNamedCases": 230,
+    "unitCases": 200,
+    "unitFiles": 11,
+    "realPostgresCases": 28,
+    "skipped": 0,
+    "typeScriptSdkCases": 1,
+    "pythonSdkCases": 1,
+    "sourceBuiltRepetitionsNotAdditionalCases": true,
+    "originalCounterexamples": {
+      "unitCases": 6,
+      "actualLoader": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/command-caller-observation.json",
+      "actualIdleRetirement": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T020855Z/command-idle-release-observation.json",
+      "description": "Original real AgentHandle disposal and tryDisposeIdle remove the Agent during actual local image admission; the detached handler executes once and records success."
+    },
+    "actualFixedLoader": "Real Loader, AgentLoop, AgentHandle and LocalAttachmentStore exercise forced disposal, same-id replacement and idle disposal. Stale handlers run0 times; fresh replacement commands succeed; pending idle release returns false and completed release returns true. Source Node22 and normal artifacts Node24 snapshots pass.",
+    "realHandlerLifetimes": "Concurrent commands retain the owner until the last handler settles; cancelled UI waiting keeps the reservation through cleanup; other Agents are not blocked. Admission failures and handler completion release reservations.",
+    "completeEntries": {
+      "compaction/command-compact/src/index.ts": {
+        "lines": {
+          "total": 35,
+          "covered": 35,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 8,
+          "covered": 8,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 40,
+          "covered": 40,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 18,
+          "covered": 18,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "goal/command-goal/src/index.ts": {
+        "lines": {
+          "total": 72,
+          "covered": 72,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 12,
+          "covered": 12,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 84,
+          "covered": 84,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 70,
+          "covered": 70,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "interaction/commands/src/index.ts": {
+        "lines": {
+          "total": 172,
+          "covered": 172,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 40,
+          "covered": 40,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 188,
+          "covered": 188,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 139,
+          "covered": 139,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "plan/plan-mode/src/index.ts": {
+        "lines": {
+          "total": 151,
+          "covered": 151,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 25,
+          "covered": 25,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 168,
+          "covered": 168,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 138,
+          "covered": 138,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "coveragePolicyChanged": false,
+    "checks": [
+      {
+        "name": "command-lifetime-unit",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-unit.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/interaction/commands/tests",
+          "packages/plan/plan-mode/tests",
+          "packages/goal/command-goal/tests",
+          "packages/compaction/command-compact/tests",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/interaction/commands/src/index.ts",
+          "--coverage.include=packages/plan/plan-mode/src/index.ts",
+          "--coverage.include=packages/goal/command-goal/src/index.ts",
+          "--coverage.include=packages/compaction/command-compact/src/index.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/final-joint-coverage",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-unit-cases.json"
+        ]
+      },
+      {
+        "name": "command-lifetime-postgres",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-postgres.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/run-pg-check.mjs",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.e2e.config.ts",
+          "packages/context/gateway-execution/tests/pg-composition.e2e.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-postgres-cases.json"
+        ]
+      },
+      {
+        "name": "command-lifetime-build-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-build-types.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-b",
+          "packages/interaction/commands",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "command-lifetime-normal-bundle",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-normal-bundle.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "RAYON_NUM_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/tsdown/dist/run.mjs",
+          "--filter",
+          "@deepseek-ai/dsh-commands"
+        ]
+      },
+      {
+        "name": "command-lifetime-host-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-host-types.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/host-types.tsbuildinfo",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "command-lifetime-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-lint.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_OXLINT_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/interaction/commands/src/index.ts",
+          "packages/interaction/commands/tests/commands.spec.ts",
+          "packages/interaction/commands/tests/caller-lifetime-loader.spec.ts",
+          "packages/interaction/commands/tests/fixtures/caller-lifetime-driver.mjs"
+        ]
+      },
+      {
+        "name": "command-lifetime-built",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-built.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/interaction/commands/tests/caller-lifetime-loader.spec.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-built-cases.json"
+        ]
+      },
+      {
+        "name": "command-lifetime-sdk-src",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-sdk-src.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=src",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.expected.config.ts",
+          "apps/cli/tests/profiles/sdk/command-registration.expected.e2e.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-sdk-src-cases.json"
+        ]
+      },
+      {
+        "name": "command-lifetime-sdk-lib",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-sdk-lib.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.expected.config.ts",
+          "apps/cli/tests/profiles/sdk/command-registration.expected.e2e.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-sdk-lib-cases.json"
+        ]
+      },
+      {
+        "name": "command-lifetime-python",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-python.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=lib",
+          "python/sdk/.venv/bin/python",
+          "-m",
+          "pytest",
+          "python/sdk/tests/test_command_registration_expected.py",
+          "--junitxml=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-python-cases.xml"
+        ]
+      },
+      {
+        "name": "command-lifetime-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-doc-quick.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_GATE_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/run-docs.mjs"
+        ]
+      },
+      {
+        "name": "command-lifetime-workspace-constraints",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-workspace-constraints.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/check-workspace-constraints.ts"
+        ]
+      },
+      {
+        "name": "command-lifetime-dependency-cohorts",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-dependency-cohorts.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-dependency-cohorts.ts"
+        ]
+      },
+      {
+        "name": "command-lifetime-export-jsdoc",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-export-jsdoc.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-export-jsdoc.ts"
+        ]
+      },
+      {
+        "name": "command-lifetime-node-next",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-node-next.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/node-next-consumer/tsconfig.json",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "command-lifetime-publint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-publint.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/publint-all.ts",
+          "--packages-root",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/publish-view"
+        ]
+      }
+    ],
+    "publication": "Exactly one normal package selected by publint; its existing ./src/* informational notice remains. External NodeNext consumer uses normal package exports without source paths.",
+    "disposableDatabasesDropped": 1,
+    "paidModelApisUsed": false
+  },
+  "scope": {
+    "ownedDeltas": 16,
+    "readOnlyPrerequisites": 586,
+    "frozenSources": 602,
+    "normalOwnedArtifacts": 14,
+    "artifactReferences": 77,
+    "capsule": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T023853Z/command-lifetime-capsule.json",
+    "rootProductionMutation": false,
+    "dependencySynchronization": false,
+    "commitOrPush": false,
+    "wholeProjectComplete": false
+  },
+  "remaining": [
+    "All12 business domains and B04/B25 remain open; these scoped module results do not establish whole-project completion.",
+    "Perform a requirement-by-requirement domain completion audit against current sources, scope inventories and existing evidence.",
+    "Finish the two known uncovered Core entry fallback statements with meaningful coverage; do not lower thresholds.",
+    "Review queued answer identity and command provider unload with outstanding handlers before claiming those lifecycles complete.",
+    "Peer reports R41 deployed; Root/peer assembled acceptance, B451 exact Admin Runtime control and cross-network DB performance remain open.",
+    "Official paid Responses verification remains deferred."
+  ]
+}

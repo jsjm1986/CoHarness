@@ -85,6 +85,8 @@ export interface DeepSeekConnectionOptions {
 export interface DeepSeekRequestAuth {
   /** Credential headers sent unchanged to the resolved endpoint. */
   headers: Readonly<Record<string, string>>
+  /** Source layer that supplied this request's credential; omitted only when the provider cannot identify it. */
+  credentialSource?: string
   /** Classify a failure using the captured credential; callback failure preserves the original error. */
   onRequestError?: (error: unknown) => Promise<unknown>
 }

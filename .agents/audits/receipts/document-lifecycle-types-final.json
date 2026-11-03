@@ -1,0 +1,14 @@
+{
+  "name": "document-lifecycle-types-final",
+  "cwd": "gateway",
+  "command": "npm run typecheck",
+  "startedAt": "2026-10-24T02:49:50.674354+00:00",
+  "seconds": 5.279,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "699457317d7501cfef2d5573318f457923bd7b4210a11945e53b36b22c96882d",
+  "inputsAfter": "636ca765b12030db43535afb2f4be798770c746ccf351c1d9454bc5183e8e53c",
+  "postgresToolDirectory": null,
+  "outputSha256": "8fa1cf5506304e8abac55868e7f1a136c9b1dde57a3981a382da4c21ea129a6f",
+  "outputTail": "\n> typecheck\n> tsc --noEmit\n\n"
+}

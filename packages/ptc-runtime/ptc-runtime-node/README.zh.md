@@ -25,6 +25,8 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
+保留的内核在其完整受管进程范围生命周期内持有一份进程许可。启动时将内核生命周期信号传入子进程准入，因此取消或释放所有者也会取消排队分配。
+
 在提供 `fs`、`subprocess`、`sandbox` 和 `sandboxPolicy` 的组合中挂载本提供方。`dsh-tools` 的 PTC 模式传入调用 Session 的目录和常设策略；直接运行时消费方在执行前解析这些选项。
 
 ### 配置

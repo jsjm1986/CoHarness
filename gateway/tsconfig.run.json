@@ -15,6 +15,10 @@
     "strict": true,
     "allowImportingTsExtensions": true,
     "paths": {
+      "@deepseek-ai/node-addon-system/flock": ["../native/system/packages/entry/lib/flock.js"],
+      "@deepseek-ai/dsh-resource-budget/wire": ["../packages/context/resource-budget/lib/types/wire.js"],
+      "@deepseek-ai/dsh-userdoc-gateway/protocol": ["../packages/attachment/userdoc-gateway/lib/types/protocol.js"],
+      "@deepseek-ai/dsh-userdoc-gateway/server": ["../packages/attachment/userdoc-gateway/lib/types/server.js"],
       "@deepseek-ai/cordis": ["../vendor/cordis/lib/types/index.js"],
       "@deepseek-ai/cosmokit": ["../vendor/cosmokit/lib/types/index.js"],
       "@deepseek-ai/schemastery": ["../vendor/schemastery/lib/types/index.js"],

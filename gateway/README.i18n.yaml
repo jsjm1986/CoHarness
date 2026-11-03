@@ -3,50 +3,56 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/README.md
 document:
-  en: b6977f4bab2d793bdb769c0cfac0905ad9f7fdbf
-  zh: 64b76047f384ffbc4425537b1219db42d2b5028c
+  en: 1ea8517d8120ca3807a06ff4c68ba19360fe5eae
+  zh: a2995ed2f233a3da71198d01b074a5a61560a0e9
 /harness-gateway:
-  en: 8302ff457ba35ee1
-  zh: e4f946b2193ffd0b
+  en: d06b73ef2a831bb8
+  zh: 8a3e3f0d5c13677e
 /harness-gateway/toolchain:
-  en: c2320daf2514d280
-  zh: 1b840f4201871ee5
+  en: b40c722ed37855ef
+  zh: 6b8592f779bb25fd
 /harness-gateway/configuration-environment-variables-see-src-config-ts:
-  en: d4eada21f7e698b7
-  zh: 223db474f347cfe7
+  en: e05c84120f0e12db
+  zh: 78e4c2ba76cddfe2
 /harness-gateway/performance-and-runtime-admission:
-  en: 89d6f89b96fdd1d5
-  zh: 63eeb21825d2b95a
+  en: e5a0a71e31abb77d
+  zh: ff644cfc5fc89065
+/harness-gateway/public-access-tunnel:
+  en: 9a0ccbb5ac6faa3b
+  zh: cb1140ec9b72f093
 /harness-gateway/admin-console-and-project-grants:
-  en: 6eae7040f5f76280
-  zh: ffb6270db24fd5b9
+  en: 0a13e8a3972a0ad2
+  zh: 7f327076cb5f3c26
+/harness-gateway/admin-console-and-project-grants/project-progress:
+  en: 6e1585e64119d4ea
+  zh: 39f2bbc0c3749326
 /harness-gateway/plugin-management:
   en: 44ec9ebc7e288aee
   zh: 5040cf211a5305ac
 /harness-gateway/steward-maintenance-space:
-  en: 1514d3e437d26789
-  zh: cc9ab71f34b434f5
+  en: 3fa160526a654692
+  zh: 9e005d7743458584
 /harness-gateway/user-terminals:
   en: bc98d4118d93d62c
   zh: 80109f508a0090ed
 /harness-gateway/android-shell-and-completion-notifications:
-  en: 72a9968da0393e82
-  zh: 4d316e3b470249fc
+  en: 2d9728bb7d41117a
+  zh: 7fbf5c4367836bff
 /harness-gateway/project-collaborative-conversations:
-  en: e5bdeda63b932126
-  zh: c6ce742b916d9969
+  en: a529be5c0986a669
+  zh: 3a47d62b004f0fc6
 /harness-gateway/model-governance-and-usage-accounting:
-  en: a8aa476dd883b2ff
-  zh: ccddc5cc6cff917b
+  en: faf6ae9cdb0cf14e
+  zh: b450bd57cbd34b6f
 /harness-gateway/postgresql-control-plane:
-  en: f1bcff4ce3e2b060
-  zh: 777df990e9693866
+  en: c27f5b4776762617
+  zh: fbaeb983a8ff22b4
 /harness-gateway/deployment-maintenance-and-coordinated-restore:
-  en: ea43e796e2c2dac1
-  zh: 6cfde3555964d734
+  en: 9e58e23510b0c479
+  zh: 7b639a0d16c3cd15
 /harness-gateway/access-revocation-across-gateways:
-  en: b841061ff4b270a6
-  zh: 11f233f8d060f9e3
+  en: e063983a3abb3e64
+  zh: 30f2872ee4b8e7cc
 /harness-gateway/layered-directory-enforcement:
   en: ab52b7ae0a8333a8
   zh: 72608aa76089e7d7

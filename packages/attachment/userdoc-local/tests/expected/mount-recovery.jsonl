@@ -1,0 +1,4 @@
+{"operation":"managed-startup","providerReady":true,"creator":"user:7","receivedBytes":2}
+{"operation":"persistent-remount","providerReady":true,"identityPreserved":true,"ownerPreserved":true,"foreignResume":"denied"}
+{"operation":"verified-legacy-recovery","refusedBeforeRecovery":true,"providerReady":true,"identityPreserved":true,"receivedBytes":2,"foreignResume":"denied"}
+{"operation":"copied-root","refused":true,"originalBytesPreserved":true}

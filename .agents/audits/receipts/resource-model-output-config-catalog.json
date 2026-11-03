@@ -1,0 +1,14 @@
+{
+  "name": "resource-model-output-config-catalog",
+  "cwd": ".",
+  "command": "pnpm run gen-config-catalog",
+  "startedAt": "2026-10-24T02:13:18.133822+00:00",
+  "seconds": 3.01,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e00b4928f115ed8da531211bd3548ad52b2544330582b7d8195ba4cda332f6d1",
+  "inputsAfter": "e00b4928f115ed8da531211bd3548ad52b2544330582b7d8195ba4cda332f6d1",
+  "postgresToolDirectory": null,
+  "outputSha256": "41ad6290228a3b07488c09515fb79c4c459c420aeee846d59f00b7e2d416f2c2",
+  "outputTail": "$ tsx scripts/gen-config-catalog.ts\ngen-config-catalog: 3 artifact(s) computed, 3 written.\n"
+}

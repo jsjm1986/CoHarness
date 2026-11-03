@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-01-atomic-runtime-activity-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-01-atomic-runtime-activity-admission.md
+document:
+  en: 18ddf2f28cd0d6c440118759ca6d405e02960f68
+  zh: 702293aa116e79080ed51f7ebcb552237b53c52a
+/agent-note-atomic-runtime-activity-admission:
+  en: 9432b5be17ae19a7
+  zh: 63b5f2068b3f0fca
+/agent-note-atomic-runtime-activity-admission/problem:
+  en: b45629e6e288cb59
+  zh: 2b92418cec65fb4c
+/agent-note-atomic-runtime-activity-admission/decision:
+  en: e0bd08370d44f539
+  zh: 4a7b50db8a599ac9
+/agent-note-atomic-runtime-activity-admission/alternatives-considered:
+  en: 1f62bd1a9654fbae
+  zh: b60424497c2aba0b
+/agent-note-atomic-runtime-activity-admission/consequences:
+  en: 4d01f5540811ca5f
+  zh: 9680985506ab2dd2

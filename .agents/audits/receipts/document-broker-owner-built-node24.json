@@ -1,0 +1,14 @@
+{
+  "name": "document-broker-owner-built-node24",
+  "cwd": ".",
+  "command": "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node .agents/audits/.local/document-broker-owner-built.mjs",
+  "startedAt": "2026-10-26T11:18:42.739935+00:00",
+  "seconds": 2.148,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "376a06e779edc63500ee9d480fef01cbc5f19b82667bf27aa275607fca766864",
+  "inputsAfter": "376a06e779edc63500ee9d480fef01cbc5f19b82667bf27aa275607fca766864",
+  "postgresToolDirectory": null,
+  "outputSha256": "0d8629c2c337542a367409a934203829a2a9839b72cb3cbb4892105a3faba6ae",
+  "outputTail": "{\"operation\":\"broker-authorization-drain\",\"admitted\":200,\"late\":503,\"joined\":true}\n{\"operation\":\"broker-catalog-drain\",\"actors\":[7,9],\"committedWhenClosed\":[7,9]}\n"
+}

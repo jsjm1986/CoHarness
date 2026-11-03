@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import {
+  ComputerBadge,
   IconCheckOutline16, IconCloseOutline16, IconCordisPluginOutline14, IconPlayOutline16,
   IconStopFill16, IconTrashOutline16, Tooltip, useDismissOnOutsidePointer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -14,7 +15,7 @@ import type { CordisInventoryRow } from './dynamic-port.ts'
 import type { CordisPanelFace } from './slots.ts'
 import type { CordisKey } from './locales.ts'
 import type {
-  ApprovalRequestId, CordisDynamicPackageId, CordisDynamicPluginId,
+  CordisDynamicPackageId, CordisDynamicPluginId,
 } from './events.ts'
 import { cordisVisibleStatus, packageOf, type CordisVisibleStatus } from './status.ts'
 import css from './CordisPanel.module.css'
@@ -105,20 +106,48 @@ function DoubleCheckIcon() {
 /** Render the inventory panel and its unified footer action. */
 export function CordisPanel({
   wide,
-  useSessions, useInventory, useActiveRuns, useRunErrors, useLoaded, useRenderFailures,
-  onApprove, onDecline, onRun, onStop, onRemove, onRefresh, t,
+  useSessions, useInventory, useActiveRuns, useRunErrors, useLoaded, useRenderFailures, usePendingApprovals, useRuntimeEnvironments,
+  actionsForSession, t,
 }: CordisPanelProps) {
-  const inventory = useInventory(snapshot => snapshot)
-  const activeRuns = useActiveRuns(snapshot => snapshot)
-  const errors = useRunErrors(snapshot => snapshot)
-  const loaded = useLoaded(snapshot => snapshot)
-  const renderFailures = useRenderFailures(snapshot => snapshot)
   const current = useSessions(state => state.current)
   const [open, setOpen] = useState(false)
-  const [selected, setSelected] = useState<Record<string, CordisDynamicPackageId>>({})
-  const [pending, setPending] = useState<ReadonlySet<CordisDynamicPluginId>>(new Set())
-  const [actionErrors, setActionErrors] = useState<ReadonlyMap<CordisDynamicPluginId, string>>(new Map())
-  const visibleRequests = useRef<Set<ApprovalRequestId>>(new Set())
+  const [captured, setCaptured] = useState<SessionId>()
+  const owner = open ? captured : current
+  const sourceKey = owner ?? 'base'
+  const inventory = useInventory(sourceKey, snapshot => snapshot)
+  const activeRuns = useActiveRuns(sourceKey, snapshot => snapshot)
+  const errors = useRunErrors(sourceKey, snapshot => snapshot)
+  const loaded = useLoaded(sourceKey, snapshot => snapshot)
+  const renderFailures = useRenderFailures(sourceKey, snapshot => snapshot)
+  const pendingApprovals = usePendingApprovals(snapshot => snapshot)
+  const environments = useRuntimeEnvironments(snapshot => snapshot)
+  if (inventory === undefined || activeRuns === undefined || errors === undefined || loaded === undefined || renderFailures === undefined) {
+    throw new Error('Cordis Runtime sources are unavailable')
+  }
+  const { onApprove, onDecline, onRun, onStop, onRemove, onRefresh, runtimeKey, runtimeId, computerName } = actionsForSession(owner)
+  const environment = environments.choices.find(choice => runtimeKey === 'base' ? choice.key === 'base'
+    : runtimeId !== undefined && choice.target?.runtimeId === runtimeId)
+  const ownerName = environment?.name ?? computerName
+  const displayed = useRef({ open, owner, revision: 0 })
+  if (displayed.current.open !== open || displayed.current.owner !== owner) {
+    displayed.current = { open, owner, revision: displayed.current.revision + 1 }
+  }
+  const revision = displayed.current.revision
+  const closeAnsweredPanel = (): void => {
+    if (displayed.current.revision === revision) {
+      setOpen(false)
+      rootRef.current?.querySelector<HTMLButtonElement>('[data-cordis-badge]')?.focus()
+    }
+  }
+  const [selections, setSelections] = useState<Record<string, Record<string, CordisDynamicPackageId>>>({})
+  const selected = selections[runtimeKey] ?? {}
+  const setSelected = (update: (previous: Record<string, CordisDynamicPackageId>) => Record<string, CordisDynamicPackageId>): void => {
+    setSelections(previous => ({ ...previous, [runtimeKey]: update(previous[runtimeKey] ?? {}) }))
+  }
+  const [pending, setPending] = useState<ReadonlySet<string>>(new Set())
+  const [actionErrors, setActionErrors] = useState<ReadonlyMap<string, string>>(new Map())
+  const operationKey = (pluginId: CordisDynamicPluginId): string => `${runtimeKey}:${pluginId}`
+  const visibleRequests = useRef<Set<string>>(new Set())
   const rootRef = useRef<HTMLDivElement>(null)
   const [anchor, setAnchor] = useState<{ left: number; bottom: number }>()
 
@@ -138,16 +167,25 @@ export function CordisPanel({
   }, [open])
 
   useDismissOnOutsidePointer(rootRef, open, setOpen)
+  useEffect(() => {
+    if (!open) return
+    const dismiss = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      event.preventDefault()
+      event.stopPropagation()
+      setOpen(false)
+      rootRef.current?.querySelector<HTMLButtonElement>('[data-cordis-badge]')?.focus()
+    }
+    document.addEventListener('keydown', dismiss)
+    return () => { document.removeEventListener('keydown', dismiss) }
+  }, [open])
 
   useEffect(() => {
-    const now = new Set<ApprovalRequestId>()
-    for (const activity of activeRuns.values()) {
-      if (activity.phase === 'awaiting-approval') now.add(activity.requestId)
-    }
-    const discovered = [...now].some(requestId => !visibleRequests.current.has(requestId))
+    const now = new Set(pendingApprovals.map(request => `${request.sessionId}:${request.requestId}`))
+    const discovered = pendingApprovals.find(request => !visibleRequests.current.has(`${request.sessionId}:${request.requestId}`))
     visibleRequests.current = now
-    if (discovered) setOpen(true)
-  }, [activeRuns])
+    if (discovered !== undefined && !open) { setCaptured(discovered.sessionId); setOpen(true) }
+  }, [pendingApprovals, open])
 
   useEffect(() => { onRefresh() }, [onRefresh])
   useEffect(() => { if (open) onRefresh() }, [onRefresh, open])
@@ -167,39 +205,42 @@ export function CordisPanel({
     byPlugin.set(pluginId, { pluginId, agentId: activity.agentId, activity })
   }
   const all = [...byPlugin.values()]
-  const mine = blockingFirst(all.filter(row => current !== undefined && row.agentId === current))
-  const theirs = blockingFirst(all.filter(row => current === undefined || row.agentId !== current))
-  const approvals = [...activeRuns.values()].filter(activity => activity.phase === 'awaiting-approval').length
+  const mine = blockingFirst(all.filter(row => owner !== undefined && row.agentId === owner))
+  const theirs = blockingFirst(all.filter(row => owner === undefined || row.agentId !== owner))
+  const approvals = pendingApprovals.length
+  const elsewhere = pendingApprovals.find(request => ![...activeRuns.values()].some(activity =>
+    activity.phase === 'awaiting-approval' && activity.requestId === request.requestId && activity.agentId === request.sessionId))
   const running = all.filter(view => visiblePanelStatus(
     view,
     selectedPackageIdOf(view, selected),
     loaded,
   ) === 'running').length
 
-  if (all.length === 0) return null
+  if (all.length === 0 && approvals === 0 && inventory.error === undefined && !open) return null
 
   const runAction = async (pluginId: CordisDynamicPluginId, action: () => Promise<void | { ok: boolean; message?: string }>) => {
-    if (pending.has(pluginId)) return
-    setPending(currentPending => new Set(currentPending).add(pluginId))
+    const key = operationKey(pluginId)
+    if (pending.has(key)) return
+    setPending(currentPending => new Set(currentPending).add(key))
     setActionErrors((currentErrors) => {
       const next = new Map(currentErrors)
-      next.delete(pluginId)
+      next.delete(key)
       return next
     })
     try {
       const result = await action()
       if (result !== undefined && !result.ok) {
-        setActionErrors(currentErrors => new Map(currentErrors).set(pluginId, result.message ?? 'operation failed'))
+        setActionErrors(currentErrors => new Map(currentErrors).set(key, result.message ?? 'operation failed'))
       }
     } catch (error) {
       setActionErrors(currentErrors => new Map(currentErrors).set(
-        pluginId,
+        key,
         error instanceof Error ? error.message : String(error),
       ))
     } finally {
       setPending((currentPending) => {
         const next = new Set(currentPending)
-        next.delete(pluginId)
+        next.delete(key)
         return next
       })
       onRefresh()
@@ -224,11 +265,11 @@ export function CordisPanel({
       ? activity.requestId
       : latest?.status === 'awaiting-approval' ? latest.approvalRequestId : undefined
     const status = visiblePanelStatus(view, selectedPackageId, loaded)
-    const busy = pending.has(pluginId) || activity?.phase === 'orchestrating'
+    const busy = pending.has(operationKey(pluginId)) || activity?.phase === 'orchestrating'
     const failure = errors.get(pluginId)
     const hostFailure = latest?.status === 'failed' ? latest.error : undefined
     const renderFailure = renderFailures.get(pluginId)
-    const actionError = actionErrors.get(pluginId)
+    const actionError = actionErrors.get(operationKey(pluginId))
     const nextPackageId = listed?.nextPackageId !== undefined
       && listed.nextPackageId !== listed.currentPackageId ? listed.nextPackageId : undefined
     const currentPackageId = listed?.currentPackageId
@@ -278,7 +319,7 @@ export function CordisPanel({
                   disabled={busy}
                   onClick={() => { void runAction(pluginId, async () => {
                     await onApprove(awaiting, false)
-                    setOpen(false)
+                    closeAnsweredPanel()
                   }) }}
                 >
                   <IconCheckOutline16 size={14} />
@@ -289,7 +330,7 @@ export function CordisPanel({
                   disabled={busy}
                   onClick={() => { void runAction(pluginId, async () => {
                     await onApprove(awaiting, true)
-                    setOpen(false)
+                    closeAnsweredPanel()
                   }) }}
                 >
                   <DoubleCheckIcon />
@@ -300,7 +341,7 @@ export function CordisPanel({
                   disabled={busy}
                   onClick={() => { void runAction(pluginId, async () => {
                     await onDecline(awaiting)
-                    setOpen(false)
+                    closeAnsweredPanel()
                   }) }}
                 >
                   <IconCloseOutline16 size={14} />
@@ -444,10 +485,17 @@ export function CordisPanel({
         <section className={css.panel} style={anchor} data-cordis-panel aria-label={t('panel.title')}>
           <header className={css.header}>
             <span className={css.title}>{t('panel.title')}</span>
+            {environments.showComputer && ownerName !== undefined && <ComputerBadge name={ownerName} label={t('panel.computer')} />}
           </header>
           <div className={css.body}>
+            {elsewhere !== undefined && <button type="button" className={css.queueAction}
+              disabled={pending.size > 0} onClick={() => { setCaptured(elsewhere.sessionId) }}>
+              {t('panel.otherApprovals')}
+            </button>}
             {inventory.error !== undefined && (
-              <p className={css.readError} role="alert">{t('panel.readFailed', { message: inventory.error })}</p>
+              <div className={css.readError} role="alert">{t('panel.readFailed', { message: inventory.error })}
+                <button type="button" onClick={onRefresh}>{t('action.retry')}</button>
+              </div>
             )}
             {!inventory.read && inventory.error === undefined && <p className={css.note}>{t('panel.loading')}</p>}
             {inventory.read && all.length === 0 && <p className={css.note}>{t('panel.empty')}</p>}
@@ -475,7 +523,7 @@ export function CordisPanel({
           data-active={approvals > 0 || undefined}
           aria-label={t('panel.plugins.aria')}
           aria-expanded={open}
-          onClick={() => { setOpen(value => !value) }}
+          onClick={() => { if (!open) setCaptured(current); setOpen(value => !value) }}
         >
           <IconCordisPluginOutline14 size={wide ? 16 : 18} />
           {wide && (

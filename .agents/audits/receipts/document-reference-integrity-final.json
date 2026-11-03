@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-integrity-final",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/check-document-reference-integrity.py",
+  "startedAt": "2026-10-26T23:06:13.498641+00:00",
+  "seconds": 0.481,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "inputsAfter": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "postgresToolDirectory": null,
+  "outputSha256": "0dce66fabbe5aac254e8c6f60d096c2cc88977a6dd0806251a3f9ab443998e5a",
+  "outputTail": "{\"verifiedFiles\": 24, \"purePublishedIdentityEntry\": true, \"latestFetchedMasterContained\": true, \"businessDomainsStillOpen\": 12, \"wholeProjectComplete\": false, \"privatePostgres\": {\"port\": 56818, \"listening\": false, \"dataPresent\": true, \"pidFilePresent\": false}, \"realModelVerification\": \"human-deferred\"}\n"
+}

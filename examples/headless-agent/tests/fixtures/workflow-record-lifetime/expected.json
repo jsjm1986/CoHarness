@@ -1,0 +1,33 @@
+{
+  "reply": "WORKFLOW_RECORD_LIFETIME_OK",
+  "foreground": {
+    "mode": "foreground",
+    "starts": 1,
+    "busyAfterWithdrawal": true,
+    "busyAtMemberEnd": true,
+    "responseClosed": true,
+    "records": [
+      "tool-workflow/run-start",
+      "tool-workflow/agent-start",
+      "tool-workflow/agent-end",
+      "tool-workflow/run-end"
+    ]
+  },
+  "background": {
+    "mode": "background",
+    "starts": 1,
+    "busyAfterWithdrawal": true,
+    "busyAtMemberEnd": true,
+    "responseClosed": true,
+    "records": [
+      "tool-workflow/run-start",
+      "tool-workflow/agent-start",
+      "tool-workflow/agent-end",
+      "tool-workflow/run-end"
+    ],
+    "progress": [
+      "After withdrawal"
+    ],
+    "jobLog": "agent #1 bounded member started\nagent #1 completed\n▸ After withdrawal\nmember finished\n"
+  }
+}

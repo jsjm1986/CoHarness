@@ -1,0 +1,565 @@
+{
+  "recordedAt": "2026-10-29T15:50:40.238900+00:00",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "findings": [
+    "B323",
+    "B324"
+  ],
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z",
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-final-source-artifact-hashes.json",
+  "paths": [
+    "gateway/src/instances.ts",
+    "gateway/tests/fixtures/runtime-readiness-lifecycle.mjs",
+    "gateway/tests/fixtures/readiness-runtime.mjs",
+    "gateway/tests/runtime-readiness-lifecycle-transcript.spec.ts",
+    "gateway/tests/expected/runtime-readiness-lifecycle.expected.md"
+  ],
+  "repair": "Cold readiness uses process-monotonic time, remaining HTTP probe budgets and abortable bounded polls. Cancellation, deadline and process exit are rechecked after the probe, resource registration and ready publication. Only transport/data/proof failures retry; backend registration/publication errors preserve their structured identity and flow into existing physical termination before resident capacity release.",
+  "negativeEvidence": [
+    {
+      "name": "readiness-frozen-clock-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T15:22:17.737451+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "tests/fixtures/runtime-readiness-lifecycle.mjs",
+        "src",
+        "-",
+        "frozen-clock"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T15:22:21.278662+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-frozen-clock-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-frozen-clock-before.log"
+    },
+    {
+      "name": "readiness-probe-budget-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T15:22:16.896822+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "tests/fixtures/runtime-readiness-lifecycle.mjs",
+        "src",
+        "-",
+        "probe-budget"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T15:22:17.704924+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-probe-budget-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-probe-budget-before.log"
+    },
+    {
+      "name": "readiness-late-registration-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T15:22:15.296075+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "tests/fixtures/runtime-readiness-lifecycle.mjs",
+        "src",
+        "-",
+        "late-registration"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T15:22:15.768785+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-late-registration-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-late-registration-before.log"
+    },
+    {
+      "name": "readiness-cancel-registration-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T15:22:15.810423+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "tests/fixtures/runtime-readiness-lifecycle.mjs",
+        "src",
+        "-",
+        "cancel-registration"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T15:22:16.324953+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-cancel-registration-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-cancel-registration-before.log"
+    },
+    {
+      "name": "readiness-late-ready-publication-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T15:22:16.358134+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "tests/fixtures/runtime-readiness-lifecycle.mjs",
+        "src",
+        "-",
+        "late-ready-publication"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T15:22:16.863934+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-late-ready-publication-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-late-ready-publication-before.log"
+    },
+    {
+      "name": "readiness-registration-error-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T15:22:21.315859+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "tests/fixtures/runtime-readiness-lifecycle.mjs",
+        "src",
+        "-",
+        "registration-error"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T15:22:26.953984+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-registration-error-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-registration-error-before.log"
+    },
+    {
+      "name": "readiness-publication-error-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T15:22:26.986073+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "tests/fixtures/runtime-readiness-lifecycle.mjs",
+        "src",
+        "-",
+        "publication-error"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T15:22:32.619865+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-publication-error-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-publication-error-before.log"
+    }
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "readiness-healthy-before",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:22:14.697440+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "tests/fixtures/runtime-readiness-lifecycle.mjs",
+          "src",
+          "-",
+          "healthy"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:22:15.263180+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-healthy-before.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-healthy-before.log"
+      },
+      {
+        "name": "readiness-complete-source-syntax-repaired",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:24:30.511335+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "tests/fixtures/runtime-readiness-lifecycle.mjs",
+          "src"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:24:34.837726+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-complete-source-syntax-repaired.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-complete-source-syntax-repaired.log"
+      },
+      {
+        "name": "readiness-manager-proxy-unit-regressions",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:27:57.603356+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/instances.spec.ts",
+          "tests/runtime-capacity.spec.ts",
+          "tests/proxy.spec.ts",
+          "tests/runtime-readiness-lifecycle-transcript.spec.ts",
+          "tests/administrator-runtime-control-transcript.spec.ts",
+          "--maxWorkers=2",
+          "--retry=0",
+          "--coverage",
+          "--coverage.include=src/instances.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-unit-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:28:23.114034+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-manager-proxy-unit-regressions.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-manager-proxy-unit-regressions.log"
+      },
+      {
+        "name": "readiness-postgres-fixtures-current-schema",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:38:33.529719+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+          "run",
+          "tests/instance-capacity-postgres.spec.ts",
+          "tests/runtime-personal-policy-postgres.spec.ts",
+          "tests/runtime-personal-policy-transcript.spec.ts",
+          "tests/administrator-runtime-control-transcript.spec.ts",
+          "tests/runtime-resource-provider.spec.ts",
+          "tests/runtime-readiness-lifecycle-transcript.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--retry=0",
+          "--coverage",
+          "--coverage.include=src/instances.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-postgres-current-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:39:11.038526+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-postgres-fixtures-current-schema.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-postgres-fixtures-current-schema.log"
+      },
+      {
+        "name": "readiness-current-private-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:44:16.777138+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "-p",
+          "gateway/tsconfig.build.json",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/gateway-artifact/lib",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/gateway-artifact/build.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:44:19.584568+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-current-private-build.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-current-private-build.log"
+      },
+      {
+        "name": "readiness-public-compiled-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:44:37.629460+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/fixtures/runtime-readiness-lifecycle.mjs",
+          "lib",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/gateway-artifacts-node22/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:44:41.415938+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-public-compiled-node22.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-public-compiled-node22.log"
+      },
+      {
+        "name": "readiness-public-compiled-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:45:05.865593+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "tests/fixtures/runtime-readiness-lifecycle.mjs",
+          "lib",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/gateway-artifacts-node24/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:45:09.617449+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-public-compiled-node24.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-public-compiled-node24.log"
+      },
+      {
+        "name": "readiness-final-gateway-types",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:45:09.661901+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "--noEmit",
+          "-p",
+          "gateway/tsconfig.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:45:14.162028+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-final-gateway-types.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-final-gateway-types.log"
+      },
+      {
+        "name": "readiness-final-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:45:18.585236+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "gateway/src/instances.ts",
+          "gateway/tests/fixtures/runtime-readiness-lifecycle.mjs",
+          "gateway/tests/fixtures/readiness-runtime.mjs",
+          "gateway/tests/runtime-readiness-lifecycle-transcript.spec.ts",
+          "gateway/tests/fixtures/postgres-fixture-cleanup.mjs",
+          "gateway/tests/fixtures/postgres-fixture-cleanup.d.mts",
+          "gateway/tests/postgres-fixture-cleanup.ts",
+          "gateway/tests/fixtures/runtime-personal-policy.mjs",
+          "gateway/tests/instance-capacity-postgres.spec.ts",
+          "scripts/ci-workflow.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:45:24.599637+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-final-scoped-lint.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-final-scoped-lint.log"
+      },
+      {
+        "name": "readiness-ci-workflow-contracts",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:45:45.176354+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "scripts/ci-workflow.spec.ts",
+          "--maxWorkers=2",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:45:46.571553+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-ci-workflow-contracts.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-ci-workflow-contracts.log"
+      },
+      {
+        "name": "readiness-final-docs",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:45:56.304592+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:47:26.504683+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-final-docs.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-final-docs.log"
+      },
+      {
+        "name": "readiness-repository-full-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:47:48.687734+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "build"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:48:14.635683+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-repository-full-build.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-repository-full-build.log"
+      }
+    ],
+    "coverage": {
+      "sourceManagerFocused": {
+        "total": {
+          "lines": {
+            "total": 686,
+            "covered": 590,
+            "skipped": 0,
+            "pct": 86
+          },
+          "statements": {
+            "total": 820,
+            "covered": 670,
+            "skipped": 0,
+            "pct": 81.7
+          },
+          "functions": {
+            "total": 120,
+            "covered": 106,
+            "skipped": 0,
+            "pct": 88.33
+          },
+          "branches": {
+            "total": 579,
+            "covered": 420,
+            "skipped": 0,
+            "pct": 72.53
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/instances.ts": {
+          "lines": {
+            "total": 686,
+            "covered": 590,
+            "skipped": 0,
+            "pct": 86
+          },
+          "functions": {
+            "total": 120,
+            "covered": 106,
+            "skipped": 0,
+            "pct": 88.33
+          },
+          "statements": {
+            "total": 820,
+            "covered": 670,
+            "skipped": 0,
+            "pct": 81.7
+          },
+          "branches": {
+            "total": 579,
+            "covered": 420,
+            "skipped": 0,
+            "pct": 72.53
+          }
+        }
+      },
+      "postgresAuthoritySelection": {
+        "total": {
+          "lines": {
+            "total": 686,
+            "covered": 343,
+            "skipped": 0,
+            "pct": 50
+          },
+          "statements": {
+            "total": 820,
+            "covered": 385,
+            "skipped": 0,
+            "pct": 46.95
+          },
+          "functions": {
+            "total": 120,
+            "covered": 60,
+            "skipped": 0,
+            "pct": 50
+          },
+          "branches": {
+            "total": 579,
+            "covered": 204,
+            "skipped": 0,
+            "pct": 35.23
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/instances.ts": {
+          "lines": {
+            "total": 686,
+            "covered": 343,
+            "skipped": 0,
+            "pct": 50
+          },
+          "functions": {
+            "total": 120,
+            "covered": 60,
+            "skipped": 0,
+            "pct": 50
+          },
+          "statements": {
+            "total": 820,
+            "covered": 385,
+            "skipped": 0,
+            "pct": 46.95
+          },
+          "branches": {
+            "total": 579,
+            "covered": 204,
+            "skipped": 0,
+            "pct": 35.23
+          }
+        }
+      },
+      "wholeManagerComplete": false,
+      "newSourceScenarios": 9,
+      "newCompiledScenariosPerSupportedNode": 9
+    },
+    "counts": "95passed/1PostgreSQLskip in the first manager/proxy selection;70passed in the independent PostgreSQL selection after schema-current fixture repair;46CI workflow cases;20documentation gates;8full-build steps. Selections overlap and are not added as unique cases."
+  },
+  "resourceQuiescence": {
+    "status": "passed",
+    "recordedAt": "2026-10-29T15:49:29.568599+00:00",
+    "ownedDatabase": {
+      "name": "hgw-readiness-9a454e99c8",
+      "port": 55941,
+      "clientsBeforeRemoval": 0,
+      "containerRemoved": true,
+      "namedVolumeRemoved": true
+    },
+    "ownedReadinessFixturePids": [],
+    "peerAndProductionResourcesAccessed": false,
+    "earlierAttempt": "The first private named-volume mount validation refused setup and removed that exact container and volume; the successful v2 instance was independent."
+  },
+  "limitations": [
+    "The new complete-entrypoint readiness cases use SQLite, real LocalLauncher supervision and signed HTTP with controlled legal backend waits; they do not claim new real PostgreSQL row-lock deadline acceptance. The adjacent70PostgreSQL cases cover current production authority, capacity and administrative controls.",
+    "Already-issued ready publications can settle before the owned rollback; the repair prevents late successful completion and preserves serialization, rather than claiming no transient database publication.",
+    "InstanceManager file coverage remains partial. Fixture child processes are outside Vitest parent coverage; no thresholds or ignores were changed. Every original audit domain and B04/B25 remain open.",
+    "No new public-network cross-computer, real Windows or real model-provider acceptance. Real model API and public push remain human-deferred."
+  ],
+  "realProviderApiValidation": "human-deferred",
+  "fixtureMaintenance": "Organization cleanup shares one schema-discovered dependency algorithm between TypeScript and plain-Node fixtures, retains primary and cleanup failures, and runs only after writer/process drainage. The remote-resident fixture provisions the node account and computer permission required by migration083; no production schema or authorization was relaxed.",
+  "intermediateEvidence": [
+    "The initial source transform had an extra closing parenthesis; its transform failure is not causal evidence and was repaired before the nine-scenario pass.",
+    "The first disposable PostgreSQL mount validation refused an ordinary named-volume Binds representation and removed its exact own container/volume; a fresh --mount-based instance was verified independently.",
+    "The first PostgreSQL selection reported fixture foreign-key/provisioning drift. Its failure receipts remain preserved; the corrected current-schema70case selection passed."
+  ]
+}

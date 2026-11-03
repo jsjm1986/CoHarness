@@ -1,0 +1,14 @@
+{
+  "name": "audit-baseline-native-model-checkpoint",
+  "cwd": ".",
+  "command": "python3 -c 'import json,subprocess; from pathlib import Path; from datetime import datetime,timezone; subprocess.run([\"git\",\"fetch\",\"origin\",\"master\"],check=True,stdout=subprocess.DEVNULL); read=lambda *args:subprocess.check_output([\"git\",*args],text=True).strip(); d={\"headRevision\":read(\"rev-parse\",\"HEAD\"),\"originRevision\":read(\"rev-parse\",\"origin/master\"),\"headTree\":read(\"rev-parse\",\"HEAD^{tree}\"),\"originTree\":read(\"rev-parse\",\"origin/master^{tree}\"),\"aheadBehind\":read(\"rev-list\",\"--left-right\",\"--count\",\"HEAD...origin/master\"),\"originIsAncestor\":subprocess.run([\"git\",\"merge-base\",\"--is-ancestor\",\"origin/master\",\"HEAD\"]).returncode==0,\"at\":datetime.now(timezone.utc).isoformat()}; Path(\".agents/audits/.local/baseline-native-model-checkpoint-identities.json\").write_text(json.dumps(d,indent=2)+\"\\n\"); print(json.dumps({\"aheadBehind\":d[\"aheadBehind\"],\"originIsAncestor\":d[\"originIsAncestor\"],\"at\":d[\"at\"]})); assert d[\"originIsAncestor\"]'",
+  "startedAt": "2026-10-25T04:04:52.760457+00:00",
+  "seconds": 4.095,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e5cacc3555411444198df524260c4caaced0410f74845e6ce5f3ae3fdd96bf89",
+  "inputsAfter": "e5cacc3555411444198df524260c4caaced0410f74845e6ce5f3ae3fdd96bf89",
+  "postgresToolDirectory": null,
+  "outputSha256": "7145b2e4340185d36b4595ff5e23c35658a11d07d288d86422f7ac873ff967ba",
+  "outputTail": "From https://github.com/jsjm1986/CoHarness\n * branch                    master     -> FETCH_HEAD\n{\"aheadBehind\": \"139\\t0\", \"originIsAncestor\": true, \"at\": \"2026-10-25T04:04:56.851621+00:00\"}\n"
+}

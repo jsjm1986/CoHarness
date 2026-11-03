@@ -1,6 +1,6 @@
 /** Built Web profile: MCP reaches existing/new Creator sessions and survives a process restart. */
 import { spawn } from 'node:child_process'
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,6 +20,7 @@ interface Observation {
   remaining: string[]
   result: unknown
   ping: unknown
+  configuration?: unknown
   removed?: unknown
 }
 
@@ -90,6 +91,9 @@ it('configures MCP on a live profile, restores it on restart, and removes its to
   expect(initial.after).toContain('mcp__demo__ping')
   expect(initial.other).toContain('mcp__demo__ping')
   expect(JSON.stringify(initial.ping)).toContain('pong')
+  expect(JSON.stringify(initial.configuration, null, 2) + '\n').toBe(await readFile(
+    new URL('./snapshots/creator-plugin-manager/config-reset.expected.json', import.meta.url), 'utf8',
+  ))
   const saved = readProfileManifest('dsh', join(root, 'home/profiles/web'))
   expect(saved.dsh?.profile?.bundles).toContain('@test/creator-mcp')
   expect(saved.dependencies).toHaveProperty('@test/creator-mcp')

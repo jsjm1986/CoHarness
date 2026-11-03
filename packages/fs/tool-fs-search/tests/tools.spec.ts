@@ -159,14 +159,14 @@ class FakeSubprocess extends SubprocessRuntime {
   async terminalEnvironment() { return { platform: 'posix' as const } }
   spawns: SubprocessSpawnSpec[] = []
   override async resolveExecutable(command: string): Promise<string> { return command }
-  override spawnTerminal(): Promise<never> { throw new Error('search tools spawn pipes, never terminals') }
+  protected override spawnTerminalProcess(): Promise<never> { throw new Error('search tools spawn pipes, never terminals') }
   handles: FakeHandle[] = []
   /** Arms the per-spawn script; a `{ reject }` return scripts a spawn-level failure. */
   handler: (spec: SubprocessSpawnSpec) => ScriptedRun | { reject: Error } = () => runResult('')
   /** When true, spawned handles drop their collect readers (the defensive branch). */
   dropReaders = false
 
-  override spawn(spec: SubprocessSpawnSpec): SubprocessHandle {
+  protected override spawnProcess(spec: SubprocessSpawnSpec): SubprocessHandle {
     this.spawns.push(spec)
     const handle = new FakeHandle(spec, () => this.handler(spec), this.dropReaders)
     this.handles.push(handle)
@@ -437,7 +437,12 @@ describe('workdir derivation and signal forwarding', () => {
     const controller = new AbortController()
     subprocess.handler = () => runResult('')
     const result = await call(ctx, 'grep', { pattern: 'x' }, { signal: controller.signal })
-    expect(subprocess.spawns[0]?.signal).toBe(controller.signal)
+    const signal = subprocess.spawns[0]?.signal
+    expect(signal?.aborted).toBe(false)
+    const reason = new Error('caller stopped')
+    controller.abort(reason)
+    expect(signal?.aborted).toBe(true)
+    expect(signal?.reason).toBe(reason)
     expect(result.isError).toBe(false)
   })
 

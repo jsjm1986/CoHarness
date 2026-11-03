@@ -99,7 +99,10 @@
         "*/tests/**/*.snapshot.ts",
         "acp-agent/tests/fixtures/subagent-activation-limit.ts",
         "headless-agent/tests/fixtures/serial-preset.ts",
-        "acp-agent/tests/fixtures/shell/tool-pwsh/driver.ts"
+        "acp-agent/tests/fixtures/shell/tool-pwsh/driver.ts",
+        "headless-agent/tests/fixtures/memory-observer-failure.ts",
+        "headless-agent/tests/fixtures/memory-curation-race-model.ts",
+        "headless-agent/tests/fixtures/memory-execution-model.ts"
       ],
       "project": [
         "**/*.ts"
@@ -1035,8 +1038,7 @@
     "packages/subagent/subagent-dsh-sdk": {
       "entry": [
         "tests/**/*.spec.ts",
-        "tests/**/*.e2e.ts",
-        "tests/fixtures/loader/*.ts"
+        "tests/**/*.e2e.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -1303,7 +1305,8 @@
     },
     "packages/experimental/browser-use-runtime": {
       "entry": [
-        "tests/**/*.spec.ts"
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
       ],
       "project": [
         "src/**/*.ts",

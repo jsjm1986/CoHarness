@@ -41,17 +41,21 @@ function conversationDetail(sessionId: string, visibility: 'project' | 'private'
   }
 }
 
-async function bench(context: CollaborationContext) {
+async function bench(context: CollaborationContext, documentIdentity = false) {
   const ctx = new Context()
   const policy = new ProjectUiPolicyRuntime()
   ctx.provide('projectUiPolicy', policy)
+  if (documentIdentity) ctx.provide('connection', { onPrincipalChange: vi.fn(() => () => {}) } as never)
+  ctx.provide('deploymentContext', { getSnapshot: () => ({ phase: 'ready', showComputer: true, aggregateComputers: true }), subscribe: () => () => {}, refresh: vi.fn() } as never)
   await ctx.plugin(SlotRegistry).await()
   ctx.provide('sessions', {})
+  if (ctx.get('deploymentContext') === undefined) ctx.provide('deploymentContext', { getSnapshot: () => ({ phase: 'ready', showComputer: true, aggregateComputers: true }), subscribe: () => () => {}, refresh: vi.fn() } as never)
   ctx.provide('locale', { register: vi.fn(() => () => {}) })
   ctx.slots.register({
     name: 'root',
     children: {
       'sidebar.footer.action': { kind: 'list', scope: 'root' },
+      'shell.mobile.header.context': { kind: 'list', scope: 'root' },
       'sidebar.settings.action': { kind: 'list', scope: 'root' },
       'conversation.session.header.actions': { kind: 'list', scope: 'session' },
       'conversation.composer': { kind: 'chain', scope: 'session' },
@@ -87,6 +91,22 @@ async function bench(context: CollaborationContext) {
 }
 
 describe('ui-collaboration apply', () => {
+  it('retains document-owned account persistence during a transport renewal while withdrawing permissions', async () => {
+    const b = await bench(baseContext, true)
+    const response = Promise.withResolvers<Response>()
+    try {
+      expect(b.policy.getSnapshot().verifiedAccountId).toBe(7)
+      b.fetcher.mockImplementationOnce(() => response.promise)
+      b.ctx.emit('connection/reset')
+      expect(b.policy.getSnapshot()).toMatchObject({ verifiedAccountId: 7, accountPermissions: 'unknown' })
+      response.resolve(Response.json(baseContext))
+      await vi.waitFor(() => { expect(b.policy.getSnapshot().accountPermissions).toBe('standard') })
+      expect(b.policy.getSnapshot().verifiedAccountId).toBe(7)
+      await b.fiber.dispose()
+      expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
+    } finally { response.resolve(Response.json(baseContext)); b.restore(); await b.ctx.fiber.dispose() }
+  })
+
   it('publishes verified account eligibility and withdraws it on a failed reconnect refresh', async () => {
     const b = await bench({ ...baseContext,
       user: { ...baseContext.user, role: 'admin' }, fullAccess: true, autoReviewEligible: true,
@@ -110,7 +130,7 @@ describe('ui-collaboration apply', () => {
     } finally { b.restore() }
   })
   it('declares only the services it reads', () => {
-    expect(inject).toEqual(['slots', 'sessions', 'locale'])
+    expect(inject).toEqual(['slots', 'sessions', 'locale', 'deploymentContext'])
   })
 
   it('publishes the steward marker while the reserved maintenance space is active', async () => {
@@ -130,6 +150,7 @@ describe('ui-collaboration apply', () => {
       const scopeEntry = b.ctx.slots.entries('sidebar.footer.action')
         .find(entry => entry.component === ScopeControl)!
       expect(scopeEntry.options).toMatchObject({ id: 'collaboration-scope', order: -20 })
+      expect(b.ctx.slots.entries('shell.mobile.header.context').map(entry => entry.options.id)).toEqual(['collaboration-computer'])
       const logoutEntry = b.ctx.slots.entries('sidebar.settings.action')
         .find(entry => entry.component === LogoutButton)!
       expect(logoutEntry.options).toMatchObject({ id: 'collaboration-logout', order: 0 })
@@ -233,6 +254,7 @@ describe('ui-collaboration apply', () => {
       await vi.waitFor(() => { expect(b.fetcher).toHaveBeenCalledTimes(2) })
       await b.fiber.dispose()
       expect(b.ctx.slots.entries('sidebar.footer.action')).toHaveLength(0)
+      expect(b.ctx.slots.entries('shell.mobile.header.context')).toHaveLength(0)
       expect(b.ctx.slots.entries('sidebar.settings.action')).toHaveLength(0)
       expect(b.ctx.slots.entries('conversation.session.header.actions')).toHaveLength(0)
       expect(b.ctx.slots.entries('conversation.composer')).toHaveLength(0)

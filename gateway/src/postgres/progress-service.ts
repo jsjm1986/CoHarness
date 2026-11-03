@@ -1,3 +1,4 @@
+import type { RuntimeId } from '../runtime-catalog.ts'
 /**
  * Human-facing project progress journal. The digest sweep detects
  * shared-visible member activity in `conversation_*` (project-visible root
@@ -7,18 +8,28 @@
  * routes; agent-facing memory is a separate runtime-owned domain that never
  * reads or writes this one.
  */
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
+import { randomUUID } from 'node:crypto'
+import { attributionHeaders } from '@deepseek-ai/dsh-llm'
 import { transaction } from './database.ts'
 import { internalProjectId, type PostgresRuntimeContext } from './runtime-context.ts'
 import { CollaborationDeniedError } from '../collaboration.ts'
 import type { GatewayModelGovernanceService } from '../services.ts'
 import type { PostgresCollaborationService } from './collaboration-service.ts'
+import type { GatewayModelBudget } from '../gateway-model-budget.ts'
+import type { GatewayAccessMonitor } from '../access-invalidation.ts'
+import { checkPostgresReadiness } from './runtime-context.ts'
+import { readResponseBytes } from '../response-budget.ts'
+import type { PostgresProgressUsage, ProgressModelRequest, ProgressRequestOutcome } from './progress-usage.ts'
+import { lockAdministrator } from './administrator-authority.ts'
 
 /** One journal line attributed back to its source conversation. */
 export interface ProgressItem {
   readonly text: string
   readonly actor?: string
   readonly sessionId?: string
+  /** Runtime of the cited source; absent only for unassigned retained history. */
+  readonly runtimeId?: RuntimeId
   readonly sessionTitle?: string
   readonly seq?: number
 }
@@ -104,6 +115,10 @@ export interface ProgressConfig {
   readonly maxOutputTokens: number
   /** Model request deadline. */
   readonly requestTimeoutMs: number
+  /** Maximum retained model response bytes. */
+  readonly maxResponseBytes: number
+  /** Settled request records replayed into billing per sweep. */
+  readonly usageReplayBatchSize: number
   /** Generating lease; a stale lease is recovered by the next candidate pass. */
   readonly leaseMs: number
   /** Projects digested per sweep tick. */
@@ -123,6 +138,8 @@ export const DEFAULT_PROGRESS_CONFIG: ProgressConfig = {
   maxItemsPerSection: 8,
   maxOutputTokens: 4096,
   requestTimeoutMs: 120_000,
+  maxResponseBytes: 1024 * 1024,
+  usageReplayBatchSize: 64,
   leaseMs: 10 * 60_000,
   sweepMaxProjects: 4,
   sweepMs: 60_000,
@@ -131,10 +148,15 @@ export const DEFAULT_PROGRESS_CONFIG: ProgressConfig = {
 /** One shared-visible material row inlined into the digest prompt. */
 interface MaterialRow {
   readonly kind: 'member' | 'decision' | 'agent'
+  readonly runtimeId: RuntimeId | null
+  readonly runtimeNamespace: string
   readonly sessionId: string
   readonly sessionTitle: string | null
   readonly actor: string | null
   readonly occurredAt: Date
+  readonly timestamp: string
+  readonly micros: bigint
+  readonly entryId: string
   readonly seq: number
   readonly text: string
 }
@@ -142,6 +164,7 @@ interface MaterialRow {
 interface StateRow {
   readonly watermark_ts: Date | null
   readonly watermark_session: string | null
+  readonly watermark_runtime_namespace: string | null
   readonly watermark_seq: string | null
   readonly last_run_at: Date | null
   readonly generating_since: Date | null
@@ -165,9 +188,9 @@ interface JournalRow {
  * display titles (same derivation the activity feed uses).
  */
 const VISIBLE_CTE = `visible AS (
-  SELECT r.id,COALESCE(harness.human_session_title(r.title), (SELECT left(search.content, 80)
+  SELECT r.organization_id,r.runtime_id,r.runtime_namespace,r.id,COALESCE(to_json(harness.human_session_title(r.title)), (SELECT harness.conversation_search_text(search.content,search.content_nul_parts,80)
     FROM harness.conversation_search search
-    WHERE search.session_id=r.id AND search.role='user'
+    WHERE search.organization_id=r.organization_id AND search.runtime_namespace=r.runtime_namespace AND search.session_id=r.id AND search.role='user'
       AND harness.human_session_title(search.content) IS NOT NULL
     ORDER BY search.occurred_at,search.event_seq LIMIT 1)) title
   FROM harness.conversation_sessions r
@@ -175,41 +198,77 @@ const VISIBLE_CTE = `visible AS (
     AND r.status<>'deleted' AND r.visibility='project'
 )`
 
-/**
- * Event JSON containing a `\u0000` escape crashes `json` navigation (`->`/`->>`)
- * when the parser de-escapes string tokens. The CASE guard skips those events —
- * the same skip-then-navigate approach the history index uses.
- */
-const SAFE_EVENT = (alias: string) =>
-  `(CASE WHEN position('\\u0000' in ${alias}.event::text) = 0 THEN ${alias}.event END)`
+/** Count-only reads need source identities, without resolving display titles from message history. */
+const VISIBLE_ROOTS_CTE = `visible AS (SELECT r.organization_id,r.runtime_id,r.runtime_namespace,r.id FROM harness.conversation_sessions r
+  WHERE r.organization_id=$1 AND r.project_id=$2 AND r.id=r.root_session_id
+    AND r.status<>'deleted' AND r.visibility='project')`
+
+/** Exclude committed sources before joining and decoding their event JSON. */
+const MEMBER_INPUTS = `pending_messages AS MATERIALIZED (
+  SELECT s.organization_id,s.runtime_id,s.runtime_namespace,s.session_id,s.event_seq,s.content,s.content_nul_parts,s.role FROM harness.conversation_search s JOIN visible v ON v.organization_id=s.organization_id AND v.runtime_namespace=s.runtime_namespace AND v.id=s.session_id
+  WHERE s.role='user' AND s.occurred_at>now()-($3::text||' days')::interval
+    AND ${unconsumedSql('s.session_id', "'message:'||s.event_seq::text", 's.runtime_namespace')}
+), pending_answers AS MATERIALIZED (
+  SELECT c.organization_id,c.runtime_id,c.runtime_namespace,c.conversation_id,c.interaction_id,c.call_id,c.outcome,c.responder_user_id,c.responded_at,c.interaction_kind
+    FROM harness.conversation_interaction_responses c JOIN visible v ON v.organization_id=c.organization_id AND v.runtime_namespace=c.runtime_namespace AND v.id=c.conversation_id
+  WHERE c.interaction_kind='question' AND jsonb_typeof(c.outcome->'answers')='array'
+    AND c.responded_at>now()-($3::text||' days')::interval
+    AND ${unconsumedSql('c.conversation_id', "'question:'||c.interaction_id", 'c.runtime_namespace')}
+)`
 
 /** Member-authored feed rows (messages plus claimed question answers). */
 const MEMBER_ROWS = `
-  SELECT 'decision' kind, c.conversation_id session_id, COALESCE(res.seq,-1) seq,
-    c.responded_at ts, NULL::text text, u.display_name actor_label,
-    ${SAFE_EVENT('call_args')}->'data'->>'arguments' question_args, c.outcome
-  FROM harness.conversation_interaction_responses c
-  JOIN visible v ON v.id=c.conversation_id
+  SELECT 'decision' kind, c.organization_id,c.runtime_id,c.runtime_namespace,c.conversation_id session_id, COALESCE(res.seq,-1) seq,
+    c.responded_at ts, NULL::json text, to_json(u.display_name) actor_label,
+    (call_args.query_fields->>'argumentsJson')::json question_args, c.outcome,
+    'question:'||c.interaction_id entry_id
+  FROM pending_answers c
+  JOIN visible v ON v.organization_id=c.organization_id AND v.runtime_namespace=c.runtime_namespace AND v.id=c.conversation_id
   JOIN harness.users u ON u.id=c.responder_user_id AND u.organization_id=c.organization_id
-  LEFT JOIN harness.conversation_events res ON res.session_id=c.conversation_id
-    AND res.event_type='tool/result' AND ${SAFE_EVENT('res')}->'data'->>'callId'=c.call_id
-  LEFT JOIN harness.conversation_events call_args ON call_args.session_id=c.conversation_id
-    AND call_args.event_type='tool/call' AND ${SAFE_EVENT('call_args')}->'data'->>'callId'=c.call_id
+  LEFT JOIN harness.conversation_events res ON res.organization_id=c.organization_id AND res.runtime_namespace=c.runtime_namespace AND res.session_id=c.conversation_id
+    AND res.event_type='tool/result' AND res.query_fields->>'callId'=c.call_id
+  LEFT JOIN harness.conversation_events call_args ON call_args.organization_id=c.organization_id AND call_args.runtime_namespace=c.runtime_namespace AND call_args.session_id=c.conversation_id
+    AND call_args.event_type='tool/call' AND call_args.query_fields->>'callId'=c.call_id
   WHERE c.interaction_kind='question' AND jsonb_typeof(c.outcome->'answers')='array'
   UNION ALL
-  SELECT 'member',e.session_id,e.seq,e.occurred_at ts,
-    left(search_row.content,500) text,
-    COALESCE(NULLIF(${SAFE_EVENT('e')}->'data'->'source'->'participant'->>'displayName',''),
-      ${SAFE_EVENT('e')}->'data'->'source'->'participant'->>'username') actor_label,
-    NULL, NULL
-  FROM harness.conversation_search search_row
-  JOIN harness.conversation_events e ON e.session_id=search_row.session_id AND e.seq=search_row.event_seq
-  JOIN visible v ON v.id=e.session_id
-  WHERE search_row.role='user' AND ${SAFE_EVENT('e')}->'data'->'source'->'participant' IS NOT NULL`
+  SELECT 'member',e.organization_id,e.runtime_id,e.runtime_namespace,e.session_id,e.seq,e.occurred_at ts,
+    harness.conversation_search_text(search_row.content,search_row.content_nul_parts,500) text,
+    (e.query_fields->>'actorLabelJson')::json actor_label,
+    NULL, NULL, 'message:'||e.seq::text
+  FROM pending_messages search_row
+  JOIN harness.conversation_events e ON e.organization_id=search_row.organization_id AND e.runtime_namespace=search_row.runtime_namespace AND e.session_id=search_row.session_id AND e.seq=search_row.event_seq
+  JOIN visible v ON v.organization_id=e.organization_id AND v.runtime_namespace=e.runtime_namespace AND v.id=e.session_id
+  WHERE search_row.role='user' AND e.query_fields->>'actorUid' IS NOT NULL`
 
-/** Watermark keyset filter shared by the pending and material queries. */
-const AFTER_WATERMARK =
-  `($3::timestamptz IS NULL OR (f.ts,f.session_id,f.seq) > ($3,$4::text,$5::bigint))`
+/** Fixed-size receipt key; the zero byte separates two PostgreSQL text values that cannot contain NUL. */
+const MATERIAL_RECEIPT = materialReceiptSql('f.session_id', 'f.entry_id')
+
+/** Arrival order and timestamp rounding cannot exclude an unconsumed source row. */
+const UNCONSUMED = unconsumedSql('f.session_id', 'f.entry_id', 'f.runtime_namespace')
+
+function materialReceiptSql(session: string, entry: string): string {
+  return `pg_catalog.sha256(pg_catalog.convert_to(${session},'UTF8')||pg_catalog.decode('00','hex')||pg_catalog.convert_to(${entry},'UTF8'))`
+}
+
+function unconsumedSql(session: string, entry: string, runtimeNamespace: string): string {
+  return `NOT EXISTS(SELECT 1 FROM harness.project_journal_materials consumed
+    WHERE consumed.organization_id=$1 AND consumed.project_id=$2 AND consumed.receipt=${materialReceiptSql(session, entry)}
+      AND consumed.runtime_namespace=${runtimeNamespace} AND consumed.session_id=${session} AND consumed.entry_id=${entry})`
+}
+
+const MATERIAL_TIME = `to_char(f.ts AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') cursor_ts,
+  floor(EXTRACT(EPOCH FROM f.ts)*1000000)::text ts_us`
+
+interface MaterialKeyRow {
+  readonly runtime_id: RuntimeId | null
+  readonly runtime_namespace: string
+  readonly session_id: string
+  readonly seq: string
+  readonly ts: Date
+  readonly cursor_ts: string
+  readonly ts_us: string
+  readonly entry_id: string
+}
 
 /** Render one material row as a numbered prompt line. */
 function materialLine(index: number, row: MaterialRow): string {
@@ -247,7 +306,7 @@ export function resolveDigestOutput(raw: string, material: readonly MaterialRow[
   const start = raw.indexOf('{')
   const end = raw.lastIndexOf('}')
   if (start < 0 || end <= start) throw new Error('digest output carried no JSON object')
-  const parsed = JSON.parse(raw.slice(start, end + 1)) as unknown
+  const parsed: unknown = JSON.parse(raw.slice(start, end + 1))
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     throw new Error('digest output is not a JSON object')
   }
@@ -270,6 +329,7 @@ export function resolveDigestOutput(raw: string, material: readonly MaterialRow[
       ...(source === undefined ? {} : {
         ...(source.actor === null ? {} : { actor: source.actor }),
         sessionId: source.sessionId,
+        ...(source.runtimeId === null ? {} : { runtimeId: source.runtimeId }),
         ...(source.sessionTitle === null ? {} : { sessionTitle: source.sessionTitle }),
         seq: source.seq,
       }),
@@ -327,18 +387,58 @@ interface DigestEndpoint {
   readonly model: string
   readonly baseURL: string
   readonly apiKey: string | null
+  readonly credentialSource: 'organization' | 'project'
+  readonly headers: Headers
+  readonly maxOutputTokens: number
+}
+
+/** Billing remains replayable; a failed acknowledgement must not start another provider attempt. */
+class ProgressUsageDeliveryError extends Error {}
+
+/** Access invalidation cancels this pass without trying a different provider. */
+class ProgressAccessChangedError extends Error {}
+
+/** Administrator-visible organization digest pin and enabled catalog candidates. */
+export interface ProgressDigestModelSettings {
+  /** Organization override; null delegates to deployment selection. */
+  model: string | null
+  /** Enabled organization-owned routes accepted by the pin mutation. */
+  candidates: Array<{ provider: string; model: string }>
 }
 
 /** PostgreSQL-backed project progress digest service. */
 export class PostgresProgressService {
+  private readonly stop = new AbortController()
+  private readonly pendingTasks = new Set<Promise<unknown>>()
+  private readonly passes = new Set<{ projectId: number; actorId: number; controller: AbortController }>()
+  private unsubscribeAccess: (() => void) | undefined
+  private closed = false
+
   constructor(
     private readonly context: PostgresRuntimeContext,
     private readonly deps: {
       readonly collaboration: Pick<PostgresCollaborationService, 'projectForUser'>
       readonly governance?: GatewayModelGovernanceService | undefined
+      readonly budget?: Pick<GatewayModelBudget, 'run'> | undefined
+      readonly usage?: Pick<PostgresProgressUsage, 'prepare' | 'complete' | 'flush'> | undefined
+      readonly accessMonitor?: GatewayAccessMonitor | undefined
+      /** Fresh maintenance and restored-data fence, evaluated after node admission. */
+      readonly beforeDispatch?: (() => Promise<void>) | undefined
+      /** Include manually started background work in maintenance quiescence. */
+      readonly trackWrite?: (<T>(operation: () => Promise<T>) => Promise<T>) | undefined
+      /** Reject results produced against a database generation replaced by restore. */
+      readonly assertDataEpoch?: (() => Promise<void>) | undefined
     },
     private readonly config: ProgressConfig = DEFAULT_PROGRESS_CONFIG,
-  ) {}
+  ) {
+    this.unsubscribeAccess = deps.accessMonitor?.subscribe(subject => {
+      for (const request of this.passes) {
+        if (subject.userId !== undefined && subject.userId !== request.actorId) continue
+        if (subject.projectId !== undefined && subject.projectId !== request.projectId) continue
+        request.controller.abort(new ProgressAccessChangedError('Project progress access changed'))
+      }
+    })
+  }
 
   private get pool(): Pool { return this.context.pool }
 
@@ -356,9 +456,10 @@ export class PostgresProgressService {
     const internal = await internalProjectId(this.pool, this.context.organizationId, projectId)
     if (internal === null) throw new CollaborationDeniedError('not-member')
     const state = await this.stateRow(internal)
-    const pending = await this.pending(internal, state)
+    const pending = await this.pending(internal)
     const entries = await this.entries(internal)
-    const enabled = this.config.enabled && (await this.resolveEndpoints(projectId)).length > 0
+    const enabled = this.config.enabled && this.deps.budget !== undefined && this.deps.usage !== undefined
+      && (await this.resolveEndpoints(projectId)).length > 0
     const status: ProgressStatus = {
       enabled,
       pending: pending.count,
@@ -384,41 +485,68 @@ export class PostgresProgressService {
    * @returns whether a pass was admitted
    */
   async generateNow(projectId: number, userId: number): Promise<ProgressGenerateResult> {
+    if (this.closed) return { started: false, reason: 'unavailable' }
+    return this.track(this.generateNowOwned(projectId, userId))
+  }
+
+  private async generateNowOwned(projectId: number, userId: number): Promise<ProgressGenerateResult> {
     const authority = await this.deps.collaboration.projectForUser(projectId, userId)
     if (authority === null) throw new CollaborationDeniedError('not-member')
     if (authority.mode !== 'rw' && !authority.administrator) throw new CollaborationDeniedError('forbidden')
     const internal = await internalProjectId(this.pool, this.context.organizationId, projectId)
     if (internal === null) throw new CollaborationDeniedError('not-member')
-    if (!this.config.enabled || (await this.resolveEndpoints(projectId)).length === 0) {
+    if (this.closed || !this.config.enabled || this.deps.budget === undefined || this.deps.usage === undefined
+      || (await this.resolveEndpoints(projectId)).length === 0) {
       return { started: false, reason: 'unavailable' }
     }
-    if (!(await this.acquire(internal))) return { started: false, reason: 'generating' }
+    const lease = await this.acquire(internal)
+    if (lease === null) return { started: false, reason: 'generating' }
     // runPass records last_error itself; only a failure of that recording path
     // escapes here, and it has nowhere else to land.
-    void this.runPass(projectId, internal).catch(() => undefined)
+    void this.track(this.runPass(projectId, internal, lease, userId)).catch(error => {
+      console.error('[gateway] project progress failure could not be recorded:', error)
+    })
     return { started: true }
   }
 
   /**
-   * One sweep tick: find projects whose shared-visible member activity advanced
-   * past their watermark, apply the gates, and run bounded passes. Idle
-   * projects cost two indexed reads; a project with no new activity never
-   * reaches the model.
+   * Find projects with unconsumed shared material, apply sweep policy and run bounded passes.
+   * A project with no new material does not reach the model.
    */
   async sweep(): Promise<void> {
-    if (!this.config.enabled) return
+    if (this.closed) return
+    if (!this.config.enabled || this.deps.budget === undefined) return this.track(this.deps.usage?.flush() ?? Promise.resolve())
+    return this.track(this.sweepOwned())
+  }
+
+  /** Stop future passes, cancel queued or running inference, and join every owned pass. */
+  async close(): Promise<void> {
+    this.closed = true
+    this.stop.abort(new Error('Project progress is shutting down'))
+    this.unsubscribeAccess?.()
+    this.unsubscribeAccess = undefined
+    while (this.pendingTasks.size > 0) await Promise.allSettled([...this.pendingTasks])
+    await this.deps.usage?.flush()
+  }
+
+  private track<T>(task: Promise<T>): Promise<T> {
+    this.pendingTasks.add(task)
+    void task.then(() => this.pendingTasks.delete(task), () => this.pendingTasks.delete(task))
+    return task
+  }
+
+  private async sweepOwned(): Promise<void> {
+    await this.deps.usage?.flush()
     const candidates = await this.candidates()
     let ran = 0
     for (const candidate of candidates) {
+      if (this.closed) return
       if (ran >= this.config.sweepMaxProjects) return
       const internal = candidate.projectId
       try {
         const state = await this.stateRow(internal)
         if (this.generating(state)) continue
-        // Equality cannot skip: rows sharing the watermark timestamp but sorted
-        // past its (session, seq) key are still undigested — pending() decides.
-        if (state?.watermark_ts != null && candidate.latest < state.watermark_ts) continue
-        const pending = await this.pending(internal, state)
+        const pending = await this.pending(internal)
         if (pending.count === 0) continue
         const now = Date.now()
         const quiet = pending.latest === null || now - pending.latest.getTime() >= this.config.idleMs
@@ -427,8 +555,9 @@ export class PostgresProgressService {
         if (!quiet || !spaced || !enough) continue
         const project = await this.publicIdOf(internal)
         if (project === null) continue
-        if (!(await this.acquire(internal))) continue
-        await this.runPass(project, internal)
+        const lease = await this.acquire(internal)
+        if (lease === null) continue
+        await this.runPass(project, internal, lease)
         ran += 1
       } catch (error) {
         // One broken project must not starve the rest of the sweep.
@@ -437,93 +566,92 @@ export class PostgresProgressService {
     }
   }
 
-  /** Projects with shared-visible member activity inside the scan window. */
-  private async candidates(): Promise<{ projectId: string; latest: Date }[]> {
-    const result = await this.pool.query<{ pid: string; mx: Date }>(`
-      SELECT pid, MAX(mx) mx FROM (
-        SELECT r.project_id::text pid, s.occurred_at mx
+  /** Local-computer projects with shared-visible member activity inside the scan window. */
+  private async candidates(): Promise<{ projectId: string }[]> {
+    const result = await this.pool.query<{ pid: string }>(`
+      WITH live_projects AS (SELECT p.id FROM harness.projects p JOIN harness.organizations o ON o.id=p.organization_id
+        WHERE p.organization_id=$1 AND p.status='active' AND o.status='active'
+          AND harness.project_node_id(p.organization_id,p.id)=$3
+          AND EXISTS(SELECT 1 FROM harness.compute_nodes n WHERE n.id=$3 AND n.organization_id=$1 AND n.status='active'))
+      SELECT pid FROM (
+        SELECT r.project_id::text pid
         FROM harness.conversation_search s
-        JOIN harness.conversation_sessions r ON r.id=s.session_id
+        JOIN harness.conversation_sessions r ON r.organization_id=s.organization_id AND r.runtime_namespace=s.runtime_namespace AND r.id=s.session_id
+        JOIN live_projects p ON p.id=r.project_id
         WHERE r.organization_id=$1 AND r.id=r.root_session_id AND r.status<>'deleted'
           AND r.visibility='project' AND r.project_id IS NOT NULL AND s.role='user'
           AND s.occurred_at > now() - ($2::text || ' days')::interval
         UNION ALL
-        SELECT r.project_id::text, c.responded_at
+        SELECT r.project_id::text
         FROM harness.conversation_interaction_responses c
-        JOIN harness.conversation_sessions r ON r.id=c.conversation_id
-        WHERE c.organization_id=$1 AND r.status<>'deleted' AND r.visibility='project'
+        JOIN harness.conversation_sessions r ON r.organization_id=c.organization_id AND r.runtime_namespace=c.runtime_namespace AND r.id=c.conversation_id
+        JOIN live_projects p ON p.id=r.project_id
+        WHERE c.organization_id=$1 AND r.id=r.root_session_id AND r.status<>'deleted' AND r.visibility='project'
           AND c.interaction_kind='question' AND jsonb_typeof(c.outcome->'answers')='array'
           AND c.responded_at > now() - ($2::text || ' days')::interval
       ) recent GROUP BY pid`,
-    [this.context.organizationId, String(this.config.materialWindowDays)])
-    return result.rows.map(row => ({ projectId: row.pid, latest: row.mx }))
+    [this.context.organizationId, String(this.config.materialWindowDays), this.context.nodeId])
+    return result.rows.map(row => ({ projectId: row.pid }))
   }
 
-  /** Undigested member-visible rows since the stored watermark, inside the scan window. */
-  private async pending(internal: string, state: StateRow | undefined): Promise<{ count: number; latest: Date | null; hasDecision: boolean }> {
+  /** Unconsumed member-visible rows inside the source window, including delayed arrivals. */
+  private async pending(internal: string): Promise<{ count: number; latest: Date | null; hasDecision: boolean }> {
     const result = await this.pool.query<{ pending: number; latest: Date | null; decided: boolean }>(`
-      WITH ${VISIBLE_CTE}, feed AS (${MEMBER_ROWS})
+      WITH ${VISIBLE_ROOTS_CTE}, ${MEMBER_INPUTS}, feed AS (${MEMBER_ROWS})
       SELECT count(*)::int pending, max(f.ts) latest, coalesce(bool_or(f.kind='decision'),false) decided
-      FROM feed f WHERE ${AFTER_WATERMARK}
-        AND f.ts > now() - ($6::text || ' days')::interval`,
-    [this.context.organizationId, internal,
-      state?.watermark_ts?.toISOString() ?? null, state?.watermark_session ?? null, state?.watermark_seq ?? 0,
-      String(this.config.materialWindowDays)])
+      FROM feed f WHERE f.ts > now() - ($3::text || ' days')::interval`,
+    [this.context.organizationId, internal, String(this.config.materialWindowDays)])
     const row = result.rows[0]
     return { count: Number(row?.pending ?? 0), latest: row?.latest ?? null, hasDecision: row?.decided === true }
   }
 
   /**
-   * Material rows since the watermark, oldest first, plus `limit`: the last
+   * Unconsumed material, oldest first, plus `limit`: the last
    * key a capped stream provably covers. When either stream hit its cap the
    * merged tail past `limit` may be missing rows, so callers consume only the
-   * complete prefix and leave the rest under the watermark for the next pass.
+   * complete prefix and retain the rest for a later pass.
    */
-  private async material(internal: string, state: StateRow | undefined): Promise<{ rows: MaterialRow[]; limit: MaterialRow | null }> {
-    const watermark = [this.context.organizationId, internal,
-      state?.watermark_ts?.toISOString() ?? null, state?.watermark_session ?? null, state?.watermark_seq ?? 0]
-    const members = await this.pool.query<{
+  private async material(internal: string): Promise<{ rows: MaterialRow[]; limit: MaterialRow | null }> {
+    const parameters = [this.context.organizationId, internal, String(this.config.materialWindowDays)]
+    const members = await this.pool.query<MaterialKeyRow & {
       kind: 'decision' | 'member'; session_id: string; seq: string; ts: Date
       text: string | null; actor_label: string | null; outcome: unknown; question_args: string | null
       title: string | null
     }>(`
-      WITH ${VISIBLE_CTE}, feed AS (${MEMBER_ROWS})
-      SELECT f.*, v.title FROM feed f JOIN visible v ON v.id=f.session_id
-      WHERE ${AFTER_WATERMARK}
-        AND f.ts > now() - ($6::text || ' days')::interval
-      ORDER BY f.ts, f.session_id, f.seq LIMIT $7`,
-    [...watermark, String(this.config.materialWindowDays), this.config.maxMaterialRows])
-    const agents = await this.pool.query<{
+      WITH ${VISIBLE_CTE}, ${MEMBER_INPUTS}, feed AS (${MEMBER_ROWS})
+      SELECT f.*, v.title, ${MATERIAL_TIME} FROM feed f JOIN visible v ON v.organization_id=f.organization_id AND v.runtime_namespace=f.runtime_namespace AND v.id=f.session_id
+      WHERE f.ts > now() - ($3::text || ' days')::interval
+      ORDER BY f.ts, f.runtime_namespace COLLATE "C", f.session_id COLLATE "C", f.seq, f.entry_id COLLATE "C" LIMIT $4`,
+    [...parameters, this.config.maxMaterialRows])
+    const agents = await this.pool.query<MaterialKeyRow & {
       session_id: string; seq: string; ts: Date; text: string | null; title: string | null
     }>(`
       WITH ${VISIBLE_CTE}, feed AS (
-        SELECT 'agent' kind, e.session_id, e.seq, e.occurred_at ts,
-          left(search_row.content,300) text
+        SELECT 'agent' kind, e.organization_id,e.runtime_id,e.runtime_namespace,e.session_id, e.seq, e.occurred_at ts,
+          harness.conversation_search_text(search_row.content,search_row.content_nul_parts,300) text, 'message:'||e.seq::text entry_id
         FROM harness.conversation_search search_row
-        JOIN harness.conversation_events e ON e.session_id=search_row.session_id AND e.seq=search_row.event_seq
-        JOIN visible v ON v.id=e.session_id
+        JOIN harness.conversation_events e ON e.organization_id=search_row.organization_id AND e.runtime_namespace=search_row.runtime_namespace AND e.session_id=search_row.session_id AND e.seq=search_row.event_seq
+        JOIN visible v ON v.organization_id=e.organization_id AND v.runtime_namespace=e.runtime_namespace AND v.id=e.session_id
         WHERE search_row.role='assistant')
-      SELECT f.*, v.title FROM feed f JOIN visible v ON v.id=f.session_id
-      WHERE ${AFTER_WATERMARK}
-        AND f.ts > now() - ($6::text || ' days')::interval
-      ORDER BY f.ts, f.session_id, f.seq LIMIT $7`,
-    [...watermark, String(this.config.materialWindowDays), this.config.maxAssistantRows])
+      SELECT f.*, v.title, ${MATERIAL_TIME} FROM feed f JOIN visible v ON v.organization_id=f.organization_id AND v.runtime_namespace=f.runtime_namespace AND v.id=f.session_id
+      WHERE ${UNCONSUMED}
+        AND f.ts > now() - ($3::text || ' days')::interval
+      ORDER BY f.ts, f.runtime_namespace COLLATE "C", f.session_id COLLATE "C", f.seq, f.entry_id COLLATE "C" LIMIT $4`,
+    [...parameters, this.config.maxAssistantRows])
     const rows: MaterialRow[] = []
     for (const row of members.rows) {
       const text = row.kind === 'decision'
         ? `${questionText(row.question_args) ?? '(question)'} → ${answerSummary(row.outcome)}`
         : (row.text ?? '')
-      if (text === '') continue
       rows.push({
         kind: row.kind, sessionId: row.session_id, sessionTitle: row.title,
-        actor: row.actor_label, occurredAt: row.ts, seq: Number(row.seq), text,
+        actor: row.actor_label, ...materialKey(row), text,
       })
     }
     for (const row of agents.rows) {
-      if (row.text === null || row.text === '') continue
       rows.push({
         kind: 'agent', sessionId: row.session_id, sessionTitle: row.title,
-        actor: null, occurredAt: row.ts, seq: Number(row.seq), text: row.text,
+        actor: null, ...materialKey(row), text: row.text ?? '',
       })
     }
     rows.sort(compareKeys)
@@ -531,43 +659,65 @@ export class PostgresProgressService {
     const lastAgent = agents.rows.length === this.config.maxAssistantRows ? agents.rows[agents.rows.length - 1] : undefined
     const limits: MaterialRow[] = []
     if (lastMember !== undefined) {
-      limits.push({ kind: 'member', sessionId: lastMember.session_id, sessionTitle: null, actor: null, occurredAt: lastMember.ts, seq: Number(lastMember.seq), text: '' })
+      limits.push({ kind: 'member', sessionId: lastMember.session_id, sessionTitle: null, actor: null, ...materialKey(lastMember), text: '' })
     }
     if (lastAgent !== undefined) {
-      limits.push({ kind: 'agent', sessionId: lastAgent.session_id, sessionTitle: null, actor: null, occurredAt: lastAgent.ts, seq: Number(lastAgent.seq), text: '' })
+      limits.push({ kind: 'agent', sessionId: lastAgent.session_id, sessionTitle: null, actor: null, ...materialKey(lastAgent), text: '' })
     }
     limits.sort(compareKeys)
     return { rows, limit: limits[0] ?? null }
   }
 
-  /** Acquire or renew the in-flight lease for one project. */
-  private async acquire(internal: string): Promise<boolean> {
+  /** Acquire or renew a generation only for an active project fixed to this computer. */
+  private async acquire(internal: string): Promise<string | null> {
+    const lease = randomUUID()
     const result = await this.pool.query(
-      `INSERT INTO harness.project_journal_state(organization_id,project_id,generating_since,updated_at)
-       VALUES($1,$2,now(),now())
-       ON CONFLICT (project_id) DO UPDATE SET generating_since=now(),updated_at=now()
+      `INSERT INTO harness.project_journal_state(organization_id,project_id,generating_since,updated_at,generation_id)
+       SELECT $1,id,now(),now(),$4 FROM harness.projects
+       WHERE organization_id=$1 AND id=$2 AND status='active' AND harness.project_node_id(organization_id,id)=$5
+       ON CONFLICT (project_id) DO UPDATE SET generating_since=now(),updated_at=now(),generation_id=excluded.generation_id
          WHERE harness.project_journal_state.generating_since IS NULL
             OR harness.project_journal_state.generating_since < now() - ($3::text || ' milliseconds')::interval`,
-      [this.context.organizationId, internal, String(this.config.leaseMs)])
-    return result.rowCount === 1
+      [this.context.organizationId, internal, String(this.config.leaseMs), lease, this.context.nodeId])
+    return result.rowCount === 1 ? lease : null
   }
 
   /**
    * Run one pass under an acquired lease: material → model → one transaction
-   * covering both entries plus the watermark. Failures record `last_error` and
-   * leave the watermark untouched so the same material rejoins the next pass.
+   * covering entries, source receipts and progress position. Failures record
+   * `last_error` and leave source receipts uncommitted for a later pass.
    */
-  private async runPass(publicId: number, internal: string): Promise<void> {
+  private runPass(publicId: number, internal: string, lease: string, actorId = 0): Promise<void> {
+    const operation = () => this.runPassOwned(publicId, internal, lease, actorId)
+    return this.deps.trackWrite === undefined ? operation() : this.deps.trackWrite(operation)
+  }
+
+  private async runPassOwned(publicId: number, internal: string, lease: string, actorId: number): Promise<void> {
+    const pass = { projectId: publicId, actorId, controller: new AbortController() }
+    const signal = AbortSignal.any([this.stop.signal, pass.controller.signal])
     try {
+      await this.deps.accessMonitor?.synchronize()
+      signal.throwIfAborted()
+      this.passes.add(pass)
       const state = await this.stateRow(internal)
-      const fetched = await this.material(internal, state)
+      const fetched = await this.material(internal)
       // A capped stream's tail may be missing rows; digest only the complete
-      // prefix so the watermark never advances past undigested material.
-      const material = fetched.limit === null
+      // prefix so no source receipt acknowledges undigested material.
+      const receipts = fetched.limit === null
         ? fetched.rows
         : fetched.rows.filter(row => compareKeys(row, fetched.limit!) <= 0)
+      const material = receipts.filter(row => row.text !== '')
       if (material.length === 0) {
-        await this.clearLease(internal)
+        if (receipts.length === 0) await this.clearLease(internal, lease)
+        else await transaction(this.pool, async client => {
+          await this.deps.assertDataEpoch?.()
+          signal.throwIfAborted()
+          await this.assertVisible(client, internal, receipts)
+          await this.renewLease(client, internal, lease)
+          await this.recordReceipts(client, internal, receipts)
+          await this.clearLease(internal, lease, client)
+          signal.throwIfAborted()
+        })
         return
       }
       const endpoints = await this.resolveEndpoints(publicId)
@@ -581,57 +731,71 @@ export class PostgresProgressService {
       const [openPeriod, current, projectName] = await Promise.all([
         this.periodEntry(internal, periodKey), this.currentEntry(internal), this.projectName(internal),
       ])
-      const prompt = DIGEST_INSTRUCTION
-        .replace('{project}', projectName ?? String(publicId))
-        .replace('{previousCurrent}', current?.content.summary ?? '(none)')
-        .replace('{periodKey}', periodKey)
-        .replace('{openPeriod}', openPeriod === undefined ? '(none)' : JSON.stringify(openPeriod.content))
-        .replace('{since}', state?.watermark_ts?.toISOString() ?? 'the beginning')
-        .replace('{material}', material.map((row, index) => materialLine(index + 1, row)).join('\n'))
-        .replace('{maxItems}', String(this.config.maxItemsPerSection))
+      const values: Record<string, string> = {
+        project: projectName ?? String(publicId), previousCurrent: current?.content.summary ?? '(none)', periodKey,
+        openPeriod: openPeriod === undefined ? '(none)' : JSON.stringify(openPeriod.content),
+        since: state?.watermark_ts?.toISOString() ?? 'the beginning',
+        material: material.map((row, index) => materialLine(index + 1, row)).join('\n'),
+        maxItems: String(this.config.maxItemsPerSection),
+      }
+      const prompt = DIGEST_INSTRUCTION.replace(/\{(project|previousCurrent|periodKey|openPeriod|since|material|maxItems)\}/g,
+        (_match, key: string) => values[key]!)
       let raw: string | undefined
       let model = ''
       let failure: unknown = new Error('no resolvable model route')
       for (const endpoint of endpoints) {
         try {
-          raw = await this.callModel(endpoint, prompt)
+          signal.throwIfAborted()
+          raw = await this.callModel(publicId, internal, lease, material, actorId, endpoint, prompt, signal)
           model = `${endpoint.provider}/${endpoint.model}`
           break
         } catch (error) {
           failure = error instanceof Error ? new Error(`${endpoint.provider}: ${error.message}`) : error
+          if (signal.aborted || error instanceof ProgressUsageDeliveryError) break
         }
       }
       if (raw === undefined) throw failure
+      await this.deps.accessMonitor?.synchronize()
+      signal.throwIfAborted()
       const content = resolveDigestOutput(raw, material, this.config.maxItemsPerSection)
       const last = material[material.length - 1]!
       const memberRows = material.filter(row => row.kind !== 'agent').length
       await transaction(this.pool, async (client) => {
+        await this.deps.assertDataEpoch?.()
+        signal.throwIfAborted()
+        await this.assertVisible(client, internal, receipts)
+        await this.renewLease(client, internal, lease)
         await client.query(`INSERT INTO harness.project_journal(
             organization_id,project_id,kind,content,activity_count,model,generated_at,created_at,updated_at)
-          VALUES($1,$2,'current',$3::jsonb,$4,$5,now(),now(),now())
+          VALUES($1,$2,'current',$3::json,$4,$5,now(),now(),now())
           ON CONFLICT (organization_id,project_id) WHERE kind='current'
           DO UPDATE SET content=excluded.content,activity_count=excluded.activity_count,
-            model=excluded.model,generated_at=excluded.generated_at,updated_at=now()`,
+            model=excluded.model,generated_at=excluded.generated_at,invalidated_at=NULL,updated_at=now()`,
         [this.context.organizationId, internal, JSON.stringify(content), memberRows, model])
         await client.query(`INSERT INTO harness.project_journal(
             organization_id,project_id,kind,period_key,content,activity_count,
             period_start,period_end,model,generated_at,created_at,updated_at)
-          VALUES($1,$2,'period',$3,$4::jsonb,$5,$6,$7,$8,now(),now(),now())
+          VALUES($1,$2,'period',$3,$4::json,$5,$6,$7,$8,now(),now(),now())
           ON CONFLICT (organization_id,project_id,period_key) WHERE kind='period'
           DO UPDATE SET content=excluded.content,activity_count=excluded.activity_count,
-            period_end=excluded.period_end,model=excluded.model,generated_at=excluded.generated_at,updated_at=now()`,
+            period_end=excluded.period_end,model=excluded.model,generated_at=excluded.generated_at,invalidated_at=NULL,updated_at=now()`,
         [this.context.organizationId, internal, periodKey, JSON.stringify(content), memberRows,
-          material[0]!.occurredAt.toISOString(), last.occurredAt.toISOString(), model])
+          material[0]!.timestamp, last.timestamp, model])
+        await this.recordReceipts(client, internal, receipts)
         await client.query(`UPDATE harness.project_journal_state
-          SET watermark_ts=$3,watermark_session=$4,watermark_seq=$5,
+          SET (watermark_ts,watermark_runtime_namespace,watermark_session,watermark_seq)=(
+            SELECT ts,namespace,sid,seq FROM (VALUES(watermark_ts,watermark_runtime_namespace,watermark_session,watermark_seq),($3::timestamptz,$7::text,$4::text,$5::bigint))
+              AS keys(ts,namespace,sid,seq) ORDER BY ts DESC NULLS LAST,namespace COLLATE "C" DESC NULLS LAST,sid COLLATE "C" DESC NULLS LAST,seq DESC NULLS LAST LIMIT 1),
             last_run_at=now(),generating_since=NULL,last_error=NULL,updated_at=now()
-          WHERE organization_id=$1 AND project_id=$2`,
+          WHERE organization_id=$1 AND project_id=$2 AND generation_id=$6`,
         [this.context.organizationId, internal,
-          last.occurredAt.toISOString(), last.sessionId, last.seq])
+          last.timestamp, last.sessionId, last.seq, lease, last.runtimeNamespace])
+        signal.throwIfAborted()
       })
     } catch (error: unknown) {
-      await this.fail(internal, error instanceof Error ? error.message : String(error))
-    }
+      await this.deps.assertDataEpoch?.()
+      await this.fail(internal, lease, error instanceof Error ? error.message : String(error))
+    } finally { this.passes.delete(pass) }
   }
 
   /**
@@ -646,15 +810,20 @@ export class PostgresProgressService {
     const endpoints: DigestEndpoint[] = []
     const seen = new Set<string>()
     for (const route of policy.models) {
-      if (!route.allowed || seen.has(`${route.provider}${route.model}`)) continue
-      seen.add(`${route.provider}${route.model}`)
+      const key = JSON.stringify([route.provider, route.model])
+      if (!route.allowed || seen.has(key)) continue
+      seen.add(key)
       const provider = policy.providers.find(entry => entry.provider === route.provider)
       if (provider === undefined || provider.protocol !== 'openai-completions') continue
-      if (!provider.models.some(entry => entry.id === route.model)) continue
+      const model = provider.models.find(entry => entry.id === route.model)
+      if (model === undefined) continue
       const apiKey = provider.credentialRef === undefined || governance.resolveManagedCredential === undefined
         ? null
         : await governance.resolveManagedCredential({ kind: 'project', id: projectId }, provider.credentialRef)
-      endpoints.push({ provider: route.provider, model: route.model, baseURL: provider.baseURL, apiKey })
+      endpoints.push({ provider: route.provider, model: route.model, baseURL: provider.baseURL, apiKey,
+        credentialSource: provider.scope === 'project' || provider.credentialRef?.startsWith('DSH_PROJECT_') === true ? 'project' : 'organization',
+        headers: configuredHeaders(provider.profile?.headers),
+        maxOutputTokens: Math.min(this.config.maxOutputTokens, model.maxTokens ?? this.config.maxOutputTokens) })
     }
     if (endpoints.length === 0) return endpoints
     const pin = await this.digestModelPin()
@@ -680,79 +849,137 @@ export class PostgresProgressService {
   /**
    * Administrator-facing digest route setting plus the enabled
    * openai-completions candidates the selector may offer.
+   * @param actorUserId - authenticated public administrator id, retained through the read.
    * @returns current pin and candidate routes in `provider/model` form
    */
-  async digestModelSettings(): Promise<{
-    model: string | null
-    candidates: Array<{ provider: string; model: string }>
-  }> {
+  async digestModelSettings(actorUserId: number): Promise<ProgressDigestModelSettings> {
+    return transaction(this.pool, async client => {
+      await lockAdministrator(client, this.context, actorUserId)
+      return this.readDigestModelSettings(client)
+    })
+  }
+
+  /** Read the catalog under the caller's retained administrator transaction. */
+  private async readDigestModelSettings(client: PoolClient): Promise<ProgressDigestModelSettings> {
     const [setting, candidates] = await Promise.all([
-      this.pool.query<{ digest_model: string | null }>(
+      client.query<{ digest_model: string | null }>(
         `SELECT digest_model FROM harness.organizations WHERE id=$1`, [this.context.organizationId]),
-      this.pool.query<{ provider_key: string; model_key: string }>(
+      client.query<{ provider_key: string; model_key: string }>(
         `SELECT c.provider_key, c.model_key FROM harness.model_catalog c
          JOIN harness.model_providers p
-           ON p.organization_id=$1 AND p.provider_key=c.provider_key
-         WHERE c.enabled AND p.status='enabled' AND p.protocol='openai-completions'
+           ON p.organization_id=c.organization_id AND p.provider_key=c.provider_key
+         WHERE c.organization_id=$1 AND c.enabled AND p.status='enabled' AND p.protocol='openai-completions'
          ORDER BY c.provider_key, c.model_key`, [this.context.organizationId]),
     ])
     return {
-      model: setting.rows[0]?.digest_model ?? null,
+      model: setting.rows[0]!.digest_model,
       candidates: candidates.rows.map(row => ({ provider: row.provider_key, model: row.model_key })),
     }
   }
 
   /**
    * Store or clear the organization digest route pin. The value must name an
-   * enabled openai-completions candidate so a stale or unauthorized route can
-   * never be pinned.
-   * @param model - `provider/model`, or `null` to return to catalog order
+   * enabled organization-owned openai-completions candidate retained through commit.
+   * @param model - exact catalog `provider/model`, or `null` to clear the organization pin.
+   * @param actorUserId - authenticated public administrator id, retained through commit.
+   * @returns accepted setting and catalog view from the same transaction.
    */
-  async setDigestModel(model: string | null): Promise<void> {
-    if (model !== null && !/^\S+\/\S+$/u.test(model)) throw new Error('digest-model-format')
-    if (model !== null) {
-      const found = await this.pool.query(
-        `SELECT 1 FROM harness.model_catalog c
-         JOIN harness.model_providers p
-           ON p.organization_id=$1 AND p.provider_key=c.provider_key
-         WHERE c.enabled AND p.status='enabled' AND p.protocol='openai-completions'
-           AND c.provider_key || '/' || c.model_key = $2`,
+  async setDigestModel(model: string | null, actorUserId: number): Promise<ProgressDigestModelSettings> {
+    return transaction(this.pool, async client => {
+      // Serialize organization writers before retaining the administrator's share locks.
+      await client.query('SELECT id FROM harness.organizations WHERE id=$1 FOR NO KEY UPDATE', [this.context.organizationId])
+      await lockAdministrator(client, this.context, actorUserId)
+      if (model !== null) {
+        const found = await client.query(
+          `SELECT 1 FROM harness.model_catalog c
+           JOIN harness.model_providers p
+             ON p.organization_id=c.organization_id AND p.provider_key=c.provider_key
+           WHERE c.organization_id=$1 AND c.enabled AND p.status='enabled' AND p.protocol='openai-completions'
+             AND c.provider_key || '/' || c.model_key = $2 FOR SHARE OF c,p`,
+          [this.context.organizationId, model])
+        if (found.rowCount === 0) throw new Error('digest-model-unavailable')
+      }
+      await client.query(
+        `UPDATE harness.organizations SET digest_model=$2, updated_at=now() WHERE id=$1`,
         [this.context.organizationId, model])
-      if (found.rowCount === 0) throw new Error('digest-model-unavailable')
-    }
-    await this.pool.query(
-      `UPDATE harness.organizations SET digest_model=$2, updated_at=now() WHERE id=$1`,
-      [this.context.organizationId, model])
+      return this.readDigestModelSettings(client)
+    })
   }
 
   /** One non-streaming OpenAI-completions request bounded by the request timeout. */
-  private async callModel(endpoint: DigestEndpoint, prompt: string): Promise<string> {
-    const url = `${endpoint.baseURL.replace(/\/+$/, '')}/chat/completions`
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(endpoint.apiKey === null ? {} : { authorization: `Bearer ${endpoint.apiKey}` }),
-      },
-      body: JSON.stringify({
-        model: endpoint.model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: this.config.maxOutputTokens,
-        temperature: 0.2,
-        stream: false,
-      }),
-      signal: AbortSignal.timeout(this.config.requestTimeoutMs),
+  private async callModel(projectId: number, internal: string, lease: string, material: readonly MaterialRow[],
+    actorId: number, previous: DigestEndpoint, prompt: string, callerSignal: AbortSignal): Promise<string> {
+    const budget = this.deps.budget
+    const usageJournal = this.deps.usage
+    if (budget === undefined || usageJournal === undefined) throw new Error('Project progress requires node admission and durable usage')
+    return budget.run({ projectId, actorId, signal: callerSignal }, async (admissionSignal, operationId) => {
+      await this.deps.accessMonitor?.synchronize()
+      admissionSignal.throwIfAborted()
+      await this.deps.beforeDispatch?.()
+      await checkPostgresReadiness(this.context, admissionSignal)
+      const active = await this.pool.query(`SELECT 1 FROM harness.projects WHERE organization_id=$1 AND public_id=$2 AND status='active' AND harness.project_node_id(organization_id,id)=$3 AND harness.project_node_id(organization_id,id)=$3`,
+        [this.context.organizationId, projectId, this.context.nodeId])
+      if (active.rowCount !== 1) throw new Error('Project is no longer active')
+      await this.renewLease(this.pool, internal, lease)
+      await this.assertVisible(this.pool, internal, material)
+      if (actorId !== 0) {
+        const authority = await this.deps.collaboration.projectForUser(projectId, actorId)
+        if (authority === null || (authority.mode !== 'rw' && !authority.administrator)) throw new CollaborationDeniedError('forbidden')
+      }
+      const endpoint = (await this.resolveEndpoints(projectId)).find(endpoint => endpoint.provider === previous.provider && endpoint.model === previous.model)
+      if (endpoint === undefined) throw new Error('Digest model route is no longer allowed')
+      admissionSignal.throwIfAborted()
+      const request: ProgressModelRequest = { model: endpoint.model, messages: [{ role: 'user', content: prompt }],
+        max_tokens: endpoint.maxOutputTokens, temperature: 0.2, stream: false }
+      const id = await usageJournal.prepare({ projectId, internalProjectId: internal, actorId, operationId,
+        provider: endpoint.provider, credentialSource: endpoint.credentialSource, request })
+      const signal = AbortSignal.any([admissionSignal, AbortSignal.timeout(this.config.requestTimeoutMs)])
+      let status: ProgressRequestOutcome['status'] = 'failed', usage: ProgressRequestOutcome['usage'], response: string | undefined
+      let failed: unknown
+      try {
+        signal.throwIfAborted()
+        const headers = new Headers(endpoint.headers)
+        headers.set('content-type', 'application/json')
+        if (endpoint.apiKey !== null) headers.set('authorization', `Bearer ${endpoint.apiKey}`)
+        for (const [name, value] of Object.entries(attributionHeaders())) headers.set(name, value)
+        const reply = await fetch(`${endpoint.baseURL.replace(/\/+$/, '')}/chat/completions`, {
+          method: 'POST', headers,
+          body: JSON.stringify(request), signal,
+        })
+        response = new TextDecoder().decode(await readResponseBytes(reply, this.config.maxResponseBytes))
+        if (!reply.ok) throw new Error(`digest model request failed: ${String(reply.status)}`)
+        const body: unknown = JSON.parse(response)
+        const record = objectValue(body)
+        usage = modelUsage(record?.usage)
+        const choice = Array.isArray(record?.choices) ? objectValue(record.choices[0]) : undefined
+        const content = objectValue(choice?.message)?.content
+        if (typeof content !== 'string' || content === '') throw new Error('digest model returned no content')
+        status = usage === undefined ? 'missing-usage' : 'succeeded'
+        return content
+      } catch (error) {
+        failed = error
+        if (signal.aborted) status = 'cancelled'
+        if (admissionSignal.reason instanceof ProgressAccessChangedError) {
+          throw new ProgressAccessChangedError('Project progress access changed', { cause: error })
+        }
+        throw error
+      } finally {
+        try {
+          await usageJournal.complete(id, { status, ...(usage === undefined ? {} : { usage }),
+            ...(response === undefined ? {} : { response }) })
+          await usageJournal.flush(id)
+        } catch (error) {
+          throw new ProgressUsageDeliveryError('Digest usage remains pending delivery', {
+            cause: failed === undefined ? error : new AggregateError([failed, error], 'Model request and usage delivery failed'),
+          })
+        }
+      }
     })
-    if (!response.ok) throw new Error(`digest model request failed: ${String(response.status)}`)
-    const body = await response.json() as { choices?: { message?: { content?: unknown } }[] }
-    const content = body.choices?.[0]?.message?.content
-    if (typeof content !== 'string' || content === '') throw new Error('digest model returned no content')
-    return content
   }
 
   /** Read the per-project digest state row, if any. */
   private async stateRow(internal: string): Promise<StateRow | undefined> {
-    const result = await this.pool.query<StateRow>(`SELECT watermark_ts,watermark_session,watermark_seq,
+    const result = await this.pool.query<StateRow>(`SELECT watermark_ts,watermark_runtime_namespace,watermark_session,watermark_seq,
       last_run_at,generating_since,last_error FROM harness.project_journal_state
       WHERE organization_id=$1 AND project_id=$2`, [this.context.organizationId, internal])
     return result.rows[0]
@@ -768,7 +995,7 @@ export class PostgresProgressService {
   private async entries(internal: string): Promise<ProgressEntry[]> {
     const result = await this.pool.query<JournalRow>(`SELECT id,kind,period_key,content,activity_count,
       period_start,period_end,model,generated_at FROM harness.project_journal
-      WHERE organization_id=$1 AND project_id=$2
+      WHERE organization_id=$1 AND project_id=$2 AND invalidated_at IS NULL
       ORDER BY CASE kind WHEN 'current' THEN 0 ELSE 1 END, period_key DESC LIMIT 26`,
     [this.context.organizationId, internal])
     return result.rows.map(row => ({
@@ -788,7 +1015,7 @@ export class PostgresProgressService {
   private async periodEntry(internal: string, periodKey: string): Promise<JournalRow | undefined> {
     const result = await this.pool.query<JournalRow>(`SELECT id,kind,period_key,content,activity_count,
       period_start,period_end,model,generated_at FROM harness.project_journal
-      WHERE organization_id=$1 AND project_id=$2 AND kind='period' AND period_key=$3`,
+      WHERE organization_id=$1 AND project_id=$2 AND invalidated_at IS NULL AND kind='period' AND period_key=$3`,
     [this.context.organizationId, internal, periodKey])
     return result.rows[0]
   }
@@ -797,15 +1024,15 @@ export class PostgresProgressService {
   private async currentEntry(internal: string): Promise<JournalRow | undefined> {
     const result = await this.pool.query<JournalRow>(`SELECT id,kind,period_key,content,activity_count,
       period_start,period_end,model,generated_at FROM harness.project_journal
-      WHERE organization_id=$1 AND project_id=$2 AND kind='current'`,
+      WHERE organization_id=$1 AND project_id=$2 AND invalidated_at IS NULL AND kind='current'`,
     [this.context.organizationId, internal])
     return result.rows[0]
   }
 
   private async publicIdOf(internal: string): Promise<number | null> {
     const result = await this.pool.query<{ public_id: string }>(
-      'SELECT public_id::text FROM harness.projects WHERE organization_id=$1 AND id=$2',
-      [this.context.organizationId, internal])
+      'SELECT public_id::text FROM harness.projects WHERE organization_id=$1 AND id=$2 AND harness.project_node_id(organization_id,id)=$3',
+      [this.context.organizationId, internal, this.context.nodeId])
     const value = result.rows[0]?.public_id
     return value === undefined ? null : Number(value)
   }
@@ -817,10 +1044,10 @@ export class PostgresProgressService {
     return result.rows[0]?.name
   }
 
-  private async clearLease(internal: string): Promise<void> {
-    await this.pool.query(`UPDATE harness.project_journal_state
-      SET generating_since=NULL,last_error=NULL,updated_at=now() WHERE organization_id=$1 AND project_id=$2`,
-    [this.context.organizationId, internal])
+  private async clearLease(internal: string, lease: string, client: Pick<Pool, 'query'> = this.pool): Promise<void> {
+    await client.query(`UPDATE harness.project_journal_state
+      SET generating_since=NULL,last_error=NULL,updated_at=now() WHERE organization_id=$1 AND project_id=$2 AND generation_id=$3`,
+    [this.context.organizationId, internal, lease])
   }
 
   /**
@@ -828,11 +1055,44 @@ export class PostgresProgressService {
    * failed attempt still stamps `last_run_at`, so the interval gate backs off
    * repeated failures instead of retrying on every sweep tick.
    */
-  private async fail(internal: string, message: string): Promise<void> {
+  private async fail(internal: string, lease: string, message: string): Promise<void> {
     await this.pool.query(`UPDATE harness.project_journal_state
       SET generating_since=NULL,last_error=$3,last_run_at=now(),updated_at=now()
-      WHERE organization_id=$1 AND project_id=$2`,
-    [this.context.organizationId, internal, message.slice(0, 500)])
+      WHERE organization_id=$1 AND project_id=$2 AND generation_id=$4`,
+    [this.context.organizationId, internal, message.slice(0, 500), lease])
+  }
+
+  /** Retain or lock the exact digest generation before dispatch and before publishing either journal entry. */
+  private async renewLease(client: Pick<Pool, 'query'>, internal: string, lease: string): Promise<void> {
+    const result = await client.query(`UPDATE harness.project_journal_state SET generating_since=now(),updated_at=now()
+      WHERE organization_id=$1 AND project_id=$2 AND generation_id=$3 RETURNING project_id`,
+    [this.context.organizationId, internal, lease])
+    if (result.rowCount !== 1) throw new Error('Project progress generation was superseded')
+  }
+
+  /** Recheck shared source visibility after admission and lock it through the journal transaction. */
+  private async assertVisible(client: Pick<Pool, 'query'>, internal: string, material: readonly MaterialRow[]): Promise<void> {
+    const identities = [...new Map(material.map(row => [JSON.stringify([row.runtimeNamespace, row.sessionId]), row])).values()]
+    const result = await client.query(`SELECT source.id FROM
+      unnest($3::text[],$4::text[]) selected(runtime_namespace,session_id)
+      JOIN harness.conversation_sessions source ON source.organization_id=$1 AND source.project_id=$2
+        AND source.runtime_namespace=selected.runtime_namespace AND source.id=selected.session_id
+      WHERE source.id=source.root_session_id AND source.status<>'deleted' AND source.visibility='project'
+        AND EXISTS(SELECT 1 FROM harness.projects p JOIN harness.organizations o ON o.id=p.organization_id
+          WHERE p.id=$2 AND p.organization_id=$1 AND p.status='active' AND o.status='active'
+            AND harness.project_node_id(p.organization_id,p.id)=$5)
+      ORDER BY source.runtime_namespace COLLATE "C",source.id COLLATE "C" FOR SHARE OF source`,
+    [this.context.organizationId, internal, identities.map(row => row.runtimeNamespace), identities.map(row => row.sessionId), this.context.nodeId])
+    if (result.rows.length !== identities.length) throw new Error('Project progress material is no longer shared')
+  }
+
+  /** Commit exact source identities with the publication that consumed them. */
+  private async recordReceipts(client: Pick<Pool, 'query'>, internal: string, material: readonly MaterialRow[]): Promise<void> {
+    if (material.length === 0) return
+    await client.query(`INSERT INTO harness.project_journal_materials(organization_id,project_id,runtime_id,session_id,entry_id,receipt)
+      SELECT $1,$2,f.runtime_id,f.session_id,f.entry_id,${MATERIAL_RECEIPT}
+      FROM unnest($3::text[],$4::text[],$5::uuid[]) AS f(session_id,entry_id,runtime_id) ON CONFLICT DO NOTHING`,
+    [this.context.organizationId, internal, material.map(row => row.sessionId), material.map(row => row.entryId), material.map(row => row.runtimeId)])
   }
 }
 
@@ -841,6 +1101,7 @@ function answerSummary(outcome: unknown): string {
   const answers = (outcome as { answers?: unknown } | null)?.answers
   if (!Array.isArray(answers)) return ''
   return answers.map((entry) => {
+    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return ''
     const item = entry as { selected?: unknown; custom?: unknown }
     const selected = Array.isArray(item.selected)
       ? item.selected.filter((label): label is string => typeof label === 'string').join('、')
@@ -850,11 +1111,19 @@ function answerSummary(outcome: unknown): string {
   }).filter(text => text !== '').join('；').slice(0, 300)
 }
 
-/** Total order over the watermark keyset `(occurredAt, sessionId, seq)`. */
+/** Match PostgreSQL microsecond, bytewise Session, sequence and individual-entry ordering. */
 function compareKeys(left: MaterialRow, right: MaterialRow): number {
-  return left.occurredAt.getTime() - right.occurredAt.getTime()
-    || left.sessionId.localeCompare(right.sessionId)
+  return (left.micros < right.micros ? -1 : left.micros > right.micros ? 1 : 0)
+    || Buffer.compare(Buffer.from(left.runtimeNamespace), Buffer.from(right.runtimeNamespace))
+    || Buffer.compare(Buffer.from(left.sessionId), Buffer.from(right.sessionId))
     || left.seq - right.seq
+    || Buffer.compare(Buffer.from(left.entryId), Buffer.from(right.entryId))
+}
+
+function materialKey(row: MaterialKeyRow): Pick<MaterialRow, 'runtimeId' | 'runtimeNamespace' | 'occurredAt' | 'timestamp' | 'micros' | 'entryId' | 'seq'> {
+  const seq = Number(row.seq)
+  if (!Number.isSafeInteger(seq) || seq < -1) throw new Error('Progress material has an unsupported event sequence')
+  return { runtimeId: row.runtime_id, runtimeNamespace: row.runtime_namespace, occurredAt: row.ts, timestamp: row.cursor_ts, micros: BigInt(row.ts_us), entryId: row.entry_id, seq }
 }
 
 /** Asked question texts from a serialized `tool/call` arguments payload. */
@@ -871,4 +1140,35 @@ function questionText(raw: string | null): string | undefined {
   } catch {
     return undefined
   }
+}
+
+function objectValue(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined
+}
+
+/** OpenAI-compatible prompt counts include cache reads; billing stores disjoint token buckets. */
+function modelUsage(value: unknown): ProgressRequestOutcome['usage'] {
+  const usage = objectValue(value)
+  const input = usage?.prompt_tokens, output = usage?.completion_tokens
+  const cached = usage?.prompt_cache_hit_tokens ?? objectValue(usage?.prompt_tokens_details)?.cached_tokens ?? 0
+  if (typeof input !== 'number' || !Number.isSafeInteger(input) || input < 0
+    || typeof output !== 'number' || !Number.isSafeInteger(output) || output < 0
+    || typeof cached !== 'number' || !Number.isSafeInteger(cached) || cached < 0 || cached > input
+    || !Number.isSafeInteger(input + output)) return undefined
+  return { inputTokens: input - cached, outputTokens: output, cacheReadTokens: cached }
+}
+
+/** Validate durable profile headers before a route can dispatch. */
+function configuredHeaders(value: unknown): Headers {
+  const headers = new Headers()
+  if (value === undefined) return headers
+  const record = objectValue(value)
+  if (record === undefined) throw new Error('Digest provider headers must be a string map')
+  for (const [name, content] of Object.entries(record)) {
+    if (typeof content !== 'string') throw new Error('Digest provider header values must be strings')
+    try { headers.set(name, content) } catch {
+      throw new Error('Digest provider headers are not valid for HTTP')
+    }
+  }
+  return headers
 }

@@ -13,21 +13,25 @@ kind: "package-reference"
 
 `workspaceFiles.renderOffice` 复用文件域的授权、相对路径及版本检查。内容权限探测在查询转换缓存前执行；队列准入后进行有界字节窗口读取，返回前再次核验源文件和权限。结果包含 PDF、缺失字体及转换代次，不暴露 Host 路径或引擎诊断。转换限制由 [Office 提供方](../../document/office-to-pdf/README.zh.md)负责。
 
-现有 Host 流以 `host/workspace-file-changed` 交付已授权的 Agent 观察，不执行 OS 文件监视。该文件 API 不传输 provider 路径或 `FsTargetKey`。`ApiTransportError.status` 保留 HTTP 401/403/429/503 状态，与 RPC 文件错误分开，且不读取错误响应正文。
+现有 Host 流以 `host/workspace-file-changed` 交付已授权的 Agent 观察，不执行 OS 文件监视。该文件 API 不传输 provider 路径或 `FsTargetKey`。`ApiTransportError.status` 保留 HTTP 401/403/429/503 状态，与 RPC 文件错误分开，且不读取错误响应正文。 Fetch 客户端请求取消被拒绝的响应，但不等待取消确认；HTTP 和流开启回调的失败仍是主要错误，传输所有者继续负责关闭连接。
 
 `session.history` 和 `subagent.history` 接受 `toolCallId`，独立读取调用所属的完整轮次。查询复用现有 Session 观察所有者，不激活 Agent 或计算投影；子会话读取保留目录及父子会话授权检查。该参数不能与分页选择或仅对话详情组合。Fetch 传输压缩轮次但不裁掉前缀；客户端响应大小限制仍会拒绝超大响应。调用不存在时返回空结果，授权、持久化与取消失败仍是错误。
 
 `workspaceChanges.summary` 与 `workspaceChanges.diff` 通过相同的 Session 和目录授权读取已记录的轮次差异。读取完成后重新核验权限，通过已加载或持久 Session 的通知定位不可变记录。内容缺失时返回 null；存储损坏仍作为错误返回。已删除的文件仍可审阅，不用当前内容替代历史证据，也不公开私有存储路径或 Git 对象标识。
 
-`desktop.status` 和 `desktop.confirm` 使用会话写入授权及部署的交互确认控制器，不启动模型回合。未配置控制器时，状态返回 null，写入被拒绝；确认绑定页面显示的根会话、节点和桌面。Host 在异步操作完成后复核访问权限，取消或卸载后不能返回迟到的成功响应。
+`desktop.status` 和 `desktop.confirm` 使用会话写入授权及部署的交互确认控制器，不启动模型回合。未配置控制器且没有已知的提供方或环境限制时，状态返回 null，写入被拒绝；确认绑定页面显示的根会话、节点和桌面。Host 在异步操作完成后复核访问权限，取消或卸载后不能返回迟到的成功响应。
 
 Host 为 `hostSessionLifecycle` 保存创建、恢复与 fork 句柄。永久清理只释放这些确切的空闲所有者，并将标识预留保持到存储删除和 Gateway 回执完成。忙碌或所有权不明时，在删除前拒绝。
 
 `host.describe.runtimeTarget` 根据受管启动凭据标识 runtime，独立 Host 则声明个人作用域。可在浏览器使用的 API 导出规范 Client Session 地址，以及与 Host 授权共用的显式 Remote Session 路径策略；这些辅助函数不改写任意载荷字符串，也不改变持久 ID。
 
+`host.describe.computerUseUnavailableReason` 返回同一已知提供方或环境限制，不创建 Agent，也不读取个人确认。类型化客户端保留此可选字段；缺失表示环境未知。桌面对话框在连接恢复期间使用此信息；明确读取状态仍核验 Session 权限，并可发现新配置的提供方。
+
 ## 概述
 
 使用 `dsh-host-apiproxy` 作为共享 API 网关：零依赖、浏览器可导入的 TypeScript API 契约、一对 fetch 载体，以及每个 HTTP 载体包装的宿主侧 `ApiProxyService`（`ctx.apiProxy`）。其 `workspaceFiles.*` 方法在授权、包含性与版本防护下按公开界限提供会话相对文件读取。
+
+桌面状态返回经 Session 授权的 `DesktopStatus`：完整确认、`{ unavailableReason: 'headless' | 'disabled' }`，或表示没有环境限制且未配置政策的 `null`。提供方或环境元数据报告限制时，确认操作在进入部署政策或驱动前以 `desktop-unavailable` 拒绝。读取可用性之前仍先检查 Session 权限。
 
 ## 目录
 
@@ -60,7 +64,7 @@ Settings 分节中的 `reasoningEffort` 在 agent-default-model 插件配置中�
 
 分层与协议决策记录在 [GUI 分层与 RPC 协议 RFC](../../../.agents/notes/implemented/architecture/2026-07-19-gui-layering-and-rpc-protocol.zh.md) 中；浏览器侧消费架构记录在 [Web 客户端架构 RFC](../../../.agents/notes/implemented/architecture/2026-07-19-gui-web-client-architecture.zh.md) 中。
 
-组合 `ctx.collaboration` 后，项目 scope 下的 Session 操作会在观察或修改对话前授权被寻址的根对话，而列表、搜索结果、stream 发布、workspace 引用和已附加 Session 数量会过滤不可读 Session id。只依赖 scope 的写操作要求已捕获的 `rw` 模式，且项目路径会保持在已配置项目根内。Typert Remote 分发使用明确的项目 allowlist：`commands/list`、`fileReferences/list` 与 `sessionReferenceResolver/candidates` 需要 Session `read`；`commands/execute` 与 `goals/*` 需要 `write`；所有未分类或进程级 Remote 都会被拒绝。Host 扩展通过 `registerRemoteSessionPolicy(endpoint, policy)` 声明自己的 Session 级端点——同一名字二次声明会抛错，因此一个端点的访问类只有一个所有者——`lookupRemoteSessionPolicy` 把内建与已注册条目一并解析供分发、wire 映射与 `remoteSessionId` 使用。个人 principal 与未组合协作能力的组合保留普通 API 行为。
+组合 `ctx.collaboration` 后，项目 scope 下的 Session 操作会在观察或修改对话前授权被寻址的根对话，而列表、搜索结果、stream 发布、workspace 引用和已附加 Session 数量会过滤不可读 Session id。只依赖 scope 的写操作要求已捕获的 `rw` 模式，且项目路径会保持在已配置项目根内。Typert Remote 分发使用明确的项目 allowlist：`commands/list`、`fileReferences/list` 与 `sessionReferenceResolver/candidates` 需要 Session `read`；`commands/execute` 与 `goals/*` 需要 `write`；所有未分类或进程级 Remote 都会被拒绝。Host 扩展通过 `registerRemoteSessionPolicy(endpoint, policy)` 声明自己的 Session 级端点——同一名字二次声明会抛错，因此一个端点的访问类只有一个所有者——`lookupRemoteSessionPolicy` 把内建与已注册条目一并解析供分发、wire 映射与 `remoteSessionId` 使用。个人 principal 与没有协作授权要求的独立组合保留普通 API 行为。
 
 Mux 与 Host stream 仅合并尚未完成的授权请求。每批发布都会复核 Session 可读性，包括已入队的基线、workspace 引用、归档列表和 Session 范围的转发事件。先前读成功不会授权后续投递，中止会丢弃缓冲帧。
 
@@ -128,6 +132,8 @@ preset 名单、按会话选择与创作接口由 [`dsh-agent-preset-registry`](
 直接的 `SessionsApi` / `SubagentsApi` 与 `IApiClient` 历史结果仍是展开后的 `{ events, hasMore, projections? }`，外加可选的 `omittedSpans`。`detail: 'conversation'` 在分页之后省略已完成追加来源 `assistant/message` 之下的历史 `assistant/chunk` 游程，并报告这些闭区间 seq 范围；缺失的 `detail` 与 `'full'` 保留全部事件。成功的 Fetch `session.history` 与 `subagent.history` 响应使用物理 `records`（含无损打包的剩余 chunk 行），并往返 `omittedSpans`；客户端先校验并展开，再暴露逻辑结果。大小目标按完整未压缩 `server-response` JSON 的 UTF-8 字节计量，且只在完整的追加来源消息组处截断；后缀裁切会把 `omittedSpans` 限制到返回后缀内的 seq。一个不可分割的消息组可以超过该目标。畸形打包记录会在运行时状态变更前失败；未知的普通或扩展 chunk 事件仍按普通事件处理。持久化、会话格式与 Conversation 组装不变。[`historyPageTargetBytes`](../../client/connection/README.zh.md) 持有部署目标；[无损历史线分页决策](../../../.agents/notes/implemented/architecture/2026-08-14-lossless-history-wire-pagination.zh.md) 与 [两档会话历史传输](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md) 记录原委。
 
 `inbox` 投影从 Session 自有的持久化 splice 重建待处理输入，不恢复 Agent。历史读取仍由 Gateway 授权控制；冷队列修改继续要求 live Agent。
+
+项目 RPC 准入、工作区读取、会话列表和本地打开能力提示遵循[应用授权要求](../../context/collaboration/README.zh.md#application-authorization)。
 
 <a id="model-experience"></a>
 ## 模型体验

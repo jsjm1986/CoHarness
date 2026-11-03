@@ -1,0 +1,29 @@
+{
+  "at": "2026-11-02T17:54:06.351008+00:00",
+  "findings": [
+    "B186",
+    "B187",
+    "B188"
+  ],
+  "status": "earlier_component_fixes_active_in_gateway_backend_named_current_paths_verified_complete_coverage_open",
+  "namedFocusedCases": 51,
+  "otherCasesFilteredOut": 70,
+  "actualGatewayHttpTranscriptCases": 1,
+  "backendBinding": {
+    "path": "gateway/src/documents-local.ts",
+    "sha256": "eeb978133bedecc9aec027b516fb473988ded48c09981f481cdb13857d19a1d7",
+    "identityConfigured": true,
+    "gatewayStoreAdapterCalled": true
+  },
+  "currentEvidence": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T174027Z/document-prior-directory-and-transport-current.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T174027Z/document-current-gateway-directory-http-absolute-launcher.json"
+  ],
+  "publishedScopeEvidence": "receipts/document-volume-identity-2026-11-02.json",
+  "historicalFindingsBeforeUpdate": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T174027Z/historical-preparatory-findings-before-reconciliation.json",
+  "wholeFileCoveragePassed": false,
+  "productionAcceptanceLimits": "B474 establishes named R44 scope recovery and dual-node API paths; this is not exhaustive document API, Linux UID or all-platform acceptance.",
+  "productSourceChangedInThisReview": false,
+  "productionWrites": false,
+  "wholeProjectComplete": false
+}

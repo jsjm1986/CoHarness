@@ -1,0 +1,13 @@
+{
+  "name": "resource-budget-isolated-packed-verified",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/packed-resource-budget-smoke.py",
+  "startedAt": "2026-10-23T20:50:10.797255+00:00",
+  "seconds": 10.044,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "61126578c0d8291e76098cf680859f510c6ca6d2a9080588f18df299125b6acb",
+  "inputsAfter": "61126578c0d8291e76098cf680859f510c6ca6d2a9080588f18df299125b6acb",
+  "outputSha256": "deb21cede471a4cf1dbf0f914cc71c4a9e000965b7576f92dabb35a29b11aaad",
+  "outputTail": "{\"isolatedPackedPackages\":7,\"missingManagedProviderRejected\":true,\"sharedServiceInstance\":true,\"permitReleased\":1,\"wireExportsLoaded\":true}\n"
+}

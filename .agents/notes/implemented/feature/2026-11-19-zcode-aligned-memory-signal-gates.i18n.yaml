@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-19-zcode-aligned-memory-signal-gates.md
 document:
-  en: 626b40191939bfae9ba7c07c5a06a0595489733d
-  zh: f4281c14420884a07f5afeef636d7bd1511126f3
+  en: 821a1a17e8d45667ff43f2c94f7336123ae9e6b9
+  zh: 018d44ed83108712447191f1e60fcb11488b4209
 /agent-note-zcode-aligned-memory-recall-extraction-gates-and-auxiliary-posture:
   en: 8ee4daa62e204fe4
   zh: 4e3a6e74616408a9
@@ -12,8 +12,8 @@ document:
   en: c1f37a06de1c74a0
   zh: e7504f45d49f986e
 /agent-note-zcode-aligned-memory-recall-extraction-gates-and-auxiliary-posture/decision:
-  en: 8f195fa531d4fe46
-  zh: 674b66ffbf9f2539
+  en: 6010313750f9afc3
+  zh: c56662962110ee58
 /agent-note-zcode-aligned-memory-recall-extraction-gates-and-auxiliary-posture/alternatives-considered:
   en: 0955b2f2535a1fa6
   zh: a0737b585e2b4b84

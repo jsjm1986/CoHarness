@@ -1,16 +1,17 @@
 /** Filesystem-backed resumable upload sessions for user documents. */
 
 import { createHash, randomUUID } from 'node:crypto'
-import { createReadStream } from 'node:fs'
+import { constants } from 'node:fs'
 import {
+  lstat,
   mkdir,
   open,
   readFile,
   readdir,
   rename,
   rm,
-  stat,
   statfs,
+  type FileHandle,
 } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
@@ -24,8 +25,11 @@ import {
   DOCUMENT_UPLOAD_SIZE_CODE,
   DOCUMENT_UPLOAD_STATE_CODE,
   DOCUMENT_UPLOAD_STORAGE_CODE,
+  decodeUserDocIdentity,
   UserDocError,
+  UserDocId,
   UserDocUploadId,
+  UserDocUploadOwnerId,
 } from '@deepseek-ai/dsh-userdoc'
 import type {
   BeginUserDocUpload,
@@ -35,7 +39,10 @@ import type {
   UserDocUploadChunk,
   UserDocUploadSession,
 } from '@deepseek-ai/dsh-userdoc'
-import { pathForDirectoryId, pathForDocId } from './name.ts'
+import { assertNestedDirectories, assertPublicDirectory, pathForDirectoryId, pathForDocId } from './name.ts'
+import { writeAll } from './write.ts'
+import { consumeDocumentBody } from './body.ts'
+import { withDocumentHandle } from './handle.ts'
 
 /** Default request body size, safely below the public Cloudflare limit. */
 export const DEFAULT_UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
@@ -68,20 +75,38 @@ export interface LocalUploadConfig {
   readonly manifestMaxBytes?: number
 }
 
+/** Host admission for writes that can outlive the initiating request. */
+export interface UserDocBackgroundWrite {
+  /**
+   * @param operation - initialization, finalization or cleanup; rejection before invocation leaves storage unchanged.
+   * @returns after the admitted write and its durable completion have settled; the host retains its writer count throughout.
+   */
+  (operation: () => Promise<void>): Promise<void>
+}
+
 /** Callbacks that connect the session manager to the ordinary document store. */
 export interface LocalUploadDependencies {
   /** Runtime document root. */
   readonly root: string
+  /** Private control root on the same filesystem; defaults to `root` for local-only storage. */
+  readonly controlRoot?: string
   /** Resolved document limits. */
   readonly limits: UserDocLimits
+  /** Host maintenance admission for detached finalization and periodic cleanup; omitted for runtime-owned storage. */
+  readonly backgroundWrite?: UserDocBackgroundWrite
   /** Resolve and reserve a sanitized target. */
-  readonly resolveTarget: (input: { name: string; directoryId: BeginUserDocUpload['directoryId'] }) => Promise<UserDocTarget>
+  readonly resolveTarget: (
+    input: { name: string; directoryId: BeginUserDocUpload['directoryId'] },
+    reserved: ReadonlySet<UserDocId>,
+  ) => Promise<UserDocTarget>
   /** Publish a complete private partial file atomically, recovering a prior commit by digest. */
   readonly publish: (
     target: UserDocTarget,
     partialPath: string,
     bytes: number,
     expectedSha256: string,
+    uploadId: UserDocUploadId,
+    ownerId?: UserDocUploadOwnerId,
   ) => Promise<import('@deepseek-ai/dsh-userdoc').UserDocRef>
 }
 
@@ -92,8 +117,13 @@ interface StoredChunk {
   sha256: string
 }
 
-interface Manifest {
-  formatVersion: 1
+type Manifest = ManifestData & (
+  | { formatVersion: 1; ownerId?: never }
+  | { formatVersion: 2; ownerId: UserDocUploadOwnerId }
+  | { formatVersion: 3; ownerId?: UserDocUploadOwnerId }
+)
+
+interface ManifestData {
   uploadId: string
   name: string
   directoryId: string
@@ -136,6 +166,12 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/u
 const MAX_FINGERPRINT_LENGTH = 512
 const ADMISSION_LOCK_NAME = '.admission'
 const LOCK_WAIT_MS = 30_000
+/* v8 ignore next -- Windows omits O_NOFOLLOW; lstat also rejects linked private leaves. */
+// oxlint-disable-next-line typescript/no-unnecessary-condition -- O_NOFOLLOW is absent on supported Windows hosts.
+const NOFOLLOW = constants.O_NOFOLLOW ?? 0
+/* v8 ignore next -- platforms without POSIX named pipes can omit O_NONBLOCK. */
+// oxlint-disable-next-line typescript/no-unnecessary-condition -- some supported platforms omit O_NONBLOCK.
+const NONBLOCK = constants.O_NONBLOCK ?? 0
 
 /** Only ESRCH proves that a recorded owner no longer exists. */
 function processMayOwnLock(pid: number): boolean {
@@ -186,13 +222,15 @@ function invalidManifest(): never {
   throw new UserDocError('The resumable upload manifest is invalid.', DOCUMENT_UPLOAD_NOT_FOUND_CODE)
 }
 
-function parseManifestRef(value: unknown): UserDocRef {
+function parseManifestRef(value: unknown, formatVersion: number): UserDocRef {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return invalidManifest()
   const ref = value as Record<string, unknown>
   if (typeof ref.docId !== 'string' || ref.docId === '' || typeof ref.path !== 'string' || ref.path === ''
     || typeof ref.name !== 'string' || ref.name === '' || !Number.isSafeInteger(ref.bytes) || (ref.bytes as number) < 0
     || typeof ref.mediaType !== 'string' || ref.mediaType === '' || ref.mediaType.length > 255
     || typeof ref.modifiedAt !== 'number' || !Number.isFinite(ref.modifiedAt)) return invalidManifest()
+  const identity = ref.identity === undefined ? undefined : decodeUserDocIdentity(ref.identity)
+  if (ref.identity !== undefined && (identity === undefined || formatVersion !== 3)) return invalidManifest()
   return {
     docId: ref.docId as UserDocRef['docId'],
     path: ref.path,
@@ -200,13 +238,14 @@ function parseManifestRef(value: unknown): UserDocRef {
     bytes: ref.bytes as number,
     mediaType: ref.mediaType,
     modifiedAt: ref.modifiedAt,
+    ...(identity === undefined ? {} : { identity }),
   }
 }
 
 function parseManifest(value: unknown): Manifest {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return invalidManifest()
   const item = value as Record<string, unknown>
-  if (item.formatVersion !== 1 || typeof item.uploadId !== 'string' || !ID_PATTERN.test(item.uploadId)
+  if ((item.formatVersion !== 1 && item.formatVersion !== 2 && item.formatVersion !== 3) || typeof item.uploadId !== 'string' || !ID_PATTERN.test(item.uploadId)
     || typeof item.name !== 'string' || item.name === '' || typeof item.directoryId !== 'string'
     || typeof item.docId !== 'string' || item.docId === '' || typeof item.targetPath !== 'string'
     || !Number.isSafeInteger(item.bytes) || (item.bytes as number) < 0
@@ -215,9 +254,13 @@ function parseManifest(value: unknown): Manifest {
     || !Number.isSafeInteger(item.receivedBytes) || (item.receivedBytes as number) < 0
     || (item.receivedBytes as number) > (item.bytes as number)
     || !Number.isSafeInteger(item.expiresAt) || (item.expiresAt as number) <= 0
-    || !['uploading', 'verifying', 'complete', 'failed'].includes(String(item.state))) {
+    || typeof item.state !== 'string' || !['uploading', 'verifying', 'complete', 'failed'].includes(item.state)) {
     return invalidManifest()
   }
+  if (item.formatVersion === 1 ? item.ownerId !== undefined
+    : item.ownerId === undefined ? item.formatVersion === 2
+      : typeof item.ownerId !== 'string' || item.ownerId.length === 0
+      || item.ownerId.length > 128 || /[\u0000-\u001f\u007f]/u.test(item.ownerId)) return invalidManifest()
   const last = item.lastChunk
   if (last !== undefined) {
     if (last === null || typeof last !== 'object' || Array.isArray(last)) return invalidManifest()
@@ -242,10 +285,15 @@ function parseManifest(value: unknown): Manifest {
     if (typeof error.code !== 'string' || error.code === '' || error.code.length > 128
       || typeof error.message !== 'string' || error.message.length > 1000) return invalidManifest()
   }
-  const ref = item.ref === undefined ? undefined : parseManifestRef(item.ref)
+  const ref = item.ref === undefined ? undefined : parseManifestRef(item.ref, item.formatVersion)
   if (item.state === 'complete' && ref === undefined) return invalidManifest()
+  if (item.formatVersion === 3 && (item.state !== 'complete' || ref?.identity === undefined)) return invalidManifest()
+  if (item.state === 'complete' && item.receivedBytes !== item.bytes) return invalidManifest()
   return {
-    formatVersion: 1,
+    ...(item.formatVersion === 1
+      ? { formatVersion: 1 as const }
+      : item.formatVersion === 2 ? { formatVersion: 2 as const, ownerId: UserDocUploadOwnerId(item.ownerId as string) }
+        : { formatVersion: 3 as const, ...(item.ownerId === undefined ? {} : { ownerId: UserDocUploadOwnerId(item.ownerId as string) }) }),
     uploadId: item.uploadId,
     name: item.name,
     directoryId: item.directoryId,
@@ -264,56 +312,58 @@ function parseManifest(value: unknown): Manifest {
   }
 }
 
+/** The callback borrows one opened regular file; the owner closes it after callback settlement. */
+async function withUploadReadFile<T>(
+  path: string, code: UserDocError['code'], operation: (handle: FileHandle, size: number) => Promise<T>,
+): Promise<T> {
+  const entry = await lstat(path)
+  if (entry.isSymbolicLink() || !entry.isFile()) throw new UserDocError('The private upload file is not regular.', code)
+  const handle = await open(path, constants.O_RDONLY | NOFOLLOW | NONBLOCK)
+  return withDocumentHandle(handle, async () => {
+    const info = await handle.stat()
+    if (!info.isFile() || !Number.isSafeInteger(info.size) || info.size < 0) {
+      throw new UserDocError('The opened private upload file is invalid.', code)
+    }
+    return operation(handle, info.size)
+  })
+}
+
 async function readManifest(path: string, maxBytes: number): Promise<Manifest> {
   try {
-    const info = await stat(path)
-    if (!Number.isSafeInteger(info.size) || info.size < 0 || info.size > maxBytes) {
-      throw new UserDocError('The resumable upload manifest exceeds its size limit.', DOCUMENT_UPLOAD_NOT_FOUND_CODE)
-    }
-    const stream = createReadStream(path)
-    const chunks: Buffer[] = []
-    let bytes = 0
-    try {
-      for await (const chunk of stream) {
-        const buffer = Buffer.from(chunk as Uint8Array)
-        bytes += buffer.byteLength
-        if (bytes > maxBytes) {
-          throw new UserDocError('The resumable upload manifest exceeds its size limit.', DOCUMENT_UPLOAD_NOT_FOUND_CODE)
-        }
-        chunks.push(buffer)
+    return await withUploadReadFile(path, DOCUMENT_UPLOAD_NOT_FOUND_CODE, async (handle, size) => {
+      if (size > maxBytes) {
+        throw new UserDocError('The resumable upload manifest exceeds its size limit.', DOCUMENT_UPLOAD_NOT_FOUND_CODE)
       }
-    } finally {
-      stream.destroy()
-    }
-    return parseManifest(JSON.parse(Buffer.concat(chunks, bytes).toString('utf8')) as unknown)
+      const buffer = Buffer.alloc(size + 1)
+      let bytes = 0
+      while (bytes < buffer.byteLength) {
+        const read = await handle.read(buffer, bytes, buffer.byteLength - bytes, bytes)
+        if (read.bytesRead === 0) break
+        bytes += read.bytesRead
+      }
+      if (bytes !== size) {
+        throw new UserDocError('The resumable upload manifest changed while reading.', DOCUMENT_UPLOAD_NOT_FOUND_CODE)
+      }
+      const value: unknown = JSON.parse(buffer.subarray(0, bytes).toString('utf8'))
+      return parseManifest(value)
+    })
   } catch (error) {
     if (error instanceof UserDocError) throw error
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw new UserDocError('Resumable upload session was not found.', DOCUMENT_UPLOAD_NOT_FOUND_CODE)
+      throw new UserDocError('Resumable upload session was not found.', DOCUMENT_UPLOAD_NOT_FOUND_CODE, { cause: error })
     }
     throw new UserDocError('Unable to read the resumable upload session.', DOCUMENT_UPLOAD_STORAGE_CODE, { cause: error })
   }
 }
 
 async function readBody(body: ReadableStream<Uint8Array>, expected: number, signal?: AbortSignal): Promise<Uint8Array> {
-  const reader = body.getReader()
   const chunks: Uint8Array[] = []
   let bytes = 0
-  try {
-    for (;;) {
-      signal?.throwIfAborted()
-      const next = await reader.read()
-      if (next.done) break
-      bytes += next.value.byteLength
-      if (bytes > expected) throw new UserDocError('Upload chunk is larger than its declared range.', DOCUMENT_UPLOAD_RANGE_CODE)
-      chunks.push(next.value)
-    }
-  } catch (error) {
-    await reader.cancel(error).catch(() => {})
-    throw error
-  } finally {
-    reader.releaseLock()
-  }
+  await consumeDocumentBody(body, (data) => {
+    bytes += data.byteLength
+    if (bytes > expected) throw new UserDocError('Upload chunk is larger than its declared range.', DOCUMENT_UPLOAD_RANGE_CODE)
+    chunks.push(data)
+  }, signal)
   if (bytes !== expected) throw new UserDocError('Upload chunk is shorter than its declared range.', DOCUMENT_UPLOAD_RANGE_CODE)
   const result = new Uint8Array(bytes)
   let offset = 0
@@ -378,9 +428,11 @@ async function availableBytes(root: string): Promise<number> {
 /** Filesystem implementation of the resumable upload lifecycle. */
 export class LocalUploadManager {
   private readonly root: string
+  private readonly controlRoot: string
   private readonly limits: UserDocLimits
   private readonly resolveTarget: LocalUploadDependencies['resolveTarget']
   private readonly publish: LocalUploadDependencies['publish']
+  private readonly backgroundWrite: UserDocBackgroundWrite
   private readonly chunkBytes: number
   private readonly sessionTtlMs: number
   private readonly minFreeBytes: number
@@ -406,15 +458,38 @@ export class LocalUploadManager {
       throw new RangeError(`cleanupIntervalMs must be a positive safe integer no greater than ${MAX_UPLOAD_TIMER_DELAY_MS}`)
     }
     this.root = dependencies.root
+    this.controlRoot = dependencies.controlRoot ?? dependencies.root
     this.limits = dependencies.limits
     this.resolveTarget = dependencies.resolveTarget
     this.publish = dependencies.publish
+    this.backgroundWrite = dependencies.backgroundWrite ?? (operation => operation())
     this.chunkBytes = config.chunkBytes
     this.sessionTtlMs = config.sessionTtlMs
     this.minFreeBytes = config.minFreeBytes
     this.maxConcurrent = config.maxConcurrent
     this.cleanupIntervalMs = config.cleanupIntervalMs
     this.manifestMaxBytes = config.manifestMaxBytes
+  }
+
+  /** Root and private components are checked before startup or maintenance can create directories. */
+  private async ensureSessionRoot(create: boolean): Promise<void> {
+    await assertPublicDirectory(this.root, this.root, DOCUMENT_UPLOAD_STORAGE_CODE)
+    await assertPublicDirectory(this.controlRoot, this.controlRoot, DOCUMENT_UPLOAD_STORAGE_CODE)
+    let directory = this.controlRoot
+    for (const leaf of ['.upload-sessions', 'v1']) {
+      directory = join(directory, leaf)
+      if (create) {
+        try { await mkdir(directory, { mode: 0o700 }) } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+        }
+      }
+      await assertNestedDirectories(this.controlRoot, directory, DOCUMENT_UPLOAD_STORAGE_CODE)
+    }
+  }
+
+  private async assertSessionDirectory(path: string): Promise<void> {
+    await this.ensureSessionRoot(false)
+    await assertNestedDirectories(this.controlRoot, dirname(path), DOCUMENT_UPLOAD_STORAGE_CODE)
   }
 
   /** Start periodic expired-session cleanup after the document root is ready. */
@@ -429,7 +504,11 @@ export class LocalUploadManager {
   /** Run at most one maintenance sweep at a time and retain its join handle. */
   private scheduleCleanupSweep(): void {
     if (this.stopped || this.cleanupTask !== undefined) return
-    const task = Promise.resolve().then(() => this.cleanupExpired()).catch(() => {}).finally(() => {
+    const task = Promise.resolve().then(() => this.backgroundWrite(async () => {
+      if (!this.stopped) await this.cleanupExpired()
+    })).catch(() => {
+      // Closed admission and filesystem failures leave cleanup for the next interval.
+    }).finally(() => {
       if (this.cleanupTask === task) this.cleanupTask = undefined
     })
     this.cleanupTask = task
@@ -467,17 +546,20 @@ export class LocalUploadManager {
   }
 
   /**
-   * Remove expired or malformed temporary sessions.
+   * Remove expired receiving or terminal sessions; retain accepted verification and unreadable recovery data.
    * @param now - current epoch time used for the expiration comparison.
    */
   async cleanupExpired(now = Date.now()): Promise<void> {
-    await mkdir(sessionRoot(this.root), { recursive: true, mode: 0o700 })
-    await recoverOrphanedAdmissionLock(this.root)
-    await withFileLock(admissionLockPath(this.root), () => this.sweepExpired(now), { waitMs: LOCK_WAIT_MS })
+    await this.ensureSessionRoot(true)
+    await recoverOrphanedAdmissionLock(this.controlRoot)
+    await withFileLock(admissionLockPath(this.controlRoot), async () => {
+      await this.ensureSessionRoot(false)
+      await this.sweepExpired(now)
+    }, { waitMs: LOCK_WAIT_MS })
   }
 
   private async sweepExpired(now: number): Promise<void> {
-    const directory = sessionRoot(this.root)
+    const directory = sessionRoot(this.controlRoot)
     let entries
     try {
       entries = await readdir(directory, { withFileTypes: true })
@@ -492,38 +574,45 @@ export class LocalUploadManager {
         const index = cursor++
         if (index >= candidates.length) return
         const entry = candidates[index] as (typeof candidates)[number]
-        // A live finalizer owns the session even if its original retention
-        // deadline passes while it is hashing or publishing. It refreshes the
-        // manifest when the commit completes; removing it here would lose a
-        // document that is already in the publication path.
+        // Local publishers can hold the session lock until their commit completes.
         if (this.jobs.has(entry.name)) continue
         const path = join(directory, entry.name, 'manifest.json')
         try {
+          await this.assertSessionDirectory(path)
           await withFileLock(path, async () => {
             if (this.jobs.has(entry.name)) return
             const manifest = await readManifest(path, this.manifestMaxBytes)
-            if (manifest.expiresAt <= now) await rm(join(directory, entry.name), { recursive: true, force: true })
+            if (manifest.state !== 'verifying' && manifest.expiresAt <= now) {
+              await rm(join(directory, entry.name), { recursive: true, force: true })
+            }
           }, { waitMs: LOCK_WAIT_MS })
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
           if (error instanceof UserDocError && error.code === DOCUMENT_UPLOAD_NOT_FOUND_CODE) {
-            await rm(join(directory, entry.name), { recursive: true, force: true })
-            continue
+            const cause = error.cause
+            if (cause !== null && typeof cause === 'object' && 'code' in cause && cause.code === 'ENOENT') continue
           }
           throw error
         }
       }
     }
     const workerCount = Math.min(this.maxConcurrent, candidates.length)
-    await Promise.all(Array.from({ length: workerCount }, () => sweepOne()))
+    const results = await Promise.allSettled(Array.from({ length: workerCount }, () => sweepOne()))
+    const errors: unknown[] = []
+    for (const result of results) {
+      if (result.status === 'rejected') errors.push(result.reason)
+    }
+    if (errors.length === 1) throw errors[0]
+    if (errors.length > 1) throw new AggregateError(errors, 'Document upload cleanup workers failed.')
   }
 
   /**
    * Create or reuse a session for one browser file.
    * @param input - validated browser file metadata.
+   * @param ownerId - authenticated actor; missing or different owners cannot access a bound session.
    * @returns the public upload session state.
    */
-  async begin(input: BeginUserDocUpload): Promise<UserDocUploadSession> {
+  async begin(input: BeginUserDocUpload, ownerId?: UserDocUploadOwnerId): Promise<UserDocUploadSession> {
     if (!Number.isSafeInteger(input.bytes) || input.bytes < 0) {
       throw new UserDocError('The upload byte count is invalid.', DOCUMENT_UPLOAD_SIZE_CODE)
     }
@@ -533,29 +622,36 @@ export class LocalUploadManager {
     if (input.fingerprint === '' || input.fingerprint.length > MAX_FINGERPRINT_LENGTH) {
       throw new UserDocError('The upload fingerprint is invalid.', DOCUMENT_UPLOAD_SIZE_CODE)
     }
-    await mkdir(sessionRoot(this.root), { recursive: true, mode: 0o700 })
-    return withFileLock(admissionLockPath(this.root), async () => {
+    await this.ensureSessionRoot(true)
+    return withFileLock(admissionLockPath(this.controlRoot), async () => {
+      await this.ensureSessionRoot(false)
       await this.sweepExpired(Date.now())
-      const existing = await this.findByFingerprint(input)
+      const existing = await this.findByFingerprint(input, ownerId)
       if (existing !== undefined) {
         if (existing.state === 'verifying') this.startFinalization(existing)
         return asPublic(existing)
       }
-      const active = await this.activeCount()
-      if (active >= this.maxConcurrent) {
+      const active = await this.activeReservations()
+      if (active.length >= this.maxConcurrent) {
         throw new UserDocError('Too many document uploads are active.', DOCUMENT_UPLOAD_BUSY_CODE)
       }
       const free = await availableBytes(this.root)
-      const reserved = await this.reservedRemainingBytes()
+      let reserved = 0
+      for (const manifest of active) {
+        reserved += manifest.bytes - manifest.receivedBytes
+        if (!Number.isSafeInteger(reserved)) throw new UserDocError('Reserved upload storage is invalid.', DOCUMENT_UPLOAD_STORAGE_CODE)
+      }
       if (free - this.minFreeBytes - reserved < input.bytes) {
         throw new UserDocError('There is not enough free document storage.', DOCUMENT_UPLOAD_STORAGE_CODE)
       }
-      const target = await this.resolveTarget({ name: input.name, directoryId: input.directoryId })
+      const target = await this.resolveTarget({ name: input.name, directoryId: input.directoryId },
+        new Set(active.map(manifest => UserDocId(manifest.docId))))
       const uploadId = randomUUID()
-      const directory = join(sessionRoot(this.root), uploadId)
+      const directory = join(sessionRoot(this.controlRoot), uploadId)
       await mkdir(directory, { recursive: true, mode: 0o700 })
+      await this.assertSessionDirectory(join(directory, 'manifest.json'))
       const manifest: Manifest = {
-        formatVersion: 1,
+        ...(ownerId === undefined ? { formatVersion: 1 as const } : { formatVersion: 2 as const, ownerId }),
         uploadId,
         name: target.name,
         directoryId: String(input.directoryId),
@@ -576,12 +672,13 @@ export class LocalUploadManager {
   }
 
   /**
-   * Read one session, rejecting expired or malformed state.
+   * Read one session; accepted verification remains available past the receiving-session retention deadline.
    * @param uploadId - opaque upload identifier.
+   * @param ownerId - authenticated actor; missing or different owners cannot access a bound session.
    * @returns the public upload session state.
    */
-  async inspect(uploadId: UserDocUploadId): Promise<UserDocUploadSession> {
-    const manifest = await this.load(uploadId)
+  async inspect(uploadId: UserDocUploadId, ownerId?: UserDocUploadOwnerId): Promise<UserDocUploadSession> {
+    const manifest = await this.loadOwned(uploadId, ownerId)
     if (manifest.state === 'verifying') this.startFinalization(manifest)
     return asPublic(manifest)
   }
@@ -590,7 +687,8 @@ export class LocalUploadManager {
   async resumePendingFinalizations(): Promise<void> {
     let entries
     try {
-      entries = await readdir(sessionRoot(this.root), { withFileTypes: true })
+      await this.ensureSessionRoot(false)
+      entries = await readdir(sessionRoot(this.controlRoot), { withFileTypes: true })
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
       throw error
@@ -612,14 +710,17 @@ export class LocalUploadManager {
    * @param uploadId - opaque upload identifier.
    * @param chunk - validated range and body digest.
    * @param signal - optional cancellation signal.
+   * @param ownerId - authenticated actor; missing or different owners cannot access a bound session.
    * @returns the updated public upload session state.
    */
-  async write(uploadId: UserDocUploadId, chunk: UserDocUploadChunk, signal?: AbortSignal): Promise<UserDocUploadSession> {
+  async write(
+    uploadId: UserDocUploadId, chunk: UserDocUploadChunk, signal?: AbortSignal, ownerId?: UserDocUploadOwnerId,
+  ): Promise<UserDocUploadSession> {
     signal?.throwIfAborted()
-    const path = manifestPath(this.root, String(uploadId))
-    return withFileLock(path, async () => {
+    const path = manifestPath(this.controlRoot, String(uploadId))
+    return this.withSessionLock(path, async () => {
       signal?.throwIfAborted()
-      const manifest = await this.load(uploadId)
+      const manifest = await this.loadOwned(uploadId, ownerId)
       if (manifest.state !== 'uploading') {
         if (manifest.state === 'complete' || manifest.state === 'verifying') return asPublic(manifest)
         throw new UserDocError('The upload session cannot accept more chunks.', DOCUMENT_UPLOAD_STATE_CODE)
@@ -658,15 +759,24 @@ export class LocalUploadManager {
       if (free < this.minFreeBytes + data.byteLength) {
         throw new UserDocError('There is not enough free document storage.', DOCUMENT_UPLOAD_STORAGE_CODE)
       }
-      let handle
       try {
-        handle = await open(partialPath(this.root, manifest.uploadId), 'r+')
-        await handle.write(data, 0, data.byteLength, chunk.start)
-        await handle.sync()
+        const partial = partialPath(this.controlRoot, manifest.uploadId)
+        const before = await lstat(partial, { bigint: true })
+        if (!before.isFile() || before.isSymbolicLink()) {
+          throw new UserDocError('The private upload payload is not a regular file.', DOCUMENT_UPLOAD_STORAGE_CODE)
+        }
+        const handle = await open(partial, constants.O_RDWR | NOFOLLOW | NONBLOCK)
+        await withDocumentHandle(handle, async () => {
+          const opened = await handle.stat({ bigint: true })
+          if (!opened.isFile() || opened.dev !== before.dev || opened.ino !== before.ino) {
+            throw new UserDocError('The private upload payload changed before writing.', DOCUMENT_UPLOAD_STORAGE_CODE)
+          }
+          await writeAll(handle, data, chunk.start, signal)
+          await handle.sync()
+        })
       } catch (error) {
+        if (signal?.aborted === true && error === signal.reason) throw error
         throw new UserDocError('Unable to store the upload chunk.', DOCUMENT_UPLOAD_STORAGE_CODE, { cause: error })
-      } finally {
-        await handle?.close()
       }
       const next: Manifest = {
         ...manifest,
@@ -676,22 +786,23 @@ export class LocalUploadManager {
       }
       await writeFileAtomic(path, `${JSON.stringify(next)}\n`, { mode: 0o600, dirMode: 0o700 })
       return asPublic(next)
-    }, { waitMs: 30_000 })
+    })
   }
 
   /**
    * Start asynchronous final verification and return its current state.
    * @param uploadId - opaque upload identifier.
    * @param sha256 - final SHA-256 digest.
+   * @param ownerId - authenticated actor; missing or different owners cannot access a bound session.
    * @returns the public upload session state.
    */
-  async complete(uploadId: UserDocUploadId, sha256: string): Promise<UserDocUploadSession> {
+  async complete(uploadId: UserDocUploadId, sha256: string, ownerId?: UserDocUploadOwnerId): Promise<UserDocUploadSession> {
     if (!SHA256_PATTERN.test(sha256)) {
       throw new UserDocError('The final upload hash is invalid.', DOCUMENT_UPLOAD_HASH_CODE)
     }
-    const path = manifestPath(this.root, String(uploadId))
+    const path = manifestPath(this.controlRoot, String(uploadId))
     return this.withSessionLock(path, async () => {
-      const manifest = await this.load(uploadId)
+      const manifest = await this.loadOwned(uploadId, ownerId)
       if ((manifest.state === 'complete' || manifest.state === 'verifying')
         && manifest.finalSha256 !== undefined && manifest.finalSha256 !== sha256) {
         throw new UserDocError('The final upload hash does not match the active session.', DOCUMENT_UPLOAD_HASH_CODE)
@@ -714,15 +825,17 @@ export class LocalUploadManager {
   /**
    * Cancel an incomplete session and remove all temporary bytes.
    * @param uploadId - opaque upload identifier.
+   * @param ownerId - authenticated actor; missing or different owners cannot access a bound session.
    */
-  async cancel(uploadId: UserDocUploadId): Promise<void> {
+  async cancel(uploadId: UserDocUploadId, ownerId?: UserDocUploadOwnerId): Promise<void> {
     const id = String(uploadId)
+    await this.loadOwned(uploadId, ownerId)
     await this.cancelFinalization(id)
-    const path = manifestPath(this.root, id)
+    const path = manifestPath(this.controlRoot, id)
     await this.withSessionLock(path, async () => {
-      const manifest = await this.load(uploadId)
+      const manifest = await this.loadOwned(uploadId, ownerId)
       if (manifest.state === 'complete') throw new UserDocError('Completed documents cannot be cancelled.', DOCUMENT_UPLOAD_STATE_CODE)
-      await rm(join(sessionRoot(this.root), id), { recursive: true, force: true })
+      await rm(join(sessionRoot(this.controlRoot), id), { recursive: true, force: true })
     })
   }
 
@@ -734,6 +847,7 @@ export class LocalUploadManager {
    */
   private async withSessionLock<T>(lockPath: string, body: () => Promise<T>): Promise<T> {
     try {
+      await this.assertSessionDirectory(lockPath)
       return await withFileLock(lockPath, body, { waitMs: LOCK_WAIT_MS })
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -743,10 +857,24 @@ export class LocalUploadManager {
     }
   }
 
-  private async load(uploadId: UserDocUploadId, options: { readonly allowExpired?: boolean } = {}): Promise<Manifest> {
+  /** Authorize before returning private metadata, resuming work or changing temporary bytes. */
+  private async loadOwned(uploadId: UserDocUploadId, ownerId: UserDocUploadOwnerId | undefined): Promise<Manifest> {
+    return this.load(uploadId, { owner: { id: ownerId } })
+  }
+
+  private async load(uploadId: UserDocUploadId, options: {
+    readonly allowExpired?: boolean
+    readonly owner?: { readonly id: UserDocUploadOwnerId | undefined }
+  } = {}): Promise<Manifest> {
     const id = String(uploadId)
     if (!ID_PATTERN.test(id)) throw new UserDocError('The upload identifier is invalid.', DOCUMENT_UPLOAD_NOT_FOUND_CODE)
-    const manifest = await readManifest(manifestPath(this.root, id), this.manifestMaxBytes)
+    try { await this.assertSessionDirectory(manifestPath(this.controlRoot, id)) } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new UserDocError('The upload session was not found.', DOCUMENT_UPLOAD_NOT_FOUND_CODE, { cause: error })
+      }
+      throw error
+    }
+    const manifest = await readManifest(manifestPath(this.controlRoot, id), this.manifestMaxBytes)
     try {
       const target = pathForDocId(this.root, manifest.docId)
       if (manifest.uploadId !== id || target !== manifest.targetPath || basename(target) !== manifest.name
@@ -759,17 +887,19 @@ export class LocalUploadManager {
     } catch (error) {
       throw new UserDocError('The resumable upload target is invalid.', DOCUMENT_UPLOAD_NOT_FOUND_CODE, { cause: error })
     }
-    if (!options.allowExpired && manifest.expiresAt <= Date.now()) {
-      await rm(join(sessionRoot(this.root), id), { recursive: true, force: true })
+    if (options.owner !== undefined && manifest.ownerId !== options.owner.id) {
+      throw new UserDocError('The upload session was not found.', DOCUMENT_UPLOAD_NOT_FOUND_CODE)
+    }
+    if (!options.allowExpired && manifest.state !== 'verifying' && manifest.expiresAt <= Date.now()) {
       throw new UserDocError('The upload session has expired.', DOCUMENT_UPLOAD_EXPIRED_CODE)
     }
     return manifest
   }
 
-  private async findByFingerprint(input: BeginUserDocUpload): Promise<Manifest | undefined> {
+  private async findByFingerprint(input: BeginUserDocUpload, ownerId?: UserDocUploadOwnerId): Promise<Manifest | undefined> {
     let entries
     try {
-      entries = await readdir(sessionRoot(this.root), { withFileTypes: true })
+      entries = await readdir(sessionRoot(this.controlRoot), { withFileTypes: true })
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
       throw error
@@ -778,7 +908,7 @@ export class LocalUploadManager {
       if (!entry.isDirectory() || !ID_PATTERN.test(entry.name)) continue
       try {
         const manifest = await this.load(UserDocUploadId(entry.name))
-        if (manifest.fingerprint === input.fingerprint && manifest.bytes === input.bytes
+        if (manifest.ownerId === ownerId && manifest.fingerprint === input.fingerprint && manifest.bytes === input.bytes
           && manifest.directoryId === String(input.directoryId)
           && (manifest.state === 'uploading' || manifest.state === 'verifying')) return manifest
       } catch {
@@ -788,53 +918,27 @@ export class LocalUploadManager {
     return undefined
   }
 
-  private async activeCount(): Promise<number> {
+  private async activeReservations(): Promise<Manifest[]> {
     let entries
     try {
-      entries = await readdir(sessionRoot(this.root), { withFileTypes: true })
+      entries = await readdir(sessionRoot(this.controlRoot), { withFileTypes: true })
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
       throw error
     }
-    let count = 0
-    for (const entry of entries) {
-      if (!entry.isDirectory() || !ID_PATTERN.test(entry.name)) continue
-      try {
-        const manifest = await readManifest(manifestPath(this.root, entry.name), this.manifestMaxBytes)
-        if (manifest.expiresAt > Date.now() && (manifest.state === 'uploading' || manifest.state === 'verifying')) count += 1
-      } catch {
-        // Malformed sessions are removed by the next cleanup pass.
-      }
-    }
-    return count
-  }
-
-  private async reservedRemainingBytes(): Promise<number> {
-    let entries
-    try {
-      entries = await readdir(sessionRoot(this.root), { withFileTypes: true })
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0
-      throw error
-    }
-    let reserved = 0
+    const active: Manifest[] = []
     for (const entry of entries) {
       if (!entry.isDirectory() || !ID_PATTERN.test(entry.name)) continue
       try {
         const manifest = await this.load(UserDocUploadId(entry.name))
-        if (manifest.state !== 'uploading' && manifest.state !== 'verifying') continue
-        const remaining = manifest.bytes - manifest.receivedBytes
-        if (remaining > 0) {
-          reserved += remaining
-          if (!Number.isSafeInteger(reserved)) throw new UserDocError('Reserved upload storage is invalid.', DOCUMENT_UPLOAD_STORAGE_CODE)
-        }
+        if (manifest.state === 'uploading' || manifest.state === 'verifying') active.push(manifest)
       } catch (error) {
         if (error instanceof UserDocError
           && (error.code === DOCUMENT_UPLOAD_EXPIRED_CODE || error.code === DOCUMENT_UPLOAD_NOT_FOUND_CODE)) continue
         throw error
       }
     }
-    return reserved
+    return active
   }
 
   private startFinalization(manifest: Manifest): void {
@@ -876,7 +980,9 @@ export class LocalUploadManager {
       }
       task.started = true
       this.activeFinalizations += 1
-      void this.finalize(task.manifest, task.controller.signal)
+      void Promise.resolve().then(() => this.backgroundWrite(async () => {
+        if (!task.controller.signal.aborted) await this.finalize(task.manifest, task.controller.signal)
+      }))
         .then(task.resolve, task.reject)
         .finally(() => {
           this.activeFinalizations -= 1
@@ -924,10 +1030,25 @@ export class LocalUploadManager {
       const digest = createHash('sha256')
       let partialPresent = true
       try {
-        for await (const chunk of createReadStream(partialPath(this.root, manifest.uploadId))) {
-          signal.throwIfAborted()
-          digest.update(Buffer.from(chunk as Uint8Array))
-        }
+        await withUploadReadFile(partialPath(this.controlRoot, manifest.uploadId), DOCUMENT_UPLOAD_STORAGE_CODE, async (handle, size) => {
+          if (size !== manifest.bytes) {
+            throw new UserDocError('The upload size does not match its manifest.', DOCUMENT_UPLOAD_SIZE_CODE)
+          }
+          let bytes = 0
+          for (;;) {
+            signal.throwIfAborted()
+            const read = await handle.read()
+            if (read.bytesRead === 0) break
+            bytes += read.bytesRead
+            if (bytes > manifest.bytes) {
+              throw new UserDocError('The upload payload grew during verification.', DOCUMENT_UPLOAD_SIZE_CODE)
+            }
+            digest.update(read.buffer.subarray(0, read.bytesRead))
+          }
+          if (bytes !== manifest.bytes) {
+            throw new UserDocError('The upload payload changed during verification.', DOCUMENT_UPLOAD_SIZE_CODE)
+          }
+        })
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
         // The hard-link publication may have committed before a process
@@ -946,18 +1067,22 @@ export class LocalUploadManager {
         name: manifest.name,
         docId: manifest.docId as UserDocTarget['docId'],
       }
-      await withFileLock(manifestPath(this.root, manifest.uploadId), async () => {
+      await this.assertSessionDirectory(manifestPath(this.controlRoot, manifest.uploadId))
+      await withFileLock(manifestPath(this.controlRoot, manifest.uploadId), async () => {
         const current = await this.load(UserDocUploadId(manifest.uploadId), { allowExpired: true })
         if (current.state === 'complete') return
         if (current.state !== 'verifying' || current.finalSha256 === undefined || current.finalSha256 !== manifest.finalSha256) return
         const ref = await this.publish(
           target,
-          partialPath(this.root, manifest.uploadId),
+          partialPath(this.controlRoot, manifest.uploadId),
           current.bytes,
           current.finalSha256,
+          UserDocUploadId(current.uploadId),
+          current.ownerId,
         )
-        const complete: Manifest = { ...current, state: 'complete', ref, expiresAt: Date.now() + this.sessionTtlMs }
-        await writeFileAtomic(manifestPath(this.root, manifest.uploadId), `${JSON.stringify(complete)}\n`, { mode: 0o600, dirMode: 0o700 })
+        const complete: Manifest = { ...current, ...(ref.identity === undefined ? {} : { formatVersion: 3 as const }),
+          state: 'complete', ref, expiresAt: Date.now() + this.sessionTtlMs }
+        await writeFileAtomic(manifestPath(this.controlRoot, manifest.uploadId), `${JSON.stringify(complete)}\n`, { mode: 0o600, dirMode: 0o700 })
       }, { waitMs: LOCK_WAIT_MS })
     } catch (error) {
       if (signal.aborted) return
@@ -967,7 +1092,8 @@ export class LocalUploadManager {
   }
 
   private async refreshFinalizationLease(manifest: Manifest): Promise<void> {
-    const path = manifestPath(this.root, manifest.uploadId)
+    const path = manifestPath(this.controlRoot, manifest.uploadId)
+    await this.assertSessionDirectory(path)
     await withFileLock(path, async () => {
       const current = await this.load(UserDocUploadId(manifest.uploadId), { allowExpired: true })
       if (current.state !== 'verifying') return
@@ -977,7 +1103,8 @@ export class LocalUploadManager {
   }
 
   private async markFailed(manifest: Manifest, code: string, message: string): Promise<void> {
-    const path = manifestPath(this.root, manifest.uploadId)
+    const path = manifestPath(this.controlRoot, manifest.uploadId)
+    await this.assertSessionDirectory(path)
     await withFileLock(path, async () => {
       let current: Manifest
       try {

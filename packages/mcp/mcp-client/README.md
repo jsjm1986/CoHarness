@@ -57,6 +57,8 @@ Add one entry per server; nothing else is required. After the harness starts, th
 | `transport` | required | `stdio` or `streamable-http` |
 | `serverName` | required | Namespace for the server's tool names; `[A-Za-z0-9_-]{1,32}`, unique inside one registration scope |
 | `command` / `args` / `env` / `cwd` | — | stdio: executable, arguments, extra env merged over scrubbed ambient env, working directory |
+| `processGraceMs` / `processCloseTimeoutMs` | `2000` / `5000` | stdio: termination grace and managed-range observation bound |
+| `startupTimeoutMs` | `120000` | stdio: admission, discovery and serving handshake deadline |
 | `url` / `headers` | — | streamable-http: endpoint URL and extra request headers |
 | `toolCallTimeoutMs` | `60,000` | Timeout per `tools/call` or resource request |
 | `maxInstructionBytes` | `32,768` | Maximum UTF-8 bytes of server instructions including attribution; an oversized value rejects the connection |
@@ -120,10 +122,12 @@ This section explains the design decisions behind the bridge and points at the c
 | [`src/connection.ts`](src/connection.ts) | Connection supervisor: client generations, reconnect policy, attempt budget, disposal |
 | [`src/server-context.ts`](src/server-context.ts) | Resource-provider registration and literal server instructions |
 | [`src/tools.ts`](src/tools.ts) | Tool bridge: discovery, naming, registration swap, execution, image projection |
-| [`src/transport.ts`](src/transport.ts) | Transport factory: stdio spawn with scrubbed env, Streamable HTTP |
+| [`src/transport.ts`](src/transport.ts) | Factory for managed stdio and SDK Streamable HTTP transports |
+| [`src/managed-stdio.ts`](src/managed-stdio.ts) | Local process admission, SDK framing and discovery, retryable range cleanup |
 
 The exported `createMcpToolDefinition(ctx, options)` adapts an upstream tool schema and raw-result callback to the same canonical values, errors, and durable image projection. Each callback receives the exact `ToolExecution`, including its Agent and cancellation signal; SDK spec-type validation checks its result before projection. Callers own registration, cancellation deadlines, and provider teardown. The native Cua Driver provider uses this adapter without opening an MCP transport.
 
+<a id="lifecycle-and-sync"></a>
 ### Lifecycle and sync
 
 `apply` resolves the reconnect policy, reserves the `serverName` inside the current registration scope, starts the supervisor, and awaits the initial connection plus discovery. Independent Agent scopes may reuse the same namespace because their tools and transports are isolated; a duplicate inside one scope fails at load. The supervisor serializes every sync — initial, notification, and reconnect — through one queue so two syncs can never interleave their dispose-previous/register-next swap. Disposal cancels pending reconnects, closes the negotiating transport or attached client, waits for the in-flight attempt and queued syncs to quiesce, and unregisters the current generation.
@@ -134,9 +138,13 @@ The SDK receives tool-list changes through legacy notifications or a modern subs
 
 A tool call uses the SDK with the raw name, complete tool definition, JSON arguments, abort signal, and configured timeout. The SDK owns protocol validation, advertised output-schema validation, and modern request headers. Canonical success is `{ content: JsonValue[], structuredContent? }`, preserving valid MCP JSON blocks for programmatic and PTC mode callers. An MCP `isError` result throws before image persistence. The bridge validates each image batch before saving it; a refusal projects every image as diagnostic text.
 
+Stdio discovery and serving use separate admitted processes. The discovery process cannot execute `initialize`; the SDK decides modern or legacy compatibility before a fresh serving process adopts that verdict. Reconnect waits for the old managed range to stop. A live Agent registration scope supplies the captured Session; global servers use Runtime infrastructure attribution. Shutdown failure rejects and retains the namespace until cleanup succeeds.
+
+`mountMcpClient(ctx, config)` exposes `ready` and retryable `dispose()` for programmatic owners. Await that disposer before releasing dependencies or exclusive browser reservations; Cordis scope disposal reports child errors through logging. `apply` uses the same handle for Loader activation.
+
 ### Environment scrubbing (stdio)
 
-The child environment starts from the subprocess seam's `scrubbedParentEnv()` — ambient names matching `/KEY|PASSWORD|SECRET|TOKEN/i` and ambient `DSH_*` names are dropped — and the configured `env` merges on top, so explicit overrides survive. The MCP SDK owns the actual spawn; this package shares the scrub definition, not the spawn path.
+The private local subprocess provider owns stdio allocation, environment scrubbing, termination and managed-range observation. Ambient names matching `/KEY|PASSWORD|SECRET|TOKEN/i` and ambient `DSH_*` names are dropped; explicit `env` entries survive. A public remote subprocess provider does not move a host-configured MCP command.
 
 </details>
 
@@ -207,7 +215,7 @@ Unchanged instructions retain identical prompt text. Updated or removed instruct
 These limits describe what you cannot do with this plugin and when it needs operational attention. They are current package constraints, not a comparison with other MCP clients or a task backlog.
 
 - **Resources are read on demand** — shipped profiles provide the [shared resource service](../mcp-resources/README.md); resource subscriptions and MCP prompt templates are unsupported.
-- **Startup and discovery timeouts are inherited from the MCP SDK** — the plugin exposes no separate connection or discovery timeout. Negotiation and discovery use the SDK's 60-second request default; discovery also uses its page limit. Plugin unload closes the transport to interrupt pending startup requests before awaiting teardown.
+- **HTTP connection and catalog-discovery requests retain SDK timeout policy** — stdio admission and negotiation use `startupTimeoutMs`; discovery pagination retains the SDK request timeout and page limit. Unload cancels pending stdio admission and closes negotiating transports before awaiting cleanup.
 - **Reconnect handles failed negotiation and transport close** — a failed initial probe or crashed stdio child uses the configured reconnect budget. Once HTTP is connected, request failures use the SDK transport's recovery rather than respawning the connection.
 - **Image is the only durable rich-result bridge** — PNG, JPEG, WebP, and GIF enter Native context after exact capability proof. Audio and embedded-resource payloads remain execution-local with explicit diagnostics, while resource links preserve only their name and URI as text.
 - **Invalid protocol results or output schemas fail through the SDK** — the bridge does not accept legacy `toolResult` substitutes or bypass advertised schema validation.
@@ -222,7 +230,7 @@ These limits describe what you cannot do with this plugin and when it needs oper
 This Dev Note is working context for maintainers: open design questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
 
 - The public-name algorithm is a v1 contract pinned by tests; changing it after release would break session history and permission rules.
-- An explicit DSH-owned connection and discovery timeout is an open direction; the SDK's 60-second default bounds startup requests.
+- HTTP startup and catalog-discovery deadline configuration remains deferred; the SDK request timeout and page limit apply.
 - Reconnect ownership for Streamable HTTP is open: per-request retry is SDK behavior, and the supervisor could also own the HTTP generation.
 - MCP prompt templates need a separate user-selection and invocation mechanism.
 - The pinned MCP SDK is still evolving; a breaking upstream change requires updating the bridge.

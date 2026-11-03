@@ -50,7 +50,10 @@ function WorkspaceProbe({ open }: EmptyWorkspaceOwnerProps) {
 
 async function bench(opts?: { blank?: boolean }) {
   const runtime = await SlotTestRuntime.create()
-  runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
+  runtime.provide('connection', {
+    api: { settings: {} }, isLoopback: false,
+    hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
+  })
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
   runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
@@ -79,7 +82,10 @@ async function bench(opts?: { blank?: boolean }) {
 describe('resident composer', () => {
   it('renders the locked view state while no session exists at all', async () => {
     const runtime = await SlotTestRuntime.create()
-    runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
+    runtime.provide('connection', {
+      api: { settings: {} }, isLoopback: false,
+      hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
+    })
     // The plugin injects both; these specs exercise no settings path.
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
@@ -110,7 +116,10 @@ describe('resident composer', () => {
 
   it('keeps the complete Hero tree mounted when the first Workspace session appears', async () => {
     const runtime = await SlotTestRuntime.create()
-    runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
+    runtime.provide('connection', {
+      api: { settings: {} }, isLoopback: false,
+      hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
+    })
     // The plugin injects both; these specs exercise no settings path.
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
@@ -180,7 +189,10 @@ describe('resident composer', () => {
 describe('prompt rejection through the assembled composer', () => {
   it('renders the promptError alert strip and keeps the draft in the machine', async () => {
     const runtime = await SlotTestRuntime.create()
-    runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
+    runtime.provide('connection', {
+      api: { settings: {} }, isLoopback: false,
+      hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
+    })
     // The plugin injects both; these specs exercise no settings path.
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })

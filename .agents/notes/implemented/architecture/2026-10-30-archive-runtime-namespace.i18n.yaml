@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-30-archive-runtime-namespace.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-30-archive-runtime-namespace.md
+document:
+  en: 414a140b6a8c1dace772dc3c4b1619724cd8b2ec
+  zh: f922e13703ea78f6ce9582f83c6b52b0000d2abd
+/agent-note-archive-records-have-stable-identities-within-runtime-namespaces:
+  en: 8ff8883633ec41be
+  zh: 37dc0176d6ebb503
+/agent-note-archive-records-have-stable-identities-within-runtime-namespaces/problem:
+  en: 532a54e1c608fea1
+  zh: 8457af6f40a67c2d
+/agent-note-archive-records-have-stable-identities-within-runtime-namespaces/decision:
+  en: 78f5c492a004c600
+  zh: 3620bf41b3d775b7
+/agent-note-archive-records-have-stable-identities-within-runtime-namespaces/alternatives-considered:
+  en: cd7f136ad6d4da75
+  zh: 6f91691fe3debf3c
+/agent-note-archive-records-have-stable-identities-within-runtime-namespaces/consequences:
+  en: 2d8992f689db5ba9
+  zh: d01a96d3bb4f0c0c

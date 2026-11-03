@@ -1,0 +1,14 @@
+{
+  "name": "native-model-provider-e2e",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config vitest.e2e.config.ts packages/web/web-search-deepseek/tests/deepseek.e2e.ts packages/llm/llm-deepseek/tests/adapter.e2e.ts --retry=0",
+  "startedAt": "2026-10-24T07:41:34.556443+00:00",
+  "seconds": 4.048,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "inputsAfter": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "postgresToolDirectory": null,
+  "outputSha256": "c6acbba1ed98c7048c7b612e1cef3db85bababda1eed9debbdd927463cee26bb",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  2 skipped (2)\n      Tests  15 skipped (15)\n   Start at  15:41:36\n   Duration  1.56s (transform 1.79s, setup 132ms, import 2.04s, tests 0ms, environment 0ms)\n\n"
+}

@@ -53,7 +53,7 @@ export async function runCommand(
     ? command
     : (await ctx.sandbox.confine(command, { ...policy, mode: policy.mode }, timeout.signal)).argv
   timeout.signal.throwIfAborted()
-  const child = ctx.subprocess.spawn({
+  const child = await ctx.subprocess.spawn({
     argv: wrapped,
     cwd,
     env: { ...GIT_ENV, GIT_TERMINAL_PROMPT: '0', GIT_LFS_SKIP_SMUDGE: '1', GIT_NO_LAZY_FETCH: '1', ...env },

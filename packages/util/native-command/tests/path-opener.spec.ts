@@ -7,13 +7,20 @@ type ExecFileCallback = (
 type ExecFileMock = (
   command: string,
   args: readonly string[],
-  options: { encoding: string; signal: AbortSignal; windowsHide: boolean },
+  options: { encoding: string; signal?: AbortSignal; windowsHide: boolean },
   callback: ExecFileCallback,
 ) => void
 
 const { execFileMock } = vi.hoisted(() => ({ execFileMock: vi.fn<ExecFileMock>() }))
 
-vi.mock('node:child_process', () => ({ execFile: execFileMock }))
+vi.mock('node:child_process', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:child_process')>()
+  return { ...original, execFile: (...args: Parameters<ExecFileMock>) => {
+    const child = new original.ChildProcess()
+    queueMicrotask(() => { execFileMock(...args); child.emit('close', 0, null) })
+    return child
+  } }
+})
 
 import { release as osRelease } from 'node:os'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -208,7 +215,7 @@ describe('native path opener', () => {
     expect(args).toEqual(['/tmp/default.txt'])
     expect(options.encoding).toBe('utf8')
     expect(options.windowsHide).toBe(true)
-    expect(options.signal).toBeInstanceOf(AbortSignal)
+    expect(options.signal).toBeUndefined()
 
     const commandError = Object.assign(new Error('open failed'), { code: 1 })
     execFileMock.mockImplementationOnce((_command, _args, _options, callback) => {

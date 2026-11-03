@@ -80,6 +80,8 @@ Client queries accept the first valid page response within `clientInspectTimeout
 
 Service package: default-exports `DynamicCordisRunnerService` (service key `dynamicCordisRunner`), with `./types` carrying the payload shapes the `dynamicCordisRunner` remote namespace and its consumers share. The `define` / `undefine` shapes stay inside the package, because they never cross the wire.
 
+Session-scoped registry controls and inventory filtering follow the [application authorization requirement](../../context/collaboration/README.md#application-authorization).
+
 <a id="model-experience"></a>
 ## Model Experience
 

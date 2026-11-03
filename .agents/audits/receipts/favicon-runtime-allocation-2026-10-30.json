@@ -1,0 +1,99 @@
+{
+  "finding": "B343",
+  "status": "fixed_by_architecture_owner_and_independently_verified_named_scope",
+  "updatedAt": "2026-10-30T10:32:16.628318+00:00",
+  "implementationOwner": "Architecture peer owns server.ts; audit owns archive form consumer alignment.",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T094655Z",
+  "sourcePaths": [
+    "gateway/src/server.ts",
+    "gateway/tests/server.spec.ts",
+    "apps/web/tests/admin-form-values.e2e.ts"
+  ],
+  "sourceHashes": {
+    "gateway/src/server.ts": "b12ad16a26905d3c09e06f2b26be3c7375667d361fc3cb2b249816c7eed8faa5",
+    "gateway/tests/server.spec.ts": "08881b8cf52f352d178abf2a764a32ee52841a96b14d46dec2495f88a21bca18",
+    "apps/web/tests/admin-form-values.e2e.ts": "615677135fa02db28f9c7264e858a4b4ee9224110819a90a7b8274d6226d7130"
+  },
+  "sourceModifiedAt": {
+    "gateway/src/server.ts": "2026-10-30T09:54:56.607861+00:00",
+    "gateway/tests/server.spec.ts": "2026-10-30T09:55:25.807926+00:00",
+    "apps/web/tests/admin-form-values.e2e.ts": "2026-10-30T10:06:35.694527+00:00"
+  },
+  "problem": "Automatic favicon requests fell through Runtime context resolution and proxy allocation during administration, producing15observed503responses and a409after explicit stop.",
+  "repair": "GETandHEAD/favicon.ico return empty204at the Gateway entry without authenticating, resolving, starting or forwarding a Runtime. Other methods retain normal routing.",
+  "verification": {
+    "uniqueTests": 4,
+    "httpRegression": 1,
+    "fullBrowserForms": 3,
+    "browser": "installed Google Chrome, configured by a private preload because Playwright bundled browser is absent",
+    "archiveConsumer": "Stable archiveId and RuntimeId fixture; status/detail/purge assert archiveId. Existing18form snapshots remain unchanged.",
+    "checks": {
+      "favicon-http-source-regression": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:14:15.661531+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+          "run",
+          "tests/server.spec.ts",
+          "-t",
+          "browser fallback icon",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:14:16.921681+00:00"
+      },
+      "archive-admin-form-favicon-repaired-browser": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:12:43.982326+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_SNAPSHOT=replay",
+          "NODE_OPTIONS=--import=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T094655Z/installed-chrome.mjs",
+          "./node_modules/.bin/vitest",
+          "run",
+          "--config",
+          "vitest.web.config.ts",
+          "apps/web/tests/admin-form-values.e2e.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:12:56.089599+00:00"
+      },
+      "archive-admin-form-owning-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:01:50.685263+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "./node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.browser.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:02:05.664815+00:00"
+      },
+      "archive-admin-form-compiler-exception-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:06:35.827845+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "tsx",
+          "scripts/run-oxlint.ts",
+          "--tsconfig=gateway/tsconfig.browser.json",
+          "apps/web/tests/admin-form-values.e2e.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:06:37.551114+00:00"
+      }
+    }
+  },
+  "limits": [
+    "Gateway backend is source in these HTTP/browser checks; the actual Admin UI is built. No compiled Gateway or full-route coverage claim.",
+    "Two narrowly justified lint exceptions cover Gateway-branded fixture IDs that Oxlint resolves in the Web-client program; the separate owning Gateway browser compiler passes.",
+    "All12original domains and B04/B25remain open. Real paid model success and public push remain deferred."
+  ]
+}

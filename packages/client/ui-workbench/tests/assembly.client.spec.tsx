@@ -36,6 +36,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 describe('assembled workbench', () => {
   it('binds two independent composers and preserves the first pane on focus changes', async () => {
     const runtime = await SlotTestRuntime.create()
+    runtime.provide('deploymentContext', createSnapshotStore({ phase: 'ready', showComputer: false, aggregateComputers: false }))
     runtime.provide('connection', { api: { settings: {} }, isLoopback: false, hostDescription: createSnapshotStore({ executionAuthorityRequired: false }) })
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
@@ -103,6 +104,7 @@ function SidebarFrame({ renderSlot }: PropsRenderSlots<'sidebar.workspaces' | 'm
 describe('assembled workbench sidebar panel', () => {
   it('renders the pane roster, actions, and display controls through the real slot chain', async () => {
     const runtime = await SlotTestRuntime.create()
+    runtime.provide('deploymentContext', createSnapshotStore({ phase: 'ready', showComputer: false, aggregateComputers: false }))
     const scope = stubSettingsScope()
     runtime.provide('connection', {
       api: { settings: {} },
@@ -156,7 +158,7 @@ describe('assembled workbench sidebar panel', () => {
     viewport.add(B)
     scope.publish({
       status: 'ready', writable: true,
-      value: { chatFontSize: 16, chatContentWidth: 720, chatFullWidth: false },
+      value: { chatContentWidth: 720, chatFullWidth: false },
     } as never)
     const view = runtime.renderRoot()
     await waitFor(() => { expect(view.getByRole('region', { name: '工作台' })).toBeTruthy() })
@@ -170,10 +172,10 @@ describe('assembled workbench sidebar panel', () => {
     fireEvent.click(panel.getByRole('button', { name: '等宽' }))
     expect(viewport.snapshot.getSnapshot().paneRatios).toEqual([0.5, 0.5])
     // The display hole hosts the shared settings face's sidebar variant.
-    fireEvent.click(panel.getByRole('button', { name: '减小字号' }))
-    expect(scope.set).toHaveBeenCalledWith('chatFontSize', 15)
     fireEvent.click(panel.getByRole('button', { name: '宽松' }))
     expect(scope.set).toHaveBeenCalledWith('chatContentWidth', 960)
+    fireEvent.click(panel.getByRole('button', { name: '占满' }))
+    expect(scope.set).toHaveBeenCalledWith('chatFullWidth', true)
     // Add opens the shared picker store → the toolbar's picker dialog.
     fireEvent.click(panel.getByRole('button', { name: '添加对话' }))
     await waitFor(() => { expect(view.getByRole('dialog')).toBeTruthy() })

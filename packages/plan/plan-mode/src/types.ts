@@ -15,7 +15,8 @@ import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
  * (the last `plan/mode`, inactive before the first); `pending` is true while
  * a logged `/plan` selection targets a state other than `active`, has not
  * failed through its paired `command/done`, and no later `plan/mode` event has
- * recorded that state. Capability absence (plan-mode not composed) is the
+ * recorded that state. A later failed command preserves an earlier successful
+ * pending selection. Capability absence (plan-mode not composed) is the
  * key's absence, never a value.
  */
 export interface PlanProjection {

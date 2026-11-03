@@ -1,5 +1,6 @@
 /** Test-owned Remote face: `$on` subscriptions driven by the internal forwarded-event plumbing. */
 import type { Context } from '@deepseek-ai/cordis'
+import type { ConnectionRuntimeTarget } from '@deepseek-ai/dsh-client-connection/client'
 
 export { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 
@@ -31,6 +32,16 @@ export class TestRemote {
    */
   constructor(ctx: Context) {
     ctx.provide('remote', this)
+  }
+
+  /**
+   * Capture this double's sole bootstrap Runtime; alternate targets require the real Client Remote.
+   * @param target - omitted for the bootstrap Runtime.
+   * @returns this bootstrap event source.
+   */
+  $forTarget(target?: ConnectionRuntimeTarget): this {
+    if (target !== undefined) throw new Error('TestRemote: alternate targets need the real Client Remote service')
+    return this
   }
 
   /**

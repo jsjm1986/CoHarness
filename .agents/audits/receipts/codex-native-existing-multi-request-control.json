@@ -1,0 +1,14 @@
+{
+  "name": "codex-native-existing-multi-request-control",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-codex/tests/real-product.spec.ts -t 'executes an explicitly selected dangerous bypass write' --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T01:55:37.710035+00:00",
+  "seconds": 4.908,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8301c9c40da476c684889e5bb0624131e29af5978697ce921d4542e728ad0a5f",
+  "inputsAfter": "8301c9c40da476c684889e5bb0624131e29af5978697ce921d4542e728ad0a5f",
+  "postgresToolDirectory": null,
+  "outputSha256": "8c77daa4123e4da04e14b299eb1ff2b0aaf1f03b5e80c0cdaa4f0a61296eeefa",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n{\"timestamp\":\"2026-10-25T01:55:42.364812Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model fixture-model is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-10-25T01:55:42.454136Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model fixture-model is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n\n Test Files  1 passed (1)\n      Tests  1 passed | 9 skipped (10)\n   Start at  09:55:40\n   Duration  1.71s (transform 868ms, setup 31ms, import 1.06s, tests 551ms, environment 0ms)\n\n"
+}

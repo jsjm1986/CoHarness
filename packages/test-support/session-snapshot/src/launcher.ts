@@ -413,10 +413,11 @@ function linkProfilePackage(source: string, cwd: string, profile: string, packag
  * @param profile - profile whose local package lookup receives the test links.
  * @param targetDir - existing directory that owns the materialized patch.
  * @param index - stable patch ordinal used in the output filename.
+ * @param resolverSource - module-resolution anchor for bare plugins; defaults to the authored patch.
  * @returns absolute materialized patch path.
  */
 export function materializeProfilePatch(
-  source: string, cwd: string, profile: string, targetDir: string, index: number,
+  source: string, cwd: string, profile: string, targetDir: string, index: number, resolverSource = source,
 ): string {
   const parsed = yaml.load(readFileSync(source, 'utf8'), { schema: entryListSchema })
   if (!Array.isArray(parsed)) throw new Error(`snapshot profile patch must be a top-level array: ${source}`)
@@ -424,7 +425,7 @@ export function materializeProfilePatch(
   const baseDir = dirname(source)
   const resolveName = (value: string): string => {
     const packageName = barePackageName(value)
-    if (packageName !== undefined) linkProfilePackage(source, cwd, profile, packageName)
+    if (packageName !== undefined) linkProfilePackage(resolverSource, cwd, profile, packageName)
     return value.startsWith('./') || value.startsWith('../')
       ? pathToFileURL(resolve(baseDir, value)).href
       : value

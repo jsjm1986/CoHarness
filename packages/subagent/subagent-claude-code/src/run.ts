@@ -162,7 +162,7 @@ export interface ClaudeCodeRunSpec {
   /** Subprocess termination grace passed to the shared process-tree owner. */
   readonly disposeGraceMs: number
   /** Shared subprocess service spawn operation. */
-  readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle
+  readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle | Promise<SubprocessHandle>
   /** Host diagnostic sink for a product failure kept outside model-visible text. */
   readonly onError?: (error: Error, stopReason: SubagentStopReason) => void
 }
@@ -307,17 +307,14 @@ export async function disposeClaudeCodeChild(
  * Build the fixed official SDK options for one one-shot provider run.
  * @param spec - Workspace, environment, process service, and disposal policy.
  * @param controller - per-run cancellation owner.
- * @param capture - receives the shared child and SDK-facing process synchronously.
+ * @param capture - receives the SDK adapter synchronously; its ready promise owns allocation.
  * @param captureDiagnostic - receives safe facts from unattended interaction callbacks.
  * @returns options that inherit native settings while disabling persistence and user questions.
  */
 export function claudeQueryOptions(
   spec: ClaudeCodeRunSpec,
   controller: AbortController,
-  capture: (
-    child: SubprocessHandle,
-    process: ManagedClaudeCodeProcess,
-  ) => void,
+  capture: (process: ManagedClaudeCodeProcess) => void,
   captureDiagnostic: (diagnostic: string) => void,
 ): Options {
   return {
@@ -369,9 +366,11 @@ export function claudeQueryOptions(
     supportedDialogKinds: SUPPORTED_UNATTENDED_DIALOG_KINDS,
     spawnClaudeCodeProcess: (options: SpawnOptions) => {
       const spawn = claudeSpawnSpec(options, spec.disposeGraceMs)
-      const child = spec.spawn(spec.remote === true ? { ...spawn, env: spec.env } : spawn)
-      const process = new ManagedClaudeCodeProcess(child)
-      capture(child, process)
+      const allocation = new AbortController()
+      const signal = AbortSignal.any([allocation.signal, controller.signal, ...spawn.signal === undefined ? [] : [spawn.signal]])
+      const child = spec.spawn({ ...spawn, ...(spec.remote === true ? { env: spec.env } : {}), signal })
+      const process = new ManagedClaudeCodeProcess(child, () => { allocation.abort(new Error('Claude Code process cancelled')) })
+      capture(process)
       return process
     },
   }
@@ -422,14 +421,7 @@ export async function startClaudeCodeRun(
       ? failure
       : `${failure}\n${diagnostic}`
   }
-  const captureChild = (
-    captured: SubprocessHandle,
-    process: ManagedClaudeCodeProcess,
-  ): void => {
-    child = captured
-    void captured.done.catch(() => { spawnState.failed = true })
-    managedProcess = process
-  }
+  const captureChild = (process: ManagedClaudeCodeProcess): void => { managedProcess = process }
   try {
     query = officialQuery({
       prompt,
@@ -440,6 +432,9 @@ export async function startClaudeCodeRun(
         capturePermissionDiagnostic,
       ),
     })
+    await Promise.resolve()
+    child = await managedProcess?.ready
+    if (child !== undefined) void child.done.catch(() => { spawnState.failed = true })
     await Promise.resolve()
     if (child === undefined || spawnState.failed) {
       throw new Error(
@@ -452,6 +447,10 @@ export async function startClaudeCodeRun(
   } catch (error: unknown) {
     request.signal.removeEventListener('abort', onAbort)
     const cancelledBeforeCleanup = controller.signal.aborted
+    requestCancel()
+    try { child = await managedProcess?.ready } catch (_allocationFailed) {
+      // The allocation error is reported by startup; its provider owns any unpublished partial work.
+    }
     // Let child.done publish a concurrently observed exit before classification.
     await Promise.resolve()
     const startupOutcome = managedProcess?.outcome

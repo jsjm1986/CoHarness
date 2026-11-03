@@ -1,0 +1,14 @@
+{
+  "name": "memory-auxiliary-persistence-catalog",
+  "cwd": ".",
+  "command": "pnpm run gen-persistence-catalog",
+  "startedAt": "2026-10-24T01:26:50.973484+00:00",
+  "seconds": 13.981,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "06080df416049455b46405dce069340346ce34463a65d1e6067bcbe61301b74c",
+  "inputsAfter": "00e3ee46366b081e1403fd1bc5c5cb67c5c0c12c11f70f4873a10ad5d1e1f592",
+  "postgresToolDirectory": null,
+  "outputSha256": "5c459d1e735e4332e7d0953772e978eebf0aff0dd1e15d5f0151633532f047f8",
+  "outputTail": "$ tsx scripts/gen-persistence-catalog.ts\ngen-persistence-catalog: wrote docs/persistence-catalog.md.\ngen-persistence-catalog: wrote docs/persistence-catalog.zh.md.\ngen-persistence-catalog: wrote docs/persistence-catalog.i18n.yaml.\ngen-persistence-catalog: wrote docs/experimental-persistence-catalog.md.\ngen-persistence-catalog: wrote docs/experimental-persistence-catalog.zh.md.\ngen-persistence-catalog: wrote docs/experimental-persistence-catalog.i18n.yaml.\ngen-persistence-catalog: wrote packages/core/session/src/known-event-types.ts.\ngen-persistence-catalog: wrote docs/persistence-schema.json.\n"
+}

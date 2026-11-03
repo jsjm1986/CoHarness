@@ -74,6 +74,13 @@ describe('bundleRoster on a scratch installation', () => {
   const scratch = new Scratch()
   afterAll(() => { rmSync(scratch.root, { recursive: true, force: true }) })
 
+  it('reads a bundle own Host entry without requiring a dependency on itself', () => {
+    const own = new Scratch()
+    onTestFinished(() => { rmSync(own.root, { recursive: true, force: true }) })
+    own.bundle('@t/own', "- insert:\n    - id: own-host\n      name: '@t/own'\n")
+    expect(own.roster(['@t/own'])).toEqual([])
+  })
+
   it('resolves a linked bundle dependency before an unrelated ancestor package', () => {
     const linked = new Scratch()
     onTestFinished(() => { rmSync(linked.root, { recursive: true, force: true }) })

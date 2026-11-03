@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-worker-final-tests",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/browser-use-stagehand-native/tests --retry=0",
+  "startedAt": "2026-10-23T13:31:55.628235+00:00",
+  "seconds": 10.301,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a8f2ca6251edfd5c444c3d6a60bb5cac28bde1aefd6e6b2ab90f2c73301eaa65",
+  "inputsAfter": "2b1fa309ea634faf3ef6a0b5c053cc52bc2ddb787a5dee257cff8cf32f0028d8",
+  "outputSha256": "706567991664a208081e9ae9ccde36dbede5c2ecceca0cb8ce13a883bc36c52f",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  9 passed (9)\n      Tests  78 passed (78)\n   Start at  21:32:00\n   Duration  5.29s (transform 7.99s, setup 656ms, import 12.86s, tests 6.86s, environment 6ms)\n\n"
+}

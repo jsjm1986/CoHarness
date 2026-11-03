@@ -1,0 +1,13 @@
+{
+  "name": "gateway-backup-postgres-with-toolchain",
+  "cwd": "gateway",
+  "command": "env PATH=/opt/homebrew/opt/libpq/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin npm exec vitest run tests/deployment-backups.spec.ts tests/deployment-restore.spec.ts tests/startup-generation.spec.ts -- --no-file-parallelism --maxWorkers=1",
+  "startedAt": "2026-10-23T21:31:54.220536+00:00",
+  "seconds": 1.911,
+  "exitCode": 127,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cbff746d41fd1046b3e5d7c20337355ebcf6a1f80d686df03a4c498ed36223be",
+  "inputsAfter": "cbff746d41fd1046b3e5d7c20337355ebcf6a1f80d686df03a4c498ed36223be",
+  "outputSha256": "13e6f7efe14c8b3430d0fb3cc8b358cf2e978e5640dc28524bdc3afc6f524db2",
+  "outputTail": "env: npm: No such file or directory\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "preset-retired-native-causal-node22",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/run-managed-native-ssh.py lib /Users/a1234/.nvm/versions/node/v22.22.1/bin/node retired",
+  "startedAt": "2026-10-25T14:14:03.166101+00:00",
+  "seconds": 2.439,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c86bd4bb4d7355591ece4d96b0f8c28253d6c995310648f4f1ece565319199d7",
+  "inputsAfter": "c86bd4bb4d7355591ece4d96b0f8c28253d6c995310648f4f1ece565319199d7",
+  "postgresToolDirectory": null,
+  "outputSha256": "914dc5e3c2d6d7ee05c1d44e21a062187ea3d4f659fb2127c0f876bb43b03b9d",
+  "outputTail": "Traceback (most recent call last):\n  File \"/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/run-managed-native-ssh.py\", line 49, in <module>\n    if active.returncode:raise RuntimeError('Native managed SSH failed in '+mode+'\\n'+stdout[-2000:]+'\\n'+stderr[-6000:])\n                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: Native managed SSH failed in retired\n\nfile:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/subagent/subagent-codex/tests/fixtures/managed-ssh-driver.mjs:229\n    assert.equal(await connection.request('heartbeat', {}, z.null()), null)\n                                                                 ^\n\nTypeError: z.null is not a function\n    at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/subagent/subagent-codex/tests/fixtures/managed-ssh-driver.mjs:229:66\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n\nNode.js v22.22.1\n\n"
+}

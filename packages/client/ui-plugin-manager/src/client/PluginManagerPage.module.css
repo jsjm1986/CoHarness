@@ -52,6 +52,14 @@
   line-height: 28px;
 }
 
+.titleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--dsw-space-2);
+  min-width: 0;
+}
+
 .pageIntro {
   display: flex;
   align-items: center;
@@ -436,17 +444,6 @@
   cursor: default;
 }
 
-/* The toolbar's Add plugin action, one step up from the 28px sm capsule. */
-.addButton,
-.addPrimary,
-.addMore {
-  height: 32px;
-  font-size: 13px;
-  line-height: 20px;
-  padding: 0 12px;
-  border-radius: var(--dsw-radius-md);
-}
-
 .addGroup {
   display: inline-flex;
   flex: none;
@@ -459,9 +456,9 @@
 }
 
 .addMore {
-  width: 32px;
+  width: var(--dsw-control-height-toolbar);
   padding: 0;
-  border-left: 0.5px solid color-mix(in srgb, var(--dsw-alias-label-primary-foreground) 30%, transparent);
+  border-left: 0.5px solid var(--dsw-alias-border-l3);
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }

@@ -1,5 +1,6 @@
 /** Idle disposal refuses owned work and closes input before asynchronous teardown. */
 import { Context } from '@deepseek-ai/cordis'
+import { agentCarrier } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -30,10 +31,12 @@ it('preserves parked inbox work and refuses maintenance even though its public s
   let maintenanceSignal: AbortSignal | undefined
   const maintenance = agent.runMaintenance((signal) => { maintenanceSignal = signal; return finish.promise })
   expect(agent.status).toBe('idle')
+  expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBe('busy')
   expect(await handle.tryDisposeIdle()).toBe(false)
   expect(maintenanceSignal?.aborted).toBe(false)
   finish.resolve(undefined)
   await maintenance
+  expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBeUndefined()
   const closing = handle.tryDisposeIdle()
   const closedAt = agent.session.seq
   expect(() => { agent.followup(message()) }).toThrow('input is closed')

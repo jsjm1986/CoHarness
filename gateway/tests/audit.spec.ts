@@ -1,13 +1,30 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { AuditService } from '../src/audit.ts'
 import { openDb } from '../src/db.ts'
 
+const cleanups: Array<() => void> = []
+afterEach(() => {
+  const failures: unknown[] = []
+  for (const close of cleanups.splice(0).reverse()) {
+    try { close() } catch (error) { failures.push(error) }
+  }
+  if (failures.length > 0) throw new AggregateError(failures, 'Audit fixture cleanup failed')
+})
+
+function fixture() {
+  const root = mkdtempSync(join(tmpdir(), 'hgw-audit-'))
+  cleanups.push(() => rmSync(root, { recursive: true, force: true }))
+  const db = openDb(join(root, 'g.sqlite'))
+  cleanups.push(() => { db.close() })
+  return { db, audit: new AuditService(db) }
+}
+
 describe('AuditService', () => {
   it('writes and filters entries', () => {
-    const audit = new AuditService(openDb(join(mkdtempSync(join(tmpdir(), 'hgw-')), 'g.sqlite')))
+    const { audit } = fixture()
     audit.write({ userId: 1, action: 'login', ip: '1.1.1.1' })
     audit.write({ userId: 1, action: 'api', methodPath: 'POST /api/session.prompt', status: 200 })
     audit.write({ userId: 2, action: 'api', methodPath: 'POST /api/session.create', status: 200 })
@@ -17,7 +34,7 @@ describe('AuditService', () => {
   })
 
   it('filters by fromMs, toMs, offset, and action prefix', () => {
-    const audit = new AuditService(openDb(join(mkdtempSync(join(tmpdir(), 'hgw-')), 'g.sqlite')))
+    const { audit } = fixture()
     audit.write({ userId: 1, action: 'admin.projects.create' })
     audit.write({ userId: 1, action: 'admin.projects.delete' })
     audit.write({ userId: 1, action: 'admin.users' })
@@ -32,7 +49,7 @@ describe('AuditService', () => {
   })
 
   it('filters by family, outcome, actor name, and literal action text', () => {
-    const audit = new AuditService(openDb(join(mkdtempSync(join(tmpdir(), 'hgw-')), 'g.sqlite')))
+    const { audit } = fixture()
     audit.write({ userId: 1, action: 'login.failed', status: 401 })
     audit.write({ userId: 1, action: 'login', ip: '1.1.1.1' })
     audit.write({ userId: 1, action: 'model.denied' })
@@ -57,10 +74,9 @@ describe('AuditService', () => {
   })
 
   it('joins actor names, clamps the limit, and counts across pages', () => {
-    const db = openDb(join(mkdtempSync(join(tmpdir(), 'hgw-')), 'g.sqlite'))
+    const { db, audit } = fixture()
     db.prepare(`INSERT INTO users(username, password_hash, display_name, role, home_path, created_at, updated_at)
       VALUES('root-admin', 'x', 'Root Admin', 'admin', '/tmp/root-admin', 1, 1)`).run()
-    const audit = new AuditService(db)
     audit.write({ userId: 1, action: 'admin.users' })
     audit.write({ userId: 99999, action: 'admin.orphan' })
     for (let i = 0; i < 3; i += 1) audit.write({ userId: 1, action: `admin.op.${i}` })
@@ -74,5 +90,24 @@ describe('AuditService', () => {
     expect(named?.displayName).toBe('Root Admin')
     const orphan = audit.query({ actionPrefix: 'admin.orphan' })[0]
     expect(orphan?.username).toBeNull()
+  })
+
+  it('matches outcome filters and counts to the returned row classification', () => {
+    const { audit } = fixture()
+    for (const action of ['login.failed', 'model.denied', 'login.locked', 'service.error', 'admin.restart-failed']) {
+      audit.write({ action })
+      audit.write({ action, status: 204 })
+    }
+    audit.write({ action: 'login.FAILED' })
+    audit.write({ action: 'service.error\n' })
+    audit.write({ action: 'admin.users', status: 503 })
+    const rows = audit.query()
+    expect(rows.filter(row => row.outcome === 'success')).toHaveLength(7)
+    expect(rows.filter(row => row.outcome === 'failure')).toHaveLength(6)
+    for (const outcome of ['success', 'failure'] as const) {
+      const expected = rows.filter(row => row.outcome === outcome).map(row => row.id)
+      expect(audit.query({ outcome }).map(row => row.id)).toEqual(expected)
+      expect(audit.count({ outcome })).toBe(expected.length)
+    }
   })
 })

@@ -294,8 +294,8 @@ it('rejects a new run until cancellation cleanup has completed for its owner', a
   const cleanup = Promise.withResolvers<true>()
   const released = Promise.withResolvers<boolean>()
   const spawn = ctx.subprocess.spawn.bind(ctx.subprocess)
-  const intercepted = vi.spyOn(ctx.subprocess, 'spawn').mockImplementationOnce((spec) => {
-    const handle = spawn(spec)
+  const intercepted = vi.spyOn(ctx.subprocess, 'spawn').mockImplementationOnce(async (spec) => {
+    const handle = await spawn(spec)
     return { ...handle, waitForExit: async () => { await handle.waitForExit(); cleanup.resolve(true); return released.promise } }
   })
   const abort = new AbortController()

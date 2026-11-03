@@ -1,0 +1,14 @@
+{
+  "name": "model-governance-artifact-types-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p plugins/dsh-model-governance/tsconfig.json",
+  "startedAt": "2026-10-24T13:21:24.285986+00:00",
+  "seconds": 4.519,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5ecbfe8d4151656ada2438257a3b18fe923df0ca4f6fcf8f4aaf277dda716417",
+  "inputsAfter": "5ecbfe8d4151656ada2438257a3b18fe923df0ca4f6fcf8f4aaf277dda716417",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

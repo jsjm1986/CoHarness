@@ -1,0 +1,3 @@
+{"phase":"unread","closedBeforeFirstPull":129,"remainingCapacity":128,"capacityBoundPreserved":true}
+{"phase":"reads","cancellationRetained":true,"text":"fixture read\n","earlyCloseAcknowledged":true,"staleVersionRefused":true,"connectionReusable":true}
+{"phase":"disposed","helperPrivateRootRemoved":true}

@@ -1,0 +1,150 @@
+{
+  "recordedAt": "2026-10-29T19:55:28.196935+00:00",
+  "status": "fixed_and_verified_for_named_scope",
+  "wholeProjectComplete": false,
+  "findings": [
+    "B330"
+  ],
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z",
+  "confirmedEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/archive-two-computer-session-collision-confirmed.json",
+  "scope": "Two real independently authenticated Runtime HTTP endpoints, same organization/account and distinct computer/Runtime identities. Different Host Session controls both200; second equal Host Session snapshot500. Existing first record remains separately owned.",
+  "beforeSourceSha256": {
+    "gateway/src/postgres/conversation-archive-service.ts": "28e61cf8d8323a89e3a5c447be4c091b35ef4cd03fc6d2667e3faf59b9633d14",
+    "gateway/src/admin-api.ts": "185a4ec228e6b67e72205425204112c31e301725a7800da04ef246fe2ade7ea1",
+    "gateway/src/runtime-api.ts": "0d205645e93b324d71944c7dec45d7f1fc9176a5413a08b6d61c976892eab1b5",
+    "gateway/admin-ui/src/api.ts": "530ee05efd1653f0c7781e1691d1e9e795eac6927f767df0d51abea0d29d0886",
+    "gateway/admin-ui/src/pages/ArchivesPage.tsx": "92d0fea3915ba2defb9bc1c2eaf5c257bce340b48de11a6f347c67ea7120d099",
+    "gateway/deploy/postgres/migrations/015_conversation_archives.sql": "95d16d48b28084fe59bdfdfc3286e72650225914ba0ccf7c8709d4fc0783f7f5",
+    "gateway/deploy/postgres/migrations/087_conversation_runtime_identity.sql": "5ba5f192e2930257693a0402ed3020f0a77a75d7a2fa9060214f1a34d13e8b46"
+  },
+  "migrationReserved": "097_archive_runtime_namespace.sql",
+  "realProviderApiValidation": "human_deferred",
+  "baseline": {
+    "ahead": 139,
+    "behind": 0,
+    "lastFetch": "2026-10-29T19:49:39.220376+00:00",
+    "dirtyWorkspacePreserved": true,
+    "headReference": "codex/business-logic-audit-2026-10-23",
+    "originReference": "origin/master",
+    "localIdentityEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/current-baseline-identity.json"
+  },
+  "sourcePaths": [
+    ".agents/notes/implemented/architecture/2026-10-30-archive-runtime-namespace.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-30-archive-runtime-namespace.md",
+    ".agents/notes/implemented/architecture/2026-10-30-archive-runtime-namespace.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.zh.md",
+    "gateway/README.i18n.yaml",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/admin-ui/src/api.spec.ts",
+    "gateway/admin-ui/src/api.ts",
+    "gateway/admin-ui/src/computer-target.spec.ts",
+    "gateway/admin-ui/src/pages/ArchivesPage.spec.tsx",
+    "gateway/admin-ui/src/pages/ArchivesPage.tsx",
+    "gateway/admin-ui/src/pages/archives.copy.ts",
+    "gateway/deploy/postgres/migrations/097_archive_runtime_namespace.sql",
+    "gateway/package.json",
+    "gateway/src/admin-api.ts",
+    "gateway/src/archive-identity.ts",
+    "gateway/src/postgres/collaboration-service.ts",
+    "gateway/src/postgres/conversation-archive-service.ts",
+    "gateway/src/postgres/conversation-repository.ts",
+    "gateway/src/runtime-api.ts",
+    "gateway/tests/access-invalidation.spec.ts",
+    "gateway/tests/admin-api.spec.ts",
+    "gateway/tests/admin-business-postgres.spec.ts",
+    "gateway/tests/archive-administration-postgres.spec.ts",
+    "gateway/tests/archive-identity.spec.ts",
+    "gateway/tests/archive-read-administration-postgres.spec.ts",
+    "gateway/tests/archive-runtime-migration-postgres.spec.ts",
+    "gateway/tests/archive-runtime-namespace-postgres.spec.ts",
+    "gateway/tests/archive-runtime-namespace-transcript.spec.ts",
+    "gateway/tests/conversation-archive-service.spec.ts",
+    "gateway/tests/execution-runtime-migration-postgres.spec.ts",
+    "gateway/tests/expected/archive-runtime-namespace-browser.jsonl",
+    "gateway/tests/expected/archive-runtime-namespace.jsonl",
+    "gateway/tests/fixtures/archive-administration.mjs",
+    "gateway/tests/fixtures/archive-read-administration.mjs",
+    "gateway/tests/fixtures/archive-runtime-namespace.mjs",
+    "gateway/tests/postgres.spec.ts",
+    "gateway/tests/run-built-archive-ui.mjs"
+  ],
+  "finalSourceAndArtifacts": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/final-source-and-artifact-hashes.json",
+  "publishedSource": true,
+  "fix": [
+    "Migration097 assigns one immutable UUID archiveId and retains the unique organization/Runtime/Host-root tuple. Search, command and file-cleanup references use archive identity; search event identity includes Runtime.",
+    "Admin record routes, bulk request archiveIds and result archiveId are updated together with service consumers and UI. Old root-addressed routes refuse, malformed or duplicate UUID inputs reject, and browser response decoding rejects missing or mismatched archive identities.",
+    "Snapshot CAS, stable tombstones and command requeue retain their Runtime. Same-Runtime search cannot move an indexed event to a different root; every SQL batch rolls back on conflict.",
+    "Detail, search fallback, title, child count and stored-data purge require recorded Runtime ownership. Unassigned legacy rows also require their recorded creator/project. Cleanup tasks cannot target another archive/computer.",
+    "Draft reservations carry the authenticated Runtime UUID; recent-conversation archive filters retain Runtime. Sibling tombstones cannot hide or forbid another Runtime history. Known purge/state idempotency keys do not accept a foreign computer record.",
+    "A delayed first snapshot cannot reindex purged data after another transaction creates and settles its tombstone. UI selection, polls, late details and exports use archiveId, retaining original Host IDs and showing Runtime identity."
+  ],
+  "verification": {
+    "sourceRegression": "262 tests passed with aligned Vitest/coverage-v8 4.1.12; includes current PostgreSQL authority, namespace, migration, legacy ownership and reader cases. One additional deterministic first-projection/tombstone case passes on published source.",
+    "broaderIntegration": "Full initial8-file run had208 pass/3 old access-fixture failures. The fixture inserts were updated to schema086/087 computer/Runtime requirements; all18 access-invalidation cases then passed. The original failing receipt remains unchanged.",
+    "publishedSource": "15 namespace/migration/parser/transcript cases and40 Admin UI/API/computer-target cases pass on authoritative files.",
+    "httpTranscript": "Two logical computers with real independently authenticated Gateway HTTP, Postgres services, and generation-checked Runtime read HTTP. Original Host IDs are retained; wrong Runtime acknowledgements409 and wrong-computer records404. Legacy routes410 and malformed/duplicate IDs400.",
+    "compiled": "Final current-source Gateway private emission and Admin private build pass. Final namespace transcript passes on plain Node22.22.1 and24.19.0. Earlier full four-transcript Node22/24 evidence also covers archive write35/read90 matrices and resource-scope isolation; native payload coldstart is not established.",
+    "browser": "Final current-source Gateway/Admin artifacts pass headless Chrome at1280/390/320; two same-Host rows, one selected/affected archive, correct Runtime body/export and retained other archive, no horizontal overflow or page errors. Real node metadata services are connected in the fixture; remote node-service connections are refused and physical forwarding is not exercised.",
+    "coverage": {
+      "archive-identity.ts": {
+        "lines": 100,
+        "functions": 100,
+        "statements": 100,
+        "branches": 100
+      },
+      "archive-runtime-reader.ts": {
+        "lines": 100,
+        "functions": 100,
+        "statements": 100,
+        "branches": 100
+      },
+      "administrator-authority.ts": {
+        "lines": 100,
+        "functions": 100,
+        "statements": 100,
+        "branches": 100
+      },
+      "conversation-archive-service.ts": {
+        "lines": 92.49,
+        "functions": 93.75,
+        "statements": 86.74,
+        "branches": 77.58
+      }
+    },
+    "coverageRunner": "Aligned installed Vitest4.1.12 and coverage-v8 4.1.12; mixed-version measurement is historical only. Archive service remains partial, not a100%file or whole-project claim.",
+    "static": "Gateway and Admin noEmit, scoped TS/TSX lint, explicit JS fixture lint, final file whitespace/newline checks and20 documentation gates pass.",
+    "migration": "Preserves all legacy archive/search/command/cleanup facts, assigned and unassigned Runtime history, immutable identity and cross-record/computer foreign keys. No committed Session generation is rewritten.",
+    "cleanup": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/archive-namespace-final-postgres-quiescence.json"
+  },
+  "acceptedCommandReceipts": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/stage-aligned-coverage.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/published-authoritative-source-replay.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/published-first-projection-tombstone.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/published-ui-behavior.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/published-gateway-types.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/published-last-test-types.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/published-ui-types-and-tests.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/published-typescript-lint.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/published-final-lint.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/final-published-js-lint.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/published-pairing.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/published-doc-quick.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/published-private-gateway-build.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/published-private-admin-build.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/final-current-artifact-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/final-current-artifact-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/final-published-browser.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/final-latest-baseline.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z/archive-namespace-owned-postgres-cleanup.json"
+  ],
+  "limits": [
+    "All12 original domains remain in_progress; B04/B25 and B331 remain open.",
+    "B331 independently reproduces PostgreSQL Session materialization collision across organization/Runtime histories. Only archive/resource identities are fixed here; the Session table still reserves Host IDs globally.",
+    "Logical-computer private HTTP/PG fixtures run on one Mac, with fixture-owned HTTP payloads and a readiness adapter. They do not prove full native Gateway/Web coldstart, a physical multi-host deployment, Linux containment or real model-provider success.",
+    "Real model-provider validation remains explicitly human-deferred.",
+    "Changes are applied to source and verified with private artifacts; production services/databases, commits and public pushes were not changed. Root workspace eight-gate build remains historical B327 evidence; current fresh builds cover the standalone Gateway/Admin projects."
+  ]
+}

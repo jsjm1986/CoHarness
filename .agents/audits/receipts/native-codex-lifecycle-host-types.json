@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-lifecycle-host-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-25T03:50:02.062812+00:00",
+  "seconds": 50.261,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4817d936b1e9aac3dd128d3bdfdecc7917eab9942b7a27da87a59054af2b50f7",
+  "inputsAfter": "4817d936b1e9aac3dd128d3bdfdecc7917eab9942b7a27da87a59054af2b50f7",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

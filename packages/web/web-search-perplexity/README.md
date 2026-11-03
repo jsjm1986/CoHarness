@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 A [Perplexity](https://perplexity.ai)-backed `WebSearchProvider` for the harness [web capability seam](../web/README.md) (`ctx.web`). It calls Perplexity's OpenAI-compatible `POST /chat/completions` endpoint and maps the generated answer plus citations into the seam's normalized `WebSearchResult`.
 
-This is an **implementation** package: it registers a provider into `ctx.web`, it does not own the key and it does not register a model-facing tool. Like `@deepseek-ai/dsh-llm-deepseek`, it is a function/namespace plugin (`inject: ['web']`). The OpenAI-compatible wire shape is a provider-private detail — it does **not** make this provider depend on `ctx.llm`.
+This implementation registers into `ctx.web` with `inject: ['web']`. Governed searches execute a prepared `perplexity-web-search` operation through the selected `ctx.llm` route; independent compositions retain the private chat-completions transport. The model-facing tool belongs to `dsh-tool-web`.
 
 ## Summary
 
@@ -30,7 +30,9 @@ With `dsh-web-search-perplexity`, the harness searches the web through Perplexit
 
 | Key | Default | Meaning |
 |---|---|---|
-| `apiKey` | `$PERPLEXITY_API_KEY` | Perplexity API key. Empty/absent makes the provider unavailable. |
+| `provider` | `perplexity` (governed) | Exact LLM route; configuring it or installing/requiring model policy selects governed execution. |
+| `apiKey` | (unset) | Independent transport key; governed execution uses the LLM route credential. |
+| `apiKeyEnv` | `PERPLEXITY_API_KEY` | Independent credential reference; uses the credentials service when mounted, otherwise the launch environment. |
 | `baseURL` | `https://api.perplexity.ai` | Endpoint base; `/chat/completions` is appended. An unparseable value makes the provider unavailable. |
 | `model` | `sonar` | Search model name. |
 | `maxTokens` | `1024` | Upper bound on generated answer tokens (`max_tokens`). Must be a positive integer. |
@@ -41,8 +43,12 @@ With `dsh-web-search-perplexity`, the harness searches the web through Perplexit
 - id: web-search-perplexity
   name: '@deepseek-ai/dsh-web-search-perplexity'
   config:
-    apiKey: !!js process.env.PERPLEXITY_API_KEY
+    apiKeyEnv: PERPLEXITY_API_KEY
 ```
+
+Governed calls use the LLM route endpoint, model and credential, sharing model policy, resource admission, execution attribution and usage middleware. Explicitly configured pi-ai `openai-completions` routes implement the operation; other protocols and catalog routes relying only on native login refuse it explicitly. Independent endpoint and key settings do not override the governed route. Independent transport resolves credentials after its model permit is granted and joins cancellation during unload.
+
+Independent requests retain their resource provider across admission and credential waits and recheck current ownership and model-policy requirements before HTTP. Withdrawal, replacement or newly installed admission refuses stale dispatch with `WEB_PROVIDER_ERROR` and returns unused capacity to the original owner. A newly required model policy also refuses independent dispatch. After restoring authorization, retry with a fresh search. Refusal before request recording adds no native input to the initiating Session.
 
 <a id="mapping"></a>
 ## Mapping
@@ -56,11 +62,11 @@ With `dsh-web-search-perplexity`, the harness searches the web through Perplexit
 
 #### What the model sees
 
-A separate Perplexity model receives `<query>` verbatim as its sole user message through the chat-completions endpoint. This request is not part of the conversation model's context.
+A separate Perplexity model receives `<query>` verbatim as its sole user message through the chat-completions endpoint. This request is not part of the conversation model's context. The exact endpoint and JSON body are recorded as `web/perplexity-search-llm-request` before dispatch; governed execution appends it before model checkpoints.
 
 #### Token effect
 
-Separate provider tokens are incurred per search; `maxTokens` caps the generated answer.
+Separate provider tokens are incurred per search; `maxTokens` caps the generated answer. Governed execution reports actual input/output counters and credential source; absent usage stays absent.
 
 #### KV Cache effect
 
@@ -85,7 +91,6 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **Citation-fallback sources are URL-only** — when Perplexity omits structured `search_results[]`, sources carry no `title`/`snippet`/`publishedAt`, so the tool renders bare hostname labels.
 - **Over-returned sources still cost tokens and latency** — with no result-count control on the wire, `maxResults` is enforced only post-hoc by seam truncation.
 - **Only `model`/`maxTokens`/`searchRecency` are exposed** — Perplexity's other search controls (domain filters, `web_search_options` context size, images) wait on provider-neutral Service Definition fields ([seam Agent Note](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md)).
-- **Abort classification is error-shape-based** — only a `DOMException` named `AbortError` maps to `WEB_ABORTED`; an abort carrying a custom reason (e.g. `dsh-timeout`'s `TimeoutReason`) surfaces as `WEB_PROVIDER_ERROR`.
 
 <a id="dev-note"></a>
 ### Dev Note

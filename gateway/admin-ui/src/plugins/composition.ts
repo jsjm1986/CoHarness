@@ -109,7 +109,7 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
     setView(null); setStorageDown(false); setDraft(null); setPlugins(null); setBundles(null); setError(''); setNotice('')
     remoteRef.current = null
     const abort = new AbortController()
-    void pluginManagementState(kind, id, abort.signal).then((next) => {
+    void pluginManagementState(kind, id, abort.signal, target.target.runtimeId).then((next) => {
       if (!abort.signal.aborted) setView(next)
     }).catch((cause: unknown) => {
       // Deployments without the PostgreSQL store still manage live instances; degrade instead of failing the page.
@@ -228,7 +228,7 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
     if (view === null) return
     setBusy(true)
     try {
-      const next = await pluginManagementSaveState({ target: { kind, id }, revision: view.revision, state })
+      const next = await pluginManagementSaveState({ target: { kind, id, runtimeId: target.target.runtimeId }, revision: view.revision, state })
       setView(next); setDraft(null); setError('')
       setNotice(state === null ? t('compositionCleared') : t('compositionSaved', { revision: next.revision }))
     } catch (cause) {

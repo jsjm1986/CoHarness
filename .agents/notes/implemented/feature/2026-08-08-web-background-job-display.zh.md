@@ -101,11 +101,11 @@ abstract onJobsChanged(listener: JobsChangedListener): () => void
 
 ## 备选方案
 
-**信号帧加 RPC 拉取，即 subagent 目录的形状。** 推一个无 payload 的 `jobs-changed` 信号，防抖后用一元 RPC 重读权威状态。subagent 目录就是这么做的，代价在 [`SessionManager`](../../../../packages/client/runtime/src/client/sessions/manager.ts) 里一览无余：`catalogInflight` 做单飞行、`catalogStale` 在成员帧落于请求中途时补一次尾拉、`updateCatalogActivity` 既就地打补丁又往在途请求里写一份好让比帧更旧的响应被覆盖、`parentAvailableOverride` 重放一个过期的 `false`，还有重连时逐一重拉每个打开的目录。这套装置之所以存在，是因为目录的权威被劈成两半——持久血缘来自投影，活跃度是响应时刻的采样——而任务没有持久的那一半，不该继承这份复杂度。它还恰好在输出那一期最在意的时刻失效：任务结算，输出流立即关闭，状态却要等防抖加一次往返才到，那段窗口里 UI 显示一个流已死的运行中任务。
+**信号帧加 RPC 拉取，即 subagent 目录的形状。** 推一个无 payload 的 `jobs-changed` 信号，防抖后用一元 RPC 重读权威状态。subagent 目录就是这么做的，代价在 [`SessionManager`](../../../../packages/client/runtime/src/client/sessions/manager.ts) 里一览无余：`catalogInflight` 做单飞行、`catalogStale` 在成员帧落于请求中途时补一次尾拉、`updateCatalogActivity` 既就地打补丁又往在途请求里写一份好让比帧更旧的响应被覆盖、`parentAvailableOverride` 重放一个过期的 `false`，还有重连时逐一重拉每个打开的目录。这套装置之所以存在，是因为目录的权威被劈成两半——持久血缘来自投影，活跃度是响应时刻的采样——而任务列表需要的是当前进程状态，不是历史执行事实。它还恰好在输出那一期最在意的时刻失效：任务结算，输出流立即关闭，状态却要等防抖加一次往返才到，那段窗口里 UI 显示一个流已死的运行中任务。
 
 **只在弹层打开时轮询，不改 seam。** 最省事，也是唯一不碰 `JobRegistry` 的选项。它无法在不常驻轮询的前提下支持触发器上的常驻计数，而后面两期反正都需要一条真正的变更订阅，所以它省下一周又还回去。
 
-**基于持久任务事件的 session-projection 单元。** 投影单元在已提交的会话事件上折叠，所以这条路要先让任务生命周期变持久——`job/started` … `job/settled` 作为一对独立的开合括号，由最后一个 [`session/end-seed`](../../../../packages/core/session/src/types.ts) 把未配对的开括号标为死历史，与 compaction 括号已有的做法完全一致。它在客户端确实更省：`dsh-tool-todo` 用十五行的单元展示了整套模式，而现成的 `session/projection` 帧、history-tail 块和持久化 checkpoint 缓存本可以承载这批数据，无需新线路面、无需载体订阅、无需 manager 状态。否决它，是因为这要拿一次持久格式变更去换一个浏览器列表，而且它并不能延伸到最需要它的那一期：[`spill/`](../../../../packages/spill/README.zh.md) 的存在正是为了让超大工具输出留在日志之外，所以流式任务输出无论如何都不能骑在持久事件上。如果持久任务历史将来凭自身价值站得住，本设计不阻挡重新考虑它。
+**基于持久任务事件的 session-projection 单元。**[所属任务生命周期日志](../bug-fix/2026-10-26-owned-job-lifecycle-records.zh.md)保留注册与终止事实，但不携带实时执行权限或保留的输出流。浏览器列表仍需当前注册表来显示运行中的工作、读取输出和停止任务；回放历史事件无法提供这些能力。
 
 **复用 `dsh-tool-jobs` 的 `PublicJobSnapshot`。** 字段几乎就是对的，但它属于面向模型的控制面。浏览器程序从一个 tool 包导入线路类型，会把客户端呈现耦合到面向 prompt 的决策上，并把一个 host-only 包拖进客户端构建。
 

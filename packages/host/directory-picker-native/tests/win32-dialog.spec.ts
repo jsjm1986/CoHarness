@@ -13,7 +13,7 @@ import { pickWin32Directory, type Win32DialogInternals, type Win32DialogWorkerLi
 import type { Win32DialogWorkerMessage } from '../src/win32-dialog-worker.ts'
 
 class FakeWorker extends EventEmitter implements Win32DialogWorkerLike {
-  kill = vi.fn(() => true)
+  kill = vi.fn((_signal: 'SIGKILL') => { this.emit('close'); return true })
   post(message: Win32DialogWorkerMessage): void {
     this.emit('message', message)
   }
@@ -70,12 +70,14 @@ describe('pickWin32Directory', () => {
     const picked = pickWin32Directory(live(), first.internals)
     first.worker.post({ kind: 'showing', threadId: 7 })
     first.worker.post({ kind: 'done', path: 'C:\\picked' })
+    first.worker.emit('close')
     await expect(picked).resolves.toBe('C:\\picked')
     expect(first.close).not.toHaveBeenCalled()
 
     const second = harness()
     const cancelled = pickWin32Directory(live(), second.internals)
     second.worker.post({ kind: 'done', path: null })
+    second.worker.emit('close')
     await expect(cancelled).resolves.toBeNull()
   })
 
@@ -83,25 +85,30 @@ describe('pickWin32Directory', () => {
     const reported = harness()
     const failing = pickWin32Directory(live(), reported.internals)
     reported.worker.post({ kind: 'error', message: 'CoCreateInstance failed' })
+    reported.worker.emit('close')
     await expect(failing).rejects.toThrow('win32 folder dialog failed: CoCreateInstance failed')
 
     const crashed = harness()
     const crashing = pickWin32Directory(live(), crashed.internals)
     crashed.worker.emit('error', new Error('worker blew up'))
+    crashed.worker.emit('close')
     await expect(crashing).rejects.toThrow('worker blew up')
 
     const silent = harness()
     const exiting = pickWin32Directory(live(), silent.internals)
-    silent.worker.emit('exit', 0)
+    silent.worker.emit('close')
     await expect(exiting).rejects.toThrow('exited before reporting a result')
   })
 
-  it('settles once: a late exit after the result is inert', async () => {
+  it('removes its process listeners after closure', async () => {
     const { worker, internals } = harness()
     const picked = pickWin32Directory(live(), internals)
     worker.post({ kind: 'done', path: 'C:\\once' })
-    worker.emit('exit', 0)
+    worker.emit('close')
     await expect(picked).resolves.toBe('C:\\once')
+    expect(worker.listenerCount('message')).toBe(0)
+    expect(worker.listenerCount('error')).toBe(0)
+    expect(worker.listenerCount('close')).toBe(0)
   })
 
   it('throws immediately on an already-aborted signal without spawning', async () => {
@@ -111,6 +118,80 @@ describe('pickWin32Directory', () => {
     await expect(pickWin32Directory(controller.signal, { spawnWorker, closeThreadWindows: async () => undefined }))
       .rejects.toThrow('native directory picker aborted')
     expect(spawnWorker).not.toHaveBeenCalled()
+  })
+
+  it('keeps its first reported result while the child finishes exiting', async () => {
+    const { worker, internals } = harness()
+    const picked = pickWin32Directory(live(), internals)
+    worker.post({ kind: 'done', path: 'C:\\first' })
+    worker.post({ kind: 'done', path: 'C:\\duplicate' })
+    worker.emit('error', new Error('late native notification'))
+    worker.emit('exit')
+    worker.emit('close')
+    await expect(picked).resolves.toBe('C:\\first')
+  })
+
+  it.each(['refused', 'throws'])('retains a child after a %s termination request until closure', async (failure) => {
+    vi.useFakeTimers()
+    const closeCompletion = Promise.withResolvers<undefined>()
+    const close = vi.fn(() => closeCompletion.promise)
+    const { worker, internals } = harness({ closeThreadWindows: close })
+    const controller = new AbortController(), nativeFailure = new Error('native termination failed')
+    worker.kill.mockImplementation(() => {
+      if (failure === 'throws') throw nativeFailure
+      worker.emit('error', nativeFailure)
+      return false
+    })
+    let completed = false
+    const picked = pickWin32Directory(controller.signal, internals).catch((error: unknown) => { completed = true; return error })
+    try {
+      controller.abort()
+      await vi.advanceTimersByTimeAsync(22)
+      expect(worker.kill).toHaveBeenCalledWith('SIGKILL')
+      expect(completed).toBe(false)
+      expect(worker.listenerCount('close')).toBe(1)
+      worker.post({ kind: 'showing', threadId: 77 })
+      await vi.advanceTimersByTimeAsync(2)
+      expect(close).toHaveBeenCalledTimes(1)
+      closeCompletion.resolve(undefined)
+      await vi.advanceTimersByTimeAsync(2)
+      expect(close.mock.calls.length).toBeGreaterThan(1)
+      worker.emit('exit'); worker.emit('close')
+      const result = await picked
+      expect(result).toBeInstanceOf(Error)
+      const cause = (result as Error).cause
+      if (failure === 'throws') expect(cause).toMatchObject({ message: 'win32 folder dialog termination failed', cause: nativeFailure })
+      else expect(cause).toBe(nativeFailure)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      closeCompletion.resolve(undefined)
+      worker.emit('close')
+      await picked
+      vi.useRealTimers()
+    }
+  })
+
+  it.each(['before-exit', 'after-exit'])('stops window messages for cancellation %s while streams drain', async (timing) => {
+    vi.useFakeTimers()
+    const { worker, internals, close } = harness()
+    const controller = new AbortController()
+    const picked = pickWin32Directory(controller.signal, internals).catch((error: unknown) => error)
+    try {
+      worker.post({ kind: 'showing', threadId: 77 })
+      if (timing === 'before-exit') controller.abort()
+      const callsBeforeExit = close.mock.calls.length
+      worker.emit('exit')
+      if (timing === 'after-exit') controller.abort()
+      worker.post({ kind: 'showing', threadId: 77 })
+      await vi.advanceTimersByTimeAsync(2)
+      expect(close).toHaveBeenCalledTimes(callsBeforeExit)
+      worker.emit('close')
+      expect(await picked).toBeInstanceOf(Error)
+    } finally {
+      worker.emit('close')
+      await picked
+      vi.useRealTimers()
+    }
   })
 
   it('services an abort by closing the dialog thread windows until the worker reports', async () => {
@@ -123,9 +204,10 @@ describe('pickWin32Directory', () => {
     worker.post({ kind: 'showing', threadId: 99 })
     controller.abort()
     await vi.waitFor(() => {
-      expect(close).toHaveBeenCalledWith(99)
+      expect(close).toHaveBeenCalledWith(99, expect.any(AbortSignal))
     })
     worker.post({ kind: 'done', path: null })
+    worker.emit('close')
     await picked
   })
 
@@ -142,6 +224,7 @@ describe('pickWin32Directory', () => {
       expect(closeFailures.mock.calls.length).toBeGreaterThan(1)
     })
     worker.post({ kind: 'done', path: null })
+    worker.emit('close')
     await picked
   })
 
@@ -150,10 +233,11 @@ describe('pickWin32Directory', () => {
     // worker hung before `showing` cannot dangle the pick.
     const { worker, internals, close } = harness()
     const controller = new AbortController()
-    const picked = expect(pickWin32Directory(controller.signal, internals)).rejects.toThrow('dialog unresponsive; worker killed')
+    const picked = expect(pickWin32Directory(controller.signal, internals)).rejects.toThrow('dialog unresponsive')
     controller.abort()
     await picked
     expect(worker.kill).toHaveBeenCalledOnce()
+    expect(worker.kill).toHaveBeenCalledWith('SIGKILL')
     expect(close).not.toHaveBeenCalled()
   })
 
@@ -163,8 +247,9 @@ describe('pickWin32Directory', () => {
     const picked = pickWin32Directory(controller.signal, internals)
     worker.post({ kind: 'showing', threadId: 5 })
     controller.abort()
-    await expect(picked).rejects.toThrow('dialog unresponsive; worker killed')
+    await expect(picked).rejects.toThrow('dialog unresponsive')
     expect(worker.kill).toHaveBeenCalledOnce()
+    expect(worker.kill).toHaveBeenCalledWith('SIGKILL')
     expect(close.mock.calls.length).toBeGreaterThan(10)
   })
 

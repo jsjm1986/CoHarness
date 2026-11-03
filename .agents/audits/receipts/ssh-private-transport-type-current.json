@@ -1,0 +1,13 @@
+{
+  "name": "ssh-private-transport-type-current",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T15:04:10.576693+00:00",
+  "seconds": 44.433,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1204387c6f47c9c0bd0e3fa16dbdefe92a205b038f7622f16a959aae4b5d9bbe",
+  "inputsAfter": "1204387c6f47c9c0bd0e3fa16dbdefe92a205b038f7622f16a959aae4b5d9bbe",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

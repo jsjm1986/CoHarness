@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/lsp/lsp-stdio/README.md
 document:
-  en: 2be1243eac5ba66781676467a35ecd91ee54ba52
-  zh: fe31e2bca7e7654a84ce92f50d3df7308ea6085d
+  en: cc8a4d5ae06c22a21af1afc41dc3d346246e0aed
+  zh: 1fa8473f2020bdfc986fd159bfc397c8b98d50ac
 /:
   en: 16eed1ff63af77b7
   zh: 61495d48365178df
@@ -24,8 +24,8 @@ document:
   en: 30e25133ecf55488
   zh: cdadf7c48c59d769
 /deepseek-ai-dsh-lsp-stdio/protocol-behavior:
-  en: b43ec2dec8224423
-  zh: 096239413aa36c3a
+  en: 18429a1bfe61f11e
+  zh: 244b9a24c53ce815
 /deepseek-ai-dsh-lsp-stdio/security-boundary:
   en: 9e4f09a125b18b92
   zh: aaccd6baabd81687

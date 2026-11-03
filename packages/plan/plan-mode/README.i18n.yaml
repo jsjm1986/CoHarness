@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/plan/plan-mode/README.md
 document:
-  en: 35291bb2d5d23e737149516028dec04c0867e57c
-  zh: 5b22d19980138ee39913b87d384dc488409c56f4
+  en: d6221f5f1b69e16e0b9f895968c189c8e61881cb
+  zh: a1a53812c4f9707be6dd779db0db3e648989a683
 /:
   en: 2d2e1f1234a40dd8
   zh: 137e06497bc0faa4
@@ -45,14 +45,14 @@ document:
   en: ff946ab59a7b4a0f
   zh: b1c79937770f57ad
 /deepseek-ai-dsh-plan-mode/understand-the-implementation/the-plan-command:
-  en: a7bf35c2a9da52bc
-  zh: dea9f4b3a41f1a6d
+  en: 89da1ec3e6908db5
+  zh: 56da8397b639905a
 /deepseek-ai-dsh-plan-mode/understand-the-implementation/the-exit-tool:
-  en: 56798d0f45fb5775
-  zh: 282e4a522ce6dae0
+  en: 791c458efb2d5a71
+  zh: 6072cc92ca5ab6cf
 /deepseek-ai-dsh-plan-mode/understand-the-implementation/session-projection-unit:
-  en: 74cd6bdf50af51f5
-  zh: 67609cf7202ececb
+  en: 4ae93e9975b553fa
+  zh: a12d9f7153c17295
 /deepseek-ai-dsh-plan-mode/understand-the-implementation/source-map:
   en: fa97e858495a8105
   zh: 8be1fbd7e420ff8a

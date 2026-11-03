@@ -204,7 +204,7 @@ describe('spawn construction (pure, every platform)', () => {
     done: Promise<SubprocessOutcome> = Promise.resolve({ exitCode: 0, signal: null })
     stderrText = ''
     override async resolveExecutable(command: string): Promise<string> { return command }
-    override spawnTerminal(): Promise<never> { throw new Error('pwsh spawns pipes, never terminals') }
+    protected override spawnTerminalProcess(): Promise<never> { throw new Error('pwsh spawns pipes, never terminals') }
     private readonly stdoutReader: SubprocessOutputReader = {
       readFrom: () => ({ text: '', lossy: false, nextOffset: 0 }),
     }
@@ -215,7 +215,7 @@ describe('spawn construction (pure, every platform)', () => {
         nextOffset: this.stderrText.length,
       }),
     }
-    override spawn(spec: SubprocessSpawnSpec): SubprocessHandle {
+    protected override spawnProcess(spec: SubprocessSpawnSpec): SubprocessHandle {
       this.specs.push(spec)
       return {
         control: undefined,
@@ -343,11 +343,11 @@ describe('background spawn failure (fake backend, every platform)', () => {
   class RejectingSubprocessRuntime extends SubprocessRuntime {
     override async terminalEnvironment() { return { platform: 'posix' as const } }
     override async resolveExecutable(command: string): Promise<string> { return command }
-    override spawnTerminal(): Promise<never> { throw new Error('pwsh spawns pipes, never terminals') }
+    protected override spawnTerminalProcess(): Promise<never> { throw new Error('pwsh spawns pipes, never terminals') }
     private readonly reader: SubprocessOutputReader = {
       readFrom: () => ({ text: '', lossy: false, nextOffset: 0 }),
     }
-    override spawn(): SubprocessHandle {
+    protected override spawnProcess(): SubprocessHandle {
       return {
         stdin: undefined,
         stdout: undefined,
@@ -383,11 +383,11 @@ describe('cancellation against a hanging backend (fake backend, every platform)'
     settle: (outcome: { exitCode: number | null; signal: NodeJS.Signals | null }) => void = () => {}
     override async terminalEnvironment(): Promise<never> { throw new Error('fixture does not open terminals') }
     override async resolveExecutable(command: string): Promise<string> { return command }
-    override spawnTerminal(): Promise<never> { throw new Error('pwsh spawns pipes, never terminals') }
+    protected override spawnTerminalProcess(): Promise<never> { throw new Error('pwsh spawns pipes, never terminals') }
     private readonly reader: SubprocessOutputReader = {
       readFrom: () => ({ text: '', lossy: false, nextOffset: 0 }),
     }
-    override spawn(): SubprocessHandle {
+    protected override spawnProcess(): SubprocessHandle {
       return {
         stdin: undefined,
         stdout: undefined,
@@ -708,7 +708,7 @@ describe.skipIf(!hasPwsh)('PwshLocalExecutor.start (background process handles)'
 
   it('a SYNCHRONOUS spawn throw is contained, and the observed stderr serves the note', async () => {
     const { ctx, bash } = await setup()
-    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(() => { throw new Error('sync spawn boom') })
+    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async () => { throw new Error('sync spawn boom') })
     const proc = (await start(bash, bash.resolve({ command: 'Write-Output never' })))
     await expect(proc.done).resolves.toBeUndefined()
     expect(proc.status).toBe('killed')

@@ -20,6 +20,7 @@ The `Menu` primitive keeps its local contract — `header`, `footer`, `listStyle
 - `requestAnimationFrame` tracking replaces pure event-driven placement so anchor movement under drag or transform stays aligned; `setFixedPos` skips identical writes.
 - `autoFocus` opens via `focusWithoutRing`, matching the pointer-style silent focus; keyboard navigation still earns its ring.
 - `selection: 'check' | 'fill'` picks the selected-row affordance; `fill` leaves highlighting to the row itself.
+- The shared modal Tab loop includes inline menu content; menus portaled outside the dialog retain independent traversal. Settings releases background inertness before restoring the invoking focus.
 
 Four consumer surfaces — the input-trigger `MenuView`, the commands `PopupSelectView`, the model selector menu, and the dockkit `TabMenu` — render through `MenuSurface`, dropping their private background/radius rules.
 

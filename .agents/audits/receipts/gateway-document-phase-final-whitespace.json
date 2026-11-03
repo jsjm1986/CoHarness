@@ -1,0 +1,14 @@
+{
+  "name": "gateway-document-phase-final-whitespace",
+  "cwd": ".",
+  "command": "git diff --check",
+  "startedAt": "2026-10-26T20:44:38.157880+00:00",
+  "seconds": 2.656,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "88cf2586400883147b82b40d91c20a2807796b7f4278999b87d09b71e6d2ab04",
+  "inputsAfter": "88cf2586400883147b82b40d91c20a2807796b7f4278999b87d09b71e6d2ab04",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

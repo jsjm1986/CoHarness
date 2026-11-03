@@ -72,6 +72,10 @@ type ModelsRenderSlot = PropsRenderSlots<ModelsChildSlots>['renderSlot']
 export type ModelsSectionProps = Partial<SettingsSectionOwnerProps>
   & Partial<InjectFace<ModelsSectionInjected>>
   & PropsRenderSlots<ModelsChildSlots>
+  & {
+    /** Notify an embedding document while provider forms or their writes need to stay mounted. */
+    onEditingChange?: (editing: boolean) => void
+  }
 
 type ModelsSectionFace = InjectFace<ModelsSectionInjected> & Partial<SettingsSectionOwnerProps>
 
@@ -263,11 +267,16 @@ export function ModelsSection(props: ModelsSectionProps): ReactNode {
         ...props.providerIdPattern === undefined ? {} : { providerIdPattern: props.providerIdPattern },
       }}
       renderSlot={renderSlot}
+      {...(props.onEditingChange === undefined ? {} : { onEditingChange: props.onEditingChange })}
     />
   )
 }
 
-function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderSlot: ModelsRenderSlot }): ReactNode {
+function Loaded({ injected, renderSlot, onEditingChange }: {
+  injected: ModelsSectionFace
+  renderSlot: ModelsRenderSlot
+  onEditingChange?: (editing: boolean) => void
+}): ReactNode {
   const projectRequested = injected.settingsScope === 'project'
   const binding = projectRequested && injected.projectId !== undefined
     ? injected.projectBinding?.(injected.projectId)
@@ -311,6 +320,10 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
   const [deleteFailure, setDeleteFailure] = useState<string | undefined>(undefined)
   const [savedTarget, setSavedTarget] = useState<ProviderIdentity | undefined>(undefined)
   const [dismissedSetup, setDismissedSetup] = useState<ReadonlySet<string>>(() => new Set())
+  useEffect(() => {
+    onEditingChange?.(editing !== undefined || addMode !== undefined || deleting)
+    return () => { onEditingChange?.(false) }
+  }, [onEditingChange, editing, addMode, deleting])
 
   useEffect(() => {
     setEditing(undefined)

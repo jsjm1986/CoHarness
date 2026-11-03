@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-queued-manual-compaction.md
 document:
-  en: 73f2c1cff2ca8ad2cfcf48403b054417bd15cfbc
-  zh: ef784a4246ffbfb3282a202aa9866faf4c6b046e
+  en: e1e85483d3c9a5104fb8e5905940bb7f6231debd
+  zh: 9212a0241d0c5f2384d09c971acaffa49a2ca039
 /agent-note-queued-manual-compaction-with-one-durable-lock:
   en: 45504a64618db51a
   zh: f8dfebaf42ee4ddf
@@ -15,8 +15,8 @@ document:
   en: a15c7c13f167e5ac
   zh: 63bcc2ef60c2f344
 /agent-note-queued-manual-compaction-with-one-durable-lock/decision/compact-is-a-command-over-a-backend-independent-seam:
-  en: a8631732e038e08d
-  zh: 68cb705f38ddfa57
+  en: 8942b528ad52c758
+  zh: ccbcbc62cecb2437
 /agent-note-queued-manual-compaction-with-one-durable-lock/decision/idle-maintenance-is-synchronously-claimed:
   en: a11c700f32838561
   zh: c20636c5f7efabaf

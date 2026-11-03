@@ -1,0 +1,14 @@
+{
+  "name": "archive-child-inbox-diagnostic",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/run-archive-inbox-probe.py",
+  "startedAt": "2026-10-26T09:08:53.133621+00:00",
+  "seconds": 2.437,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "46e89097937d6d4236bbfaaa9e940312c61be802eb1ef6010d7673c99aa72cc2",
+  "inputsAfter": "46e89097937d6d4236bbfaaa9e940312c61be802eb1ef6010d7673c99aa72cc2",
+  "postgresToolDirectory": null,
+  "outputSha256": "386e79ed92377e1482a611a7321860c0e69f68f36ace6c11d2a44a5f2e26a16e",
+  "outputTail": "(node:91676) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n{\"id\":\"archive-first-child\",\"state\":{\"next-turn\":[],\"next-step\":[]},\"rootState\":{\"next-turn\":[],\"next-step\":[]}}\n/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/core/agent-loop/src/inbox.ts:257\n      : Math.min(offset, inbox.length)\n                               ^\n\nTypeError: Cannot read properties of undefined (reading 'length')\n    at ReactLoopInbox.mutate (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/core/agent-loop/src/inbox.ts:257:32)\n    at ReactLoopInbox.splice (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/core/agent-loop/src/inbox.ts:218:17)\n    at ReactLoopAgent.send (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/core/agent-loop/src/agent.ts:190:18)\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/archive-inbox-probe.mjs:172:18)\n\nNode.js v25.8.1\n"
+}

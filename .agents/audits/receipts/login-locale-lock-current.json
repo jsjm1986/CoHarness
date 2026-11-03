@@ -1,0 +1,13 @@
+{
+  "name": "login-locale-lock-current",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/auth-postgres.spec.ts --no-file-parallelism --retry=0",
+  "startedAt": "2026-10-23T19:18:57.408855+00:00",
+  "seconds": 3.076,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e5493fdd308f4ac48e79957522ac9166a86fb067de8f03f6e264e57f3d38afbf",
+  "inputsAfter": "e5493fdd308f4ac48e79957522ac9166a86fb067de8f03f6e264e57f3d38afbf",
+  "outputSha256": "de7fc7ec1143df568b69f270d6b34ef7375656f333f83f2c7e32c1078f50bca3",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  03:18:59\n   Duration  815ms (transform 65ms, setup 0ms, import 109ms, tests 624ms, environment 0ms)\n\n"
+}

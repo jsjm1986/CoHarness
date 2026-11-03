@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/file-upload/README.md
 document:
-  en: 9840bbe1475249a3826883956c97402f415fa51c
-  zh: 82ef38a4c1ab84f20b9a23e95bb59acc5e1cab60
+  en: 43737d4875dd3cf7298c5bd6193872a008e23464
+  zh: be1cb8dd18c9f064bbe815641fa550d1df964033
 /:
   en: c983fa9f5976bac3
   zh: b3c2c2fdf19b461e
@@ -18,8 +18,8 @@ document:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
 /deepseek-ai-dsh-client-file-upload/use-this-package:
-  en: 9d5bbf52599b0d00
-  zh: 7907542ce1e34549
+  en: e69cc6a55a09f165
+  zh: d08393015bd3c69d
 /deepseek-ai-dsh-client-file-upload/understand-the-implementation:
   en: 1d43c44e2ec1fab3
   zh: 985e6a6f472e8928
@@ -33,8 +33,8 @@ document:
   en: ca75c51c89c2c9b0
   zh: f57cc48a1b5cbfa9
 /deepseek-ai-dsh-client-file-upload/known-limitations-and-deferred-work:
-  en: 8592a9aab413e5dc
-  zh: ae12d9777eda0b63
+  en: 998d940e9f170790
+  zh: 2eeed89631d6a511
 /deepseek-ai-dsh-client-file-upload/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: e88aeb617ffb74ea

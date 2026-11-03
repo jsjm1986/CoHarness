@@ -35,6 +35,8 @@ Status: implemented
 - Client tsc 在 Host Typert 已生成 Remote Client 声明后对 `tsconfig.client.json` 执行 `tsc -b`；Client tsdown 再读取 Client 图发射的 JS，生成 Client 包的 Node loader 入口与 browser bundle。
 - Web build 只在两个 lib 阶段完成后启动。
 
+示例解析检查将目录引用和显式项目配置文件都计为其包目录的覆盖，并继续遍历具名配置引用。遍历该图不会合并 Host 与 Client 编译器程序。
+
 `tsdown` 不再负责 TypeScript 编译或声明文件输出。
 
 `pnpm run typecheck` 先执行 Host lib 阶段，以生成 Client 类型检查所需的 Remote 声明，再对 `tsconfig.client.json` 执行 `tsc -b`。两个 aggregate 本身以 `noEmit` 方式检查各自的示例、测试与脚本；被引用的包项目和 vendor 项目保持与构建相同的发射行为。

@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-registration-complete-built-standalone",
+  "cwd": "gateway",
+  "command": "node tests/run-local-web-assembly.mjs lib",
+  "startedAt": "2026-10-24T23:01:55.029009+00:00",
+  "seconds": 38.795,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "65c9935ef0ba71822f43e2e51979a665c2fc36c76a6bfcc18e9e040168926766",
+  "inputsAfter": "65c9935ef0ba71822f43e2e51979a665c2fc36c76a6bfcc18e9e040168926766",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "27bd527f3ef96e11f9f1f24fae70a719f9d374e37a4dc133d97efd37c2b27bfb",
+  "outputTail": "tunnel: authenticated quick startup failure leaves Gateway available.\ntunnel: quick and named launches stay starting until their own connector registers.\ntunnel: quick and named children drain output and exclude deployment credentials.\ntunnel: token retrieval retries reuse the durable tunnel and stop confirms child closure.\ntunnel: Stop cancels current registration and earlier queued starts before another allocation.\ntunnel: missing connector registration reaches its configured deadline and closes the owned child.\npersonal: signed-in Gateway serves the real Web profile after registered readiness.\npersonal: replacement Gateway reuses the exact generation without another cold-start credit.\npersonal: unavailable supervision returns 503, retains occupation, and resumes the same generation.\ntunnel: Gateway shutdown cancels pending registration and confirms connector closure.\npersonal: graceful replacement shutdown confirms process exit and durable stop.\nproject: signed-in Gateway serves the real Web profile after registered readiness.\nproject: replacement Gateway reuses the exact generation without another cold-start credit.\nproject: a second member shares the recovered project Runtime.\nproject: unavailable supervision returns 503, retains occupation, and resumes the same generation.\nproject: graceful replacement shutdown confirms process exit and durable stop.\n"
+}

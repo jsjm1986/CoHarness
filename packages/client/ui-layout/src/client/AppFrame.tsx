@@ -29,7 +29,7 @@ import css from './AppFrame.module.css'
 /** Full composed props: runtime share + child-slot render share + store share + locale seat. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.bottom' | 'shell.overlay' | 'shell.mobile.header.actions'>
+  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.bottom' | 'shell.overlay' | 'shell.mobile.header.context' | 'shell.mobile.header.actions'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'layout'>
   & { dismissRightbar: () => void }
@@ -441,6 +441,9 @@ export function AppFrame({
             <span className={css.topbarTitle} title={currentTitle ?? t('app.title')}>
               {currentTitle ?? t('app.title')}
             </span>
+            <div className={css.topbarEnvironment}>
+              {renderSlot('shell.mobile.header.context', { compact: true })}
+            </div>
           </div>
           <div className={css.topbarActions} data-mobile-session-actions>
             <SessionProvider empty={() => null}>
@@ -494,6 +497,9 @@ export function AppFrame({
           registered global panel; details use the selected Session unless an
           explicit pane action pins their target. */}
       <CenterColumn>
+        {mode !== 'compact' && sidebarCollapsed && <div className={css.railEnvironment}>
+          {renderSlot('shell.mobile.header.context', { compact: false })}
+        </div>}
         {renderSlot('main', { compact: mode === 'compact' }, {
           entryKey: panels.panelInfo.activePanelId ?? 'conversation',
         })}

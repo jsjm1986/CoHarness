@@ -1,0 +1,13 @@
+{
+  "name": "organization-auth-gateway-types-final",
+  "cwd": "gateway",
+  "command": "npm run typecheck",
+  "startedAt": "2026-10-23T19:30:49.030427+00:00",
+  "seconds": 4.451,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "58b6f351d88337b0db3c52bc3b56b2b16af6fdfe3533fb892df8591006a69fd4",
+  "inputsAfter": "58b6f351d88337b0db3c52bc3b56b2b16af6fdfe3533fb892df8591006a69fd4",
+  "outputSha256": "55cbcd212e61751574540b291436a0a1ee305811955141eed0ffba38d42a5c4e",
+  "outputTail": "\n> typecheck\n> tsc --noEmit\n\ntests/auth-admission.perf.ts(59,35): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.\n  Type 'undefined' is not assignable to type 'string'.\n"
+}

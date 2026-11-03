@@ -56,6 +56,7 @@ class ClaudeMemberSession implements ExternalMemberSession {
   /** The SDK-issued session id; minted inside the first turn's messages. */
   externalId: string | undefined
   private child: SubprocessHandle | undefined
+  private allocation: Promise<SubprocessHandle> | undefined
   private queryHandle: Query | undefined
   private readonly controller = new AbortController()
 
@@ -84,8 +85,8 @@ class ClaudeMemberSession implements ExternalMemberSession {
       onError: () => undefined,
     }
     const options = {
-      ...claudeQueryOptions(spec, this.controller, (child) => {
-        this.child = child
+      ...claudeQueryOptions(spec, this.controller, (process) => {
+        this.allocation = process.ready
       }, () => undefined),
       persistSession: true,
       ...this.externalId === undefined ? {} : { resume: this.externalId },
@@ -99,6 +100,9 @@ class ClaudeMemberSession implements ExternalMemberSession {
     // binding and pending record before the result can arrive unrecorded.
     let needsBind = this.externalId === undefined
     try {
+      this.child = await this.allocation
+      if (this.child === undefined) throw new Error('claude member SDK did not request a managed process')
+      signal.throwIfAborted()
       for await (const message of q) {
         signal.throwIfAborted()
         this.captureSessionId(message)
@@ -142,8 +146,14 @@ class ClaudeMemberSession implements ExternalMemberSession {
 
   async dispose(): Promise<void> {
     this.controller.abort()
-    const child = this.child
+    let child = this.child
+    if (child === undefined) {
+      try { child = await this.allocation } catch (_allocationFailed) {
+        // The turn observes failed allocation; no shared handle was published to this session.
+      }
+    }
     this.child = undefined
+    this.allocation = undefined
     if (child === undefined) {
       this.queryHandle?.close()
       return
@@ -170,8 +180,9 @@ export class ClaudeMemberTransport implements ExternalMemberTransport {
   }
 }
 
-/** LLM adapter owning the member route; each model call becomes one external turn. */
+/** LLM orchestration adapter owning the member route; each call drives one external turn. */
 export class ClaudeMemberAdapter extends LlmAdapter {
+  override readonly callKind = 'orchestration' as const
   constructor(
     private readonly transport: ExternalMemberTransportSource,
     private readonly store: ExternalBindingStore,

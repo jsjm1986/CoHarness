@@ -134,6 +134,32 @@
   font-size: 15px;
   font-weight: 500;
   line-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+.reason {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.parameters {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-family: var(--ds-font-family-code);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.feedback {
+  padding: var(--dsw-space-2) var(--dsw-space-4) 0;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
 }
 
 .command {

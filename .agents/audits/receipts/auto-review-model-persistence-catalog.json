@@ -1,0 +1,14 @@
+{
+  "name": "auto-review-model-persistence-catalog",
+  "cwd": ".",
+  "command": "pnpm run gen-persistence-catalog",
+  "startedAt": "2026-10-24T02:55:04.147170+00:00",
+  "seconds": 8.327,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6809732b7b19fe9e1fbfd6a8b89d5eafa5679db73f51da26429c999e55d2039f",
+  "inputsAfter": "6809732b7b19fe9e1fbfd6a8b89d5eafa5679db73f51da26429c999e55d2039f",
+  "postgresToolDirectory": null,
+  "outputSha256": "f1247408d4bc652e1ada5d514fa88925e9e61aa8ac80c9efa55713e933a2f4a3",
+  "outputTail": "$ tsx scripts/gen-persistence-catalog.ts\n/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/persistence-schema.ts:108\n    throw new PersistenceSchemaError(`persistence schema: compiler and source event discovery disagree; omitted: ${omitted.join(', ')}; uncompiled: ${uncompiled.join(', ')}`)\n          ^\n\nPersistenceSchemaError: persistence schema: compiler and source event discovery disagree; omitted: auto-review/request; uncompiled: \n    at extractPersistenceSchema (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/persistence-schema.ts:108:11)\n    at main (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/gen-persistence-catalog.ts:237:18)\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/gen-persistence-catalog.ts:267:3)\n    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)\n    at async node:internal/modules/esm/loader:639:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v25.8.1\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

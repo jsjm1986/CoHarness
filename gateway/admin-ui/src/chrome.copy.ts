@@ -25,6 +25,7 @@ export const zh = {
   navRemoteDesktops: '远程桌面',
   navAudit: '审计',
   loading: '正在加载',
+  serviceUnavailable: '服务暂不可用，请稍后重试。',
   dialogClose: '关闭',
   cancel: '取消',
 } satisfies Record<string, string>
@@ -56,6 +57,7 @@ export const en = {
   navRemoteDesktops: 'Remote desktops',
   navAudit: 'Audit',
   loading: 'Loading',
+  serviceUnavailable: 'This service is temporarily unavailable. Try again later.',
   dialogClose: 'Close',
   cancel: 'Cancel',
 } satisfies Record<ChromeCopyKey, string>

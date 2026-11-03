@@ -13,6 +13,8 @@ Register authentication and model discovery for `deepseek-official`. This plugin
 
 Authentication resolution returns the validated API key in `x-api-key` for both Messages and Files requests.
 
+Authentication retains the resolved credential source alongside its validated key. The adapter attaches that source to actual usage, so governance distinguishes a personal file credential from deployment-owned environment or organization credentials.
+
 ## Table of Contents
 
 - [Use this package](#use-this-package)

@@ -1,0 +1,14 @@
+{
+  "name": "memory-configurable-output-coverage-final",
+  "cwd": ".",
+  "command": "pnpm exec vitest run packages/memory/memory-context/tests packages/memory/memory-curation/tests --coverage --coverage.include=packages/memory/memory-context/src/index.ts --coverage.include=packages/memory/memory-curation/src/index.ts --coverage.reportsDirectory=.agents/audits/.local/memory-output-config-coverage-final --coverage.reporter=text --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T02:12:15.463642+00:00",
+  "seconds": 19.897,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4363c14c39bed65387ff8d07e0263f3b16c8568a39ee183acbfe1e17efa44ee8",
+  "inputsAfter": "4363c14c39bed65387ff8d07e0263f3b16c8568a39ee183acbfe1e17efa44ee8",
+  "postgresToolDirectory": null,
+  "outputSha256": "1bb21bcef50166882de2a87ab8595abaf5c579ba162712a9f200a2585c37366a",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  3 passed (3)\n      Tests  107 passed (107)\n   Start at  10:12:29\n   Duration  6.17s (transform 2.74s, setup 108ms, import 3.83s, tests 4.07s, environment 0ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 610/610 )\nBranches     : 100% ( 444/444 )\nFunctions    : 100% ( 81/81 )\nLines        : 100% ( 509/509 )\n================================================================================\n"
+}

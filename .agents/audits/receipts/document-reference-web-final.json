@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-web-final",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 DSH_SNAPSHOT=replay pnpm run test:web:built apps/web/tests/file-upload-round.e2e.ts apps/web/tests/document-manager.e2e.ts",
+  "startedAt": "2026-10-26T22:58:40.481226+00:00",
+  "seconds": 29.313,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "inputsAfter": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "postgresToolDirectory": null,
+  "outputSha256": "506d9bc70820d6e3c93452922aaf7beaf242f569fadedfe058e3966126e5a74e",
+  "outputTail": "$ vitest run --config vitest.web.config.ts apps/web/tests/file-upload-round.e2e.ts apps/web/tests/document-manager.e2e.ts\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  2 passed (2)\n      Tests  19 passed (19)\n   Start at  06:58:43\n   Duration  26.46s (transform 1.59s, setup 0ms, import 2.86s, tests 23.35s, environment 0ms)\n\n"
+}

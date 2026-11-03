@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-joined-status-and-errors",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-dsh-sdk/tests/control.spec.ts packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts --retry=0",
+  "startedAt": "2026-10-24T15:59:24.765848+00:00",
+  "seconds": 26.932,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4afbffd1c851da9e66a34fd2a5f211dd1dd5c803c78243ae1b173ea2f922092d",
+  "inputsAfter": "4afbffd1c851da9e66a34fd2a5f211dd1dd5c803c78243ae1b173ea2f922092d",
+  "postgresToolDirectory": null,
+  "outputSha256": "36e6e5e8b30a480844b0c95bd400899dd8bea8a7c2d688a4d16263cdf53ac5d9",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts (43 tests | 1 failed) 2497ms\n   × reports parent middleware failure before reaching a child model body 1371ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts > reports parent middleware failure before reaching a child model body\nResourceAdmissionError: SDK parent control timed out.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 1 passed (2)\n      Tests  1 failed | 116 passed (117)\n   Start at  23:59:33\n   Duration  18.56s (transform 27.80s, setup 212ms, import 30.12s, tests 5.69s, environment 0ms)\n\n"
+}

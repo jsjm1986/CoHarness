@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for 2026-10-24-prepared-model-operations.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-24-prepared-model-operations.md
+document:
+  en: 9a593a4fb928f227ea6e6583af40e1a6a26b6f95
+  zh: 7be43e4ec58d09116dd9c6feca5479c4b55e1142
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-24-prepared-model-operations:
+  en: f75457719b470e65
+  zh: f9e46100f10e7681
+/2026-10-24-prepared-model-operations/summary:
+  en: 2f7d9f9eeea1a1cc
+  zh: 4c3e748a8f07c58f
+/2026-10-24-prepared-model-operations/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-24-prepared-model-operations/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-24-prepared-model-operations/compatibility:
+  en: b38808415bb307de
+  zh: 9bf61349787b537b
+/2026-10-24-prepared-model-operations/verification:
+  en: 2322226564340196
+  zh: ea5a70a92c601dcc
+/2026-10-24-prepared-model-operations/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

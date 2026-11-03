@@ -23,18 +23,20 @@
     "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:~",
-    "@deepseek-ai/dsh-mcp-client": "workspace:*"
+    "@deepseek-ai/dsh-mcp-client": "workspace:*",
+    "@deepseek-ai/dsh-native-command": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
-    "@deepseek-ai/dsh-computer-use": "workspace:*"
+    "@deepseek-ai/dsh-computer-use": "workspace:*",
+    "@deepseek-ai/dsh-system-prompt": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
@@ -49,5 +51,10 @@
     "@deepseek-ai/dsh-agent-loop": "workspace:*",
     "@deepseek-ai/dsh-attachment-local": "workspace:*",
     "@deepseek-ai/dsh-session-projection": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-system-prompt": {
+      "optional": true
+    }
   }
 }

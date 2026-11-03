@@ -1,0 +1,13 @@
+{
+  "name": "mcp-final-readme-pairing",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write packages/mcp/mcp-client/README.md",
+  "startedAt": "2026-10-23T17:07:25.470547+00:00",
+  "seconds": 17.032,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9adc87a83a62bb3d5c69368e8564624f0915e27b7085cf9f957de9684897b343",
+  "inputsAfter": "6d4091f224c469dc329539ec1b99d8e61024f528fbc8ac1a019688c550915e21",
+  "outputSha256": "0d7aa1dc07a530ae572b8128a90f16989710ee13a6297f6be82ba4673c6f18f1",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write packages/mcp/mcp-client/README.md\nverify-translation-pairing: recorded packages/mcp/mcp-client/README.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

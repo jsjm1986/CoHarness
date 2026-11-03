@@ -1,0 +1,3 @@
+{"operation":"normal","alive":true}
+{"operation":"unavailable","liveRefused":true,"snapshotRefused":true,"signalRefused":true,"noSignalSent":true,"childStillAlive":true}
+{"operation":"recovered","signals":["SIGTERM"],"childClosed":true}

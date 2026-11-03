@@ -1,0 +1,14 @@
+{
+  "name": "auth-login-current-clock-postgres",
+  "cwd": "gateway",
+  "command": "npx vitest run tests/auth-postgres.spec.ts --retry=0",
+  "startedAt": "2026-10-24T01:57:36.881040+00:00",
+  "seconds": 8.156,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7c07438e4c98d8abac6e8eaab8654b2fc7a7f34638ee6a6e3cd3a2a0415ca32f",
+  "inputsAfter": "7c07438e4c98d8abac6e8eaab8654b2fc7a7f34638ee6a6e3cd3a2a0415ca32f",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "2e8d6be8c65a835cae0e2e6dc6795e1362edb9fd065848bbd5943dd41b696a32",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  8 passed (8)\n   Start at  09:57:40\n   Duration  4.91s (transform 1.46s, setup 0ms, import 1.73s, tests 3.06s, environment 0ms)\n\n"
+}

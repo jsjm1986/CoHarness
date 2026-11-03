@@ -1,10 +1,10 @@
 /** Process-lifetime exclusion for a database restore and its managed-file reconciliation. */
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 import { randomUUID } from 'node:crypto'
 import { DEPLOYMENT_DATA_LOCK, DEPLOYMENT_SQL_LOCK, MaintenanceError } from './maintenance-service.ts'
 
-/** Dedicated backend ownership carried into the independent restore SQL transaction. */
-export interface DeploymentDataLease extends AsyncDisposable {
+/** Dedicated backend ownership carried into restore SQL and configuration transactions; query remains bound to this backend until disposal. */
+export interface DeploymentDataLease extends AsyncDisposable, Pick<PoolClient, 'query'> {
   signal: AbortSignal
   owner: { pid: number; backendStart: string; token: string }
 }
@@ -42,6 +42,7 @@ export async function acquireDeploymentDataLock(pool: Pool): Promise<DeploymentD
   }
   let released = false
   return {
+    query: client.query.bind(client),
     signal: lifetime.signal,
     owner,
     async [Symbol.asyncDispose]() {

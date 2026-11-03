@@ -136,6 +136,24 @@ describe('ConversationController', () => {
     await b.runtime.dispose()
   })
 
+  it('refuses document admission for an absent, blocked or no-longer-authorized captured conversation', async () => {
+    const b = await bench()
+    try {
+      const id = 's1' as never
+      expect(b.root.canAttachDocument('missing' as never)).toBe(false)
+      expect(b.root.canAttachDocument(id)).toBe(true)
+      b.root.blocks.set(id, { reason: 'Choose a model' })
+      expect(b.root.canAttachDocument(id)).toBe(false)
+      b.root.blocks.set(id, undefined)
+      const revoke = b.runtime.ctx.on('conversation/document-admission', () => 'deny')
+      expect(b.root.canAttachDocument(id)).toBe(false)
+      expect(b.root.attachDocument(id, { docId: 'report.pdf' as never, name: 'report.pdf', bytes: 12, mediaType: 'application/pdf' })).toBe(false)
+      expect(b.root.documentStore(id).getSnapshot()).toEqual([])
+      revoke()
+      expect(b.root.canAttachDocument(id)).toBe(true)
+    } finally { await b.runtime.dispose() }
+  })
+
   it('attaches an existing document by reference and never deletes it when removed', async () => {
     const b = await bench()
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
@@ -168,10 +186,13 @@ describe('ConversationController', () => {
     await b.runtime.dispose()
   })
 
-  it('uploads and removes a draft in its addressed runtime, and refuses an unknown Session owner', async () => {
+  it.each([
+    { kind: 'project', projectId: 41 },
+    { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000041' },
+    { kind: 'project', projectId: 41, nodeId: '10000000-0000-4000-8000-000000000042' },
+  ] as import('@deepseek-ai/dsh-client-runtime/client').SessionRuntimeTarget[])('uploads and removes a draft in its captured environment %j, and refuses an unknown Session owner', async (target) => {
     const b = await bench()
     const urls: Array<{ url: URL; method: string }> = []
-    const target = { kind: 'project' as const, projectId: 41 }
     Object.assign(b.runtime.sessions, { runtimeIdentityFor: (id: string) => id === 's1' ? target : undefined })
     b.runtime.ctx.reflect.provide('connection', {
       privateResourceUrl: (path: string) => {
@@ -196,7 +217,13 @@ describe('ConversationController', () => {
       await vi.waitFor(() => { expect(urls).toHaveLength(2) })
       expect(urls.map(value => value.method)).toEqual(['POST', 'DELETE'])
       for (const { url } of urls) {
-        expect(url.searchParams.get('dshTarget')).toBe('project:41')
+        if (target.nodeId !== undefined) {
+          expect(url.searchParams.get('dshNode')).toBe(target.nodeId)
+          expect(url.searchParams.get('scope')).toBe(target.kind === 'project' ? `project:${target.projectId}` : 'personal')
+        } else {
+          expect(url.searchParams.get('dshTarget')).toBe(target.kind === 'project' ? `project:${target.projectId}` : 'personal')
+          if (target.runtimeId !== undefined) expect(url.searchParams.get('dshRuntime')).toBe(target.runtimeId)
+        }
         expect(url.searchParams.get('dshPrincipal')).toBe('7')
       }
       expect(urls[1]!.url.searchParams.get('id')).toBe('project-document')
@@ -232,6 +259,31 @@ describe('ConversationController', () => {
     read.resolve({ ok: true, value: { attachment, data: Uint8Array.of(1) } })
     await expect(pending).rejects.toThrow('historical image scope was released')
     await b.runtime.dispose()
+  })
+
+  it.each([
+    { name: 'plain text', text: '保留执行前失败的输入', document: false },
+    { name: 'document reference', text: '', document: true },
+  ])('retains the $name draft when accepted input fails before durable admission', async ({ text, document }) => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1 })
+    const programmable = programmableSubmissionBegin()
+    const b = await bench(undefined, programmable.beginSubmission)
+    try {
+      if (document) {
+        const ref = { docId: 'retained.txt', path: '/documents/retained.txt', name: 'retained.txt',
+          bytes: 1, mediaType: 'text/plain', modifiedAt: 0 } as UserDocRef
+        expect(b.root.attachDocument(b.session.sessionId, ref)).toBe(true)
+      }
+      const drafts = b.root.documentStore(b.session.sessionId).getSnapshot()
+      const sending = b.root.sendSession(b.session, text, [], drafts.map(draft => draft.id), 'queue')
+      await vi.waitFor(() => { expect(b.prompt).toHaveBeenCalledOnce() })
+      programmable.inputs[0]!.onRetire?.({ reason: 'failed' })
+      await expect(sending).resolves.toEqual({ kind: 'error' })
+      expect(b.root.documentStore(b.session.sessionId).getSnapshot()).toEqual(drafts)
+    } finally {
+      await b.runtime.dispose()
+      vi.unstubAllGlobals()
+    }
   })
 
   it('registers a local echo before slow image encoding and forwards its requestId', async () => {
@@ -382,8 +434,11 @@ describe('ConversationController', () => {
       const [document] = b.root.documentStore('s1' as never).getSnapshot()
       if (document === undefined) throw new Error('document draft missing')
       b.prompt.mockResolvedValueOnce({ ok: true, value: { accepted: true } } as never)
-      await expect(b.root.sendSession(b.session, '', [], [document.id], 'queue'))
-        .resolves.toEqual({ kind: 'success' })
+      const documentSend = b.root.sendSession(b.session, '', [], [document.id], 'queue')
+      await vi.waitFor(() => { expect(b.prompt).toHaveBeenCalledTimes(2) })
+      expect(b.root.documentStore('s1' as never).getSnapshot()).toHaveLength(1)
+      programmable.inputs[1]!.onRetire?.({ reason: 'observed', attachments: [] })
+      await expect(documentSend).resolves.toEqual({ kind: 'success' })
       expect(b.prompt).toHaveBeenLastCalledWith(
         [{ type: 'document', docId: ref.docId }],
         'queue',

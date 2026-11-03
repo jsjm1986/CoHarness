@@ -104,11 +104,26 @@
       name: '@deepseek-ai/dsh-host-apiproxy'
 
 
-    # User-uploaded documents are ordinary files below the user's home. The
-    # HTTP consumer registers its streaming subtree through Connection, so the
-    # shared Host/Origin trust check runs without buffering upload bodies.
+    # Storage mode follows the inherited credential channel before concurrent
+    # plugins mount. Environment-file values cannot select managed storage.
+    # The HTTP consumer registers streaming routes through Connection.
     - id: userdoc-local
       name: '@deepseek-ai/dsh-userdoc-local'
+      disabled: !!js >-
+        ['DSH_GATEWAY_CREDENTIAL_FD', 'DSH_GATEWAY_CREDENTIAL_FILE'].some(name => {
+          const launch = ctx.get('launchEnvironment');
+          return launch === undefined ? process.env[name] : launch.getFrom(name, ['process'])?.value;
+        })
+
+    # Gateway-launched runtimes keep the same document API while all filesystem
+    # access and lifecycle authorization run in the Gateway process.
+    - id: userdoc-gateway
+      name: '@deepseek-ai/dsh-userdoc-gateway'
+      disabled: !!js >-
+        !['DSH_GATEWAY_CREDENTIAL_FD', 'DSH_GATEWAY_CREDENTIAL_FILE'].some(name => {
+          const launch = ctx.get('launchEnvironment');
+          return launch === undefined ? process.env[name] : launch.getFrom(name, ['process'])?.value;
+        })
 
     - id: userdoc-context
       name: '@deepseek-ai/dsh-userdoc-context'

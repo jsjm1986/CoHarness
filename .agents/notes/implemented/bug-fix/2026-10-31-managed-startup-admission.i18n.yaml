@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-31-managed-startup-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-managed-startup-admission.md
+document:
+  en: eae7507ec1c7be69fb1cf63608983194b38aaa5f
+  zh: 5d7cb2cf444875ae2f4d6b3ac0ee1e23365af715
+/agent-note-managed-startup-admission:
+  en: 13f90e5b86b0a589
+  zh: d73ec828a1d9c1a8
+/agent-note-managed-startup-admission/problem:
+  en: cbe52156598ab9ae
+  zh: b77cb002b3714368
+/agent-note-managed-startup-admission/decision:
+  en: 6eadb6b867c0f026
+  zh: 8effd5e438afb0ec
+/agent-note-managed-startup-admission/alternatives-considered:
+  en: 2cb280444d7d89e8
+  zh: a632db27f5079efc
+/agent-note-managed-startup-admission/consequences:
+  en: 85340ee85a40fbaa
+  zh: f28ac486f16bbd34

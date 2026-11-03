@@ -23,6 +23,8 @@
 
 `computerUseAuthorization` 上的可选确认控制器通过[会话 API](../../packages/host/apiproxy/README.zh.md) 处理当前用户读取与明确操作。[Gateway 执行提供者](../../packages/context/gateway-execution/README.zh.md) 负责活动根会话继承、资格核验及根工作流租约。浏览器消费者从 `dsh-computer-use/types` 导入确认数据，不加载 Host 服务声明。
 
+部署可独立发布 `computerUseEnvironment` 限制，不预留提供方。已配置的提供方负责报告实际可用性，环境回退仅提供信息。[计算机操作包](../../packages/computer-use/computer-use/README.zh.md) 定义驱动执行和 Host 元数据共用的读取规则。
+
 ## 结果和平台要求
 
 工具使用常规执行流程和 Session 日志。支持图像的模型路由在挂载附件存储时接收持久化截图；不支持图像的路由接收现有 MCP 图像诊断。提供方 README 负责说明安装、权限和平台限制。
@@ -58,9 +60,10 @@ async run<T>(execution: ToolExecution, operation: (signal: AbortSignal) => Promi
  * A second registration fails even when it repeats the current name. Providers
  * must stop their tools and await owned work before releasing this registration.
  * @param name - provider-owned name used in registration diagnostics.
+ * @param options - optional environment limitation; unavailable providers publish no desktop effects.
  * @returns the effect disposer for this exact registration.
  */
-register(name: ComputerUseProviderName): () => Promise<void>
+register(name: ComputerUseProviderName, options?: { unavailableReason: ComputerUseUnavailableReason }): () => Promise<void>
 ```
 
 Types: [ToolExecution](tools.zh.md)
@@ -84,6 +87,14 @@ run<T>(execution: ToolExecution, operation: (signal: AbortSignal) => Promise<T>)
 ```
 
 Types: [ToolExecution](tools.zh.md)
+
+Source: [`packages/computer-use/computer-use/src/index.ts`](../../packages/computer-use/computer-use/src/index.ts)
+
+<a id="ctxcomputeruseenvironment--computeruseenvironment"></a>
+
+### `ctx.computerUseEnvironment` — `ComputerUseEnvironment`
+
+A known limitation used only while no desktop provider is registered.
 
 Source: [`packages/computer-use/computer-use/src/index.ts`](../../packages/computer-use/computer-use/src/index.ts)
 <!-- END GENERATED cordis-surface -->

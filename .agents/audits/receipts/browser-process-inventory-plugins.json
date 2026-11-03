@@ -1,0 +1,13 @@
+{
+  "name": "browser-process-inventory-plugins",
+  "cwd": ".",
+  "command": "node --input-type=module -",
+  "startedAt": "2026-10-23T17:33:40.980460+00:00",
+  "seconds": 4.284,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1df11c9c7ad2f8f183d1fea5687eace6bd5388219acc38bb804f61be746a5d26",
+  "inputsAfter": "1df11c9c7ad2f8f183d1fea5687eace6bd5388219acc38bb804f61be746a5d26",
+  "outputSha256": "e638f2835590ccbf1211f31e817bc58bfaefda44a0dbbb81bc29f96c078c30cc",
+  "outputTail": "{\"sourceFilesParsed\":2727,\"importingFiles\":41,\"directCalls\":29,\"coverage\":\"candidate inventory only\"}\n"
+}

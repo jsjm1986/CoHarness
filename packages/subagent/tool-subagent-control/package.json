@@ -28,11 +28,11 @@
     "./list-agents/locale/*.json": "./locale/list-agents/*.json"
   },
   "files": [
+    "locale/*.json",
+    "locale/list-agents/*.json",
     "lib/index.js",
     "lib/types/**/*.js",
-    "lib/types/**/*.d.ts",
-    "locale/*.json",
-    "locale/list-agents/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {

@@ -1,0 +1,14 @@
+{
+  "name": "document-http-owner-references-final",
+  "cwd": ".",
+  "command": "pnpm run verify-repository-references",
+  "startedAt": "2026-10-26T11:37:48.383355+00:00",
+  "seconds": 17.527,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fc6b8f2556828b687f18465a6e6abd73d12c8a3334c19686ab37b237cc73b10c",
+  "inputsAfter": "fc6b8f2556828b687f18465a6e6abd73d12c8a3334c19686ab37b237cc73b10c",
+  "postgresToolDirectory": null,
+  "outputSha256": "30831631cc03c3098ac98e4d739d2bf25f508da7838984ff13696070ac0a323b",
+  "outputTail": "$ tsx scripts/verify-repository-references.ts\nverify-repository-references: maintained files contain no repository commit identifiers or disallowed organization URLs.\n"
+}

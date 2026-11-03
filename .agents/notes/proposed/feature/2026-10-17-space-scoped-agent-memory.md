@@ -66,6 +66,8 @@ A `scope` parameter appears only when the space offers more than one scope. A st
 
 ## Write authorization
 
+The implemented [member authority lifetime](../../implemented/bug-fix/2026-10-23-memory-member-authority.md) and [durable mutation outcomes](../../implemented/bug-fix/2026-10-23-memory-mutation-outcomes.md) records own request expiry, provider invalidation, and cursor-versus-entry commit ordering.
+
 `ctx.memory.save()` and `ctx.memory.delete()` enforce every rule before mutating, because the model tools, curation, and the browser all reach memory through these two operations:
 
 - **Personal and workspace scopes.** Agent writers may address only their own session's workspace. No grant beyond the already-authorized execution is required.

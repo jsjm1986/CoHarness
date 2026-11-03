@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-31-managed-runtime-policy-readiness.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-managed-runtime-policy-readiness.md
+document:
+  en: ca3a73ae3b681201f4c85d2f3177414853329444
+  zh: 0b230800b90a5b84c919c5ae9f00062fde019650
+/agent-note-managed-runtime-readiness-requires-active-policy-plugins:
+  en: 0da8fe77c389699b
+  zh: 4d63438832a2adfe
+/agent-note-managed-runtime-readiness-requires-active-policy-plugins/problem:
+  en: b7a6915d022a04b3
+  zh: cae9eb993d15c288
+/agent-note-managed-runtime-readiness-requires-active-policy-plugins/decision:
+  en: b0cae55b179b5a2f
+  zh: 96d3fb8da1673865
+/agent-note-managed-runtime-readiness-requires-active-policy-plugins/alternatives-considered:
+  en: c95fd655de0362cd
+  zh: d7488b43984ad28c
+/agent-note-managed-runtime-readiness-requires-active-policy-plugins/consequences:
+  en: cce2ffd38402b781
+  zh: 55f08ea163e86541

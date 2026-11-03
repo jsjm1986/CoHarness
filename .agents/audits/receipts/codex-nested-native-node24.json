@@ -1,0 +1,14 @@
+{
+  "name": "codex-nested-native-node24",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/run-managed-native-ssh.py lib /Users/a1234/.nvm/versions/node/v24.19.0/bin/node nested nested-revoked",
+  "startedAt": "2026-10-25T14:06:29.897373+00:00",
+  "seconds": 9.565,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bdce112c5aff6b785cf0baabdb63b60658e042e77b26076e3e5428d50d9007ff",
+  "inputsAfter": "bdce112c5aff6b785cf0baabdb63b60658e042e77b26076e3e5428d50d9007ff",
+  "postgresToolDirectory": null,
+  "outputSha256": "a5c5938ab892654e6fb7545227f30ad839457cf797229e93872a7b799e9881e8",
+  "outputTail": "{\"artifact\":\"lib\",\"node\":\"v24.19.0\",\"nativeOpenSSH\":true,\"scenarios\":[{\"mode\":\"nested\",\"outcome\":\"completed\",\"nativeRequests\":2,\"modelAdmissions\":2,\"usageOwners\":[\"ssh-model-member\"],\"originalActor\":true,\"allPermitsSettled\":true,\"upstreamKeyStayedInParent\":true,\"nativeProcessesStopped\":true,\"remoteModelListenersClosed\":true,\"memberColdResume\":true},{\"mode\":\"nested-revoked\",\"outcome\":\"error\",\"nativeRequests\":1,\"modelAdmissions\":2,\"usageOwners\":[\"ssh-model-member\"],\"originalActor\":true,\"allPermitsSettled\":true,\"upstreamKeyStayedInParent\":true,\"nativeProcessesStopped\":true,\"remoteModelListenersClosed\":true,\"memberColdResume\":true}]}\n"
+}

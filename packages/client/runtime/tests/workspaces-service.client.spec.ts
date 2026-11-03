@@ -43,7 +43,7 @@ it.each(['plain', 'encoded-looking'] as const)('keeps %s draft reservations in w
   api.onCreate = async request => ok({ sessionId: callField(request, 'sessionId') as SessionId })
   const base = new SessionRuntime(ctx, api, fakeRemote(api), undefined, { provideService: false })
   const pool = new SessionRuntimePool(ctx, base, {
-    api, isLoopback: false, interactions: 'none',
+    metadataTiming: { requestTimeoutMs: 15000, retryAfterMs: 10000 }, api, isLoopback: false, interactions: 'none',
     hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
     state: { getSnapshot: () => undefined, subscribe: () => () => {} },
     rpc: { call: () => Promise.reject(new Error('Unexpected Remote')) },
@@ -837,6 +837,8 @@ describe('WorkspaceRuntime', () => {
       const creating = deferred<Awaited<ReturnType<FakeApiClient['onCreate']>>>()
       api.onCreate = () => creating.promise
       workspaces.startSession(wid('target'))
+      expect(sessions.list.getSnapshot().navigationBlockedSessionId).toBe(sid('old'))
+      expect(sessions.list.getSnapshot().current).toBe(sid('old'))
       await vi.waitFor(() => { expect(api.callsOf('session.create')).toHaveLength(1) })
       if (action === 'select') sessions.open(sid('new'))
       else if (action === 'clear') sessions.clear()
@@ -852,6 +854,7 @@ describe('WorkspaceRuntime', () => {
       await Promise.resolve()
       await vi.waitFor(() => { expect(sessions.list.getSnapshot().current).toBe(action === 'clear' ? undefined : sid('new')) })
       expect(sessions.binding(sid('late'))).toBeUndefined()
+      expect(sessions.list.getSnapshot().navigationBlockedSessionId).toBeUndefined()
     } finally {
       await ctx.fiber.dispose()
     }
@@ -950,16 +953,19 @@ describe('WorkspaceRuntime', () => {
     const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('target')] as never[] }))
-    api.onList = () => Promise.resolve(ok({ items: [] }))
+    api.onList = () => Promise.resolve(ok({ items: [{ sessionId: sid('old'), updatedAt: 1, running: false, blank: false }] }))
     const onFailure = vi.fn()
     try {
       await Promise.all([workspaces.refresh(), sessions.refresh()])
+      sessions.open(sid('old'))
       api.onCreate = () => Promise.resolve(err({ code: 'internal', message: 'connect refused', details: {} }))
       workspaces.startSession(wid('target'), { onFailure })
       await vi.waitFor(() => { expect(onFailure).toHaveBeenCalledOnce() })
       // The bare start rides the fresh arm — no reuse candidate or draft
       // reservation rides the wire.
       expect(api.callsOf('session.create')).toEqual([{ workspaceId: 'target' }])
+      expect(sessions.list.getSnapshot().current).toBe(sid('old'))
+      expect(sessions.list.getSnapshot().navigationBlockedSessionId).toBeUndefined()
     } finally {
       await ctx.fiber.dispose()
     }

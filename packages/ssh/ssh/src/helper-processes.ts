@@ -29,7 +29,7 @@ interface ProcessRecord {
   endpoints: Partial<Record<Channel, Endpoint>>
   controller: AbortController
   preparing?: Promise<void>
-  release?: Promise<void>
+  release?: () => Promise<void>
   ordinary?: SubprocessHandle
   terminal?: SubprocessTerminalHandle
   start?: Promise<void>
@@ -91,8 +91,9 @@ export class RemoteProcesses {
   private readonly records = new Map<SshProcessId, ProcessRecord>()
   // Settled promises preserve the original rejection for late done requests.
   private readonly completed = new Map<SshProcessId, Promise<Completion>>()
-  private readonly cleanups = new Set<Promise<void>>()
+  private readonly cleanups = new Set<() => Promise<void>>()
   private closing = false
+  private closure: Promise<void> | undefined
 
   /** Spill failures reach the helper's logger; the remote caller then receives the tail without a spill path. */
   private readonly reportSpillFailure: SpillFailureReporter
@@ -205,7 +206,7 @@ export class RemoteProcesses {
     const spec: SubprocessSpawnSpec = { argv: request.argv, cwd, env, graceMs: request.graceMs, signal: record.controller.signal,
       stdio: { stdin: stdio.stdin, stdout: 'pipe', stderr: 'pipe', ...(stdio.control === undefined ? {} : { control: stdio.control }) },
     }
-    const ordinary = this.ctx.subprocess.spawn(spec)
+    const ordinary = await this.ctx.subprocess.spawn(spec)
     record.ordinary = ordinary
     const control = ordinary.control
     if (record.endpoints.control !== undefined && control === undefined) {
@@ -359,12 +360,19 @@ export class RemoteProcesses {
     await terminal.resize(cols, rows)
   }
 
-  /** Stop every owned process on lease expiry or disconnect. */
-  async close(): Promise<void> {
-    if (this.closing) return
+  /**
+   * Stop admitting work and join every cleanup; a failed attempt retains owners for a later retry.
+   * @returns Completion shared by callers of the same attempt.
+   * @throws When any process range, stream endpoint or private directory cleanup remains unconfirmed.
+   */
+  close(): Promise<void> {
     this.closing = true
+    return this.closure ??= this.closeOnce().catch((error: unknown) => { this.closure = undefined; throw error })
+  }
+
+  private async closeOnce(): Promise<void> {
     const releases = [...this.records.keys()].map(id => this.release(id))
-    const outcomes = await Promise.allSettled([...releases, ...this.cleanups])
+    const outcomes = await Promise.allSettled([...releases, ...[...this.cleanups].map(close => close())])
     const errors = [...new Set(outcomes.flatMap(result => result.status === 'rejected' ? [result.reason as unknown] : []))]
     if (errors.length > 0) throw new AggregateError(errors, 'SSH remote process cleanup failed')
   }
@@ -380,10 +388,10 @@ export class RemoteProcesses {
       record.ordinary?.terminate()
       if (record.ordinary !== undefined) await record.ordinary.waitForExit()
       if (record.terminal !== undefined) await record.terminal.terminate()
-      this.records.delete(id)
       await rm(record.directory, { recursive: true, force: true })
+      this.records.delete(id)
     })
-    await record.release
+    await record.release()
   }
 
   private record(id: SshProcessId): ProcessRecord {
@@ -409,13 +417,17 @@ export class RemoteProcesses {
     this.records.delete(id)
     this.completed.set(id, result)
     if (this.completed.size > this.limit * 4) this.completed.delete(this.completed.keys().next().value as SshProcessId)
-    await cleanup
+    await cleanup()
   }
 
-  private trackCleanup(work: () => Promise<void>): Promise<void> {
-    const pending = Promise.resolve().then(work)
-    this.cleanups.add(pending)
-    return pending.finally(() => { this.cleanups.delete(pending) })
+  /** Retain one idempotent cleanup callback until an attempt confirms resource closure. */
+  private trackCleanup(work: () => Promise<void>): () => Promise<void> {
+    let attempt: Promise<void> | undefined
+    const close = (): Promise<void> => attempt ??= Promise.resolve().then(work).then(() => {
+      this.cleanups.delete(close)
+    }).catch((error: unknown) => { attempt = undefined; throw error })
+    this.cleanups.add(close)
+    return close
   }
 
   private async endpoint(path: string): Promise<Endpoint> {

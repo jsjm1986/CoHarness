@@ -79,13 +79,13 @@ export function apply(ctx: ClientContext): void {
   // scope publishes nothing when one is written. This is the only signal that
   // a key written on another surface reached the Host.
   ctx.effect(
-    () => ctx.remote.$on('credentials/reference-updated', (ref) => { webSearch.refreshCredential(ref) }),
+    () => ctx.remote.$forTarget().$on('credentials/reference-updated', (ref) => { webSearch.refreshCredential(ref) }),
     'ui-settings-plugins: credential invalidations',
   )
 
-  ctx.effect(() => ctx.remote.$on('llm/adapters-updated', () => { subagentModels.refreshCatalog() }),
+  ctx.effect(() => ctx.remote.$forTarget().$on('llm/adapters-updated', () => { subagentModels.refreshCatalog() }),
     'ui-settings-plugins: subagent model catalog')
-  ctx.effect(() => ctx.remote.$on('settings/document-updated', () => { subagentModels.refreshCatalog() }),
+  ctx.effect(() => ctx.remote.$forTarget().$on('settings/document-updated', () => { subagentModels.refreshCatalog() }),
     'ui-settings-plugins: subagent model settings')
   ctx.effect(() => ctx.on('connection/reset', () => { subagentModels.resetConnection() }),
     'ui-settings-plugins: subagent model connection')

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-auto-review-request-records.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-auto-review-request-records.md
+document:
+  en: 1de09f98857e92ae9f3d9d356da76bc34aee4322
+  zh: ef7aa38d9d89c27636db17f2ff07b289ff85dd6d
+/agent-note-durable-auto-review-request-inputs:
+  en: 571aa60aee8cc221
+  zh: bb6df28c0b4dd0b9
+/agent-note-durable-auto-review-request-inputs/problem:
+  en: 568b97240edb2bf4
+  zh: 8f501b812600d51f
+/agent-note-durable-auto-review-request-inputs/decision:
+  en: bc21df8bc53d9c51
+  zh: 042823741e775de2
+/agent-note-durable-auto-review-request-inputs/alternatives-considered:
+  en: cd411d0a0e9970db
+  zh: 2d89a427f69d24cc
+/agent-note-durable-auto-review-request-inputs/consequences:
+  en: 6be1585258774b46
+  zh: d239e8da7c97034d
+/agent-note-durable-auto-review-request-inputs/verification:
+  en: e0328631ffb4de29
+  zh: b4b0e62bdb213942

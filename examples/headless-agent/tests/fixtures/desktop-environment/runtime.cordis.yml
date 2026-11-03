@@ -1,0 +1,9 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, desktopAvailabilityFixtureReady, computerUseEnvironment]
+- insert:
+    - id: desktop-availability
+      name: '@deepseek-ai/dsh-gateway-execution/desktop-availability'
+    - id: desktop-availability-fixture
+      name: './model.mjs'

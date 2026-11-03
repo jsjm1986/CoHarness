@@ -37,6 +37,12 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../preset/agent-preset-registry"
+    },
+    {
+      "path": "../../ssh/ssh"
     }
   ]
 }

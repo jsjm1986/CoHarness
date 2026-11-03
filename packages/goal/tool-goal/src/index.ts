@@ -304,10 +304,10 @@ export function apply(ctx: Context, config: Config): void {
         throw new HarnessError('blocked_reason is required with action blocked', 'GOAL_TOOL_INVALID_UPDATE')
       }
       if (args.action === 'blocked' && authority.kind === 'goal-round'
-        && authority.goal.roundsStarted < resolved.blockedAfterConsecutiveRounds) {
+        && authority.roundsSinceResume < resolved.blockedAfterConsecutiveRounds) {
         throw new HarnessError(
           `blocked requires at least ${resolved.blockedAfterConsecutiveRounds} consecutive goal rounds; `
-          + `current round is ${authority.goal.roundsStarted}`,
+          + `current round is ${authority.roundsSinceResume}`,
           'GOAL_TOOL_BLOCK_THRESHOLD',
         )
       }

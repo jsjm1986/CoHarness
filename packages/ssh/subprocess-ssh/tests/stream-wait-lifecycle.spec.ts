@@ -36,6 +36,7 @@ async function setup(options: { pause?: Stage; failStart?: Error; failWait?: Err
     finally { signal?.removeEventListener('abort', abort) }
   }
   const connection = {
+    retainConsumer: (cleanup: () => Promise<void>) => cleanup,
     request: async <T>(method: string, _params: unknown, schema: z.ZodType<T>, signal?: AbortSignal): Promise<T> => {
       calls.push(method)
       let value: unknown
@@ -93,7 +94,7 @@ async function setup(options: { pause?: Stage; failStart?: Error; failWait?: Err
 describe('SSH public output streams', () => {
   it.each(['stdout', 'stderr'] as const)('closes only the matching transport when %s is destroyed', async (name) => {
     const test = await setup()
-    const handle = test.runtime.spawn(spec)
+    const handle = await test.runtime.spawn(spec)
     await test.started
     handle[name]!.destroy()
     await new Promise(resolve => setImmediate(resolve))
@@ -105,7 +106,7 @@ describe('SSH public output streams', () => {
 
   it.each(['stdout', 'stderr'] as const)('remembers %s closure before remote allocation finishes', async (name) => {
     const test = await setup({ pause: 'prepare' })
-    const handle = test.runtime.spawn(spec)
+    const handle = await test.runtime.spawn(spec)
     await test.entered
     handle[name]!.destroy()
     test.release()
@@ -118,7 +119,7 @@ describe('SSH public output streams', () => {
 describe('SSH range-observation cancellation', () => {
   it.each(['prepare', 'connect', 'start', 'wait', 'terminate'] as const)('bounds the whole observation while %s is pending', async (pause) => {
     const test = await setup({ pause })
-    const handle = test.runtime.spawn(spec)
+    const handle = await test.runtime.spawn(spec)
     if (pause === 'terminate') { await test.started; handle.terminate() }
     const controller = new AbortController()
     let settled = false
@@ -139,7 +140,7 @@ describe('SSH range-observation cancellation', () => {
   it('bounds termination after failed startup while retaining real termination failure', async () => {
     const cleanup = new Error('range owner unavailable')
     const test = await setup({ pause: 'terminate', failStart: new Error('start refused'), failTerminate: cleanup })
-    const handle = test.runtime.spawn(spec)
+    const handle = await test.runtime.spawn(spec)
     const controller = new AbortController()
     let settled = false
     const observed = handle.waitForExit(controller.signal).then(
@@ -156,7 +157,7 @@ describe('SSH range-observation cancellation', () => {
 
   it('returns false for a pre-aborted live observation and true once quiescence is known', async () => {
     const test = await setup({ pause: 'prepare' })
-    const handle = test.runtime.spawn(spec)
+    const handle = await test.runtime.spawn(spec)
     const signal = AbortSignal.abort()
     let settled = false
     const observed = handle.waitForExit(signal).then(
@@ -173,7 +174,7 @@ describe('SSH range-observation cancellation', () => {
   it('preserves real observation failure and detaches the caller cancellation listener', async () => {
     const failure = new Error('remote range observation failed')
     const test = await setup({ failWait: failure })
-    const handle = test.runtime.spawn(spec)
+    const handle = await test.runtime.spawn(spec)
     await test.started
     const controller = new AbortController()
     await expect(handle.waitForExit(controller.signal)).rejects.toBe(failure)
@@ -182,7 +183,7 @@ describe('SSH range-observation cancellation', () => {
 
   it('returns true when an uncancelled bounded observation completes', async () => {
     const test = await setup()
-    const handle = test.runtime.spawn(spec)
+    const handle = await test.runtime.spawn(spec)
     const controller = new AbortController()
     expect(await handle.waitForExit(controller.signal)).toBe(true)
     expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)

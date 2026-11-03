@@ -1,0 +1,17 @@
+{
+  "name": "real-web-local-owner-initial",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/probe-real-web-owner.mjs",
+  "startedAt": "2026-10-24T20:24:47.550596+00:00",
+  "seconds": 4.446,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1f8b4c1f971e09e8c17655fc3e8355498f2943569b4ea83e933e3449cdd7d912",
+  "inputsAfter": "1f8b4c1f971e09e8c17655fc3e8355498f2943569b4ea83e933e3449cdd7d912",
+  "postgresToolDirectory": null,
+  "outputSha256": "97d90fd838400834090133ef765ecd8a7d0c12a272cb3d2d9cdeb6e895b2cffc",
+  "outputTail": "{\"webStatus\":401,\"bodyPrefix\":\"dsh web authentication required; reopen the URL printed by dsh web.\\n\"}\ndsh: all_proxy names a SOCKS proxy, which is not supported; connecting directly for that scheme \u2014 set an http:// or https:// proxy URL instead\ndsh web: http://127.0.0.1:64296/?token=[fixture-token]\n\n",
+  "redactions": [
+    "Disposable Web authentication token removed; the owned Runtime was already terminated."
+  ]
+}

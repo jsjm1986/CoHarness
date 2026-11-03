@@ -1,0 +1,10 @@
+{"scenario":"terminal-role","runtimeAdmitted":true,"withdrawnStatus":403,"privateMetadataPublished":false,"operationRefs":0}
+{"scenario":"plugin-unary-role","runtimeAdmitted":true,"withdrawnStatus":403,"privateMetadataPublished":false,"operationRefs":0}
+{"scenario":"plugin-first-stream-role","runtimeAdmitted":true,"withdrawnStatus":403,"privateMetadataPublished":false,"operationRefs":0}
+{"scenario":"terminal-organization","runtimeAdmitted":true,"withdrawnStatus":403,"privateMetadataPublished":false,"operationRefs":0}
+{"scenario":"plugin-unary-organization","runtimeAdmitted":true,"withdrawnStatus":403,"privateMetadataPublished":false,"operationRefs":0}
+{"scenario":"plugin-first-stream-organization","runtimeAdmitted":true,"withdrawnStatus":403,"privateMetadataPublished":false,"operationRefs":0}
+{"scenario":"plugin-mid-stream","runtimeAdmitted":true,"initialStatus":200,"authorizedProgressPublished":true,"withdrawnStreamInterrupted":true,"privateMetadataPublished":false,"operationRefs":0}
+{"scenario":"terminal-current-administrator","status":200,"privateMetadataPublished":true,"operationRefs":0}
+{"scenario":"plugin-unary-current-administrator","status":200,"privateMetadataPublished":true,"operationRefs":0}
+{"scenario":"owner-disabled-before-lease-commit","status":409,"runtimeReached":false,"activityChanged":false,"operationRefs":0}

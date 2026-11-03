@@ -23,9 +23,9 @@
     "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {
@@ -36,11 +36,15 @@
   },
   "dependencies": {
     "@deepseek-ai/dsh-atomic-write": "workspace:*",
-    "@deepseek-ai/schemastery": "workspace:~"
+    "@deepseek-ai/dsh-util-values": "workspace:*",
+    "@deepseek-ai/node-addon-system": "workspace:~",
+    "@deepseek-ai/schemastery": "workspace:~",
+    "koffi": "^3.3.4"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-home-paths": "workspace:*",
+    "@deepseek-ai/dsh-loader-smoke": "workspace:*",
     "@deepseek-ai/dsh-managed-data": "workspace:*",
     "@deepseek-ai/dsh-userdoc": "workspace:*"
   }

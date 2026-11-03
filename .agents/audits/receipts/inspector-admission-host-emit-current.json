@@ -1,0 +1,13 @@
+{
+  "name": "inspector-admission-host-emit-current",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T14:41:44.956678+00:00",
+  "seconds": 6.551,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "962722c2841eb395ca28ec75bedf99c44dd054e53f8644bcecdf4c3879546c9e",
+  "inputsAfter": "962722c2841eb395ca28ec75bedf99c44dd054e53f8644bcecdf4c3879546c9e",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

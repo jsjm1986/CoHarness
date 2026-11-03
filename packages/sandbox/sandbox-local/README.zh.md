@@ -56,6 +56,8 @@ kind: "package-reference"
 
 不受支持的平台或不可用的 runner 会拒绝执行：`confine()` 以 `SANDBOX_UNAVAILABLE` 拒绝 并列出该平台的 runner 选项，消费方会呈现该错误，而不是让命令不受限制地运行。启动后拒绝自身 profile 的 runner 由其致命 stderr 签名与退出码识别，因此损坏的沙箱不会被误认为被拒绝的命令。`runnerCommand` 覆盖是操作方断言：它跳过功能探测，并假定配置的 runner 诚实实现与 bwrap 兼容的 profile。
 
+功能探测在 `probeTimeoutMs` 到期时强制终止停滞的原生客户端，并在客户端关闭后返回。超时使候选不可用，不能授权未隔离执行。提供者缓存已完成的选择结果。[探测所有权决策](../../../.agents/notes/implemented/bug-fix/2026-10-29-native-capability-probe-closure.zh.md)记录失败及生命周期规则。
+
 -----
 
 <a id="understand-the-implementation"></a>

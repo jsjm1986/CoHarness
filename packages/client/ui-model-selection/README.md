@@ -35,6 +35,8 @@ The Web GUI lets users switch the model and reasoning effort for an existing ses
 
 -----
 
+Each directory reads, selects and observes models through its Session’s Runtime connection. A model or settings change and a reconnect refresh only directories on that Runtime. Missing alternate transports fail explicitly instead of reading the bootstrap catalog.
+
 <a id="model-experience"></a>
 ## Model Experience
 

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-model-policy-owner-lifetime.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-24-model-policy-owner-lifetime.md
+document:
+  en: 12da48fc400eb779f47308ae128d863e60f04a5f
+  zh: ad0a1c8dc254f2f70249336d84dcd8fee48053d9
+/agent-note-model-policy-ownership-survives-request-waits:
+  en: becd3d494ad70b4d
+  zh: 7d3570a80f5a0f6b
+/agent-note-model-policy-ownership-survives-request-waits/problem:
+  en: 435ce7849b85d533
+  zh: 96805c78ebaf4035
+/agent-note-model-policy-ownership-survives-request-waits/decision:
+  en: dfa6648a375d4cd5
+  zh: 956e2341051e946d
+/agent-note-model-policy-ownership-survives-request-waits/alternatives-considered:
+  en: de4439432aaf7ef2
+  zh: 07282ebb0176a7a6
+/agent-note-model-policy-ownership-survives-request-waits/consequences:
+  en: 53b7daece15ad36d
+  zh: ab182cdbb6eba3b0
+/agent-note-model-policy-ownership-survives-request-waits/verification:
+  en: f53cbf9a4ab3267f
+  zh: 71f7f351870f7293

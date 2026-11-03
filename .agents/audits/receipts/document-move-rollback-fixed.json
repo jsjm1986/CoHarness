@@ -1,0 +1,14 @@
+{
+  "name": "document-move-rollback-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests/move-rollback.spec.ts packages/attachment/userdoc-local/tests/store.spec.ts packages/attachment/userdoc-local/tests/store-failures.spec.ts packages/attachment/userdoc-local/tests/private-upload-paths.spec.ts",
+  "startedAt": "2026-10-26T02:14:00.107809+00:00",
+  "seconds": 4.925,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a8666c3762652cf6b2cfed5ab599719d2f0f977b28d180502677e383bb975a90",
+  "inputsAfter": "a8666c3762652cf6b2cfed5ab599719d2f0f977b28d180502677e383bb975a90",
+  "postgresToolDirectory": null,
+  "outputSha256": "6a19e9f871cc97b58ac326bd27c0a377217f7162be3e106263f8831071906826",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  4 passed (4)\n      Tests  67 passed | 1 skipped (68)\n   Start at  10:14:04\n   Duration  732ms (transform 713ms, setup 183ms, import 783ms, tests 743ms, environment 1ms)\n\n"
+}

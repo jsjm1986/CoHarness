@@ -1,0 +1,14 @@
+{
+  "name": "systemd-control-built-node22",
+  "cwd": "gateway",
+  "command": "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node tests/run-built-systemd-control.mjs",
+  "startedAt": "2026-10-25T00:50:47.399897+00:00",
+  "seconds": 14.851,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d2d4f9f1c9681583f12fb4f216494b4e575b68f61e622651ef4e92558155b32d",
+  "inputsAfter": "d2d4f9f1c9681583f12fb4f216494b4e575b68f61e622651ef4e92558155b32d",
+  "postgresToolDirectory": null,
+  "outputSha256": "120e48d88340b87ed0d6c54045de0b5354cd9efd45e1b1d679a657197b428b6e",
+  "outputTail": "Native control clients exclude Gateway database variables and disable prompts.\nCancellation closes the daemon-reload client before startup settles.\nCancellation closes the restart client and retains the generation cleanup handle.\nA stalled liveness client times out without proving unit exit.\nA stalled stop client times out without releasing service ownership.\n"
+}

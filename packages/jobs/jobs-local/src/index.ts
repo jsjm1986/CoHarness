@@ -18,11 +18,11 @@ import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { ScopedLayers, scopeOf } from '@deepseek-ai/dsh-scope'
 import type { SessionId } from '@deepseek-ai/dsh-session'
-import { deadline, timeoutOf } from '@deepseek-ai/dsh-timeout'
-import { JobRegistry, JobId } from '@deepseek-ai/dsh-jobs'
+import { deadline, MAX_TIMER_DELAY_MS, timeoutOf } from '@deepseek-ai/dsh-timeout'
+import { JobRegistry, JobId, renderJobFailure } from '@deepseek-ai/dsh-jobs'
 import type {
   JobAppendOptions, JobEvent, JobEvents, JobHandle, JobKind, JobOutcome, JobOutputRead, JobOutputSource,
-  JobRead, JobSettleCause, JobSpec, JobStatus, JobView,
+  JobHooks, JobRead, JobRegisteredData, JobSettledData, JobSettleCause, JobSpec, JobStatus, JobToolCall, JobView,
 } from '@deepseek-ai/dsh-jobs'
 import { JobEventHub, JobLayer } from './events.ts'
 import { startPump } from './pump.ts'
@@ -47,7 +47,7 @@ const DEFAULT_PUMP_POLL_MS = 150
 /** Configuration for the process-local job registry. */
 export interface Config {
   /**
-   * Maximum `running` plus `stopping` jobs per exact owner or in the shared unowned bucket;
+   * Maximum starting, `running` and `stopping` jobs per exact owner or shared unowned bucket;
    * omission defaults to 10.
    */
   maxConcurrentJobsPerOwner?: number
@@ -59,7 +59,7 @@ export interface Config {
    * this cap; the first terminal model read then trims to it.
    */
   settledRetainBytes?: number
-  /** Poll interval for a job's pull sources, in milliseconds; omission defaults to 150. */
+  /** Poll interval in milliseconds, at most Node's timer limit; omission defaults to 150. */
   pumpPollMs?: number
 }
 
@@ -79,6 +79,7 @@ interface ProducerState {
 interface TrackedJob {
   /** Origin retained for completion input; never a current authorization grant. */
   executionScope: ExecutionInheritance | undefined
+  toolCall: JobToolCall | undefined
   id: JobId
   kind: JobKind
   label: string
@@ -150,7 +151,7 @@ export class LocalJobRegistry extends JobRegistry {
     pumpPollMs: z.number()
       .step(1)
       .min(1)
-      .max(Number.MAX_SAFE_INTEGER)
+      .max(MAX_TIMER_DELAY_MS)
       .default(DEFAULT_PUMP_POLL_MS),
   })
 
@@ -163,6 +164,12 @@ export class LocalJobRegistry extends JobRegistry {
   /** Schemastery-defaulted pull-source poll interval. */
   private readonly pumpPollMs: number
   private store = new Map<JobId, TrackedJob>()
+  private closed = false
+  /** Synchronous producer starts with reserved capacity but no public record yet. */
+  private readonly starting = new Map<Agent | undefined, number>()
+  /** Producer resources remain owned after a registry-only forced settlement. */
+  private readonly producers = new Map<Agent | undefined, { pending: number }>()
+  private releaseProducerIdle: () => void = () => {}
   /**
    * Controllers and scoped subscriptions layered by the scope that registered
    * them, in the tools-registry shape: a contribution files into its
@@ -193,7 +200,20 @@ export class LocalJobRegistry extends JobRegistry {
     this.pumpPollMs = resolved.pumpPollMs
     this.selfCtx = ctx
     this.hub = new JobEventHub(this.layers, (message) => { ctx.logger.warn(message) })
-    ctx.effect(() => () => this.disposeAll(), 'jobs teardown')
+    ctx.effect(() => {
+      const releaseRuntime = ctx.root.on('runtime/idle-release-check', () => this.producers.size > 0 ? 'busy' : undefined, { global: true })
+      const releaseAgent = ctx.root.on('agent/idle-release-check', ({ agent }) => this.producers.has(agent) ? 'busy' : undefined, { global: true })
+      let disposed = false
+      this.releaseProducerIdle = () => {
+        if (!disposed || this.producers.size > 0) return
+        releaseAgent()
+        releaseRuntime()
+      }
+      return async () => {
+        try { await this.disposeAll() }
+        finally { disposed = true; this.releaseProducerIdle() }
+      }
+    }, 'jobs teardown')
   }
 
   /**
@@ -208,6 +228,7 @@ export class LocalJobRegistry extends JobRegistry {
   }
 
   start(spec: JobSpec): JobId {
+    if (this.closed) throw new Error('background jobs unavailable: job registry is closed')
     const owner = this.resolveOwner(spec.owner)
     if (!this.servesOwner(owner)) {
       throw new Error('background jobs unavailable: no job controller serves this agent (load @deepseek-ai/dsh-tool-jobs in its composition)')
@@ -231,7 +252,8 @@ export class LocalJobRegistry extends JobRegistry {
     // lifecycle events. The mint precedes the starter, so a throwing starter
     // still leaves nothing registered; a collision retries while this registry
     // still holds an earlier id.
-    const executionScope = owner === undefined ? undefined : executionAuthorityOf(this.ctx)?.capture(owner)
+    const toolCall = spec.toolCall === undefined ? undefined
+      : { callId: spec.toolCall.callId, rootCallId: spec.toolCall.rootCallId }
     let id: JobId
     do {
       id = JobId(`${spec.kind}-${randomUUID().replaceAll('-', '').slice(0, 16)}`)
@@ -243,12 +265,27 @@ export class LocalJobRegistry extends JobRegistry {
       append: (text, options) => { this.appendRing(state, ring, text, options, 'producer') },
       updateProgress: (line) => { this.updateProgress(state, line) },
     }
-    const hooks = spec.run(handle)
+    const starting = this.starting.get(owner) ?? 0
+    this.starting.set(owner, starting + 1)
+    const releaseProducer = this.holdProducer(owner)
+    let executionScope: ExecutionInheritance | undefined
+    let hooks: JobHooks
+    try {
+      executionScope = owner === undefined ? undefined : executionAuthorityOf(this.ctx)?.capture(owner)
+      hooks = spec.run(handle)
+    } catch (error) {
+      releaseProducer()
+      throw error
+    } finally {
+      if (starting === 0) this.starting.delete(owner)
+      else this.starting.set(owner, starting)
+    }
 
     let markSettled!: () => void
     const settled = new Promise<void>((resolve) => { markSettled = resolve })
     const job: TrackedJob = {
       executionScope,
+      toolCall,
       id,
       kind: spec.kind,
       label: spec.label,
@@ -281,16 +318,17 @@ export class LocalJobRegistry extends JobRegistry {
     // has genuinely changed. The announcement precedes the pump because the
     // pump drains its sources once synchronously, and that drain may append
     // and announce output: a job's first event is always `registered`.
-    this.emit({ type: 'registered', job: this.view(job) }, owner)
+    this.emit({ type: 'registered', job: this.view(job) }, owner, () => { this.recordSessionEvent(job) })
 
     // The producer's settlement or a registry-forced one ends the pump; the
     // pump's final drain then lands before this registry trims the ring.
     const producerDone = hooks.done.then(
-      outcome => outcome,
-      (error: unknown): JobOutcome => {
+      outcome => ({ outcome, producerReported: true }),
+      (error: unknown): { outcome: JobOutcome; producerReported: boolean } => {
         // Contain a producer contract violation (`done` rejected) so cleanup and waiters cannot hang.
-        this.selfCtx.logger.warn(`jobs: job ${job.id} producer done promise rejected (producer contract violation): ${String(error)}`)
-        return { status: 'failed', detail: String(error) }
+        const detail = renderJobFailure(error)
+        this.selfCtx.logger.warn(`jobs: job ${job.id} producer done promise rejected (producer contract violation); automatic idle release remains blocked: ${detail}`)
+        return { outcome: { status: 'failed', detail }, producerReported: false }
       },
     )
     if (spec.output !== undefined && spec.output.length > 0) {
@@ -304,11 +342,29 @@ export class LocalJobRegistry extends JobRegistry {
         Promise.race([producerDone, settled]),
       )
     }
-    void producerDone.then(async (outcome) => {
+    void producerDone.then(async ({ outcome, producerReported }) => {
       if (job.pump !== undefined) await job.pump.done
-      this.settle(job, outcome, job.settleCause ?? 'producer')
+      this.settle(job, outcome, job.settleCause ?? 'producer', producerReported)
+      if (producerReported) releaseProducer()
+    }).catch((error: unknown) => {
+      this.selfCtx.logger.warn(`jobs: job ${job.id} cleanup failed; automatic idle release remains blocked: ${renderJobFailure(error)}`)
     })
     return id
+  }
+
+  /** Retain exact producer ownership until its successful resource-release acknowledgment. */
+  private holdProducer(owner: Agent | undefined): () => void {
+    const counter = this.producers.get(owner) ?? { pending: 0 }
+    counter.pending += 1
+    this.producers.set(owner, counter)
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      counter.pending -= 1
+      if (counter.pending === 0) this.producers.delete(owner)
+      this.releaseProducerIdle()
+    }
   }
 
   list(caller?: SessionId): JobView[] {
@@ -389,9 +445,9 @@ export class LocalJobRegistry extends JobRegistry {
       .some(layer => !layer.controllers.isEmpty())
   }
 
-  /** Count authoritative active records for one exact owner or the shared unowned bucket. */
+  /** Count active records and reserved starts for one exact owner or the unowned bucket. */
   private activeJobCount(owner: Agent | undefined): number {
-    let count = 0
+    let count = this.starting.get(owner) ?? 0
     for (const job of this.store.values()) {
       if (job.owner === owner && (job.status === 'running' || job.status === 'stopping')) count += 1
     }
@@ -441,8 +497,28 @@ export class LocalJobRegistry extends JobRegistry {
     }
   }
 
-  private emit(event: JobEvent, owner: Agent | undefined): void {
-    this.hub.emit(event, owner)
+  private emit(event: JobEvent, owner: Agent | undefined, beforeDelivery?: () => void): void {
+    this.hub.emit(event, owner, beforeDelivery)
+  }
+
+  /** Publish committed lifecycle facts before observers or completion waiters react. */
+  private recordSessionEvent(
+    job: TrackedJob,
+    settlement?: Pick<JobSettledData, 'finishedAt' | 'status' | 'cause' | 'producerReported' | 'detail'>,
+  ): void {
+    const owner = job.owner
+    if (owner === undefined) return
+    const data: JobRegisteredData = {
+      jobId: job.id, owner: owner.id, kind: job.kind, label: job.label, startedAt: job.startedAt,
+      ...job.toolCall === undefined ? {} : { toolCall: job.toolCall },
+    }
+    try {
+      if (settlement === undefined) owner.session.append('job/registered', data)
+      else owner.session.append('job/settled', { ...data, ...settlement })
+    } catch (error: unknown) {
+      // Recording failure cannot orphan accepted work or prevent waiter release.
+      this.selfCtx.logger.warn(`jobs: failed to record lifecycle for ${job.id}: ${renderJobFailure(error)}`)
+    }
   }
 
   /**
@@ -493,11 +569,9 @@ export class LocalJobRegistry extends JobRegistry {
         }
         const onAbort = (): void => {
           job.waitResolvers.delete(onSettled)
-          // A settled job cannot reach here: settlement releases every waiter
-          // before it announces, and each released waiter detaches this
-          // listener in the same synchronous span, so nothing that reacts to a
-          // settlement can abort a wait the settlement already owed.
-          if (timeoutOf(d.signal, TASK_WAIT_TIMEOUT) !== undefined) {
+          // A journal observer may abort after the terminal state commits,
+          // before its waiter resolver runs; the committed outcome still wins.
+          if (isTerminal(job.status) || timeoutOf(d.signal, TASK_WAIT_TIMEOUT) !== undefined) {
             resolve()
           } else {
             reject(new Error('wait aborted'))
@@ -548,7 +622,7 @@ export class LocalJobRegistry extends JobRegistry {
           return source.read(fromByte)
         } catch (error: unknown) {
           failed = true
-          this.selfCtx.logger.warn(`jobs: output source for ${job.id} failed; its stream stops here: ${String(error)}`)
+          this.selfCtx.logger.warn(`jobs: output source for ${job.id} failed; its stream stops here: ${renderJobFailure(error)}`)
           return { text: '', nextOffset: fromByte, lossy: false }
         }
       },
@@ -583,7 +657,7 @@ export class LocalJobRegistry extends JobRegistry {
    * reports whether it released one: a timed-out or aborted wait has already
    * left the set, so only a wait still owed the projection counts.
    */
-  private settle(job: TrackedJob, outcome: JobOutcome, cause: JobSettleCause): void {
+  private settle(job: TrackedJob, outcome: JobOutcome, cause: JobSettleCause, producerReported: boolean): void {
     if (isTerminal(job.status)) return
     job.status = outcome.status
     // A killed settlement carries the recorded kill reason in its detail:
@@ -599,7 +673,8 @@ export class LocalJobRegistry extends JobRegistry {
     }
     job.state.progress = undefined
     job.result = outcome.result
-    job.finishedAt = Date.now()
+    const finishedAt = Date.now()
+    job.finishedAt = finishedAt
     // Settlement ends the stream: trim to the settled cap before any observer
     // reads the terminal projection, but never below the bytes the model
     // cursor has not consumed. A job that finishes before its first model
@@ -607,9 +682,14 @@ export class LocalJobRegistry extends JobRegistry {
     job.ring.trim(Math.max(this.settledRetainBytes, job.ring.total - job.modelCursor))
     const waitResolvers = [...job.waitResolvers]
     job.waitResolvers.clear()
-    for (const resolveWait of waitResolvers) resolveWait()
-    job.markSettled()
-    this.emit({ type: 'settled', job: this.view(job), cause, awaited: waitResolvers.length > 0 }, job.owner)
+    this.emit({ type: 'settled', job: this.view(job), cause, awaited: waitResolvers.length > 0 }, job.owner, () => {
+      this.recordSessionEvent(job, {
+        finishedAt, status: outcome.status, cause, producerReported,
+        ...job.detail === undefined ? {} : { detail: job.detail },
+      })
+      for (const resolveWait of waitResolvers) resolveWait()
+      job.markSettled()
+    })
     // The ring's stream ends with settlement; the signal follows the committed
     // settlement so an observer that wakes on it reads the terminal state.
     this.emitOutput(job)
@@ -659,6 +739,7 @@ export class LocalJobRegistry extends JobRegistry {
    * effects. Throwing cancels are force-failed to avoid teardown deadlock.
    */
   private async disposeAll(): Promise<void> {
+    this.closed = true
     const all = [...this.store.values()]
     this.cancelForTeardown(all, 'jobs service disposed')
     await Promise.all(all.map(job => job.settled))
@@ -693,9 +774,10 @@ export class LocalJobRegistry extends JobRegistry {
         // observer from showing `running` for that whole window.
         this.emit({ type: 'stopping', job: this.view(job) }, job.owner)
       } catch (error: unknown) {
-        const detail = `cancel threw during teardown; work may be orphaned: ${String(error)}`
-        this.selfCtx.logger.warn(`jobs: cancel of ${job.id} threw during teardown; job record forced failed and work may be orphaned: ${String(error)}`)
-        this.settle(job, { status: 'failed', detail }, 'teardown')
+        const rendered = renderJobFailure(error)
+        const detail = `cancel threw during teardown; work may be orphaned: ${rendered}`
+        this.selfCtx.logger.warn(`jobs: cancel of ${job.id} threw during teardown; job record forced failed and work may be orphaned: ${rendered}`)
+        this.settle(job, { status: 'failed', detail }, 'teardown', false)
       }
     }
   }

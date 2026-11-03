@@ -8,12 +8,16 @@ type ExecFileMock = (
   args: readonly string[],
   options: { encoding: string; signal: AbortSignal; windowsHide: boolean },
   callback: ExecFileCallback,
-) => void
+) => ChildProcess
 
 const { execFileMock } = vi.hoisted(() => ({ execFileMock: vi.fn<ExecFileMock>() }))
 
-vi.mock('node:child_process', () => ({ execFile: execFileMock }))
+vi.mock('node:child_process', async importOriginal => ({
+  ...await importOriginal<typeof import('node:child_process')>(),
+  execFile: execFileMock,
+}))
 
+import { ChildProcess } from 'node:child_process'
 import { release as osRelease } from 'node:os'
 import { describe, expect, it, vi } from 'vitest'
 import { canOpenNativePath, openNativePath, openNativeTextFile, type PathOpenerRunner } from '../src/native-path-opener.ts'
@@ -146,7 +150,12 @@ describe('native path opener', () => {
 
   it('runs the default command adapter without a shell and preserves command failures', async () => {
     execFileMock.mockImplementationOnce((_command, _args, _options, callback) => {
-      callback(null, '', '')
+      const child = new ChildProcess()
+      queueMicrotask(() => {
+        callback(null, '', '')
+        child.emit('close', 0, null)
+      })
+      return child
     })
     await openNativePath('/tmp/default.txt', signal(), { platform: 'darwin' })
     const [command, args, options] = execFileMock.mock.calls[0]!
@@ -158,7 +167,12 @@ describe('native path opener', () => {
 
     const commandError = Object.assign(new Error('open failed'), { code: 1 })
     execFileMock.mockImplementationOnce((_command, _args, _options, callback) => {
-      callback(commandError, 'partial output', 'failure details')
+      const child = new ChildProcess()
+      queueMicrotask(() => {
+        callback(commandError, 'partial output', 'failure details')
+        child.emit('close', 1, null)
+      })
+      return child
     })
     await expect(openNativePath('/tmp/missing.txt', signal(), { platform: 'darwin' })).rejects.toMatchObject({
       message: 'open failed', cause: commandError, code: 1,

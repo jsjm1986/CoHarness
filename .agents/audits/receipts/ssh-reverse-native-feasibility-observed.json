@@ -1,0 +1,14 @@
+{
+  "name": "ssh-reverse-native-feasibility-observed",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/probe-native-ssh-forward.py",
+  "startedAt": "2026-10-25T11:45:38.286195+00:00",
+  "seconds": 2.41,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f228954b1842b443f207e7162d90835ebf91682da826eafc97713819e126d7c2",
+  "inputsAfter": "f228954b1842b443f207e7162d90835ebf91682da826eafc97713819e126d7c2",
+  "postgresToolDirectory": null,
+  "outputSha256": "07f8a9780bcb871ebd5354ff6c4afb9be9629fc604bfeff9b50318e2413f6343",
+  "outputTail": "{\"nativeReverseBytes\": true, \"cancelUsesOriginalZeroPort\": true, \"listenerClosedAfterBarrier\": true, \"repeatCancelExitCode\": 0, \"repeatCancelStderr\": \"mux_client_forward: forwarding request failed: port not forwarded\\nmuxclient: master cancel forward request failed\", \"daemonIsOwnedLoopback\": true}\nOwned SSH daemon diagnostic: BSM audit: bsm_audit_session_setup: setaudit_addr failed: Operation not permitted\n\n"
+}

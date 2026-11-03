@@ -25,6 +25,8 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
+等待进程准入期间取消或到期，会返回对应的中止或超时结果，不启动进程。与取消无关的分配失败保留其原始错误。
+
 当组合需要执行 PowerShell 命令——通常是在 Windows 上——且不需要隔离时，挂载此执行器。它注册为 `ctx.shell`，面向模型的 `pwsh` 工具会立即基于它工作：agent（智能体）调用工具，命令即以全新 `pwsh -Command` 进程按下面的预算运行。
 
 ### 何时选择

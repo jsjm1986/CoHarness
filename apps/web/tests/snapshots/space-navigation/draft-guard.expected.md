@@ -1,0 +1,8 @@
+- dialog "Keep the current draft":
+  - heading "Keep the current draft" [level=2]
+  - button "Close":
+    - img
+  - paragraph: This tab has unsaved input, images, or attachments. Open the prepared space in a new tab to keep this content intact.
+  - paragraph: Payments migration · Compute computer
+  - button "Stay in this space"
+  - button "Open in a new tab"

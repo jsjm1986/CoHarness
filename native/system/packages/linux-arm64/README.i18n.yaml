@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write native/system/packages/linux-arm64/README.md
 document:
-  en: b1e97481a3f59b5b7cf85e6565cd3d078e42cd7f
-  zh: 68efb95c60f41b2b95d1e963d9b4f0c8c130a80c
+  en: 1b2c3fdaa90674ccb5445eebe7f8f1c0861d6b20
+  zh: a00b8f53154c09a3d81b3a1a177eadef6958a0f3
 /:
-  en: 942d2c5dd9dbc58f
-  zh: d30204e653a55bd4
+  en: 6ad2a1d827775d8b
+  zh: 7b2b9e48305e6d24
 /deepseek-ai-node-addon-system-linux-arm64:
   en: ff40f2ee61173e91
   zh: 076fcf1246428ecc

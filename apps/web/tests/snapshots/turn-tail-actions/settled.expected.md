@@ -5,8 +5,6 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - button "Feedback":
-    - img
   - button "Open right sidebar":
     - img
 - button "System prompt":
@@ -37,10 +35,6 @@
 - paragraph: partial
 - text: Stopped
 - button "Copy":
-  - img
-- button "Good response":
-  - img
-- button "Bad response":
   - img
 - button "Branch into a new conversation":
   - img

@@ -1,0 +1,14 @@
+{
+  "name": "document-identity-filesystem-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/attachment/userdoc-local",
+  "startedAt": "2026-10-25T17:04:02.246210+00:00",
+  "seconds": 4.366,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2a266c654c7efc5128fbdbd8ed5aec5bf81ee0f19e474e1d6b8e4fa0cdba018f",
+  "inputsAfter": "2a266c654c7efc5128fbdbd8ed5aec5bf81ee0f19e474e1d6b8e4fa0cdba018f",
+  "postgresToolDirectory": null,
+  "outputSha256": "d3ca1f9c85c71941275370c5938907cd88e7d5380b138fe7ce8cf061a1d9604d",
+  "outputTail": "packages/attachment/userdoc-local/src/identity-fs.ts(5,20): error TS6133: 'dirname' is declared but its value is never read.\npackages/attachment/userdoc-local/src/identity-fs.ts(39,12): error TS2783: 'docId' is specified more than once, so this usage will be overwritten.\n"
+}

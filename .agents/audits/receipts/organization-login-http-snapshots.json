@@ -1,0 +1,13 @@
+{
+  "name": "organization-login-http-snapshots",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/postgres.spec.ts tests/auth-postgres.spec.ts --no-file-parallelism --retry=0 -t 'refuses human|serializes .*case variants'",
+  "startedAt": "2026-10-23T19:20:34.063560+00:00",
+  "seconds": 7.777,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5cdb44c96e798137c7a1c36b104c4975168e45a18c14a7ca7975c4807f0cc4cb",
+  "inputsAfter": "00ad38e0c05a4a0157b15255eb7afc1ef539ecada00a96d2bb2dcefd25e268b4",
+  "outputSha256": "6d27c526f3e041eac6c75d2560705276cf3208f863ffa60cd04394ac8ebded25",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n  Snapshots  5 written\n Test Files  2 passed (2)\n      Tests  5 passed | 36 skipped (41)\n   Start at  03:20:36\n   Duration  4.93s (transform 2.28s, setup 0ms, import 3.02s, tests 1.65s, environment 0ms)\n\n"
+}

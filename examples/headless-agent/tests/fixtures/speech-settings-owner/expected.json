@@ -1,0 +1,6 @@
+{
+  "withdrawn": { "language": "auto", "writeRefused": true },
+  "replaced": { "language": "en", "resolvedLanguage": "en" },
+  "write": { "first": "zh", "second": "ja" },
+  "persist-withdrawn": { "acknowledged": false, "language": "auto", "stored": "ja" }
+}

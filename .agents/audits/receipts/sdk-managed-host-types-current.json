@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-host-types-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p tsconfig.host.json",
+  "startedAt": "2026-10-24T15:34:43.700773+00:00",
+  "seconds": 11.097,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "436c2b3ade75fa79afaf3a1fc404650adabadd2437e3be0d727bac93ee912a35",
+  "inputsAfter": "436c2b3ade75fa79afaf3a1fc404650adabadd2437e3be0d727bac93ee912a35",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

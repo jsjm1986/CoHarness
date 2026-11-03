@@ -1,10 +1,16 @@
 /** External browser/Stagehand fixture; DSH registries, tools, and result logging remain real. */
 
-import type { ModelConfig } from '@browserbasehq/stagehand'
+import type { ClientLLM } from '@browserbasehq/stagehand'
+import type { StagehandModelConfig } from '../../src/native.ts'
 import { z } from 'zod'
 
 /** Explicit offline configuration; fixture AI calls never access a model provider. */
-export const nativeModel = { modelName: 'openai/gpt-5.4-mini', apiKey: 'fixture-model-key' } as const satisfies ModelConfig
+export const nativeModel = { provider: 'browser-fixture', model: 'browser-model' } as const satisfies StagehandModelConfig
+
+/** Standalone callback for native wrapper tests that do not assemble the host LLM service. */
+export const fixtureModel: ClientLLM = { async generate() {
+  return { role: 'assistant', outputFormat: 'text', content: { type: 'text', text: JSON.stringify(fixture.result ?? { extraction: 'Fixture heading' }) } }
+} }
 
 /** Valid PNG for the real attachment admission path. */
 export const screenshotBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADElEQVQImWNgZGIGAAAOAAeCcsnOAAAAAElFTkSuQmCC'
@@ -12,12 +18,12 @@ export const screenshotBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAA
 /** Controllable external operations and acquired browser handles. */
 export const fixture: {
   browsers: FixtureBrowser[]
-  models: ModelConfig[]
+  models: ClientLLM[]
   inference?: () => Promise<void>
   result?: unknown
   connections: Map<string, FixtureBrowser>
   createError?: Error
-  create?: (model: ModelConfig) => Promise<void>
+  create?: (model: ClientLLM) => Promise<void>
   navigate?: (page: FixturePage) => Promise<void>
   browserClose?: () => Promise<void>
   actResult?: { success: boolean; message: string }
@@ -108,8 +114,8 @@ export const localBrowser = {
 /** Native wrapper with an independent model and drainable external operations. */
 export class Stagehand {
   private readonly closed: PromiseWithResolvers<undefined> = Promise.withResolvers()
-  constructor(readonly browser: FixtureBrowser, readonly model: ModelConfig) { browser.connectionClosed = this.closed.promise }
-  static async create(options: { browser: FixtureBrowser; model: ModelConfig }): Promise<Stagehand> {
+  constructor(readonly browser: FixtureBrowser, readonly model: ClientLLM) { browser.connectionClosed = this.closed.promise }
+  static async create(options: { browser: FixtureBrowser; model: ClientLLM }): Promise<Stagehand> {
     fixture.models.push(options.model)
     await fixture.create?.(options.model)
     if (fixture.createError) throw fixture.createError
@@ -121,12 +127,20 @@ export class Stagehand {
     this.browser.stagehandClosed = true
     this.closed.resolve(undefined)
   }
-  async extract(_instruction: string, schemaOrOptions: unknown, _options?: unknown): Promise<unknown> {
-    await this.browser.track(Promise.race([
-      Promise.resolve(fixture.inference?.()),
+  async extract(instruction: string, schemaOrOptions: unknown, _options?: unknown): Promise<unknown> {
+    const generated = await this.browser.track(Promise.race([
+      this.model.generate({
+        messages: [{ role: 'user', content: { type: 'text', text: instruction } }],
+        responseFormat: {
+          type: 'json_schema', name: 'browser_extraction',
+          schema: schemaOrOptions instanceof z.ZodType ? z.json().parse(z.toJSONSchema(schemaOrOptions)) : { type: 'object', additionalProperties: true },
+        },
+      }),
       (fixture.interrupt ?? this.closed.promise).then(() => { throw new Error('Fixture browser disconnected') }),
     ]))
-    const result = fixture.result ?? { extraction: 'Fixture heading' }
+    const content = Array.isArray(generated.content) ? generated.content : [generated.content]
+    const result: unknown = generated.outputFormat === 'json_schema' ? generated.structuredContent
+      : JSON.parse(content.map(block => block.type === 'text' ? block.text : '').join(''))
     return { data: schemaOrOptions instanceof z.ZodType ? schemaOrOptions.parse(result) : result }
   }
   async observe(instruction: string, options: unknown): Promise<unknown> { return this.extract(instruction, options) }

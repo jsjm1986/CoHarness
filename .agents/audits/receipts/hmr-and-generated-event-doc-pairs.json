@@ -1,0 +1,14 @@
+{
+  "name": "hmr-and-generated-event-doc-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write packages/boot/hmr/README.md docs/event-producer-consumer.md",
+  "startedAt": "2026-10-24T02:06:47.477181+00:00",
+  "seconds": 1.98,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d11de03c4354b75b4f22726ed1d956972c5fa10acd83f34e4bad2633fedba812",
+  "inputsAfter": "10eb7c5bfaa0fdce1315692dcff6575aedc5562ba0b4ccbdc760d8ed805add0c",
+  "postgresToolDirectory": null,
+  "outputSha256": "55b17769c64a7970672456a601f40cc4f3eec6055739e1b96be04f08628048e7",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write packages/boot/hmr/README.md docs/event-producer-consumer.md\nverify-translation-pairing: recorded docs/event-producer-consumer.i18n.yaml\nverify-translation-pairing: recorded packages/boot/hmr/README.i18n.yaml\nverify-translation-pairing: 2 record(s) written; run the check to validate the pairs.\n"
+}

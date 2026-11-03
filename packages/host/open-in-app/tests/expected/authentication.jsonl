@@ -1,0 +1,5 @@
+{"operation":"before-authentication","statuses":[404,404,404]}
+{"operation":"active-authentication","anonymous":401,"authenticated":405}
+{"operation":"authentication-withdrawal","admittedRequest":503,"newRequest":404}
+{"operation":"authentication-replacement","anonymous":401,"authenticated":405}
+{"operation":"desktop-unload","status":404}

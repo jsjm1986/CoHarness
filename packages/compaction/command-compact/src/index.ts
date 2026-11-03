@@ -7,6 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import { ManualCompactionError } from '@deepseek-ai/dsh-compaction'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
+import { executionAuthorityOf, sameExecutionAuthority } from '@deepseek-ai/dsh-execution-authority'
 
 export const name = 'command-compact'
 export const inject = ['commands', 'compaction']
@@ -55,7 +56,7 @@ function expectedFailure(error: ManualCompactionError): CommandResult {
   }
 }
 
-/** Execute one argument-free manual compaction request. */
+/** Attest the invoking user before manual compaction can acquire resources or request a summary. */
 async function executeCompact(
   ctx: Context,
   invocation: CommandInvocation,
@@ -64,7 +65,16 @@ async function executeCompact(
     return { kind: 'error', text: USAGE }
   }
   try {
-    const result = await ctx.compaction.compactNow(invocation.agent, invocation.signal, invocation.commandId)
+    const authority = executionAuthorityOf(ctx)
+    const compact = () => {
+      invocation.signal.throwIfAborted()
+      if (!sameExecutionAuthority(executionAuthorityOf(ctx), authority)) {
+        throw new Error('The execution authority changed before manual compaction.')
+      }
+      return ctx.compaction.compactNow(invocation.agent, invocation.signal, invocation.commandId)
+    }
+    const result = await (authority === undefined ? compact() : authority.runRequest(invocation.agent,
+      { command: 'compact', input: invocation.rawInput }, compact))
     if (result === null) return { kind: 'success', text: 'No compactable history yet.' }
     return {
       kind: 'success',

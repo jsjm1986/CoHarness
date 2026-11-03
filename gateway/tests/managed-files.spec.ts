@@ -58,6 +58,15 @@ it('detects added data as well as modified, missing and changed-permission membe
   expect(await compareManagedFiles(snapshot)).toEqual([changed])
 })
 
+it('retains setgid directory access through a verified restore', async () => {
+  const f = await fixture()
+  await chmod(f.data, 0o2770)
+  const snapshot = await f.capture()
+  await chmod(f.data, 0o700)
+  await restoreManagedSnapshot(f.files, snapshot, f.paths)
+  expect((await lstat(f.data)).mode & 0o7777).toBe(0o2770)
+})
+
 it('reconciles later owned roots and kind changes while the protection copy retains their original bytes', async () => {
   const f = await fixture(), value = join(f.data, 'value')
   await writeFile(value, 'selected backup')
@@ -133,12 +142,38 @@ it('rejects malformed, overlapping, escaping and incomplete durable manifests', 
     mutated(s => { s.files[0]!.member = '../escape' }),
     mutated(s => { s.files[0]!.sourcePath = join(f.root, 'outside') }),
     mutated(s => { s.files[0]!.sizeBytes = -1 }),
-    mutated(s => { s.files[0]!.mode = 0o7777 }),
+    mutated(s => { s.files[0]!.mode = 0o10000 }),
     mutated(s => { s.files.push(s.files[0]!) }),
     mutated(s => { s.roots.push(s.roots[0]!) }),
     mutated(s => { s.directories = [] }),
     mutated(s => { s.absent.push(join(f.data, 'non-root')) }),
   ]) expect(() => parseManagedSnapshot(value)).toThrow()
+})
+
+it('retains unordered independent roots and rejects missing parents or members under absent and file roots', () => {
+  const base = join(tmpdir(), 'managed-manifest-parser-input')
+  const first = join(base, 'root'), sibling = join(base, 'root-more'), absent = join(base, 'absent'), file = join(base, 'settings')
+  const metadata = { mode: 0o700, uid: 1001, gid: 1001 }
+  const value: ManagedSnapshot = { version: 1,
+    roots: [{ owner: 'sibling', kind: 'directory', path: sibling }, { owner: 'absent', kind: 'directory', path: absent },
+      { owner: 'settings', kind: 'file', path: file }, { owner: 'first', kind: 'directory', path: first }],
+    directories: [{ path: join(first, 'nested'), ...metadata }, { path: sibling, ...metadata }, { path: first, ...metadata }],
+    absent: [absent],
+    files: [join(first, 'nested', 'session.jsonl'), file, join(sibling, 'data')].map((sourcePath, index) => ({
+      sourcePath, member: `${index}`.padStart(8, '0') + '.data', sizeBytes: 8, sha256: 'a'.repeat(64), ...metadata,
+    })),
+  }
+  expect(parseManagedSnapshot(value)).toEqual(value)
+  const invalid = (edit: (snapshot: ManagedSnapshot) => void) => { const copy = structuredClone(value); edit(copy); return copy }
+  for (const snapshot of [
+    invalid(s => { s.directories = s.directories.filter(row => row.path !== join(first, 'nested')) }),
+    invalid(s => { s.roots.push({ owner: 'nested', kind: 'file', path: s.files[0]!.sourcePath }) }),
+    invalid(s => { s.files[0]!.sourcePath = join(absent, 'not-absent') }),
+    invalid(s => { s.files[0]!.sourcePath = join(file, 'not-a-directory') }),
+    invalid(s => { s.roots[2]!.kind = 'directory' }),
+    invalid(s => { s.roots[0]!.kind = 'file' }),
+    invalid(s => { s.files[0]!.sourcePath = join(base, 'root-other', 'outside') }),
+  ]) expect(() => parseManagedSnapshot(snapshot)).toThrow()
 })
 
 it('does no work after its caller loses the data operation lease', async () => {

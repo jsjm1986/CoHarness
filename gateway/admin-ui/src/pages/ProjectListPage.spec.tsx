@@ -11,6 +11,13 @@ vi.mock('../api.ts', () => ({
 }))
 
 describe('ProjectListPage', () => {
+  it('keeps a failed initial request distinct from an empty project list', async () => {
+    vi.mocked(api.listProjects).mockRejectedValueOnce(new Error('projects-unavailable'))
+    render(<ProjectListPage />)
+    expect((await screen.findByRole('alert')).textContent).toBe('projects-unavailable')
+    expect(screen.queryByText('还没有项目')).toBeNull()
+    expect(api.listProjects).toHaveBeenCalledOnce()
+  })
   afterEach(() => cleanup())
 
   beforeEach(() => {

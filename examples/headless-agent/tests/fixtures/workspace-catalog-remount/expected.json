@@ -1,0 +1,11 @@
+{
+  "reply": "WORKSPACE_REMOUNT_OK",
+  "registry": {
+    "mode": "registry", "newerRevision": true, "acceptedTitle": "After remount",
+    "retainedWorkspaceIdentity": true, "generation": 7
+  },
+  "transport": {
+    "mode": "transport", "newerRevision": true, "acceptedTitle": "After remount",
+    "retainedWorkspaceIdentity": true, "generation": 7
+  }
+}

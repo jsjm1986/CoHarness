@@ -1,0 +1,14 @@
+{
+  "name": "document-catalog-private-postgres-stop",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/stop-catalog-postgres.py",
+  "startedAt": "2026-10-26T21:20:33.837195+00:00",
+  "seconds": 10.28,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "55106eac52c480d0bc432b23e51467b67a142fdf7bccf5aac3d7aa81871e8e80",
+  "inputsAfter": "55106eac52c480d0bc432b23e51467b67a142fdf7bccf5aac3d7aa81871e8e80",
+  "postgresToolDirectory": null,
+  "outputSha256": "56331d365352ba583d9ed4140cf07c274f83cddcfec9ce731f5d498cc4bce238",
+  "outputTail": "pg_ctl: server is running (PID: 73920)\n/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/postgres-runtime/package/native/bin/postgres \"-D\" \"/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/pgdata-document-catalog-20261027\" \"-h127.0.0.1\" \"-p56818\" \"-k\" \"\" \"-c\" \"max_connections=60\"\nwaiting for server to shut down.... done\nserver stopped\nOwned PostgreSQL18.4 stopped; fresh disposable data retained. Production5432 was not used.\n"
+}

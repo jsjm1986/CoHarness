@@ -1,4 +1,5 @@
 /** Registered SSH targets, project sharing, and account qualification. */
+import { usePendingEdits } from '../pending-edits.tsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pencil, Plus, RefreshCw, Share2, Trash2 } from 'lucide-react'
 import {
@@ -113,6 +114,7 @@ export function SshPage() {
   const [sharing, setSharing] = useState<AdminSshTarget | null>(null)
   const [acting, setActing] = useState(false)
   const [reload, setReload] = useState(0)
+  usePendingEdits(acting || editing !== null)
   const generation = useRef(0)
 
   useEffect(() => {

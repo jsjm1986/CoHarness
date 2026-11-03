@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-scoped-oxlint-final",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-gateway/src packages/attachment/userdoc-gateway/tests packages/attachment/userdoc/src/index.ts packages/attachment/userdoc/src/error.ts packages/host/userdoc-http/src/index.ts packages/context/gateway-runtime/src/index.ts",
+  "startedAt": "2026-10-26T17:38:02.915795+00:00",
+  "seconds": 6.663,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4eae666ca7353383b2eda653c382ace7cdfa1d21acd4841fb52bf5006ec24427",
+  "inputsAfter": "4eae666ca7353383b2eda653c382ace7cdfa1d21acd4841fb52bf5006ec24427",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

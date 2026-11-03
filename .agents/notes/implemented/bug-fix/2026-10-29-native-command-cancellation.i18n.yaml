@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-29-native-command-cancellation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-29-native-command-cancellation.md
+document:
+  en: 982285a968e8be654da37a1fd66ce1d22168cd56
+  zh: 1b3481faf360241a199633e58f2987a6b935c46b
+/agent-note-await-native-helper-termination-on-cancellation:
+  en: 4a986136e53f181f
+  zh: 84ffd286f032c728
+/agent-note-await-native-helper-termination-on-cancellation/problem:
+  en: 9e5a61033019b0b8
+  zh: 0b5e4be9573f2b81
+/agent-note-await-native-helper-termination-on-cancellation/decision:
+  en: 61973553cb063073
+  zh: 8e7eb7e93f2e9d60
+/agent-note-await-native-helper-termination-on-cancellation/alternatives-considered:
+  en: b1ac7cd81802a1a3
+  zh: 0ee42303e60ed99a
+/agent-note-await-native-helper-termination-on-cancellation/consequences:
+  en: 3594d75a32c4e75f
+  zh: 949acada8bdd5ddb
+/agent-note-await-native-helper-termination-on-cancellation/testing:
+  en: ee7e14a7376905bf
+  zh: dfdbb57e4c6385b5

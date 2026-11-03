@@ -1,0 +1,24 @@
+---
+kind: upgrade-guide
+description: "Computer use and resource qualifications require a permission on the selected computer."
+---
+
+# Computer-scoped use and qualifications
+
+English | [中文](guide.zh.md)
+
+## Change
+
+Gateway account/project access requires permission on the hosting computer. Existing personal-host grants survive migration; project membership grants no computer. Capability decisions belong to a computer. Credentials, plugin state, execution records and archive commands retain Runtime UUIDs. Model reporting credentials are Runtime/computer-scoped; billing and quotas remain account/project-owned. Computer-local account paths and document indexes remain independent. Purpose-limited Admin management and owned cleanup retain their authority.
+
+## Migration
+
+1. Run `npm run pg:migrate --prefix gateway` with the existing deployment database configuration. Migration080 refuses enabled qualifications for active owners without assignments: restore the original assignment or explicitly disable the unplaced qualification, then rerun. Migrations084 and086 require original assignments for saved plugin configuration and document metadata. Restore those assignments before retrying; preserve existing files and Session generations.
+2. Read `GET /admin/api/users/<user ID>/computers` with the administrator session and browser-origin checks. Configure another computer through `PUT /admin/api/users/<user ID>/computers/<node UUID>` with `enabled` and the observed decimal `revision`. A grant allocates no Runtime or project membership. Configure capabilities through existing Admin endpoints with explicit `dshNode`; qualifications, Session confirmation and physical-desktop exclusivity remain separate.
+3. Upgrade all Gateways and managed Runtimes together. Confirm old process termination through existing supervision before restarting. Allocated Runtime credentials and signed principals must carry the same UUID; one-sided omission is refused. Enrolled computers require the exact live startup connection and epoch. Reconnection cannot revive old generations. Preserve cleanup-only credentials and uncertain resource occupation. Process generations are monotonic and may skip values.
+4. Preserve existing personal DSH_HOME directories and the account-preferences migration source. Provision each additional computer's OS account through the existing deployment process. Private profiles, settings, Session reads and supervisor names use persisted Runtime storage selection; working documents remain account/computer-owned. Historical unassigned records authorize no replacement environment. User-list consumers handle nullable `port` and local `runtimeCount`.
+5. Custom compositions supply `GatewayDeps.computerAccess`, the node UUID to execution services, credential rechecks and bounded watch deadlines. Use `scopeAccessMonitor` locally and the original monitor for forwarding. Policy writes retain the current administrator. Forwarding placement and scope-cookie repair are composed together. An ambiguous owner selector requires an exact Runtime; metadata reads never start one.
+6. Allocate through `POST /admin/api/users/<id>/runtimes?dshNode=<node UUID>` with a fresh `requestId` UUID. Retain it to query `/admin/api/runtime-allocations/<request UUID>` or resume a preparing allocation. Configure allocation limits using revision-checked organization/account policies. Stop, restart and retire address exact UUIDs and reviewed generations; retirement retains data and receipts. Migration094 disables unplaced Webhook endpoints; rebind them explicitly. See the [management API reference](../../../../gateway/docs/node-agent/README.md#runtime-isolation).
+7. Verify independent computer permissions, resource cleanup, document indexes and archive ownership. Forwarding stays disabled until deployment acceptance. Complete backups retain the existing requirement to prove coverage of every database node; one computer's files do not establish a multi-computer recovery set.
+
+8. Rebuild and deploy the browser and Admin assets with the matching Gateway. Managed browser links use `/?dshRuntime=<UUID>`; existing tabs retain their own target when another tab switches. Sign-in and required password setup retain the local UI destination through `returnTo`. A stopped page keeps its `dshRuntime` in the restart form and redirect; verify this with multiple personal assignments. Apply migration098 for cached Workspace metadata. Confirm the single personal entry and its computer groups, fixed-computer project creation and computer-authorized invitation candidates. Verify Runtime selection and Session-owned uploads before computer metadata arrives. Document locations use account/computer ownership and require no running Runtime; test a planned cross-computer copy and revoke one computer’s permission. See [browser environments and document locations](../../../../gateway/docs/node-agent/browser/README.md).

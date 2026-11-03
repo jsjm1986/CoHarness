@@ -29,15 +29,17 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-export const inject = ['slots', 'locale', 'sessions', 'conversation', 'connection']
+export const inject = ['slots', 'locale', 'sessions', 'conversation', 'connection', 'deploymentContext']
 
 export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-documents: dictionaries')
 
   const injected = (): DocumentsButtonInjected => ({
+    hooks: { deployment: ctx.deploymentContext },
     documentScopeFor: sessionId => ctx.sessions.runtimeIdentityFor?.(sessionId),
     privateResourceUrl: url => connection.privateResourceUrl?.(url) ?? url,
+    canAttachDocument: sessionId => ctx.get('conversation')?.canAttachDocument(sessionId) ?? false,
     attachDocument: (document, targetSessionId) => {
       const sessionId = targetSessionId ?? ctx.sessions.list.getSnapshot().current
       if (sessionId === undefined) return false

@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from deepseek_harness import DeepSeekHarness, HarnessClient, HarnessConfig, Notification, RunResult, SdkProtocolError
-from deepseek_harness.errors import JsonRpcError
+from deepseek_harness.errors import JsonRpcError, TransportClosedError
 
 
 def test_high_level_sdk_runs_turn_and_collects_final_response(tmp_path: Path) -> None:
@@ -1358,3 +1358,90 @@ def test_client_reports_missing_bundled_runtime_dependency(monkeypatch: pytest.M
 
     with pytest.raises(FileNotFoundError, match="Install deepseek-harness-runtime-bin"):
         HarnessClient(HarnessConfig(dsh_home="/explicit/home")).start()
+
+
+@pytest.mark.parametrize('raise_after_close', [False, True])
+def test_filter_cannot_publish_after_closing_its_subscription(raise_after_close: bool) -> None:
+    client = HarnessClient(HarnessConfig())
+
+    def close_subscription(_notification: Notification) -> bool:
+        subscription.close()
+        if raise_after_close:
+            raise RuntimeError('closed filter failure')
+        return True
+
+    subscription = client.subscribe_notifications(close_subscription)
+    try:
+        client._handle_message({'method': 'owned-frame', 'params': {}})
+        received: list[Notification] = []
+        subscription.drain(received.append)
+        assert received == []
+    finally:
+        client.close()
+
+
+def test_filter_does_not_run_for_a_subscription_closed_by_an_earlier_filter() -> None:
+    client = HarnessClient(HarnessConfig())
+    calls: list[Notification] = []
+
+    def close_sibling(_notification: Notification) -> bool:
+        sibling.close()
+        return False
+
+    first = client.subscribe_notifications(close_sibling)
+    sibling = client.subscribe_notifications(lambda notification: not calls.append(notification))
+    try:
+        client._handle_message({'method': 'owned-frame', 'params': {}})
+        assert calls == []
+    finally:
+        first.close()
+        sibling.close()
+        client.close()
+
+
+def test_session_ancestry_is_independent_of_one_frame_notification_queue() -> None:
+    client = HarnessClient(HarnessConfig(max_notification_queue=1))
+    subscription = client.subscribe_session_notifications('root')
+    try:
+        client._handle_message({'method': 'subagent.started', 'params': {'parentSessionId': 'root', 'childSessionId': 'child'}})
+        assert subscription.next().payload['childSessionId'] == 'child'
+        client._handle_message({'method': 'subagent.started', 'params': {'parentSessionId': 'child', 'childSessionId': 'grandchild'}})
+        received: list[Notification] = []
+        subscription.drain(received.append)
+        assert [item.payload['childSessionId'] for item in received] == ['grandchild']
+    finally:
+        subscription.close()
+        client.close()
+
+
+@pytest.mark.parametrize('limit', [0, -1, 1.5, True])
+def test_rejects_invalid_session_relationship_capacity(limit: object) -> None:
+    with pytest.raises(ValueError, match='max_session_relationships'):
+        HarnessClient(HarnessConfig(max_session_relationships=limit))  # type: ignore[arg-type]
+
+
+def test_session_relationship_overflow_fails_instead_of_silently_evicting_ancestry() -> None:
+    client = HarnessClient(HarnessConfig(max_session_relationships=1))
+    subscription = client.subscribe_session_notifications('root')
+    try:
+        client._handle_message({'method': 'subagent.started', 'params': {'parentSessionId': 'root', 'childSessionId': 'first'}})
+        assert subscription.next().payload['childSessionId'] == 'first'
+        client._handle_message({'method': 'subagent.started', 'params': {'parentSessionId': 'root', 'childSessionId': 'second'}})
+        with pytest.raises(TransportClosedError, match='Session relationship limit exceeded'):
+            subscription.next()
+        assert client._session_parents == {}
+        with pytest.raises(TransportClosedError, match='Session relationship limit exceeded'):
+            client.subscribe_session_notifications('root').next()
+        with pytest.raises(TransportClosedError, match='Session relationship limit exceeded'):
+            client.start()
+    finally:
+        subscription.close()
+        client.close()
+
+
+def test_high_level_sdk_forwards_session_relationship_capacity() -> None:
+    harness = DeepSeekHarness(max_session_relationships=7)
+    try:
+        assert harness.client.config.max_session_relationships == 7
+    finally:
+        harness.close()

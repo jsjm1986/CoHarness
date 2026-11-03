@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-final-integrity",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/verify-ssh-final-state.py",
+  "startedAt": "2026-10-25T13:39:06.112488+00:00",
+  "seconds": 1.846,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "inputsAfter": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "postgresToolDirectory": null,
+  "outputSha256": "15ebe2c037916e1f97164e4e998270ee28e3e7d91b2e9a5054d5bfc5291adcef",
+  "outputTail": "11 final receipts pass on current recorded source inputs; B144–146 recorded; all12domains remain open; Responses remains deferred; private PostgreSQL stopped and owned SSH fixture roots removed.\n"
+}

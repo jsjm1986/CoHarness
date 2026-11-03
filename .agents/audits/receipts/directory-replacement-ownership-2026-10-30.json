@@ -1,0 +1,796 @@
+{
+  "finding": "B354",
+  "status": "fixed_and_verified_named_directory_scope",
+  "updatedAt": "2026-10-30T15:34:35.633364+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z",
+  "sourcePaths": [
+    ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.md",
+    ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-directory-access/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-directory-access/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-directory-access/guide.zh.md",
+    "gateway/tests/expected/directory-replacement-web-assembly.expected.md",
+    "gateway/tests/fixtures/local-runtime-web-gateway.mjs",
+    "gateway/tests/run-local-web-assembly.mjs",
+    "native/system/.gitignore",
+    "native/system/AGENTS.md",
+    "native/system/README.i18n.yaml",
+    "native/system/README.md",
+    "native/system/README.zh.md",
+    "native/system/docs/architecture.md",
+    "native/system/docs/directory-contract.md",
+    "native/system/docs/support-matrix.md",
+    "native/system/package.json",
+    "native/system/packages/darwin-arm64/README.i18n.yaml",
+    "native/system/packages/darwin-arm64/README.md",
+    "native/system/packages/darwin-arm64/README.zh.md",
+    "native/system/packages/darwin-arm64/package.json",
+    "native/system/packages/darwin-x64/README.i18n.yaml",
+    "native/system/packages/darwin-x64/README.md",
+    "native/system/packages/darwin-x64/README.zh.md",
+    "native/system/packages/darwin-x64/package.json",
+    "native/system/packages/entry/README.i18n.yaml",
+    "native/system/packages/entry/README.md",
+    "native/system/packages/entry/README.zh.md",
+    "native/system/packages/entry/package.json",
+    "native/system/packages/entry/src/binding.ts",
+    "native/system/packages/entry/src/directory.c",
+    "native/system/packages/entry/src/directory.ts",
+    "native/system/packages/entry/src/flock.c",
+    "native/system/packages/entry/src/flock.ts",
+    "native/system/packages/entry/src/index.ts",
+    "native/system/packages/entry/tsconfig.json",
+    "native/system/packages/linux-arm64/README.i18n.yaml",
+    "native/system/packages/linux-arm64/README.md",
+    "native/system/packages/linux-arm64/README.zh.md",
+    "native/system/packages/linux-arm64/package.json",
+    "native/system/packages/linux-x64/README.i18n.yaml",
+    "native/system/packages/linux-x64/README.md",
+    "native/system/packages/linux-x64/README.zh.md",
+    "native/system/packages/linux-x64/package.json",
+    "native/system/scripts/build.ts",
+    "native/system/scripts/verify-packed-install.mjs",
+    "native/system/test/directory.test.js",
+    "native/system/test/entry.test.js",
+    "native/system/test/fixtures/directory-worker.js",
+    "native/system/test/package-matrix.test.js",
+    "native/system/test/probe-timeout.mjs",
+    "packages/host/directory-picker-browse/README.i18n.yaml",
+    "packages/host/directory-picker-browse/README.md",
+    "packages/host/directory-picker-browse/README.zh.md",
+    "packages/host/directory-picker-browse/package.json",
+    "packages/host/directory-picker-browse/src/directory-lifetime.ts",
+    "packages/host/directory-picker-browse/src/index.ts",
+    "packages/host/directory-picker-browse/src/pinned-directory-win32.ts",
+    "packages/host/directory-picker-browse/src/pinned-directory.ts",
+    "packages/host/directory-picker-browse/src/windows-directory-calls.ts",
+    "packages/host/directory-picker-browse/tests/managed-grants.spec.ts",
+    "packages/host/directory-picker-browse/tests/pinned-directory.spec.ts",
+    "packages/host/directory-picker-browse/tests/replacement-race.spec.ts",
+    "packages/host/directory-picker-browse/tests/service.spec.ts",
+    "packages/host/directory-picker-browse/tests/windows-directory-calls.spec.ts",
+    "packages/host/directory-picker-browse/tests/windows-directory.spec.ts",
+    "packages/host/directory-picker-browse/tests/windows-native.spec.ts",
+    "packages/host/directory-picker-browse/tsconfig.json",
+    "pnpm-lock.yaml",
+    "scripts/check-workspace-constraints.ts",
+    "tsconfig.base.json"
+  ],
+  "sourceHashes": {
+    ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.i18n.yaml": "978808606402a63c6eade22ffe293b14846ee4f90726443487c9ec7860b741be",
+    ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.md": "bed06ad1b25b374fc9828c48af1e78362c060992191f47de6bc383fdb67fbee6",
+    ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.zh.md": "87dc3a4e0d6d8dac4d3727caeb0db08cc1d5ef26759e0445f9895436205bdb14",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-directory-access/guide.i18n.yaml": "208549ed8d963ad7e10db5a6c8124de0873e328f34029f8454867113cf9c99bb",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-directory-access/guide.md": "0b3541a18e247fc0efad59079080329435e37f495f360304895dbaaad5da500d",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-directory-access/guide.zh.md": "0310a88dae6e9620a86f5147007677982b66f8bb16c20a4a950f8a659d695ef7",
+    "gateway/tests/expected/directory-replacement-web-assembly.expected.md": "754026482bf5896adf8ec497dcafefa90da2a0d4e3ed3a289c929c5776c5ec75",
+    "gateway/tests/fixtures/local-runtime-web-gateway.mjs": "90c01f5a5817a4bd16b4c1c05169344c5392731da96acedd0e6c839f5cf5cf2c",
+    "gateway/tests/run-local-web-assembly.mjs": "9109022a51e328db58286bde0f2448889d1b5273a70bd000595a153740444255",
+    "native/system/.gitignore": "43ab638d1a14f864923d24ae7c1c12d8c0ef86595fc8064b8a99f361430f113b",
+    "native/system/AGENTS.md": "0dcfb14af9bd6b18ec862fab256e138feaf4d4e4eef06af58ea073f10b4b9406",
+    "native/system/README.i18n.yaml": "1d25576a014aeba4010e37bcbb739d738b5a03a49725f2b21ecb69906c379b65",
+    "native/system/README.md": "c43a7f5c7740dbf274eb084a2c2b5dce20d28c64ad8ab26a44635c387f679181",
+    "native/system/README.zh.md": "3b63475f9f2d5dcf1f2994432791c85722502abb400de2804b528c036958b2e8",
+    "native/system/docs/architecture.md": "465ac3848b6904ee23465837e0621beb09520d0af4631cf164b02531c329b550",
+    "native/system/docs/directory-contract.md": "d15ae432d2a8ede1805ecbf40b852742e85cde9238b780a0ce99b52caffe2a50",
+    "native/system/docs/support-matrix.md": "ffbca00b56ca3ecd90cfd9a14ecaf41192265657a4297de00d062a5132ff9075",
+    "native/system/package.json": "bc332326078c7ab5308e22c37a88f84c8a781b83977534182c6e0d56f43346fd",
+    "native/system/packages/darwin-arm64/README.i18n.yaml": "1dffe4a489113fc6118262b71f732c511a6dcc37b9676ab3089a9ec6885df4a8",
+    "native/system/packages/darwin-arm64/README.md": "1988954b399c975f88c86c90324e265c7de8860732bc64996a4b6d33bb50e1b8",
+    "native/system/packages/darwin-arm64/README.zh.md": "7ef30b7990ebedccdf3f13b50a4029f03858cfe91710e3a541fac3a10872a9e2",
+    "native/system/packages/darwin-arm64/package.json": "a954cb32035e2ed1468384e2ab5a39461c59a611b44080db7a0dab7fb54f6f3c",
+    "native/system/packages/darwin-x64/README.i18n.yaml": "5c65511baaeaae3282ca8fa215889f71522a20a6ff83a7f1df08da2c46f0e4cc",
+    "native/system/packages/darwin-x64/README.md": "e11217940ae35ab033a7e664bbd0cafcc6127d6a4775963d52048b8cd5205d1c",
+    "native/system/packages/darwin-x64/README.zh.md": "bde66ebf9383bb1c283377591ddd0db3b647ab0bb5ed1708b684a7a662e17722",
+    "native/system/packages/darwin-x64/package.json": "72aff623d6170fb74f2ee1da6a91b3f7ed3393dd443c90e5f28f2f66d85da951",
+    "native/system/packages/entry/README.i18n.yaml": "57861c688a37774ecb65f21f74febfd3d7b7c919c015f809f72dbe3da7424b00",
+    "native/system/packages/entry/README.md": "71f9064a50222e6cee109a2f232f3d9c799fb3c13ff9682f6446b02061cac18d",
+    "native/system/packages/entry/README.zh.md": "e27052ca1316875cc1f2b413a90bcc0e05ed01dc73c698dedb5e7782b578d8a8",
+    "native/system/packages/entry/package.json": "010a05c958aa5b8f75459566e5e412855b939eb20d3872fe3e622d9b0c3a673b",
+    "native/system/packages/entry/src/binding.ts": "a46df6da9a44b09d2eab1a746245b815ee17bcc71822729ee268977ef656d01c",
+    "native/system/packages/entry/src/directory.c": "33b484931ce50d0ff50e2ffbfe9fdd111e82e9cd6b81f5123e9f2d0f4524f1c8",
+    "native/system/packages/entry/src/directory.ts": "b663a4f53ef9f41d92afc27cef74e8d0e8cec4e79e1e007b2c3416d07196d17b",
+    "native/system/packages/entry/src/flock.c": "08b5d8e0631de4ec03cbfd27cf02fa9e91ee3251af234956b3b9c6a6095e5e3d",
+    "native/system/packages/entry/src/flock.ts": "d76a231cbac8298d4d31ece754cfaeb2fc9e7db2c3f5c7271bc0d3a22a811dc5",
+    "native/system/packages/entry/src/index.ts": "2c27f23842ff16477ec7461f222ccd02f61b19180a5b435e88c8d0975022d5f2",
+    "native/system/packages/entry/tsconfig.json": "aae45e644f7ec35e181ca20900702f3b859ba77785ef881f661489b906a5edae",
+    "native/system/packages/linux-arm64/README.i18n.yaml": "c1d22bfe16eeb745cd45b7736958b373bc4d21eb4d959d957e8a0fd7084ae370",
+    "native/system/packages/linux-arm64/README.md": "63a511854fe0ec4df2d1a25071b504fbf46fb542838d33701ca00369e78e9f30",
+    "native/system/packages/linux-arm64/README.zh.md": "d2f5aba82b2b773e3e941e3fc4c7fb15773a64de530467078ebac0f22bf653ba",
+    "native/system/packages/linux-arm64/package.json": "70e1439b47891111bbf7bcdb5b80c909fb733cbee6c26d9e67abc546fcfd5e78",
+    "native/system/packages/linux-x64/README.i18n.yaml": "ac1c4f1ff00079c1c236a9ab7611f1542437ea4de08aa00ca7bc0e228bd199be",
+    "native/system/packages/linux-x64/README.md": "b06aa54076e242c54dddb02713520220725bc37fbf01eb23b75cc61f6d3d4efb",
+    "native/system/packages/linux-x64/README.zh.md": "b5cd05c9b8b9f6efd483031eff0b8d2f3ef55733fde3608c98d4f0e489cc45fa",
+    "native/system/packages/linux-x64/package.json": "4a2f5c813f73fd45d8ae8c8bb8e1614f567c87cb462be4cc3646c03073bb4594",
+    "native/system/scripts/build.ts": "08b0a81bbe4b42c4acab5c87e39567b1002f37c8caec9006f6340f68ddb28c33",
+    "native/system/scripts/verify-packed-install.mjs": "9b252936a7c5f03fcdcee9479d02a003b9cd1a9e90a6da43fe6c0c871916292d",
+    "native/system/test/directory.test.js": "2cf78650cc5cf4701cbe85391312a864fd0fb503f5fe5dad907ee8aef2c0d634",
+    "native/system/test/entry.test.js": "160314299b98bd886f0603700a96d41bf4f90141bdcb9b2c4b97acaef3c0dc8d",
+    "native/system/test/fixtures/directory-worker.js": "7db838a184fe87ecd2c5457577e3f0964ff628e6e2ab946e858d934f9a44727f",
+    "native/system/test/package-matrix.test.js": "0854202efa84b2db50af1907fbf21b72fdeda072d54f67be0e7104016bf5f4aa",
+    "native/system/test/probe-timeout.mjs": "59fa6b382754e79e63f8b659afb42c3d8bed8e809de11846175b157c4120c5f5",
+    "packages/host/directory-picker-browse/README.i18n.yaml": "97df0581f7ec6393578a9e75d0bc6ebe7809af4900163073bf4979225ac0e19b",
+    "packages/host/directory-picker-browse/README.md": "dde817505519d0c3e795377513cca3885e5fec68a23be8e6276fac6bd46d25e6",
+    "packages/host/directory-picker-browse/README.zh.md": "22578793286f0b6ca47f6bd880b88a6b95f96a16a979d27959910f23e595e618",
+    "packages/host/directory-picker-browse/package.json": "118c905de828f9fa553fdb9f1a514280fa65d123876dd70fb0bdc118e8dfb8e7",
+    "packages/host/directory-picker-browse/src/directory-lifetime.ts": "2a412df56e7bad6cacc009e11d2f8bf6ce2b979936a57abc75fb10ffd6851890",
+    "packages/host/directory-picker-browse/src/index.ts": "c480643d521ba83bf007191a42371ffc0ed8ece0cfe1500c52ee6c4b10ecc675",
+    "packages/host/directory-picker-browse/src/pinned-directory-win32.ts": "d9db7c729c57739ff98cdbf305c56765d307ec0ffd778b7117a723e43112e44b",
+    "packages/host/directory-picker-browse/src/pinned-directory.ts": "03247bad1a62a5cd8dde86b88dc4a83d03d2f605788d4a23e6cdb8b850af12cc",
+    "packages/host/directory-picker-browse/src/windows-directory-calls.ts": "7368ab6d1d1e3914a5a9976c9d592db4745408af2de6ecb6a1fec0980e746a8c",
+    "packages/host/directory-picker-browse/tests/managed-grants.spec.ts": "3b449d699f22ea05a87ce9d0bf136c041487fc1432abd377227b3ce644059998",
+    "packages/host/directory-picker-browse/tests/pinned-directory.spec.ts": "16fa4ec6e0f2715c1511c9eb383787a38176800bfcf163b3f7a10b0c28711e19",
+    "packages/host/directory-picker-browse/tests/replacement-race.spec.ts": "dce43cfa37dc037b520b2a349b43ef2d62aef7b8103ab583114e84ce46698232",
+    "packages/host/directory-picker-browse/tests/service.spec.ts": "2cd0fad1c5ac0a252ebf1960f3333ecb459cb07ffa0d22950886176b78bd396d",
+    "packages/host/directory-picker-browse/tests/windows-directory-calls.spec.ts": "ec1314f3d0091e503a9927c8fbff64ab52f06ed0a34096e96d9d3552b905ab46",
+    "packages/host/directory-picker-browse/tests/windows-directory.spec.ts": "4fca44e3455c240c60a6649a79a396fea9af8ef65f1ed6b4024ba346f7fb92d5",
+    "packages/host/directory-picker-browse/tests/windows-native.spec.ts": "705fa526f5707f5d666f88297a633b0b42d796f6f593dfdc015ac1d1b4300552",
+    "packages/host/directory-picker-browse/tsconfig.json": "34c7cdcb656f52ae509f9ff152bca8fc1961c955ba2963a3ff7baa403d193efb",
+    "pnpm-lock.yaml": "9b101f347280a0049f44b00e045a5cf844a3835f76a2f061f73ce819cca1b40b",
+    "scripts/check-workspace-constraints.ts": "ea4fd4d13ce9f97031965c1b78957f88c87ab71e8699a6c760fbb05aa613a72f",
+    "tsconfig.base.json": "94ecd3787694a22d9d095fbf13bed94c3f11e7813621ce1bcb2d1e22a692622a"
+  },
+  "compiledArtifactHashes": {
+    "native/system/packages/darwin-arm64/bin/system.node": "131a2d3a8ceb8b9a7b27b4dcac9d3a6275ea6d5b28802da1302aaf590eca4f05",
+    "native/system/packages/entry/lib/directory.js": "aa4f8a5812896b5878d1591502c70d3140e7ec8be0040be8875818cdfc3e077b",
+    "native/system/packages/entry/lib/binding.js": "b1222f133cd9c77d9d1d75214c2db3df3543ad785a09cf2eae8e25c6aea1c339",
+    "packages/host/directory-picker-browse/lib/index.js": "f71d7171170bdafd5ad3b80e04887dc05990cf548a762ac2e116903cc6c4d509"
+  },
+  "privateGatewayArtifactFingerprintReceipt": "directory-replacement-accepted-inputs.json",
+  "repair": [
+    "Grants pin the canonical root device/inode at activation. Relative native directory handles retain authorized ancestors and targets across read/create operations; logical identity is checked before publishing results.",
+    "macOS O_SEARCH and Linux O_PATH keep execute-only ancestors usable. Listing opens a separate read handle on demand; bounded batches retain the configured maximum.",
+    "Windows uses parent-relative NtCreateFile and handle-owned NtQueryDirectoryFile through Koffi; no path-based listing or mkdir fallback. Reparse points and malformed records fail closed.",
+    "Cancellation does not close a native object while a consumer still uses it. Late opens are closed, worker termination releases owned directory descriptors, and cleanup errors remain observable.",
+    "Native package family version0.1.3 adds the public directory subpath and is required by the browser provider. No package was published."
+  ],
+  "causalNegative": {
+    "receipt": "directory-replacement-source-negative.json",
+    "realFilesystemRefusalFailures": 2,
+    "ordinaryControlPassed": 1,
+    "actualForeignWriteObserved": true,
+    "worktreeRollback": false
+  },
+  "verification": {
+    "providerCases": 105,
+    "workspaceConstraintCases": 113,
+    "sourceAndPolicyPassed": 218,
+    "physicalWindowsCasesSkipped": 2,
+    "providerCoverage": {
+      "total": {
+        "lines": {
+          "total": 349,
+          "covered": 349,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 448,
+          "covered": 448,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 70,
+          "covered": 70,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 281,
+          "covered": 281,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/host/directory-picker-browse/src/directory-lifetime.ts": {
+        "lines": {
+          "total": 11,
+          "covered": 11,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 11,
+          "covered": 11,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 17,
+          "covered": 17,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/host/directory-picker-browse/src/index.ts": {
+        "lines": {
+          "total": 171,
+          "covered": 171,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 34,
+          "covered": 34,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 214,
+          "covered": 214,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 164,
+          "covered": 164,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/host/directory-picker-browse/src/pinned-directory-win32.ts": {
+        "lines": {
+          "total": 51,
+          "covered": 51,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 6,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 66,
+          "covered": 66,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 23,
+          "covered": 23,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/host/directory-picker-browse/src/pinned-directory.ts": {
+        "lines": {
+          "total": 41,
+          "covered": 41,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 6,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 50,
+          "covered": 50,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 17,
+          "covered": 17,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/host/directory-picker-browse/src/windows-directory-calls.ts": {
+        "lines": {
+          "total": 75,
+          "covered": 75,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 13,
+          "covered": 13,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 101,
+          "covered": 101,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 75,
+          "covered": 75,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "coverageThresholdsLowered": false,
+    "coverageExemptionsAdded": false,
+    "nativeCases": 63,
+    "nativeNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "nativeRepeatedExecutionsAreNotAdditionalCoverage": true,
+    "linuxMuslNativeCases": 31,
+    "linuxMuslNativeCasesOverlapMacNativeCases": true,
+    "linuxUnprivileged": true,
+    "nativePackedInstallBothNodeEngines": true,
+    "packedNativeMatchesCurrentBinary": true,
+    "actualKoffiCAbiOperations": 11,
+    "physicalWindows": false,
+    "compiledGatewayAndCliBothNodeEngines": true,
+    "realPostgres": true,
+    "replacementGoldenLines": 12,
+    "scopeVariants": [
+      "personal",
+      "project"
+    ],
+    "additionalGoldenControls": {
+      "readOnly": 6,
+      "emptyGrants": 6,
+      "ordinaryLifecycle": 19
+    },
+    "browserJavaScriptThisPhase": false,
+    "physicalSecondComputerThisPhase": false,
+    "rootBuildGates": 8,
+    "docQuickGates": 20,
+    "checks": {
+      "directory-pinning-final-source-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:13:59.934829+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "./node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/directory-picker-browse/tests",
+          "scripts/check-workspace-constraints.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/host/directory-picker-browse/src/*.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-final-source-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:14:10.031836+00:00"
+      },
+      "directory-pinning-current-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T14:59:09.050886+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "--tsconfig=tsconfig.host.json",
+          "packages/host/directory-picker-browse/src/index.ts",
+          "packages/host/directory-picker-browse/src/pinned-directory.ts",
+          "packages/host/directory-picker-browse/src/pinned-directory-win32.ts",
+          "packages/host/directory-picker-browse/src/directory-lifetime.ts",
+          "packages/host/directory-picker-browse/src/windows-directory-calls.ts",
+          "packages/host/directory-picker-browse/tests/service.spec.ts",
+          "packages/host/directory-picker-browse/tests/managed-grants.spec.ts",
+          "packages/host/directory-picker-browse/tests/replacement-race.spec.ts",
+          "packages/host/directory-picker-browse/tests/pinned-directory.spec.ts",
+          "packages/host/directory-picker-browse/tests/windows-directory.spec.ts",
+          "packages/host/directory-picker-browse/tests/windows-directory-calls.spec.ts",
+          "packages/host/directory-picker-browse/tests/windows-native.spec.ts",
+          "native/system/packages/entry/src/directory.ts",
+          "native/system/packages/entry/src/binding.ts",
+          "native/system/packages/entry/src/flock.ts",
+          "native/system/scripts/build.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T14:59:10.596163+00:00"
+      },
+      "directory-pinning-host-types-final-tests": {
+        "status": "passed",
+        "startedAt": "2026-10-30T14:47:59.159719+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "./node_modules/typescript/bin/tsc",
+          "-b",
+          "tsconfig.host.json",
+          "--pretty",
+          "false"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T14:48:14.075239+00:00"
+      },
+      "directory-pinning-current-production-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T14:59:10.277121+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/build.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T14:59:25.478763+00:00"
+      },
+      "directory-pinning-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T14:47:59.159720+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T14:48:32.671001+00:00"
+      },
+      "directory-native-node22-complete": {
+        "status": "passed",
+        "startedAt": "2026-10-30T14:49:49.461638+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/native/system",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--test",
+          "test/directory.test.js",
+          "test/flock.test.js",
+          "test/package-matrix.test.js",
+          "test/release-packing.test.js"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T14:49:52.349599+00:00"
+      },
+      "directory-native-node24-complete": {
+        "status": "passed",
+        "startedAt": "2026-10-30T14:51:39.151108+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/native/system",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "--test",
+          "test/directory.test.js",
+          "test/flock.test.js",
+          "test/package-matrix.test.js",
+          "test/release-packing.test.js"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T14:51:42.064973+00:00"
+      },
+      "directory-pinning-native-packed-artifacts": {
+        "status": "passed",
+        "startedAt": "2026-10-30T14:47:59.159730+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/native/system",
+        "command": [
+          "node",
+          "scripts/pack-release.mjs",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/native-packs",
+          "--current-platform-only"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T14:48:02.070879+00:00"
+      },
+      "directory-native-packed-install-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T14:49:49.461624+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/native/system",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "scripts/verify-packed-install.mjs",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/native-packs",
+          "--current-platform-only"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T14:49:51.030265+00:00"
+      },
+      "directory-native-packed-install-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T14:51:39.151109+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/native/system",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "scripts/verify-packed-install.mjs",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/native-packs",
+          "--current-platform-only"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T14:51:40.194412+00:00"
+      },
+      "directory-linux-musl-layout-corrected": {
+        "status": "passed",
+        "startedAt": "2026-10-30T14:33:39.919698+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "docker",
+          "run",
+          "--rm",
+          "--name",
+          "hgw-b354-native-20261030",
+          "--label",
+          "coharness.audit=B354",
+          "--label",
+          "coharness.owner=business-audit",
+          "--cpus=2",
+          "--memory=512m",
+          "--pids-limit=128",
+          "--mount",
+          "type=bind,src=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/native/system,dst=/source,readonly",
+          "--mount",
+          "type=bind,src=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z,dst=/artifacts",
+          "node:22.22.1-alpine",
+          "sh",
+          "/artifacts/linux-native-driver.sh"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T14:33:48.492852+00:00"
+      },
+      "directory-windows-native-abi-esm": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:18:35.666163+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/windows-directory-abi-probe.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:18:39.076756+00:00"
+      },
+      "directory-pinning-private-gateway-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T14:49:49.461629+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "./node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.build.json",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/lib",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/tsconfig.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T14:49:52.281185+00:00"
+      },
+      "directory-replacement-compiled-node22-scope-specific": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:07:37.193875+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/lib",
+          "LOCAL_WEB_DIRECTORY_CASE=replacement",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:07:41.338808+00:00"
+      },
+      "directory-replacement-compiled-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:13:59.934830+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/lib",
+          "LOCAL_WEB_DIRECTORY_CASE=replacement",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:14:04.483759+00:00"
+      },
+      "directory-pinning-final-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:33:19.815413+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "--prune"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:33:23.277388+00:00"
+      },
+      "directory-pinning-node22-readonly-control": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:22:35.588461+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/lib",
+          "LOCAL_WEB_DIRECTORY_CASE=readonly",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:22:40.835055+00:00"
+      },
+      "directory-pinning-node22-empty-control": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:22:40.860995+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/lib",
+          "LOCAL_WEB_DIRECTORY_CASE=empty",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:22:45.301049+00:00"
+      },
+      "directory-pinning-node22-default-control": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:22:45.326653+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/lib",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:23:21.043309+00:00"
+      },
+      "directory-pinning-node24-readonly-control": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:22:35.559826+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/lib",
+          "LOCAL_WEB_DIRECTORY_CASE=readonly",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:22:40.828485+00:00"
+      },
+      "directory-pinning-node24-empty-control": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:22:40.856454+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/lib",
+          "LOCAL_WEB_DIRECTORY_CASE=empty",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:22:45.301052+00:00"
+      },
+      "directory-pinning-node24-default-control": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:22:45.326648+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/lib",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:23:21.048954+00:00"
+      }
+    }
+  },
+  "documentation": {
+    "pairedStems": 9,
+    "existingAgentNoteUpdated": ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.md",
+    "fullySupersededActiveNotes": [],
+    "frozenArchivesEdited": false,
+    "upgradeGuideUpdated": true
+  },
+  "limits": [
+    "Physical Windows behavior and remaining platform/architecture matrix require CI or a Windows host. The macOS C ABI oracle is marshalling evidence, not Windows OS acceptance.",
+    "The real PostgreSQL Web-profile fixture covers directory authorization. It does not mount the production document broker and therefore does not certify userdoc-gateway activation.",
+    "Gateway artifact was compiled before the peer latest connection-timeout changes; fingerprints identify the accepted artifact. Those peer changes are a separate verification scope.",
+    "This is directory browse/create replacement protection, not completion of all document identity, model admission or cross-computer operation ownership work. All12original domains and B04/B25remain open.",
+    "Real paid model success and public push remain human-deferred; no live deployment/database changes were performed. Peer frozen releases still exclude this group until their separate integration."
+  ]
+}

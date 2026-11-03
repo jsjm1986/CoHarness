@@ -3,25 +3,29 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import type { Browser, Page } from 'playwright'
+import type { Browser, BrowserContext, Page, Route } from 'playwright'
 import { chromium } from 'playwright'
-import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed, onTestFinished } from 'vitest'
 import { SESSION_FORMAT_VERSION, SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
-  launchWebScaffold, seedBlankSession, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
+  launchWebScaffold, seedBlankSession, seedSession, watchConsole, webSnapshotMode, acknowledgeReloadConnectionLoss,
+  fixtureUserPrompts, type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/project-collaboration', import.meta.url))
+const PRIVATE_DRAFTS_DIR = fileURLToPath(new URL('./expected/project-collaboration', import.meta.url))
 const SCOPE_PICKER_EXPECTED = join(SNAPSHOT_DIR, 'scope-picker.expected.md')
 const SCOPE_PICKER_MOBILE_EXPECTED = join(SNAPSHOT_DIR, 'scope-picker-mobile.expected.md')
 const SHARING_EXPECTED = join(SNAPSHOT_DIR, 'sharing.expected.md')
 const SWITCHING_EXPECTED = join(SNAPSHOT_DIR, 'switching.expected.md')
 const READ_ONLY_EXPECTED = join(SNAPSHOT_DIR, 'read-only.expected.md')
+const INCOMING_INVITATION_EXPECTED = join(SNAPSHOT_DIR, 'incoming-invitation.expected.md')
 const HEADER_GEOMETRY_EXPECTED = join(SNAPSHOT_DIR, 'header-geometry.expected.md')
+const PRIVATE_DRAFTS_EXPECTED = join(PRIVATE_DRAFTS_DIR, 'private-drafts.expected.md')
 const SHIPPED_PRESETS = fileURLToPath(new URL('../../cli/config/agent-presets', import.meta.url))
 const MODE = webSnapshotMode()
 const SESSION_ID = 'project-collaboration-web-e2e'
@@ -30,9 +34,28 @@ const SEEDED_PROMPT = 'Use the read tool twice in one assistant message: read a.
 
 type ProjectMode = 'ro' | 'rw'
 
-function collaborationContext(mode: ProjectMode, extraProjects = 0) {
+const NAV_RUNTIME_A = '10000000-0000-4000-8000-000000000001'
+const NAV_RUNTIME_B = '10000000-0000-4000-8000-000000000002'
+const NAV_RUNTIME_PROJECT = '10000000-0000-4000-8000-000000000003'
+const NAV_SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/space-navigation', import.meta.url))
+
+function navigationRuntime(id: string | null) {
+  const nodeId = id === NAV_RUNTIME_A || id === null ? '20000000-0000-4000-8000-000000000001' : '20000000-0000-4000-8000-000000000002'
+  const nodeName = nodeId.endsWith('1') ? 'Office computer' : 'Compute computer'
+  const location = { nodeId, nodeName, runtimeId: id ?? NAV_RUNTIME_A }
+  return id === NAV_RUNTIME_PROJECT ? { kind: 'project' as const, projectId: 9, projectName: 'Payments migration', ...location }
+    : { kind: 'personal' as const, ...location }
+}
+
+function navigationTarget(route: Route) {
+  const id = new URL(route.request().url()).searchParams.get('dshRuntime')
+    ?? new URL(route.request().frame().page().url()).searchParams.get('dshRuntime')
+  return navigationRuntime(id)
+}
+
+function collaborationContext(mode: ProjectMode, extraProjects = 0, accountId = 7) {
   return {
-    user: { id: 7, username: 'lin', displayName: 'Lin', role: 'member' },
+    user: { id: accountId, username: accountId === 7 ? 'lin' : 'zhou', displayName: accountId === 7 ? 'Lin' : 'Zhou', role: 'member' },
     scope: { kind: 'project', projectId: 9, projectName: 'Payments migration', mode },
     projects: [
       { projectId: 9, name: 'Payments migration', path: '/srv/payments', mode },
@@ -79,33 +102,74 @@ function conversationDetail(
   }
 }
 
-async function mockGateway(page: Page, mode: ProjectMode, options: {
+async function mockGateway(page: Page | BrowserContext, mode: ProjectMode, options: {
+  runtimeDirectory?: boolean
   scopeReady?: Promise<void>
   extraProjects?: number
+  accountId?: () => number
+  contextReady?: () => Promise<void>
 } = {}): Promise<{
   visibilityBodies: string[]
   conversationReads: string[]
+  conversationUrls: string[]
   visibilityBySession: Map<string, 'project' | 'private'>
 }> {
   const visibilityBodies: string[] = []
   const conversationReads: string[] = []
+  const conversationUrls: string[] = []
   const visibilityBySession = new Map<string, 'project' | 'private'>()
+  await page.route(/\/account\/api\/deployment\/context$/, async (route) => {
+    const entry = { nodeId: navigationRuntime(NAV_RUNTIME_A).nodeId, name: 'Office computer' }
+    await route.fulfill({ json: { mode: options.runtimeDirectory ? 'multi' : 'single', revision: '1', entry,
+      primary: options.runtimeDirectory ? { ...entry, origin: new URL(route.request().url()).origin } : null,
+      role: options.runtimeDirectory ? 'primary' : 'standalone', scope: options.runtimeDirectory ? 'organization' : 'local',
+      refreshAfterMs: 30000, legacyMigrationRequired: false } })
+  })
   await page.route(/\/api\/host\.describe(?:\?.*)?$/, async (route) => {
     const response = await route.fetch()
     const body = await response.json() as {
-      result: { ok: true; value: { runtimeTarget?: { kind: 'project'; projectId: number } } } | { ok: false }
+      result: { ok: true; value: { runtimeTarget?: unknown; executionAuthorityRequired?: boolean } } | { ok: false }
     }
-    if (body.result.ok) body.result.value.runtimeTarget = { kind: 'project', projectId: 9 }
+    if (body.result.ok) {
+      body.result.value.runtimeTarget = options.runtimeDirectory ? navigationTarget(route) : { kind: 'project', projectId: 9 }
+      if (options.accountId !== undefined) body.result.value.executionAuthorityRequired = true
+    }
     await route.fulfill({ response, json: body })
   })
   await page.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
-    await route.fulfill({ json: collaborationContext(mode, options.extraProjects ?? 0) })
+    await options.contextReady?.()
+    const context = collaborationContext(mode, options.extraProjects ?? 0, options.accountId?.() ?? 7)
+    const target = navigationTarget(route)
+    await route.fulfill({ json: options.runtimeDirectory ? { ...context, scope: target.kind === 'project' ? { ...target, mode } : target,
+      environment: { id: target.runtimeId, nodeId: target.nodeId, nodeName: target.nodeName } } : context })
+  })
+  if (options.runtimeDirectory) await page.route(/\/account\/api\/runtimes(?:\?.*)?$/, async (route) => {
+    await route.fulfill({ json: { items: [NAV_RUNTIME_A, NAV_RUNTIME_B, NAV_RUNTIME_PROJECT].map((id) => {
+      const target = navigationRuntime(id)
+      return { id, owner: { kind: target.kind, id: target.kind === 'personal' ? 7 : 9,
+        name: target.kind === 'personal' ? 'Lin' : 'Payments migration' },
+      node: { id: target.nodeId, name: target.nodeName, status: 'active', lastHeartbeatAt: null },
+      routing: 'local', observedState: 'ready', generation: 1 }
+    }), nextCursor: null } })
+  })
+  if (options.accountId !== undefined) await page.route(/\/account\/api\/workbench\/catalog(?:\?.*)?$/, async (route) => {
+    const base = collaborationContext(mode, options.extraProjects ?? 0, options.accountId!())
+    const target = navigationTarget(route)
+    const context = options.runtimeDirectory ? { ...base, scope: target } : base
+    await route.fulfill({ json: {
+      personalComplete: true, personal: { id: context.user.id, name: 'Personal' }, activeRuntime: context.scope,
+      projects: context.projects, items: [{
+        sessionId: SESSION_ID, title: 'Shared release room', runtime: options.runtimeDirectory ? target : { kind: 'project', projectId: 9, projectName: 'Payments migration' },
+        visibility: 'project', creatorUserId: 7, creatorDisplayName: 'Lin', updatedAt: 1, blank: false, canWrite: mode === 'rw',
+      }],
+    } })
   })
   await page.route(/\/account\/api\/scope(?:\?.*)?$/, async (route) => {
     if (options.scopeReady !== undefined) await options.scopeReady
-    await route.fulfill({ status: 204, body: '' })
+    await route.fulfill({ status: 204, body: '', ...(options.runtimeDirectory ? { headers: { location: `/?dshRuntime=${navigationTarget(route).runtimeId}` } } : {}) })
   })
   await page.route('**/account/api/conversations/*', async (route) => {
+    conversationUrls.push(route.request().url())
     if (route.request().method() === 'PATCH') {
       visibilityBodies.push(route.request().postData() ?? '')
       await route.fulfill({ status: 204, body: '' })
@@ -118,7 +182,7 @@ async function mockGateway(page: Page, mode: ProjectMode, options: {
     })
     conversationReads.push(sessionId)
   })
-  return { visibilityBodies, conversationReads, visibilityBySession }
+  return { visibilityBodies, conversationReads, conversationUrls, visibilityBySession }
 }
 
 /**
@@ -134,8 +198,13 @@ async function stagePrivateVisibility(page: Page): Promise<void> {
   await scope.click()
 }
 
-async function openSeededSession(page: Page, scaffold: WebScaffold): Promise<void> {
+async function openSeededSession(page: Page, scaffold: WebScaffold, runtimeId?: string): Promise<void> {
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+  if (runtimeId !== undefined) {
+    const destination = new URL(scaffold.baseUrl)
+    destination.searchParams.set('dshRuntime', runtimeId)
+    await page.goto(destination.href, { waitUntil: 'load' })
+  }
   await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   const searchButton = page.getByRole('button', { name: 'Search sessions' })
   if (await searchButton.getAttribute('aria-expanded') !== 'true') await searchButton.click()
@@ -248,6 +317,109 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     if (failures.length > 1) throw new AggregateError(failures, 'project collaboration e2e cleanup failed')
   })
 
+  it('accepts an incoming invitation while viewing another read-only project without changing its Runtime', async () => {
+    page = await newEnglishPage(browser)
+    tripwire = watchConsole(page)
+    await mockGateway(page, 'ro')
+    let accepted = false, protectedReads = 0, scopeChanges = 0
+    const invitation = { id: 'incoming-other-project', projectId: 19, projectName: 'Compute release room',
+      invitee: { id: 7, username: 'lin', displayName: 'Lin' }, inviter: { id: 8, username: 'zhou', displayName: 'Zhou' },
+      mode: 'ro', status: 'pending', createdAt: '2026-10-31T00:00:00.000Z', expiresAt: null, respondedAt: null }
+    await page.route(/\/account\/api\/invitations\/count$/, route => route.fulfill({ json: { pending: accepted ? 0 : 1 } }))
+    await page.route(/\/account\/api\/invitations$/, route => route.fulfill({ json: accepted ? [] : [invitation] }))
+    await page.route(/\/account\/api\/projects\/9\/(?:invitations|invitable-users)$/, async (route) => {
+      protectedReads += 1
+      await route.fulfill({ status: 403, json: { error: 'forbidden' } })
+    })
+    await page.route(/\/account\/api\/invitations\/incoming-other-project\/accept$/, async (route) => {
+      accepted = true
+      await route.fulfill({ status: 204, body: '' })
+    })
+    page.on('request', (request) => { if (new URL(request.url()).pathname === '/account/api/scope') scopeChanges += 1 })
+    await openSeededSession(page, scaffold)
+    const originalUrl = page.url()
+    await page.getByRole('button', { name: 'Switch personal or project scope' }).click()
+    await page.getByRole('button', { name: /Invitations/ }).click()
+    const dialog = page.getByRole('dialog', { name: 'Project members and invitations' })
+    await dialog.getByText('Compute release room', { exact: true }).waitFor()
+    expect(protectedReads).toBe(0)
+    expect(await dialog.getByRole('alert').count()).toBe(0)
+    await compareOrRefreshGolden(INCOMING_INVITATION_EXPECTED,
+      await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), MODE)
+    await dialog.getByRole('button', { name: 'Accept', exact: true }).click()
+    await expect.poll(() => accepted).toBe(true)
+    await dialog.getByText('No pending invitations', { exact: true }).waitFor()
+    expect(page.url()).toBe(originalUrl)
+    expect(scopeChanges).toBe(0)
+    expect(protectedReads).toBe(0)
+  })
+
+  it('keeps unsent shared-session drafts private to the verified account across reloads', async () => {
+    page = await newEnglishPage(browser)
+    tripwire = watchConsole(page)
+    let accountId = 7
+    const phases: string[] = []
+    const capture = async (label: string): Promise<void> => {
+      phases.push(`${label}: ${JSON.stringify(await page!.locator('textarea').inputValue())}`)
+    }
+    await mockGateway(page, 'rw', { accountId: () => accountId })
+    const open = async (): Promise<void> => {
+      const warnings = tripwire!.warnings.length
+      await openSeededSession(page!, scaffold)
+      acknowledgeReloadConnectionLoss(tripwire!, warnings)
+      await expect.poll(() => page!.locator('textarea').isEditable()).toBe(true)
+    }
+    await open()
+    await page.locator('textarea').fill('Private release note from Lin')
+    await expect.poll(() => page!.evaluate(() => Object.values(localStorage).some(value => String(value).includes('Private release note from Lin')))).toBe(true)
+    await capture('Lin saves a private draft')
+
+    accountId = 8
+    await open()
+    expect(await page.locator('textarea').inputValue()).toBe('')
+    await capture('Zhou opens the same shared Session')
+    await page.locator('textarea').fill('Private release note from Zhou')
+    await expect.poll(() => page!.evaluate(() => Object.values(localStorage).some(value => String(value).includes('Private release note from Zhou')))).toBe(true)
+
+    accountId = 7
+    await open()
+    expect(await page.locator('textarea').inputValue()).toBe('Private release note from Lin')
+    await capture('Lin returns to the shared Session')
+    accountId = 8
+    await open()
+    expect(await page.locator('textarea').inputValue()).toBe('Private release note from Zhou')
+    await capture('Zhou returns to the shared Session')
+    await compareOrRefreshGolden(PRIVATE_DRAFTS_EXPECTED, phases.join('\n'), MODE)
+  })
+
+  it('restores the composer after account ownership is verified later than the Session', async () => {
+    page = await newEnglishPage(browser)
+    tripwire = watchConsole(page)
+    let blocked = false
+    let release!: () => void
+    const verified = new Promise<void>((resolve) => { release = resolve })
+    await mockGateway(page, 'rw', { accountId: () => 7, contextReady: () => blocked ? verified : Promise.resolve() })
+    try {
+      await openSeededSession(page, scaffold)
+      const input = page.locator('textarea:enabled').last()
+      await input.fill('Private draft restored after account verification')
+      await expect.poll(() => page!.evaluate(() => Object.values(localStorage)
+        .some(value => value.includes('Private draft restored after account verification')))).toBe(true)
+      blocked = true
+      const warnings = tripwire.warnings.length
+      await page.reload({ waitUntil: 'load' })
+      await page.getByText('DONE', { exact: true }).waitFor({ timeout: 15_000 })
+      await expect.poll(() => input.inputValue()).toBe('')
+      release()
+      await expect.poll(() => input.inputValue(), { timeout: 15_000 }).toBe('Private draft restored after account verification')
+      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'ownership-draft.expected.md'),
+        await captureStableAria(page, '[data-composer-card] textarea', scaffold.workspaceCwd), MODE)
+      acknowledgeReloadConnectionLoss(tripwire, warnings)
+    } finally {
+      release()
+    }
+  })
+
   it('shows project scope, staged visibility, participants, and creator sharing controls', async () => {
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
@@ -261,6 +433,17 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     await scope.click()
     const scopePage = page.getByRole('group', { name: 'Switch personal or project scope' })
     await scopePage.waitFor({ timeout: 10_000 })
+    expect(await scopePage.getByRole('button', { name: 'Close', exact: true }).evaluate(element => element === document.activeElement)).toBe(true)
+    expect(await page.locator('[data-sidebar-browsing]').evaluate(element => (element as HTMLElement).inert)).toBe(true)
+    await page.keyboard.press('Shift+Tab')
+    expect(await page.evaluate(() => {
+      const focused = document.activeElement
+      if (!(focused instanceof HTMLElement)) return false
+      const box = focused.getBoundingClientRect()
+      const visible = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)
+      return visible !== null && (focused.contains(visible) || visible.contains(focused))
+    })).toBe(true)
+    await page.keyboard.press('Tab')
     // The grant text moved off the trigger into the page hero; the page stays
     // bounded to the browsing region rather than floating over it.
     expect(await scopePage.textContent()).toContain('Can edit')
@@ -269,6 +452,25 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     if (pageBox === null || viewport === null) throw new Error('scope page geometry is unavailable')
     expect(pageBox.width).toBeLessThanOrEqual(viewport.width / 2)
     await page.getByText('New conversation visibility', { exact: true }).waitFor()
+    for (const colorScheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme })
+      await expect.poll(() => scopePage.page().evaluate(() => document.documentElement.style.colorScheme)).toBe(colorScheme)
+      const colors = await scopePage.getByRole('searchbox', { name: 'Search spaces', exact: true }).evaluate((input) => {
+        let surface: Element = input
+        while (surface.parentElement !== null && getComputedStyle(surface).backgroundColor === 'rgba(0, 0, 0, 0)') surface = surface.parentElement
+        return { foreground: getComputedStyle(input, '::placeholder').color, background: getComputedStyle(surface).backgroundColor }
+      })
+      const luminance = (color: string): number => {
+        const channels = color.match(/[0-9.]+/gu)?.slice(0, 3).map(Number)
+        if (channels === undefined || channels.length !== 3) throw new Error(`Expected computed RGB color: ${color}`)
+        const linear = channels.map(channel => channel / 255)
+          .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+        return linear[0]! * 0.2126 + linear[1]! * 0.7152 + linear[2]! * 0.0722
+      }
+      const levels = [luminance(colors.foreground), luminance(colors.background)].sort((left, right) => left - right)
+      expect((levels[1]! + 0.05) / (levels[0]! + 0.05)).toBeGreaterThanOrEqual(4.5)
+    }
+    await page.emulateMedia({ colorScheme: 'light' })
     const scopeSnapshot = await captureStableAria(page, '[class*="scopePage"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(SCOPE_PICKER_EXPECTED, scopeSnapshot, MODE)
     await stagePrivateVisibility(page)
@@ -288,6 +490,29 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       .toEqual(['{"visibility":"private"}'])
     await expect.poll(() => sharing.textContent(), { timeout: 10_000 }).toContain('Only me')
   }, 60_000)
+
+  it('keeps sharing reads and visibility changes on the exact project Runtime', async () => {
+    page = await newEnglishPage(browser)
+    tripwire = watchConsole(page)
+    const gateway = await mockGateway(page, 'rw', { runtimeDirectory: true })
+    onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-collaboration-runtime-sharing'))
+    await openSeededSession(page, scaffold, NAV_RUNTIME_PROJECT)
+    const sharing = page.getByRole('button', { name: 'Manage conversation sharing' })
+    await expect.poll(() => sharing.isEnabled(), { timeout: 15_000 }).toBe(true)
+    await sharing.click()
+    await page.getByText('Created by Lin', { exact: true }).waitFor()
+    const snapshot = await captureStableAria(page, '[role="menu"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(SHARING_EXPECTED, snapshot, MODE)
+    await page.getByRole('menuitem', { name: /Only me/ }).click()
+    await expect.poll(() => gateway.visibilityBodies).toEqual(['{"visibility":"private"}'])
+    expect(gateway.conversationUrls.length).toBeGreaterThanOrEqual(2)
+    for (const request of gateway.conversationUrls) {
+      const url = new URL(request)
+      expect(url.searchParams.get('dshRuntime')).toBe(NAV_RUNTIME_PROJECT)
+      expect(url.searchParams.get('dshTarget')).toBe('project:9')
+      expect(url.searchParams.get('projectId')).toBe('9')
+    }
+  })
 
   it('shows the target and live startup status while a scope switch waits', async () => {
     page = await newEnglishPage(browser)
@@ -350,7 +575,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     const snapshot = await captureStableAria(page, '[class*="scopePage"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(SCOPE_PICKER_MOBILE_EXPECTED, snapshot, MODE)
     await search.fill('pay')
-    expect(await scopePage.getByRole('button', { name: 'Clear project-space search' }).evaluate(element => getComputedStyle(element).width)).toBe('44px')
+    expect(await scopePage.getByRole('button', { name: 'Clear space search' }).evaluate(element => getComputedStyle(element).width)).toBe('44px')
     expect(await scopePage.getByRole('button', { name: /Audit platform/ }).count()).toBe(0)
     expect(await scopePage.getByRole('button', { name: /Payments migration/ }).count()).toBe(1)
   }, 60_000)
@@ -481,7 +706,131 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
 
   it('keeps its snapshot inventory closed', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, [
-      'header-geometry.expected.md', 'read-only.expected.md', 'scope-picker-mobile.expected.md', 'scope-picker.expected.md', 'sharing.expected.md', 'switching.expected.md',
+      'header-geometry.expected.md', 'incoming-invitation.expected.md', 'ownership-draft.expected.md', 'read-only.expected.md', 'scope-picker-mobile.expected.md', 'scope-picker.expected.md', 'sharing.expected.md', 'switching.expected.md',
     ])
+    await assertFixtureInventory(PRIVATE_DRAFTS_DIR, ['private-drafts.expected.md'])
   })
 })
+
+
+it.skipIf(MODE === 'record')('keeps space navigation, tab drafts and a running turn independent', async () => {
+  const replay = fileURLToPath(new URL('./snapshots/live-interactions/session.jsonl', import.meta.url))
+  const world = await launchWebScaffold({ replayFixture: replay, paceMs: 5, openInApp: false })
+  const acquired: { browser?: Browser; context?: BrowserContext; settled?: Promise<SessionId> } = {}
+  let releaseStep: (() => void) | undefined
+  let stopGate: (() => void) | undefined
+  onTestFinished(async () => {
+    releaseStep?.()
+    stopGate?.()
+    const failures: unknown[] = []
+    if (acquired.settled !== undefined) await acquired.settled.catch((error) => { failures.push(error) })
+    await acquired.context?.close().catch((error) => { failures.push(error) })
+    await acquired.browser?.close().catch((error) => { failures.push(error) })
+    await world.close().catch((error) => { failures.push(error) })
+    if (failures.length > 0) throw new AggregateError(failures, 'space navigation cleanup failed')
+  })
+  await seedSession(world, await readFile(SEED, 'utf8'), SESSION_ID)
+  const browser = await chromium.launch(); acquired.browser = browser
+  const context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', colorScheme: 'dark' })
+  acquired.context = context
+  // Directory aliases exercise browser navigation over one real Host. The
+  // separate runtime-identity scenarios own cross-process data isolation.
+  await mockGateway(context, 'rw', { runtimeDirectory: true, accountId: () => 7 })
+  const page = await context.newPage()
+  const tripwire = watchConsole(page)
+  onTestFailed(() => saveFailureShot(page, 'web-e2e-space-navigation'))
+  await openSeededSession(page, world, NAV_RUNTIME_A)
+  const composer = () => page.locator('textarea:enabled').last()
+  await composer().fill('First tab draft')
+  const other = await context.newPage()
+  const otherTripwire = watchConsole(other)
+  await openSeededSession(other, world, NAV_RUNTIME_A)
+  await other.locator('textarea:enabled').last().fill('Second tab draft')
+  const reloadWarningStart = tripwire.warnings.length
+  await page.reload({ waitUntil: 'networkidle' })
+  acknowledgeReloadConnectionLoss(tripwire, reloadWarningStart)
+  await expect.poll(() => composer().inputValue()).toBe('First tab draft')
+  expect(await other.locator('textarea:enabled').last().inputValue()).toBe('Second tab draft')
+
+  const openSpaces = async () => {
+    await page.getByRole('button', { name: 'Switch personal or project scope', exact: true }).click()
+    const picker = page.getByRole('group', { name: 'Switch personal or project scope', exact: true })
+    await picker.getByRole('button', { name: /Payments migration/ }).waitFor()
+    return picker
+  }
+  const switchTo = async (name: RegExp, id: string) => {
+    const picker = await openSpaces()
+    const warningStart = tripwire.warnings.length
+    await picker.getByRole('button', { name }).click()
+    await page.waitForURL(`**/?dshRuntime=${id}`)
+    await page.waitForLoadState('networkidle')
+    acknowledgeReloadConnectionLoss(tripwire, warningStart)
+  }
+  let picker = await openSpaces()
+  await compareOrRefreshGolden(join(NAV_SNAPSHOT_DIR, 'directory.expected.md'),
+    await captureStableAria(page, '[role="group"][aria-label="Switch personal or project scope"]', world.workspaceCwd), MODE)
+  await picker.getByRole('button', { name: 'Favorite this space', exact: true }).click()
+  await picker.getByRole('button', { name: 'Remove favorite', exact: true }).waitFor()
+  expect(await picker.getByText('Favorites', { exact: true }).isVisible()).toBe(true)
+  expect(await picker.getByRole('button', { name: /Personal/ }).count()).toBe(1)
+  const firstSwitchWarnings = tripwire.warnings.length
+  await picker.getByRole('button', { name: /Payments migration/ }).click()
+  await page.waitForURL(`**/?dshRuntime=${NAV_RUNTIME_PROJECT}`)
+  await page.waitForLoadState('networkidle')
+  acknowledgeReloadConnectionLoss(tripwire, firstSwitchWarnings)
+  expect(new URL(other.url()).searchParams.get('dshRuntime')).toBe(NAV_RUNTIME_A)
+  await switchTo(/Personal/, NAV_RUNTIME_A)
+  await expect.poll(() => composer().inputValue()).toBe('First tab draft')
+  picker = await openSpaces()
+  await picker.getByRole('button', { name: 'Remove favorite', exact: true }).waitFor()
+  await picker.getByRole('button', { name: 'Close', exact: true }).click()
+
+  const image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jY9kAAAAASUVORK5CYII='
+  await page.locator('input[type="file"]').setInputFiles({ name: 'draft.png', mimeType: 'image/png', buffer: Buffer.from(image, 'base64') })
+  await page.getByRole('button', { name: 'Remove image draft.png', exact: true }).waitFor()
+  picker = await openSpaces()
+  await picker.getByRole('button', { name: /Payments migration/ }).click()
+  const offer = page.getByRole('dialog', { name: 'Keep the current draft', exact: true })
+  await offer.waitFor()
+  expect(new URL(page.url()).searchParams.get('dshRuntime')).toBe(NAV_RUNTIME_A)
+  expect(await composer().inputValue()).toBe('First tab draft')
+  await compareOrRefreshGolden(join(NAV_SNAPSHOT_DIR, 'draft-guard.expected.md'),
+    await captureStableAria(page, '[role="dialog"]', world.workspaceCwd), MODE)
+  const opened = context.waitForEvent('page')
+  await offer.getByRole('button', { name: 'Open in a new tab', exact: true }).click()
+  const target = await opened
+  await target.waitForURL(`**/?dshRuntime=${NAV_RUNTIME_PROJECT}`)
+  await page.getByRole('button', { name: 'Remove image draft.png', exact: true }).click()
+  expect(await other.locator('textarea:enabled').last().inputValue()).toBe('Second tab draft')
+  await target.close()
+
+  let enteredStep!: (signal: AbortSignal) => void
+  const entered = new Promise<AbortSignal>((resolve) => { enteredStep = resolve })
+  const stepGate = new Promise<void>((resolve) => { releaseStep = resolve })
+  let hold = true
+  stopGate = world.ctx.on('agent/request', async ({ signal }, next) => {
+    if (hold) { hold = false; enteredStep(signal); await stepGate }
+    return next()
+  })
+  const settled = world.whenTurnSettled(); acquired.settled = settled
+  void settled.catch(() => { /* The scenario and its cleanup observe the retained result. */ })
+  await composer().fill(fixtureUserPrompts(await readFile(replay, 'utf8'))[0]!)
+  await composer().press('Enter')
+  const runningSignal = await entered
+  await expect.poll(() => composer().inputValue()).toBe('')
+  await switchTo(/Payments migration/, NAV_RUNTIME_PROJECT)
+  expect(runningSignal.aborted).toBe(false)
+  expect(await other.locator('textarea:enabled').last().inputValue()).toBe('Second tab draft')
+  releaseStep!()
+  expect(await settled).toBe(SESSION_ID)
+  const completed = await world.ctx.sessionPersistence.load(SessionId(SESSION_ID))
+  const lastEnd = completed?.events.filter(event => event.type === 'turn/end').at(-1)
+  expect(lastEnd?.data.reason.kind).toBe('completed')
+  stopGate()
+  stopGate = undefined
+  expect(tripwire.warnings).toEqual([])
+  expect(tripwire.pageErrors).toEqual([])
+  expect(otherTripwire.warnings).toEqual([])
+  expect(otherTripwire.pageErrors).toEqual([])
+  await assertFixtureInventory(NAV_SNAPSHOT_DIR, ['directory.expected.md', 'draft-guard.expected.md'])
+}, 120_000)

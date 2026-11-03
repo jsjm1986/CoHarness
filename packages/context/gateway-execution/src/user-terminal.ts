@@ -2,6 +2,7 @@
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 import { readGatewayResponseJson } from '@deepseek-ai/dsh-gateway-runtime'
+import { discardGatewayRead } from './response.ts'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { TerminalAuthority, TerminalCreatorId, UserTerminalAuthorization } from '@deepseek-ai/dsh-api-terminal-controller'
 
@@ -38,7 +39,7 @@ export class GatewayUserTerminalAuthorization implements UserTerminalAuthorizati
     const response = await this.runtime.request('/internal/runtime/execution/terminal-authorize', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId }), principal, signal: combined,
     })
-    if (!response.ok) { await response.body?.cancel(); throw denied() }
+    if (!response.ok) { discardGatewayRead(response.body); throw denied() }
     const value: unknown = await readGatewayResponseJson(response, undefined, combined)
     combined.throwIfAborted()
     if (!this.available() || revision !== this.revision || !isRecord(value) || value.userId !== principal.claims.user.id
@@ -74,7 +75,7 @@ export class GatewayUserTerminalAuthorization implements UserTerminalAuthorizati
     const response = await this.runtime.request('/internal/runtime/terminal-management/authorize', {
       method: 'POST', principal, signal: combined,
     })
-    if (response.status !== 204) { await response.body?.cancel(); throw denied() }
+    if (response.status !== 204) { discardGatewayRead(response.body); throw denied() }
     combined.throwIfAborted()
   }
 
@@ -94,7 +95,7 @@ export class GatewayUserTerminalAuthorization implements UserTerminalAuthorizati
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ sessionId: grant.sessionId, grantId: grant.id }), signal: this.lifetime.signal,
         })
-        if (!response.ok) { await response.body?.cancel(); throw denied() }
+        if (!response.ok) { discardGatewayRead(response.body); throw denied() }
         const result: unknown = await readGatewayResponseJson(response, undefined, this.lifetime.signal)
         if (!isRecord(result) || result.userId !== grant.userId) throw denied()
       } catch {

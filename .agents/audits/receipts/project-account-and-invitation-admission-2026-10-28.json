@@ -1,0 +1,704 @@
+{
+  "findings": [
+    "B237",
+    "B238",
+    "B239",
+    "B240",
+    "B241"
+  ],
+  "status": "named_business_and_fixture_acceptance_verified_remaining_full_review_open",
+  "updatedAt": "2026-10-28T11:06:35.171599+00:00",
+  "scope": "Current acting identity for invitation acceptance and authenticated self-owned project creation; invitation recipient/issuer eligibility; SQLite transaction publication; additive PostgreSQL fixture isolation and required replay selection. No universal lifecycle or whole-project completion is claimed.",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchedAt": "2026-10-28T11:06:35.171599+00:00",
+    "preExistingDirtyEditsPreserved": true
+  },
+  "negativeControls": {
+    "account": "Previous emitted HTTP returns204/201 for9 disabled/revoked account, organization membership, organization and project cases; deleted acting accounts separately returned400. Real SQLite2-case negative also fails.",
+    "invitation": "Actual emitted HTTP issues201 in4of6 recipient-membership/scope scenarios. Physical recipient disablement409 and issuer-membership disablement403 were already correct. Real two-connection SQLite control publishes after the captured recipient becomes inactive.",
+    "sharedSchema": "Combined284-case source run records283 passes and one42P01 failure while Steward setup drops harness.",
+    "registry": "All5 newly introduced direct PostgreSQL replay files were omitted by this audit from test:postgres; the required registry check detects them.",
+    "databaseSelection": "Old preflight accepts a non-test database path when application_name ends in_test. The negative control executes only that preflight, never SQL or Vitest."
+  },
+  "fixes": [
+    "Retain current active acting user and organization membership before project/allocation admission. Missing/deleted acting identities are typed403; trusted internal owner/recipient errors retain their existing classification.",
+    "Require active project and current organization availability for accepting invitations. Denial preserves the pending record except relationships already removed by authorized account deletion; deleted identities are never resurrected.",
+    "The HTTP self-creation path supplies the authenticated actor, owner and creator; client actor/owner fields cannot override them. Explicit service actor omission denotes trusted internal maintenance.",
+    "Retain issuer and recipient membership before the project lock and check project/organization availability before issuing or renewing a pending invitation. Unavailable recipient returns409 and unavailable issuer/scope403.",
+    "Place SQLite active-account and invitation eligibility checks in the immediate publication transaction.",
+    "Remove Steward shared-schema reset. UUID organization records live until the disposable database owner cleans them; close pool and temporary files without altering retention foreign keys. Migration/restore reset suites keep the exclusive serialized lane.",
+    "Register the5 replay specs in test:postgres and validate the pg driver-selected database name through one plain-ESM test helper. Undefined configuration permits keyless skipping; required command rejects it."
+  ],
+  "acceptance": {
+    "sourceCasesPassed": 299,
+    "sourceFilesPassed": 15,
+    "skipped": 0,
+    "sourceNode": "v25.8.1",
+    "assembledHttp": {
+      "observationsPerRuntime": 30,
+      "account": 11,
+      "invitation": 6,
+      "deletion": 1,
+      "administrator": 6,
+      "manager": 6,
+      "source": true,
+      "plainNode22": "v22.22.1 passed5 transcripts",
+      "plainNode24": "v24.19.0 passed5 transcripts",
+      "checks": [
+        "actual login and HTTP status",
+        "no new membership/project/directory/success audit on denial",
+        "pending invitation retained after temporary access revocation",
+        "fresh authorized retry succeeds",
+        "authenticated self ownership/provenance survives spoofed body fields",
+        "expired pending invitation unchanged when eligibility denies renewal",
+        "retained host bytes and all affected members invalidated"
+      ]
+    },
+    "sqlite": "Source and compiled actual two-connection publication/acceptance replay passes on matching host Node25 native ABI. Node22/24 SQLite native replay was not claimed.",
+    "locking": "Real single-connection pool, admitted operations versus queued user/membership revocation, organization changes during project/allocation waits, project archival/deletion, directory compensation and lost-ACK regressions pass. Organization availability is checked fresh at admission, not a universal organization-revocation lease.",
+    "independentProcesses": "Two separate Vitest processes are observed waiting at the real migration advisory barrier before release; both finish exit0 with no signal and preserve a peer organization.",
+    "databaseGuard": "13 parser/driver selection cases and2 corpus/registry cases pass; misleading query preflight now exits1 without connecting.",
+    "gatewayDirectBuild": "passed before final harness-only changes; no production source changed afterward",
+    "gatewayNoEmit": "passed",
+    "scopedLint": "passed",
+    "documentation": "4 bilingual pairs and20 quick documentation gates passed; direct current-version guide headings/frontmatter/triplet/word-budget and changed-path whitespace/newline check passed",
+    "schemaChanged": false,
+    "sessionOrSdkChanged": false,
+    "wireRequestFieldsChanged": false,
+    "liveModelApiCalled": false
+  },
+  "coverage": {
+    "report": "gateway/coverage/project-relationships-r2-20261028/coverage-summary.json",
+    "metrics": {
+      "total": {
+        "statements": 65.64,
+        "branches": 60.8,
+        "functions": 79.12,
+        "lines": 69.67
+      },
+      "gateway/src/projects.ts": {
+        "statements": 85.06,
+        "branches": 72.76,
+        "functions": 95.65,
+        "lines": 87
+      },
+      "gateway/src/server.ts": {
+        "statements": 57.81,
+        "branches": 54.94,
+        "functions": 65.9,
+        "lines": 61.98
+      },
+      "gateway/src/services.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "gateway/src/postgres/project-management-authority.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "gateway/src/postgres/project-service.ts": {
+        "statements": 80.06,
+        "branches": 72.92,
+        "functions": 87.23,
+        "lines": 86.93
+      }
+    },
+    "remaining": "Diagnostic full-class/server measurement remains below100percent. All12 domain reviews and file review/coverage debt remain open. No threshold was lowered and no exclusion was added.",
+    "thresholdsLowered": false,
+    "exclusionsAdded": false
+  },
+  "notes": {
+    "updatedExisting": [
+      ".agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.md",
+      ".agents/notes/implemented/bug-fix/2026-09-28-gateway-fixture-state-isolation.md"
+    ],
+    "new": [],
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false
+  },
+  "cleanup": {
+    "owned": true,
+    "name": "hgw-project-account-78eb3cf3",
+    "database": "hgw_projects_test",
+    "productionPortExcluded": 5432,
+    "createdAt": "2026-10-28T09:33:55.111643+00:00",
+    "status": "stopped_and_removed_after_verification",
+    "id": "706f9b57fd437fe0a75ccaea161b8385beb6cb42a6839228552e843f6c04f303",
+    "port": 54428,
+    "url": "postgresql://postgres@127.0.0.1:54428/hgw_projects_test",
+    "version": "PostgreSQL 18.6 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+    "cleanedAt": "2026-10-28T11:05:06.889618+00:00",
+    "productionDataAccessed": false,
+    "verifiedScopes": [
+      "B237",
+      "B238",
+      "B239",
+      "B240",
+      "B241"
+    ]
+  },
+  "currentNamedRegressions": [
+    "B232",
+    "B233",
+    "B234",
+    "B235",
+    "B236"
+  ],
+  "unsuccessfulEvidencePreserved": [
+    "The initial parallel aggregate failed42P01 and is not a passing result.",
+    "An attempted fixture cleanup DELETE of its own organization failed the retained-user foreign key after all22 Steward cases passed; the repair retains scoped records until disposable database destruction. No product foreign key was weakened.",
+    "The first schema-reset corpus guard was overbroad and rejected legitimate exclusive migration/restore suites; the final guard targets only declared additive fixtures.",
+    "All pre-fix negative controls and earlier registry failures remain recorded with their original exit status."
+  ],
+  "limitations": [
+    "All12 business domains remain in progress. Named scenario verification is not whole-file coverage or whole-project completion.",
+    "Project deletion actor admission and runtime stop/grant lifetime require further independent review.",
+    "No new performance benchmark, native Windows execution or Linux native SQLite ABI replay was performed.",
+    "Real model API success verification remains explicitly user-deferred."
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "commandReceipts": [
+    {
+      "name": "project-account-before-emitted-negative",
+      "status": "failed",
+      "startedAt": "2026-10-28T09:33:56.766914+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54428/hgw_projects_test",
+        "DSH_HOME=/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/project-account-negative-3oeaxxof/dsh",
+        "DSH_AGENTS_HOME=/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/project-account-negative-3oeaxxof/agents",
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/fixtures/project-account-admission.mjs",
+        "lib"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T09:33:58.937385+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-account-before-emitted-negative.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-account-before-emitted-negative.log"
+    },
+    {
+      "name": "project-account-before-sqlite-negative",
+      "status": "failed",
+      "startedAt": "2026-10-28T09:37:14.770280+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/projects.spec.ts",
+        "--maxWorkers=2",
+        "-t",
+        "refuses a disabled SQLite account"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T09:37:15.764700+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-account-before-sqlite-negative.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-account-before-sqlite-negative.log"
+    },
+    {
+      "name": "project-account-before-emitted-deletion-negative",
+      "status": "failed",
+      "startedAt": "2026-10-28T09:49:45.627244+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54428/hgw_projects_test",
+        "DSH_HOME=/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/project-account-deletion-negative-rxx8dwic/dsh",
+        "DSH_AGENTS_HOME=/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/project-account-deletion-negative-rxx8dwic/agents",
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/fixtures/project-account-admission.mjs",
+        "lib"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T09:49:50.286597+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-account-before-emitted-deletion-negative.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-account-before-emitted-deletion-negative.log"
+    },
+    {
+      "name": "project-invitation-before-emitted-negative",
+      "status": "failed",
+      "startedAt": "2026-10-28T10:01:02.734869+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54428/hgw_projects_test",
+        "DSH_HOME=/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/invitation-admission-negative-i39g81_b/dsh",
+        "DSH_AGENTS_HOME=/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/invitation-admission-negative-i39g81_b/agents",
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/fixtures/project-invitation-admission.mjs",
+        "lib"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T10:01:04.150307+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-invitation-before-emitted-negative.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-invitation-before-emitted-negative.log"
+    },
+    {
+      "name": "project-invitation-before-sqlite-emitted-negative",
+      "status": "failed",
+      "startedAt": "2026-10-28T10:11:39.327005+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_HOME=/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/sqlite-invitation-negative-w4rcjd5i/dsh",
+        "DSH_AGENTS_HOME=/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/sqlite-invitation-negative-w4rcjd5i/agents",
+        "node",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/fixtures/sqlite-invitation-admission.mjs",
+        "lib"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T10:11:39.508099+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-invitation-before-sqlite-emitted-negative.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-invitation-before-sqlite-emitted-negative.log"
+    },
+    {
+      "name": "project-relationships-final-source-coverage",
+      "status": "failed",
+      "startedAt": "2026-10-28T10:19:07.127714+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54428/hgw_projects_test",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/project-service-postgres.spec.ts",
+        "tests/projects.spec.ts",
+        "tests/project-account-admission-transcript.spec.ts",
+        "tests/project-invitation-admission-transcript.spec.ts",
+        "tests/sqlite-invitation-admission-transcript.spec.ts",
+        "tests/project-deletion-transcript.spec.ts",
+        "tests/project-administration-transcript.spec.ts",
+        "tests/project-management-transcript.spec.ts",
+        "tests/admin-api.spec.ts",
+        "tests/project-model-settings.spec.ts",
+        "tests/model-governance-integration.spec.ts",
+        "tests/steward.spec.ts",
+        "tests/server.spec.ts",
+        "--maxWorkers=2",
+        "--coverage",
+        "--coverage.include=src/postgres/project-service.ts",
+        "--coverage.include=src/projects.ts",
+        "--coverage.include=src/services.ts",
+        "--coverage.include=src/server.ts",
+        "--coverage.include=src/postgres/project-management-authority.ts",
+        "--coverage.reportsDirectory=coverage/project-relationships-current-20261028",
+        "--coverage.reporter=json",
+        "--coverage.reporter=json-summary",
+        "--coverage.reporter=text"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T10:19:25.493292+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-final-source-coverage.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-final-source-coverage.log"
+    },
+    {
+      "name": "project-relationships-pg-registry-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T10:27:22.017078+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/postgres-suite.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T10:27:22.595454+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-pg-registry-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-pg-registry-before.log"
+    },
+    {
+      "name": "project-relationships-pg-schema-policy-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T10:40:08.189082+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/postgres-suite.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T10:40:08.808253+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-pg-schema-policy-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-pg-schema-policy-before.log"
+    },
+    {
+      "name": "project-relationships-shared-schema-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T10:42:45.484397+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/postgres-suite.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T10:42:46.272540+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-shared-schema-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-shared-schema-before.log"
+    },
+    {
+      "name": "project-relationships-database-preflight-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T10:40:08.048980+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/prove-test-database-preflight.py"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T10:40:08.111549+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-database-preflight-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-database-preflight-before.log"
+    },
+    {
+      "name": "project-relationships-database-preflight-current",
+      "status": "passed",
+      "startedAt": "2026-10-28T10:45:01.511764+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/prove-test-database-preflight.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T10:45:01.587368+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-database-preflight-current.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-database-preflight-current.log"
+    },
+    {
+      "name": "project-relationships-database-units-current",
+      "status": "passed",
+      "startedAt": "2026-10-28T10:45:00.837436+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/postgres-test-database.spec.ts",
+        "tests/postgres-suite.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T10:45:01.480126+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-database-units-current.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-database-units-current.log"
+    },
+    {
+      "name": "project-relationships-postgres-isolation-current",
+      "status": "failed",
+      "startedAt": "2026-10-28T10:50:41.953069+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/prove-postgres-fixture-isolation.mjs"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T10:50:44.452420+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-postgres-isolation-current.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-postgres-isolation-current.log"
+    },
+    {
+      "name": "project-relationships-postgres-isolation-r2",
+      "status": "passed",
+      "startedAt": "2026-10-28T10:56:09.519375+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/prove-postgres-fixture-isolation-r2.mjs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T10:56:12.401570+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-postgres-isolation-r2.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-postgres-isolation-r2.log"
+    },
+    {
+      "name": "project-relationships-final-build",
+      "status": "passed",
+      "startedAt": "2026-10-28T10:19:25.527180+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--project",
+        "tsconfig.build.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T10:19:28.049894+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-final-build.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-final-build.log"
+    },
+    {
+      "name": "project-relationships-r2-final",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:00:54.667708+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-project-relationships-r2.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:03:17.729014+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-final.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-final.log"
+    },
+    {
+      "name": "project-relationships-r2-lint",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:00:54.718420+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_OXLINT_THREADS=1",
+        "node_modules/.bin/tsx",
+        "scripts/run-oxlint.ts",
+        "gateway/src/postgres/project-service.ts",
+        "gateway/src/projects.ts",
+        "gateway/src/services.ts",
+        "gateway/src/server.ts",
+        "gateway/tests/project-service-postgres.spec.ts",
+        "gateway/tests/projects.spec.ts",
+        "gateway/tests/project-account-admission-transcript.spec.ts",
+        "gateway/tests/project-invitation-admission-transcript.spec.ts",
+        "gateway/tests/sqlite-invitation-admission-transcript.spec.ts",
+        "gateway/tests/project-management-transcript.spec.ts",
+        "gateway/tests/project-administration-transcript.spec.ts",
+        "gateway/tests/project-deletion-transcript.spec.ts",
+        "gateway/tests/steward.spec.ts",
+        "gateway/tests/postgres-suite.spec.ts",
+        "gateway/tests/postgres-test-database.spec.ts",
+        "gateway/tests/postgres-test-database.d.mts",
+        "gateway/tests/postgres-test-database.mjs",
+        "gateway/tests/fixtures/project-account-admission.mjs",
+        "gateway/tests/fixtures/project-invitation-admission.mjs",
+        "gateway/tests/fixtures/sqlite-invitation-admission.mjs",
+        "gateway/tests/fixtures/project-management.mjs",
+        "gateway/tests/fixtures/project-administration.mjs",
+        "gateway/tests/fixtures/project-deletion.mjs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:00:56.394796+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-lint.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-lint.log"
+    },
+    {
+      "name": "project-relationships-r2-source-coverage",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:00:56.425738+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54428/hgw_projects_test",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/project-service-postgres.spec.ts",
+        "tests/projects.spec.ts",
+        "tests/project-account-admission-transcript.spec.ts",
+        "tests/project-invitation-admission-transcript.spec.ts",
+        "tests/sqlite-invitation-admission-transcript.spec.ts",
+        "tests/project-deletion-transcript.spec.ts",
+        "tests/project-administration-transcript.spec.ts",
+        "tests/project-management-transcript.spec.ts",
+        "tests/admin-api.spec.ts",
+        "tests/project-model-settings.spec.ts",
+        "tests/model-governance-integration.spec.ts",
+        "tests/steward.spec.ts",
+        "tests/server.spec.ts",
+        "tests/postgres-suite.spec.ts",
+        "tests/postgres-test-database.spec.ts",
+        "--maxWorkers=2",
+        "--coverage",
+        "--coverage.include=src/postgres/project-service.ts",
+        "--coverage.include=src/projects.ts",
+        "--coverage.include=src/services.ts",
+        "--coverage.include=src/server.ts",
+        "--coverage.include=src/postgres/project-management-authority.ts",
+        "--coverage.reportsDirectory=coverage/project-relationships-r2-20261028",
+        "--coverage.reporter=json",
+        "--coverage.reporter=json-summary",
+        "--coverage.reporter=text"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:01:16.870756+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-source-coverage.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-source-coverage.log"
+    },
+    {
+      "name": "project-relationships-r2-types",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:01:16.903082+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:01:20.773215+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-types.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-types.log"
+    },
+    {
+      "name": "project-relationships-r2-emitted-node22",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:01:20.801899+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54428/hgw_projects_test",
+        "DSH_EXAMPLE_MODE=lib",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/project-account-admission-transcript.spec.ts",
+        "tests/project-invitation-admission-transcript.spec.ts",
+        "tests/project-deletion-transcript.spec.ts",
+        "tests/project-administration-transcript.spec.ts",
+        "tests/project-management-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:01:25.856249+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-emitted-node22.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-emitted-node22.log"
+    },
+    {
+      "name": "project-relationships-r2-emitted-node24",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:01:25.886280+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54428/hgw_projects_test",
+        "DSH_EXAMPLE_MODE=lib",
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/project-account-admission-transcript.spec.ts",
+        "tests/project-invitation-admission-transcript.spec.ts",
+        "tests/project-deletion-transcript.spec.ts",
+        "tests/project-administration-transcript.spec.ts",
+        "tests/project-management-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:01:30.696375+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-emitted-node24.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-emitted-node24.log"
+    },
+    {
+      "name": "project-relationships-r2-emitted-sqlite-host",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:01:30.732097+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/sqlite-invitation-admission-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:01:31.332859+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-emitted-sqlite-host.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-emitted-sqlite-host.log"
+    },
+    {
+      "name": "project-relationships-r2-doc-pairs",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:01:31.362058+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/tsx",
+        "scripts/verify-translation-pairing.ts",
+        "--write",
+        "gateway/README.md",
+        ".agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.md",
+        "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.md",
+        ".agents/notes/implemented/bug-fix/2026-09-28-gateway-fixture-state-isolation.md"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:01:32.052135+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-doc-pairs.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-doc-pairs.log"
+    },
+    {
+      "name": "project-relationships-r2-doc-quick",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:01:32.080923+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "pnpm",
+        "run",
+        "test:docs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:03:17.718706+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-doc-quick.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-relationships-r2-doc-quick.log"
+    }
+  ],
+  "sourceSha256": {
+    "gateway/src/postgres/project-service.ts": "1f79758948d9aa3f255654a78ede15ab4cf3a2f3ea0a7df05bfc6c0473fa5a0b",
+    "gateway/src/postgres/project-management-authority.ts": "86119694874700d01b2628d18574771b873fa4a0b49f15f68d400f4f9a3e1e89",
+    "gateway/src/projects.ts": "8aa5e68629fc6b18c4aa163cb918cad89d7e0f7cd7435a49a54315f6cf13fb89",
+    "gateway/src/services.ts": "d8f420b3da3c5888f866c81c9a4561c26d1d6f16e209abe0baf97d1212f2bcb3",
+    "gateway/src/server.ts": "bf98a9dfc45b903944f1717194e647c52aa1fd922beb54d7f9194f8d4c9a6536"
+  },
+  "validationSha256": {
+    "gateway/tests/project-service-postgres.spec.ts": "76427f6416f802452b8abe4e1b93c5fe168c73bb6f4d4888ec5e4d13819dd74a",
+    "gateway/tests/projects.spec.ts": "a641e891ae23ccd39f8d0c774d7a8b7dfc8003e4aebcc172e68e5fe25f7705f1",
+    "gateway/tests/project-account-admission-transcript.spec.ts": "51a28ed9527095c7423656da7ac6fccaf8202d9108cfebc6f0aaec3f51810dca",
+    "gateway/tests/project-invitation-admission-transcript.spec.ts": "e50af7fe6262ffc5d772ab14acfe6379d73c58a3e68d56804f58100490c8f413",
+    "gateway/tests/sqlite-invitation-admission-transcript.spec.ts": "c604f72e6ec5ec20b3cc77c8da673b5fc99897b81c546e051fa16e1429161f9b",
+    "gateway/tests/project-management-transcript.spec.ts": "b62d25b17fc575cbfae3c57df5d4c83dc3a41fe9af65b4f2c78f3b9e7caff036",
+    "gateway/tests/project-administration-transcript.spec.ts": "4d1b079d28e18bd549582409a8b72fa69a3c22839d95f2068fc7b91ece38690f",
+    "gateway/tests/project-deletion-transcript.spec.ts": "3c23aa55ddb850f0f841ade5c10b457c41ecbfed3d4ee4f8c70d15782353ac12",
+    "gateway/tests/steward.spec.ts": "eb122e88a747b43c0861c8d7c7e753fe64a7d5830979c533d4da3e6653d9b4e2",
+    "gateway/tests/postgres-suite.spec.ts": "ba9d461afd941417c0dfa609aca6943a939b929c776f79d993093e9219464927",
+    "gateway/tests/postgres-test-database.spec.ts": "de22cd2d43c56fbef826dcbb2bf67be67d2765f376fa61d19b62a9ef4c7e0578",
+    "gateway/tests/postgres-test-database.d.mts": "fafdca6fec44d62dd539fba6fcfb9eba9eef2d8779aef4dc253df597df244fa5",
+    "gateway/tests/postgres-test-database.mjs": "41238ccb76eb17a7e53ae54230cf3556c26ed219b7dd0b0200b375c3e2b7dd33",
+    "gateway/tests/fixtures/project-account-admission.mjs": "b3e9a81a0fe4da757f25277cf83398249f67ecc3b90fa7ca658519195dcec459",
+    "gateway/tests/fixtures/project-invitation-admission.mjs": "b938e5ce7c8be2499cba9a48822a8fbb0644873b33eed5df5bd1f2ecd5b05201",
+    "gateway/tests/fixtures/sqlite-invitation-admission.mjs": "4975eb504ba712a91f0b4c9e904d6b69c4719161e8c878fda6ccc5eed44d4574",
+    "gateway/tests/fixtures/project-management.mjs": "867fdf0a99df3a656b1582883cf3971b98c8436ef437cdfeacab7dc5c6329ce8",
+    "gateway/tests/fixtures/project-administration.mjs": "a01053b1ff6520f2fcd3800adf1b6bc52129d27ca9602ff8283b25a4982a7af4",
+    "gateway/tests/fixtures/project-deletion.mjs": "3e29cf61cc5f8cdb260c663cfbccc960125d05f34a747f5380049e6250ed3ba4",
+    "gateway/tests/expected/projects/account-admission.jsonl": "e8a8bca01f076e300d2edbbc36de01d3a89c6ec654ba5545a2f3bd3205edfaa0",
+    "gateway/tests/expected/projects/invitation-admission.jsonl": "b9f890689fb347f42a70523f6fceba9ac9cbf5b65e8e5f3b8df0817e3be201c4",
+    "gateway/tests/expected/projects/sqlite-invitation-admission.jsonl": "500564a7fa6d5d4e0562f663aa189ab3c541c32a3090be731e7864e1181a5bde",
+    "gateway/package.json": "b905d8350e4346820f21c05a7e0ff5c6c1a6d4fff15b1f83aa34b8627769042a"
+  },
+  "documentationSha256": {
+    "gateway/README.md": "70fda491129498f391242de98970e15b6205d824c84e40c2b04ddb7d46b583e2",
+    "gateway/README.zh.md": "b5e2774902b48d588c3f695e945ca2d8cf0332a51eadb9dd265fb5f9fcdd706c",
+    "gateway/README.i18n.yaml": "13b3c6163dd7ac5d419c9e96f3a524b24541266d6ff102eae97b76c23dbc3797",
+    ".agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.md": "b60ef005aa35f9f666c51d7d21e82e5c1d65e329df29090b748905c70c1746e8",
+    ".agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.zh.md": "4f8a69d5a8ec3c506f172bd7d5bf4169d933c23e8e06c2d57308ccf498653ff9",
+    ".agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.i18n.yaml": "0e04fdf25a422a587bf1a63a9dbd950cb7c9e1d06af04d64fe657494c92851ce",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.md": "98455f77573ca8094d9762f4d46c657944193ecc8b55879d9cfbb771dc2f2cb3",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.zh.md": "f745022314e7a94b8ef23db363aa60984360cfa97c7c22034ed600cd9374c8d6",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.i18n.yaml": "f735f82b50c68ca1901a21c0b8f598b6e4d1292d2281bbcf54706084062ea78f",
+    ".agents/notes/implemented/bug-fix/2026-09-28-gateway-fixture-state-isolation.md": "f55362fd53669598c5b74fee8045f4f4ed805aed242bf3a91d14eeb4a15ac7a4",
+    ".agents/notes/implemented/bug-fix/2026-09-28-gateway-fixture-state-isolation.zh.md": "e969674dace63b30d3a5a4999939c8e5ac4c93bbaa5c4c812779b68a3fa64c9e",
+    ".agents/notes/implemented/bug-fix/2026-09-28-gateway-fixture-state-isolation.i18n.yaml": "218c99fb516700846ba4d60354cd4685437c1cf3515aeed997fce2c3c1dbf309"
+  },
+  "emittedSha256": {
+    "gateway/lib/postgres/project-service.js": "2f3714104b583ddbfed0de84d23531f8983d5fff02ee985e80ce6df6faf49c77",
+    "gateway/lib/postgres/project-management-authority.js": "fa406bf7f374155d6be5c8b97c20daf2eed2c5a0387235735e34735acf2273b9",
+    "gateway/lib/projects.js": "a45bc5076bb5722788610bb4eff6a8401085d395b8cb3a9646d2b9d8028fb2cd",
+    "gateway/lib/services.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "gateway/lib/server.js": "b45ab05588a9a32c5b9a569ecdd730a255c711dd1669479f31c61e1e565383a9"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "gateway-execution-scope-lint",
+  "cwd": ".",
+  "command": "pnpm exec eslint gateway/tests/execution-fixture-server.ts gateway/tests/run-built-resource-admission.mjs gateway/tests/fixtures/runtime-start-built.mjs packages/context/gateway-execution/tests/pg-composition.e2e.ts scripts/ci-workflow.spec.ts",
+  "startedAt": "2026-10-23T13:04:31.053489+00:00",
+  "seconds": 3.927,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "deda2a985ce434253d0329dce6f9a49e1259d889d86533592391c0608ac71a6d",
+  "inputsAfter": "deda2a985ce434253d0329dce6f9a49e1259d889d86533592391c0608ac71a6d",
+  "outputSha256": "07433ec4f264fcbea011cb736ce73cb5ee9afe467c58738003d111174fc1adeb",
+  "outputTail": "\nOops! Something went wrong! :(\n\nESLint: 10.5.0\n\nESLint couldn't find an eslint.config.(js|mjs|cjs) file.\n\nFrom ESLint v9.0.0, the default configuration file is now eslint.config.js.\nIf you are using a .eslintrc.* file, please follow the migration guide\nto update your configuration file to the new format:\n\nhttps://eslint.org/docs/latest/use/configure/migration-guide\n\nIf you still have problems after following the migration guide, please stop by\nhttps://eslint.org/chat/help to chat with the team.\n\n"
+}

@@ -1,0 +1,310 @@
+{
+  "recordedAt": "2026-10-28T23:08:48.345039+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "findings": [
+    "B241"
+  ],
+  "scopeExtension": {
+    "legacyEntryPoints": 35,
+    "newLegacyEntries": 34,
+    "priorDigestEntry": "gateway/tests/project-progress-postgres.spec.ts",
+    "entryPaths": [
+      "gateway/tests/maintenance.spec.ts",
+      "gateway/tests/run-local-web-assembly.mjs",
+      "gateway/tests/project-activity-postgres.spec.ts",
+      "gateway/tests/deployment-restore.spec.ts",
+      "gateway/tests/ssh.spec.ts",
+      "gateway/tests/execution-fixture-server.ts",
+      "gateway/tests/project-activity.perf.ts",
+      "gateway/tests/admin-business-postgres.spec.ts",
+      "gateway/tests/execution-scopes.spec.ts",
+      "gateway/tests/instance-capacity-postgres.spec.ts",
+      "gateway/tests/access-invalidation.spec.ts",
+      "gateway/tests/conversation-writer.perf.ts",
+      "gateway/tests/node-config-process.spec.ts",
+      "gateway/tests/execution.spec.ts",
+      "gateway/tests/postgres.spec.ts",
+      "gateway/tests/document-upload-postgres.spec.ts",
+      "gateway/tests/plugin-state.spec.ts",
+      "gateway/tests/deployment-backups.spec.ts",
+      "gateway/tests/document-catalog-maintenance.spec.ts",
+      "gateway/tests/startup-generation.spec.ts",
+      "gateway/tests/webhook.spec.ts",
+      "gateway/tests/auth-admission.perf.ts",
+      "gateway/tests/runtime-resource-provider.spec.ts",
+      "gateway/tests/progress-material.perf.ts",
+      "gateway/tests/auth-postgres.spec.ts",
+      "gateway/tests/fixtures/project-activity-perf.mjs",
+      "gateway/tests/fixtures/runtime-start-built.mjs",
+      "gateway/tests/fixtures/project-progress-built.mjs",
+      "gateway/tests/fixtures/gateway-model-owner.ts",
+      "gateway/tests/fixtures/progress-material-perf.mjs",
+      "gateway/tests/fixtures/conversation-writer-perf.mjs",
+      "gateway/tests/fixtures/local-runtime-web-gateway.mjs",
+      "gateway/tests/fixtures/auth-admission-perf.mjs",
+      "gateway/tests/fixtures/node-service-gateway.mjs"
+    ],
+    "mandatoryChildBootstraps": [
+      "gateway/tests/fixtures/local-runtime-web-gateway.mjs",
+      "gateway/tests/fixtures/node-service-gateway.mjs"
+    ]
+  },
+  "negativeReceipt": {
+    "name": "postgres-test-entry-guards-causal-before",
+    "status": "failed",
+    "startedAt": "2026-10-28T22:43:47.771836+00:00",
+    "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+    "command": [
+      "../node_modules/.bin/vitest",
+      "run",
+      "tests/postgres-suite.spec.ts",
+      "tests/postgres-test-database.spec.ts",
+      "--maxWorkers=2"
+    ],
+    "exitCode": 1,
+    "finishedAt": "2026-10-28T22:43:48.306219+00:00"
+  },
+  "behavior": [
+    "Every directly configured test database is validated using the actual pg driver database selection.",
+    "The two mandatory Web child bootstraps reject missing configuration before runtime setup instead of falling through to process defaults.",
+    "The recursive executed registry test checks specs, diagnostic scripts, perf entries and child fixtures for selector use."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "postgres-test-entry-native-rejection",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:48:45.156931+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/postgres-suite.spec.ts",
+          "tests/postgres-test-database.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:48:45.731280+00:00"
+      },
+      {
+        "name": "postgres-test-entry-node22",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:58:14.543020+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/postgres-suite.spec.ts",
+          "tests/postgres-test-database.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:58:15.270133+00:00"
+      },
+      {
+        "name": "postgres-test-entry-node24",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:04:58.016311+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/postgres-suite.spec.ts",
+          "tests/postgres-test-database.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:04:58.643063+00:00"
+      },
+      {
+        "name": "postgres-test-entry-keyless-collection",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:55:14.865084+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "-u",
+          "HGW_TEST_DATABASE_URL",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/maintenance.spec.ts",
+          "tests/project-activity-postgres.spec.ts",
+          "tests/deployment-restore.spec.ts",
+          "tests/ssh.spec.ts",
+          "tests/admin-business-postgres.spec.ts",
+          "tests/execution-scopes.spec.ts",
+          "tests/instance-capacity-postgres.spec.ts",
+          "tests/access-invalidation.spec.ts",
+          "tests/node-config-process.spec.ts",
+          "tests/execution.spec.ts",
+          "tests/postgres.spec.ts",
+          "tests/document-upload-postgres.spec.ts",
+          "tests/plugin-state.spec.ts",
+          "tests/deployment-backups.spec.ts",
+          "tests/document-catalog-maintenance.spec.ts",
+          "tests/startup-generation.spec.ts",
+          "tests/webhook.spec.ts",
+          "tests/runtime-resource-provider.spec.ts",
+          "tests/auth-postgres.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:55:19.034875+00:00"
+      },
+      {
+        "name": "postgres-test-guards-gateway-types-utf8",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:55:58.250270+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-preferences-typecheck.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:55:59.025666+00:00"
+      },
+      {
+        "name": "postgres-test-entry-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:56:36.247513+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/tests/maintenance.spec.ts",
+          "gateway/tests/run-local-web-assembly.mjs",
+          "gateway/tests/project-activity-postgres.spec.ts",
+          "gateway/tests/deployment-restore.spec.ts",
+          "gateway/tests/ssh.spec.ts",
+          "gateway/tests/execution-fixture-server.ts",
+          "gateway/tests/project-activity.perf.ts",
+          "gateway/tests/admin-business-postgres.spec.ts",
+          "gateway/tests/execution-scopes.spec.ts",
+          "gateway/tests/instance-capacity-postgres.spec.ts",
+          "gateway/tests/access-invalidation.spec.ts",
+          "gateway/tests/conversation-writer.perf.ts",
+          "gateway/tests/node-config-process.spec.ts",
+          "gateway/tests/execution.spec.ts",
+          "gateway/tests/postgres.spec.ts",
+          "gateway/tests/document-upload-postgres.spec.ts",
+          "gateway/tests/plugin-state.spec.ts",
+          "gateway/tests/deployment-backups.spec.ts",
+          "gateway/tests/document-catalog-maintenance.spec.ts",
+          "gateway/tests/startup-generation.spec.ts",
+          "gateway/tests/webhook.spec.ts",
+          "gateway/tests/auth-admission.perf.ts",
+          "gateway/tests/runtime-resource-provider.spec.ts",
+          "gateway/tests/progress-material.perf.ts",
+          "gateway/tests/auth-postgres.spec.ts",
+          "gateway/tests/fixtures/project-activity-perf.mjs",
+          "gateway/tests/fixtures/runtime-start-built.mjs",
+          "gateway/tests/fixtures/project-progress-built.mjs",
+          "gateway/tests/fixtures/gateway-model-owner.ts",
+          "gateway/tests/fixtures/progress-material-perf.mjs",
+          "gateway/tests/fixtures/conversation-writer-perf.mjs",
+          "gateway/tests/fixtures/local-runtime-web-gateway.mjs",
+          "gateway/tests/fixtures/auth-admission-perf.mjs",
+          "gateway/tests/fixtures/node-service-gateway.mjs",
+          "gateway/tests/postgres-suite.spec.ts",
+          "gateway/tests/postgres-test-database.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:56:37.356770+00:00"
+      },
+      {
+        "name": "digest-and-postgres-current-owned-doc-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:07:54.483463+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "gateway/README.md",
+          ".agents/notes/implemented/bug-fix/2026-10-29-model-administration-authority.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-administration-authority/guide.md",
+          ".agents/notes/implemented/bug-fix/2026-09-28-gateway-fixture-state-isolation.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:07:54.740548+00:00"
+      }
+    ],
+    "pureAndNativeCasesPerEngine": 20,
+    "engines": [
+      "host25.8.1",
+      "22.22.1",
+      "24.19.0"
+    ],
+    "keylessCollection": {
+      "passed": 3,
+      "skipped": 345,
+      "files": 19
+    },
+    "databaseConnectionsForNegativeUriChecks": 0,
+    "scope": "Imports, database selection and rejection paths; source protocol, node routing and lifecycle behavior are unchanged."
+  },
+  "sourceHashes": {
+    "gateway/tests/maintenance.spec.ts": "dc06fbf5c77f277802f62fcc2949ba7f82cd7eb08c260304c97b4c7ab1dde772",
+    "gateway/tests/run-local-web-assembly.mjs": "5497a7232559986a02bf22ca8253950a4360ae3c0a91a8211fa1f531aeed919c",
+    "gateway/tests/project-activity-postgres.spec.ts": "f28d0f27360bdfe6fd96684911ca9e8919c0c6d40d1c381aa352f8e98ce36334",
+    "gateway/tests/deployment-restore.spec.ts": "ba078b0795fb3bf07c5baa5624578232cd6cce89aa87565580f776ea64553ac4",
+    "gateway/tests/ssh.spec.ts": "76b13288440b85331bbb8034dc54dc8eb22b62dc8fd68607665a49abd10abfd5",
+    "gateway/tests/execution-fixture-server.ts": "f243617766e94d0a843a919cfc90e25bd1291c165c4c10b84988f63383ce4998",
+    "gateway/tests/project-activity.perf.ts": "d90e18a9c2ebda4475bc65039b86f90f8159b66d611033f55efdbe2b60691656",
+    "gateway/tests/admin-business-postgres.spec.ts": "697b01b3ae3a9718e3d9ae33b45a96b108a60d977a3f344f81ec56e4bfcfd781",
+    "gateway/tests/execution-scopes.spec.ts": "a5b7003b81a066d529a32eae2a01cddac7b9c38beb5e5d34a7b51326276825d8",
+    "gateway/tests/instance-capacity-postgres.spec.ts": "8dab8975dcf472989707a9dce5ebe43e26edfba696974259195bca00c46a3faa",
+    "gateway/tests/access-invalidation.spec.ts": "370d2379909fde639d524e2b6e9514027c76cb2b2930a64d5d752d10887b8c79",
+    "gateway/tests/conversation-writer.perf.ts": "faab9fe440d1241e6b17ef66e6947df7f58e3db3ebdabe8a870880cc4b40f394",
+    "gateway/tests/node-config-process.spec.ts": "54a686c88a38e4428d3c2a7382d5f431830cf08caa2739e9d1d847ee9264ed21",
+    "gateway/tests/execution.spec.ts": "579e31778f968e3b6a80830358d594eab3402a99a67c3cf3f3096b64a53a7697",
+    "gateway/tests/postgres.spec.ts": "5a16359696d25befaaa507d755c96e85011caeda87c926e925d16121278a7e59",
+    "gateway/tests/document-upload-postgres.spec.ts": "4ecbc26142d3d3b0e4cdb4be407a50304ad7881a2848a2729134077791f3e17b",
+    "gateway/tests/plugin-state.spec.ts": "7d4505d4ff7cc638b6b3b0514e764b924e0756fc56ecfea6dfcbc45be81b9aa0",
+    "gateway/tests/deployment-backups.spec.ts": "a771f504b71addd47f6fd1ecf39b58b57930bf3f309e0fea6a63bed0b43d9964",
+    "gateway/tests/document-catalog-maintenance.spec.ts": "4e54a404e198896827339f97b09162500a873bb0ce0ac48f58961f0108a876f3",
+    "gateway/tests/startup-generation.spec.ts": "9bd276d27d42de2fe3f3d5d06ecc207f7d095912459380f1806606cafad5d8b4",
+    "gateway/tests/webhook.spec.ts": "9eecfaa74196e69d75ffdc8afc57b894344266ae10b657e16ca20d61063b3ee4",
+    "gateway/tests/auth-admission.perf.ts": "2c6ae39c923ebde20b1521081eb6fad4ed24540d7c8beed88bcfe631e5c7bf79",
+    "gateway/tests/runtime-resource-provider.spec.ts": "3ab3b20635602abe002f97e98f447069af9a5184499f3444eac4b3dfb57e1e41",
+    "gateway/tests/progress-material.perf.ts": "ce48cd1055b98fd0024fcb637712856e5360eaf5ab8dd6cc9900ee63fff7cd3c",
+    "gateway/tests/auth-postgres.spec.ts": "8633c3df6846ddfdcdea008c3516a42f39ea24fe7e18a5eef6450e464c48c03c",
+    "gateway/tests/fixtures/project-activity-perf.mjs": "59c6d733493ad56ccf5bdea909a78ee94dc447dfc4abadb38e9728694dd8ce0f",
+    "gateway/tests/fixtures/runtime-start-built.mjs": "3a6e9344d4a316e752f4cc38144e31fcf191d8bcf4d8c91543bccf7c30c9b59a",
+    "gateway/tests/fixtures/project-progress-built.mjs": "dde4c695bfb0aeacd40a08404cb8d0118e4384bc5bc647fcccc6e34eab0d1732",
+    "gateway/tests/fixtures/gateway-model-owner.ts": "90e5355edecbe20a19aa1644405a7b2140fc4700ba7e0e9800d42833c5477ef1",
+    "gateway/tests/fixtures/progress-material-perf.mjs": "b401f2df910b6e3b019f266ca59c2f0f63b7d7ac7a03c63174a77431557a755b",
+    "gateway/tests/fixtures/conversation-writer-perf.mjs": "41fd60d52c9b1cafd5875c53806ddcecb2fca5d614ca890f099b886b8e09b73c",
+    "gateway/tests/fixtures/local-runtime-web-gateway.mjs": "242a00454a66b0d1ee985f0dcb9bbd890cc6f59f92c79d1ba6e3ba329d8fb56e",
+    "gateway/tests/fixtures/auth-admission-perf.mjs": "c00f531f7cb312702ef86f432bef13f6df319efa38f835be8f0be5e8df44632a",
+    "gateway/tests/fixtures/node-service-gateway.mjs": "820c8ec70020188134a9a2a9f3bd0997a972d8c880aeb36757291f805fd1592e",
+    "gateway/tests/project-progress-postgres.spec.ts": "d309cf95a2a3e1b55f749cee362b4523ddddb760643ce00ba1465c1c3b365785",
+    "gateway/tests/postgres-test-database.spec.ts": "38f0ce59f3439976bfb4ffee8cdf3881fad54d8090980d9e7fa6c5e9b0faa657",
+    "gateway/tests/postgres-suite.spec.ts": "d1ed28e8d65f1b0366130ac34c6dcf14ce49335b865f34edca68a5614a4a4772"
+  },
+  "noteReview": {
+    "extendedExisting": [
+      ".agents/notes/implemented/bug-fix/2026-09-28-gateway-fixture-state-isolation.md"
+    ],
+    "new": [],
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false
+  },
+  "limitations": [
+    "Optional suites still skip when no test database is configured.",
+    "This safety guard is not complete business acceptance of the guarded suites or peer RuntimeId features."
+  ]
+}

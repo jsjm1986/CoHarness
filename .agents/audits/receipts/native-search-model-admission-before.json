@@ -1,0 +1,14 @@
+{
+  "name": "native-search-model-admission-before",
+  "cwd": ".",
+  "command": "pnpm exec vitest run packages/web/web-search-deepseek/tests/admission.spec.ts --retry=0",
+  "startedAt": "2026-10-24T03:17:31.664211+00:00",
+  "seconds": 4.058,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e6d0afebad7c6363e1ec991aeeb17199614b5c5b85f04ecd8b4340101533bde5",
+  "inputsAfter": "e6d0afebad7c6363e1ec991aeeb17199614b5c5b85f04ecd8b4340101533bde5",
+  "postgresToolDirectory": null,
+  "outputSha256": "f5c46ae7af49b5a3efb751799ae77a55d31e55963703e480567b3b551c4fa030",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/web/web-search-deepseek/tests/admission.spec.ts (1 test | 1 failed) 23ms\n   × refuses native Messages search before HTTP when model admission denies it 23ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/web/web-search-deepseek/tests/admission.spec.ts > refuses native Messages search before HTTP when model admission denies it\nAssertionError: promise resolved \"{ sources: [ { …(2) } ], …(1) }\" instead of rejecting\n\n- Expected\n+ Received\n\n- Error {\n-   \"message\": \"rejected promise\",\n+ {\n+   \"sources\": [\n+     {\n+       \"title\": \"Result\",\n+       \"url\": \"https://result.test\",\n+     },\n+   ],\n+   \"truncated\": false,\n  }\n\n ❯ packages/web/web-search-deepseek/tests/admission.spec.ts:35:67\n     33|   await ctx.plugin(WebRuntime, {})\n     34|   await ctx.plugin(Search, { apiKey: 'owned-fixture-key', baseURL: `ht…\n     35|   await expect(ctx.web.search({ query: 'private fixture query' })).rej…\n       |                                                                   ^\n     36|   expect(contacted).toBe(0)\n     37| })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  11:17:35\n   Duration  502ms (transform 325ms, setup 42ms, import 360ms, tests 23ms, environment 0ms)\n\n"
+}

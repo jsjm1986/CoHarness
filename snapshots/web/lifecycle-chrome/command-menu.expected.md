@@ -3,7 +3,6 @@
   - option "File" [selected]
   - option "Goal Set or view the goal for a long-running task"
   - option "Plan Enter or leave plan mode"
-  - option "Feedback Record feedback about this session"
   - text: Commands
   - option "Compact Compact older conversation history"
   - option "Permission Switch the permission preset (sandbox mode + approval policy)"

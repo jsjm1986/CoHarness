@@ -9,9 +9,11 @@ English | [中文](README.zh.md)
 
 The `agent/pre-step` catalog listener and opt-in recall selector: renders the session's saved memories into one durable user message, republished only when the visible catalog's entry digest changes, when it goes empty after having entries, or when compaction shadows it — and, when `recall` is enabled, picks up to five relevant entries per question and injects their content into a later admitted request.
 
+An in-flight recall selector, including its cancellation cleanup, vetoes automatic Host-process release through `runtime/idle-release-check`. Merely enabling recall creates no permanent running obligation.
+
 ## Summary
 
-`dsh-memory-context` is a function plugin (`name = 'memory-context'`, `inject = ['memory', 'tools']`). On every admitted step it fits the session's `ctx.memory` scopes and catalog rows into a byte-bounded `<system-reminder>` catalog message, republishing only when the visible digest changes, goes empty after having entries, or is shadowed by compaction; delegated sessions are skipped unless `delegatedSessions` is set. With `memory.recall` on, a turn's first step launches an auxiliary `purpose: 'memory'` selector whose picks inject as a `memory-recall` message into the next admitted request.
+`dsh-memory-context` is a function plugin (`name = 'memory-context'`, `inject = ['memory', 'tools']`). On every admitted step it fits the session's `ctx.memory` scopes and catalog rows into a byte-bounded `<system-reminder>` catalog message, republishing only when the visible digest changes, goes empty after having entries, or is shadowed by compaction; delegated sessions are skipped unless `delegatedSessions` is set. With `memory.recall` on, the first step stages the question and catalog, then the `agent/request` listener launches an auxiliary `purpose: 'memory'` selector after message admission confirms the participants and route. Its picks inject as a `memory-recall` message into the next admitted request.
 
 ## Table of Contents
 
@@ -30,6 +32,7 @@ The `agent/pre-step` catalog listener and opt-in recall selector: renders the se
 
 | Field | Type | Default | Bounds |
 |---|---|---|---|
+| `maxOutputTokens` | integer | `5000` | positive safe integer (independent auxiliary model output cap) |
 | `catalogMaxBytes` | integer | `12288` | 1024–65536 (UTF-8 bytes of the complete message text) |
 | `delegatedSessions` | boolean | `false` | — |
 | `recallMaxBytes` | integer | `4096` | 256–65536 (UTF-8 bytes of one injected recall message) |
@@ -51,6 +54,8 @@ The listener awaits `next()` first and returns rejects untouched. For each admit
 - **Republish after compaction** — when the newest published catalog no longer sits on the session surface (compaction shadowed it), the catalog republishes as an update even though its digest is unchanged.
 - **Delegated sessions** — skipped when `delegationDepthOf(agent) > 0` unless `delegatedSessions` is set.
 
+Catalog rows are filtered through the Agent's current offered scopes after storage completes. Disabling memory while a list is pending discards its rows; a previously published catalog receives the ordinary empty replacement.
+
 Ordering follows `scopesFor()` scope order; within a scope: kind `guidance`, `profile`, `background`, `resource`, then `updated.at` descending, then key ascending. The digest is sha256 over each entry's `[scope, name, memoryKind, updated, description]` JSON tuple in order, plus `omitted` — prose never decides republishing.
 
 <a id="per-question-recall"></a>
@@ -60,10 +65,16 @@ Recall is off unless the `memory` settings namespace's `recall` switch is on. At
 
 1. Finds the latest human-authored text in the step's claimed batch (`source.kind === 'user'`), bounded at `recallInputMaxBytes`. No human text — or text under two signal words (whitespace tokens plus one unit per Han ideograph, so a short CJK question still counts) — means no recall for the turn.
 2. Filters the catalog rows against the session dedup sets — a `scopeId:key` already injected in this session is never a candidate again, and neither is a key the agent already fetched with `memory_read` — and skips the call when nothing remains or the surface already carries `recallSessionMaxBytes` of recall text.
-3. Sends the selector one standalone `purpose: 'memory'` request on the session's last routed provider/model (the agent's options as fallback) at the model's lowest advertised reasoning effort with a 5,000-token output cap: the verbatim instruction, the candidate lines, and the bounded human message; the reply is JSON only, `{"keys": [...]}`.
-4. Resolves at most `recallMaxSelections` picks (≤5) back to full entries — unknown keys and entries deleted since the catalog read drop out — truncates each content to `recallEntryMaxBytes`, prefixes a "N days old" staleness caution on entries updated more than a day ago, fits the complete reminder into `recallMaxBytes` (bounded by the session's remaining budget), and queues it through `agent.inject()`, so it lands between tool batches as an ordinary next-step context.
+3. Sends the selector one standalone `purpose: 'memory'` request on the primary request's admitted provider/model at the model's lowest advertised reasoning effort with the independent `maxOutputTokens` cap (default 5,000): the verbatim instruction, the candidate lines, and the bounded human message; the reply is JSON only, `{"keys": [...]}`.
+4. Resolves at most `recallMaxSelections` picks (≤5) back to full entries in catalog order, choosing the first eligible row for a same-named key and ignoring repeated addresses — unknown keys and entries deleted since the catalog read drop out — truncates each content to `recallEntryMaxBytes`, prefixes a "N days old" staleness caution on entries updated more than a day ago, fits the complete reminder into `recallMaxBytes` (bounded by the session's remaining budget), and queues it through `agent.inject()`, so it lands between tool batches as an ordinary next-step context.
 
 Only scopes `ctx.memory.scopesFor(agent)` offers are eligible — the same rows the catalog would publish, never a wider search. A selector still in flight at `turn/end` is aborted and its picks dropped. No embeddings or vector search is involved: selection is a small model call over the published catalog.
+
+The selector fixes its resolved adapter and settings with `prepareCall()` and records the exact immutable input as `memory/recall-request` before dispatch. It explicitly selects Session execution resource attribution and retains the normal LLM policy, admission and metering path. Session disposal cancels recall; plugin unloading stops admission and waits for every outstanding selector, including cleanup after turn cancellation. See the [request and lifetime decision](../../../.agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.md).
+
+Recall rechecks current switches and offered scopes after model preparation and before reading or injecting selected content. Turning off `memory.enabled` or `memory.recall` cancels active selectors through their existing request signal, including requests waiting for model admission. Entries remain available to their owner. See the [live availability decision](../../../.agents/notes/implemented/bug-fix/2026-10-31-memory-live-availability.md).
+
+Settings-provider replacement and composition fallback use the [memory service availability notification](../memory/README.md#events), so queued work also cancels when the new effective source disables its operation.
 
 <a id="catalog-frame"></a>
 ## Catalog frame
@@ -83,6 +94,8 @@ This catalog lists summaries only. Read a memory with memory_read before relying
 
 The replacement frame is identical except its first prose line reads `The saved memories changed. This complete catalog replaces every earlier saved-memory catalog in this conversation:`; the emptied frame reads `The saved memories changed. No saved memories are available now; disregard every earlier saved-memory catalog in this conversation.` inside the same `<system-reminder>` wrapper. The `{readSentence}` clause appears only when `memory_read` resolves for the agent, and the omission line names `memory_search` only when that tool resolves.
 
+The selector retains its admitted execution issuer and participants, passes verified billing witnesses, and requires current `execute` permission at model dispatch and before injection. Read-only members need no memory-writing qualification. Issuer replacement, primary-turn cancellation and unavailable scopes prevent publication; terminal `error` or `aborted` outcomes discard even valid selector JSON. Owned cleanup still settles before plugin disposal. See the [admission decision](../../../.agents/notes/implemented/bug-fix/2026-11-01-memory-recall-authority.md).
+
 <a id="recall-frame"></a>
 ## Recall frame
 
@@ -97,14 +110,14 @@ Prefers terse replies without trailing summaries.
 </system-reminder>
 ```
 
-The durable `memory-recall` source carries the injected `scopeId:key` addresses so the dedup fold never re-parses prose.
+The durable `memory-recall` source carries exactly the `scopeId:key` addresses retained in the injected text, in selection order; entries omitted by the frame budget remain eligible on later turns. The dedup fold reads recorded addresses without parsing prose. See the [recall address decision](../../../.agents/notes/implemented/bug-fix/2026-10-31-memory-recall-addresses.md).
 
 <a id="byte-budget"></a>
 ## Byte budget
 
 The complete message text must fit `catalogMaxBytes` UTF-8 bytes. When it does not, entries drop from the END of the catalog order until the text including the omission line (`{n} more saved memories are not listed here; use memory_search to find them.` — or the no-tool variant) fits; `omitted` records the dropped count in the durable source. When even zero entries plus the omission line overruns, nothing publishes for the step and the listener logs one warning per session.
 
-Recall has three bounds of its own: one injected message fits `recallMaxBytes` (entries drop in selection order from the end until the frame fits; a frame that fits no entry injects nothing), each recalled content truncates at `recallEntryMaxBytes` UTF-8 bytes, and the recall text visible on the session surface never exceeds `recallSessionMaxBytes` — keys stay deduplicated session-wide even after compaction reclaims the bytes.
+Human input and entry-content truncation preserve complete UTF-8 characters and never add a replacement character at the cut. Recall has three bounds of its own: one injected message fits `recallMaxBytes` (entries drop in selection order from the end until the frame fits; a frame that fits no entry injects nothing), each recalled content truncates at `recallEntryMaxBytes` UTF-8 bytes, and the recall text visible on the session surface never exceeds `recallSessionMaxBytes` — keys stay deduplicated session-wide even after compaction reclaims the bytes.
 
 <a id="invariants"></a>
 ## Invariants
@@ -148,7 +161,7 @@ The selector is a standalone request and never disturbs the conversation prefix.
 - **Publication lags concurrent writers** — the listener reads at pre-step; another session's write mid-step lands in the next step's catalog.
 - **Delegated sessions are opt-in** — subagent sessions see no catalog unless the composition sets `delegatedSessions`, keeping delegated contexts free of the parent's memory list by default.
 - **Recall is selector-dependent** — a selector that misjudges relevance injects the wrong entries or none; the catalog remains the only guaranteed memory surface.
-- **Recall dedup is session-scoped** — a key injects at most once per session; a new session may select it again.
+- **Recall dedup is session-scoped** — a scoped address injects at most once per session; a new session may select it again. Historical dedup metadata is read as recorded; the reader does not reconstruct addresses from free-form entry bodies.
 
 <a id="dev-note"></a>
 ### Dev Note

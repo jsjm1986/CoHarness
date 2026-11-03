@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-inspector-bootstrap-response-lifetime.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-inspector-bootstrap-response-lifetime.md
+document:
+  en: abc1fdfee8d12f369c5de7de94b47769dc9e1a09
+  zh: ac9e17ca05ff9cd3a5567373c0c30f358e49ec85
+/agent-note-inspector-bootstrap-waits-belong-to-the-response-connection:
+  en: f7a089ad9c8864d2
+  zh: 3b0c4f897fd59701
+/agent-note-inspector-bootstrap-waits-belong-to-the-response-connection/problem:
+  en: 7b6498ec1de4e0a5
+  zh: 4268456269e380ea
+/agent-note-inspector-bootstrap-waits-belong-to-the-response-connection/decision:
+  en: a02fc8e3c068542d
+  zh: ad769f70569ef8c4
+/agent-note-inspector-bootstrap-waits-belong-to-the-response-connection/alternatives-considered:
+  en: 5f28b6cc901bc226
+  zh: 398c0c779d93d15f
+/agent-note-inspector-bootstrap-waits-belong-to-the-response-connection/consequences:
+  en: f9ccffcc9b4992f9
+  zh: 6d04214d356c5bf8
+/agent-note-inspector-bootstrap-waits-belong-to-the-response-connection/verification:
+  en: 3e572f0774f51473
+  zh: d2ac0c5ca66eb928

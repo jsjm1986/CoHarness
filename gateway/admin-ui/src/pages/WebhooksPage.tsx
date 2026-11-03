@@ -1,3 +1,6 @@
+import { usePendingEdits } from '../pending-edits.tsx'
+import { RuntimePicker } from '../components/RuntimePicker.tsx'
+import type { RuntimeId } from '../api.ts'
 /** Registered webhook endpoints, delivery diagnostics, and administrator redispatch. */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Inbox, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
@@ -35,6 +38,7 @@ interface EndpointDraft {
   executionUserId: string
   runtimeKind: 'user' | 'project'
   runtimePublicId: string
+  runtimeId?: RuntimeId
   intakeLimit: string
   intakeWindowMs: string
   replayWindowMs: string
@@ -83,7 +87,7 @@ function draftOf(endpoint: AdminWebhookEndpoint): EndpointDraft {
     modelProvider: endpoint.modelProvider ?? '', modelId: endpoint.modelId ?? '',
     modelMaxTokens: endpoint.modelMaxTokens === null ? '' : String(endpoint.modelMaxTokens),
     executionUserId: String(endpoint.executionUserId),
-    runtimeKind: endpoint.runtimeKind, runtimePublicId: String(endpoint.runtimePublicId),
+    runtimeKind: endpoint.runtimeKind, runtimePublicId: String(endpoint.runtimePublicId), runtimeId: endpoint.runtimeId ?? undefined,
     intakeLimit: String(endpoint.intakeLimit), intakeWindowMs: String(endpoint.intakeWindowMs),
     replayWindowMs: String(endpoint.replayWindowMs), maxBodyBytes: String(endpoint.maxBodyBytes),
     secret: '',
@@ -98,6 +102,7 @@ function fieldsOf(draft: EndpointDraft): AdminWebhookEndpointFields {
   const executionUserId = Number(draft.executionUserId)
   if (!Number.isSafeInteger(executionUserId) || executionUserId <= 0) throw new Error(t('validationExecutionUser'))
   // 个人运行时的目标固定为执行账号本人；服务端按此约束校验每次投递。
+  if (draft.runtimeId === undefined) throw new Error(t('validationRuntimeTarget'))
   const runtimePublicId = draft.runtimeKind === 'user' ? executionUserId : Number(draft.runtimePublicId)
   if (draft.runtimeKind === 'project' && (!Number.isSafeInteger(runtimePublicId) || runtimePublicId <= 0)) {
     throw new Error(t('validationRuntimeTarget'))
@@ -120,7 +125,7 @@ function fieldsOf(draft: EndpointDraft): AdminWebhookEndpointFields {
     permissionPreset: boundedText(draft.permissionPreset, t('fieldPermissionPreset'), 128),
     projectVisibility: draft.projectVisibility,
     modelProvider, modelId, modelMaxTokens: optionalLimit(draft.modelMaxTokens, t('fieldModelMaxTokens')),
-    executionUserId, runtimeKind: draft.runtimeKind, runtimePublicId,
+    executionUserId, runtimeKind: draft.runtimeKind, runtimePublicId, runtimeId: draft.runtimeId,
     intakeLimit: limit(draft.intakeLimit, t('fieldIntakeLimit'), 1_000_000),
     intakeWindowMs: limit(draft.intakeWindowMs, t('labelIntakeWindow'), 86_400_000),
     replayWindowMs: limit(draft.replayWindowMs, t('labelReplayWindow'), 2_592_000_000),
@@ -137,21 +142,25 @@ const RECEIPT_LABEL: Record<keyof typeof RECEIPT_TONE, WebhooksCopyKey> = {
 export function WebhooksPage() {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
   const [endpoints, setEndpoints] = useState<AdminWebhookEndpoint[] | null>(null)
+  const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<Array<{ id: number; username: string; active: boolean }>>([])
   const [projects, setProjects] = useState<Array<{ id: number; name: string }>>([])
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [runtimeAvailable, setRuntimeAvailable] = useState(false)
   const [editing, setEditing] = useState<{ endpoint: AdminWebhookEndpoint | null; draft: EndpointDraft } | null>(null)
   const [removing, setRemoving] = useState<AdminWebhookEndpoint | null>(null)
   const [deliveries, setDeliveries] = useState<{
     endpoint: AdminWebhookEndpoint; items: AdminWebhookReceipt[]; nextCursor: string | null
   } | null>(null)
   const [acting, setActing] = useState(false)
+  usePendingEdits(acting || editing !== null)
   const [reload, setReload] = useState(0)
   const generation = useRef(0)
 
   useEffect(() => {
     let disposed = false
+    setLoading(true)
     void Promise.all([listWebhookEndpoints(), listUsers(), listProjects()]).then(([listed, userRows, projectRows]) => {
       if (disposed) return
       setEndpoints(listed.endpoints)
@@ -159,6 +168,7 @@ export function WebhooksPage() {
       setProjects(projectRows.map(project => ({ id: project.id, name: project.name })))
       setError('')
     }).catch((cause: unknown) => { if (!disposed) setError(messageOf(cause)) })
+      .finally(() => { if (!disposed) setLoading(false) })
     return () => { disposed = true; generation.current++ }
   }, [reload])
 
@@ -176,6 +186,7 @@ export function WebhooksPage() {
     setActing(true); setError(''); setNotice('')
     try {
       const fields = fieldsOf(editing.draft)
+      if (!runtimeAvailable) throw new Error(t('validationRuntimeTarget'))
       const secret = text(editing.draft.secret)
       if (editing.endpoint === null) {
         if (secret === null) throw new Error(t('validationSecret'))
@@ -270,7 +281,7 @@ export function WebhooksPage() {
           <Button icon={Plus} onClick={() => { setError(''); setEditing({ endpoint: null, draft: EMPTY_DRAFT }) }}>{t('registerEndpoint')}</Button>
         </>}
       >
-        {endpoints === null ? <LoadingState label={t('loadingEndpoints')} /> : endpoints.length === 0 ? (
+        {endpoints === null ? loading ? <LoadingState label={t('loadingEndpoints')} /> : null : endpoints.length === 0 ? (
           <EmptyState title={t('endpointsEmptyTitle')} detail={t('endpointsEmptyDetail')} />
         ) : (
           <div className="tableWrap" role="region" aria-label={t('endpointsTableAria')} tabIndex={0}>
@@ -306,7 +317,7 @@ export function WebhooksPage() {
         onClose={() => { if (!acting) setEditing(null) }}
         footer={<>
           <Button type="button" onClick={() => { setEditing(null) }} disabled={acting}>{t('cancel')}</Button>
-          <Button type="button" variant="primary" onClick={() => void save()} disabled={acting}>{t('save')}</Button>
+          <Button type="button" variant="primary" onClick={() => void save()} disabled={acting || editing?.draft.runtimeId !== undefined && !runtimeAvailable}>{t('save')}</Button>
         </>}
         wide
       >
@@ -328,25 +339,29 @@ export function WebhooksPage() {
             <Field label={t('fieldModelId')}><input className="input" value={editing.draft.modelId} onChange={event => { patchDraft({ modelId: event.target.value }) }} /></Field>
             <Field label={t('fieldModelMaxTokens')}><input className="input" inputMode="numeric" value={editing.draft.modelMaxTokens} onChange={event => { patchDraft({ modelMaxTokens: event.target.value }) }} /></Field>
             <Field label={t('fieldExecutionUser')} hint={t('hintExecutionUser')}>
-              <select className="input" value={editing.draft.executionUserId} onChange={event => { patchDraft({ executionUserId: event.target.value }) }}>
+              <select className="input" value={editing.draft.executionUserId} onChange={event => { patchDraft({ executionUserId: event.target.value, runtimeId: undefined }) }}>
                 <option value="">{t('optionSelectAccount')}</option>
                 {users.filter(user => user.active).map(user => <option key={user.id} value={String(user.id)}>{user.username}</option>)}
               </select>
             </Field>
             <Field label={t('fieldRuntimeKind')}>
-              <select className="input" value={editing.draft.runtimeKind} onChange={event => { patchDraft({ runtimeKind: event.target.value === 'project' ? 'project' : 'user', runtimePublicId: '' }) }}>
+              <select className="input" value={editing.draft.runtimeKind} onChange={event => { patchDraft({ runtimeKind: event.target.value === 'project' ? 'project' : 'user', runtimePublicId: '', runtimeId: undefined }) }}>
                 <option value="user">{t('optionRuntimeUser')}</option>
                 <option value="project">{t('optionRuntimeProject')}</option>
               </select>
             </Field>
             {editing.draft.runtimeKind === 'project' && (
               <Field label={t('fieldRuntimeTarget')} hint={t('hintRuntimeTarget')}>
-                <select className="input" value={editing.draft.runtimePublicId} onChange={event => { patchDraft({ runtimePublicId: event.target.value }) }}>
+                <select className="input" value={editing.draft.runtimePublicId} onChange={event => { patchDraft({ runtimePublicId: event.target.value, runtimeId: undefined }) }}>
                   <option value="">{t('optionSelectTarget')}</option>
                   {projects.map(project => <option key={project.id} value={String(project.id)}>{project.name}</option>)}
                 </select>
               </Field>
             )}
+            {Number(editing.draft.runtimeKind === 'user' ? editing.draft.executionUserId : editing.draft.runtimePublicId) > 0 ? <RuntimePicker
+              key={`${editing.draft.runtimeKind}:${editing.draft.runtimeKind === 'user' ? editing.draft.executionUserId : editing.draft.runtimePublicId}`}
+              owner={{ kind: editing.draft.runtimeKind, id: Number(editing.draft.runtimeKind === 'user' ? editing.draft.executionUserId : editing.draft.runtimePublicId) }}
+              disabled={acting} onAvailabilityChange={setRuntimeAvailable} selectedId={editing.draft.runtimeId} value={undefined} onSelect={value => { patchDraft({ runtimeId: value?.id }) }} /> : null}
             {editing.draft.runtimeKind === 'project' && (
               <Field label={t('fieldVisibility')} hint={t('hintVisibility')}>
                 <select className="input" value={editing.draft.projectVisibility} onChange={event => { patchDraft({ projectVisibility: event.target.value === 'private' ? 'private' : 'project' }) }}>

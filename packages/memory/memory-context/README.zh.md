@@ -8,9 +8,11 @@ kind: "package-reference"
 
 `agent/pre-step` 目录监听器与可选召回选择器：把会话已保存的记忆渲染为一条持久用户消息，仅当可见目录的条目摘要变化、有条目变空、或被压缩遮蔽时才重新发布——启用 `recall` 时，还会为每个问题挑选至多五条相关条目，并把其内容注入后续获准请求。
 
+进行中的记忆召回选择及其取消清理会通过 `runtime/idle-release-check` 阻止 Host 进程自动释放。仅启用召回不会产生永久运行占用。
+
 ## 概述
 
-`dsh-memory-context` 是一个函数插件（`name = 'memory-context'`，`inject = ['memory', 'tools']`）。在每个获准步骤上，它把该会话的 `ctx.memory` 作用域与目录行装进字节有界的 `<system-reminder>` 目录消息，仅在可见摘要变化、有条目变空、或被压缩遮蔽时重新发布；除非设置 `delegatedSessions`，委派会话一律跳过。启用 `memory.recall` 时，回合的第一个步骤会发起一次辅助 `purpose: 'memory'` 选择器，其挑选结果作为 `memory-recall` 消息注入下一个获准请求。
+`dsh-memory-context` 是一个函数插件（`name = 'memory-context'`，`inject = ['memory', 'tools']`）。在每个获准步骤上，它把该会话的 `ctx.memory` 作用域与目录行装进字节有界的 `<system-reminder>` 目录消息，仅在可见摘要变化、有条目变空、或被压缩遮蔽时重新发布；除非设置 `delegatedSessions`，委派会话一律跳过。启用 `memory.recall` 时，首个步骤暂存问题与目录；`agent/request` 监听器在消息准入确认参与者和路由之后启动辅助 `purpose: 'memory'` 选择器，其挑选结果作为 `memory-recall` 消息注入下一个获准请求。
 
 ## 目录
 
@@ -29,6 +31,7 @@ kind: "package-reference"
 
 | 字段 | 类型 | 默认值 | 边界 |
 |---|---|---|---|
+| `maxOutputTokens` | 整数 | `5000` | 正安全整数（独立辅助模型输出上限） |
 | `catalogMaxBytes` | 整数 | `12288` | 1024–65536（完整消息文本的 UTF-8 字节数） |
 | `delegatedSessions` | 布尔 | `false` | — |
 | `recallMaxBytes` | 整数 | `4096` | 256–65536（单条注入召回消息的 UTF-8 字节数） |
@@ -50,6 +53,8 @@ kind: "package-reference"
 - **压缩遮蔽后重发** — 最新已发布目录不再位于会话表面上（被压缩遮蔽）时，即使摘要未变也以更新形式重新发布。
 - **委派会话** — 当 `delegationDepthOf(agent) > 0` 时跳过，除非设置 `delegatedSessions`。
 
+存储读取完成后，目录行按 Agent 当前提供的作用域重新筛选。在列表等待期间关闭记忆会丢弃其结果；已经发布过的目录按普通空目录替换规则更新。
+
 排序遵循 `scopesFor()` 的作用域顺序；作用域内按 kind（`guidance`、`profile`、`background`、`resource`）、`updated.at` 降序、key 升序。摘要是各条目 `[scope, name, memoryKind, updated, description]` JSON 元组按序拼接再加 `omitted` 的 sha256——散文文本不参与重发判定。
 
 <a id="per-question-recall"></a>
@@ -59,10 +64,16 @@ kind: "package-reference"
 
 1. 在该步骤已认领批次中定位最新的人类撰写文本（`source.kind === 'user'`），以 `recallInputMaxBytes` 为界；没有人类文本——或文本不足两个信号词（空白分隔词元加每个汉字各计一个单位，短中文提问同样计入）——该回合不召回。
 2. 用会话去重集合过滤目录行——本会话已注入过的 `scopeId:key` 不再成为候选，代理已用 `memory_read` 取过的键也不再是候选——没有剩余候选、或表面上已有 `recallSessionMaxBytes` 召回文本时跳过该调用。
-3. 向选择器发起一次独立的 `purpose: 'memory'` 请求，使用会话最近路由的 provider/model（代理自身 options 作为回退），按模型公开的最低推理档位并封顶 5,000 输出 token：逐字指令、候选行与有界的人类消息；应答仅为 JSON，`{"keys": [...]}`。
-4. 将至多 `recallMaxSelections` 个挑选（≤5）还原为完整条目——未知键与目录读取后已删除的条目被丢弃——每条内容截断至 `recallEntryMaxBytes`，更新超过一天的条目前置"N 天前"陈旧提示，把完整提醒装进 `recallMaxBytes`（受会话剩余预算约束），再经 `agent.inject()` 入队，作为普通的下一步上下文落在工具批次之间。
+3. 向选择器发起一次独立的 `purpose: 'memory'` 请求，使用本次主请求正式准入的 provider/model，按模型公开的最低推理档位并使用 `maxOutputTokens` 输出上限（默认 5,000）：逐字指令、候选行与有界的人类消息；应答仅为 JSON，`{"keys": [...]}`。
+4. 将至多 `recallMaxSelections` 个挑选（≤5）按目录顺序还原为完整条目，同名键选择首个合格目录行，并忽略重复地址——未知键与目录读取后已删除的条目被丢弃——每条内容截断至 `recallEntryMaxBytes`，更新超过一天的条目前置"N 天前"陈旧提示，把完整提醒装进 `recallMaxBytes`（受会话剩余预算约束），再经 `agent.inject()` 入队，作为普通的下一步上下文落在工具批次之间。
 
 只有 `ctx.memory.scopesFor(agent)` 提供的作用域可选——与目录将发布的行相同，绝不做更宽搜索。回合结束时仍在途的选择器被中止、其挑选被丢弃。不涉及嵌入或向量检索：选择就是一次对已发布目录的小型模型调用。
+
+选择器通过 `prepareCall()` 固定已解析适配器与设置，在发送前以 `memory/recall-request` 记录精确的不可变输入。它显式选择 Session 执行资源归属，并保留正常 LLM 策略、准入和计量路径。Session 销毁会取消召回；插件卸载停止准入并等待全部未完成选择器，包括回合取消后的清理。参见[请求与生命周期决策](../../../.agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.zh.md)。
+
+召回在模型准备完成后，以及读取或注入所选内容前，重新检查当前开关和已提供作用域。关闭 `memory.enabled` 或 `memory.recall` 会通过现有请求信号取消活动选择器，包括正在等待模型准入的请求。所有者仍可查看已存条目。参见[实时可用性决策](../../../.agents/notes/implemented/bug-fix/2026-10-31-memory-live-availability.zh.md)。
+
+设置提供者替换与组合配置回退使用[记忆服务可用性通知](../memory/README.zh.md#events)，因此新有效来源关闭操作时，排队工作也会取消。
 
 <a id="catalog-frame"></a>
 ## 目录帧
@@ -82,6 +93,8 @@ This catalog lists summaries only. Read a memory with memory_read before relying
 
 替换帧除首行散文外完全相同，其首行为 `The saved memories changed. This complete catalog replaces every earlier saved-memory catalog in this conversation:`；清空帧在同一个 `<system-reminder>` 包装内为 `The saved memories changed. No saved memories are available now; disregard every earlier saved-memory catalog in this conversation.`。`{readSentence}` 子句仅在 `memory_read` 对该代理可解析时出现，省略行仅在 `memory_search` 可解析时点名该工具。
 
+选择器保留正式准入时的执行签发方与参与者，携带已验证的计费依据，并在模型发送和注入前检查当前 `execute` 权限。只读成员不需要记忆写入资格。签发方替换、主回合取消或作用域不可用都会阻止发布；即使含有合法选择器 JSON，终态为 `error` 或 `aborted` 的响应也会丢弃。插件卸载仍等待自身清理完成。参见[准入决策](../../../.agents/notes/implemented/bug-fix/2026-11-01-memory-recall-authority.zh.md)。
+
 <a id="recall-frame"></a>
 ## 召回帧
 
@@ -96,14 +109,14 @@ Prefers terse replies without trailing summaries.
 </system-reminder>
 ```
 
-持久的 `memory-recall` source 携带已注入的 `scopeId:key` 地址，去重折叠无需重新解析散文文本。
+持久的 `memory-recall` source 按挑选顺序精确记录注入文本中保留的 `scopeId:key` 地址；因帧预算被省略的条目仍可在后续回合召回。去重折叠读取已记录地址，不解析散文文本。参见[召回归属决策](../../../.agents/notes/implemented/bug-fix/2026-10-31-memory-recall-addresses.zh.md)。
 
 <a id="byte-budget"></a>
 ## 字节预算
 
 完整消息文本必须不超过 `catalogMaxBytes` UTF-8 字节。超出时，从目录顺序的末尾丢弃条目，直到包含省略行（`{n} more saved memories are not listed here; use memory_search to find them.`——或无工具变体）的文本装入为止；`omitted` 在持久 source 中记录丢弃数。当零条目加省略行仍超限时，该步骤不发布任何内容，监听器每会话记录一次警告。
 
-召回另有三重边界：单条注入消息不超过 `recallMaxBytes`（条目按挑选顺序从末尾丢弃直至帧装入；装不下任何条目的帧不注入），每条召回内容截断至 `recallEntryMaxBytes` UTF-8 字节，且会话表面上可见的召回文本不超过 `recallSessionMaxBytes`——即使压缩回收了字节，键仍在会话范围内保持去重。
+人类输入与条目正文截断保留完整 UTF-8 字符，切口不会新增替换字符。召回另有三重边界：单条注入消息不超过 `recallMaxBytes`（条目按挑选顺序从末尾丢弃直至帧装入；装不下任何条目的帧不注入），每条召回内容截断至 `recallEntryMaxBytes` UTF-8 字节，且会话表面上可见的召回文本不超过 `recallSessionMaxBytes`——即使压缩回收了字节，键仍在会话范围内保持去重。
 
 <a id="invariants"></a>
 ## 不变式
@@ -148,7 +161,7 @@ Prefers terse replies without trailing summaries.
 - **发布滞后于并发写入者** — 监听器在 pre-step 读取；另一会话在步骤中写入的内容要到下一步的目录才出现。
 - **委派会话需显式开启** — 除非组合设置 `delegatedSessions`，子代理会话看不到目录，默认让委派上下文不携带父会话的记忆列表。
 - **召回依赖选择器** — 选择器误判相关性会注入错误条目或没有条目；目录仍是唯一有保证的记忆表面。
-- **召回去重以会话为界** — 一个键每会话至多注入一次；新会话可能再次选中它。
+- **召回去重以会话为界** — 一个作用域地址每会话至多注入一次；新会话可能再次选中它。历史去重元数据按记录读取；读取者不从自由格式的条目正文重建地址。
 
 <a id="dev-note"></a>
 ### 开发备注

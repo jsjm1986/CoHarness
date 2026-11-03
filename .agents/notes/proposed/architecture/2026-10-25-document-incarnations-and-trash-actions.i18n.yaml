@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-25-document-incarnations-and-trash-actions.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-10-25-document-incarnations-and-trash-actions.md
+document:
+  en: 1dbd95087ed116f9f2fe132fe89615151c81f0fa
+  zh: 585237732303de6764112858ca87b8851a88ab55
+/agent-note-document-incarnations-and-trash-actions:
+  en: 82405ba6dcc65539
+  zh: 810c0b2fb701d706
+/agent-note-document-incarnations-and-trash-actions/problem:
+  en: 231c5f9a55a7dbb0
+  zh: 24043fdbf3db28c8
+/agent-note-document-incarnations-and-trash-actions/proposal:
+  en: bd7704590fdd7444
+  zh: 0aff502bf9e19d5c
+/agent-note-document-incarnations-and-trash-actions/alternatives-considered:
+  en: bbae2f73244216c6
+  zh: b7b898000c30a562
+/agent-note-document-incarnations-and-trash-actions/acceptance-criteria:
+  en: c434e6bbc1cf6d52
+  zh: 29d42baa08d89b5c
+/agent-note-document-incarnations-and-trash-actions/risks:
+  en: 493feb0bc4299a24
+  zh: 46cc1531f85dd7df

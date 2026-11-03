@@ -1,0 +1,14 @@
+{
+  "name": "atomic-file-acquisition-checkpoint-integrity",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/verify-atomic-file-acquisition-checkpoint.py",
+  "startedAt": "2026-10-25T23:23:28.203661+00:00",
+  "seconds": 3.11,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7a1300b448aa7fba28cbc11ca1dac646c8d1f2f231083650bd915be1728f2cf1",
+  "inputsAfter": "7a1300b448aa7fba28cbc11ca1dac646c8d1f2f231083650bd915be1728f2cf1",
+  "postgresToolDirectory": null,
+  "outputSha256": "b691b123d4948c272d52089c1e91850a02f4eb09ab8c80a36618c12d167be7b7",
+  "outputTail": "B156 named shared-library fix verified; B157 OS-account storage remains open; B131 private/unwired; all12domains open. Failed diagnostic receipts retained, real API deferral preserved, no PostgreSQL command run in this phase.\n"
+}

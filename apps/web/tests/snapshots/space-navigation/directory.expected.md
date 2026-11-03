@@ -1,0 +1,17 @@
+- group "Switch personal or project scope":
+  - button "Close":
+    - img
+  - text: Workspaces Personal Only me All spaces · 2
+  - searchbox "Search spaces or computers"
+  - text: Recent
+  - button "Personal"
+  - text: Projects
+  - button "Payments migration Compute computer"
+  - button "Refresh spaces"
+  - text: Space settings
+  - button "Open in a new tab"
+  - button "Favorite this space"
+  - button "Invitations and tasks":
+    - text: Invitations and tasks
+    - img
+  - button "New project space"

@@ -1,0 +1,13 @@
+{
+  "name": "mcp-pre-effect-config-coverage",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/mcp/mcp-client/tests packages/experimental/browser-use-runtime/tests --coverage --coverage.include=packages/mcp/mcp-client/src/managed-stdio.ts --coverage.include=packages/mcp/mcp-client/src/transport.ts --coverage.include=packages/mcp/mcp-client/src/connection.ts --coverage.include=packages/mcp/mcp-client/src/index.ts --coverage.include=packages/experimental/browser-use-runtime/src/mcp.ts --coverage.reportsDirectory=.agents/audits/.local/mcp-pre-effect-coverage --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-23T17:06:26.728800+00:00",
+  "seconds": 22.277,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5bbb0684549f8445f7e5b9ca80fe12731fe9c789d7f77042cfd38e1e9dbf9bc1",
+  "inputsAfter": "5bbb0684549f8445f7e5b9ca80fe12731fe9c789d7f77042cfd38e1e9dbf9bc1",
+  "outputSha256": "eae5e30652e8483cdf1e005b52338bf4dda050fc0a1511d5376a7238f4e98747",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  15 passed (15)\n      Tests  187 passed (187)\n   Start at  01:06:39\n   Duration  9.23s (transform 1.65s, setup 179ms, import 3.64s, tests 7.16s, environment 1ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 493/493 )\nBranches     : 100% ( 267/267 )\nFunctions    : 100% ( 101/101 )\nLines        : 100% ( 415/415 )\n================================================================================\n"
+}

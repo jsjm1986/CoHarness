@@ -1,4 +1,4 @@
-import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId, type UserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { describe, expect, it } from 'vitest'
 import { executionInputOf, executionScope, executionState, hasUnverifiedExecutionInput, inputDigest } from '../src/input.ts'
@@ -10,6 +10,11 @@ const state = () => ({
 const scope = () => ({ parentSessionId: SessionId('parent'), inputs: [A], primaryActorUserId: 1, unverifiedHistory: false })
 
 describe('untrusted execution references', () => {
+  it('preserves unverified input without inventing a primary actor or execution scope', () => {
+    const unattributed = { revision: '0', inputs: [], actors: [], unverifiedHistory: true }
+    expect(executionState(unattributed)).toEqual(unattributed)
+  })
+
   it('preserves an immutable scope identity in both response and delegated metadata', () => {
     expect(executionState({ ...state(), scopeId: A }).scopeId).toBe(A)
     expect(executionScope({ ...scope(), scopeId: A }).scopeId).toBe(A)
@@ -65,6 +70,11 @@ describe('untrusted execution references', () => {
     expect(hasUnverifiedExecutionInput(unknown)).toBe(true)
     const verified = { ...unknown, source: { kind: 'user', gatewayExecutionInput: A } } as unknown as UserMessage
     expect(hasUnverifiedExecutionInput(verified)).toBe(false)
+    const reply = createUserMessage({ source: { kind: 'user-question-reply', callId: ToolCallId('late-reply'), outcome: 'answered' },
+      content: [{ type: 'text', text: 'Keep the constraints.' }] })
+    expect(hasUnverifiedExecutionInput(reply)).toBe(true)
+    const verifiedReply = { ...reply, source: { ...reply.source, gatewayExecutionInput: A } } as unknown as UserMessage
+    expect(hasUnverifiedExecutionInput(verifiedReply)).toBe(false)
     const relayed = { ...unknown, source: {
       kind: 'agent-message', gatewayExecutionScope: {
         parentSessionId: SessionId('child'), inputs: [], unverifiedHistory: true,

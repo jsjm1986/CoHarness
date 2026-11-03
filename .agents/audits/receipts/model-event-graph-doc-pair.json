@@ -1,0 +1,13 @@
+{
+  "name": "model-event-graph-doc-pair",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write docs/event-producer-consumer.md",
+  "startedAt": "2026-10-23T19:34:04.530821+00:00",
+  "seconds": 2.032,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "55d4f66fccc1d8f7962db27dae93b1170fdef836fbcd4d4d722ce31d1f34f3ad",
+  "inputsAfter": "55d4f66fccc1d8f7962db27dae93b1170fdef836fbcd4d4d722ce31d1f34f3ad",
+  "outputSha256": "94a09770117a5b150e1f996738b7fa72bdd905ba2824edfc8b563bb5185054ee",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write docs/event-producer-consumer.md\nverify-translation-pairing: recorded docs/event-producer-consumer.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

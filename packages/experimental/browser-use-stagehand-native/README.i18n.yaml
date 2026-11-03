@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/browser-use-stagehand-native/README.md
 document:
-  en: add854d36c91ea7b89a2e970e41a1d4ed39fb57c
-  zh: b09c0a2c870e27629649e914f1268a60b95cf593
+  en: 0b96b871d0f693b27124deb077f873538a990196
+  zh: 68773130760823716f21643771c759d638e70075
 /:
   en: 3f9127c3981e9453
   zh: b4fcc1468319b9b2
@@ -12,23 +12,23 @@ document:
   en: 4b88ed0b7d903e32
   zh: 6375e389216d981c
 /deepseek-ai-dsh-experimental-browser-use-stagehand-native/summary:
-  en: 05c2fd0d2d2856a0
-  zh: fd90ef7fce885498
+  en: 89036a7d8c0531a6
+  zh: d8ca8f706ea0b4b5
 /deepseek-ai-dsh-experimental-browser-use-stagehand-native/table-of-contents:
   en: d152484eb41ac6b4
   zh: a949126695843224
 /deepseek-ai-dsh-experimental-browser-use-stagehand-native/use-this-package:
-  en: de47f71ab56fd0ed
-  zh: fdc58f273a7dba3d
+  en: fc08f1e43d39252e
+  zh: 9fcc5ccc6a2d6d1b
 /deepseek-ai-dsh-experimental-browser-use-stagehand-native/use-this-package/minimal-configuration:
-  en: 1554d55fd5be9735
-  zh: d39e7dd0b8ff1b7d
+  en: ba65b41e7ba069be
+  zh: 89a0c0c0201a6ad3
 /deepseek-ai-dsh-experimental-browser-use-stagehand-native/use-this-package/verification:
-  en: fea3ad16a77fc478
-  zh: cf551a8a2d183f93
+  en: f608260b9ca02e5f
+  zh: 9c67e6fff0ad835b
 /deepseek-ai-dsh-experimental-browser-use-stagehand-native/understand-the-implementation:
-  en: ba13e1703d5aaca4
-  zh: 91db415ed074307c
+  en: d7611965341268dc
+  zh: ce9e7b691337118f
 /deepseek-ai-dsh-experimental-browser-use-stagehand-native/further-exploration:
   en: eff8f4541eb26ca7
   zh: 76a61fe9bd48df2a
@@ -57,14 +57,14 @@ document:
   en: 615b72f1971846c8
   zh: d0ec71a9905137df
 /deepseek-ai-dsh-experimental-browser-use-stagehand-native/model-experience/native-browser-tools-and-results/token-effect:
-  en: 8c75c58031e659c8
-  zh: b40294201e358ce3
+  en: a548764859945d17
+  zh: 1a81abbb92f22d33
 /deepseek-ai-dsh-experimental-browser-use-stagehand-native/model-experience/native-browser-tools-and-results/kv-cache-effect:
-  en: 2bd36c8da753a1e5
-  zh: dba0147407dd4f8c
+  en: 2c6a265862ca0c7b
+  zh: 510192ae9671080b
 /deepseek-ai-dsh-experimental-browser-use-stagehand-native/known-limitations-and-deferred-work:
-  en: 27754d9785e555ae
-  zh: 89fef432cebabef6
+  en: b69d681b5151bfcf
+  zh: 703f7d77b0ee74c3
 /deepseek-ai-dsh-experimental-browser-use-stagehand-native/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: e88aeb617ffb74ea

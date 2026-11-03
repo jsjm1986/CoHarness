@@ -1,0 +1,14 @@
+{
+  "name": "persistent-codex-oxlint-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/llm/llm/src/index.ts packages/llm/llm/tests/orchestration.spec.ts packages/subagent/subagent/src/external.ts packages/subagent/subagent/tests/external-member-identity.spec.ts packages/subagent/subagent-codex/src/index.ts packages/subagent/subagent-codex/src/member.ts packages/subagent/subagent-codex/tests/member.spec.ts packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts packages/subagent/subagent-codex/tests/real-product.spec.ts examples/headless-agent/tests/managed-codex-model.snapshot.ts",
+  "startedAt": "2026-10-25T06:35:30.390559+00:00",
+  "seconds": 2.092,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1ab8cfcc42d5778c4f31ce059ebb97782e824ece6b337d811c88b004b2a2ccfe",
+  "inputsAfter": "1ab8cfcc42d5778c4f31ce059ebb97782e824ece6b337d811c88b004b2a2ccfe",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

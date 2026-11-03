@@ -14,11 +14,13 @@ Status: implemented
 
 当前 Session 仍需显式选择 Auto；[管理员资格](2026-09-22-admin-auto-review-eligibility.zh.md)只是一项授予。`/permission` 命令先等待部署授权，再同步写入预设；取消或策略移除后晚到的授权被拒绝。未来会话默认值沿用既有设置命名空间，并排除 Auto。Full 默认值通过仅用于写入的 `authorizeWrite` 钩子要求实时管理员授权。注册与提供方重载仍由 schema 和同步值校验负责；依赖请求的权威只在进程内持久化之前检查。等待期间卸载或外部版本变化会拒绝写入。
 
-受管 Auto 卸载将存活 Session 恢复到 Workspace write，即使权威提供方已经丢失也一样。独立本地卸载仍按[上游 Auto 生命周期决策](../feature/2026-08-28-auto-review.zh.md)保留 Full access。受管部署不能通过移除 reviewer 获得未经审查的 Full access。
+受管 Auto 卸载将存活 Session 恢复到 Workspace write，即使权威提供方已经丢失也一样。[捕获的审查权威](2026-11-01-auto-review-authority.zh.md)负责在容量与物理派发期间保留签发方，以及在任何审查前出现可选权威时的分类。独立本地卸载仍按[上游 Auto 生命周期决策](../feature/2026-08-28-auto-review.zh.md)保留 Full access。受管部署不能通过移除 reviewer 获得未经审查的 Full access。
 
 每次 reviewer 请求携带 Session 与 `purpose: auto-review`，受管计费还携带不可变执行见证和一位主要发起人。这些字段不进入 Provider 请求正文或模型文本。治理插件使用实际发起 Agent 或已提供的已验证见证，不用当前浏览器或展示参与人替代受管权威。没有 Agent 的辅助调用明确保持未归属。多位用户参与仍只产生一笔账单。
 
 PostgreSQL intake 在保存用量前，按 Session、运行时、组织与主要发起人验证历史见证。子 Session 只有通过服务端记录的见证成员关系，才能使用祖先输入。撤权或软删除用户仍可归因于已证明的历史请求，但不会重新获得执行权限。项目承担账单并记录一位活动发起人；个人记录只使用账务所有者，不重复记录活动发起人。无效证明保留在 outbox，不能移除身份后重试。无证明的旧记录保留当前可写成员检查和既有未归属重试。SQLite 拒绝其无法验证的证明。
+
+按 Runtime 签发的上报凭据会把持久 `RuntimeId` 保留到 intake，并要求已记录的执行 Session 属于同一 Runtime。共享账号或电脑不能授权借用另一 Runtime 的输入凭据，上报正文也不能替换凭据身份。账号/项目账务和显式旧版主体级上报保留原有归属。执行资格被撤销后，历史证明仍可用于归账；这项检查不会授予新的执行权限。
 
 ## 考虑过的替代方案
 

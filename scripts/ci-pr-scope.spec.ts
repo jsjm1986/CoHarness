@@ -573,14 +573,26 @@ describe('complete scope shadow comparison', () => {
   })
 
   it('executes every previous Web-group member while comparing exact owner selection', () => {
-    const plan = resolveCiPrScopePlans(['apps/web/tests/goal-bar.e2e.ts'], '', root, {})
-    expect(plan.previous).toMatchObject({ snapshotMode: 'focused', webGroups: ['conversation'], webScenarios: [] })
-    expect(plan.candidate.webScenarios).toEqual(exactScenarioFiles(policy, ['goal-bar.e2e.ts']))
-    expect(plan.execution.webScenarios).toEqual(focusedScenarioFiles(policy, ['conversation']))
-    expect(plan.execution.webScenarios).toContain('queue-actions.e2e.ts')
+    const plan = resolveCiPrScopePlans(['apps/web/tests/default-model.e2e.ts'], '', root, {})
+    expect(plan).toMatchObject({ baselineStatus: 'available' })
+    expect(plan.previous).toMatchObject({ snapshotMode: 'focused', webGroups: ['settings'], webScenarios: [] })
+    expect(plan.candidate.webScenarios).toEqual(exactScenarioFiles(policy, ['default-model.e2e.ts']))
+    expect(plan.execution.webScenarios).toEqual(focusedScenarioFiles(policy, ['settings']))
+    expect(plan.execution.webScenarios).toContain('models-settings.e2e.ts')
     const webReduction = plan.changes.removed.find(change => change.lane === 'web')
-    expect(webReduction?.from).toContain('queue-actions.e2e.ts')
+    expect(webReduction?.from).toContain('models-settings.e2e.ts')
     expect(webReduction?.reason).toBe('exact-scenario-owners-and-smokes')
+  })
+
+  it('retains full validation when a frozen group contains retired scenarios', () => {
+    const plan = resolveCiPrScopePlans(['apps/web/tests/goal-bar.e2e.ts'], '', root, {})
+    expect(plan).toMatchObject({
+      baselineStatus: 'unavailable',
+      baselineError: 'ci-pr-scope: frozen scenario is absent: feedback-command.e2e.ts',
+      previous: { coverageMode: 'full', snapshotMode: 'full' },
+      execution: { coverageMode: 'full', snapshotMode: 'full' },
+    })
+    expect(plan.candidate.webScenarios).toEqual(exactScenarioFiles(policy, ['goal-bar.e2e.ts']))
   })
 
   it('records additional validation for a golden the previous policy classified as prose', () => {
@@ -600,7 +612,13 @@ describe('complete scope shadow comparison', () => {
     expect(plan.execution.snapshotMode).toBe('full')
     const shared = resolveCiPrScopePlans([source, 'packages/client/runtime/src/index.ts'], '', root, {})
     expect(shared.candidate.snapshotMode).toBe('full')
-    expect(shared.changes.removed).toEqual([])
+    expect(shared.execution.snapshotMode).toBe('full')
+    expect(shared.changes.removed).toEqual([{
+      lane: 'web', from: [
+        'feedback-command.e2e.ts', 'message-feedback-layout.e2e.ts',
+        'message-feedback-protocol.snapshot.ts', 'message-feedback.e2e.ts',
+      ], to: [], reason: 'unexplained',
+    }])
   })
 
   it('uses candidate selection only for an explicit experiment', () => {

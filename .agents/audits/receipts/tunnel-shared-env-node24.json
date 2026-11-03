@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-shared-env-node24",
+  "cwd": "gateway",
+  "command": "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node tests/run-built-local-supervision.mjs",
+  "startedAt": "2026-10-24T22:00:19.713576+00:00",
+  "seconds": 2.5,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "inputsAfter": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "postgresToolDirectory": null,
+  "outputSha256": "25a1f0fe8de83d284b7dce3c3f907d6c2104aa767db242ae80e6e4dac38bdef0",
+  "outputTail": "Compiled Runtime starts with its private credential.\nGateway database and credential variables stay outside the Runtime environment.\nApplication backups refuse roots that overlap node execution control.\nGateway SIGKILL leaves the independently owned Runtime available.\nA replacement Gateway authenticates the exact runtime generation.\nA different credential cannot stop the active generation.\nConfirmed stop joins the owned process range and retained runtime output.\nA stopped credential generation cannot allocate again.\nA fresh credential survives a repeated stop from the older handle.\nCancellation after preparation prevents independent runtime allocation.\n"
+}

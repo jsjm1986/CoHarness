@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-token-final-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts gateway/src/child-environment.ts gateway/src/launcher.ts gateway/src/instances.ts gateway/src/tunnel-supervisor.ts gateway/src/tunnel-access.ts gateway/src/cloudflare-api.ts gateway/tests/instances.spec.ts gateway/tests/tunnel-supervisor.spec.ts gateway/tests/tunnel-access.spec.ts gateway/tests/cloudflare-api.spec.ts gateway/tests/fixtures/tunnel-binary.mjs gateway/tests/fixtures/local-runtime-web-gateway.mjs gateway/tests/run-local-web-assembly.mjs",
+  "startedAt": "2026-10-24T21:58:39.884492+00:00",
+  "seconds": 1.6,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "inputsAfter": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -342,7 +342,7 @@ describe('LocalBashExecutor.start (background process handles)', () => {
         lossy: false,
       }),
     }
-    vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue({
+    vi.spyOn(ctx.subprocess, 'spawn').mockResolvedValue({
       control: undefined,
       stdin: undefined,
       stdout: undefined,
@@ -369,7 +369,7 @@ describe('LocalBashExecutor.start (background process handles)', () => {
       readFrom: () => ({ text: '', nextOffset: 0, lossy: false }),
     }
     const rejected = Promise.withResolvers<SubprocessOutcome>()
-    vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue({
+    vi.spyOn(ctx.subprocess, 'spawn').mockResolvedValue({
       stdin: undefined,
       stdout: undefined,
       stderr: undefined,
@@ -397,7 +397,7 @@ describe('LocalBashExecutor.start (background process handles)', () => {
       readFrom: () => ({ text: '', nextOffset: 0, lossy: false }),
     }
     const rejected = Promise.withResolvers<SubprocessOutcome>()
-    vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue({
+    vi.spyOn(ctx.subprocess, 'spawn').mockResolvedValue({
       stdin: undefined,
       stdout: undefined,
       stderr: undefined,
@@ -425,7 +425,7 @@ describe('LocalBashExecutor.start (background process handles)', () => {
     Object.defineProperty(providerError, Symbol.toPrimitive, {
       value: () => { throw new Error('provider formatting must not escape') },
     })
-    vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue({
+    vi.spyOn(ctx.subprocess, 'spawn').mockResolvedValue({
       control: undefined,
       stdin: undefined,
       stdout: undefined,
@@ -519,11 +519,11 @@ describe('cancellation against a hanging backend', () => {
     settle: (outcome: { exitCode: number | null; signal: NodeJS.Signals | null }) => void = () => {}
     override async terminalEnvironment(): Promise<never> { throw new Error('fixture does not open terminals') }
     override async resolveExecutable(command: string): Promise<string> { return command }
-    override spawnTerminal(): Promise<never> { throw new Error('bash spawns pipes, never terminals') }
+    protected override spawnTerminalProcess(): Promise<never> { throw new Error('bash spawns pipes, never terminals') }
     private readonly reader: SubprocessOutputReader = {
       readFrom: () => ({ text: '', lossy: false, nextOffset: 0 }),
     }
-    override spawn(): SubprocessHandle {
+    protected override spawnProcess(): SubprocessHandle {
       return {
         stdin: undefined,
         stdout: undefined,

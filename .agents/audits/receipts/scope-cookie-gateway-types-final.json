@@ -1,0 +1,14 @@
+{
+  "name": "scope-cookie-gateway-types-final",
+  "cwd": "gateway",
+  "command": "npm run typecheck",
+  "startedAt": "2026-10-24T02:40:06.921959+00:00",
+  "seconds": 5.96,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "56185e9df2ec2178e011430f3900141b9bfeb0e22e32413672b833e98636d88d",
+  "inputsAfter": "56185e9df2ec2178e011430f3900141b9bfeb0e22e32413672b833e98636d88d",
+  "postgresToolDirectory": null,
+  "outputSha256": "e1bc2ee0c196fc36317ba8327cf8d786f891220e56b36c4633bd36fd14835823",
+  "outputTail": "\n> typecheck\n> tsc --noEmit\n\ntests/server.spec.ts(619,29): error TS2722: Cannot invoke an object which is possibly 'undefined'.\ntests/server.spec.ts(619,29): error TS18048: 'deps.projects.createManaged' is possibly 'undefined'.\n"
+}

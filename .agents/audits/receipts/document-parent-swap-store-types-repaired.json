@@ -1,0 +1,14 @@
+{
+  "name": "document-parent-swap-store-types-repaired",
+  "cwd": ".",
+  "command": "pnpm exec tsc -b packages/attachment/userdoc-local",
+  "startedAt": "2026-10-26T01:26:59.576034+00:00",
+  "seconds": 4.232,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c6e86482a3758585ba4026778c4b419317c8c6af27527e2e39cdd1004ded7e21",
+  "inputsAfter": "c6e86482a3758585ba4026778c4b419317c8c6af27527e2e39cdd1004ded7e21",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

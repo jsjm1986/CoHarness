@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-monotonic-artifacts",
+  "cwd": "packages/subagent/subagent-dsh-sdk",
+  "command": "../../../node_modules/.bin/tsdown --config tsdown.config.ts",
+  "startedAt": "2026-10-24T16:51:44.295067+00:00",
+  "seconds": 0.568,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c4c6b105b322e28444efa5a8d13d34b83f8b01c4064ef016b4df3941d4fad376",
+  "inputsAfter": "c4c6b105b322e28444efa5a8d13d34b83f8b01c4064ef016b4df3941d4fad376",
+  "postgresToolDirectory": null,
+  "outputSha256": "b53e2eee9d920b900bd1c025716fb9954b04090f994852e162b1ddbca2289df3",
+  "outputTail": "ℹ tsdown v0.23.0 powered by rolldown v1.2.7\nℹ config file: /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent-dsh-sdk/tsdown.config.ts \nℹ entry: lib/types/index.js\nℹ target: es2024\nℹ tsconfig: tsconfig.json\nℹ entry: lib/types/managed.js\nℹ target: es2024\nℹ tsconfig: tsconfig.json\nℹ Build start\nℹ lib/managed.js  18.62 kB │ gzip: 5.33 kB\nℹ 1 files, total: 18.62 kB\n✔ Build complete in 38ms\nℹ lib/index.js  47.73 kB │ gzip: 13.18 kB\nℹ 1 files, total: 47.73 kB\n✔ Build complete in 39ms\n"
+}

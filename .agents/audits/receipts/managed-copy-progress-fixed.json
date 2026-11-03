@@ -1,0 +1,14 @@
+{
+  "name": "managed-copy-progress-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/managed-files-short-write.spec.ts tests/managed-files.spec.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T11:04:29.893419+00:00",
+  "seconds": 6.489,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c51db3acb4209b9628bf09e91f9be1ff6dece5846f4b770c59187d2bf0ba7f9e",
+  "inputsAfter": "c51db3acb4209b9628bf09e91f9be1ff6dece5846f4b770c59187d2bf0ba7f9e",
+  "postgresToolDirectory": null,
+  "outputSha256": "630a9144492db730d48b02935e98d073053d24427dd2d1b8724a003a4bdf9e92",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  13 passed (13)\n   Start at  19:04:33\n   Duration  3.22s (transform 56ms, setup 0ms, import 93ms, tests 2.91s, environment 0ms)\n\n"
+}

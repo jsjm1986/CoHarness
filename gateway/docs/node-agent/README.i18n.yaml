@@ -1,0 +1,49 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write gateway/docs/node-agent/README.md
+document:
+  en: 42786411c05980f592c0f14f0dae038ffb3a4c82
+  zh: f378ea586cdd1bb5c83dad8346853f603f55eea9
+/:
+  en: 9437b0da044bb538
+  zh: 0a314f5801ab579d
+/node-agent-access-reference:
+  en: 6179834d0029efdb
+  zh: 3c542cd871d8ed88
+/node-agent-access-reference/summary:
+  en: 681e2d1d409bc4d9
+  zh: b2a4afba7ebbc233
+/node-agent-access-reference/contents:
+  en: ca6365fe086f39c2
+  zh: 85eaded30539a999
+/node-agent-access-reference/run-an-agent:
+  en: 97181dbca76c2aa4
+  zh: fd15bad3a7a84d6d
+/node-agent-access-reference/administrator-api:
+  en: 291b86022f80c860
+  zh: 1a71c0ff13063a6f
+/node-agent-access-reference/computer-permissions:
+  en: ea2738d2015bba5c
+  zh: b6a517eed41dce20
+/node-agent-access-reference/existing-gateway-services:
+  en: 640cf7910d0fb955
+  zh: 479cd37d11a52e46
+/node-agent-access-reference/runtime-isolation:
+  en: 1e8440428a9b3f09
+  zh: a45f870c70c5cd67
+/node-agent-access-reference/runtime-isolation/allocation-and-administration:
+  en: 4d754d650d9a3633
+  zh: ce30e7eb03ff2df5
+/node-agent-access-reference/configuration:
+  en: 336554bd9baf797d
+  zh: 1e931fda81d50d91
+/node-agent-access-reference/recovery:
+  en: b734d9a59b34d6ca
+  zh: a8c5aa980240f366
+/node-agent-access-reference/verification:
+  en: 4e605ec8086ad348
+  zh: 68ea052683ee56f5
+/node-agent-access-reference/dev-note:
+  en: 94d09b0bc0c78320
+  zh: 2a0525c2352ca392

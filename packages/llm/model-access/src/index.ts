@@ -4,6 +4,8 @@ import { Context, Service } from '@deepseek-ai/cordis'
 declare module '@deepseek-ai/cordis' {
   interface Context {
     modelAccess: ModelAccessService
+    /** Managed runtimes refuse model dispatch while their authorization provider is absent. */
+    modelAccessRequired?: boolean
   }
 }
 

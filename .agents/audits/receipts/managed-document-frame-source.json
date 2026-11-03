@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-frame-source",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/vitest run packages/attachment/userdoc-gateway/tests/frame.spec.ts",
+  "startedAt": "2026-10-26T15:32:14.893467+00:00",
+  "seconds": 3.863,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7b1c1594c9e9de8ea1c74903ed3b80f0557e9ab7281c9e55aa20278c192311db",
+  "inputsAfter": "7b1c1594c9e9de8ea1c74903ed3b80f0557e9ab7281c9e55aa20278c192311db",
+  "postgresToolDirectory": null,
+  "outputSha256": "be38d55aa13ce53748b4862d60182183e9c2504d64c838c04b6ada9c158aeb84",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  18 passed (18)\n   Start at  23:32:18\n   Duration  157ms (transform 39ms, setup 37ms, import 16ms, tests 23ms, environment 0ms)\n\n"
+}

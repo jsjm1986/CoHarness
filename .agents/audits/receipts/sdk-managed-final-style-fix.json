@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-final-style-fix",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/subagent/subagent-dsh-sdk packages/llm/llm/src/index.ts packages/llm/llm/src/model-policy.ts packages/llm/llm/tests/model-policy.spec.ts apps/cli/src/profile-boot.ts plugins/dsh-model-governance packages/context/gateway-execution/tests/pg-composition.e2e.ts gateway/tests/execution-fixture-server.ts examples/headless-agent/tests/sdk-process-admission.snapshot.ts --fix",
+  "startedAt": "2026-10-24T16:16:59.387476+00:00",
+  "seconds": 7.894,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a978c0a4986ca9057113158f6efc4c8f7c3b597c954765e1d18def1cde0011e2",
+  "inputsAfter": "a978c0a4986ca9057113158f6efc4c8f7c3b597c954765e1d18def1cde0011e2",
+  "postgresToolDirectory": null,
+  "outputSha256": "2f75f16d30dcfa83de07bb81de0bad9afafc82485c49736e48d15c9f70deef6d",
+  "outputTail": "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts:37:1: error @stylistic(max-len): This line has a length of 147. Maximum allowed is 140.\npackages/subagent/subagent-dsh-sdk/tests/control.spec.ts:230:91: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\npackages/subagent/subagent-dsh-sdk/tests/control.spec.ts:360:81: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\npackages/subagent/subagent-dsh-sdk/tests/control.spec.ts:360:122: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\npackages/subagent/subagent-dsh-sdk/tests/control.spec.ts:383:1: error @stylistic(max-len): This line has a length of 143. Maximum allowed is 140.\npackages/subagent/subagent-dsh-sdk/src/bridge.ts:115:55: error typescript(no-non-null-assertion): Forbidden non-null assertion.\npackages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts:588:73: error typescript(prefer-promise-reject-errors): Expected the Promise rejection reason to be an Error.\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-current-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T21:44:04.607727+00:00",
+  "seconds": 5.543,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "60abe11842a52f1baf0d553e2c6aa23f3c60b736e2ccfa009d0af7243885ac0a",
+  "inputsAfter": "60abe11842a52f1baf0d553e2c6aa23f3c60b736e2ccfa009d0af7243885ac0a",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

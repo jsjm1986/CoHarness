@@ -69,12 +69,15 @@ if (process.platform !== 'win32') {
     return file;
   };
 
-  assert.equal(probe(fake('full', 'echo "landlock: fully enforced"; exit 0')), 'full');
-  assert.equal(probe(fake('partial', 'echo "landlock: partially enforced (older ABI)"; exit 0')), 'partial');
-  assert.equal(probe(fake('failing', `exit ${LAUNCHER_FAILURE_EXIT}`)), 'unusable');
-  assert.equal(probe(fake('hanging', 'sleep 10'), { timeoutMs: 200 }), 'unusable');
-
-  fs.rmSync(fakeDir, { recursive: true, force: true });
+  try {
+    assert.equal(probe(fake('full', 'echo "landlock: fully enforced"; exit 0'), { timeoutMs: 15000 }), 'full');
+    assert.equal(probe(fake('partial', 'echo "landlock: partially enforced (older ABI)"; exit 0'), { timeoutMs: 15000 }), 'partial');
+    assert.equal(probe(fake('failing', `exit ${LAUNCHER_FAILURE_EXIT}`), { timeoutMs: 15000 }), 'unusable');
+    assert.equal(probe(fake('hanging', 'exec sleep 10'), { timeoutMs: 200 }), 'unusable');
+  } finally {
+    fs.rmSync(fakeDir, { recursive: true, force: true });
+  }
+  await import('./probe-timeout.mjs');
 }
 
 console.log('entry.test: ok');

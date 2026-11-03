@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-speech-removal-quiescence.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-speech-removal-quiescence.md
+document:
+  en: 7856219c5ff571b178592f542f794ceb5dc75071
+  zh: 55ee359b013da5f17e1cad4c1e857a2bbd27f930
+/agent-note-speech-withdrawal-retains-completion-ownership:
+  en: bb90aee9d35fffe3
+  zh: 5bbb6cf6ac52b35d
+/agent-note-speech-withdrawal-retains-completion-ownership/problem:
+  en: 3e8e8bd6650e0bfa
+  zh: 0fcc66ba1934fb4f
+/agent-note-speech-withdrawal-retains-completion-ownership/decision:
+  en: 1aafdb9e0b2b38dd
+  zh: eb81257c3295f2eb
+/agent-note-speech-withdrawal-retains-completion-ownership/alternatives-considered:
+  en: 9f7cc7a91010f360
+  zh: 8ad626162abc1fcf
+/agent-note-speech-withdrawal-retains-completion-ownership/consequences:
+  en: 507042d76b9c9206
+  zh: b4e1aabfb8ed401c
+/agent-note-speech-withdrawal-retains-completion-ownership/verification:
+  en: 59ee442a763b0de9
+  zh: 65039b99599b2da0

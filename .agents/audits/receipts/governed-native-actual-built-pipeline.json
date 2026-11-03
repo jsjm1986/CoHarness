@@ -1,0 +1,14 @@
+{
+  "name": "governed-native-actual-built-pipeline",
+  "cwd": ".",
+  "command": "node --import ./.agents/audits/.local/native-policy-built-peers.mjs .agents/audits/.local/verify-built-governed-native.mjs",
+  "startedAt": "2026-10-24T07:45:33.782353+00:00",
+  "seconds": 2.639,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "inputsAfter": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "postgresToolDirectory": null,
+  "outputSha256": "ea00afda22a92d5b4a56ebdf50373da482cd508bef78c67b3197a3b10f1922b1",
+  "outputTail": "{\"requests\":1,\"admissions\":1,\"releases\":1,\"uncertain\":0,\"successSource\":\"file\",\"successClass\":\"personal\",\"usage\":{\"inputTokens\":3,\"outputTokens\":2},\"denial\":\"denied\",\"records\":2}\n"
+}

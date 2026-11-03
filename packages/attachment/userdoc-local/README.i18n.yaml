@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/attachment/userdoc-local/README.md
 document:
-  en: fcf18e834ad8766816a1fac41e4c207e04a1ad49
-  zh: bc53ae563ab381fd9e7d8ab932074e02b70340b6
+  en: 0e593b1830d7b1cf047311cec5e27e4838b527cf
+  zh: 76ec12d5fa7ebf0d114f390b95f9552e02df14d0
 /:
   en: 4fe0e8dc7b86f757
   zh: 61495d48365178df
 /deepseek-ai-dsh-userdoc-local:
-  en: bdad13279bc87246
-  zh: a238c80a00237da6
+  en: dfb9274048166c5a
+  zh: ac0ff715f85ef343
 /deepseek-ai-dsh-userdoc-local/summary:
   en: 0d64e4436c2fa3e0
   zh: 75757c6b0fe0c610
@@ -18,17 +18,17 @@ document:
   en: 6e16e3a9bf5fe84e
   zh: e3db917199cdd99e
 /deepseek-ai-dsh-userdoc-local/resumable-uploads:
-  en: 97960032d95bdac8
-  zh: 1890b2b30146bd8e
+  en: a305fb83291477b6
+  zh: d7d2eb672fc3b308
 /deepseek-ai-dsh-userdoc-local/model-experience:
   en: 29ebe533d432708a
   zh: 9528fee6fc3b8ff5
 /deepseek-ai-dsh-userdoc-local/model-experience/kv-cache-effect:
   en: c62adaa305f773bb
-  zh: c7fd22d72743a759
+  zh: 680eec328574ed58
 /deepseek-ai-dsh-userdoc-local/known-limitations-and-deferred-work:
-  en: d4a5f7cb265a06fb
-  zh: 0e409d0119362781
+  en: 2f1343fc8260790a
+  zh: 56cb3806365efd64
 /deepseek-ai-dsh-userdoc-local/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

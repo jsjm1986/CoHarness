@@ -8,7 +8,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
-import type {} from '@deepseek-ai/dsh-collaboration'
+import { isCollaborationRequired } from '@deepseek-ai/dsh-collaboration'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { createUserMessage, freezeMessage, LlmError } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, LlmResolvedModelInfo, UserMessage } from '@deepseek-ai/dsh-llm'
@@ -199,7 +199,7 @@ export class SessionReferenceResolver extends TypertRemoteService {
     if (!Number.isSafeInteger(limit) || limit <= 0) {
       throw new SessionReferenceError('candidate limit must be a positive safe integer', 'SESSION_REFERENCE_INVALID_REFERENCE')
     }
-    const requiresAcl = this.ctx.get('collaboration') !== undefined
+    const requiresAcl = isCollaborationRequired(this.ctx)
     const needle = query.toLocaleLowerCase()
     const targetCwd = agent.session.header.cwd
     assertNotCancelled(signal)
@@ -318,7 +318,7 @@ export class SessionReferenceResolver extends TypertRemoteService {
     references: SessionReferenceInput[],
     signal?: AbortSignal,
   ): Promise<PreparedReferencedMessage> {
-    const requiresAcl = this.ctx.get('collaboration') !== undefined
+    const requiresAcl = isCollaborationRequired(this.ctx)
     const acceptedContent = structuredClone(content)
     const inputs = normalizeReferences(agent.id, references, this.config.maxReferences)
     if (inputs.length === 0) return { content: acceptedContent }
@@ -386,7 +386,7 @@ export class SessionReferenceResolver extends TypertRemoteService {
     ids: readonly SessionId[], signal: AbortSignal | undefined, required: boolean,
   ): Promise<ReadonlySet<SessionId>> | undefined {
     const collaboration = this.ctx.get('collaboration')
-    if (collaboration === undefined && !required) return undefined
+    if (collaboration === undefined && !required && !isCollaborationRequired(this.ctx)) return undefined
     return (async () => {
       try {
         if (collaboration === undefined) throw new Error('collaboration provider is unavailable')

@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-phase-final-references",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/verify-repository-references.ts",
+  "startedAt": "2026-10-26T18:34:13.494710+00:00",
+  "seconds": 27.648,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bab156caafd2706df76c0a66551c6b2e160ca3c65be04bad5c208681623464e3",
+  "inputsAfter": "bab156caafd2706df76c0a66551c6b2e160ca3c65be04bad5c208681623464e3",
+  "postgresToolDirectory": null,
+  "outputSha256": "548b2f0b6f1fdc9dc2b083adf1ca3fa6d1ef62ec5d8a642e9f8ed6b63b48181d",
+  "outputTail": "verify-repository-references: maintained files contain no repository commit identifiers or disallowed organization URLs.\n"
+}

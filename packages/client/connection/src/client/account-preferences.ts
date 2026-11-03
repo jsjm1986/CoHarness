@@ -15,6 +15,24 @@ const DEFAULT_PERFORMANCE_USAGE_MODE = 'detailed'
 const LINK_OPENINGS = ['sidebar', 'new-tab'] as const
 const DEFAULT_LINK_OPENING = 'sidebar'
 
+const FONT_SIZE_RANGES = {
+  fontSize: { min: 10, max: 22, default: 14 },
+  codeFontSize: { min: 10, max: 16, default: 11 },
+  terminalFontSize: { min: 10, max: 20, default: 13 },
+} as const
+const FONT_FAMILY_FIELDS = ['textFontFamily', 'codeFontFamily', 'terminalFontFamily'] as const
+
+/** Effective appearance and font values owned by the authenticated account. */
+export interface AccountThemePreferences {
+  preference: 'light' | 'dark' | 'system'
+  fontSize: number
+  codeFontSize: number
+  terminalFontSize: number
+  textFontFamily: string
+  codeFontFamily: string
+  terminalFontFamily: string
+}
+
 /** Account preference namespace accepted by the Gateway. */
 export type AccountPreferenceNamespace = 'locale' | 'ui-theme' | 'ui-conversation'
 
@@ -23,7 +41,7 @@ export interface AccountPreferencesView {
   revision: number
   values: {
     locale: { preference?: 'zh' | 'en' }
-    'ui-theme': { preference: 'light' | 'dark' | 'system' }
+    'ui-theme': AccountThemePreferences
     'ui-conversation': {
       busyEnter: 'queue' | 'steer'
       chatContentWidth: number
@@ -36,7 +54,7 @@ export interface AccountPreferencesView {
   }
   overrides: {
     locale: { preference?: 'zh' | 'en' }
-    'ui-theme': { preference?: 'light' | 'dark' | 'system' }
+    'ui-theme': Partial<AccountThemePreferences>
     'ui-conversation': {
       busyEnter?: 'queue' | 'steer'
       chatContentWidth?: number
@@ -56,6 +74,8 @@ export interface AccountPreferenceMutation {
   field:
     | 'preference' | 'busyEnter' | 'chatContentWidth' | 'chatFullWidth' | 'chatFontSize'
     | 'transcriptView' | 'performanceUsage' | 'linkOpening'
+    | 'fontSize' | 'codeFontSize' | 'terminalFontSize'
+    | 'textFontFamily' | 'codeFontFamily' | 'terminalFontFamily'
   operation: 'set' | 'unset'
   value?: string | number | boolean
   expectedRevision?: number
@@ -97,12 +117,27 @@ function optionalLocale(value: unknown): { preference?: 'zh' | 'en' } {
   return row.preference === undefined ? {} : { preference: row.preference }
 }
 
-function optionalTheme(value: unknown): { preference?: 'light' | 'dark' | 'system' } {
+function optionalTheme(value: unknown): Partial<AccountThemePreferences> {
   const row = object(value)
   if (row.preference !== undefined && row.preference !== 'light' && row.preference !== 'dark' && row.preference !== 'system') {
     throw new Error('invalid account preferences response')
   }
-  return row.preference === undefined ? {} : { preference: row.preference }
+  return { ...optionalFonts(row), ...(row.preference === undefined ? {} : { preference: row.preference }) }
+}
+
+function optionalFonts(row: Record<string, unknown>): Partial<Omit<AccountThemePreferences, 'preference'>> {
+  const result: Partial<Omit<AccountThemePreferences, 'preference'>> = {}
+  for (const field of Object.keys(FONT_SIZE_RANGES) as (keyof typeof FONT_SIZE_RANGES)[]) {
+    const value = row[field], spec = FONT_SIZE_RANGES[field]
+    if (value !== undefined) result[field] = numberPreference(value, spec.default, spec.min, spec.max)
+  }
+  for (const field of FONT_FAMILY_FIELDS) {
+    const value = row[field]
+    if (value === undefined) continue
+    if (typeof value !== 'string') throw new Error('invalid account preferences response')
+    result[field] = value
+  }
+  return result
 }
 
 function optionalBusyEnter(value: unknown): { busyEnter?: 'queue' | 'steer' } {
@@ -113,12 +148,16 @@ function optionalBusyEnter(value: unknown): { busyEnter?: 'queue' | 'steer' } {
   return row.busyEnter === undefined ? {} : { busyEnter: row.busyEnter }
 }
 
-function theme(value: unknown): { preference: 'light' | 'dark' | 'system' } {
+function theme(value: unknown): AccountThemePreferences {
   const row = object(value)
   if (row.preference !== 'light' && row.preference !== 'dark' && row.preference !== 'system') {
     throw new Error('invalid account preferences response')
   }
-  return { preference: row.preference }
+  return {
+    fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+    textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+    ...optionalFonts(row), preference: row.preference,
+  }
 }
 
 function busyEnter(value: unknown): { busyEnter: 'queue' | 'steer' } {

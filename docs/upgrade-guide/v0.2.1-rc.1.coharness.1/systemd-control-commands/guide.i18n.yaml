@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/systemd-control-commands/guide.md
+document:
+  en: cd84532f87b2011ccb303959931cc7b0d66b2f3f
+  zh: 76c68533a39d43abc11629e67f487872169694dc
+/:
+  en: ba4051ff08a28ddc
+  zh: 6beca9c460283ac8
+/systemctl-clients-have-bounded-lifetimes:
+  en: 2b3e5e9208db83c7
+  zh: d5da3ff5ef68cf94
+/systemctl-clients-have-bounded-lifetimes/change:
+  en: 895d781953b751e6
+  zh: ba19f0db846902dc
+/systemctl-clients-have-bounded-lifetimes/migration:
+  en: 7ca2d191eb4851fc
+  zh: 735a07d6ebfef07b

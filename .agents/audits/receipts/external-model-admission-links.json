@@ -1,0 +1,14 @@
+{
+  "name": "external-model-admission-links",
+  "cwd": ".",
+  "command": "pnpm install --offline --ignore-scripts --reporter=append-only",
+  "startedAt": "2026-10-24T17:02:34.573888+00:00",
+  "seconds": 2.547,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4a0affc77ed20eb55c84b57393a8f4745745d37f33d249a9aa48c9fcb2f62f39",
+  "inputsAfter": "4a0affc77ed20eb55c84b57393a8f4745745d37f33d249a9aa48c9fcb2f62f39",
+  "postgresToolDirectory": null,
+  "outputSha256": "25e540378fbb3bde576a942c18bb9410b0d63bf49000fee7ea0f5084858f984d",
+  "outputTail": "native/system/packages/darwin-x64        | [WARN] Unsupported platform: wanted: {\"cpu\":[\"x64\"],\"os\":[\"darwin\"],\"libc\":[\"any\"]} (current: {\"os\":\"darwin\",\"cpu\":\"arm64\",\"libc\":\"unknown\"})\nnative/system/packages/linux-arm64       | [WARN] Unsupported platform: wanted: {\"cpu\":[\"arm64\"],\"os\":[\"linux\"],\"libc\":[\"any\"]} (current: {\"os\":\"darwin\",\"cpu\":\"arm64\",\"libc\":\"unknown\"})\nnative/system/packages/linux-x64         | [WARN] Unsupported platform: wanted: {\"cpu\":[\"x64\"],\"os\":[\"linux\"],\"libc\":[\"any\"]} (current: {\"os\":\"darwin\",\"cpu\":\"arm64\",\"libc\":\"unknown\"})\nScope: all 378 workspace projects\nAlready up to date\nDone in 482ms using pnpm v11.28.5\n"
+}

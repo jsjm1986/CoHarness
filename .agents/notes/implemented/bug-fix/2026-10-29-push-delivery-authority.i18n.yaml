@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-29-push-delivery-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-29-push-delivery-authority.md
+document:
+  en: 262bbee609dc5e9a9c82e2aa6a2a44b6314c0cd2
+  zh: dcd2d8b5785aeeabbf6d8f9a14581f5f65f006ee
+/agent-note-push-delivery-retains-recipient-and-attempt-ownership:
+  en: 89242dd0cccbc68d
+  zh: 54d9b0b55804abad
+/agent-note-push-delivery-retains-recipient-and-attempt-ownership/problem:
+  en: 5e81c48463f29ee2
+  zh: cc4501826229afc6
+/agent-note-push-delivery-retains-recipient-and-attempt-ownership/decision:
+  en: 0ebc5d8c95264264
+  zh: 47f7cbd15736dd96
+/agent-note-push-delivery-retains-recipient-and-attempt-ownership/alternatives-considered:
+  en: 4cc0e3ac06a56203
+  zh: 210958d1feaf5e45
+/agent-note-push-delivery-retains-recipient-and-attempt-ownership/consequences:
+  en: 76850e1c7e597483
+  zh: b72dfbfe7c01319b
+/agent-note-push-delivery-retains-recipient-and-attempt-ownership/verification:
+  en: e3a4e1c47b6299c1
+  zh: cbf0d4bc8c51a4b5

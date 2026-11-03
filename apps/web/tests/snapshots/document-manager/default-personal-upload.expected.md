@@ -1,0 +1,59 @@
+- dialog "Document Manager":
+  - banner:
+    - heading "Document Manager" [level=2]
+    - button "Upload information":
+      - img
+    - button "Close":
+      - img
+  - complementary "Document scopes":
+    - img
+    - textbox "Find a space"
+    - button "All accessible documents Metadata only":
+      - strong: All accessible documents
+      - text: Metadata only
+    - button "Personal documents Private to you":
+      - strong: Personal documents
+      - text: Private to you
+    - text: Scopes
+    - button "Trash":
+      - img
+      - text: Trash
+    - button "History"
+  - status: Open a conversation to add documents to it. Browsing, downloads and copying remain available.
+  - heading "Personal documents" [level=3]
+  - navigation "Document path":
+    - button "Root folder" [disabled]
+  - group "Document filters":
+    - img
+    - textbox "Search document name"
+    - combobox "Type":
+      - option "All types" [selected]
+      - option "Images"
+      - option "PDF"
+      - option "Text"
+      - option "Other"
+    - button "Sort":
+      - img
+      - text: Modified · Newest first
+      - img
+  - group "Document actions":
+    - button "New Folder":
+      - img
+      - text: New Folder
+    - button "Upload Document":
+      - img
+      - text: Upload Document
+    - button "More actions":
+      - img
+  - checkbox "Select this page"
+  - text: Visible only to you 0 folders · 1 documents
+  - list "Document Manager":
+    - group "Upload date 2026-08-14":
+      - text: 2026-08-14
+      - listitem:
+        - checkbox "default-target.txt"
+        - button "Preview default-target.txt": default-target.txt Text · 2026-08-14
+        - text: 6 B
+        - button "Add default-target.txt to conversation" [disabled]: Add to conversation
+        - 'button "More actions: default-target.txt"':
+          - img

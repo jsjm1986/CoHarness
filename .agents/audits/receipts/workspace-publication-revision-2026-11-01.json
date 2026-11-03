@@ -1,0 +1,255 @@
+{
+  "finding": "B433",
+  "status": "fixed_verified_named_workspace_publication_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T08:02:37.679576+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-origin.json",
+    "fetchCompletedAt": "2026-11-01T07:50:54.054453+00:00"
+  },
+  "problem": "Workspace registry or Gateway transport replacement restarted the publisher-local revision inside one authenticated generation. Gateway acknowledged requests but retained old metadata, and a late old request could supersede a lower-numbered replacement.",
+  "fix": "Allocate monotonically increasing publication revisions from root-owned instance data. Scoped publishers retain independent request cancellation and serialization; safe-integer exhaustion refuses another publication without wrapping.",
+  "verification": {
+    "distinctBusinessCases": 138,
+    "packageRegressionCases": 133,
+    "realPostgresCases": 1,
+    "typescriptSdkCases": 2,
+    "pythonSdkCases": 2,
+    "newUnitCases": 6,
+    "catalogPartitionGateCases": 10,
+    "versionRepeatsAndSubsetRerunsNotAdded": true,
+    "checks": [
+      {
+        "name": "workspace-catalog-unit-coverage-complete",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-unit-coverage-complete.json"
+      },
+      {
+        "name": "workspace-catalog-package-regression",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-package-regression.json"
+      },
+      {
+        "name": "workspace-catalog-postgres-generation",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-postgres-generation.json"
+      },
+      {
+        "name": "workspace-catalog-sdk-source",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-sdk-source.json"
+      },
+      {
+        "name": "workspace-catalog-sdk-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-sdk-node22.json"
+      },
+      {
+        "name": "workspace-catalog-sdk-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-sdk-node24.json"
+      },
+      {
+        "name": "workspace-catalog-sdk-python",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-sdk-python.json"
+      },
+      {
+        "name": "workspace-catalog-source-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-source-types.json"
+      },
+      {
+        "name": "workspace-catalog-bundle",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-bundle.json"
+      },
+      {
+        "name": "workspace-catalog-host-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-host-types.json"
+      },
+      {
+        "name": "workspace-catalog-final-gateway-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-final-gateway-types.json"
+      },
+      {
+        "name": "workspace-catalog-lint-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-lint-final.json"
+      },
+      {
+        "name": "workspace-catalog-final-script-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-final-script-lint.json"
+      },
+      {
+        "name": "workspace-catalog-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-python-lint.json"
+      },
+      {
+        "name": "workspace-catalog-fixture-syntax",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-fixture-syntax.json"
+      },
+      {
+        "name": "workspace-catalog-export-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-export-docs.json"
+      },
+      {
+        "name": "workspace-catalog-cordis-config",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-cordis-config.json"
+      },
+      {
+        "name": "workspace-catalog-pairing",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-pairing.json"
+      },
+      {
+        "name": "workspace-catalog-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-docs.json"
+      },
+      {
+        "name": "workspace-catalog-catalog-partition",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-catalog-partition.json"
+      },
+      {
+        "name": "workspace-catalog-generated-catalog-complete",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-generated-catalog-complete.json"
+      },
+      {
+        "name": "workspace-catalog-original-test-preservation",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-original-test-preservation.json"
+      },
+      {
+        "name": "workspace-catalog-origin",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-origin.json"
+      },
+      {
+        "name": "workspace-catalog-final-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-catalog-final-repository-references.json"
+      }
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 24,
+          "covered": 24,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 36,
+          "covered": 36,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 18,
+          "covered": 18,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/gateway-runtime/src/workspace-catalog.ts": {
+        "lines": {
+          "total": 24,
+          "covered": 24,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 36,
+          "covered": 36,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 18,
+          "covered": 18,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "coverageScope": "Only gateway-runtime/src/workspace-catalog.ts measured, all4 metrics100% under the unchanged default per-file thresholds. No other whole-file or project-wide100% claim.",
+    "physicalProof": "Actual PostgreSQL publication/catalog/user services reject another account, stale credentials and forged next generation. Advancing the instance generation permits a fresh revision1 and rejects the older generation even at revision4. Real SDK profiles replace actual WorkspaceRegistry/SQLite or GatewayRuntime; only external Gateway and model inputs are controlled.",
+    "counterfactual": "All39 files of the original provider remain immutable. The original publisher yields revisions1,2,1; actual PostgreSQL retains Before remount; source and normal Node22 built SDK each fail2 intended WORKSPACE_REMOUNT markers, without module failure or timeout.",
+    "originalTestPreservation": {
+      "status": "passed",
+      "originalCases": 2,
+      "newCases": 6,
+      "method": "JavaScript ASTs after TypeScript emission match each original test; arrow parentheses and erased Error assertions do not change the runtime AST."
+    },
+    "failureReceiptsRetained": "Initial incomplete coverage, fixture/style failures and the unclassified internal Context key remain in private evidence; final acceptance paths pass without lowering thresholds or widening ignore rules.",
+    "catalogClassification": "One exact internal data key is documented in SERVICE_WALK_EXEMPTIONS. Existing10 acceptance-path cases pass; normal generation computes127 artifacts and writes0.",
+    "lintScope": "Repository lint passes owned TypeScript and Python ruff. Existing policy ignores mjs; both fixtures pass Node syntax and real source/Node22/Node24/Python execution, with no policy change.",
+    "docsQuick": "20 passed,0 failed",
+    "bilingualPairs": 2,
+    "cordisConfigs": 438,
+    "productionAcceptanceClaimed": false,
+    "officialResponsesDeferred": true
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/workspace-publication-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-workspace-publication-revision.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-workspace-publication-revision.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-workspace-publication-revision.zh.md",
+    "apps/cli/tests/profiles/sdk/workspace-catalog-remount.expected.e2e.ts",
+    "examples/headless-agent/tests/fixtures/workspace-catalog-remount/expected.json",
+    "examples/headless-agent/tests/fixtures/workspace-catalog-remount/model.mjs",
+    "examples/headless-agent/tests/fixtures/workspace-catalog-remount/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/workspace-catalog-remount/runtime.cordis.yml",
+    "gateway/tests/workspace-catalog-remount.spec.ts",
+    "packages/context/gateway-runtime/README.i18n.yaml",
+    "packages/context/gateway-runtime/README.md",
+    "packages/context/gateway-runtime/README.zh.md",
+    "packages/context/gateway-runtime/src/workspace-catalog.ts",
+    "packages/context/gateway-runtime/tests/workspace-catalog.spec.ts",
+    "python/sdk/tests/test_workspace_catalog_remount_expected.py",
+    "scripts/gen-cordis-catalog.ts"
+  ],
+  "readOnlyPrerequisiteCount": 65,
+  "artifactReferences": 16,
+  "noteReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T071937Z/note-supersession.json",
+  "remaining": [
+    "All12 domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue remaining resource admission, cold model/tool/Inspector authorization, foreground subagent/workflow cleanup recovery, and account/computer ownership outside peer-reserved files.",
+    "Other response cancellation consumers remain review candidates only: Workspace publication response teardown, archive-gateway acknowledgements and Host ApiProxy handler. Peer owns fetch/client.ts and its Web refusal tests; do not duplicate or overwrite that work.",
+    "Trusted peer reports R25 deployed at07:11UTC on both computers, schema103 unchanged and node epoch50. Root has not independently verified production acceptance; B416+ capsules, including B432/B433, are not included. REAL-042 and full cross-computer acceptance remain open.",
+    "Official paid Responses remains deferred. No root production deploy/restart/dependency synchronization/reset/stash/commit/push."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true
+}

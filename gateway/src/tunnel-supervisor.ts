@@ -1,18 +1,20 @@
 /**
  * cloudflared binary resolution, pinned installation, and process supervision
  * for the public-access tunnel. The tunnel child is a direct subprocess of the
- * Gateway: it dies with the Gateway under both launchd and systemd cgroup
- * teardown, so a stopped Gateway never leaves a public entry orphaned. Children
- * are additionally tracked here and killed on this process's `exit` event.
+ * Gateway. Normal shutdown awaits child closure; host service containment owns
+ * forced Gateway termination. Each process handle owns its exit observer until
+ * native child closure.
  */
-import { createHash, randomBytes } from 'node:crypto'
-import { execFile, spawn, spawnSync, type ChildProcess } from 'node:child_process'
-import { chmodSync, createReadStream, createWriteStream, mkdirSync, renameSync, rmSync, statSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
+import { createHash } from 'node:crypto'
+import { chmodSync, createReadStream, createWriteStream, mkdirSync, mkdtempSync, renameSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { promisify } from 'node:util'
-
-const execFileAsync = promisify(execFile)
+import { Readable } from 'node:stream'
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
+import { pipeline } from 'node:stream/promises'
+import { runGatewayChildCommand as runCommand } from './child-command.ts'
+import { spawnTunnelProcess, TunnelSupervisorError, type TunnelLaunchOptions, type TunnelProc } from './tunnel-process.ts'
+export { TunnelSupervisorError } from './tunnel-process.ts'
+export type { TunnelLaunchOptions, TunnelProc } from './tunnel-process.ts'
 
 /** cloudflared release pinned for in-product installation (hashes verified below). */
 export const CLOUDFLARED_PINNED_VERSION = '2026.9.3'
@@ -32,44 +34,7 @@ const ASSET_PINS: Record<string, AssetPin> = {
   'win32-x64': { asset: 'cloudflared-windows-amd64.exe', sha256: 'f096265ec2fcbe9bb6e2d64268db167ced3fcbb83d894bdb9e2fcdb26f2ea7e2', tgz: false },
 }
 
-const QUICK_URL = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/u
-const QUICK_URL_WAIT_MS = 30_000
 const DOWNLOAD_TIMEOUT_MS = 120_000
-const SENSITIVE_ENV = /KEY|PASSWORD|SECRET|TOKEN/i
-
-const tunnelChildren = new Set<ChildProcess>()
-let tunnelChildCleanupInstalled = false
-
-function installTunnelChildCleanup(): void {
-  if (tunnelChildCleanupInstalled) return
-  tunnelChildCleanupInstalled = true
-  process.once('exit', () => {
-    // Synchronous exit path: kill every tracked tunnel so a fresh Gateway start
-    // cannot inherit an orphaned public entry.
-    for (const child of tunnelChildren) {
-      if (child.pid !== undefined && process.platform !== 'win32') {
-        try { process.kill(-child.pid, 'SIGKILL') } catch { child.kill('SIGKILL') }
-      } else if (child.pid !== undefined && process.platform === 'win32') {
-        spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
-      } else {
-        child.kill('SIGKILL')
-      }
-    }
-  })
-}
-
-/** Environment for the tunnel child: parent env minus ambient credentials and DSH state. */
-function scrubbedEnv(): NodeJS.ProcessEnv {
-  return Object.fromEntries(Object.entries(process.env).filter(([name, value]) =>
-    value !== undefined && !SENSITIVE_ENV.test(name) && !name.startsWith('DSH_')))
-}
-
-/** A tunnel binary lookup or lifecycle request failed in an explainable way. */
-export class TunnelSupervisorError extends Error {
-  constructor(readonly code: 'not-installed' | 'unsupported-platform' | 'checksum-mismatch' | 'download-failed' | 'start-failed' | 'url-timeout', message: string) {
-    super(message)
-  }
-}
 
 /** Where the cloudflared binary was found, for administrator visibility. */
 export interface CloudflaredBinary {
@@ -82,28 +47,33 @@ export interface CloudflaredBinary {
 export interface CloudflaredResolverDeps {
   envPath?: string
   stateDir: string
-  /** Lookup on PATH; defaults to `which`/`where`. */
-  which?: (name: string) => Promise<string | null>
-  versionOf?: (path: string) => Promise<string | null>
+  /** Lookup on PATH; defaults to `which`/`where`; external work honors cancellation. */
+  which?: (name: string, signal?: AbortSignal) => Promise<string | null>
+  /** Read the selected version; external work honors cancellation. */
+  versionOf?: (path: string, signal?: AbortSignal) => Promise<string | null>
+  /** Cancellation for native discovery/version probes and selection. */
+  signal?: AbortSignal
 }
 
-async function defaultWhich(name: string): Promise<string | null> {
+async function defaultWhich(name: string, signal?: AbortSignal): Promise<string | null> {
   const command = process.platform === 'win32' ? 'where' : 'which'
   try {
-    const { stdout } = await execFileAsync(command, [name])
+    const { stdout } = await runCommand(command, [name], 10_000, signal)
     const first = stdout.split('\n').map(line => line.trim()).find(line => line.length > 0)
     return first ?? null
   } catch {
+    signal?.throwIfAborted()
     return null
   }
 }
 
-async function defaultVersionOf(path: string): Promise<string | null> {
+async function defaultVersionOf(path: string, signal?: AbortSignal): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync(path, ['--version'], { timeout: 10_000 })
+    const { stdout } = await runCommand(path, ['--version'], 10_000, signal)
     const match = /cloudflared version (\S+)/u.exec(stdout)
     return match?.[1] ?? null
   } catch {
+    signal?.throwIfAborted()
     return null
   }
 }
@@ -121,15 +91,19 @@ function isExecutableFile(path: string): boolean {
  * Resolve the cloudflared binary: explicit `HGW_CLOUDFLARED`, then the managed
  * install under the state directory, then PATH, then well-known brew/system
  * locations. Returns null when nothing is installed.
+ * @param deps - selected paths, cancellation and optional discovery implementations.
+ * @returns selected installed binary, or null when no candidate exists.
  */
 export async function resolveCloudflared(deps: CloudflaredResolverDeps): Promise<CloudflaredBinary | null> {
+  deps.signal?.throwIfAborted()
   const which = deps.which ?? defaultWhich
   const versionOf = deps.versionOf ?? defaultVersionOf
   const managedName = process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared'
   const candidates: Array<{ path: string; source: CloudflaredBinary['source'] }> = []
   if (deps.envPath !== undefined && deps.envPath !== '') candidates.push({ path: deps.envPath, source: 'env' })
   candidates.push({ path: join(deps.stateDir, 'bin', managedName), source: 'state-dir' })
-  const onPath = await which('cloudflared')
+  const onPath = await which('cloudflared', deps.signal)
+  deps.signal?.throwIfAborted()
   if (onPath !== null) candidates.push({ path: onPath, source: 'path' })
   if (process.platform === 'darwin') {
     candidates.push({ path: '/opt/homebrew/bin/cloudflared', source: 'well-known' })
@@ -138,7 +112,9 @@ export async function resolveCloudflared(deps: CloudflaredResolverDeps): Promise
   if (process.platform === 'linux') candidates.push({ path: '/usr/local/bin/cloudflared', source: 'well-known' })
   for (const candidate of candidates) {
     if (!isExecutableFile(candidate.path)) continue
-    return { path: candidate.path, version: await versionOf(candidate.path), source: candidate.source }
+    const version = await versionOf(candidate.path, deps.signal)
+    deps.signal?.throwIfAborted()
+    return { path: candidate.path, version, source: candidate.source }
   }
   return null
 }
@@ -165,160 +141,76 @@ async function sha256File(path: string): Promise<string> {
 /**
  * Download the pinned cloudflared release for this platform into
  * `${stateDir}/bin`, verify its SHA-256 against the pin, and mark it
- * executable. Partial downloads and checksum mismatches leave no binary behind.
+ * executable before atomic replacement on the destination filesystem. Failed downloads
+ * close both streams; checksum and extraction failures preserve an existing install.
+ * @param stateDir - private tunnel installation directory.
+ * @param fetchImpl - download transport with cancellation support.
+ * @param signal - optional cancellation of download, extraction and publication.
+ * @returns binary descriptor after validated publication.
  */
 export async function installCloudflared(
   stateDir: string,
   fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<CloudflaredBinary> {
+  signal?.throwIfAborted()
   const pin = assetPin()
   const binDir = join(stateDir, 'bin')
   const name = process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared'
   const target = join(binDir, name)
   mkdirSync(binDir, { recursive: true, mode: 0o700 })
-  const staging = join(tmpdir(), `dsh-cloudflared-${randomBytes(6).toString('hex')}`)
-  mkdirSync(staging, { recursive: true, mode: 0o700 })
+  const staging = mkdtempSync(join(binDir, '.cloudflared-'))
   const archive = join(staging, pin.asset)
   try {
     const url = `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_PINNED_VERSION}/${pin.asset}`
-    const response = await fetchImpl(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS), redirect: 'follow' })
+    const lifetime = AbortSignal.any([AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS), ...(signal === undefined ? [] : [signal])])
+    const response = await fetchImpl(url, { signal: lifetime, redirect: 'follow' })
     if (!response.ok || response.body === null) {
+      await response.body?.cancel()
       throw new TunnelSupervisorError('download-failed', `cloudflared download failed with HTTP ${response.status}`)
     }
-    await new Promise<void>((resolve, reject) => {
-      const sink = createWriteStream(archive, { mode: 0o600 })
-      sink.once('error', reject)
-      sink.once('finish', resolve)
-      const reader = response.body!.getReader()
-      const pump = async (): Promise<void> => {
-        for (;;) {
-          const { done, value } = await reader.read()
-          if (done) { sink.end(); return }
-          if (!sink.write(value)) await new Promise<void>(r => sink.once('drain', r))
-        }
-      }
-      pump().catch(reject)
-    })
+    // Node fetch supplies this stream; DOM and Node declarations differ for BYOB readers.
+    const source = Readable.fromWeb(response.body as NodeReadableStream<Uint8Array>, { signal: lifetime })
+    const sink = createWriteStream(archive, { mode: 0o600 })
+    const closed = new Promise<void>(resolve => sink.once('close', resolve))
+    // A failed Web source can settle pipeline while a file open is still pending.
+    try { await pipeline(source, sink, { signal: lifetime }) } finally { sink.destroy(); await closed }
     const digest = await sha256File(archive)
     if (digest !== pin.sha256) {
       throw new TunnelSupervisorError('checksum-mismatch', `cloudflared ${pin.asset} sha256 ${digest} does not match the pinned release`)
     }
+    signal?.throwIfAborted()
     if (pin.tgz) {
-      await execFileAsync('tar', ['-xzf', archive, '-C', staging])
-      renameSync(join(staging, 'cloudflared'), target)
-    } else {
-      renameSync(archive, target)
+      await runCommand('tar', ['-xzf', archive, '-C', staging], DOWNLOAD_TIMEOUT_MS, signal)
     }
-    if (process.platform !== 'win32') chmodSync(target, 0o700)
+    signal?.throwIfAborted()
+    const candidate = pin.tgz ? join(staging, 'cloudflared') : archive
+    if (process.platform !== 'win32') chmodSync(candidate, 0o700)
+    renameSync(candidate, target)
     return { path: target, version: CLOUDFLARED_PINNED_VERSION, source: 'state-dir' }
   } finally {
     rmSync(staging, { recursive: true, force: true })
   }
 }
 
-/** Handle over one running tunnel child. */
-export interface TunnelProc {
-  /** The hostname the tunnel is serving once known. */
-  publicUrl: string | null
-  /** Whether the underlying child has exited. */
-  hasExited(): boolean
-  /** Stop the child and its process group. */
-  terminate(graceMs: number): Promise<void>
-  /** Resolves when the child exits, with its exit description. */
-  exited: Promise<{ code: number | null; signal: NodeJS.Signals | null }>
-}
-
-function trackChild(child: ChildProcess): void {
-  installTunnelChildCleanup()
-  tunnelChildren.add(child)
-  child.once('exit', () => { tunnelChildren.delete(child) })
-}
-
-function makeProc(child: ChildProcess): TunnelProc {
-  const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(resolve => {
-    child.once('exit', (code, signal) => resolve({ code, signal }))
-  })
-  return {
-    publicUrl: null,
-    hasExited: () => child.exitCode !== null || child.signalCode !== null,
-    exited,
-    terminate: async () => {
-      if (child.exitCode !== null || child.signalCode !== null) return
-      if (child.pid !== undefined && process.platform !== 'win32') {
-        try { process.kill(-child.pid, 'SIGTERM') } catch { child.kill('SIGTERM') }
-      } else {
-        child.kill('SIGTERM')
-      }
-      const force = setTimeout(() => {
-        if (child.exitCode === null && child.signalCode === null) {
-          if (child.pid !== undefined && process.platform !== 'win32') {
-            try { process.kill(-child.pid, 'SIGKILL') } catch { child.kill('SIGKILL') }
-          } else {
-            child.kill('SIGKILL')
-          }
-        }
-      }, 5_000)
-      try { await exited } finally { clearTimeout(force) }
-    },
-  }
-}
-
-function spawnCloudflared(bin: string, args: string[]): ChildProcess {
-  const child = spawn(bin, args, {
-    env: { ...scrubbedEnv(), HOME: homedir() },
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: process.platform !== 'win32',
-  })
-  trackChild(child)
-  return child
+/**
+ * Allocate a quick connector; readiness requires its URL and owned registration witness.
+ * @param bin - selected cloudflared executable.
+ * @param target - loopback Gateway target.
+ * @param options - validated startup and closure timing, with optional startup cancellation.
+ * @returns immediate cleanup owner with an awaited readiness promise.
+ */
+export function spawnQuickTunnel(bin: string, target: string, options: TunnelLaunchOptions): TunnelProc {
+  return spawnTunnelProcess(bin, { kind: 'quick', target }, options)
 }
 
 /**
- * Start a quick tunnel (`--url`): no Cloudflare account, no DNS, and a random
- * `*.trycloudflare.com` hostname that changes on every start. Resolves once the
- * hostname appears in cloudflared's log output.
+ * Allocate a named connector using its explicit token environment, outside process arguments.
+ * @param bin - selected cloudflared executable.
+ * @param runToken - selected connector credential.
+ * @param options - validated startup and closure timing, with optional startup cancellation.
+ * @returns immediate cleanup owner with an awaited registration promise.
  */
-export async function spawnQuickTunnel(bin: string, target: string): Promise<TunnelProc> {
-  const child = spawnCloudflared(bin, ['tunnel', '--no-autoupdate', '--url', target])
-  let url: string | null = null
-  let buffered = ''
-  const urlFound = new Promise<string>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new TunnelSupervisorError('url-timeout', 'cloudflared did not report a quick-tunnel URL in time'))
-    }, QUICK_URL_WAIT_MS)
-    const scan = (chunk: Buffer): void => {
-      buffered += chunk.toString('utf8')
-      const match = QUICK_URL.exec(buffered)
-      if (match !== null) {
-        clearTimeout(timer)
-        resolve(match[0])
-      }
-    }
-    child.stdout?.on('data', scan)
-    child.stderr?.on('data', scan)
-    child.once('exit', (code, signal) => {
-      clearTimeout(timer)
-      reject(new TunnelSupervisorError('start-failed',
-        `cloudflared exited before reporting a URL (code ${String(code)}, signal ${String(signal)})`))
-    })
-  })
-  const proc = makeProc(child)
-  try {
-    url = await urlFound
-  } catch (error) {
-    await proc.terminate(0).catch(() => {})
-    throw error
-  }
-  proc.publicUrl = url
-  return proc
-}
-
-/**
- * Start a named tunnel with its remotely-fetched run token
- * (`cloudflared tunnel run --token`). The hostname is the one configured
- * through the Cloudflare API before the run.
- */
-export function spawnNamedTunnel(bin: string, runToken: string): TunnelProc {
-  const child = spawnCloudflared(bin, ['tunnel', '--no-autoupdate', 'run', '--token', runToken])
-  return makeProc(child)
+export function spawnNamedTunnel(bin: string, runToken: string, options: TunnelLaunchOptions): TunnelProc {
+  return spawnTunnelProcess(bin, { kind: 'named', token: runToken }, options)
 }

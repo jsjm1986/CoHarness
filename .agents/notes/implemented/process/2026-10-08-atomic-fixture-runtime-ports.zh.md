@@ -12,16 +12,21 @@ Status: implemented
 
 夹具子进程改用 `listen(0)` 绑定，并把内核分配的端口发布到 `$DSH_HOME/child-port`；launcher 本来就按 runtime 身份注入 `DSH_HOME`，因此每个子进程都拥有私有的发布文件。每个 durable instance 端口——用户的 `instances` 行、project runtime 的 repository stub——都是 OS 分配的 [runtimeRelay](../../../../gateway/tests/runtime-relay.ts) 端口，它把每个接入的连接转发到子进程当前发布的监听器。`setup()` 包装 `users.create`，使每个新建身份领取自己的 relay 与端口文件；构造 stub repository 的测试则针对 project runtime home 领取 relay。字面量 base 仅保留为分配器输入，字面量端口断言改为对行端口或返回端口的关系断言。manager 从不 spawn 的 stub repository 保留字面量端口，因为这些值是数据而非绑定资源。
 
+端口文件发布先在同一目录独占写入临时文件，再通过重命名替换此前的发布。relay 因而读取旧的完整端口或新的完整端口，不会遇到截断公开文件产生的空内容窗口。共享发布表达式嵌入普通 Node 执行的 instance、proxy 与 grant 夹具。发布缺失仍触发 readiness 重试；发布损坏或不可读则保留为夹具故障，在监听器与所属 socket 关闭后由等待完成的 disposer 报告。网络回调不会把这些错误抛向后续测试。
+
 ## Alternatives considered
 
 - **先探测空闲字面量再让子进程绑定。** 探测与绑定之间隔着进程 spawn，其间一次内核分配即可重现同一类冲突。
 - **按测试或文件划分互斥字面量区间。** 字面量仍在 ephemeral 范围内，内核可以把其中任何一个分配给无关 socket；区间划分也无法防御其他进程或 runner 流量。
 - **串行化整个 Gateway 套件。** 文件级串行无法保护宿主机端口免受其他 spec 文件、独立 Vitest 进程或共享 runner 的 job 影响，还会为一个夹具的缺陷拖慢每次运行。
 - **重试或延长 readiness 等待。** 子进程已经崩溃；延长等待只是更晚报告同一个崩溃，并不修复所有权。
+- **直接覆盖私有端口文件。** 私有文件名防止跨夹具冲突，却不能让截断再写入相对于自身 relay 读方具有原子性。发布使用重命名，不用重试隐藏损坏记录。
 
 ## Testing
 
 在运行前占用 `127.0.0.1:43410`，旧夹具可复现 CI 签名（`listen EADDRINUSE`，上报为 `instance for alice failed to become ready on port 43410`）；同一占用对新夹具无影响。两个独立的 `vitest run tests/instances.spec.ts` 进程并发执行且全部通过，`tests/apply-grants.spec.ts` 亦通过。`npm run typecheck --prefix gateway` 与 `npm run build:check --prefix gateway` 通过。
+
+子进程发布屏障暴露直接写入对照组的空文件，并在原子发布提交前保留旧的完整端口。无效端口回归验证等待完成的清理失败，且没有未捕获网络错误；真实 instance、proxy 与 grant 套件运行共享发布表达式。
 
 ## Consequences
 

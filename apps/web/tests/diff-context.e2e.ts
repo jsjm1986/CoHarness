@@ -13,9 +13,10 @@ import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './suppor
 
 const MODE = webSnapshotMode()
 const EXACT_DIR = fileURLToPath(new URL('./snapshots/diff-context', import.meta.url))
+const EXACT_OVERRIDE_DIR = fileURLToPath(new URL('./fixtures/diff-context', import.meta.url))
 const BOUNDED_DIR = fileURLToPath(new URL('./snapshots/diff-bounded', import.meta.url))
-// The ACP owner retains its live recording. The bounded script is authored upstream;
-// both replace only model responses while this browser scenario executes the real tools.
+// The ACP recording is read-only. Its scenario override addresses files relative
+// to the live Workspace; both cases execute the real read and edit tools.
 const EXACT_FIXTURE = fileURLToPath(new URL('../../../examples/acp-agent/tests/snapshots/fs-edit/session.v7.jsonl', import.meta.url))
 const BOUNDED_FIXTURE = join(BOUNDED_DIR, 'session.v3.jsonl')
 const UNTOUCHED = Buffer.from('unrelated file\r\nkeep these bytes\n', 'utf8')
@@ -25,6 +26,7 @@ const settings = (prefix: string): string =>
 const CASES = [
   {
     name: 'diff-context', fixture: EXACT_FIXTURE, snapshotDir: EXACT_DIR, file: 'config.txt',
+    replayOverride: join(EXACT_OVERRIDE_DIR, 'replay.override.json'),
     before: 'mode=DEBUG\nlevel=info\n', after: 'mode=RELEASE\nlevel=info\n',
     totals: '+1 -1', shared: 'level=info', bounded: false, inventory: ['ui.expected.md'],
   },
@@ -48,7 +50,9 @@ describe.skipIf(MODE === 'record').each(CASES)('web e2e: $name', (scenario) => {
     const prompts = fixtureUserPrompts(await readFile(scenario.fixture, 'utf8'))
     if (prompts.length !== 1 || prompts[0] === undefined) throw new Error(`${scenario.name} must have one drive prompt`)
     prompt = prompts[0]
-    scaffold = await launchWebScaffold({ replayFixture: scenario.fixture })
+    scaffold = await launchWebScaffold({ replayFixture: scenario.fixture,
+      ...'replayOverride' in scenario ? { replayOverride: scenario.replayOverride } : {},
+    })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { events.push(event) })
     const workspace = join(scaffold.workspaceCwd, 'workspace')
     await mkdir(workspace, { recursive: true })
@@ -126,6 +130,7 @@ describe.skipIf(MODE === 'record').each(CASES)('web e2e: $name', (scenario) => {
     expect(await edit.locator('[data-diff]').count()).toBe(0)
     expect(await disclosure.textContent()).toContain(scenario.totals)
     await assertFixtureInventory(scenario.snapshotDir, scenario.inventory)
+    if (!scenario.bounded) await assertFixtureInventory(EXACT_OVERRIDE_DIR, ['replay.override.json'])
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
     await compareOrRefreshGolden(join(scenario.snapshotDir, 'ui.expected.md'), snapshot, MODE)

@@ -1,0 +1,634 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-28T15:07:37.571349+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "finding": "B248",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "preExistingEditsPreserved": true
+  },
+  "behavior": {
+    "actor": "Server-authenticated actor is passed to account creation, profile/Auto eligibility/role/status updates, password reset and deletion. Request-body actor spoofing ignored; optional service omission remains trusted bootstrap/maintenance.",
+    "authority": "After hashing/admission, PostgreSQL locks available organization then current active nondeleted administrator account and membership, retaining share locks to commit; SQLite uses immediate transactions. No new schema migration.",
+    "initialStop": "Personal account deletion passes actor into initial stop/fence before queued cancellation/termination and again into the deletion transaction. Project authority and078 ownership semantics preserved.",
+    "lateRevocation": "Revocation after an approved physical stop returns403, retains account and home files and leaves manually stopped instance; no success audit. No promise to undo approved stop.",
+    "data": "Rejected creation allocates no new account directory; denied field/credential writes retain target data. Existing self-delete, last-admin and logical-deletion behavior retains its separate policies."
+  },
+  "negativeEvidence": [
+    "user-administration-sqlite-before-real-http:3realHTTP stale-role mutations wrongly204",
+    "user-administration-postgres-before-real-http:3realHTTP production PG mutations wrongly204; delete also stops observable carrier",
+    "user-administration-organization-wait-before:combined authority query used stale organization state after waiting on actor; named regression fails then fixed"
+  ],
+  "verification": {
+    "source": {
+      "cases": 339,
+      "files": 11,
+      "skips": 0,
+      "productionInputsStable": true,
+      "transcriptFollowup": "After339case coverage, only replay fixtures/goldens expanded to include late post-stop revocation; both transcript cases rerun and35observations pass. No production code changed afterward."
+    },
+    "httpObservations": {
+      "postgres": 22,
+      "sqlite": 13,
+      "carrier": "Observable synthetic HTTP Runtime listener, not a model Runtime"
+    },
+    "compiled": {
+      "node22": "22.22.1;22new+59existing=81HTTP observations",
+      "node24": "24.19.0;22new+59existing=81HTTP observations",
+      "sqliteHost": "25.8.1;13observations, same maintained golden",
+      "isolatedConcurrentProcesses": "Current source HTTP transcript and plain Node22 emitted fixture overlapped with private roots/organizations and both passed; no schema reset."
+    },
+    "docs": "20/20 quick gates after organization-lock prose/pairing update",
+    "commands": [
+      {
+        "name": "user-administration-final-source-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:49:17.453127+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:50809/hgw_projects_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/users.spec.ts",
+          "tests/user-service-postgres.spec.ts",
+          "tests/user-administration-transcript.spec.ts",
+          "tests/auth-postgres.spec.ts",
+          "tests/admin-api.spec.ts",
+          "tests/instances.spec.ts",
+          "tests/project-service-postgres.spec.ts",
+          "tests/runtime-stop-lease-postgres.spec.ts",
+          "tests/project-removal-transcript.spec.ts",
+          "tests/project-deletion-transcript.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=src/users.ts",
+          "--coverage.include=src/postgres/user-service.ts",
+          "--coverage.include=src/administrator-authority.ts",
+          "--coverage.include=src/postgres/administrator-authority.ts",
+          "--coverage.include=src/instances.ts",
+          "--coverage.include=src/postgres/instance-repository.ts",
+          "--coverage.include=src/services.ts",
+          "--coverage.include=src/admin-api.ts",
+          "--coverage.reportsDirectory=coverage/user-administration-current-20261028",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:49:46.407770+00:00"
+      },
+      {
+        "name": "user-administration-final-transcripts",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:56:10.039057+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:50809/hgw_projects_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/user-administration-transcript.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:56:16.617885+00:00"
+      },
+      {
+        "name": "user-administration-current-types",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:51:46.253638+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:51:49.856690+00:00"
+      },
+      {
+        "name": "user-administration-current-build",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:51:47.403464+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.build.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:51:49.746629+00:00"
+      },
+      {
+        "name": "user-administration-final-lint",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:58:56.392935+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "gateway/src/administrator-authority.ts",
+          "gateway/src/postgres/administrator-authority.ts",
+          "gateway/src/users.ts",
+          "gateway/src/postgres/user-service.ts",
+          "gateway/src/services.ts",
+          "gateway/src/instances.ts",
+          "gateway/src/postgres/instance-repository.ts",
+          "gateway/src/admin-api.ts",
+          "gateway/tests/users.spec.ts",
+          "gateway/tests/user-service-postgres.spec.ts",
+          "gateway/tests/user-administration-transcript.spec.ts",
+          "gateway/tests/fixtures/user-administration.mjs",
+          "gateway/tests/postgres-suite.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:58:58.107938+00:00"
+      },
+      {
+        "name": "user-administration-emitted-node22",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:56:08.884294+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-user-administration-emitted.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "postgres"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:56:12.945100+00:00"
+      },
+      {
+        "name": "user-administration-emitted-node24",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:58:00.178898+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-user-administration-emitted.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "postgres"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:58:04.680058+00:00"
+      },
+      {
+        "name": "user-administration-emitted-sqlite-host",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:58:01.321813+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-user-administration-emitted.py",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "sqlite"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:58:03.231392+00:00"
+      },
+      {
+        "name": "user-administration-compat-node22",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:58:55.228882+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:50809/hgw_projects_test",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/project-provisioning-transcript.spec.ts",
+          "tests/project-account-admission-transcript.spec.ts",
+          "tests/project-invitation-admission-transcript.spec.ts",
+          "tests/project-deletion-transcript.spec.ts",
+          "tests/project-administration-transcript.spec.ts",
+          "tests/project-management-transcript.spec.ts",
+          "tests/project-removal-transcript.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:59:02.960988+00:00"
+      },
+      {
+        "name": "user-administration-compat-node24",
+        "status": "passed",
+        "startedAt": "2026-10-28T15:03:12.615599+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:50809/hgw_projects_test",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/project-provisioning-transcript.spec.ts",
+          "tests/project-account-admission-transcript.spec.ts",
+          "tests/project-invitation-admission-transcript.spec.ts",
+          "tests/project-deletion-transcript.spec.ts",
+          "tests/project-administration-transcript.spec.ts",
+          "tests/project-management-transcript.spec.ts",
+          "tests/project-removal-transcript.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T15:03:24.948697+00:00"
+      },
+      {
+        "name": "user-administration-docs-final",
+        "status": "passed",
+        "startedAt": "2026-10-28T15:03:23.508667+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T15:05:00.014690+00:00"
+      },
+      {
+        "name": "user-administration-final-postgres-http",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:53:48.600144+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-user-administration-postgres-source.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:53:52.490203+00:00"
+      },
+      {
+        "name": "user-administration-final-sqlite-http",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:53:47.443764+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-user-administration-source.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:53:49.182768+00:00"
+      }
+    ]
+  },
+  "coverage": {
+    "kind": "Selected whole-module diagnostic coverage; not100percent CI acceptance",
+    "summary": {
+      "lines": {
+        "total": 2088,
+        "covered": 1389,
+        "skipped": 0,
+        "pct": 66.52
+      },
+      "statements": {
+        "total": 2638,
+        "covered": 1571,
+        "skipped": 0,
+        "pct": 59.55
+      },
+      "functions": {
+        "total": 221,
+        "covered": 192,
+        "skipped": 0,
+        "pct": 86.87
+      },
+      "branches": {
+        "total": 2286,
+        "covered": 1201,
+        "skipped": 0,
+        "pct": 52.53
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "fullyCoveredNewAuthorityModules": [
+      "gateway/src/administrator-authority.ts",
+      "gateway/src/postgres/administrator-authority.ts"
+    ],
+    "files": {
+      "gateway/src/admin-api.ts": {
+        "lines": {
+          "total": 1180,
+          "covered": 563,
+          "skipped": 0,
+          "pct": 47.71
+        },
+        "functions": {
+          "total": 45,
+          "covered": 29,
+          "skipped": 0,
+          "pct": 64.44
+        },
+        "statements": {
+          "total": 1583,
+          "covered": 655,
+          "skipped": 0,
+          "pct": 41.37
+        },
+        "branches": {
+          "total": 1571,
+          "covered": 652,
+          "skipped": 0,
+          "pct": 41.5
+        }
+      },
+      "gateway/src/administrator-authority.ts": {
+        "lines": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 1,
+          "covered": 1,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 3,
+          "covered": 3,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "gateway/src/instances.ts": {
+        "lines": {
+          "total": 579,
+          "covered": 530,
+          "skipped": 0,
+          "pct": 91.53
+        },
+        "functions": {
+          "total": 92,
+          "covered": 88,
+          "skipped": 0,
+          "pct": 95.65
+        },
+        "statements": {
+          "total": 674,
+          "covered": 598,
+          "skipped": 0,
+          "pct": 88.72
+        },
+        "branches": {
+          "total": 440,
+          "covered": 351,
+          "skipped": 0,
+          "pct": 79.77
+        }
+      },
+      "gateway/src/services.ts": {
+        "lines": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "gateway/src/users.ts": {
+        "lines": {
+          "total": 85,
+          "covered": 84,
+          "skipped": 0,
+          "pct": 98.82
+        },
+        "functions": {
+          "total": 22,
+          "covered": 22,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 100,
+          "covered": 94,
+          "skipped": 0,
+          "pct": 94
+        },
+        "branches": {
+          "total": 53,
+          "covered": 46,
+          "skipped": 0,
+          "pct": 86.79
+        }
+      },
+      "gateway/src/postgres/administrator-authority.ts": {
+        "lines": {
+          "total": 6,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 1,
+          "covered": 1,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 7,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 8,
+          "covered": 8,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "gateway/src/postgres/instance-repository.ts": {
+        "lines": {
+          "total": 113,
+          "covered": 92,
+          "skipped": 0,
+          "pct": 81.41
+        },
+        "functions": {
+          "total": 34,
+          "covered": 27,
+          "skipped": 0,
+          "pct": 79.41
+        },
+        "statements": {
+          "total": 132,
+          "covered": 97,
+          "skipped": 0,
+          "pct": 73.48
+        },
+        "branches": {
+          "total": 103,
+          "covered": 61,
+          "skipped": 0,
+          "pct": 59.22
+        }
+      },
+      "gateway/src/postgres/user-service.ts": {
+        "lines": {
+          "total": 123,
+          "covered": 112,
+          "skipped": 0,
+          "pct": 91.05
+        },
+        "functions": {
+          "total": 26,
+          "covered": 24,
+          "skipped": 0,
+          "pct": 92.3
+        },
+        "statements": {
+          "total": 139,
+          "covered": 117,
+          "skipped": 0,
+          "pct": 84.17
+        },
+        "branches": {
+          "total": 109,
+          "covered": 81,
+          "skipped": 0,
+          "pct": 74.31
+        }
+      }
+    },
+    "debt": "UserService and large administration/lifecycle modules retain uncovered lines/branches; thresholds not lowered, affected sources not excluded."
+  },
+  "files": {
+    "sourceAndEmitted": {
+      "gateway/src/administrator-authority.ts": "0b63d1ce6c3ecffc0515bbe3c0fea98c0681e458575442f7a0de685896c13c66",
+      "gateway/src/postgres/administrator-authority.ts": "02bf878d1ffa150b28c7b103fb2224082c86d84ea1f72f7a90ee607171224f9b",
+      "gateway/src/users.ts": "a00ed8894921ab704a17f25bebdc5f07e217bc089ca0a94bdaa09da06c0ff459",
+      "gateway/src/postgres/user-service.ts": "6270ed9b7caf22535328c43ab23bf46dfaf52ab45317dab7b42d661850d42843",
+      "gateway/src/instances.ts": "18d7ef14f5cfbde6d528c45842025bb8c188873a294886eec340b1ba47eeee55",
+      "gateway/src/postgres/instance-repository.ts": "e58f31b203e6019fba2f7591214883fa4fed3735085475b0ad823148b26d785e",
+      "gateway/src/services.ts": "5fe8c059e200abb57a44bb26cb50444588bd894673693554400cf3af7e2161da",
+      "gateway/src/admin-api.ts": "112d460ad8dafd17d5546d6de4dfaad75b0efd04c242bc3491150e9defdb340b",
+      "gateway/lib/administrator-authority.js": "d0d7655b244773f3dfcdb19b8c70a039cb7e1090cd71e2c3dd44339384aa66e1",
+      "gateway/lib/postgres/administrator-authority.js": "ce163788323afd777ff0b6d036126d469e48466673ce74c59405c9cb2a451889",
+      "gateway/lib/users.js": "37c707b80b778c0d14fff8cbb61e623b3a13bcf06379c798c0321159d1449838",
+      "gateway/lib/postgres/user-service.js": "315b7e805e9aa6136a58db4de59f12db57b92759434a6b75a07e183744290b9c",
+      "gateway/lib/instances.js": "bc714a16dcfa40a5f01ccac7a194ff2f2a97c52e53286e4624720dc9cfa15127",
+      "gateway/lib/postgres/instance-repository.js": "9031d49d94e6cb97c5888163e908aa67577cf8ac38b49afabba48fc7d5ce9c9b",
+      "gateway/lib/services.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+      "gateway/lib/admin-api.js": "48e42d61025d8eabd3ec78f3cde0314b7420a283a4f34474569dd4f03394cf6a"
+    },
+    "validation": {
+      "gateway/tests/users.spec.ts": "d128f5d7a8360b62acf05191d5414dfab84a83c88f8fcc12900bb3e3b8a4df5b",
+      "gateway/tests/user-service-postgres.spec.ts": "a4c98986445ee67264bcc7512e7d5abb50965082dbd748af7a1a4c268c80b6ca",
+      "gateway/tests/user-administration-transcript.spec.ts": "e2352c7334b95044cf065f54b62d008dbb65f7b36841552fe70fabaa48e10c05",
+      "gateway/tests/fixtures/user-administration.mjs": "58fb547f0f40f9db1b5b334b8475a85cb604d4519e4bdc903000a936997101a1",
+      "gateway/tests/expected/projects/user-administration-sqlite.jsonl": "4d0c21881e30ffb82ec28b80220af549a861889e6cccb45c4ef592237e6d7ad4",
+      "gateway/tests/expected/projects/user-administration-postgres.jsonl": "5763dddd3b6d2d29aedb916cde6a3345b310cf0f133b62d2a7df7d492b446656",
+      "gateway/tests/postgres-suite.spec.ts": "8b281d89a074292198783a66ff10fbc6431376638854973fd6baf4da5f01e54b",
+      "gateway/package.json": "a1776721d454968ca03f5b133f9809978c425b41d8a3f1dc89922fa57f22e668"
+    },
+    "documentation": {
+      "gateway/README.md": "e0332ca47b3f0aca436b5c387858c44ae569d342d4b23bb5ced9165f62702043",
+      "gateway/README.zh.md": "f48f82dec9e14685a42aceac4ef5fd8e7f547d742b4b8522062c9aa1cec9fa74",
+      "gateway/README.i18n.yaml": "06cd995cc7bcf2819b103730331662f459b35680b965903d35bdfc60e0d5d5bb",
+      ".agents/notes/implemented/bug-fix/2026-10-28-user-administration-authority.md": "843d7033a8a0694eb6d950804886a889440660d0ecc5381adab425ebae5a7692",
+      ".agents/notes/implemented/bug-fix/2026-10-28-user-administration-authority.zh.md": "25fb67ca167708a953152d0f8b499f404d15e78569ef1d3abbdaf8aaec50f97a",
+      ".agents/notes/implemented/bug-fix/2026-10-28-user-administration-authority.i18n.yaml": "1ddccb9df7dc751b7813e8f47c5fe0f75f82566a4aff6d009e84aec23987b553",
+      "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/user-administration-authority/guide.md": "9022dbecdb991e3e83873a871b9ce9a68194c217a2593aae3376ba6a2462069e",
+      "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/user-administration-authority/guide.zh.md": "5790eb1c087cb7ffd13f5d8886eff76695b7e2d1133a79c81f56a11fe69b47ca",
+      "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/user-administration-authority/guide.i18n.yaml": "9f51fc2f8bf225e1f0fb7bbadeb60828250b3f7cf4e3a2c326aaafa2001a2706"
+    },
+    "concurrentNodeChannelOverlayNotAccepted": {
+      "gateway/src/server.ts": "49db14f619038b3d6a25bac4374b54834a1007919ebe86d0465c2adba36a53fd",
+      "gateway/src/config.ts": "c6a21fc9a92f75989c329ee7b810c021f6e6c5cd3c52bf74923f6b6ceb29bfd8",
+      "gateway/src/index.ts": "7456079b374032cd02c041aa3c283b457ac12d4142f8f321ac48edf381d8df22",
+      "gateway/src/node-channel.ts": "21e88826912241fabe633b762a150b2543e4e47b7790cf36ca8267fa16cc2c16",
+      "gateway/src/node-channel-protocol.ts": "9ad2c442c6b8bb0c3fdb84c3a1492125f6567b23433785b418e51c916f9da6c7",
+      "gateway/src/node-channel-wire.ts": "178c5f54d888d12f8c79eb12dbeef098cd73c9dd73b73944d9c950af10988746",
+      "gateway/src/node-channel-client.ts": "a8ef66c1b18094188520fef6f1f89f805830aabaa6a46da3c742edc53dbac22d",
+      "gateway/src/node-agent.ts": "eb058b82219a618877ffb417d846fb9082a195308714dace5e99d7f349b2e674",
+      "gateway/src/node-agent-main.ts": "0a0cabbea08de8492a54b2cad47a39a37657dc8e8cb5d318969a70c935cd52a4",
+      "gateway/src/postgres/node-access-service.ts": "84e0216c1657d5abb9722db1cde696d4f5b541631ead8474ed0825c4761e6097"
+    }
+  },
+  "noteReview": {
+    "new": "Account authority decision retains future value for hashing/admission waits, lock ordering, trusted omission and pre-stop authority.",
+    "retained": [
+      "Logical user deletion owns history/username/last-admin policy",
+      "Browser authentication owns session validation/expiry",
+      "Project deletion lifecycle owns durable destructive ownership and accounting"
+    ],
+    "archivedNotesEdited": false
+  },
+  "environment": {
+    "ownedPostgres": {
+      "owned": true,
+      "name": "hgw-project-removal-d6480758",
+      "database": "hgw_projects_test",
+      "productionPortExcluded": 5432,
+      "createdAt": "2026-10-28T11:42:49.725544+00:00",
+      "status": "stopped_and_removed",
+      "id": "b400acb55e474641a301d2bf6672898f0f0a171d1acb1aa550ced187f8aaa589",
+      "port": 50809,
+      "url": "postgresql://postgres@127.0.0.1:50809/hgw_projects_test",
+      "history": [
+        {
+          "name": "hgw-project-removal-5512e407",
+          "id": "96ff47d6778194005a407a4f276f10d18afdd92b57cee1934dca8e13272ba330",
+          "status": "stopped_and_removed",
+          "reason": "Owned 256MiB tmpfs filled by repeated migration/restore fixtures; no production state",
+          "at": "2026-10-28T14:00:39.183437+00:00"
+        }
+      ],
+      "volume": "hgw-project-removal-data-5b4d9cac31",
+      "storage": "owned named volume; no tmpfs database",
+      "lastFailure": "Docker Desktop is unable to start; no global restart or prune performed",
+      "volumeStatus": "removed",
+      "removedAt": "2026-10-28T15:07:37.516791+00:00",
+      "production5432Untouched": true,
+      "peerDatabaseUntouched": true
+    },
+    "cleanupComplete": true,
+    "liveModelApi": "Explicitly user-deferred"
+  },
+  "limitations": [
+    "All12 original audit domains remain in_progress. No whole-file or whole-project completion implied.",
+    "General administrative instance controls and remaining administrative capabilities need their own admission review.",
+    "Peer node-channel/control transport is unverified WIP. Its presence in compiled modules is not new feature acceptance or enabling remote execution.",
+    "User approved multiple personal runtimes per node and arbitrary single-node project placement are future required migrations; current owner uniqueness retained until all consumers migrate.",
+    "No native Windows or real cross-computer execution evidence."
+  ]
+}

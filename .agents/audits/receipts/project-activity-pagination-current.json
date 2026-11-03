@@ -1,0 +1,13 @@
+{
+  "name": "project-activity-pagination-current",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/project-activity-postgres.spec.ts --no-file-parallelism --retry=0",
+  "startedAt": "2026-10-23T19:39:19.893503+00:00",
+  "seconds": 4.252,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d1dd0f710fb5ccbfe48712cc2bac1a773bdef429e5dc9a2a035077984f3f6c3b",
+  "inputsAfter": "d1dd0f710fb5ccbfe48712cc2bac1a773bdef429e5dc9a2a035077984f3f6c3b",
+  "outputSha256": "93eb49ea18ccfbaf166b0f3bfb5edaef4e930e03d6c82e40c83de02d79b25e6e",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n  Snapshots  6 written\n Test Files  1 passed (1)\n      Tests  6 passed (6)\n   Start at  03:39:22\n   Duration  1.74s (transform 327ms, setup 0ms, import 474ms, tests 1.15s, environment 0ms)\n\n"
+}

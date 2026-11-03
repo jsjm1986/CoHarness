@@ -22,6 +22,8 @@ import {
   previewEmptyDrafts,
   trashEmptyDrafts,
   type EmptyDraftCandidate,
+  type ConversationSessionIdentity,
+  type ConversationArchiveId,
   type ConversationArchiveDetail,
   type ConversationArchiveRow,
   type ConversationArchiveState,
@@ -62,6 +64,10 @@ const TAB_ACTIONS: Record<ArchiveTab, readonly RecordAction[]> = {
   purged: [],
 }
 
+function emptyDraftKey(candidate: EmptyDraftCandidate): string {
+  return JSON.stringify([candidate.runtime.runtimeId, candidate.rootSessionId])
+}
+
 export function ArchivesPage() {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
   const [rows, setRows] = useState<ConversationArchiveRow[]>([])
@@ -70,18 +76,18 @@ export function ArchivesPage() {
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selected, setSelected] = useState<Set<ConversationArchiveId>>(new Set())
   const [detail, setDetail] = useState<ConversationArchiveDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [pendingAction, setPendingAction] = useState<ArchiveAction | null>(null)
-  const [confirmIntent, setConfirmIntent] = useState<{ action: ArchiveAction; ids: string[] } | null>(null)
+  const [confirmIntent, setConfirmIntent] = useState<{ action: ArchiveAction; ids: ConversationArchiveId[] } | null>(null)
   const [actionError, setActionError] = useState('')
   const [emptyDialogOpen, setEmptyDialogOpen] = useState(false)
   const [emptyCandidates, setEmptyCandidates] = useState<EmptyDraftCandidate[]>([])
   const [emptyScanned, setEmptyScanned] = useState(false)
   const [emptySelected, setEmptySelected] = useState<Set<string>>(new Set())
   const [emptyCutoff, setEmptyCutoff] = useState<number | null>(null)
-  const [emptyConfirm, setEmptyConfirm] = useState<{ ids: readonly string[]; cutoff: number | null } | null>(null)
+  const [emptyConfirm, setEmptyConfirm] = useState<{ sessions: readonly ConversationSessionIdentity[]; cutoff: number | null } | null>(null)
   const [emptyResult, setEmptyResult] = useState('')
   const [emptyLoading, setEmptyLoading] = useState(false)
   const [emptyError, setEmptyError] = useState('')
@@ -117,7 +123,7 @@ export function ArchivesPage() {
       setRows(current)
       setOffset(nextOffset)
       if (showLoading) setSelected(new Set())
-      else setSelected(previous => new Set([...previous].filter(id => current.some(row => row.rootSessionId === id))))
+      else setSelected(previous => new Set([...previous].filter(id => current.some(row => row.archiveId === id))))
       setError('')
     } catch (cause) {
       if (generation === rowsGeneration.current) setError(messageFrom(cause))
@@ -129,20 +135,20 @@ export function ArchivesPage() {
   useEffect(() => { void fetchRows(EMPTY_ACTIVE, 0) }, [fetchRows])
 
   useEffect(() => {
-    const pending = rows.filter(row => row.syncState === 'pending' && row.rootSessionId !== detail?.record.rootSessionId)
+    const pending = rows.filter(row => row.syncState === 'pending' && row.archiveId !== detail?.record.archiveId)
     if (pending.length === 0) return
     let cancelled = false
     let timer: ReturnType<typeof setTimeout>
     const generation = rowsGeneration.current
     const poll = async () => {
       try {
-        const statuses = await Promise.all(pending.map(row => getArchiveStatus(row.rootSessionId)))
+        const statuses = await Promise.all(pending.map(row => getArchiveStatus(row.archiveId)))
         if (cancelled || generation !== rowsGeneration.current) return
         if (statuses.some(row => row.state !== active.tab)) {
           await fetchRows(active, offset, false)
         } else {
-          const byId = new Map(statuses.map(row => [row.rootSessionId, row]))
-          setRows(current => current.map(row => byId.get(row.rootSessionId) ?? row))
+          const byId = new Map(statuses.map(row => [row.archiveId, row]))
+          setRows(current => current.map(row => byId.get(row.archiveId) ?? row))
         }
       } catch (cause) {
         if (!cancelled && generation === rowsGeneration.current) setError(messageFrom(cause))
@@ -151,11 +157,11 @@ export function ArchivesPage() {
     }
     timer = setTimeout(() => void poll(), 5000)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [active, detail?.record.rootSessionId, fetchRows, offset, rows])
+  }, [active, detail?.record.archiveId, fetchRows, offset, rows])
 
   useEffect(() => {
     if (detail?.record.syncState !== 'pending') return
-    const id = detail.record.rootSessionId
+    const id = detail.record.archiveId
     const generation = detailGeneration.current
     let cancelled = false
     let timer: ReturnType<typeof setTimeout>
@@ -163,7 +169,7 @@ export function ArchivesPage() {
       try {
         const record = await getArchiveStatus(id)
         if (cancelled || generation !== detailGeneration.current) return
-        setDetail(current => current?.record.rootSessionId !== id ? current : {
+        setDetail(current => current?.record.archiveId !== id ? current : {
           ...current, record, ...record.state === 'purged' ? { descendants: [], events: [], hasMore: false } : {},
         })
         if (record.syncState !== 'pending') { void fetchRows(active, offset, false); return }
@@ -174,7 +180,7 @@ export function ArchivesPage() {
     }
     timer = setTimeout(() => void poll(), 2000)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [active, detail?.record.rootSessionId, detail?.record.syncState, fetchRows, offset])
+  }, [active, detail?.record.archiveId, detail?.record.syncState, fetchRows, offset])
 
   function onFilter(event: FormEvent) {
     event.preventDefault()
@@ -214,17 +220,18 @@ export function ArchivesPage() {
 
   function requestEmptyTrash() {
     if (emptySelected.size === 0) return
-    setEmptyConfirm({ ids: [...emptySelected], cutoff: emptyCutoff })
+    setEmptyConfirm({ sessions: emptyCandidates.filter(candidate => emptySelected.has(emptyDraftKey(candidate)))
+      .map(candidate => ({ rootSessionId: candidate.rootSessionId, runtimeId: candidate.runtime.runtimeId })), cutoff: emptyCutoff })
   }
 
   async function confirmEmptyTrash() {
     const intent = emptyConfirm
-    if (intent === null || intent.ids.length === 0) return
+    if (intent === null || intent.sessions.length === 0) return
     setEmptyLoading(true)
     setEmptyError('')
     try {
-      const result = await trashEmptyDrafts([...intent.ids], intent.cutoff ?? undefined)
-      const skipped = Math.max(0, intent.ids.length - result.trashed.length)
+      const result = await trashEmptyDrafts(intent.sessions, intent.cutoff ?? undefined)
+      const skipped = Math.max(0, intent.sessions.length - result.trashed.length)
       setEmptyConfirm(null)
       await scanEmptyDrafts()
       setEmptyResult(t('emptyTrashResult', { count: String(result.trashed.length), skipped: String(skipped) }))
@@ -247,7 +254,7 @@ export function ArchivesPage() {
     setDetailLoading(true)
     setActionError('')
     try {
-      const current = await getArchive(row.rootSessionId)
+      const current = await getArchive(row.archiveId)
       if (generation === detailGeneration.current) setDetail(current)
     } catch (cause) {
       if (generation === detailGeneration.current) setError(messageFrom(cause))
@@ -256,18 +263,18 @@ export function ArchivesPage() {
     }
   }
 
-  async function runAction(action: ArchiveAction, ids: string[]) {
+  async function runAction(action: ArchiveAction, ids: ConversationArchiveId[]) {
     if (ids.length === 0) return
     setPendingAction(action)
     setActionError('')
     try {
       const result = await applyArchiveAction(action, ids)
       const failed = result.results.filter(item => !item.ok)
-      if (failed.length > 0) setActionError(t('actionPartialFailure', { count: String(failed.length), details: failed.map(item => item.error ?? item.rootSessionId).join(t('detailSeparator')) }))
-      else if (detail !== null && ids.includes(detail.record.rootSessionId)) {
+      if (failed.length > 0) setActionError(t('actionPartialFailure', { count: String(failed.length), details: failed.map(item => item.error ?? item.archiveId).join(t('detailSeparator')) }))
+      else if (detail !== null && ids.includes(detail.record.archiveId)) {
         const generation = detailGeneration.current
-        const record = await getArchiveStatus(detail.record.rootSessionId)
-        if (generation === detailGeneration.current) setDetail(current => current?.record.rootSessionId !== record.rootSessionId ? current : {
+        const record = await getArchiveStatus(detail.record.archiveId)
+        if (generation === detailGeneration.current) setDetail(current => current?.record.archiveId !== record.archiveId ? current : {
           ...current, record, ...record.state === 'purged' ? { descendants: [], events: [], hasMore: false } : {},
         })
       }
@@ -282,7 +289,7 @@ export function ArchivesPage() {
   const hasFilters = draft.query !== '' || draft.userId !== '' || draft.projectId !== ''
     || active.query !== '' || active.userId !== '' || active.projectId !== ''
   const page = Math.floor(offset / PAGE_SIZE) + 1
-  const selectedRows = useMemo(() => rows.filter(row => selected.has(row.rootSessionId)), [rows, selected])
+  const selectedRows = useMemo(() => rows.filter(row => selected.has(row.archiveId)), [rows, selected])
   const allSelected = rows.length > 0 && selectedRows.length === rows.length
   const indeterminate = selectedRows.length > 0 && !allSelected
   const selectAllRef = useRef<HTMLInputElement>(null)
@@ -290,7 +297,7 @@ export function ArchivesPage() {
     if (selectAllRef.current !== null) selectAllRef.current.indeterminate = indeterminate
   }, [indeterminate])
   const toggleAll = (checked: boolean): void => {
-    setSelected(checked ? new Set(rows.map(row => row.rootSessionId)) : new Set())
+    setSelected(checked ? new Set(rows.map(row => row.archiveId)) : new Set())
   }
 
   const tabLabels: Record<ArchiveTab, string> = { archived: t('tab_archived'), trash: t('tab_trash'), purged: t('tab_purged') }
@@ -348,22 +355,22 @@ export function ArchivesPage() {
               {selectedRows.length === 0 ? null : (
                 <div className="pageActionGroup">
                   {tabActions.map(action => <Button key={action} icon={action === 'restore' ? Undo2 : action === 'trash' ? Trash2 : OctagonX} variant={action === 'restore' ? 'secondary' : 'danger'} onClick={() => setConfirmIntent({ action, ids: [...selected] })}>{batchLabels[action]}</Button>)}
-                  {batchSettle ? <Button variant="secondary" icon={StopCircle} onClick={() => setConfirmIntent({ action: 'settle', ids: selectedRows.filter(row => isStalePending(row)).map(row => row.rootSessionId) })}>{t('settle')}</Button> : null}
+                  {batchSettle ? <Button variant="secondary" icon={StopCircle} onClick={() => setConfirmIntent({ action: 'settle', ids: selectedRows.filter(row => isStalePending(row)).map(row => row.archiveId) })}>{t('settle')}</Button> : null}
                 </div>
               )}
             </div>
             <div className="tableWrap desktopOnly">
               <table className="dataTable archiveTable">
                 <thead><tr><th aria-label={t('colSelect')}><label className="checkLabel archiveSelectAll"><input ref={selectAllRef} type="checkbox" checked={allSelected} aria-checked={indeterminate ? 'mixed' : allSelected} onChange={event => toggleAll(event.target.checked)} /><span>{t('selectAllPage')}</span></label></th><th>{t('colConversation')}</th><th>{t('colOwner')}</th><th>{t('colArchivedAt')}</th><th>{t('syncStateLabel')}</th><th>{t('colMessages')}</th><th aria-label={t('colActions')} /></tr></thead>
-                <tbody>{rows.map(row => <ArchiveTableRow key={row.rootSessionId} row={row} tab={active.tab} checked={selected.has(row.rootSessionId)} onCheck={checked => setSelected(nextSelection(selected, row.rootSessionId, checked))} onOpen={() => void openDetail(row)} onAction={action => setConfirmIntent({ action, ids: [row.rootSessionId] })} />)}</tbody>
+                <tbody>{rows.map(row => <ArchiveTableRow key={row.archiveId} row={row} tab={active.tab} checked={selected.has(row.archiveId)} onCheck={checked => setSelected(nextSelection(selected, row.archiveId, checked))} onOpen={() => void openDetail(row)} onAction={action => setConfirmIntent({ action, ids: [row.archiveId] })} />)}</tbody>
               </table>
             </div>
-            <div className="mobileList">{rows.map(row => <ArchiveMobileRow key={row.rootSessionId} row={row} tab={active.tab} checked={selected.has(row.rootSessionId)} onCheck={checked => setSelected(nextSelection(selected, row.rootSessionId, checked))} onOpen={() => void openDetail(row)} onAction={action => setConfirmIntent({ action, ids: [row.rootSessionId] })} />)}</div>
+            <div className="mobileList">{rows.map(row => <ArchiveMobileRow key={row.archiveId} row={row} tab={active.tab} checked={selected.has(row.archiveId)} onCheck={checked => setSelected(nextSelection(selected, row.archiveId, checked))} onOpen={() => void openDetail(row)} onAction={action => setConfirmIntent({ action, ids: [row.archiveId] })} />)}</div>
           </>
         )}
         {loading || (rows.length === 0 && offset === 0) ? null : <div className="pagination"><span>{t('pageIndicator', { page: String(page) })}</span><IconButton label={t('prevPage')} icon={ChevronLeft} variant="secondary" disabled={offset === 0} onClick={() => void fetchRows(active, Math.max(0, offset - PAGE_SIZE))} /><IconButton label={t('nextPage')} icon={ChevronRight} variant="secondary" disabled={rows.length < PAGE_SIZE} onClick={() => void fetchRows(active, offset + PAGE_SIZE)} /></div>}
       </Section>
-      <Dialog open={detail !== null || detailLoading} title={detail?.record.title ?? t('dialogTitleFallback')} description={detail === null ? t('dialogLoading') : `${detail.record.workspace?.title ?? t('ungrouped')} · ${detail.record.project?.name ?? t('personalConversation')}`} onClose={() => { if (!detailLoading) { detailGeneration.current++; setDetail(null) } }} wide footer={detail === null ? undefined : <DetailFooter detail={detail} pendingAction={pendingAction} onAction={action => setConfirmIntent({ action, ids: [detail.record.rootSessionId] })} />}>
+      <Dialog open={detail !== null || detailLoading} title={detail?.record.title ?? t('dialogTitleFallback')} description={detail === null ? t('dialogLoading') : `${detail.record.workspace?.title ?? t('ungrouped')} · ${detail.record.project?.name ?? t('personalConversation')}`} onClose={() => { if (!detailLoading) { detailGeneration.current++; setDetail(null) } }} wide footer={detail === null ? undefined : <DetailFooter detail={detail} pendingAction={pendingAction} onAction={action => setConfirmIntent({ action, ids: [detail.record.archiveId] })} />}>
         {detailLoading ? <LoadingState label={t('loadingConversation')} /> : detail === null ? null : <ArchiveDetail detail={detail} error={actionError} />}
       </Dialog>
       <ConfirmDialog
@@ -395,9 +402,9 @@ export function ArchivesPage() {
               <table className="dataTable emptyDraftTable" aria-label={t('emptyTableAria')}>
                 <thead><tr><th aria-label={t('colSelect')} /><th>{t('colSession')}</th><th>{t('colOwner')}</th><th>{t('creatorLabel')}</th><th>{t('colUpdatedAt')}</th><th>{t('colEvents')}</th></tr></thead>
                 <tbody>{emptyCandidates.map(candidate => (
-                  <tr key={candidate.rootSessionId}>
-                    <td><input type="checkbox" aria-label={t('selectItem', { name: candidate.rootSessionId })} checked={emptySelected.has(candidate.rootSessionId)} onChange={event => setEmptySelected(nextSelection(emptySelected, candidate.rootSessionId, event.target.checked))} /></td>
-                    <td><span className="codeText">{candidate.rootSessionId}</span></td>
+                  <tr key={emptyDraftKey(candidate)}>
+                    <td><input type="checkbox" aria-label={t('selectItem', { name: `${candidate.rootSessionId} (${candidate.runtime.runtimeId})` })} checked={emptySelected.has(emptyDraftKey(candidate))} onChange={event => setEmptySelected(nextSelection(emptySelected, emptyDraftKey(candidate), event.target.checked))} /></td>
+                    <td><span className="codeText">{candidate.rootSessionId}</span><small className="codeText archiveSessionId">{candidate.runtime.runtimeId}</small></td>
                     <td><span className="archiveOwner"><strong>{candidate.project?.name ?? t('personalConversation')}</strong><small>{candidate.runtime.kind === 'project' ? t('projectRuntime', { id: String(candidate.runtime.id) }) : t('personalRuntime', { id: String(candidate.runtime.id) })}</small></span></td>
                     <td>{candidate.creator?.displayName ?? t('unknownUser')}</td>
                     <td><time dateTime={new Date(candidate.updatedAt).toISOString()}>{formatTime(candidate.updatedAt)}</time></td>
@@ -407,9 +414,9 @@ export function ArchivesPage() {
               </table>
             </div>
             <div className="mobileList emptyDraftMobileList">{emptyCandidates.map(candidate => (
-              <label className="mobileItem" key={candidate.rootSessionId}>
-                <span className="mobileItemHeader"><span className="checkLabel"><input type="checkbox" aria-label={t('selectItem', { name: candidate.rootSessionId })} checked={emptySelected.has(candidate.rootSessionId)} onChange={event => setEmptySelected(nextSelection(emptySelected, candidate.rootSessionId, event.target.checked))} /><strong className="codeText">{candidate.rootSessionId}</strong></span><strong>{candidate.project?.name ?? t('personalConversation')}</strong></span>
-                <span className="mobileItemBody"><span className="muted">{candidate.creator?.displayName ?? t('unknownUser')} · {candidate.runtime.kind === 'project' ? t('projectRuntime', { id: String(candidate.runtime.id) }) : t('personalRuntime', { id: String(candidate.runtime.id) })}</span><span className="muted">{t('eventCount', { count: String(candidate.eventCount) })} · {formatTime(candidate.updatedAt)}</span></span>
+              <label className="mobileItem" key={emptyDraftKey(candidate)}>
+                <span className="mobileItemHeader"><span className="checkLabel"><input type="checkbox" aria-label={t('selectItem', { name: `${candidate.rootSessionId} (${candidate.runtime.runtimeId})` })} checked={emptySelected.has(emptyDraftKey(candidate))} onChange={event => setEmptySelected(nextSelection(emptySelected, emptyDraftKey(candidate), event.target.checked))} /><strong className="codeText">{candidate.rootSessionId}</strong></span><strong>{candidate.project?.name ?? t('personalConversation')}</strong></span>
+                <span className="mobileItemBody"><small className="codeText archiveSessionId">{candidate.runtime.runtimeId}</small><span className="muted">{candidate.creator?.displayName ?? t('unknownUser')} · {candidate.runtime.kind === 'project' ? t('projectRuntime', { id: String(candidate.runtime.id) }) : t('personalRuntime', { id: String(candidate.runtime.id) })}</span><span className="muted">{t('eventCount', { count: String(candidate.eventCount) })} · {formatTime(candidate.updatedAt)}</span></span>
               </label>
             ))}</div>
           </>
@@ -418,7 +425,7 @@ export function ArchivesPage() {
       <ConfirmDialog
         open={emptyConfirm !== null}
         title={t('emptyConfirmTitle')}
-        description={t('emptyConfirmBody', { count: String(emptyConfirm?.ids.length ?? 0) })}
+        description={t('emptyConfirmBody', { count: String(emptyConfirm?.sessions.length ?? 0) })}
         confirmLabel={t('trashAction')}
         pending={emptyLoading}
         onClose={() => { if (!emptyLoading) setEmptyConfirm(null) }}
@@ -455,12 +462,12 @@ function RowActionButtons({ row, tab, onAction }: { row: ConversationArchiveRow;
 
 function ArchiveTableRow({ row, tab, checked, onCheck, onOpen, onAction }: { row: ConversationArchiveRow; tab: ArchiveTab; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void; onAction: (action: ArchiveAction) => void }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
-  return <tr><td><input type="checkbox" aria-label={t('selectItem', { name: row.title })} checked={checked} onChange={event => onCheck(event.target.checked)} /></td><td><button type="button" className="tableLink" onClick={onOpen}><strong>{row.title}</strong>{row.contentPreview === undefined || row.contentPreview === null ? <small className="archivePreview archivePreviewEmpty">{t('noPreview')}</small> : <small className="archivePreview" title={row.contentPreview}>{row.contentPreview}</small>}<span className="codeText archiveSessionId">{row.rootSessionId}</span></button></td><td><span className="archiveOwner">{row.creator?.displayName ?? t('unknownUser')}<small>{row.project?.name ?? t('personalConversation')}</small></span></td><td><time dateTime={new Date(row.archivedAt).toISOString()}>{formatTime(row.archivedAt)}</time></td><td>{row.recordKind === 'empty-draft' ? <StatusBadge tone="neutral">{t('emptyDraftBadge')}</StatusBadge> : null}<ArchiveSyncState row={row} /></td><td>{row.messageCount}</td><td className="alignRight"><div className="rowActions"><IconButton label={t('viewItem', { name: row.title })} icon={Eye} onClick={onOpen} /><RowActionButtons row={row} tab={tab} onAction={onAction} /></div></td></tr>
+  return <tr><td><input type="checkbox" aria-label={t('selectItem', { name: row.title })} checked={checked} onChange={event => onCheck(event.target.checked)} /></td><td><button type="button" className="tableLink" onClick={onOpen}><strong>{row.title}</strong>{row.contentPreview === undefined || row.contentPreview === null ? <small className="archivePreview archivePreviewEmpty">{t('noPreview')}</small> : <small className="archivePreview" title={row.contentPreview}>{row.contentPreview}</small>}<span className="codeText archiveSessionId">{row.rootSessionId}</span><small className="codeText" title={row.runtime.runtimeId}>{t('runtimeIdentity', { id: row.runtime.runtimeId ?? t('unassignedRuntime') })}</small></button></td><td><span className="archiveOwner">{row.creator?.displayName ?? t('unknownUser')}<small>{row.project?.name ?? t('personalConversation')}</small></span></td><td><time dateTime={new Date(row.archivedAt).toISOString()}>{formatTime(row.archivedAt)}</time></td><td>{row.recordKind === 'empty-draft' ? <StatusBadge tone="neutral">{t('emptyDraftBadge')}</StatusBadge> : null}<ArchiveSyncState row={row} /></td><td>{row.messageCount}</td><td className="alignRight"><div className="rowActions"><IconButton label={t('viewItem', { name: row.title })} icon={Eye} onClick={onOpen} /><RowActionButtons row={row} tab={tab} onAction={onAction} /></div></td></tr>
 }
 
 function ArchiveMobileRow({ row, tab, checked, onCheck, onOpen, onAction }: { row: ConversationArchiveRow; tab: ArchiveTab; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void; onAction: (action: ArchiveAction) => void }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
-  return <article className="mobileItem archiveMobileItem"><div className="mobileItemHeader"><label className="checkLabel"><input type="checkbox" aria-label={t('selectItem', { name: row.title })} checked={checked} onChange={event => onCheck(event.target.checked)} /><span className="archiveIdentity"><strong>{row.title}</strong><small className="archivePreview">{row.contentPreview ?? t('noPreview')}</small><small className="codeText archiveSessionId">{row.rootSessionId}</small></span></label><div>{row.recordKind === 'empty-draft' ? <StatusBadge tone="neutral">{t('emptyDraftBadge')}</StatusBadge> : null}<ArchiveSyncState row={row} /></div></div><div className="archiveMobileFooter"><button type="button" className="archiveMobileOpen" onClick={onOpen}><span>{row.creator?.displayName ?? t('unknownUser')} · {row.project?.name ?? t('personalConversation')}</span><span>{formatTime(row.archivedAt)} · {t('messageCount', { count: String(row.messageCount) })}</span></button><RowActionButtons row={row} tab={tab} onAction={onAction} /></div></article>
+  return <article className="mobileItem archiveMobileItem"><div className="mobileItemHeader"><label className="checkLabel"><input type="checkbox" aria-label={t('selectItem', { name: row.title })} checked={checked} onChange={event => onCheck(event.target.checked)} /><span className="archiveIdentity"><strong>{row.title}</strong><small className="archivePreview">{row.contentPreview ?? t('noPreview')}</small><small className="codeText archiveSessionId">{row.rootSessionId}</small><small className="codeText" title={row.runtime.runtimeId}>{t('runtimeIdentity', { id: row.runtime.runtimeId ?? t('unassignedRuntime') })}</small></span></label><div>{row.recordKind === 'empty-draft' ? <StatusBadge tone="neutral">{t('emptyDraftBadge')}</StatusBadge> : null}<ArchiveSyncState row={row} /></div></div><div className="archiveMobileFooter"><button type="button" className="archiveMobileOpen" aria-label={t('viewItem', { name: row.title })} onClick={onOpen}><span>{row.creator?.displayName ?? t('unknownUser')} · {row.project?.name ?? t('personalConversation')}</span><span>{formatTime(row.archivedAt)} · {t('messageCount', { count: String(row.messageCount) })}</span></button><RowActionButtons row={row} tab={tab} onAction={onAction} /></div></article>
 }
 
 function ArchiveSyncState({ row }: { row: ConversationArchiveRow }) {
@@ -479,7 +486,7 @@ function DetailFooter({ detail, pendingAction, onAction }: { detail: Conversatio
   const pending = record.syncState === 'pending'
   const labels = archiveActionLabels(t)
   return <div className="dialogActionRow">
-    {record.state === 'purged' ? <Button variant="secondary" disabled>{t('exportAction')}</Button> : <a className="button button-secondary" href={exportArchive(record.rootSessionId)}>{t('exportAction')}</a>}
+    {record.state === 'purged' ? <Button variant="secondary" disabled>{t('exportAction')}</Button> : <a className="button button-secondary" href={exportArchive(record.archiveId)}>{t('exportAction')}</a>}
     {record.state === 'purged' ? null : TAB_ACTIONS[record.state === 'trash' ? 'trash' : 'archived'].map(action => { const meta = archiveActionMeta(action); return <Button key={action} icon={meta.icon} variant={action === 'restore' ? 'secondary' : 'danger'} onClick={() => onAction(action)} loading={pendingAction === action} disabled={pending}>{labels[action]}</Button> })}
     {pending ? <Button variant="secondary" icon={StopCircle} onClick={() => onAction('settle')} loading={pendingAction === 'settle'}>{t('settle')}</Button> : null}
   </div>
@@ -510,7 +517,7 @@ function ArchiveStateBadge({ state }: { state: ConversationArchiveState }) {
   return <StatusBadge tone={tones[state]}>{labels[state]}</StatusBadge>
 }
 
-function nextSelection(current: Set<string>, id: string, checked: boolean): Set<string> {
+function nextSelection<T extends string>(current: Set<T>, id: T, checked: boolean): Set<T> {
   const next = new Set(current)
   if (checked) next.add(id); else next.delete(id)
   return next

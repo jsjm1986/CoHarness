@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-owner-doc-pairs-write",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write gateway/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md .agents/notes/implemented/architecture/2026-10-25-local-runtime-supervisor.md .agents/notes/implemented/bug-fix/2026-08-18-gateway-startup-resilience.md .agents/notes/implemented/bug-fix/2026-09-17-stop-all-worker-failures.md",
+  "startedAt": "2026-10-24T19:26:47.658146+00:00",
+  "seconds": 3.297,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "06d0b0148cef34053ad1b26738be4f49ae824234f05ca516a803e95ca4648189",
+  "inputsAfter": "c34fe84287463ba1fc2e559851c97e211e7e6b70d55f2f2d06925182017cef4c",
+  "postgresToolDirectory": null,
+  "outputSha256": "4c2a13dedeed9c6bd5f0327f55d3a841dd05b1f21c9c9aa36b1a1d6ac48c94c8",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-25-local-runtime-supervisor.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-08-18-gateway-startup-resilience.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-09-17-stop-all-worker-failures.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 5 record(s) written; run the check to validate the pairs.\n"
+}

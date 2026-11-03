@@ -117,6 +117,11 @@ function mount(
   }
   const props: TaskManagerPageProps = {
     useCatalog: select => select(snapshot),
+    useTaskCatalog: ((_key, select, equal) => props.useCatalog(select ?? (value => value), equal)) as TaskManagerPageProps['useTaskCatalog'],
+    useTaskEnvironments: select => select({ showComputer: false, choices: [{ key: 'base', available: true }], status: 'ready' }),
+    taskActionsForRuntime: () => ({ onDelete: props.onDelete, onRetry: props.onRetry, onNewTask: props.onNewTask,
+      onUpdateTiming: props.onUpdateTiming, loadHistory: props.loadHistory, onOpenSession: props.onOpenSession }),
+    refreshTaskEnvironments: async () => {},
     useSessions: select => select(sessions),
     useWorkspaces: select => select(workspaces),
     usePanelInfo: select => select({ activePanelId: null }),

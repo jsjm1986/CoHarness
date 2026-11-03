@@ -36,6 +36,8 @@ kind: "package-reference"
 
 `scope` 参数仅当 `ctx.memory.space === 'personal'`（双作用域空间）时存在。执行器通过 `ctx.memory.scopesFor(exec.agent)` 解析该参数：`workspace` 映射到会话自己的工作区作用域（无 `cwd` 的会话得到 `memory_invalid`/`scope-unavailable`），`personal` 映射到 personal 作用域，`memory_search` 上省略 scope 时搜索所有可用作用域。无代理的调用抛出 `memory tools require a calling agent`。写入准入本身在服务内——schema 的存在永远不是强制手段。
 
+每个工具在执行入口从当前提供的集合解析作用域，包括 personal 与隐式 project 作用域。`memory.enabled: false` 时，读取、搜索、保存和删除均在访问存储前返回 `memory_invalid`；面向所有者的成员读取仍可检查已保存条目。读取或搜索在等待存储期间失去已提供作用域时，会等待存储结束，再以 `memory_invalid` 拒绝返回结果。重新启用后无需重建记录即可恢复访问。参见[工具作用域决策](../../../.agents/notes/implemented/bug-fix/2026-10-31-memory-tool-scopes.zh.md)。
+
 <a id="refusal-codes"></a>
 ## 拒绝码
 
@@ -44,7 +46,7 @@ kind: "package-reference"
 <a id="invariants"></a>
 ## 不变式
 
-**运行时不变式：** 不发布伴生检查。每次工具调用都在工具执行器自身生命周期内委派给 `ctx.memory`；本插件只注册 schema 与提示词指导，不持有可能偏离的关系。
+**运行时不变式：** 不发布伴生检查。工具执行器持有每次调用的生命周期。本插件检查当前提供的作用域，并将存储委派给 `ctx.memory`；不缓存条目或功能开关。
 
 <a id="model-experience"></a>
 ## 模型体验

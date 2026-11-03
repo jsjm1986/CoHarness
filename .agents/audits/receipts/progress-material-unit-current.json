@@ -1,0 +1,14 @@
+{
+  "name": "progress-material-unit-current",
+  "cwd": "gateway",
+  "command": "npm exec vitest run tests/progress-service.spec.ts tests/config.spec.ts tests/macos-release-control.spec.ts tests/postgres-suite.spec.ts",
+  "startedAt": "2026-10-23T22:03:16.260340+00:00",
+  "seconds": 12.851,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b07413833c07ea3a5ed5a943d103ca25c12cd63ac9f242f8f025b336de9fdc63",
+  "inputsAfter": "b07413833c07ea3a5ed5a943d103ca25c12cd63ac9f242f8f025b336de9fdc63",
+  "postgresToolDirectory": null,
+  "outputSha256": "4710be87122556a3080bd6616b8962f867ad44238895b241269de71270e95c38",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/progress-service.spec.ts (23 tests | 1 failed) 155ms\n     × runs one pass for an eligible project and commits entries with the watermark 12ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/progress-service.spec.ts > PostgresProgressService.sweep > runs one pass for an eligible project and commits entries with the watermark\nAssertionError: expected [ 'journal-insert', …(3) ] to deeply equal [ 'journal-insert', …(2) ]\n\n- Expected\n+ Received\n\n  [\n    \"journal-insert\",\n    \"journal-insert\",\n+   \"journal-insert\",\n    \"watermark\",\n  ]\n\n ❯ tests/progress-service.spec.ts:281:20\n    279|     await service.sweep()\n    280|     // A decision row bypasses the minActivity threshold; entries + wa…\n    281|     expect(writes).toEqual(['journal-insert', 'journal-insert', 'water…\n       |                    ^\n    282|     const model = pool.query.mock.calls.find(([sql]) => String(sql).in…\n    283|     expect(model?.[1]).toEqual(['org-1', 'p-internal', '2026-10-20T09:…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 3 passed (4)\n      Tests  1 failed | 72 passed (73)\n   Start at  06:03:17\n   Duration  11.20s (transform 1.13s, setup 0ms, import 1.42s, tests 11.22s, environment 0ms)\n\n"
+}

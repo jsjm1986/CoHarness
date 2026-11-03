@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-31-desktop-request-authorization.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-desktop-request-authorization.md
+document:
+  en: b76e78b592cea34f6c6e5d36a0b6d16511d4b567
+  zh: fa3cccedcf1db5a97cbe9fb1795bd8e9378221b6
+/agent-note-desktop-request-authorization:
+  en: 724b8c26a2a0fa45
+  zh: 73e87628b422f2fa
+/agent-note-desktop-request-authorization/problem:
+  en: 1966f5f3df802139
+  zh: 4f92ead284c85050
+/agent-note-desktop-request-authorization/decision:
+  en: 6f2bcc48e04eef6d
+  zh: e29e8abd5d088134
+/agent-note-desktop-request-authorization/alternatives-considered:
+  en: 2b53d3f15109811f
+  zh: 17d7d6bd3c186492
+/agent-note-desktop-request-authorization/consequences:
+  en: b1bd9a9dda9ca4a6
+  zh: c6e5e84772618e00

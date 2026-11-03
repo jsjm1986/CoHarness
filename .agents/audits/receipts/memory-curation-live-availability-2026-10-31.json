@@ -1,0 +1,134 @@
+{
+  "finding": "B408",
+  "title": "Curation continues model rounds and completion progress after committed memory settings withdraw its operation",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "at": "2026-10-31T15:58:02.090767+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T151555Z",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.md",
+    ".agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-curation-live-availability.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-curation-live-availability.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-curation-live-availability.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-live-availability.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-live-availability.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-live-availability.zh.md",
+    "apps/cli/tests/profiles/sdk/memory-curation-settings.expected.e2e.ts",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-auxiliary-events/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-auxiliary-events/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-auxiliary-events/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/memory-curation-settings/model.mjs",
+    "examples/headless-agent/tests/fixtures/memory-curation-settings/register.mjs",
+    "examples/headless-agent/tests/fixtures/memory-curation-settings/runtime.cordis.yml",
+    "packages/memory/memory-curation/README.i18n.yaml",
+    "packages/memory/memory-curation/README.md",
+    "packages/memory/memory-curation/README.zh.md",
+    "packages/memory/memory-curation/src/index.ts",
+    "packages/memory/memory-curation/tests/memory-curation.spec.ts"
+  ],
+  "matchingPrerequisites": [
+    "apps/cli/src/sdk-source.cordis.patch.yml",
+    "examples/headless-agent/tests/auxiliary-model-fixture.ts",
+    "examples/package.json",
+    "packages/bundle/sdk-minimal/cordis.patch.yml",
+    "packages/memory/memory-curation/package.json",
+    "packages/memory/memory-curation/tsconfig.json",
+    "packages/memory/memory/package.json",
+    "packages/memory/memory/src/client.ts",
+    "packages/memory/memory/src/index.ts",
+    "packages/memory/memory/src/search.ts",
+    "packages/memory/memory/src/storage.ts",
+    "packages/memory/memory/src/types.ts",
+    "packages/memory/memory/tests/harness.ts",
+    "packages/memory/memory/tsconfig.json",
+    "vitest.expected.config.ts",
+    "vitest.snapshot.config.ts"
+  ],
+  "cause": "Extraction/consolidation retained switches before asynchronous storage and model work. Tool results could enter another model round after withdrawal. The Session lane had no operation-specific settings cancellation, so queued model grants and progress writes stayed active.",
+  "implementation": "Each extraction/consolidation operation retains an independent controller linked to its Session lane. Committed settings cancel only the unavailable operation; the lane joins cleanup and preserves queued turns and independently enabled work. Current switches and exact offered scopes are checked after storage/preparation, at every round/tool result and before completion cursor admission. Stream failure diagnostics retain an independent failure when cancellation coincides.",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchedAt": "2026-10-31T15:51:06.498158+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T151555Z/curation-origin-fetch.json",
+    "sharedChangesPreserved": true
+  },
+  "verification": {
+    "uniqueRelatedCases": 302,
+    "unitCases": 294,
+    "unitFiles": 11,
+    "assembledSdkCases": 2,
+    "existingSnapshotCases": 6,
+    "coverage": {
+      "packages/memory/memory-curation/src/index.ts": {
+        "statements": [
+          372,
+          372
+        ],
+        "branches": [
+          254,
+          254
+        ],
+        "functions": [
+          50,
+          50
+        ],
+        "lines": [
+          307,
+          307
+        ]
+      }
+    },
+    "coverageEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T151555Z/coverage-evidence.json",
+    "nodeMajors": [
+      22,
+      24
+    ],
+    "beforeFix": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T151555Z/curation-withdrawal-before-fix-complete.json",
+    "oldCompiledNegative": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T151555Z/curation-sdk-old-negative.json",
+    "oldPackageHashes": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T151555Z/old-package-hashes.json",
+    "native": "Actual shipped sdk-minimal profile through the TypeScript SDK uses JSON storage and the file settings provider. It records the exact auxiliary request before dispatch, commits the corresponding feature off during its model stream, observes cancellation before shutdown while one permit remains live, then observes iterator cleanup before both primary/auxiliary permits release. Complete private old packages fail both unchanged tests because cancellation is false before shutdown. No external model is called.",
+    "admissionAndProgress": "Real LlmRuntime with a held late grant is cancelled before disposal, invokes no adapter and releases the late lease once. Queued extraction cursor admission also observes feature cancellation; disabled work does not advance its cursor. Enabled consolidation continues after extraction cancellation and stream cleanup.",
+    "normalCases": "Six existing curation race, concurrent Session, mutation cancellation and SDK request-projection cases pass unchanged. Runtime repetitions are not extra unique cases. New non-recorded SDK observations use the owning test:expected lane.",
+    "types": "Changed unit/SDK tests and their referenced package faces, including resource-budget Context and memory message declarations, have zero own or transitive diagnostics.",
+    "build": "Normal scoped TypeScript and tsdown builds pass for memory-curation; runtime index and matching type-plane JS/declaration are frozen.",
+    "documentation": "All20 doc-quick checks, five bilingual pairs, export JSDoc and127-file catalog freshness pass. No generated catalog write was needed; full doc-sync and whole-repository checks are not claimed.",
+    "lint": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T151555Z/curation-lint-after-ordering.json"
+  },
+  "developmentCorrections": [
+    "The initial catalog gate observed list(), while curation reads entries(); that initial timeout is fixture evidence only. The corrected complete negative fails all6 cases through continued dispatch.",
+    "Review found that a new availability check preceded the stream failure report. A targeted regression failed that intermediate ordering; the final implementation preserves the independent received failure and the complete suite passes."
+  ],
+  "semantics": "Committed setting edits cancel the current operation without aborting the whole Session lane. Owner reads, already admitted durable writes, execution resource origin, model grants, limits, request event formats and stored memory records remain unchanged. Standalone switch tests do not prove production project membership revocation.",
+  "noteReview": {
+    "keptActive": [
+      "2026-10-31-memory-live-availability: model/owner separation and main-tool/recall completion remain current; curation is cross-linked.",
+      "2026-10-24-memory-auxiliary-ownership: exact request records and cleanup ownership remain current; operation-specific cancellation is cross-linked.",
+      "2026-10-28-memory-curation-scope: captured review scopes remain independent.",
+      "2026-10-31-memory-consolidation-coalescing: per-scope arbitration and conditional cursor commits remain independent.",
+      "2026-10-23-memory-mutation-outcomes: admitted writes and cursor cancellation remain independent."
+    ],
+    "newActive": "2026-10-31-memory-curation-live-availability records independent switch cancellation and unfinished review progress.",
+    "archived": 0,
+    "deleted": 0,
+    "classification": "Partial extensions and independently useful rationale; no full supersession or borderline archival."
+  },
+  "peerReports": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T151555Z/peer-r17-deployed-and-real001.json"
+  ],
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T151555Z/r6-followup-root-source-union.json",
+  "mergeRequirement": "Apply21 B408 deltas and16 matching source prerequisites, then rebuild memory-curation within the matching combined application. This extends B407 and retains B406/B407/B408 for the next backend freeze after R16/B405; do not mix these into the deployed R17 Admin-only candidate. Preserve peer Local/Gateway/UI, FortuneSheet patch and lock changes. The capsule is a review reference, not a standalone production image.",
+  "limitations": [
+    "Verify memory settings provider attach/detach: installSettingsSection onChange currently only changes the switch source; consumers use settings/updated for immediate queued-request cancellation. Check a disabled provider attachment while a model grant is held, including recall.",
+    "Verify project memory authority replacement/revocation during storage, model preparation and subsequent rounds; do not infer membership acceptance from feature-switch tests.",
+    "Keep all12 full business domains open and continue other non-reserved resource and permission paths.",
+    "Peer owns Gateway authorization/routing, production topology and REAL001 slow B reads. R17 Admin is deployed over R16/B405; B406/B407/B408 require a later combined backend freeze.",
+    "Real paid/official model verification remains deferred by the user; root performs no production deployment or physical Windows/Linux acceptance.",
+    "Built smokes consume live shared workspace dependencies; retained earlier Local artifacts are reference-only and require a complete matching combined build."
+  ],
+  "rootDeployed": false
+}

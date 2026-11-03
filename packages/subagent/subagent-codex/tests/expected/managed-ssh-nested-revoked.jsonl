@@ -1,0 +1,1 @@
+{"mode":"nested-revoked","outcome":"error","nativeRequests":1,"modelAdmissions":2,"usageOwners":["ssh-model-member"],"originalActor":true,"allPermitsSettled":true,"upstreamKeyStayedInParent":true,"nativeProcessesStopped":true,"remoteModelListenersClosed":true,"memberColdResume":true}

@@ -1,0 +1,3 @@
+{"phase":"failed-cleanup","nativeServerStillLive":true,"allocations":1}
+{"phase":"replacement","oldProcessStopped":true}
+{"phase":"settled","allocations":2,"nativeServersStopped":2}

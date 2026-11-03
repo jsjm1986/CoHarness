@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-production-shutdown-order-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/shutdown.spec.ts tests/tunnel-access.spec.ts tests/tunnel-supervisor.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T22:27:39.259651+00:00",
+  "seconds": 2.51,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bc1b20693a2cd9544ba4c81dd204426381427c02560e2a51d5d79c85fbdf5030",
+  "inputsAfter": "bc1b20693a2cd9544ba4c81dd204426381427c02560e2a51d5d79c85fbdf5030",
+  "postgresToolDirectory": null,
+  "outputSha256": "2dfdca9d1afa3f911c24e80a8a235e85bf94ee309980fd0610fc7d5d207fe419",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯\n\nVitest caught 1 unhandled error during the test run.\nThis might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.\n\n⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯\nError: tunnel-shutting-down\n ❯ GatewayTunnelAccess.shutdown src/tunnel-access.ts:384:32\n    382|   async shutdown(): Promise<void> {\n    383|     this.closing = true\n    384|     this.startupLifetime.abort(new TunnelAccessError(503, 'tunnel-shut…\n       |                                ^\n    385|     await (this.shutdownAttempt ??= this.serialize(async () => {\n    386|       await this.stopProcess(3_000)\n ❯ shutdown evalmachine.<anonymous>:18:115\n ❯ tests/shutdown.spec.ts:55:20\n ❯ processTicksAndRejections node:internal/process/task_queues:104:5\n ❯ ../../../../%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/node_modules/.pnpm/@vitest+runner@4.1.12/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\nSerialized Error: { status: 503 }\nThis error originated in \"tests/shutdown.spec.ts\" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n\n\n Test Files  3 passed (3)\n      Tests  37 passed (37)\n     Errors  1 error\n   Start at  06:27:41\n   Duration  441ms (transform 139ms, setup 0ms, import 403ms, tests 156ms, environment 0ms)\n\n"
+}

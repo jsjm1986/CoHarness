@@ -25,6 +25,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 |---|---|---|
 | `@deepseek-ai/dsh-attachment-local` | yes | Private content-addressed DSH_HOME attachment storage |
 | `@deepseek-ai/dsh-tool-userdoc` | yes | Model-facing discovery and read tools for personal user documents |
+| `@deepseek-ai/dsh-userdoc-gateway` | yes | Authenticated Gateway-backed real-file document provider |
 | `@deepseek-ai/dsh-userdoc-local` | yes | Real-file user document storage below a per-user upload root |
 
 ## boot
@@ -133,10 +134,10 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-agent-instructions` | yes | Workspace context loader for AGENTS.md/CLAUDE.md instruction files |
 | `@deepseek-ai/dsh-archive-gateway` | yes | Synchronizes runtime conversation archive state with the Gateway |
 | `@deepseek-ai/dsh-collaboration-context` | no | Durable participant attribution for shared project conversations |
-| `@deepseek-ai/dsh-collaboration-gateway` | no | Gateway-backed project collaboration provider for DeepSeek Harness |
+| `@deepseek-ai/dsh-collaboration-gateway` | no | Gateway-backed project collaboration provider for CoHarness |
 | `@deepseek-ai/dsh-file-reference-local` | yes | Local-filesystem ctx.fileReferences provider with bounded fuzzy indexes |
 | `@deepseek-ai/dsh-gateway-execution` | yes | Gateway-verified execution participants and live authorization for managed agents |
-| `@deepseek-ai/dsh-gateway-runtime` | no | Authenticated Gateway request context and internal runtime transport for DeepSeek Harness |
+| `@deepseek-ai/dsh-gateway-runtime` | yes | Authenticated Gateway request context and internal runtime transport for DeepSeek Harness |
 | `@deepseek-ai/dsh-harness-dev-context` | no | Model context naming the DeepSeek Harness checkout and Web GUI URL without letting either change the system prompt |
 | `@deepseek-ai/dsh-session-reference` | yes | Cross-session snapshot references and durable untrusted model context (ctx.sessionReferenceResolver) |
 | `@deepseek-ai/dsh-time-context` | yes | Opt-in durable per-step context with the current time and elapsed time |
@@ -191,14 +192,14 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-experimental-auto-review` | no | Per-tool LLM authorization review for the DeepSeek Harness Auto permission preset |
 | `@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp` | yes | Experimental per-Session Chromium browser tools through chrome-devtools-mcp |
 | `@deepseek-ai/dsh-experimental-browser-use-playwright-mcp` | yes | Experimental per-Session Chromium browser tools through @playwright/mcp |
-| `@deepseek-ai/dsh-experimental-browser-use-stagehand-native` | yes | Experimental Stagehand browser tools with separately configured native models |
+| `@deepseek-ai/dsh-experimental-browser-use-stagehand-native` | yes | Experimental Stagehand browser tools with separately configured governed model routes |
 | `@deepseek-ai/dsh-experimental-claude-code-mods` | yes | Experimental bridge: load Claude Code mods (hooks modules) and run their hook chains on DeepSeek Harness extension points |
 | `@deepseek-ai/dsh-experimental-client-ui-agent-team` | no | Web Agent Teams roster, task board, and teammate navigation |
 | `@deepseek-ai/dsh-experimental-client-ui-claude-code-mods` | no | Web band above the prompt for Claude Code mods: draws each session's mod tree and sends button presses back to the bridge |
 | `@deepseek-ai/dsh-experimental-client-ui-cot-translation` | yes | Optional machine translation of expanded reasoning, preserving original Session text |
 | `@deepseek-ai/dsh-experimental-client-ui-voice-input` | no | Record speech and insert editable text into the conversation draft |
 | `@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp` | yes | Experimental computer use through an installed Cua Driver MCP executable |
-| `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native` | no | Experimental computer-use provider embedding the Cua Driver native npm SDK |
+| `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native` | yes | Experimental computer-use provider embedding the Cua Driver native npm SDK |
 | `@deepseek-ai/dsh-experimental-inspector` | yes | Experimental cross-realm CDP hub for Host debugging and Client Runtime inspection |
 | `@deepseek-ai/dsh-experimental-ptc-runtime-python` | yes | CPython subprocess implementation of the DeepSeek Harness PTC execution seam |
 | `@deepseek-ai/dsh-experimental-session-inspector` | no | Experimental virtualized Session log and live Chat group/node inspectors |
@@ -372,7 +373,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 |---|---|---|
 | `@deepseek-ai/dsh-session-checkpoint-policy` | no | Semantic session durability checkpoints before model requests and tool side effects |
 | `@deepseek-ai/dsh-session-log-deepseek` | yes | Incremental lossless session-log request extension for the official DeepSeek LLM API |
-| `@deepseek-ai/dsh-session-persistence-gateway` | yes | Gateway PostgreSQL session persistence provider for DeepSeek Harness |
+| `@deepseek-ai/dsh-session-persistence-gateway` | yes | Gateway PostgreSQL session persistence provider for CoHarness |
 | `@deepseek-ai/dsh-session-persistence-jsonl` | yes | JSONL durable session persistence backend for the DeepSeek Harness |
 | `@deepseek-ai/dsh-session-persistence-sqlite` | yes | SQLite durable session persistence with physical chunk-row packing |
 | `@deepseek-ai/dsh-session-projection` | no | Session-projection seam: the merge-extensible projection type table, the provider contract, and the ctx.sessionProjections registry serving whole current values of log-derived per-session state |

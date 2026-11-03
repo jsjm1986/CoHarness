@@ -1,0 +1,14 @@
+{
+  "name": "model-account-deletion-races-before",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/admin-business-postgres.spec.ts -t 'model governance account deletion' --no-file-parallelism",
+  "startedAt": "2026-10-24T00:17:45.502965+00:00",
+  "seconds": 2.803,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4033cccbde6df4c5c5295d07705ce11eaecded5a598fdba193262ee7112a0655",
+  "inputsAfter": "4033cccbde6df4c5c5295d07705ce11eaecded5a598fdba193262ee7112a0655",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "cbf9d922f4f60dc060fa31968ca31a64aba7569972e42f924aa637760e820483",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/admin-business-postgres.spec.ts (36 tests | 3 failed | 33 skipped) 333ms\n       × does not recreate model-access after concurrent account cleanup 134ms\n       × does not recreate intake-token after concurrent account cleanup 73ms\n       × does not recreate quota after concurrent account cleanup 83ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/admin-business-postgres.spec.ts > Admin business PostgreSQL regressions > model governance account deletion > does not recreate model-access after concurrent account cleanup\n FAIL  tests/admin-business-postgres.spec.ts > Admin business PostgreSQL regressions > model governance account deletion > does not recreate intake-token after concurrent account cleanup\n FAIL  tests/admin-business-postgres.spec.ts > Admin business PostgreSQL regressions > model governance account deletion > does not recreate quota after concurrent account cleanup\nError: organization provider must match /^org-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/\n ❯ PostgresModelGovernanceService.upsertProvider src/postgres/model-governance-service.ts:486:13\n    484|     const provider = nonEmpty(input.provider, 'provider')\n    485|     if (!ORGANIZATION_PROVIDER_PATTERN.test(provider)) {\n    486|       throw new Error(`organization provider must match ${String(ORGAN…\n       |             ^\n    487|     }\n    488|     const displayName = nonEmpty(input.displayName, 'displayName')\n ❯ tests/admin-business-postgres.spec.ts:1030:24\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\n\n\n Test Files  1 failed (1)\n      Tests  3 failed | 33 skipped (36)\n   Start at  08:17:46\n   Duration  1.54s (transform 845ms, setup 0ms, import 1.10s, tests 333ms, environment 0ms)\n\n"
+}

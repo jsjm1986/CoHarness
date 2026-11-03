@@ -1,0 +1,14 @@
+{
+  "name": "native-search-source-lint",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/web/web-search-deepseek/src/admission.ts packages/web/web-search-deepseek/src/index.ts packages/web/web-search-deepseek/tests/admission.spec.ts scripts/coverage-baseline.ts snapshots/session/web-search-endpoint-guidance/web-search-error-fixture.mjs",
+  "startedAt": "2026-10-24T03:40:55.332361+00:00",
+  "seconds": 7.242,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3be91457491ba87471ce39725681b096b2224e00588f036e3526080a8ae3042f",
+  "inputsAfter": "07224c96c922dc7dd8445eccbed9106c7f801b3360075e5d0fffc8d80fcc97a5",
+  "postgresToolDirectory": null,
+  "outputSha256": "4525b9152e57f9d624a521eba7a2c31412133a07fb93021ec7fccaaa062c1070",
+  "outputTail": "packages/web/web-search-deepseek/tests/admission.spec.ts:30:63: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/web/web-search-deepseek/tests/admission.spec.ts:137:111: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/web/web-search-deepseek/tests/admission.spec.ts:189:94: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\n"
+}

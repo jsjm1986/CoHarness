@@ -5,6 +5,8 @@ import { z } from 'zod'
 import type { RuntimeTarget } from '../instances.ts'
 import { transaction } from './database.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
+import type { PoolClient } from 'pg'
+import { lockAdministrator } from './administrator-authority.ts'
 
 /** Replay dedup horizon; keeps the PG interval computation inside the supported range. */
 export const REPLAY_WINDOW_LIMIT_MS = 2_592_000_000
@@ -53,18 +55,38 @@ export class WebhookReceiptError extends Error {
 export class PostgresWebhookDeliveryService {
   constructor(private readonly context: PostgresRuntimeContext) {}
 
+  /** Retain the active organization and exact captured endpoint revision before reserving work. */
+  private async retainEndpoint(client: PoolClient, input: {
+    endpointId: string; configurationRevision: string; executionUserUuid: string; target: RuntimeTarget
+  }, requireEnabled: boolean): Promise<void> {
+    const organization = await client.query("SELECT 1 FROM harness.organizations WHERE id=$1 AND status='active' FOR SHARE", [this.context.organizationId])
+    if (organization.rowCount !== 1) throw new WebhookReceiptError(404, 'webhook endpoint not found')
+    const current = await client.query<{ revision: string; enabled: boolean; execution_user_id: string; runtime_kind: string; runtime_public_id: string; runtime_id: string | null; node_id: string | null }>(`SELECT
+      revision::text,enabled,execution_user_id,runtime_kind,runtime_public_id::text,runtime_id,node_id FROM harness.webhook_endpoints
+      WHERE organization_id=$1 AND id=$2 FOR SHARE`, [this.context.organizationId, input.endpointId])
+    const endpoint = current.rows[0]
+    if (endpoint === undefined || (requireEnabled && !endpoint.enabled)) throw new WebhookReceiptError(404, 'webhook endpoint not found')
+    if (endpoint.revision !== input.configurationRevision || endpoint.execution_user_id !== input.executionUserUuid
+      || endpoint.runtime_kind !== input.target.kind || Number(endpoint.runtime_public_id) !== input.target.id
+      || endpoint.runtime_id !== input.target.runtimeId || endpoint.node_id !== this.context.nodeId) {
+      throw new WebhookReceiptError(409, 'webhook endpoint changed; retry delivery')
+    }
+  }
+
   /**
    * Read one bounded page for administrative delivery diagnostics.
+   * @param actorUserId - server-authenticated public administrator id, retained through the read.
    * @param endpoint - endpoint UUID received from the admin query.
    * @param cursor - last receipt id from the previous page, or undefined.
    * @param limit - page size, defaulting to 50 and capped at 100.
    * @returns newest receipts and the next cursor, without payloads or credentials.
    */
-  async list(endpoint: unknown, cursor?: unknown, limit: unknown = 50): Promise<{ items: WebhookReceipt[]; nextCursor: WebhookReceiptId | null }> {
+  async list(actorUserId: number, endpoint: unknown, cursor?: unknown, limit: unknown = 50): Promise<{ items: WebhookReceipt[]; nextCursor: WebhookReceiptId | null }> {
     const query = z.object({ endpoint: z.uuid(), cursor: z.uuid().optional(), limit: z.number().int().min(1).max(100) }).safeParse({ endpoint, cursor, limit })
     if (!query.success) throw new WebhookReceiptError(400, 'invalid webhook receipt query')
     const input = query.data
     return transaction(this.context.pool, async client => {
+      await lockAdministrator(client, this.context, actorUserId)
       if (input.cursor !== undefined) {
         const found = await client.query('SELECT id FROM harness.webhook_delivery_receipts WHERE organization_id=$1 AND endpoint_id=$2 AND id=$3',
           [this.context.organizationId, input.endpoint, input.cursor])
@@ -84,7 +106,7 @@ export class PostgresWebhookDeliveryService {
    * Equal bodies with new ids share the original receipt within replayWindowMs;
    * unresolved dispatches remain protected beyond that window. The independent
    * windowMs and limit bound intake of new work, not transport retries.
-   * @param input - verified delivery digest and server-resolved configuration and execution account.
+   * @param input - verified delivery digest and current enabled endpoint revision, execution account and target, retained through commit.
    * @returns whether this caller owns dispatch, plus the durable status for repeat deliveries.
    */
   async reserve(input: {
@@ -94,13 +116,14 @@ export class PostgresWebhookDeliveryService {
   }): Promise<{ dispatch: boolean; receipt: WebhookReceipt }> {
     const parsed = z.object({ endpointId: z.uuid(), deliveryId: z.string().min(1).max(256), requestHash: z.string().regex(/^[0-9a-f]{64}$/u),
       configurationRevision: z.string().regex(/^[1-9][0-9]{0,17}$/u), executionUserUuid: z.uuid(),
-      target: z.object({ kind: z.enum(['user', 'project']), id: z.number().int().positive() }).strict(),
+      target: z.object({ kind: z.enum(['user', 'project']), id: z.number().int().positive(), runtimeId: z.uuid().optional() }).strict(),
       limit: z.number().int().min(1).max(1_000_000), windowMs: z.number().int().min(1).max(86_400_000),
       replayWindowMs: z.number().int().min(1).max(REPLAY_WINDOW_LIMIT_MS), event: z.unknown(),
     }).strict().safeParse(input)
     if (!parsed.success) throw new WebhookReceiptError(400, 'invalid webhook reservation')
     const org = this.context.organizationId, endpoint = input.endpointId
     return transaction(this.context.pool, async client => {
+      await this.retainEndpoint(client, input, true)
       await client.query(`INSERT INTO harness.webhook_intake_windows(organization_id,endpoint_id)
         VALUES($1,$2) ON CONFLICT DO NOTHING`, [org, endpoint])
       await client.query('SELECT endpoint_id FROM harness.webhook_intake_windows WHERE organization_id=$1 AND endpoint_id=$2 FOR UPDATE', [org, endpoint])
@@ -129,10 +152,10 @@ export class PostgresWebhookDeliveryService {
           AND (accepted<$3 OR started_at + $4*interval '1 millisecond' <= statement_timestamp())`, [org, endpoint, input.limit, input.windowMs])
       if (budget.rowCount !== 1) throw new WebhookReceiptError(429, 'webhook intake limit reached')
       const inserted = await client.query<ReceiptRow>(`INSERT INTO harness.webhook_delivery_receipts
-        (organization_id,endpoint_id,delivery_id,request_hash,configuration_revision,node_id,execution_user_id,runtime_kind,runtime_public_id,event)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING ${columns}`,
+        (organization_id,endpoint_id,delivery_id,request_hash,configuration_revision,node_id,execution_user_id,runtime_kind,runtime_public_id,event,runtime_id)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING ${columns}`,
       [org, endpoint, input.deliveryId, input.requestHash, input.configurationRevision, this.context.nodeId,
-        input.executionUserUuid, input.target.kind, input.target.id, JSON.stringify(input.event ?? null)])
+        input.executionUserUuid, input.target.kind, input.target.id, JSON.stringify(input.event ?? null), input.target.runtimeId])
       return { dispatch: true, receipt: view(inserted.rows[0]!) }
     })
   }
@@ -158,14 +181,17 @@ export class PostgresWebhookDeliveryService {
    * administrator decision is auditable through the new receipt row.
    * @param receiptId - settled receipt to replay.
    * @param endpoint - the endpoint's current configuration and account binding.
+   * @param actorUserId - server-authenticated public administrator id, rechecked when the reservation is admitted.
    * @returns the new reservation and the stored event for dispatch.
    */
   async redispatch(receiptId: unknown, endpoint: {
     endpointId: string; configurationRevision: string; executionUserUuid: string; target: RuntimeTarget
-  }): Promise<{ receipt: WebhookReceipt; event: unknown; deliveryId: string }> {
+  }, actorUserId: number): Promise<{ receipt: WebhookReceipt; event: unknown; deliveryId: string }> {
     const parsed = z.uuid().safeParse(receiptId)
     if (!parsed.success) throw new WebhookReceiptError(400, 'invalid webhook receipt id')
     return transaction(this.context.pool, async client => {
+      await lockAdministrator(client, this.context, actorUserId)
+      await this.retainEndpoint(client, endpoint, false)
       const original = await client.query<ReceiptRow>(`SELECT ${columns} FROM harness.webhook_delivery_receipts
         WHERE organization_id=$1 AND id=$2 FOR UPDATE`, [this.context.organizationId, parsed.data])
       const row = original.rows[0]
@@ -176,16 +202,13 @@ export class PostgresWebhookDeliveryService {
       if (row.endpoint_id !== endpoint.endpointId) {
         throw new WebhookReceiptError(400, 'webhook receipt belongs to another endpoint')
       }
-      const alive = await client.query('SELECT 1 FROM harness.webhook_endpoints WHERE organization_id=$1 AND id=$2',
-        [this.context.organizationId, endpoint.endpointId])
-      if (alive.rowCount !== 1) throw new WebhookReceiptError(404, 'webhook endpoint was removed')
       const deliveryId = `rerun:${row.id}:${randomUUID()}`
       const inserted = await client.query<ReceiptRow>(`INSERT INTO harness.webhook_delivery_receipts
-        (organization_id,endpoint_id,delivery_id,request_hash,configuration_revision,node_id,execution_user_id,runtime_kind,runtime_public_id,event)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING ${columns}`,
+        (organization_id,endpoint_id,delivery_id,request_hash,configuration_revision,node_id,execution_user_id,runtime_kind,runtime_public_id,event,runtime_id)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING ${columns}`,
       [this.context.organizationId, row.endpoint_id, deliveryId, row.request_hash, endpoint.configurationRevision,
         this.context.nodeId, endpoint.executionUserUuid, endpoint.target.kind, endpoint.target.id,
-        JSON.stringify(row.event ?? null)])
+        JSON.stringify(row.event ?? null), endpoint.target.runtimeId])
       return { receipt: view(inserted.rows[0]!), event: row.event, deliveryId }
     })
   }

@@ -20,6 +20,7 @@ One page per subsystem of the DeepSeek Harness: what it is, the data structures 
 | [persistence.md](persistence.md) | the durability seam: `SessionPersistence`, JSONL + SQLite backends, `session/flush`, crash recovery, `SessionHeader` |
 | [settings.md](settings.md) | the user-settings seam: `SettingsNamespace` registration, layered resolution (defaults → composition `base` → user document), owner scopes, hot commits |
 | [credentials.md](credentials.md) | the credential seam: `CredentialRef` references (never values) in configuration, per-operation resolution, UI-safe `CredentialInfo`, exclusive read-only layers |
+| [resource-budget.md](resource-budget.md) | node-wide model/process permit requests and execution quiescence obligations |
 | [collaboration.md](collaboration.md) | Gateway-signed request principals, personal/project runtime identity, root-inherited conversation ACLs, request-captured authority, and shared interaction claims |
 | [session-query.md](session-query.md) | logical records, bounded exact-event reads, relationship traces, semantic filters/documents, and full-text result pages |
 | [session-title.md](session-title.md) | durable title snapshots, cited source-message seqs, and the asynchronous provider contract |

@@ -43,6 +43,32 @@ const view = (expandedGroups: readonly string[] = [], ungroupedOrder?: readonly 
   ...(ungroupedOrder === undefined ? {} : { ungroupedOrder }),
 })
 const noArchive: readonly SessionId[] = []
+
+it('keeps an inactive composer-owned blank in its Workspace and flat list while hiding parked blanks', () => {
+  const current = summary('history', 3), draft = { ...summary('draft', 2), blank: true }
+  const parked = { ...summary('parked', 1), blank: true }
+  const state = { ...list(current, draft, parked), current: current.id }
+  const rows = { pinnedSessionIds: [], archivedSessionIds: [], archivedFilter: 'default' as const,
+    inputDraftSessionIds: [draft.id] }
+  const workspaces = [workspace('a', ['history']), workspace('b', ['draft', 'parked'])]
+  const grouped = deriveGroups(state, workspaces, rows, view(['a', 'b']))
+  expect(grouped.find(group => group.workspaceId === wid('b'))?.sessions.map(item => item.id)).toEqual([draft.id])
+  const members = sessionMemberIds(state, rows.inputDraftSessionIds)
+  expect(members).toEqual([current.id, draft.id])
+  expect(deriveFlat(state, members, rows).map(item => item.id)).toContain(draft.id)
+  expect(deriveFlat(state, members, rows).map(item => item.id)).not.toContain(parked.id)
+})
+
+it('keeps an inactive input blank under its local Workspace hint before Host membership arrives', () => {
+  const current = summary('history', 2), draft = { ...summary('draft', 1), blank: true, workspaceId: wid('b') }
+  const state = { ...list(current, draft), current: current.id }
+  const rows = { pinnedSessionIds: [], archivedSessionIds: [], archivedFilter: 'default' as const,
+    inputDraftSessionIds: [draft.id] }
+  const grouped = deriveGroups(state, [workspace('a', ['history']), workspace('b', [])], rows, view(['a', 'b']))
+  expect(grouped.find(group => group.workspaceId === wid('b'))?.sessions.map(item => item.id)).toEqual([draft.id])
+  expect(grouped.find(group => group.key === UNGROUPED_KEY)).toBeUndefined()
+})
+
 const archived = (...ids: string[]): readonly SessionId[] => ids.map(sid)
 const rowState = (options: {
   pinned?: readonly string[]

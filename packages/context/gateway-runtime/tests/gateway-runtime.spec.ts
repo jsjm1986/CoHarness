@@ -2,6 +2,8 @@ import { generateKeyPairSync, sign } from 'node:crypto'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { setImmediate } from 'node:timers/promises'
+import { inspect } from 'node:util'
 import { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +15,7 @@ import GatewayRuntime, {
   readGatewayResponseBytes,
   readGatewayResponseJson,
   parseGatewayRuntimeCredential,
+  readGatewayRuntimeCredential,
   verifyGatewayPrincipal,
 } from '../src/index.ts'
 
@@ -58,6 +61,36 @@ afterEach(() => {
 })
 
 describe('Gateway runtime credential', () => {
+  it.each(['http://127.0.0.1:8899', 'http://localhost:8899', 'http://[::1]:8899'])('accepts the loopback origin %s', (gatewayUrl) => {
+    const { credential } = fixture()
+    expect(parseGatewayRuntimeCredential({ ...credential, gatewayUrl }).gatewayUrl).toBe(gatewayUrl)
+  })
+
+  it.each([
+    'http://example.com:8899', 'http://[2001:db8::1]:8899', 'http://[::]:8899',
+    'https://[::1]:8899', 'http://[::1]:8899/private', 'http://[::1]:8899/?scope=other',
+    'http://user:synthetic-password@[::1]:8899',
+  ])('refuses the non-origin or non-loopback credential URL %s', (gatewayUrl) => {
+    const { credential } = fixture()
+    expect(() => parseGatewayRuntimeCredential({ ...credential, gatewayUrl })).toThrow('loopback HTTP origin')
+  })
+
+  it('retains the channel read failure without misreporting it as invalid JSON', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-credential-read-error-'))
+    try {
+      const channel = { DSH_GATEWAY_CREDENTIAL_FILE: join(root, 'missing.json') }
+      expect(() => readGatewayRuntimeCredential(channel)).toThrow(/ENOENT/u)
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+
+  it('omits malformed origin bytes from credential diagnostics', () => {
+    const { credential } = fixture(), marker = 'private-synthetic-origin'
+    let failure: unknown
+    try { parseGatewayRuntimeCredential({ ...credential, gatewayUrl: marker }) } catch (error) { failure = error }
+    expect(failure).toBeInstanceOf(Error)
+    expect(inspect(failure, { depth: 8 })).not.toContain(marker)
+  })
+
   it('accepts only a loopback HTTP origin and a positive runtime identity', () => {
     const { credential } = fixture()
     expect(parseGatewayRuntimeCredential(credential)).toEqual(credential)
@@ -81,6 +114,21 @@ describe('Gateway runtime credential', () => {
     expect(() => verifyGatewayPrincipal(issue({
       runtime: { kind: 'project', id: 41, generation: 8 },
     }), credential, undefined, NOW + 1)).toThrow(/expired or foreign/)
+  })
+
+  it('binds the signed principal to the allocated RuntimeId even when owner and generation match', () => {
+    const { credential, issue } = fixture()
+    const runtimeId = '11111111-1111-4111-8111-111111111111' as NonNullable<GatewayRuntimeCredential['runtime']['runtimeId']>
+    const otherId = '22222222-2222-4222-8222-222222222222' as typeof runtimeId
+    const selected = { ...credential, runtime: { ...credential.runtime, runtimeId } }
+    expect(parseGatewayRuntimeCredential(selected).runtime.runtimeId).toBe(runtimeId)
+    expect(verifyGatewayPrincipal(issue({ runtime: selected.runtime }), selected, undefined, NOW + 1).runtime.runtimeId).toBe(runtimeId)
+    expect(() => verifyGatewayPrincipal(
+      issue({ runtime: { ...selected.runtime, runtimeId: otherId } }), selected, undefined, NOW + 1,
+    )).toThrow(/foreign/)
+    expect(() => verifyGatewayPrincipal(issue(), selected, undefined, NOW + 1)).toThrow(/foreign/)
+    expect(() => verifyGatewayPrincipal(issue({ runtime: selected.runtime }), credential, undefined, NOW + 1)).toThrow(/foreign/)
+    expect(() => parseGatewayRuntimeCredential({ ...selected, runtime: { ...selected.runtime, runtimeId: 'invalid' } })).toThrow(/invalid/)
   })
 
   it('accepts only the signed administrator archive capability for another personal runtime', () => {
@@ -119,6 +167,8 @@ describe('Gateway request context', () => {
     expect(ctx.gatewayRuntime.identity).toEqual(credential.runtime)
     expect(ctx.gatewayRuntime.organization).toBe('acme')
     expect(ctx.get('executionAuthorityRequired')).toBe(true)
+    expect(ctx.get('modelAccessRequired')).toBe(true)
+    expect(ctx.get('collaborationRequired')).toBe(true)
 
     const sessionId = SessionId('pending-root')
     const authorization = Promise.resolve(GatewaySessionCreationAuthorization('creation-authorization'))
@@ -206,6 +256,12 @@ describe('Gateway request context', () => {
     expect(ctx.gatewayRuntime.current()).toBeUndefined()
     await fiber.dispose()
     expect(ctx.get('executionAuthorityRequired')).toBe(true)
+    expect(ctx.get('modelAccessRequired')).toBe(true)
+    expect(ctx.get('collaborationRequired')).toBe(true)
+    const replacement = ctx.plugin(GatewayRuntime)
+    await replacement.await()
+    expect(ctx.get('collaborationRequired')).toBe(true)
+    await replacement.dispose()
     await rm(root, { recursive: true, force: true })
   })
 
@@ -259,6 +315,82 @@ describe('Gateway request context', () => {
 })
 
 describe('bounded Gateway responses', () => {
+  it.each(['declared-overflow', 'streamed-overflow', 'between-chunks'] as const)(
+    'ends a %s response read before pending body cancellation is acknowledged', async (mode) => {
+      const cleanup = Promise.withResolvers<undefined>(), entered = Promise.withResolvers<undefined>()
+      const cancellation = new AbortController(), reason = new Error('response deadline')
+      let delivered = false, settled = false, failure: unknown
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          if (mode !== 'between-chunks') controller.enqueue(new Uint8Array(5))
+        },
+        pull(controller) {
+          if (mode !== 'between-chunks' || delivered) return
+          delivered = true
+          controller.enqueue(new Uint8Array(1))
+          queueMicrotask(() => { cancellation.abort(reason) })
+        },
+        cancel() { entered.resolve(undefined); return cleanup.promise },
+      })
+      const response = new Response(body, mode === 'declared-overflow' ? { headers: { 'content-length': '5' } } : undefined)
+      const result = readGatewayResponseBytes(response, 4, cancellation.signal).then(
+        () => { settled = true }, (error: unknown) => { settled = true; failure = error },
+      )
+      try {
+        await entered.promise
+        cancellation.abort(reason)
+        await setImmediate()
+        expect(settled).toBe(true)
+        if (mode === 'between-chunks') expect(failure).toBe(reason)
+        else expect(failure).toBeInstanceOf(GatewayResponseTooLargeError)
+      } finally {
+        cleanup.resolve(undefined)
+        await result
+      }
+    },
+  )
+
+  it('cancels a pre-aborted response without waiting for body cleanup acknowledgement', async () => {
+    const cleanup = Promise.withResolvers<undefined>(), reason = new Error('cancelled before reading')
+    let cancelled = false, failure: unknown
+    const body = new ReadableStream<Uint8Array>({
+      cancel() { cancelled = true; return cleanup.promise },
+    })
+    const result = readGatewayResponseBytes(new Response(body), 32, AbortSignal.abort(reason))
+      .catch((error: unknown) => { failure = error })
+    try {
+      await setImmediate()
+      expect(cancelled).toBe(true)
+      expect(failure).toBe(reason)
+    } finally {
+      cleanup.resolve(undefined)
+      await body.cancel()
+      await result
+    }
+  })
+
+  it.each(['declared-overflow', 'streamed-overflow', 'pending-signal'] as const)(
+    'preserves the %s read error when body cancellation fails', async (mode) => {
+      const cancellation = new AbortController(), reason = new Error('response consumer closed')
+      let cancelled = false
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          if (mode !== 'pending-signal') controller.enqueue(new Uint8Array(5))
+        },
+        cancel() { cancelled = true; throw new Error('body cleanup failed') },
+      })
+      const response = new Response(body, mode === 'declared-overflow' ? { headers: { 'content-length': '5' } } : undefined)
+      const result = readGatewayResponseBytes(response, 4, cancellation.signal)
+      const rejected = mode === 'pending-signal'
+        ? expect(result).rejects.toBe(reason)
+        : expect(result).rejects.toBeInstanceOf(GatewayResponseTooLargeError)
+      if (mode === 'pending-signal') cancellation.abort(reason)
+      await rejected
+      expect(cancelled).toBe(true)
+      await setImmediate()
+    },
+  )
+
   it('reads and parses a chunked JSON response within its byte budget', async () => {
     const response = new Response(new ReadableStream<Uint8Array>({
       start(controller) {

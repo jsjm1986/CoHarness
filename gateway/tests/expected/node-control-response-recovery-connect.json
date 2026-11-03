@@ -1,0 +1,14 @@
+{
+  "phase": "connect",
+  "successfulHeadersBeforeCut": true,
+  "faultOperationRetried": true,
+  "sameCredential": true,
+  "sameConnection": true,
+  "sameLeaseEpoch": true,
+  "connectedEvents": 1,
+  "finalStatus": "stopped",
+  "enrollmentCodeCleared": true,
+  "savedNodeMatches": true,
+  "runtimeStarts": 0,
+  "runtimeAssignments": 0
+}

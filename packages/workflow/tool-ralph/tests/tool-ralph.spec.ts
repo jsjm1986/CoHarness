@@ -21,6 +21,9 @@ class StubEngine extends WorkflowEngine {
   requests: WorkflowStartRequest[] = []
   cancels: string[] = []
   disposed = 0
+  disposeError: unknown
+  retained = 0
+  readonly retainedCompletion = Promise.withResolvers<undefined>()
   settle!: (result: WorkflowResult) => void
   startError: Error | undefined
   onStart: (() => void) | undefined
@@ -34,6 +37,10 @@ class StubEngine extends WorkflowEngine {
       id: WorkflowRunId(`ralph-${this.requests.length}`),
       meta: request.meta,
       result,
+      retainFailedCleanup: () => {
+        this.retained += 1
+        return this.retainedCompletion.promise
+      },
       cancel: (reason?: string) => {
         this.cancels.push(reason ?? 'cancelled')
         this.settle({
@@ -43,9 +50,9 @@ class StubEngine extends WorkflowEngine {
           agentsStarted: 0,
         })
       },
-      dispose: () => {
+      dispose: async () => {
         this.disposed += 1
-        return Promise.resolve()
+        if (this.disposeError !== undefined) throw this.disposeError
       },
     }
   }
@@ -85,7 +92,8 @@ async function setup(options?: SetupOptions) {
   await ctx.plugin(SubagentRuntime)
   const provider = options?.provider === false ? undefined : options?.provider ?? new StubProvider()
   if (provider !== undefined) ctx.subagents.registerProvider(provider)
-  await ctx.plugin(StubEngine)
+  const engineScope = ctx.plugin(StubEngine)
+  await engineScope.await()
   const config: toolRalph.Config = { subagentProvider: 'fresh' }
   if (options?.config?.subagentProvider !== undefined) config.subagentProvider = options.config.subagentProvider
   if (options?.config?.maxRounds !== undefined) config.maxRounds = options.config.maxRounds
@@ -93,7 +101,7 @@ async function setup(options?: SetupOptions) {
   if (options?.config?.maxResultChars !== undefined) config.maxResultChars = options.config.maxResultChars
   const fiber = await ctx.plugin(toolRalph, config)
   const parent = { id: SessionId('caller'), options: {} } as unknown as Agent
-  return { ctx, engine: ctx.workflowEngine as StubEngine, parent, fiber }
+  return { ctx, engine: ctx.workflowEngine as StubEngine, parent, fiber, engineScope }
 }
 
 function execute(
@@ -146,6 +154,64 @@ async function settleCompleted(
 }
 
 describe('dsh-tool-ralph', () => {
+  it('joins foreground cancellation and cleanup when its engine withdraws', async () => {
+    const { ctx, engine, parent, engineScope } = await setup()
+    const pending = execute(ctx, { objective: 'Bounded work.' }, { agent: parent })
+    try {
+      await vi.waitFor(() => { expect(engine.requests).toHaveLength(1) })
+      await engineScope.dispose()
+      expect(engine.cancels).toEqual(['parent step aborted'])
+      expect(engine.disposed).toBe(1)
+      expect((await pending).isError).toBe(true)
+    } finally {
+      engine.settle({ value: null, stopReason: 'completed', agentsStarted: 0 })
+      await pending
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('retains failed foreground disposal with the original workflow run', async () => {
+    const { ctx, engine, parent } = await setup()
+    try {
+      engine.disposeError = new Error('Ralph child cleanup remains unconfirmed')
+      const started = Promise.withResolvers<undefined>()
+      engine.onStart = () => { started.resolve(undefined) }
+      const pending = execute(ctx, { objective: 'Work.' }, { agent: parent })
+      await started.promise
+      engine.settle({ value: { status: 'complete', roundsStarted: 1, report: COMPLETE }, stopReason: 'completed', agentsStarted: 1 })
+      const result = await pending
+      expect(result.isError).toBe(true)
+      expect(result.content).toEqual([{ type: 'text', text: 'Error: Ralph child cleanup remains unconfirmed' }])
+      expect(engine.retained).toBe(1)
+    } finally {
+      engine.retainedCompletion.resolve(undefined)
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('contains failure of the original workflow cleanup confirmation', async () => {
+    const { ctx, engine, parent } = await setup()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => ctx.logger)
+    const failure = new Error('original cleanup confirmation unavailable')
+    engine.disposeError = new Error('initial cleanup unconfirmed')
+    const pending = execute(ctx, { objective: 'Work.' }, { agent: parent })
+    try {
+      await vi.waitFor(() => { expect(engine.requests).toHaveLength(1) })
+      engine.settle({ value: { status: 'complete', roundsStarted: 1, report: COMPLETE }, stopReason: 'completed', agentsStarted: 1 })
+      expect((await pending).isError).toBe(true)
+      engine.retainedCompletion.reject(failure)
+      await vi.waitFor(() => { expect(warn).toHaveBeenCalledWith('ralph: retained workflow cleanup failed', failure) })
+      expect(engine.retained).toBe(1)
+      expect(engine.requests).toHaveLength(1)
+    } finally {
+      engine.retainedCompletion.resolve(undefined)
+      engine.settle({ value: null, stopReason: 'completed', agentsStarted: 0 })
+      await pending
+      warn.mockRestore()
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('starts the fixed workflow through the configured fresh provider and renders completion', async () => {
     const { ctx, engine, parent } = await setup({ config: { maxRounds: 9, maxHandoffChars: 9000 } })
     const pending = execute(ctx, { objective: '  Finish the migration.  ', maxRounds: 4 }, { agent: parent })
@@ -295,7 +361,8 @@ describe('dsh-tool-ralph', () => {
     const result = await execute(ctx, { objective: 'Work.' }, { agent: parent, signal: controller.signal })
 
     expect(result.isError).toBe(true)
-    expect(engine.requests[0]?.signal).toBe(controller.signal)
+    expect(engine.requests[0]?.signal?.aborted).toBe(true)
+    expect(engine.requests[0]?.signal?.reason).toBe(controller.signal.reason)
     expect(engine.cancels).toEqual(['parent step aborted'])
     expect(engine.disposed).toBe(1)
   })

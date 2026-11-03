@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/subagent-codex/README.md
 document:
-  en: 7d67cf8b5c75c1063b5826385a0ab24f01445f38
-  zh: 66f6fcb5679fb22678ec1dc0eacda26afcc91785
+  en: 6e8d52f27cf9b5e48d940993215141b85ec17e72
+  zh: bdc2cc929b717fdc96983706367034ecb64f40b0
 /:
   en: 266b664df709da67
   zh: 07bde2df0c861ceb
@@ -12,8 +12,8 @@ document:
   en: 8c21d5e98f7067cf
   zh: 626c14f91f047575
 /deepseek-ai-dsh-subagent-codex/summary:
-  en: 2d790b5830aecb62
-  zh: 5c59141aec808188
+  en: 672fe3024f1b0161
+  zh: c4eb8b1f147f06f6
 /deepseek-ai-dsh-subagent-codex/table-of-contents:
   en: f5c2ae1c282ea5d1
   zh: d0d95e10928bc415
@@ -21,17 +21,17 @@ document:
   en: fa1a023130d2dab0
   zh: 5e888cfae9f5558e
 /deepseek-ai-dsh-subagent-codex/capabilities-and-context:
-  en: 1772bbe74e152194
-  zh: fa41cf7b59792a44
+  en: 099812dcad043db5
+  zh: ccb4dec575936875
 /deepseek-ai-dsh-subagent-codex/configuration:
-  en: 4236b0c61e83f2c9
-  zh: 02a6ccfa74d14687
+  en: 51a701ae442bf529
+  zh: a176018dbfb7a6c8
 /deepseek-ai-dsh-subagent-codex/persistent-members:
-  en: 12d233d6918756ab
-  zh: 128d230ac5d31a59
+  en: 06113f1bed27181b
+  zh: d771372139b7dd3a
 /deepseek-ai-dsh-subagent-codex/product-compatibility-and-evidence:
-  en: d82c6d5b38a76b8d
-  zh: eb7c4045967230dc
+  en: 3cbfdcb4554b8ba0
+  zh: 6addb017de5002bd
 /deepseek-ai-dsh-subagent-codex/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -60,8 +60,8 @@ document:
   en: fdbb7dcbf8b37f2b
   zh: 9accaada9f21e36a
 /deepseek-ai-dsh-subagent-codex/known-limitations-and-deferred-work:
-  en: 80ff25de585aaacf
-  zh: b78da362e407cf5b
+  en: 0fa9ca60a3ccf9fb
+  zh: dd62faf8bd8a8d20
 /deepseek-ai-dsh-subagent-codex/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

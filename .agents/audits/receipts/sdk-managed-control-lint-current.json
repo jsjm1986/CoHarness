@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-control-lint-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/subagent/subagent-dsh-sdk packages/llm/llm/src/index.ts packages/llm/llm/src/model-policy.ts packages/llm/llm/tests/model-policy.spec.ts apps/cli/src/profile-boot.ts plugins/dsh-model-governance packages/context/gateway-execution/tests/pg-composition.e2e.ts gateway/tests/execution-fixture-server.ts examples/headless-agent/tests/sdk-process-admission.snapshot.ts",
+  "startedAt": "2026-10-24T14:58:49.250479+00:00",
+  "seconds": 4.901,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "67e71093ce28cab41e98996234ccefb7d16a1781da6cc7bfac9891c82de88164",
+  "inputsAfter": "67e71093ce28cab41e98996234ccefb7d16a1781da6cc7bfac9891c82de88164",
+  "postgresToolDirectory": null,
+  "outputSha256": "bce3c6e917ad1af703cdd7e88a2404ffdc1826a57d4897b49dc2adf9343aae69",
+  "outputTail": "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts:32:1: error @stylistic(max-len): This line has a length of 148. Maximum allowed is 140.\n"
+}

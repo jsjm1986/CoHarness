@@ -12,9 +12,11 @@ Status: implemented
 
 ## Decision
 
-DSH 能力称为 **computer use（计算机操作）**。[`dsh-computer-use`](../../../../packages/computer-use/computer-use/README.zh.md) 拥有 `ctx.computerUse`，注册一个提供方自定的名称并返回其 effect 清理函数。第二次注册无论名称为何都会失败。服务不包含提供方对象、共享操作类型、分派方法、Session 锁或运行时选择器。
+DSH 能力称为 **computer use（计算机操作）**。[`dsh-computer-use`](../../../../packages/computer-use/computer-use/README.zh.md) 拥有 `ctx.computerUse`，注册一个提供方自定的名称并返回其 effect 清理函数。第二次注册无论名称为何都会失败。服务不包含提供方对象、共享操作术语、Session 锁或运行时选择器。执行包装方法将授权委托给部署侧策略。
 
 **Cua Driver** 是上游实现的名称。[MCP 提供方](../../../../packages/experimental/computer-use-cua-driver-mcp/README.zh.md)连接已安装的可执行文件。[原生提供方](../../../../packages/experimental/computer-use-cua-driver-native/README.zh.md)安装上游原生 npm 依赖。两者均保持实验性并加入显式公开发布允许列表；均不默认启用。
+
+提供方可以在保留独占注册的同时，报告已知的环境不可用状态。浏览器状态与模型说明将该限制和账户资格、桌面确认、系统权限分开。Host 发现信息的编解码保留可用性元数据，不将其转换为桌面同意或账户资格；元数据缺失仍表示未知。原生提供方先检查本机会话，再创建驱动；本机桌面不可用不会禁用另行配置的无头浏览器或外部 VNC 端点。自动发现之外的桌面需要显式配置。
 
 各集成暴露上游工具目录。MCP 结果转换保留在 `dsh-mcp-client` 中，其基于回调的工具适配函数也转换原生 Cua Driver 结果。计算机操作服务不依赖该适配函数或任一提供方。
 
@@ -34,4 +36,4 @@ DSH 能力称为 **computer use（计算机操作）**。[`dsh-computer-use`](..
 
 服务保持独立于实验性包。公开发布允许列表接纳两个提供方包，但不提升其支持状态。配置选择提供方，切换需要先卸载当前提供方。
 
-原生平台支持和宿主权限仍由上游和部署负责。macOS 光标叠加层托管和专用 Desktop 权限界面暂缓实现。取消会停止等待并传播到驱动；不承诺回滚已交付的桌面输入。
+原生平台支持和宿主权限仍由上游和部署负责。macOS 光标叠加层托管仍暂缓实现；受管桌面组合提供桌面确认界面。取消会停止等待并传播到驱动；不承诺回滚已交付的桌面输入。

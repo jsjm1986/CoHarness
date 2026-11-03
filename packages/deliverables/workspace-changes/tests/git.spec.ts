@@ -176,7 +176,7 @@ describe('TurnRecorder', () => {
     let release!: (runner: GitRunner | null) => void
     const gate = new Promise<GitRunner | null>((resolve) => { release = resolve })
     const tempRoot = await scratchDir('dsh-git-store-', cleanups)
-    const env = { reviewStore: new ReviewStore(join(tempRoot, 'reviews'), 1_000_000), git: gate, tempRoot, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100, warn: (m: string) => { warnings.push(m) } }
+    const env = { reviewStore: new ReviewStore(join(tempRoot, 'reviews'), 1_000_000), git: () => gate, tempRoot, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100, warn: (m: string) => { warnings.push(m) } }
     const disposed = new TurnRecorder(session, cwd, env)
     disposed.start(1)
     await new Promise(resolve => setTimeout(resolve, 5))
@@ -189,9 +189,9 @@ describe('TurnRecorder', () => {
     expect(disposed.summary(1)).toBeUndefined()
 
     const { git: missing } = await runner(undefined, '/nonexistent/git-binary')
-    const failing = new TurnRecorder(session, cwd, { ...env, git: Promise.resolve(missing) })
+    const failing = new TurnRecorder(session, cwd, { ...env, git: () => Promise.resolve(missing) })
     failing.start(1)
-    await expect(failing.settled()).rejects.toThrow('Historical review storage failed')
+    await expect(failing.settled()).rejects.toThrow('Historical review did not complete')
     expect(warnings).toHaveLength(1)
     expect(warnings[0]).toContain('workspace-changes:')
   })
@@ -201,7 +201,7 @@ describe('TurnRecorder', () => {
     const { ctx, git: runnerGit } = await runner()
     const env = {
       reviewStore: new ReviewStore(join(tempRoot, 'reviews'), 1_000_000),
-      git: Promise.resolve(runnerGit), tempRoot, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100,
+      git: () => Promise.resolve(runnerGit), tempRoot, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100,
       warn: (m: string) => { throw new Error(m) },
     }
     const plain = new TurnRecorder(ctx.sessions.create(SessionId('plain'), { meta: { cwd: tempRoot } }), tempRoot, env)
@@ -226,7 +226,7 @@ describe('TurnRecorder', () => {
     const session = ctx.sessions.create(SessionId('closed-log'), { meta: { cwd: root } })
     const warn = vi.fn()
     const recorder = new TurnRecorder(session, root, {
-      reviewStore: new ReviewStore(join(root, 'reviews'), 1_000_000), git: Promise.resolve(null),
+      reviewStore: new ReviewStore(join(root, 'reviews'), 1_000_000), git: () => Promise.resolve(null),
       tempRoot: root, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100, warn,
     })
     recorder.capture('write', { file_path: 'file.txt', content: 'x' })
@@ -236,7 +236,7 @@ describe('TurnRecorder', () => {
     const append = vi.spyOn(session, 'append').mockImplementation(() => { throw new Error('Session log unavailable') })
     recorder.failStorage(1, new Error('Storage write failed'))
     expect(warn.mock.calls.flat().join(' ')).toContain('Session log unavailable')
-    await expect(recorder.settled()).rejects.toThrow('storage failed')
+    await expect(recorder.settled()).rejects.toThrow('Historical review did not complete')
     append.mockRestore()
     recorder.start(2)
     await recorder.settled()
@@ -262,7 +262,7 @@ describe('TurnRecorder', () => {
     const session = ctx.sessions.create(SessionId('tmp-in-tree'), { meta: { cwd } })
     const env = {
       reviewStore: new ReviewStore(join(tempRoot, 'reviews'), 1_000_000),
-      git: Promise.resolve(runnerGit), tempRoot, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100,
+      git: () => Promise.resolve(runnerGit), tempRoot, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100,
       warn: (m: string) => { throw new Error(m) },
     }
     const recorder = new TurnRecorder(session, cwd, env)

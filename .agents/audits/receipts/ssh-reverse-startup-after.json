@@ -1,0 +1,14 @@
+{
+  "name": "ssh-reverse-startup-after",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/ssh/ssh/tests/startup-behavior.spec.ts",
+  "startedAt": "2026-10-25T11:49:37.461945+00:00",
+  "seconds": 5.294,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "55af866787f7db10189533800506f0816b43c140273a2e386c74bc51c3d45d21",
+  "inputsAfter": "55af866787f7db10189533800506f0816b43c140273a2e386c74bc51c3d45d21",
+  "postgresToolDirectory": null,
+  "outputSha256": "99dc1bfbc4b8f1b8694f0b16fc6c2a403ff0544015cad53eea313c6d506b8cb8",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  44 passed (44)\n   Start at  19:49:41\n   Duration  947ms (transform 385ms, setup 46ms, import 481ms, tests 303ms, environment 0ms)\n\n"
+}

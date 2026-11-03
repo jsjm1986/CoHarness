@@ -12,9 +12,11 @@ Desktop providers expose different operations, observation formats, and platform
 
 ## Decision
 
-The DSH capability is named **computer use**. [`dsh-computer-use`](../../../../packages/computer-use/computer-use/README.md) owns `ctx.computerUse`, which registers one provider-owned name and returns its effect disposer. A second registration fails regardless of its name. The service contains no provider object, shared operation type, dispatch method, Session lock, or runtime selector.
+The DSH capability is named **computer use**. [`dsh-computer-use`](../../../../packages/computer-use/computer-use/README.md) owns `ctx.computerUse`, which registers one provider-owned name and returns its effect disposer. A second registration fails regardless of its name. The service contains no provider object, shared operation vocabulary, Session lock, or runtime selector. Its execution wrapper delegates authorization to the deployment-owned policy.
 
 **Cua Driver** names the upstream implementation. The [MCP provider](../../../../packages/experimental/computer-use-cua-driver-mcp/README.md) connects an installed executable. The [native provider](../../../../packages/experimental/computer-use-cua-driver-native/README.md) installs the upstream native npm dependency. Both remain experimental and join the explicit public-release allowlist; neither is enabled by default.
+
+A provider can retain its exclusive registration while reporting a known unavailable environment. The browser status and model guidance distinguish that limitation from account eligibility, desktop consent and OS permissions. Host discovery codecs retain availability metadata without converting it into consent or account eligibility; missing metadata remains unknown. Native providers inspect local session evidence before creating their driver; an unavailable local desktop does not disable separately configured headless browsers or external VNC endpoints. Explicit configuration is required to select a desktop outside automatic discovery.
 
 Each integration exposes the upstream tool catalog. MCP result conversion stays in `dsh-mcp-client`, whose callback-based tool adapter also converts native Cua Driver results. The computer-use service has no dependency on that adapter or either provider.
 
@@ -34,4 +36,4 @@ Provider teardown retains the registration until tool admission stops and owned 
 
 The service remains independent of experimental packages. The public-release allowlist admits the two provider packages without promoting their support status. Configuration selects a provider, and switching requires unloading the current provider first.
 
-Native platform support and host permissions remain upstream and deployment responsibilities. macOS cursor-overlay hosting and dedicated Desktop permission UI are deferred. Cancellation stops waiting and propagates to the driver; it does not promise rollback of delivered desktop input.
+Native platform support and host permissions remain upstream and deployment responsibilities. macOS cursor-overlay hosting remains deferred; desktop confirmation is provided by the managed desktop composition. Cancellation stops waiting and propagates to the driver; it does not promise rollback of delivered desktop input.

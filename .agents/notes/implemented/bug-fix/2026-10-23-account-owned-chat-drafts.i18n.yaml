@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-account-owned-chat-drafts.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-account-owned-chat-drafts.md
+document:
+  en: 430e0741b2e8758881faa67941853525e4beab46
+  zh: 079a80b1a08d6a2ab9fe3b0c5ff70ff84e634009
+/agent-note-account-owned-chat-drafts:
+  en: defa7c0c28284d8b
+  zh: 1e7bf8620c3f1cba
+/agent-note-account-owned-chat-drafts/problem:
+  en: c04b55767dc039a2
+  zh: f093ad34025b7ced
+/agent-note-account-owned-chat-drafts/decision:
+  en: a9c5a81eeff677c5
+  zh: a7406507bde5cddc
+/agent-note-account-owned-chat-drafts/alternatives-considered:
+  en: 21ef59910c2f2a6a
+  zh: d31ced8d17c51360
+/agent-note-account-owned-chat-drafts/consequences:
+  en: 8aa52d98653df800
+  zh: 60b7d5c243423341
+/agent-note-account-owned-chat-drafts/verification:
+  en: 8549942d074942c6
+  zh: 49049002a1dca769

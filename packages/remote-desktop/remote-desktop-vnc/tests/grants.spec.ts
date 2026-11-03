@@ -3,7 +3,7 @@
  * principal/target binding) and the JSONL store's durable round-trip.
  */
 
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, symlink, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,6 +11,7 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { RemoteDesktopError, RemoteDesktopGrantId } from '@deepseek-ai/dsh-remote-desktop'
 import type { RemoteDesktopGrant } from '@deepseek-ai/dsh-remote-desktop'
 import { matchingGrants, VncGrantStore } from '../src/grants.ts'
+import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 
 const io = vi.hoisted(() => ({ failedDestination: undefined as string | undefined }))
 
@@ -106,6 +107,36 @@ describe('VncGrantStore', () => {
     expect(reopened.all()[0]!.revokedAt).toBe(NOW)
   })
 
+  it('preserves an independent writer revocation when another runtime inserts a grant', async () => {
+    const file = join(dir, 'grants.jsonl')
+    const first = await VncGrantStore.open(file)
+    await first.insert(grant())
+    const second = await VncGrantStore.open(file)
+    await second.refresh()
+    await first.update(RemoteDesktopGrantId('g1'), { revokedAt: NOW })
+    await second.insert(grant({ id: RemoteDesktopGrantId('g2'), principal: 'bob' }))
+    const rows = (await VncGrantStore.open(file)).all()
+    expect(rows).toEqual([grant({ revokedAt: NOW }), grant({ id: RemoteDesktopGrantId('g2'), principal: 'bob' })])
+    expect(second.all()).toEqual(rows)
+    expect(matchingGrants(rows, 'alice', { nodeId: 'n1' }, undefined, NOW)).toEqual([])
+  })
+
+  it('preserves independent inserts and revocations when a stale runtime changes another grant level', async () => {
+    const file = join(dir, 'grants.jsonl')
+    const first = await VncGrantStore.open(file)
+    await first.insert(grant())
+    await first.insert(grant({ id: RemoteDesktopGrantId('g2'), principal: 'bob' }))
+    const second = await VncGrantStore.open(file)
+    await second.refresh()
+    await first.update(RemoteDesktopGrantId('g1'), { revokedAt: NOW })
+    await first.insert(grant({ id: RemoteDesktopGrantId('g3'), principal: 'carol' }))
+    expect((await second.update(RemoteDesktopGrantId('g2'), { level: 'control' })).level).toBe('control')
+    const rows = (await VncGrantStore.open(file)).all()
+    expect(rows.map(row => row.id)).toEqual(['g1', 'g2', 'g3'])
+    expect(rows[0]!.revokedAt).toBe(NOW)
+    expect(second.all()).toEqual(rows)
+  })
+
   it('keeps failed inserts out of authorization and later durable writes', async () => {
     const file = join(dir, 'grants.jsonl')
     const store = await VncGrantStore.open(file)
@@ -171,6 +202,32 @@ describe('VncGrantStore', () => {
     expect(store.all().map(g => g.id)).toEqual(['g1', 'g2'])
     await store.refresh()
     expect(store.all()).toHaveLength(2)
+  })
+
+  it('observes a revoked grant when atomic replacement preserves the modification timestamp', async () => {
+    const file = join(dir, 'shared.jsonl'), timestamp = new Date('2020-01-01T00:00:00Z')
+    await writeFileAtomic(file, `${JSON.stringify(grant())}\n`, { mode: 0o600 })
+    await utimes(file, timestamp, timestamp)
+    const store = await VncGrantStore.open(file)
+    await store.refresh()
+    await writeFileAtomic(file, `${JSON.stringify(grant({ revokedAt: NOW }))}\n`, { mode: 0o600 })
+    await utimes(file, timestamp, timestamp)
+    await store.refresh()
+    expect(store.all()[0]!.revokedAt).toBe(NOW)
+    expect(matchingGrants(store.all(), 'alice', { nodeId: 'n1' }, undefined, NOW)).toEqual([])
+  })
+
+  it('rejects unreadable file identity without discarding committed grants and recovers after repair', async () => {
+    const file = join(dir, 'grants.jsonl')
+    await writeFileAtomic(file, `${JSON.stringify(grant())}\n`, { mode: 0o600 })
+    const store = await VncGrantStore.open(file)
+    await rm(file); await symlink('grants.jsonl', file)
+    await expect(store.refresh()).rejects.toThrow()
+    expect(store.all()).toEqual([grant()])
+    await rm(file)
+    await writeFileAtomic(file, `${JSON.stringify(grant({ revokedAt: NOW }))}\n`, { mode: 0o600 })
+    await store.refresh()
+    expect(store.all()).toEqual([grant({ revokedAt: NOW })])
   })
 
   it('keeps the last good rows on a corrupt write and retries until it parses', async () => {

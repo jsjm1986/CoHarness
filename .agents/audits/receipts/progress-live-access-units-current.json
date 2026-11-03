@@ -1,0 +1,14 @@
+{
+  "name": "progress-live-access-units-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/progress-service.spec.ts tests/macos-release-control.spec.ts",
+  "startedAt": "2026-10-23T23:06:52.573113+00:00",
+  "seconds": 12.982,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "597ec875983664fc726ab7d9bf3c71f6bb56245e7229c92d05970c9e055ff9eb",
+  "inputsAfter": "597ec875983664fc726ab7d9bf3c71f6bb56245e7229c92d05970c9e055ff9eb",
+  "postgresToolDirectory": null,
+  "outputSha256": "0d938c7e29b8c7c3d10e57fae7fb01f2cfea75a533dea656672bbc64ad496f28",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  53 passed (53)\n   Start at  07:06:54\n   Duration  11.43s (transform 510ms, setup 0ms, import 618ms, tests 11.41s, environment 0ms)\n\n"
+}

@@ -1,11 +1,13 @@
 /** Built Admin forms over authenticated Gateway HTTP; PostgreSQL suites own transaction and storage semantics. */
-import { mkdtemp, mkdir, rm, readdir } from 'node:fs/promises'
+import { chmod, mkdtemp, mkdir, readFile, rm, readdir, writeFile } from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { expect, it } from 'vitest'
+import { installAdminComputerFixture } from './admin-computer-fixture.ts'
 import { loadConfig } from '../../../gateway/src/config.ts'
 import { openDb } from '../../../gateway/src/db.ts'
 import { AuthService } from '../../../gateway/src/auth.ts'
@@ -13,20 +15,25 @@ import { UserService } from '../../../gateway/src/users.ts'
 import { ProjectService } from '../../../gateway/src/projects.ts'
 import { AuditService } from '../../../gateway/src/audit.ts'
 import { InstanceManager } from '../../../gateway/src/instances.ts'
+import { RuntimeAccountError } from '../../../gateway/src/launcher.ts'
 import { ModelGovernanceService } from '../../../gateway/src/model-governance.ts'
 import { createGatewayServer, type GatewayDeps } from '../../../gateway/src/server.ts'
 import { createProxyHandlers } from '../../../gateway/src/proxy.ts'
 import { createAdminApiHandler } from '../../../gateway/src/admin-api.ts'
 import type { ConversationArchiveRow } from '../../../gateway/src/postgres/conversation-archive-service.ts'
 import { NodeConfigurationStore } from '../../../gateway/src/node-config-store.ts'
+import { isolatedNodeConfigurationAuthority } from '../../../gateway/tests/node-config-fixture.ts'
+import { GatewayTunnelAccess, type TunnelAccessDeps } from '../../../gateway/src/tunnel-access.ts'
+import { TunnelCredentialCipher, type TunnelAccessRow } from '../../../gateway/src/postgres/tunnel-access-service.ts'
+import { installCloudflared } from '../../../gateway/src/tunnel-supervisor.ts'
 import { compareOrRefreshGolden, webSnapshotMode } from './expected.ts'
 
 const DIRECTORY = fileURLToPath(new URL('./snapshots/admin-form-values', import.meta.url))
 const GOLDENS = [
   'archive-pending.expected.md', 'archive-purged.expected.md', 'archive-refused.expected.md',
   'audit-metadata.expected.md', 'model-price.expected.md', 'more-navigation.expected.md',
-  'node-config-conflict.expected.md', 'node-config-fields.expected.md', 'node-config-review.expected.md', 'personal-document.expected.md',
-  'project-quota.expected.md', 'project-rename-error.expected.md', 'project-runtime-stop.expected.md', 'runtime-stopped.expected.md',
+  'node-config-conflict.expected.md', 'node-config-fields.expected.md', 'node-config-review.expected.md', 'pending-edits.expected.md', 'personal-document.expected.md',
+  'project-quota.expected.md', 'project-rename-error.expected.md', 'project-runtime-stop.expected.md', 'runtime-account-missing.expected.md', 'runtime-stopped.expected.md',
   'ssh-reference.expected.md', 'webhook-error.expected.md', 'webhook-visibility.expected.md',
 ]
 
@@ -41,14 +48,13 @@ it('preserves stored values through built forms and keeps every mobile destinati
     const deps: GatewayDeps = { cfg, instances: new InstanceManager(db, cfg), auth: new AuthService(db, cfg),
       users: new UserService(db, cfg), projects: new ProjectService(db, cfg), audit: new AuditService(db), governance }
     const nodeIdentity = { organizationId: 'organization-fixture', nodeId: 'node-fixture' }
-    const nodeConfiguration = new NodeConfigurationStore(nodeIdentity, cfg, {}, {
-      run: operation => operation(new AbortController().signal), writeEpoch: async () => '1',
-    })
+    const nodeConfiguration = new NodeConfigurationStore(nodeIdentity, cfg, {}, isolatedNodeConfigurationAuthority)
     await nodeConfiguration.initialize()
     deps.nodeConfiguration = nodeConfiguration
     const deploymentState = { mode: 'maintenance' as const, maintenanceEpoch: '1', writeEpoch: '1', reason: '测试配置流程',
       enteredAt: null, updatedAt: '2026-09-27', nodes: [], writersQuiesced: true }
     deps.maintenance = {
+      administration: async () => ({ ...deploymentState, operations: [] }),
       state: async () => deploymentState, listOperations: async () => [],
       enterMaintenance: async () => deploymentState, exitMaintenance: async () => { throw new Error('This form scenario keeps maintenance open') },
       setNodeStatus: async () => { throw new Error('This form scenario has no peer nodes') },
@@ -58,6 +64,12 @@ it('preserves stored values through built forms and keeps every mobile destinati
       record: async () => { throw new Error('This form scenario does not capture data') }, setVerified: async () => { throw new Error('No backup selected') } }
     deps.memoryAccess = { get: async owner => ({ ...owner, enabled: false, revision: '0' }),
       set: async (owner, enabled) => ({ ...owner, enabled: enabled === true, revision: '1' }) }
+    deps.progress = {
+      digestModelSettings: async () => ({ model: null, candidates: [] }),
+      setDigestModel: async () => { throw new Error('This form scenario does not change the digest model') },
+      progressForUser: async () => { throw new Error('This form scenario does not read a project journal') },
+      generateNow: async () => { throw new Error('This form scenario does not generate a project journal') },
+    }
     const runtimeActions: unknown[] = []
     const stopInstance = deps.instances.stop.bind(deps.instances)
     deps.instances.stop = async (target, reason) => {
@@ -99,6 +111,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
       update: async (value: unknown) => { sshWrites.push(value); return target },
       mutate: async () => { throw new Error('This form scenario does not mutate target state') },
       share: async () => { throw new Error('This form scenario does not share a target') },
+      shareAsAdministrator: async () => { throw new Error('This form scenario does not share a target') },
       resolveForRuntime: async () => { throw new Error('This form scenario does not start SSH execution') },
       listForProject: async () => { throw new Error('This form scenario does not list project targets') },
     }
@@ -109,23 +122,29 @@ it('preserves stored values through built forms and keeps every mobile destinati
       mutate: async () => { throw new Error('This form scenario does not mutate endpoint state') },
     }
     let archive: ConversationArchiveRow = {
+      // oxlint-disable-next-line typescript/no-unsafe-assignment -- Gateway browser types use a separate compiler program.
+      archiveId: '22000000-0000-4000-8000-000000000022' as ConversationArchiveRow['archiveId'],
       rootSessionId: 'archive-fixture', title: '归档清理示例', contentPreview: '需要保留的对话内容',
-      creator: { id: admin.id, displayName: 'Admin fixture' }, project: null, runtime: { kind: 'user', id: admin.id },
+      creator: { id: admin.id, displayName: 'Admin fixture' }, project: null,
+      runtime: { kind: 'user', id: admin.id,
+        // oxlint-disable-next-line typescript/no-unsafe-assignment -- Gateway browser types use a separate compiler program.
+        runtimeId: '33000000-0000-4000-8000-000000000033' as NonNullable<ConversationArchiveRow['runtime']['runtimeId']> },
       workspace: null, state: 'trash', archivedAt: Date.UTC(2026, 8, 27), restoredAt: null, trashedAt: Date.UTC(2026, 8, 28),
       purgeAfter: null, syncState: 'synced', childCount: 0, messageCount: 1, updatedAt: Date.UTC(2026, 8, 27),
     }
     let archiveReads = 0, archivePurges = 0
     deps.archives = {
       adminList: async () => [archive],
-      status: async () => archive,
-      detail: async () => {
+      status: async (id: string) => { expect(id).toBe(archive.archiveId); return archive },
+      detail: async (id: string) => {
+        expect(id).toBe(archive.archiveId)
         archiveReads++
         return { record: archive, descendants: [], hasMore: false, events: [
           { sessionId: archive.rootSessionId, seq: 0, type: 'user/message', time: archive.archivedAt,
             data: { content: [{ type: 'text', text: '需要保留的对话内容' }] } },
         ] }
       },
-      purge: async () => { archivePurges++; archive = { ...archive, syncState: 'pending', lastSyncError: undefined }; return true },
+      purge: async (id: string) => { expect(id).toBe(archive.archiveId); archivePurges++; archive = { ...archive, syncState: 'pending', lastSyncError: undefined }; return true },
     } as unknown as GatewayDeps['archives']
     const zero = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0,
       totalTokens: 0, estimatedCostMicros: 0, companyCostMicros: 0, calls: 0, missingUsageCalls: 0 }
@@ -136,6 +155,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
     const adminHandler = createAdminApiHandler(deps)
     const proxy = createProxyHandlers(deps)
     cleanup.push(() => { proxy.close() })
+    installAdminComputerFixture(deps)
     const server = createGatewayServer(deps, {
       ...proxy,
       adminRoot: resolve('gateway/public/admin'),
@@ -181,12 +201,12 @@ it('preserves stored values through built forms and keeps every mobile destinati
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
     // Expected 4xx responses also log "Failed to load resource" console errors;
     // skip those for the deliberately refused admin writes below.
-    const refusalPaths = /^\/admin\/api\/(projects\/\d+|deployment\/configuration)$/
+    const refusalPaths = /^\/admin\/api\/(projects\/\d+(?:\/instance\/start)?|deployment\/configuration)$/
     page.on('console', (message) => {
       if (message.type() !== 'error') return
       const url = message.location().url
       if (url !== undefined && url !== '' && refusalPaths.test(new URL(url).pathname)) return
-      errors.push(`console: ${message.text()}`)
+      errors.push(`console: ${message.text()} (${url})`)
     })
     const httpFailures: string[] = []
     page.on('response', (response) => {
@@ -204,6 +224,17 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await runtimeDialog.getByRole('button', { name: '确认执行', exact: true }).click()
     await runtimeDialog.waitFor({ state: 'hidden' })
     expect(runtimeActions).toEqual([{ kind: 'project', id: project.id }])
+    const ensureRunning = deps.instances.ensureRunning.bind(deps.instances)
+    const accountFailure = new RuntimeAccountError('harness-project', 'missing', { cause: new Error('/private/command-output') })
+    deps.instances.ensureRunning = async () => { throw accountFailure }
+    await page.getByRole('button', { name: '启动实例', exact: true }).click()
+    const startDialog = page.getByRole('dialog', { name: '启动项目实例', exact: true })
+    await startDialog.getByRole('button', { name: '确认执行', exact: true }).click()
+    await startDialog.getByRole('alert').getByText(accountFailure.message, { exact: true }).waitFor()
+    expect(await startDialog.innerText()).not.toContain('/private/command-output')
+    await compareOrRefreshGolden(join(DIRECTORY, 'runtime-account-missing.expected.md'), await startDialog.ariaSnapshot(), webSnapshotMode())
+    await startDialog.getByRole('button', { name: '取消', exact: true }).click()
+    deps.instances.ensureRunning = ensureRunning
     await page.getByRole('button', { name: '重命名', exact: true }).click()
     const renameDialog = page.getByRole('dialog', { name: '重命名项目', exact: true })
     await renameDialog.getByLabel('项目名称', { exact: true }).fill('Taken')
@@ -277,31 +308,49 @@ it('preserves stored values through built forms and keeps every mobile destinati
       tokenMode: 'custom', tokenLimit: 777, companyCostMode: 'inherit', companyCostMicrosLimit: null,
     })
 
-    await page.goto(`${base}/admin/deployment`)
+    const beforeDeployment = new URL(page.url()).pathname
+    await page.locator('.sidebarNav').getByRole('link', { name: '部署', exact: true }).click()
     const networkSettings = page.getByRole('group', { name: '访问与监听', exact: true })
     await networkSettings.getByRole('textbox', { name: 'Gateway 端口（1–65535）', exact: true }).waitFor()
     await compareOrRefreshGolden(join(DIRECTORY, 'node-config-fields.expected.md'), await networkSettings.ariaSnapshot(), webSnapshotMode())
+    const editable = networkSettings.locator('input').first()
+    const originalValue = await editable.inputValue()
+    await editable.fill(`${Number(originalValue) + 1}`)
+    await page.locator('.sidebarNav').getByRole('link', { name: '模型', exact: true }).click()
+    const pendingEdits = page.getByRole('dialog', { name: '保留当前编辑', exact: true })
+    await pendingEdits.waitFor()
+    await compareOrRefreshGolden(join(DIRECTORY, 'pending-edits.expected.md'), await pendingEdits.ariaSnapshot(), webSnapshotMode())
+    expect(await pendingEdits.getByRole('link', { name: '在新标签页打开' }).getAttribute('target')).toBe('_blank')
+    await pendingEdits.getByRole('button', { name: '留在当前页面', exact: true }).click()
+    expect(await editable.inputValue()).toBe(`${Number(originalValue) + 1}`)
+    await page.goBack()
+    await pendingEdits.waitFor()
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/admin/deployment')
+    expect(await pendingEdits.getByRole('link', { name: '在新标签页打开' }).getAttribute('href')).toBe(beforeDeployment)
+    await pendingEdits.getByRole('button', { name: '留在当前页面', exact: true }).click()
+    expect(await editable.inputValue()).toBe(`${Number(originalValue) + 1}`)
+    await editable.fill(originalValue)
     await networkSettings.getByRole('textbox', { name: 'Gateway 端口（1–65535）', exact: true }).fill('9330')
     await page.getByRole('button', { name: '保存待应用配置', exact: true }).click()
     await page.getByRole('status').filter({ hasText: '已保存待应用配置' }).waitFor()
-    expect((await nodeConfiguration.view()).effective.HGW_PORT).toBe('8899')
-    expect((await nodeConfiguration.view()).desired.HGW_PORT).toBe('9330')
+    expect((await nodeConfiguration.view(admin.id)).effective.HGW_PORT).toBe('8899')
+    expect((await nodeConfiguration.view(admin.id)).desired.HGW_PORT).toBe('9330')
     await page.getByRole('button', { name: '应用并重启', exact: true }).click()
     const configurationDialog = page.getByRole('dialog', { name: '应用节点配置并重启', exact: true })
     await compareOrRefreshGolden(join(DIRECTORY, 'node-config-review.expected.md'), await configurationDialog.ariaSnapshot(), webSnapshotMode())
-    const latest = await nodeConfiguration.view()
-    await nodeConfiguration.save(nodeIdentity, latest.revision, { ...latest.desired, HGW_PORT: '9340' })
+    const latest = await nodeConfiguration.view(admin.id)
+    await nodeConfiguration.save(nodeIdentity, latest.revision, { ...latest.desired, HGW_PORT: '9340' }, admin.id)
     await configurationDialog.getByRole('button', { name: '确认应用并重启', exact: true }).click()
     await configurationDialog.getByRole('alert').waitFor({ state: 'visible' })
     await compareOrRefreshGolden(join(DIRECTORY, 'node-config-conflict.expected.md'), await configurationDialog.ariaSnapshot(), webSnapshotMode())
-    expect((await nodeConfiguration.view()).operation).toBeNull()
+    expect((await nodeConfiguration.view(admin.id)).operation).toBeNull()
     await configurationDialog.getByRole('button', { name: '取消', exact: true }).click()
-    await page.getByRole('button', { name: '重新读取', exact: true }).click()
+    await page.locator('section', { has: networkSettings }).getByRole('button', { name: '重新读取', exact: true }).click()
     await expect.poll(async () => networkSettings.getByRole('textbox', { name: 'Gateway 端口（1–65535）', exact: true }).inputValue()).toBe('9340')
     await page.getByRole('button', { name: '应用并重启', exact: true }).click()
     await configurationDialog.getByRole('button', { name: '确认应用并重启', exact: true }).click()
     await configurationDialog.waitFor({ state: 'hidden' })
-    expect((await nodeConfiguration.view()).operation).toMatchObject({ status: 'pending', revision: 2, writeEpoch: '1' })
+    expect((await nodeConfiguration.view(admin.id)).operation).toMatchObject({ status: 'pending', revision: 2, writeEpoch: '1' })
 
     await page.goto(`${base}/admin/ssh`)
     await page.getByRole('button', { name: '编辑', exact: true }).click()
@@ -433,6 +482,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
     const deliberateRefusals = [
       /^4\d\d PATCH \/admin\/api\/projects\/\d+$/,
       /^4\d\d POST \/admin\/api\/deployment\/configuration$/,
+      /^409 POST \/admin\/api\/projects\/\d+\/instance\/start$/,
     ]
     expect(httpFailures.filter(entry => !deliberateRefusals.some(pattern => pattern.test(entry)))).toEqual([])
     expect(errors).toEqual([])
@@ -444,3 +494,152 @@ it('preserves stored values through built forms and keeps every mobile destinati
 }, 60_000)
 
 it('owns the Admin form and mobile navigation goldens', async () => { expect((await readdir(DIRECTORY)).sort()).toEqual(GOLDENS) })
+
+it('cancels an unregistered connector through the built Admin and reports clipboard refusal', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'admin-tunnel-'))
+  const cleanup: Array<() => unknown> = [() => rm(root, { recursive: true, force: true })]
+  try {
+    const binary = join(root, 'cloudflared-fixture')
+    const executable = new URL('../../../gateway/tests/fixtures/tunnel-binary.mjs', import.meta.url).href
+    await writeFile(binary, `#!${process.execPath}\nimport { runTunnelBinary } from ${JSON.stringify(executable)};\nawait runTunnelBinary(${JSON.stringify(root)});\n`)
+    await chmod(binary, 0o700)
+    let row: TunnelAccessRow = {
+      mode: 'off', desired: 'stopped', state: 'stopped', publicUrl: null, hostname: null, domain: null,
+      zoneId: null, accountId: null, tunnelId: null, apiTokenCipher: null, runTokenCipher: null,
+      lastError: null, revision: 1, startedAt: null, updatedAt: '2026-10-25T00:00:00Z',
+    }
+    // Storage behavior has PostgreSQL acceptance; this browser fixture only
+    // retains quick-mode fields while running the real controller and child.
+    const store: TunnelAccessDeps['store'] = {
+      get: async () => row,
+      update: async (patch) => {
+        row = { ...row, mode: patch.mode ?? row.mode, desired: patch.desired ?? row.desired, state: patch.state ?? row.state,
+          publicUrl: patch.public_url === undefined ? row.publicUrl : patch.public_url,
+          lastError: patch.last_error === undefined ? row.lastError : patch.last_error,
+          startedAt: patch.started_at === undefined ? row.startedAt : patch.started_at, revision: row.revision + 1 }
+        return row
+      },
+    }
+    const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_STATE_ROOT: join(root, 'state') })
+    const db = openDb(join(root, 'gateway.sqlite')); cleanup.push(() => db.close())
+    let binaryAvailable = false, failedDownloadCancelled = false
+    const tunnel = new GatewayTunnelAccess({ store, cipher: new TunnelCredentialCipher(randomBytes(32)),
+      organizationId: 'browser-fixture', nodeId: 'browser-node', target: 'http://127.0.0.1:1', stateDir: join(root, 'tunnel'),
+      startupTimeoutMs: 30_000, closeTimeoutMs: 5000, probeIntervalMs: 25,
+      resolveBinary: async () => binaryAvailable ? { path: binary, version: 'fixture', source: 'env' } : null,
+      install: (state, signal) => installCloudflared(state, async () => new Response(new ReadableStream<Uint8Array>({
+        cancel() { failedDownloadCancelled = true },
+      }), { status: 503 }), signal),
+    })
+    cleanup.push(() => tunnel.shutdown())
+    const deps: GatewayDeps = { cfg, instances: new InstanceManager(db, cfg), auth: new AuthService(db, cfg),
+      users: new UserService(db, cfg), projects: new ProjectService(db, cfg), audit: new AuditService(db), tunnelAccess: tunnel }
+    const admin = await deps.users.create({ username: 'admin', password: 'fixture-password', role: 'admin' })
+    await deps.users.changeOwnPassword(admin.id, 'fixture-password')
+    const handler = createAdminApiHandler(deps)
+    let failRead = true, tunnelReads = 0
+    let initialReadEntered!: () => void, releaseInitialRead!: () => void
+    const initialReadPending = new Promise<void>((resolve) => { initialReadEntered = resolve })
+    const initialReadRelease = new Promise<void>((resolve) => { releaseInitialRead = resolve })
+    const server = createGatewayServer(deps, { ...createProxyHandlers(deps), admin: async (req, res, user, path, body) => {
+      if (path === '/admin/api/tunnel') {
+        tunnelReads++
+        if (failRead) {
+          initialReadEntered()
+          await initialReadRelease
+          failRead = false
+          res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'fixture-read-unavailable' })); return true
+        }
+      }
+      return handler(req, res, user, path, body)
+    } })
+    await new Promise<void>(ready => server.listen(0, '127.0.0.1', ready))
+    cleanup.push(() => new Promise<void>((done, reject) => {
+      server.closeAllConnections()
+      server.close((error) => { if (error) reject(error); else done() })
+    }))
+    cleanup.push(() => { releaseInitialRead() })
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`; cfg.publicOrigins.push(base)
+    const browser = await chromium.launch(); cleanup.push(() => browser.close())
+    const page = await browser.newPage({ viewport: { width: 1200, height: 1000 }, colorScheme: 'light' })
+    await page.clock.install()
+    const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
+    const login = await page.request.post(`${base}/login`, { form: { username: 'admin', password: 'fixture-password' }, headers: { origin: base }, maxRedirects: 0 })
+    expect(login.status()).toBe(302)
+    await page.goto(`${base}/admin/deployment`)
+    const section = page.locator('section', { has: page.getByRole('heading', { name: '公网访问', exact: true }) })
+    const snapshots = fileURLToPath(new URL('./snapshots/admin-tunnel-access', import.meta.url))
+    if (webSnapshotMode() === 'refresh') await mkdir(snapshots, { recursive: true })
+    const snapshot = async (name: string) => compareOrRefreshGolden(join(snapshots, `${name}.expected.md`),
+      (await section.ariaSnapshot()).replaceAll(root, '<fixture>'), webSnapshotMode())
+    await initialReadPending
+    await section.getByText('正在加载隧道状态', { exact: true }).waitFor()
+    await page.clock.runFor(20_000)
+    expect(tunnelReads).toBe(1)
+    const pendingReadSnapshot = (await section.ariaSnapshot()).replaceAll(root, '<fixture>')
+    releaseInitialRead()
+    await section.getByRole('alert').waitFor({ timeout: 15_000 })
+    expect(tunnelReads).toBe(1)
+    await compareOrRefreshGolden(join(snapshots, 'slow-read-pending.expected.md'), pendingReadSnapshot, webSnapshotMode())
+    await snapshot('read-failure')
+    await section.getByRole('button', { name: '重新读取', exact: true }).click()
+    await section.getByRole('button', { name: '安装 cloudflared', exact: true }).click()
+    await section.getByRole('alert').filter({ hasText: 'cloudflared download failed with HTTP 503' }).waitFor()
+    expect(failedDownloadCancelled).toBe(true)
+    await snapshot('download-failure')
+    binaryAvailable = true
+    await page.reload()
+    await section.getByRole('button', { name: '开启临时链接', exact: true }).click()
+    let witness: { controlUrl: string; probeToken: string } | undefined
+    await expect.poll(async () => {
+      try {
+        const observed: unknown = JSON.parse(await readFile(join(root, 'tunnel-quick.prepared'), 'utf8'))
+        if (typeof observed !== 'object' || observed === null || !('controlUrl' in observed) || !('probeToken' in observed)
+          || typeof observed.controlUrl !== 'string' || typeof observed.probeToken !== 'string') throw new Error('Malformed connector witness')
+        witness = { controlUrl: observed.controlUrl, probeToken: observed.probeToken }
+        return true
+      } catch (error) {
+        if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+          const view = await tunnel.view()
+          if (view.state === 'error') throw new Error(view.lastError ?? 'Connector failed before its prepared witness')
+          return false
+        }
+        throw error
+      }
+    }, { timeout: 10_000 }).toBe(true)
+    expect((await tunnel.view()).state).toBe('starting')
+    await snapshot('starting')
+    await section.getByRole('button', { name: '停止隧道', exact: true }).click()
+    await section.getByText('隧道已停止', { exact: true }).waitFor()
+    expect((await tunnel.view()).state).toBe('stopped')
+    if (witness === undefined) throw new Error('Connector preparation witness missing')
+    await expect(fetch(witness.controlUrl)).rejects.toBeInstanceOf(TypeError)
+    expect(await section.getByRole('alert').count()).toBe(0)
+    await snapshot('stopped')
+
+    await writeFile(join(root, 'tunnel-quick.register'), 'register\n')
+    await section.getByRole('button', { name: '开启临时链接', exact: true }).click()
+    await section.getByRole('link', { name: 'https://fixture.trycloudflare.com', exact: true }).waitFor()
+    await page.evaluate(() => { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: async () => { throw new DOMException('Fixture clipboard refusal', 'NotAllowedError') },
+    } }) })
+    await section.getByRole('button', { name: '复制链接', exact: true }).click()
+    await section.getByText('复制失败，请手动选择并复制链接', { exact: true }).waitFor()
+    await snapshot('copy-failure')
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.emulateMedia({ colorScheme: 'dark' })
+    const stop = section.getByRole('button', { name: '停止隧道', exact: true })
+    await stop.scrollIntoViewIfNeeded()
+    const bounds = await stop.boundingBox()
+    expect(bounds).not.toBeNull()
+    expect(bounds!.x).toBeGreaterThanOrEqual(0)
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390)
+    await stop.click()
+    await section.getByText('隧道已停止', { exact: true }).waitFor()
+    expect(errors).toEqual([])
+  } finally {
+    const failures: unknown[] = []
+    for (const dispose of cleanup.reverse()) { try { await dispose() } catch (error) { failures.push(error) } }
+    if (failures.length > 0) throw new AggregateError(failures, 'Admin tunnel fixture cleanup failed')
+  }
+}, 60_000)

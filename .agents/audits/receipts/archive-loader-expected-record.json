@@ -1,0 +1,14 @@
+{
+  "name": "archive-loader-expected-record",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/workflow/tool-workflow/tests/failure-loader.spec.ts --update",
+  "startedAt": "2026-10-26T09:11:51.950333+00:00",
+  "seconds": 4.469,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bbee71fc46e4d87a313996125751d1bffce9df033c4dbc0023caaec204fbcfe0",
+  "inputsAfter": "bbee71fc46e4d87a313996125751d1bffce9df033c4dbc0023caaec204fbcfe0",
+  "postgresToolDirectory": null,
+  "outputSha256": "a6d09d58cd6600b91f0e7a3ff00856a1d89d4a09761b59ffbe847ecc9d03875e",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n  Snapshots  1 updated \n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  17:11:55\n   Duration  896ms (transform 42ms, setup 40ms, import 15ms, tests 749ms, environment 0ms)\n\n"
+}

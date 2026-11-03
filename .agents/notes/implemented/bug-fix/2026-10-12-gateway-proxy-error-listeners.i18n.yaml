@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-gateway-proxy-error-listeners.md
 document:
-  en: 057a1d6080b54a80e09ed436de8e9fed73d97939
-  zh: 2ac1b83651fef7de4800b8783655c1f293411e00
+  en: a92d22c201435d1a69b9b77e41b431a5dbaeaa7b
+  zh: 10ce263bb454800bf1681984eae2d19932632791
 /agent-note-gateway-proxy-absorbs-library-level-error-events-instead-of-crashing:
   en: 5003e66bf0c80da5
   zh: 4fe87b34957b798e
@@ -12,8 +12,8 @@ document:
   en: 49ad49bf506c2354
   zh: 662f36c62ea36b4e
 /agent-note-gateway-proxy-absorbs-library-level-error-events-instead-of-crashing/decision:
-  en: b92e8775d20f0c05
-  zh: 3d183b9ba31b20fb
+  en: 90125d532991d417
+  zh: 3a6190911f63bb34
 /agent-note-gateway-proxy-absorbs-library-level-error-events-instead-of-crashing/alternatives-considered:
   en: 9b4c6e6c8028eddd
   zh: a68a82afc5ec39c6
@@ -21,8 +21,8 @@ document:
   en: 3e516989c3e080ef
   zh: d3ca71afb6ba075e
 /agent-note-gateway-proxy-absorbs-library-level-error-events-instead-of-crashing/verification:
-  en: d3b929594b39827a
-  zh: a02abd9cefefd515
+  en: c084cbc2a2864806
+  zh: 3b80ab77e523792a
 /agent-note-gateway-proxy-absorbs-library-level-error-events-instead-of-crashing/related:
   en: 6065d396378e1d4f
   zh: e2c17d9944521122

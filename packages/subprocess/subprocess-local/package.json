@@ -31,13 +31,13 @@
     "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/runner.js",
     "lib/runner-*.js",
     "lib/output.js",
     "scripts/ensure-spawn-helper.mjs",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "scripts": {
     "postinstall": "node scripts/ensure-spawn-helper.mjs"

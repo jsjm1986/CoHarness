@@ -1,0 +1,2 @@
+{"phase":"unconfirmed-close","finalResponse":"Runtime cleanup recovery verified.","cleanupEntered":true,"processAlive":true,"signalsRefused":true,"newWorkRefused":true}
+{"phase":"confirmed-close","originalProcessExited":true,"replacementStarted":false,"newWorkRefused":true}

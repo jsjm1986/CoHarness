@@ -1,0 +1,68 @@
+{
+  "operation": "One local project context resolution through the Gateway local adapter and PostgreSQL collaboration/project services.",
+  "workload": "Existing QA project with the same caller and node; fresh Ubuntu Node24.20 process for each sample; alternating old/candidate/candidate/old/old/candidate.",
+  "clock": "Prepared service objects and established read-only PostgreSQL connection; includes every SQL query and context projection, excludes imports, connection opening, SSH transfer and process startup.",
+  "memory": "Both module versions loaded before either variant; baseline after GC; selected context retained through final GC; process peak RSS includes setup.",
+  "databaseReadOnly": true,
+  "byVariant": {
+    "old": {
+      "samplesMs": [
+        2224,
+        1529,
+        1010
+      ],
+      "sqlStatements": [
+        3,
+        3,
+        3
+      ],
+      "medianMs": 1529,
+      "peakRssKiB": [
+        78280,
+        79008,
+        79224
+      ],
+      "retainedHeapBytes": [
+        12673280,
+        12678168,
+        12662744
+      ]
+    },
+    "candidate": {
+      "samplesMs": [
+        518,
+        505,
+        282
+      ],
+      "sqlStatements": [
+        1,
+        1,
+        1
+      ],
+      "medianMs": 505,
+      "peakRssKiB": [
+        78884,
+        79600,
+        79536
+      ],
+      "retainedHeapBytes": [
+        12611280,
+        12609072,
+        12607752
+      ]
+    }
+  },
+  "medianRatio": 3.0277227722772277,
+  "scope": "Component diagnostic only; no browser or whole HTTP improvement claim. Source/build fix not deployed.",
+  "behavior": {
+    "currentScopeEqualAcrossAllSamples": true,
+    "liveAuthorityReads": true,
+    "permissionCache": false
+  },
+  "references": [
+    ".artifacts/full-real-task-20261031/r18-authority-secondary-query-comparison.json",
+    ".artifacts/full-real-task-20261031/r18-project-authority-postgres.log",
+    ".artifacts/full-real-task-20261031/r18-project-authority-new-built-positive.log",
+    ".artifacts/full-real-task-20261031/r18-project-authority-old-built-negative.log"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "memory-auxiliary-regressions-source",
+  "cwd": ".",
+  "command": "env DSH_SNAPSHOT_MAX_CONCURRENCY=1 pnpm exec vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/memory.snapshot.ts examples/headless-agent/tests/memory-lifecycle.snapshot.ts examples/headless-agent/tests/memory-execution.snapshot.ts examples/headless-agent/tests/memory-cancellation.snapshot.ts examples/headless-agent/tests/memory-curation-race.snapshot.ts examples/headless-agent/tests/gateway-memory.snapshot.ts --retry=0",
+  "startedAt": "2026-10-24T01:35:20.369376+00:00",
+  "seconds": 11.591,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "665b5c455ac8ebcaff23ea34804609343776459d5627eac025b6692e13a6a3c7",
+  "inputsAfter": "e619e4cb12bb3636290c13cdaba85a4e8536e2fc903c197b93b8c5466b655691",
+  "postgresToolDirectory": null,
+  "outputSha256": "625ba395a834192421b10d2531cc7a7062f1e2803a367519d27311e3a4478454",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  6 passed (6)\n      Tests  7 passed (7)\n   Start at  09:35:22\n   Duration  9.32s (transform 2.13s, setup 55ms, import 3.25s, tests 5.48s, environment 0ms)\n\n"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "activity-diagnostics-types",
+  "cwd": "gateway",
+  "command": "npm run typecheck",
+  "startedAt": "2026-10-23T19:47:25.002550+00:00",
+  "seconds": 6.551,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "22771f312283761546083bd425e70202539efb11dd20e6b187cb64b3cc191090",
+  "inputsAfter": "22771f312283761546083bd425e70202539efb11dd20e6b187cb64b3cc191090",
+  "outputSha256": "8fa1cf5506304e8abac55868e7f1a136c9b1dde57a3981a382da4c21ea129a6f",
+  "outputTail": "\n> typecheck\n> tsc --noEmit\n\n"
+}

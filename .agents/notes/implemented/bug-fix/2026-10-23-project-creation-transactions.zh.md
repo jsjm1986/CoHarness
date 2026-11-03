@@ -12,11 +12,15 @@ Status: implemented
 
 [PostgresProjectService](../../../../gateway/src/postgres/project-service.ts) 获取节点的端口分配 advisory lock 后，使用事务客户端检查保留的用户路径和既有项目挂载。管理员导入、用户自有项目创建和维护空间初始化共用这条插入路径。锁覆盖检查和挂载插入，也让创建与保留用户 home 路径的用户初始化操作串行执行。
 
+管理员项目创建和目录导入将认证创建者传入事务，要求当前有效的组织管理员身份。账户和成员锁先于节点分配，等待结束后再检查组织可用性。权限拒绝返回403，且发生在分配管理员目录或登记挂载之前。SQLite 在同一即时事务内检查权限、目录资格并执行插入。省略服务参与者表示受信任的内部维护。
+
 插入操作负责用户项目创建所分配目录的补偿清理。只有事务体尚未完成时才允许删除目录。事务体准备提交后，缺失提交确认或响应详情查询失败都会保留目录，因此提交结果不明确时不会递归删除可能已经提交的项目内容。
 
 项目种类检查接收调用方的查询执行器。成员变更和项目删除传入现有事务客户端，每次变更只需借用一个连接。
 
-[受管目录策略](../feature/2026-08-16-gateway-managed-project-directories.zh.md) 和[管理员目录浏览器](../feature/2026-08-17-gateway-admin-host-directory-browser.zh.md) 继续独立规定命名、浏览和宿主机文件归属。
+项目删除先保留项目行，再读取受影响的成员，因此等待删除期间提交的成员事务会纳入返回的授权刷新集合。SQLite 删除在捕获同一集合前获取即时事务。两个提供方都保留项目文件。成员插入在项目不存在时报告未知项目；PostgreSQL 会在等待项目锁后重新检查，不再尝试外键写入。
+
+[删除生命周期](2026-10-28-project-deletion-lifecycle.zh.md) 负责 Runtime 停机准入与静止性。[受管目录策略](../feature/2026-08-16-gateway-managed-project-directories.zh.md) 和[管理员目录浏览器](../feature/2026-08-17-gateway-admin-host-directory-browser.zh.md) 继续独立规定命名、浏览和宿主机文件归属。
 
 ## Alternatives considered
 

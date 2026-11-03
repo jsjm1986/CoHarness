@@ -1,0 +1,419 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-28T17:43:13.626729+00:00",
+  "status": "fixed_named_business_acceptance_verified_remaining_full_review_open",
+  "findings": [
+    "B255",
+    "B256"
+  ],
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "dirtyEditsPreserved": true,
+    "exactRevisions": "External administrator-runtime-control-baseline.json"
+  },
+  "behavior": {
+    "B255": "Server-authenticated initiating administrator retained through personal/project start/stop/restart, per-actor pending starts, current admission after lifecycle/resident/resource/preparation waits, joint personal owner/actor policy transaction and current stop intent. Older tracked handles recheck actor before cleanup. Trusted maintenance remains explicit by omission; Steward lifecycle control remains distinct from destructive access.",
+    "B256": "Actual bounded PostgreSQL checkout refusal returns503 with readable error and DB_CHECKOUT_QUEUE_FULL; failed audit preserves503. Earlier approved stages need not roll back."
+  },
+  "negativeEvidence": [
+    "administrator-runtime-control-real-manager-before:three actual Gateway/InstanceManager target-lookup revocation counterexamples.",
+    "administrator-database-capacity-before:typed real pool capacity error wrongly500.",
+    "administrator-stale-handle-control-before:old real process terminated after generation lookup revokes actor; subsequent cleanup reports unavailable legacy recovery. Positive test retains actual reachable process."
+  ],
+  "verification": {
+    "source": {
+      "cases": 372,
+      "files": 16,
+      "skips": 0,
+      "note": "Scope guard initially found a concurrently added PG suite missing from test:postgres; its manifest registration is additive and current cohort passes."
+    },
+    "compiled": {
+      "privateOutput": true,
+      "sharedGatewayLibWritten": false,
+      "node22": "22.22.1;15 administrator real HTTP/LocalLauncher observations plus6 personal-owner regressions, PostgreSQL.",
+      "node24": "24.19.0;same maintained goldens.",
+      "hostSqlite": "25.8.1;7 administrator observations plus3 personal-owner regressions.",
+      "ownedSourceDriftSinceBuild": [],
+      "peerFeatures": "New computer/node service integration remains independently reviewed by its owner; this receipt does not accept it."
+    },
+    "types": "Gateway checking face passes.",
+    "lint": "Scoped source and fixture lint passes.",
+    "docs": "20 passed,0 failed,0 skipped; three bilingual pairs recorded.",
+    "commands": [
+      {
+        "name": "administrator-runtime-control-current-pg-policy",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:29:18.004253+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54297/hgw_admin_runtime_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/runtime-personal-policy-postgres.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:29:21.558327+00:00"
+      },
+      {
+        "name": "administrator-stale-handle-control-current",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:30:40.227460+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/instances.spec.ts",
+          "-t",
+          "retains an older process handle",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:30:41.507241+00:00"
+      },
+      {
+        "name": "administrator-runtime-control-source-coverage-accepted",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:33:07.022953+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54297/hgw_admin_runtime_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/admin-api.spec.ts",
+          "tests/instances.spec.ts",
+          "tests/runtime-personal-policy-postgres.spec.ts",
+          "tests/administrator-runtime-control-transcript.spec.ts",
+          "tests/runtime-personal-policy-transcript.spec.ts",
+          "tests/instance-capacity-postgres.spec.ts",
+          "tests/node-resource-budget-postgres.spec.ts",
+          "tests/runtime-stop-lease-postgres.spec.ts",
+          "tests/users.spec.ts",
+          "tests/user-service-postgres.spec.ts",
+          "tests/user-administration-transcript.spec.ts",
+          "tests/project-removal-transcript.spec.ts",
+          "tests/proxy.spec.ts",
+          "tests/launcher.spec.ts",
+          "tests/systemd.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=src/instances.ts",
+          "--coverage.include=src/postgres/instance-repository.ts",
+          "--coverage.include=src/admin-api.ts",
+          "--coverage.include=src/services.ts",
+          "--coverage.reportsDirectory=coverage/administrator-runtime-control-current-20261029",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportOnFailure=true"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:33:52.221307+00:00"
+      },
+      {
+        "name": "administrator-runtime-control-types",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:32:51.802618+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:32:55.107585+00:00"
+      },
+      {
+        "name": "administrator-runtime-control-private-build",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:34:06.928738+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/build-administrator-runtime-artifact.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:34:09.090433+00:00"
+      },
+      {
+        "name": "administrator-runtime-control-emitted-node22",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:34:50.729262+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-administrator-runtime-artifacts.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "postgres"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:35:05.263181+00:00"
+      },
+      {
+        "name": "administrator-runtime-control-emitted-node24",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:38:18.928523+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-administrator-runtime-artifacts.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "postgres"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:38:33.710838+00:00"
+      },
+      {
+        "name": "administrator-runtime-control-emitted-sqlite",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:38:45.790665+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-administrator-runtime-artifacts.py",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "sqlite"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:38:52.139877+00:00"
+      },
+      {
+        "name": "administrator-runtime-control-focused-lint",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:35:01.473451+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/instances.ts",
+          "gateway/src/postgres/instance-repository.ts",
+          "gateway/src/admin-api.ts",
+          "gateway/src/services.ts",
+          "gateway/tests/instances.spec.ts",
+          "gateway/tests/admin-api.spec.ts",
+          "gateway/tests/runtime-personal-policy-postgres.spec.ts",
+          "gateway/tests/administrator-runtime-control-transcript.spec.ts",
+          "gateway/tests/fixtures/runtime-personal-policy.mjs",
+          "gateway/tests/instance-capacity-postgres.spec.ts",
+          "gateway/tests/runtime-stop-lease-postgres.spec.ts",
+          "gateway/tests/node-resource-budget-postgres.spec.ts",
+          "gateway/tests/postgres-suite.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:35:02.825194+00:00"
+      },
+      {
+        "name": "administrator-runtime-control-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:34:08.065346+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "--write",
+          ".agents/notes/implemented/bug-fix/2026-10-29-administrator-runtime-control.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-runtime-control/guide.md",
+          "gateway/README.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:34:10.030834+00:00"
+      },
+      {
+        "name": "administrator-runtime-control-doc-quick",
+        "status": "passed",
+        "startedAt": "2026-10-28T17:38:59.436156+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T17:40:16.260845+00:00"
+      }
+    ]
+  },
+  "coverage": {
+    "total": {
+      "lines": {
+        "total": 1934,
+        "covered": 1257,
+        "skipped": 0,
+        "pct": 64.99
+      },
+      "statements": {
+        "total": 2473,
+        "covered": 1443,
+        "skipped": 0,
+        "pct": 58.35
+      },
+      "functions": {
+        "total": 189,
+        "covered": 160,
+        "skipped": 0,
+        "pct": 84.65
+      },
+      "branches": {
+        "total": 2201,
+        "covered": 1157,
+        "skipped": 0,
+        "pct": 52.56
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "gateway/src/admin-api.ts": {
+      "lines": {
+        "total": 1193,
+        "covered": 584,
+        "skipped": 0,
+        "pct": 48.95
+      },
+      "functions": {
+        "total": 45,
+        "covered": 29,
+        "skipped": 0,
+        "pct": 64.44
+      },
+      "statements": {
+        "total": 1605,
+        "covered": 685,
+        "skipped": 0,
+        "pct": 42.67
+      },
+      "branches": {
+        "total": 1593,
+        "covered": 682,
+        "skipped": 0,
+        "pct": 42.81
+      }
+    },
+    "gateway/src/instances.ts": {
+      "lines": {
+        "total": 619,
+        "covered": 570,
+        "skipped": 0,
+        "pct": 92.08
+      },
+      "functions": {
+        "total": 101,
+        "covered": 95,
+        "skipped": 0,
+        "pct": 94.05
+      },
+      "statements": {
+        "total": 724,
+        "covered": 646,
+        "skipped": 0,
+        "pct": 89.22
+      },
+      "branches": {
+        "total": 495,
+        "covered": 399,
+        "skipped": 0,
+        "pct": 80.6
+      }
+    },
+    "gateway/src/services.ts": {
+      "lines": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "gateway/src/postgres/instance-repository.ts": {
+      "lines": {
+        "total": 122,
+        "covered": 103,
+        "skipped": 0,
+        "pct": 84.42
+      },
+      "functions": {
+        "total": 43,
+        "covered": 36,
+        "skipped": 0,
+        "pct": 83.72
+      },
+      "statements": {
+        "total": 144,
+        "covered": 112,
+        "skipped": 0,
+        "pct": 77.77
+      },
+      "branches": {
+        "total": 113,
+        "covered": 76,
+        "skipped": 0,
+        "pct": 67.25
+      }
+    }
+  },
+  "fixtureCorrections": [
+    "Steward qualification fixture supplies required positive revision; unqualified destructive403 and qualified reserved denial remain distinct.",
+    "Raw SQL account fixtures explicitly grant their declared computer permission before lazy assignment initialization, matching migration079 usage requirements. Actual account-service transcripts retain initial grants without fixture bypass.",
+    "PostgreSQL audit query aliases persisted status_code; SQLite uses status."
+  ],
+  "noteReview": {
+    "new": [
+      ".agents/notes/implemented/bug-fix/2026-10-29-administrator-runtime-control.md"
+    ],
+    "keptIndependent": [
+      ".agents/notes/implemented/bug-fix/2026-10-28-personal-runtime-authority.md",
+      ".agents/notes/implemented/bug-fix/2026-10-28-user-administration-authority.md",
+      ".agents/notes/implemented/bug-fix/2026-10-28-project-deletion-lifecycle.md",
+      ".agents/notes/implemented/architecture/2026-10-23-postgres-checkout-admission.md"
+    ],
+    "reason": "Initiating runtime actor admission, personal process policy, account mutations, distributed destructive operations and bounded checkout ownership retain separate future decisions.",
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false
+  },
+  "limitations": [
+    "Whole-project review and all12 original domains remain open.",
+    "Selected Admin,instance and PostgreSQL repository files retain measured coverage debt; no threshold or exclusion is weakened.",
+    "Already approved cancellation/termination can complete before later refusal; this is admission authority, not a continuous execution lease.",
+    "Real model API validation remains human-deferred.",
+    "Native Windows LocalLauncher supervision is outside the POSIX transcript scope.",
+    "The isolated PostgreSQL was retained for the subsequent audit-query scope and is removed there; production5432 remains untouched."
+  ],
+  "postScopeCleanup": {
+    "receipt": "receipts/audit-query-and-page-2026-10-29.json",
+    "status": "owned_container_and_volume_removed",
+    "otherServicesModified": false
+  }
+}

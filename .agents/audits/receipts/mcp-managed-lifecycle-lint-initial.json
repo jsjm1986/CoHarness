@@ -1,0 +1,13 @@
+{
+  "name": "mcp-managed-lifecycle-lint-initial",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/mcp/mcp-client/src/managed-stdio.ts packages/mcp/mcp-client/src/transport.ts packages/mcp/mcp-client/src/connection.ts packages/mcp/mcp-client/src/index.ts packages/mcp/mcp-client/tests/resource-admission.spec.ts packages/mcp/mcp-client/tests/mcp-client.spec.ts packages/mcp/mcp-client/tests/reconnect.spec.ts packages/mcp/mcp-client/tests/apply.spec.ts packages/experimental/browser-use-runtime/src/mcp.ts",
+  "startedAt": "2026-10-23T16:26:43.050517+00:00",
+  "seconds": 2.784,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b60f63ee4e3af08c6133c3e9ae0b7ea811c9457ef9324d5ceaa0da63122f7e1f",
+  "inputsAfter": "b60f63ee4e3af08c6133c3e9ae0b7ea811c9457ef9324d5ceaa0da63122f7e1f",
+  "outputSha256": "db8f7173bf9ce11f00b7d262a7d3379fea73cba7317aa63d395c16dc22669ef4",
+  "outputTail": "packages/mcp/mcp-client/tests/mcp-client.spec.ts:1091:27: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/mcp/mcp-client/src/managed-stdio.ts:59:1: error @stylistic(max-len): This line has a length of 148. Maximum allowed is 140.\npackages/mcp/mcp-client/src/managed-stdio.ts:187:30: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/mcp/mcp-client/src/managed-stdio.ts:188:31: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/mcp/mcp-client/src/managed-stdio.ts:225:43: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\npackages/mcp/mcp-client/src/managed-stdio.ts:225:59: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\n"
+}

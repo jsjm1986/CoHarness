@@ -1,0 +1,14 @@
+{
+  "name": "jobs-reentrant-event-order-before",
+  "cwd": ".",
+  "command": "node --import tsx/esm .agents/audits/.local/jobs-reentrant-event-probe.mjs",
+  "startedAt": "2026-10-26T08:25:39.467486+00:00",
+  "seconds": 0.739,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a03e3dff58247044e19d5269a661049ce9df606e12ee8bafe5002f2d79648875",
+  "inputsAfter": "a03e3dff58247044e19d5269a661049ce9df606e12ee8bafe5002f2d79648875",
+  "postgresToolDirectory": null,
+  "outputSha256": "4356dfbe8bfbad9371f25ed07a9fc8a0691aa54eba2ad20014dff3db08e28afd",
+  "outputTail": "{\"observed\":[\"first:registered\",\"first:output\",\"second:output\",\"second:registered\"]}\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n  [\n    'first:registered',\n-   'second:registered',\n    'first:output',\n    'second:output',\n+   'second:registered'\n  ]\n\n    at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/.agents/audits/.local/jobs-reentrant-event-probe.mjs:22:10 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: [\n    'first:registered',\n    'first:output',\n    'second:output',\n    'second:registered',\n    'first:settled',\n    'second:settled',\n    'first:output',\n    'second:output'\n  ],\n  expected: [\n    'first:registered',\n    'second:registered',\n    'first:output',\n    'second:output'\n  ],\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v25.8.1\n"
+}

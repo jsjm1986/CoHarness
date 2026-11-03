@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-command-image-attachment-envelope.md
 document:
-  en: c81fbeb23997c9f4090e66f84c6589566e070916
-  zh: 2c53ce004dcdfe1674b48101567c9a151fbe2e46
+  en: 8d047243f821c2b39f9004a8662cb65eed4fca04
+  zh: 63627f8669ba8c0c8b8f08aa5c540521922e6fcb
 /agent-note-command-image-attachment-envelope:
   en: 3fcfef1622f25354
   zh: 604ee952eba55b8a
@@ -12,14 +12,14 @@ document:
   en: 91af44be08dd3144
   zh: 2a8017eec3df633b
 /agent-note-command-image-attachment-envelope/decision:
-  en: 2703afadbac835ed
-  zh: f080f308b26d0a56
+  en: 0850924110c842ec
+  zh: 8777c99a29bf4297
 /agent-note-command-image-attachment-envelope/testing:
   en: 99ed0dd0b999f750
   zh: a9d2c60c2fff4e59
 /agent-note-command-image-attachment-envelope/alternatives-considered:
-  en: 223dc2bee37b010c
-  zh: 2c06ca68b5c96d95
+  en: a5cad519f98856a1
+  zh: 2e64a8d5b39f6087
 /agent-note-command-image-attachment-envelope/consequences:
-  en: a04c4db8c0c32a63
-  zh: 1075956207f65039
+  en: 0476004569f749be
+  zh: 1eb4f8926d3ced28

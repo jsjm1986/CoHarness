@@ -4,7 +4,7 @@
  */
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apply, type ConnectionHandle } from '../src/client/index.ts'
+import { apply, installConnection, type ConnectionHandle } from '../src/client/index.ts'
 import type { RpcMessage, SessionId } from '../src/client/api.ts'
 import { RpcId } from '../src/client/api.ts'
 import { FixtureApiClient } from '../src/client/fixture.ts'
@@ -66,6 +66,49 @@ async function mount(): Promise<ConnectionHandle> {
 }
 
 describe('connection client apply', () => {
+  it('advertises document identity cleanup only when the browser account fence owns the connection', async () => {
+    ;(globalThis as Win).location = { hostname: 'gateway.example', search: '', origin: 'https://gateway.example' }
+    expect((await mount()).onPrincipalChange).toBeTypeOf('function')
+    ;(globalThis as Win).location = { hostname: 'gateway.example', search: '?fixture', origin: 'https://gateway.example' }
+    expect((await mount()).onPrincipalChange).toBeUndefined()
+  })
+
+  it('rejects an invalid browser unary deadline before creating its API carrier', () => {
+    const ctx = new Context()
+    mountedContexts.push(ctx)
+    expect(() => { installConnection(ctx, { rpcTimeoutMs: 0 }) }).toThrow('rpcTimeoutMs')
+  })
+
+  it.each([false, true])('applies a configured unary deadline to the browser carrier (pooled: %s)', async (pooled) => {
+    vi.useFakeTimers()
+    let requestSignal: AbortSignal | undefined
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => new Promise((_resolve, reject) => {
+      requestSignal = init?.signal ?? undefined
+      requestSignal?.addEventListener('abort', () => {
+        const reason: unknown = requestSignal?.reason
+        reject(reason instanceof Error ? reason : new Error('request aborted', { cause: reason }))
+      }, { once: true })
+    }))
+    const ctx = new Context()
+    mountedContexts.push(ctx)
+    try {
+      installConnection(ctx, { rpcTimeoutMs: 120_000 })
+      const handle = ctx.get('connection') as ConnectionHandle
+      const selected = pooled ? handle.forTarget!({ kind: 'project', projectId: 7 }) : handle
+      const pending = selected.api.host.describe({}).then(
+        () => ({ kind: 'resolved' }), (error: unknown) => ({ kind: 'rejected', error }),
+      )
+      await vi.advanceTimersByTimeAsync(31_000)
+      expect(requestSignal?.aborted).toBe(false)
+      await vi.advanceTimersByTimeAsync(89_000)
+      expect(requestSignal?.aborted).toBe(true)
+      expect(await pending).toMatchObject({ kind: 'rejected', error: { name: 'TimeoutError' } })
+    } finally {
+      fetch.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
   it('mounts ctx.connection with the real client when no ?fixture switch is present', async () => {
     ;(globalThis as Win).location = { hostname: 'localhost', search: '' }
     const handle = await mount()
@@ -474,7 +517,7 @@ describe('connection client apply', () => {
       .rejects.toThrow(/endpoint.*unavailable/)
   })
 
-  it('forSession reuses the pool-started target connection and evicts it on stop', async () => {
+  it('keeps the target handle across view closure and isolates the next stream owner', async () => {
     ;(globalThis as Win).location = { hostname: 'localhost', search: '?fixture' }
     ;(globalThis as WebSocketGlobal).WebSocket = FakeWebSocket as unknown as typeof WebSocket
     const handle = await mount()
@@ -516,9 +559,15 @@ describe('connection client apply', () => {
         loop.stop()
         expect(pooled.state.getSnapshot()).toBeUndefined()
         expect(pooled.hostDescription.getSnapshot()).toBeUndefined()
-        // A stopped target is evicted: the next resolution mints a fresh handle.
-        expect(handle.forSession!('s1' as SessionId)).not.toBe(pooled)
+        expect(handle.forSession!('s1' as SessionId)).toBe(pooled)
         expect(handle.forSession!('s1' as SessionId).state.getSnapshot()).toBeUndefined()
+        const next = pooled.start({})
+        try {
+          await vi.waitFor(() => { expect(pooled.state.getSnapshot()).toBe('connected') })
+          loop.stop()
+          expect(pooled.state.getSnapshot()).toBe('connected')
+          expect(handle.forSession!('s1' as SessionId)).toBe(pooled)
+        } finally { next.stop() }
       } finally {
         globalThis.fetch = original
       }

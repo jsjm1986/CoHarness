@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-managed-model-default-yaml.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-managed-model-default-yaml.md
+document:
+  en: ecab1abcd82d9a59a5924530cccb29434c554c12
+  zh: f514fe6501ba3dca2d083b2f0d91c9afa9c547ec
+/agent-note-managed-model-defaults-in-yaml-patches:
+  en: 3159d3cd2ddbec1c
+  zh: a121a5f58b040493
+/agent-note-managed-model-defaults-in-yaml-patches/problem:
+  en: fedab9781687112c
+  zh: 3ee3df2b98c0b3a3
+/agent-note-managed-model-defaults-in-yaml-patches/decision:
+  en: 74f0052303ceabe7
+  zh: bffd91dee5a8d6b0
+/agent-note-managed-model-defaults-in-yaml-patches/alternatives-considered:
+  en: 68d9bc9ec5f0ab68
+  zh: da13a37a553f95e0
+/agent-note-managed-model-defaults-in-yaml-patches/consequences:
+  en: 9cfde93bdb84aeff
+  zh: 9c288b4d8586c197
+/agent-note-managed-model-defaults-in-yaml-patches/verification:
+  en: 8df0fce60527c322
+  zh: bce55b8142994c02

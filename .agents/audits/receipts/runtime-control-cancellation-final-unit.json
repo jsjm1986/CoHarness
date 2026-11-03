@@ -1,0 +1,14 @@
+{
+  "name": "runtime-control-cancellation-final-unit",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/local-runtime-launcher.spec.ts tests/local-runtime-owner.spec.ts tests/launcher.spec.ts tests/instances.spec.ts tests/runtime-capacity.spec.ts tests/config.spec.ts tests/deployment-data.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T19:45:57.320221+00:00",
+  "seconds": 37.927,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "687a166a24dc81467c177dc53ab84365e31066a3e0124a44a0a4672e3fc75e7a",
+  "inputsAfter": "687a166a24dc81467c177dc53ab84365e31066a3e0124a44a0a4672e3fc75e7a",
+  "postgresToolDirectory": null,
+  "outputSha256": "21096de28d42b6adf07566b3a30d85276da4790ecd45bc1313078215cf9a75c5",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/local-runtime-launcher.spec.ts (13 tests | 1 failed) 34241ms\n     × fences a queued allocation when stop intent arrives before its admission resolves 30005ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/local-runtime-launcher.spec.ts > recoverable LocalLauncher > fences a queued allocation when stop intent arrives before its admission resolves\nError: Test timed out in 30000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/local-runtime-launcher.spec.ts:136:3\n    134|   })\n    135|\n    136|   it('fences a queued allocation when stop intent arrives before its a…\n       |   ^\n    137|     const f = await fixture()\n    138|     let release!: () => void, entered!: () => void\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 6 passed (7)\n      Tests  1 failed | 127 passed (128)\n   Start at  03:45:59\n   Duration  35.35s (transform 1.52s, setup 0ms, import 2.29s, tests 51.42s, environment 0ms)\n\n"
+}

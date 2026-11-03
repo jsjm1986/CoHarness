@@ -1,0 +1,13 @@
+{
+  "name": "python-managed-descendant-regression",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/ptc-runtime-python/tests/runtime.spec.ts -t 'stops a setsid descendant' --retry=0",
+  "startedAt": "2026-10-23T15:53:47.957066+00:00",
+  "seconds": 2.955,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "530de5adb24b4bf66605fbc378cc8633facc1087426b9d98e1465108e5a6c6ee",
+  "inputsAfter": "530de5adb24b4bf66605fbc378cc8633facc1087426b9d98e1465108e5a6c6ee",
+  "outputSha256": "c1c893067fba78b95ba34dc1c08df51fe8c5d7ced40426c89b25ad5e1bc8cd1c",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/experimental/ptc-runtime-python/tests/runtime.spec.ts (253 tests | 1 failed | 252 skipped) 717ms\n     × stops a setsid descendant before reporting its decided result 715ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/experimental/ptc-runtime-python/tests/runtime.spec.ts > PythonPtcRuntime — budgets, termination, disposal > stops a setsid descendant before reporting its decided result\nAssertionError: expected 1792770830819.663 to be 1792770830308.9 // Object.is equality\n\n- Expected\n+ Received\n\n- 1792770830308.9\n+ 1792770830819.663\n\n ❯ packages/experimental/ptc-runtime-python/tests/runtime.spec.ts:3463:41\n    3461|     const stoppedAt = statSync(heartbeat).mtimeMs\n    3462|     await new Promise(resolve => setTimeout(resolve, 500))\n    3463|     expect(statSync(heartbeat).mtimeMs).toBe(stoppedAt)\n       |                                         ^\n    3464|   }, 8000)\n    3465|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 252 skipped (253)\n   Start at  23:53:49\n   Duration  1.34s (transform 447ms, setup 28ms, import 526ms, tests 717ms, environment 0ms)\n\n"
+}

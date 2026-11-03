@@ -1,0 +1,182 @@
+{
+  "at": "2026-10-31T08:00:42.700239+00:00",
+  "findings": [
+    "B395",
+    "B396"
+  ],
+  "titles": {
+    "B395": "Inspector startup uses stale admission and loses retryable completion of unused grants",
+    "B396": "Inspector bootstrap mistakes consumed request bodies for disconnected browsers and returns premature 503"
+  },
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "paths": [
+    "packages/experimental/inspector/src/host/bridge/controller.ts",
+    "packages/experimental/inspector/src/host/plugin.ts",
+    "packages/experimental/inspector/tests/plugin.host.spec.ts",
+    "packages/experimental/inspector/tests/resource-admission.host.spec.ts",
+    "packages/experimental/inspector/tests/controller-options.host.spec.ts",
+    "packages/experimental/inspector/tests/controller-failures.host.spec.ts",
+    "packages/experimental/inspector/tests/bootstrap-network.host.spec.ts",
+    "packages/experimental/inspector/tests/bootstrap-route.host.spec.ts",
+    "packages/experimental/inspector/tests/api-fetch.ts",
+    "packages/experimental/inspector/tests/fixtures/startup-owner.mjs",
+    "snapshots/session/inspector-startup-owner.snapshot.ts",
+    "snapshots/session/inspector-startup-owner/expected.jsonl",
+    "scripts/coverage-baseline.ts",
+    "packages/experimental/inspector/README.md",
+    "packages/experimental/inspector/README.zh.md",
+    "packages/experimental/inspector/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-29-inspector-resource-completion.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-inspector-resource-completion.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-inspector-resource-completion.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-inspector-bootstrap-response-lifetime.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-inspector-bootstrap-response-lifetime.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-inspector-bootstrap-response-lifetime.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/inspector-resource-completion/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/inspector-resource-completion/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/inspector-resource-completion/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/inspector-bootstrap-lifetime/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/inspector-bootstrap-lifetime/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/inspector-bootstrap-lifetime/guide.i18n.yaml"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T071954Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T071954Z/inspector-final-verified-coverage.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T071954Z/inspector-final-source-snapshot.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T071954Z/inspector-final-build-corrected.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T071954Z/inspector-final-docs.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T071954Z/inspector-final-built-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T071954Z/inspector-final-built-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T071954Z/inspector-final-cleanup-compatibility.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T071954Z/inspector-final-lint-passed.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T071954Z/inspector-final-catalog.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T071954Z/inspector-final-export-jsdoc.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T071954Z/inspector-final-origin-fetch.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T071954Z/inspector-final-pairing.json"
+  ],
+  "causalEvidence": "Both original public plugin ownership cases start successfully under stale admission; both original native HTTP cases send headers before readiness. A private complete old artifact reproduces stale physical Worker creation/readiness publication and premature 503 after body completion. Updated source and Node22/24 real Loader/Web/Connection transcripts reject two stale starts before native allocation, retain positive managed/independent starts, keep a live response pending until 200, and leave a disconnected response untouched.",
+  "behavior": {
+    "startup": "Capture original provider before process admission and check before MessageChannel/Worker creation. Transfer failed unused-grant completion through retryable InspectorStartupCleanupError. Coalesce cleanup retries, retain original cancellation plus cleanup failures, and preserve current running-Worker obligations.",
+    "bootstrap": "Use response close for abandonment, skip destroyed responses and keep inbound request completion independent. The matching prefix requires a request URL. The test Fetch adapter closes both stream ends on abort and rejects its caller."
+  },
+  "verification": {
+    "uniqueRelatedCases": 84,
+    "sourceAndBaselineCases": 82,
+    "startupApplicationSnapshot": 1,
+    "existingCleanupApplicationExample": 1,
+    "snapshotRows": 6,
+    "standardCoverage": {
+      "packages/experimental/inspector/src/host/plugin.ts": {
+        "statements": [
+          135,
+          135
+        ],
+        "branches": [
+          65,
+          65
+        ],
+        "functions": [
+          30,
+          30
+        ],
+        "lines": [
+          115,
+          115
+        ]
+      },
+      "packages/experimental/inspector/src/host/bridge/controller.ts": {
+        "statements": [
+          134,
+          134
+        ],
+        "branches": [
+          79,
+          79
+        ],
+        "functions": [
+          25,
+          25
+        ],
+        "lines": [
+          114,
+          114
+        ]
+      },
+      "packages/experimental/inspector/src/host/bridge/lifecycle.ts": {
+        "statements": [
+          78,
+          78
+        ],
+        "branches": [
+          20,
+          20
+        ],
+        "functions": [
+          22,
+          22
+        ],
+        "lines": [
+          65,
+          65
+        ]
+      }
+    },
+    "removedFileExclusions": [
+      "packages/experimental/inspector/src/host/bridge/controller.ts",
+      "packages/experimental/inspector/src/host/plugin.ts"
+    ],
+    "coverageQualification": "Three named Host modules meet the standard per-file gate after removing two historical file exclusions. One three-line bundled-entry selector is excluded only from source instrumentation and exercised by real plain-Node snapshots. Other mirrored Inspector modules are not included in this coverage claim.",
+    "platformQualification": "Windows dispatch checks environment metadata through an isolated platform fixture; physical Windows behavior remains unverified.",
+    "buildGates": 8,
+    "quickDocumentationGates": 20,
+    "guideEnglishWords": {
+      "inspector-resource-completion": 195,
+      "inspector-bootstrap-lifetime": 171
+    },
+    "documentation": "Five final bilingual pairs, budgets, catalog freshness and export JSDoc pass. Full doc-sync is not claimed.",
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "evidenceSetupCorrection": "Two private HTTP diagnostic runs reversed setTimeout arguments and blocked their own cleanup. Only their verified owned Node processes were stopped; both invalid runs are excluded. Their corrected native HTTP probes and committed regressions establish the body-completion behavior. Initial test typing/lint errors were corrected before the final passing build and checks.",
+  "noteReview": {
+    "startupOwner": ".agents/notes/implemented/bug-fix/2026-10-29-inspector-resource-completion.md",
+    "bootstrapOwner": ".agents/notes/implemented/bug-fix/2026-10-31-inspector-bootstrap-response-lifetime.md",
+    "decision": "Extend the active resource-completion decision; add one distinct HTTP response-lifetime decision to prevent the request-close fallacy. No archived notes or unrelated active decisions are changed."
+  },
+  "baseline": {
+    "at": "2026-10-31T07:51:40.591392+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "at": "2026-10-31T08:00:42.700239+00:00",
+    "source": "Peer direct operational message; not root production acceptance.",
+    "serving": "Peer reports R11 serving on both nodes, including B392; B393/B394 await its next candidate. Project29 generation3 policy-package readability and Web plugin interface are restored.",
+    "reservedR12": [
+      "gateway/src/managed-files.ts and related manifest tests",
+      "ui-collaboration/ProjectManagerModal.tsx and related invitation tests",
+      "gateway-runtime required-policy-plugin readiness and related tests"
+    ],
+    "remaining": "The peer real-task matrix remains incomplete. Root retains its archive/search work and does not modify reserved files.",
+    "merge": "Apply only the twenty-eight current source paths and rebuild matching Inspector index.js/worker.js on the current candidate. Preserve prior B393/B394 deltas and all peer Local/Gateway/UI work; do not overwrite current merged artifacts with cumulative older references."
+  },
+  "externalSourceChangesExcluded": {
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "7a54b9e99352908283ee973e2dcd7707c9d7a7ba312ad9761311219172a47569",
+    "packages/subprocess/subprocess-local/README.md": "223b3dfcdc9732041ea508d9d131b9505e98abca53ea60dbb098851bd2c74629",
+    "packages/subprocess/subprocess-local/README.zh.md": "f13592bad150012aaa31e62226119ed4f22772b4bca5174936f988e1ae0cd407"
+  },
+  "externalArtifactChangesExcluded": {
+    "packages/subprocess/subprocess-local/lib/index.js": "5fbdc054c9a1ef7799f7da80b030e5db88ffdb3639b5e5b0f2a908d5e183e950"
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Review native browser Worker resource ownership, independent model-search admission and authority-only SDK composition.",
+    "Continue nonconflicting business permissions, remote pipes and resource-only remote execution.",
+    "Review Inspector debug endpoint authority for shared runtimes; startup verification does not complete its permission review.",
+    "Peer owns R12 managed backup-manifest parsing, ProjectManagerModal invitations and required-policy-plugin readiness.",
+    "Paid API verification stays deferred. Root production database operations, deployments and physical Linux/Windows acceptance remain unclaimed."
+  ]
+}

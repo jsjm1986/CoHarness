@@ -1,0 +1,294 @@
+{
+  "finding": "B455",
+  "status": "fixed_verified_job_capture_capacity_full_registry_entry_100_percent_global_review_open",
+  "updatedAt": "2026-11-01T21:56:10.442943+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "verifiedAt": "2026-11-01T21:44:17.061474+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-latest-origin-fetch.json",
+    "workingTreePreserved": true
+  },
+  "problem": "The local registry captured execution provenance before reserving the exact-owner starting slot. An authority callback could synchronously start another job for that owner and then return to the outer starter. Both producers ran with maxConcurrentJobsPerOwner1; the original normal SDK profile opened two real HTTP work responses.",
+  "fix": "Move execution provenance capture inside the existing reserved-start try/finally, immediately before producer execution. Nested same-owner capture is refused before another producer allocates. Capture failure releases its original reservation, while another exact owner remains independent. No additional counter, queue or timer is introduced.",
+  "compatibility": {
+    "newConfigurationFields": false,
+    "newWireOrSessionFields": false,
+    "schemaOrSessionFormatChange": false,
+    "publicServiceSignatureChange": false,
+    "productionAllocationAdded": false,
+    "rootProductionMutation": false
+  },
+  "verification": {
+    "distinctPassingNamedCases": 223,
+    "unitCases": 213,
+    "unitFiles": 10,
+    "typescriptRunnableCases": 5,
+    "pythonRunnableCases": 5,
+    "versionRepeatsAddedToCount": false,
+    "sourceNode22AndNormalBuiltNode24": true,
+    "completeJobRegistryCoverage": {
+      "lines": {
+        "total": 227,
+        "covered": 227,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 64,
+        "covered": 64,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 267,
+        "covered": 267,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 157,
+        "covered": 157,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "repositoryThresholdOrBaselineChanged": false,
+    "fullCoreEntryRemeasuredThisBatch": false,
+    "coreSourceStillMatchesB454": true,
+    "originalEvidence": "Original source permits reentrant capture with no capacity refusal. The original normal JobsLocal bundle byte-matches B454. A real SDK profile configured with limit1 registers two jobs, starts two native HTTP work responses, and reports nestedRefusedfalse. Both old responses are closed and activeAfterCleanup0, so the negative control leaves no live work.",
+    "currentNativeEvidence": "The shipped SDK profile uses the real job registry and a Service Definition-backed external execution fixture. Its provenance capture starts a nested same-owner job. One producer and one actual HTTP response are admitted; the nested producer never runs. Both SDKs pin native response closure, killed settlement and no active work after cleanup.",
+    "businessCases": [
+      "Execution provenance capture cannot reenter the same exact-owner capacity bucket",
+      "Capture refusal starts no producer and releases the reservation for a retry",
+      "Another exact owner remains admitted while the first owner has a reserved start",
+      "Service and exact-owner teardown during synchronous producer startup cancels and joins accepted work",
+      "Existing reentrant producer admission, failed starts, ownership controls and background cleanup continue passing"
+    ],
+    "checks": [
+      {
+        "name": "job-capture-final-local",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-final-local.json"
+      },
+      {
+        "name": "job-capture-final-registry-coverage",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-final-registry-coverage.json"
+      },
+      {
+        "name": "job-capture-native-source-profile",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-native-source-profile.json"
+      },
+      {
+        "name": "job-capture-built-acceptance",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-built-acceptance.json"
+      },
+      {
+        "name": "job-capture-related-built-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-related-built-sdk.json"
+      },
+      {
+        "name": "job-capture-python-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-python-sdk.json"
+      },
+      {
+        "name": "job-capture-related-python-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-related-python-sdk.json"
+      },
+      {
+        "name": "job-capture-build-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-build-types.json"
+      },
+      {
+        "name": "job-capture-normal-bundle",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-normal-bundle.json"
+      },
+      {
+        "name": "job-capture-final-host-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-final-host-types.json"
+      },
+      {
+        "name": "job-capture-declared-kind-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-declared-kind-lint.json"
+      },
+      {
+        "name": "job-capture-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-python-lint.json"
+      },
+      {
+        "name": "job-capture-final-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-final-doc-quick.json"
+      },
+      {
+        "name": "job-capture-export-jsdoc",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-export-jsdoc.json"
+      },
+      {
+        "name": "job-capture-latest-origin-fetch",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-latest-origin-fetch.json"
+      },
+      {
+        "name": "job-capture-capacity-before",
+        "status": "expected_original_exact_owner_capacity_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-capacity-before.json"
+      },
+      {
+        "name": "job-capture-native-original-profile",
+        "status": "expected_original_exact_owner_capacity_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-native-original-profile.json"
+      },
+      {
+        "name": "job-capture-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-repository-references.json"
+      }
+    ],
+    "intermediateSetup": [
+      "An initial teardown hypothesis was disproved: all three service/owner cases already cancel, join and remove the producer. Those passing lifecycle regressions remain in the final tests; no teardown implementation was changed.",
+      "The first native patch duplicated the jobs service already supplied by sdk-minimal. The final fixture configures the shipped jobs row and uses that real provider; initial startup collisions are retained separately from the successful-start original behavior proof.",
+      "The first coverage command inherited the existing exact entry exclusion and measured0/0. The private measurement config removes only that exclusion and preserves all100%thresholds; final complete entry measurement is100%all4metrics. Repository policy is unchanged.",
+      "Strict typecheck required the fixture-owned JobKindMap declaration and contextually typed JobSpec values. These add no executable behavior. Final types, lint and full213-case coverage pass.",
+      "The first documentation run passed19 leaves and failed on the peer-owned node-service note format. A single concrete handoff let its owner fix the bilingual note; final20 leaves pass."
+    ]
+  },
+  "coordination": {
+    "status": "independent_jobs_scope_no_peer_source_edits",
+    "rootScope": "JobsLocal capacity ordering and its tests/docs only",
+    "peerScope": "R37 UI entry/workspace creation, node-service HTTP reuse and necessary PG authorization round trips",
+    "peerRootBuildReport": "Peer reported an accidental Root full-build attempt stopped in host compilation with no source edits or deployment. Root retains source beforeimages and checks current artifact fingerprints.",
+    "sharedDocFormat": "Root reported one concrete format failure in the peer-owned node-service note. Peer repaired its bilingual sections/metadata; final20-leaf check verifies the combined current documentation.",
+    "b451Integration": "deferred_by_peer",
+    "rootProductionMutation": false
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-admission-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-08-11-bounded-background-job-admission.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-08-11-bounded-background-job-admission.md",
+    ".agents/notes/implemented/bug-fix/2026-08-11-bounded-background-job-admission.zh.md",
+    "apps/cli/tests/profiles/sdk/job-capture-admission.expected.e2e.ts",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/job-capture-admission/expected.json",
+    "examples/headless-agent/tests/fixtures/job-capture-admission/model.mjs",
+    "examples/headless-agent/tests/fixtures/job-capture-admission/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/job-capture-admission/runtime.cordis.yml",
+    "examples/headless-agent/tests/fixtures/job-capture-admission/runtime.mjs",
+    "packages/jobs/jobs-local/README.i18n.yaml",
+    "packages/jobs/jobs-local/README.md",
+    "packages/jobs/jobs-local/README.zh.md",
+    "packages/jobs/jobs-local/src/index.ts",
+    "packages/jobs/jobs-local/tests/start-teardown.spec.ts",
+    "python/sdk/tests/test_job_capture_admission_expected.py"
+  ],
+  "readOnlyPrerequisiteCount": 344,
+  "artifactReferences": {
+    "apps/cli/lib/bin.js": "a3f373cfa7a3a84aa5fb6e25c3db5b2cb9b338afe986169c00fcc38ea0044455",
+    "packages/boot/app-boot/lib/index.js": "e7527dacdd9bc28e1a95536f3930f042ebbac186b16393059469ac7f3a537b80",
+    "packages/bundle/sdk-minimal/lib/index.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "packages/context/collaboration-gateway/lib/index.js": "0f9959205ed5dcc40ee9558d04c575fbf5fe3aa643e42430ec471ca3cc975b65",
+    "packages/core/agent-loop/lib/index.js": "4d9e306e15bd8a750ff97bd48c6253a45f2faa49edf5b41ac88b37c2b0f0e882",
+    "packages/core/agent/lib/index.js": "4ffa8768f1ed50640eaba1ef6cddd9183c824a5a183208e3012a4f86ed27fa18",
+    "packages/extensions/tool-cordis/lib/index.js": "a8db112aaa38e65f1c4a25ff4215d876df687c4f079ad38faaa8c83a9bd01cb8",
+    "packages/extensions/tool-cordis/lib/types/api-catalog.d.ts": "751ebac54d1c2d0a694d18973b2d1a95f901b8dda3ed49eb6303795a30c8dc4e",
+    "packages/extensions/tool-cordis/lib/types/api-catalog.js": "1601d1a9a14d2788d68534f88c96ea7d66fc5eceea45427abb5e14e7c2e6167a",
+    "packages/extensions/tool-cordis/lib/types/index.d.ts": "af71d264ee9c5c04b991eeb6c75c7b02137bc0281cd576b6db3f8e7f8d49ae57",
+    "packages/extensions/tool-cordis/lib/types/index.js": "a96b33268cd03e577cdfc62f32c55ebc380e98d7ba3006789feb65cd2480dfc6",
+    "packages/jobs/jobs-local/lib/index.js": "9d7ef77f5119202345aafddd4ac2a1dead773db0a70e887bc852f50f4fa2cf3b",
+    "packages/jobs/jobs-local/lib/types/index.d.ts": "ee46e954b695a13ede2d19a07028517e0389a79ed73a4c4b86d687296a9f84e6",
+    "packages/jobs/jobs-local/lib/types/index.js": "7a7872b40f897a044e630c19ad7b42a637687556467e548ea7aaecdbb42b9523",
+    "packages/jobs/jobs/lib/index.js": "0e7659e20c3ab0cdef78aeadc08d14baa23cc05412f28daf21e5ecc7b71b3821",
+    "packages/jobs/tool-jobs/lib/index.js": "d09749a36d2b6247ac32a476fb2947c1fe32fe95ea4444bbd768901c6b838c0b",
+    "packages/ptc-runtime/ptc-runtime-node/lib/index.js": "9b01e82609461ca27c7353386722a523bed4ebbed0f326d6ccc803c620032fa6",
+    "packages/sdk/client/lib/index.js": "7099941321aa5a129caed823ac18c4749ac269dba7705c5ce6274b0276f51aad",
+    "packages/sdk/server/lib/index.js": "c94739bc12898d337ca362ef657464e2aa06d117cec7c90395fc37a03abd4196",
+    "packages/subagent/subagent/lib/index.js": "d1d5a046de6fb2a67dc15d682bdb7c0b8ef6966a3b918a1ca48b62f66180b007",
+    "packages/subagent/subagent/lib/types/index.d.ts": "0fda33152b96a3ab06f65d8d2f3009554e7e51c330c1b2f193ad7c6254285dea",
+    "packages/subagent/subagent/lib/types/index.js": "367eeafbfccd4d538ce6d26b6733e7f8208b0fb056215b25ac0c9d1cfb992e6b",
+    "packages/subagent/subagent/lib/types/internal.d.ts": "910db97a43b6dd599126d6c7cf9057b2c007120bcf9dd761bcf1439aa2e45291",
+    "packages/subagent/subagent/lib/types/internal.js": "9e629487ae14104c2d46269197692279bf5c1a5209af0b2a56ee0865ac477afb",
+    "packages/subagent/subagent/lib/types/retained-cleanup.d.ts": "612a42281e3890f569f17ff5a8a34cbd14b62efde68bf7b4578bfce7bf0bebf3",
+    "packages/subagent/subagent/lib/types/retained-cleanup.js": "f3faf639884fea1af4ddcf84386170e8e41926d229b7fd131425b7bba71924a1",
+    "packages/subagent/subagent/lib/types/run-lease.d.ts": "b4a73727a97ba0369cf20f99633cef031ba8a9b3671b7ef427021ffc91fa2037",
+    "packages/subagent/subagent/lib/types/run-lease.js": "68a420195cd7358362a8edd97d9a4cfd4c766e836d1f32e25e467d2b9ec7fa63",
+    "packages/subagent/subagent/lib/types/types.d.ts": "fe23d6fbb40919d51ec2b1a65934249b074f6d3b9794847d58dfe453f6887501",
+    "packages/subagent/subagent/lib/types/types.js": "74c4a6ef14ae2c83292457c179e22fc44885e5d92976595089107527c160f9cd",
+    "packages/subagent/tool-subagent/lib/index.js": "d9de7ae8a530685125fa1cca13d988bde53ab75c30e9846188c2efe264e0cf46",
+    "packages/subagent/tool-subagent/lib/types/index.d.ts": "8b09f71db58a223e7e965f4f5775d97941851d5d6dd8d92b3e6a83d54b6eea5c",
+    "packages/subagent/tool-subagent/lib/types/index.js": "4d8643492ed30c70d067d7d0e5f91115371318e890e35da11380847c7b9041c5",
+    "packages/workflow/tool-ralph/lib/index.js": "657f8d26e9bba0ed6a953351c3133c0042e3e5d33e145a265988e58308b50c47",
+    "packages/workflow/tool-ralph/lib/types/index.d.ts": "aca7d199ca84ddfa327b1f198767482d647cadab731176dbfc66466eb2064d1a",
+    "packages/workflow/tool-ralph/lib/types/index.js": "5eb5bd99e37fbefec07703d7b6d28e0e98e90f0bdf07ca2e5d8f09e1fbad4736",
+    "packages/workflow/tool-workflow/lib/index.js": "b67d1ca2c2f20b0ae0162ab79977cacac34358ec0dbdbf72329da00d5dcba466",
+    "packages/workflow/tool-workflow/lib/types/index.d.ts": "580add4796ea967c51f79558608ef6472780a393c046e20673751437d41df549",
+    "packages/workflow/tool-workflow/lib/types/index.js": "63ba6b1738032618f6894e342b488ff9a6ddd24a27f58c7f12a3ba303095411b",
+    "packages/workflow/tool-workflow/lib/types/record.d.ts": "b76ec5244084c6bc7a23bf099fab530280c818b7c4b87866d0d675960fa521a6",
+    "packages/workflow/tool-workflow/lib/types/record.js": "a796561d1ce5a65fcaeb4c62f20694dfade02a92102534306ed0c6c7ccbfa8f6",
+    "packages/workflow/workflow-ptc/lib/index.js": "c3d9578dcdaa08430018fc72848d587d98f457d695b2200dd5a385d758a4b373",
+    "packages/workflow/workflow-ptc/lib/types/index.d.ts": "7fb2a61124763eed3629d93eb1d0e95de4de7a2e68697961b740f959eda81c54",
+    "packages/workflow/workflow-ptc/lib/types/index.js": "4faffdf81ad5a92ec4b99070ec2775362af9ce7711da3f0e2ff3f0e63e0a70e5",
+    "packages/workflow/workflow/lib/index.js": "fa7c0ac38c714b7230c41fa38d22524923c1237940fbfa416f63d3e1b37fde8b",
+    "packages/workflow/workflow/lib/types/index.d.ts": "91b595cdbb6d70e398d68b7529e4980f74f4651cea24a65f286201926dee1b15",
+    "packages/workflow/workflow/lib/types/index.js": "889279d97ad94551d2dcc2e945f0d4363e6056d3d175ae3dabd6cc889d1cd54d"
+  },
+  "noteReview": {
+    "action": "updated the owning bounded-admission note, JobsLocal README and existing managed-resource upgrade guide; corrected the note identity wording to the current registry-issued id behavior",
+    "newNotes": 0,
+    "archivedNotesChanged": false
+  },
+  "remaining": [
+    "All12 business domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue B456 with remaining Core lifecycle and resource-admission paths, queued continuation, exact-parent teardown, model/Inspector consumers and permission withdrawal. Named cases and one complete module do not prove domain completion.",
+    "Complete JobsLocal entry is100%:267 statements,157 branch arms,64 functions,227 lines. Core source remains byte-identical to B454:97.55%statements,93.75%branches,96.92%functions,98.02%lines with7 existing uncovered statements. Keep the last B453 Tool entry100%measurement as historical scoped evidence. Do not change repository exclusions or thresholds.",
+    "Peer owns R37 computer-side entry, no-workspace conversation creation, HTTP connection reuse and necessary Gateway node-service/PG authorization changes. Peer reports169 Gateway cases and plans dual-host native acceptance; Root has not inspected a completed R37 production receipt. B451 exact Admin Runtime control integration remains deferred. No routine peer messages.",
+    "Continue all cross-account/computer/document business paths outside peer-reserved files. The authority-only search candidate was not confirmed: managed SDK bootstrap already declares model/resource requirements. The peer-reported forbidden or unsupported search route stays a capability/configuration gap; never broaden account authorization.",
+    "Full native user/Admin operational acceptance, remaining allocation inventory and an assembled Root/peer release remain incomplete.",
+    "Official paid Responses remains deferred. No Root production deployment, restart, dependency synchronization, reset, stash, commit or push."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": {
+    "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/B416-B455-integration-index.json",
+    "findings": 40,
+    "capsules": 33,
+    "frozenDeltaVersions": 720,
+    "presentPaths": 423,
+    "currentSourceDriftPaths": [
+      "gateway/README.i18n.yaml",
+      "gateway/README.md",
+      "gateway/README.zh.md",
+      "packages/context/gateway-runtime/src/index.ts"
+    ]
+  },
+  "inventoryObservation": {
+    "at": "2026-11-01T21:58:03.665848+00:00",
+    "currentGitPaths": 22059,
+    "trackedInInventoryAfterRefresh": 22076,
+    "newPeerPathsAddedAsPending": [
+      ".agents/notes/implemented/architecture/2026-11-02-node-service-http-reuse.i18n.yaml",
+      ".agents/notes/implemented/architecture/2026-11-02-node-service-http-reuse.md",
+      ".agents/notes/implemented/architecture/2026-11-02-node-service-http-reuse.zh.md",
+      "gateway/src/node-service-http-pool.ts",
+      "gateway/tests/fixtures/computer-workspace-client.mjs"
+    ],
+    "unrecordedCurrentGitPaths": 0,
+    "historicalAbsentPaths": 17,
+    "reviewComplete": false
+  }
+}

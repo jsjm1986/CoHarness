@@ -1,0 +1,409 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:session/handoff-llm-request",
+      "kind": "event",
+      "event": "session/handoff-llm-request",
+      "surface": false,
+      "digest": "e158e789d5f24a4b55c6de22ff22778917df7635ab0d4235ad87d19b282565f5",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 30,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 34,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "messages",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "route",
+                "type": 33,
+                "optional": false
+              },
+              {
+                "name": "sourceSessionId",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 3
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "content",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "role",
+                "type": 32,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 5
+          },
+          {
+            "kind": "union",
+            "types": [
+              6,
+              11,
+              13,
+              15,
+              18,
+              20,
+              22
+            ]
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachment",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachmentId",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "bytes",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "file"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "text",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 12,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "reasoning"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "text",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 14,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "text"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "tool",
+                "type": 16,
+                "optional": true
+              },
+              {
+                "name": "toolName",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 17,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "never"
+          },
+          {
+            "kind": "literal",
+            "value": "tool-addition"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "toolName",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 19,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "tool-removal"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "arguments",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "id",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 21,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "tool-call"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachment",
+                "type": 23,
+                "optional": false
+              },
+              {
+                "name": "offloaded",
+                "type": 30,
+                "optional": true
+              },
+              {
+                "name": "type",
+                "type": 31,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachmentId",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "bytes",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "height",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "mediaType",
+                "type": 24,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 8,
+                "optional": true
+              },
+              {
+                "name": "originalDimensions",
+                "type": 29,
+                "optional": true
+              },
+              {
+                "name": "width",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              25,
+              26,
+              27,
+              28
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "image/gif"
+          },
+          {
+            "kind": "literal",
+            "value": "image/jpeg"
+          },
+          {
+            "kind": "literal",
+            "value": "image/png"
+          },
+          {
+            "kind": "literal",
+            "value": "image/webp"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "height",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "width",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "image"
+          },
+          {
+            "kind": "literal",
+            "value": "user"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "model",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "session/handoff-llm-request"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

@@ -107,6 +107,46 @@ describe('JobEventHub', () => {
     expect(warnings).toEqual([expect.stringContaining('event listener threw on registered: Error: listener boom')])
   })
 
+  it('contains a listener error that cannot be converted to a string', () => {
+    const { ctx, hub, warnings } = bench()
+    const seen: JobEvent[] = []
+    hub.subscribe(ctx, { owners: 'all' }, () => { throw Object.create(null) })
+    hub.subscribe(ctx, { owners: 'all' }, (event) => { seen.push(event) })
+    hub.emit({ type: 'registered', job: view(undefined) }, undefined)
+    expect(seen).toHaveLength(1)
+    expect(warnings).toEqual(['jobs: event listener threw on registered: [unrenderable thrown value]'])
+  })
+
+  it.each([false, true])('delivers a nested event after the current event reaches every peer: throwing=%s', async (throwAfterPublish) => {
+    const { ctx, hub, warnings } = bench()
+    const seen: string[] = []
+    try {
+      hub.subscribe(ctx, { owners: 'all' }, (event) => {
+        seen.push(`first:${event.type}`)
+        if (event.type !== 'registered') return
+        hub.emit({ type: 'progress', job: view(undefined) }, undefined)
+        if (throwAfterPublish) throw Object.create(null)
+      })
+      hub.subscribe(ctx, { owners: 'all' }, (event) => { seen.push(`second:${event.type}`) })
+      hub.emit({ type: 'registered', job: view(undefined) }, undefined)
+      expect(seen).toEqual(['first:registered', 'second:registered', 'first:progress', 'second:progress'])
+      expect(warnings).toHaveLength(throwAfterPublish ? 1 : 0)
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('records a publication before its subscribers and retains its place ahead of nested notifications', async () => {
+    const { ctx, hub } = bench()
+    const seen: string[] = []
+    try {
+      hub.subscribe(ctx, { owners: 'all' }, (event) => { seen.push(event.type) })
+      hub.emit({ type: 'registered', job: view(undefined) }, undefined, () => {
+        seen.push('record')
+        hub.emit({ type: 'progress', job: view(undefined) }, undefined, () => { seen.push('nested-record') })
+      })
+      expect(seen).toEqual(['record', 'nested-record', 'registered', 'progress'])
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('unregisters through the disposer and with the subscribing fiber', async () => {
     const { ctx, hub } = bench()
     const seen: number[] = []

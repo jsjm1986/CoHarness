@@ -1,0 +1,9 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, drainingCleanupReady]
+- insert:
+    - id: draining-subagent-runtime
+      name: './runtime.mjs'
+    - id: draining-subagent-model
+      name: './model.mjs'

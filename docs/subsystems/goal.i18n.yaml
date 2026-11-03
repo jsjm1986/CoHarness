@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/goal.md
 document:
-  en: d7639743d0a76efeca05947710407b31505364dd
-  zh: c3192a507d22f93be7f8fcf321001a66930d137a
+  en: 9fb7e8ec11cf82b369ca2728a30114c4791ea7cc
+  zh: 7dab64025e87743768fdd9ea701e40c3ae287ef0
 /same-session-goals:
   en: f76138e8235819ce
   zh: fdb595b0451cd8f7

@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-worker-late-error-before",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts -t 'retains uncertain accounting' --retry=0",
+  "startedAt": "2026-10-23T13:29:59.663596+00:00",
+  "seconds": 17.441,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d4323c53fe6d9e5731dffd64361201da480e10edee977aeef780718b736efa7b",
+  "inputsAfter": "d4323c53fe6d9e5731dffd64361201da480e10edee977aeef780718b736efa7b",
+  "outputSha256": "b68ff9c7e28bc8a26769f84a927f0dde9bd898e2c9ca15d9a95aea8f6b21d1e4",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts (14 tests | 1 failed | 13 skipped) 114ms\n   × retains uncertain accounting after termination failure and accepts a later thread exit 113ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts > retains uncertain accounting after termination failure and accepts a later thread exit\nAssertionError: expected \"vi.fn()\" to be called once, but got 0 times\n ❯ packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts:128:29\n    126|     expect(() => worker.emit('error', new Error('late Worker failure')…\n    127|     expect(owner.release).not.toHaveBeenCalled()\n    128|     expect(owner.uncertain).toHaveBeenCalledOnce()\n       |                             ^\n    129|   } finally { termination.mockRestore() }\n    130|   await worker.terminate()\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 13 skipped (14)\n   Start at  21:30:16\n   Duration  946ms (transform 129ms, setup 62ms, import 548ms, tests 114ms, environment 0ms)\n\n"
+}

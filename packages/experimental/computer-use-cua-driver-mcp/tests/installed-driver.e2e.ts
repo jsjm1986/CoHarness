@@ -33,6 +33,7 @@ it.skipIf(executable === undefined || executable === '')(
       await ctx.plugin(SystemPrompt)
       await ctx.plugin(ToolRuntime)
       const provider = await ctx.plugin(Provider, {
+        desktopMode: 'enabled',
         command: executable,
         args: driverArguments(),
         reconnect: { enabled: false },

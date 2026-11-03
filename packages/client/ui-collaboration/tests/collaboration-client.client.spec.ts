@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import { clientSessionKey, type SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import {
   CollaborationClient, CollaborationRequestError, createBrowserCollaborationTransport,
   parseCollaborationContext, parseConversationDetail, type CollaborationContext,
-  type CollaborationTransport, type ConversationDetail,
+  type CollaborationTransport, type ConversationDetail, type CollaborationEnvironmentPage,
 } from '../src/client/collaboration-client.ts'
+
+afterEach(() => { localStorage.clear(); vi.restoreAllMocks() })
 
 const projectContext: CollaborationContext = {
   user: { id: 7, username: 'lin', displayName: '林工', role: 'member' },
@@ -63,6 +67,15 @@ function transport(overrides: Partial<CollaborationTransport> = {}): Collaborati
 }
 
 describe('response parsing', () => {
+  it('retains fixed computer metadata for an empty project and rejects invalid computer identities', () => {
+    const project = { ...projectContext.projects[0], nodeId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', nodeName: 'Ubuntu' }
+    expect(parseCollaborationContext({ ...projectContext, projects: [project] }).projects[0]).toMatchObject({
+      nodeId: project.nodeId, nodeName: 'Ubuntu',
+    })
+    expect(() => parseCollaborationContext({ ...projectContext, projects: [{ ...project, nodeId: 'another-computer' }] }))
+      .toThrow('invalid collaboration project computer')
+  })
+
   it('retains explicit account eligibility and rejects malformed eligibility fields', () => {
     expect(parseCollaborationContext({ ...personalContext, fullAccess: true, autoReviewEligible: true }))
       .toMatchObject({ fullAccess: true, autoReviewEligible: true })
@@ -152,6 +165,41 @@ describe('response parsing', () => {
 })
 
 describe('browser transport', () => {
+  it('pins sharing reads and changes to each Session Runtime independently of the active page', async () => {
+    const first = { kind: 'project', projectId: 9,
+      runtimeId: '10000000-0000-4000-8000-000000000001' as NonNullable<SessionRuntimeTarget['runtimeId']> } satisfies SessionRuntimeTarget
+    const second = { kind: 'project', projectId: 10,
+      runtimeId: '10000000-0000-4000-8000-000000000002' as NonNullable<SessionRuntimeTarget['runtimeId']> } satisfies SessionRuntimeTarget
+    const fetcher = vi.fn().mockResolvedValueOnce(Response.json(detail))
+      .mockResolvedValueOnce(new Response(null, { status: 204 })) as unknown as typeof fetch
+    const api = createBrowserCollaborationTransport({ fetch: fetcher })
+    const signal = new AbortController().signal
+    await api.loadConversation(clientSessionKey(first, SessionId('same-session')), signal)
+    await api.setVisibility(clientSessionKey(second, SessionId('same-session')), 'private', signal)
+    for (const [index, target] of [first, second].entries()) {
+      const url = new URL(vi.mocked(fetcher).mock.calls[index]![0] as string, 'http://gateway')
+      expect(url.pathname).toBe('/account/api/conversations/same-session')
+      expect(url.searchParams.get('projectId')).toBe(String(target.projectId))
+      expect(url.searchParams.get('dshRuntime')).toBe(target.runtimeId)
+      expect(url.searchParams.get('dshTarget')).toBe(`project:${String(target.projectId)}`)
+    }
+  })
+
+  it('keeps an unqualified sharing request on the Runtime explicitly selected in this tab', async () => {
+    const previous = location.href
+    const runtimeId = '10000000-0000-4000-8000-000000000003'
+    history.replaceState(null, '', `/?dshRuntime=${runtimeId}`)
+    try {
+      const fetcher = vi.fn().mockResolvedValue(Response.json(detail)) as unknown as typeof fetch
+      const api = createBrowserCollaborationTransport({ fetch: fetcher })
+      await api.loadConversation('legacy-session', new AbortController().signal)
+      const url = new URL(vi.mocked(fetcher).mock.calls[0]![0] as string, 'http://gateway')
+      expect(url.searchParams.get('dshRuntime')).toBe(runtimeId)
+    } finally {
+      history.replaceState(null, '', previous)
+    }
+  })
+
   it('uses the Gateway account routes, encodes session ids, and reloads through the injected callback', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(Response.json(projectContext))
@@ -317,6 +365,166 @@ describe('browser transport', () => {
 })
 
 describe('CollaborationClient', () => {
+  it('retains loaded destinations across pages and resets them on an explicit refresh', async () => {
+    const first = { target: { kind: 'personal' as const, runtimeId: '10000000-0000-4000-8000-000000000001' as never }, name: 'Lin', nodeName: 'A', observedState: 'ready' }
+    const second = { ...first, target: { kind: 'personal' as const, runtimeId: '10000000-0000-4000-8000-000000000002' as never }, nodeName: 'B' }
+    const loadEnvironments = vi.fn().mockResolvedValueOnce({ items: [first], nextCursor: 'next' })
+      .mockResolvedValueOnce({ items: [first, second], nextCursor: null })
+      .mockResolvedValueOnce({ items: [second], nextCursor: null })
+    const client = new CollaborationClient(transport({ loadEnvironments }))
+    await client.load()
+    await client.loadEnvironments()
+    await client.loadEnvironments('next')
+    expect(client.getSnapshot().environments?.items).toEqual([first, second])
+    await client.loadEnvironments()
+    expect(client.getSnapshot().environments?.items).toEqual([second])
+    client.dispose()
+  })
+
+  it('resolves a favorite beyond the first page and drops its metadata when access is withdrawn', async () => {
+    const id = '10000000-0000-4000-8000-000000000009'
+    localStorage.setItem(`dsh.spaces.favorite.v1.account:7.runtime:${id}`, '1')
+    const favorite = { target: { kind: 'personal' as const, runtimeId: id as never }, name: 'Lin', nodeName: 'Computer B', observedState: 'stopped' }
+    const resolve = vi.fn().mockResolvedValueOnce([favorite]).mockResolvedValueOnce([])
+    const client = new CollaborationClient(transport({
+      loadEnvironments: async () => ({ items: [], nextCursor: 'later' }), loadPreferredEnvironments: resolve,
+    }))
+    try {
+      await client.load()
+      await client.loadEnvironments()
+      expect(resolve).toHaveBeenCalledWith([id], expect.any(AbortSignal))
+      expect(client.getSnapshot().preferredEnvironments).toEqual([favorite])
+      expect(client.getSnapshot().favoriteRuntimeIds).toEqual([id])
+      await client.loadEnvironments()
+      expect(client.getSnapshot().preferredEnvironments).toEqual([])
+      expect(client.getSnapshot().favoriteRuntimeIds).toEqual([])
+    } finally { client.dispose() }
+  })
+
+  it('cancels saved-destination metadata on connection invalidation and ignores its late completion', async () => {
+    const id = '10000000-0000-4000-8000-000000000009'
+    localStorage.setItem(`dsh.spaces.favorite.v1.account:7.runtime:${id}`, '1')
+    let finish!: (items: []) => void
+    let signal!: AbortSignal
+    const client = new CollaborationClient(transport({
+      loadEnvironments: async () => ({ items: [], nextCursor: null }),
+      loadPreferredEnvironments: (_ids, owned) => { signal = owned; return new Promise((resolve) => { finish = resolve }) },
+    }))
+    try {
+      await client.load()
+      const loading = client.loadEnvironments()
+      client.invalidateContext()
+      expect(signal.aborted).toBe(true)
+      finish([])
+      await loading
+      expect(client.getSnapshot().preferredEnvironments).toBeUndefined()
+      expect(client.getSnapshot().favoriteRuntimeIds).toBeUndefined()
+    } finally { client.dispose() }
+  })
+
+  it.each([
+    [503, 'node-service/unavailable', 'offline'], [503, 'node-service/busy', 'busy'],
+    [409, 'runtime-management/quota-exceeded', 'quota'], [403, 'runtime-catalog/forbidden', 'forbidden'],
+    [401, undefined, 'auth'], [404, undefined, 'retired'],
+  ])('retains a recoverable switch refusal for status %s and code %s', async (status, code, reason) => {
+    const client = new CollaborationClient(transport({
+      switchScope: async () => { throw new CollaborationRequestError(status, code) },
+    }))
+    try {
+      await client.load()
+      await client.switchScope({ kind: 'personal' })
+      expect(client.getSnapshot()).toMatchObject({ scopeBusy: false, scopeError: reason, scopeFailedTarget: { kind: 'personal' } })
+    } finally { client.dispose() }
+  })
+
+  it('prepares the destination while preserving transient input in the source tab', async () => {
+    const runtimeId = '10000000-0000-4000-8000-000000000002'
+    let mayLeave = false
+    const reload = vi.fn()
+    const client = new CollaborationClient(transport({
+      canNavigate: () => mayLeave, reload,
+      loadEnvironments: vi.fn().mockResolvedValue({ items: [{ target: { kind: 'personal', runtimeId },
+        name: 'lin', nodeName: 'Computer B', observedState: 'ready' }], nextCursor: null }),
+      switchScope: vi.fn().mockResolvedValue(`/?dshRuntime=${runtimeId}`),
+    }))
+    await client.load()
+    await client.loadEnvironments()
+    await client.switchScope({ kind: 'personal', runtimeId: runtimeId as never })
+    expect(reload).not.toHaveBeenCalled()
+    expect(client.getSnapshot().scopeOffer?.runtimeId).toBe(runtimeId)
+    expect(client.getSnapshot().scopeOffer?.target.nodeName).toBe('Computer B')
+    expect(client.getSnapshot().scopeBusy).toBe(false)
+    client.dismissScopeOffer()
+    expect(client.getSnapshot().scopeOffer).toBeUndefined()
+    mayLeave = true
+    await client.switchScope({ kind: 'personal', runtimeId: runtimeId as never })
+    expect(reload).toHaveBeenCalledWith(`/?dshRuntime=${runtimeId}`)
+    client.dispose()
+  })
+
+  it('does not navigate when account verification is invalidated during preparation', async () => {
+    const pending = deferred<string>()
+    const switchScope = vi.fn().mockReturnValue(pending.promise)
+    const reload = vi.fn()
+    const client = new CollaborationClient(transport({ switchScope, reload }))
+    await client.load()
+    const request = client.switchScope({ kind: 'project', projectId: 9 })
+    client.invalidateContext()
+    expect((switchScope.mock.calls[0]![1] as AbortSignal).aborted).toBe(true)
+    pending.resolve('/?dshRuntime=10000000-0000-4000-8000-000000000002')
+    await request
+    expect(reload).not.toHaveBeenCalled()
+    expect(client.getSnapshot().scopeBusy).toBe(false)
+    expect(client.getSnapshot().scopeOffer).toBeUndefined()
+    client.dispose()
+  })
+
+  it('waits for verified account context before reading environment metadata', async () => {
+    const loadEnvironments = vi.fn().mockResolvedValue({ items: [], nextCursor: null })
+    const client = new CollaborationClient(transport({ loadEnvironments }))
+    await client.loadEnvironments()
+    expect(loadEnvironments).not.toHaveBeenCalled()
+    await client.load()
+    await client.loadEnvironments('page-2')
+    expect(client.getSnapshot().environmentsCursor).toBe('page-2')
+    client.dispose()
+  })
+
+  it('aborts old environment reads and refuses their late result after the account changes', async () => {
+    const old = deferred<CollaborationEnvironmentPage>()
+    const loadContext = vi.fn().mockResolvedValueOnce(personalContext)
+      .mockResolvedValueOnce({ ...personalContext, user: { ...personalContext.user, id: 8 } })
+    const loadEnvironments = vi.fn().mockReturnValueOnce(old.promise).mockResolvedValueOnce({ items: [], nextCursor: null })
+    const client = new CollaborationClient(transport({ loadContext, loadEnvironments }))
+    await client.load()
+    const obsolete = client.loadEnvironments()
+    await vi.waitFor(() => { expect(loadEnvironments).toHaveBeenCalledTimes(1) })
+    const signal = loadEnvironments.mock.calls[0]![1] as AbortSignal
+    await client.load(true)
+    expect(signal.aborted).toBe(true)
+    await client.loadEnvironments()
+    old.resolve({ items: [], nextCursor: 'old-account-cursor' })
+    await obsolete
+    expect(client.getSnapshot().environments).toEqual({ items: [], nextCursor: null })
+    client.dispose()
+  })
+
+  it('aborts the pending directory on connection invalidation and releases its loading state', async () => {
+    const pending = deferred<CollaborationEnvironmentPage>()
+    const loadEnvironments = vi.fn().mockReturnValue(pending.promise)
+    const client = new CollaborationClient(transport({ loadEnvironments }))
+    await client.load()
+    const read = client.loadEnvironments()
+    await vi.waitFor(() => { expect(loadEnvironments).toHaveBeenCalledTimes(1) })
+    client.invalidateContext()
+    expect((loadEnvironments.mock.calls[0]![1] as AbortSignal).aborted).toBe(true)
+    pending.resolve({ items: [], nextCursor: 'old-connection' })
+    await read
+    expect(client.getSnapshot().environments).toBeUndefined()
+    expect(client.getSnapshot().environmentsLoading).toBe(false)
+    client.dispose()
+  })
+
   it('ignores an earlier connection generation after the account context was invalidated', async () => {
     const old = deferred<CollaborationContext>()
     const fresh = deferred<CollaborationContext>()
@@ -668,6 +876,7 @@ describe('CollaborationClient', () => {
 
     const scopePending = deferred<undefined>()
     const scopeClient = new CollaborationClient(transport({ switchScope: vi.fn().mockReturnValue(scopePending.promise) }))
+    await scopeClient.load()
     const scopeRequest = scopeClient.switchScope({ kind: 'personal' })
     scopeClient.dispose()
     scopePending.reject(new Error('offline'))
@@ -829,9 +1038,9 @@ it('loads sharing in a project pane from a personal page and sends its explicit 
     const fetcher = vi.fn().mockResolvedValue(Response.json(detail))
     const browser = createBrowserCollaborationTransport({ fetch: fetcher, reload: vi.fn() })
     await browser.loadConversation(key, new AbortController().signal)
-    expect(fetcher).toHaveBeenCalledWith('/account/api/conversations/child?projectId=9', expect.any(Object))
+    expect(fetcher).toHaveBeenCalledWith('/account/api/conversations/child?projectId=9&dshTarget=project%3A9', expect.any(Object))
     await browser.setVisibility(key, 'private', new AbortController().signal)
-    expect(fetcher).toHaveBeenLastCalledWith('/account/api/conversations/child?projectId=9', expect.objectContaining({ method: 'PATCH' }))
+    expect(fetcher).toHaveBeenLastCalledWith('/account/api/conversations/child?projectId=9&dshTarget=project%3A9', expect.objectContaining({ method: 'PATCH' }))
     expect(() => browser.loadConversation(personal, new AbortController().signal)).toThrow('no project sharing')
   } finally { client.dispose() }
 })

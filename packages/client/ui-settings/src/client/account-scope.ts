@@ -5,7 +5,7 @@ import type {
   AccountPreferencesRequestError,
 } from '@deepseek-ai/dsh-client-connection/client'
 import {
-  createSnapshotStore, type SettingsScope, type SettingsScopeSnapshot,
+  createSnapshotStore, settingsControlState, type SettingsControlState, type SettingsScope, type SettingsScopeSnapshot,
   type SettingsScopeSpec, type SettingsWriteState, type SnapshotStore,
 } from '@deepseek-ai/dsh-client-runtime/client'
 
@@ -391,7 +391,7 @@ export class AccountSettingsScopeController<T> implements SettingsScope<T> {
  */
 const ACCOUNT_FIELDS: Record<string, readonly string[]> = {
   locale: ['preference'],
-  'ui-theme': ['preference'],
+  'ui-theme': ['preference', 'fontSize', 'codeFontSize', 'terminalFontSize', 'textFontFamily', 'codeFontFamily', 'terminalFontFamily'],
   'ui-conversation': [
     'busyEnter', 'chatContentWidth', 'chatFullWidth', 'chatFontSize',
     'transcriptView', 'performanceUsage', 'linkOpening',
@@ -436,6 +436,15 @@ export class AccountOrHostSettingsScopeController<T> implements SettingsScope<T>
    * publication differ. */
   /** @returns the merged or fallback source snapshot. */
   getSnapshot(): SettingsScopeSnapshot<T> { return this.store.getSnapshot() }
+
+  /**
+   * Project the same source that receives this field's writes.
+   * @param field - scalar namespace field.
+   * @returns current field-source availability and write state.
+   */
+  getFieldControlState(field: string): SettingsControlState {
+    return settingsControlState(this.route(field).getSnapshot())
+  }
 
   /** @param listener - called after snapshot changes. @returns disposer. */
   subscribe(listener: () => void): () => void { return this.store.subscribe(listener) }

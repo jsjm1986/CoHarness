@@ -1,0 +1,5 @@
+- id: userdoc-local
+  name: '@deepseek-ai/dsh-userdoc-local'
+  config:
+    uploadRoot: !!js "process.cwd() + '/documents'"
+    maxFileBytes: 64

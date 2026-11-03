@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-inherited-owner-lock",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/probe-inherited-runtime-lock.mjs",
+  "startedAt": "2026-10-24T18:34:52.143658+00:00",
+  "seconds": 2.135,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fafbe6c5d4884e0a262b9ad5005dbb6ad90139aa091585b95eb1b630d54be2dc",
+  "inputsAfter": "fafbe6c5d4884e0a262b9ad5005dbb6ad90139aa091585b95eb1b630d54be2dc",
+  "postgresToolDirectory": null,
+  "outputSha256": "00ac745cbcc41a447d21c646dda08db63daff5f310cd6119d0785ce31b2a15f2",
+  "outputTail": "{\"inheritedDescriptorRetainsKernelLock\":true,\"parentCloseDoesNotRelease\":true,\"childExitAllowsRecovery\":true}\n"
+}

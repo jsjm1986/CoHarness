@@ -1,0 +1,14 @@
+{
+  "name": "document-authority-first-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts gateway/src/postgres/document-catalog-service.ts gateway/tests/admin-business-postgres.spec.ts",
+  "startedAt": "2026-10-25T00:15:43.123866+00:00",
+  "seconds": 1.838,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "36f6ac102a7c8b685139bd1716b10a3dc7f81de044343fdc718149b657577c5e",
+  "inputsAfter": "36f6ac102a7c8b685139bd1716b10a3dc7f81de044343fdc718149b657577c5e",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

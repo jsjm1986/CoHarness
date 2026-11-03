@@ -49,6 +49,15 @@ export type {
 // Export discipline: packages/client/AGENTS.md.
 
 declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * Refuse document admission using a plugin's current Session authorization.
+     * @param sessionId - captured target conversation, including its Runtime identity.
+     * @mode bail
+     * @returns 'deny' to refuse, or undefined to let other policies check admission.
+     */
+    'conversation/document-admission'(sessionId: import('@deepseek-ai/dsh-client-runtime/client').SessionId): 'deny' | undefined
+  }
   interface Context {
     /** The outward face only; the concrete service stays inside this plugin. */
     conversation: import('./service.ts').IConversation

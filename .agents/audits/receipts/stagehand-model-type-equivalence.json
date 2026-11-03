@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-type-equivalence",
+  "cwd": ".",
+  "command": "pnpm run verify-type-equiv",
+  "startedAt": "2026-10-23T18:39:47.925714+00:00",
+  "seconds": 20.851,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "inputsAfter": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "outputSha256": "d0bb06c364d4916a72eefcfc09ce5d616536dec1233f3bd2888f9752cc22efae",
+  "outputTail": "$ tsx scripts/verify-type-equiv.ts\nverify-type-equiv: 526 type-equiv block(s) match source structure and JSDoc (1:1 with manifest); 526 paired derivative(s).\n"
+}

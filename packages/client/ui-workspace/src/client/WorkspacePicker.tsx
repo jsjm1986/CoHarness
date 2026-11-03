@@ -15,7 +15,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   DirectoryBrowseError,
-  type DirectoryListing, type WorkspaceId, type WorkspaceListState, type WorkspaceView,
+  type DirectoryListing, type SessionRuntimeTarget, type WorkspaceId, type WorkspaceListState, type WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type { DirectoryFlowOwnerProps, WorkspacePickerProps } from './contract/slots.ts'
@@ -42,7 +42,7 @@ export interface WorkspacePickFlowProps {
   /** Selector hook over the workspace list (framework standard hook). */
   useWorkspaces: <S>(selector: (state: WorkspaceListState) => S) => S
   /** Adopt a picked host directory as a real Workspace. */
-  createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
+  createWorkspace: (input: { path: string; runtimeTarget?: SessionRuntimeTarget | null }) => Promise<WorkspaceView>
   /** Bound occupancy selector hook for this surface's directory-flow hole (empty leaves the surface with no add action). */
   useDirectoryFlow: SnapshotSelectorHook<boolean>
   /** Render this surface's directory-flow hole with the owner conversation (the entry's narrowed renderSlot). */
@@ -62,7 +62,8 @@ export interface WorkspacePickFlowProps {
    * roots. Omitted inject, or `directory-picker-unavailable` from a native
    * Host, skips the check so standalone dsh web still opens existing workspaces.
    */
-  listDirectory?: ((path?: string, signal?: AbortSignal) => Promise<DirectoryListing>) | undefined
+  listDirectory?: ((path?: string, signal?: AbortSignal, runtimeTarget?: SessionRuntimeTarget | null)
+  => Promise<DirectoryListing>) | undefined
   /** Mirror picking occupancy so workspace commands can gate their availability. */
   onBusyChange?: ((busy: boolean) => void) | undefined
 }
@@ -90,6 +91,7 @@ export function WorkspacePickFlow({
 }: WorkspacePickFlowProps) {
   const workspaceSnapshot = useWorkspaces(state => state)
   const workspaces = workspaceSnapshot.items
+  const flowRuntime = useRef<SessionRuntimeTarget | null>(null)
   const getAnchorRect = useCallback(
     () => anchorRef?.current?.getBoundingClientRect() ?? null,
     [anchorRef],
@@ -130,7 +132,11 @@ export function WorkspacePickFlow({
   const items: MenuEntry[] = pinAdd
     ? workspaces.map(workspace => ({
       id: workspace.workspaceId,
-      label: workspace.title,
+      label: workspaceSnapshot.computerGroups === undefined ? workspace.title : <span className={css.workspaceLabel}>
+        <span>{workspace.title}</span>
+        <span className={css.workspaceComputer}>{workspaceSnapshot.computerGroups.find(group =>
+          group.runtime.runtimeId === workspaceSnapshot.workspaceRuntimeIds?.[workspace.workspaceId])?.runtime.nodeName}</span>
+      </span>,
       icon: <IconFolderClose16 size={16} />,
       disabled: flowBusy,
     }))
@@ -147,7 +153,7 @@ export function WorkspacePickFlow({
 
   /** Adopt a picked directory; failures land in the folder-error dialog (Choose again reopens the flow). */
   const adoptDirectory = (path: string): Promise<void> =>
-    createWorkspace({ path }).then((workspace) => {
+    createWorkspace({ path, runtimeTarget: flowRuntime.current }).then((workspace) => {
       setFlowOpen(false)
       onPick(workspace.workspaceId)
     }).catch((reason: unknown) => {
@@ -157,11 +163,12 @@ export function WorkspacePickFlow({
     })
 
   const openDirectoryFlow = useCallback((): void => {
+    flowRuntime.current = workspaceSnapshot.directoryRuntime ?? null
     onClose()
     setErrorOpen(false)
     setModalError(null)
     setFlowOpen(true)
-  }, [onClose])
+  }, [onClose, workspaceSnapshot.directoryRuntime])
 
   // A menu exists to disambiguate between targets. With no workspaces listed
   // and the add action the only entry left, the anchor gesture IS that action:
@@ -182,6 +189,7 @@ export function WorkspacePickFlow({
   /** Owner side of the flow conversation: adopt keeps the flow open (busy) until the Host answers. */
   const flowOwner: DirectoryFlowOwnerProps = {
     open: flowOpen,
+    runtimeTarget: flowRuntime.current,
     busy: pickingFolder,
     onPicked: (path) => {
       setPickingFolder(true)
@@ -208,7 +216,9 @@ export function WorkspacePickFlow({
       onPick(workspaceId)
       return
     }
-    void listDirectory().then((listing) => {
+    void listDirectory(undefined, undefined, workspaceSnapshot.computerGroups === undefined ? undefined
+      : workspaceSnapshot.computerGroups.find(group =>
+        group.runtime.runtimeId === workspaceSnapshot.workspaceRuntimeIds?.[workspaceId])?.runtime ?? null).then((listing) => {
       if (generation !== pickGeneration.current) return
       // Grant-root listings advertise empty crumbs; an OS-home listing keeps
       // ancestry crumbs and must not fence standalone dsh web.

@@ -1,4 +1,5 @@
 import { DesktopPermissions } from '../components/DesktopPermissions.tsx'
+import { DesktopEnvironmentNotice } from '../components/DesktopEnvironmentNotice.tsx'
 import { Ban, Monitor, RefreshCw, ShieldOff } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -102,6 +103,7 @@ export function DesktopsPage() {
         description={t('pageDescription')}
         meta={t('resourceCount', { count: String(rows.length) })}
       />
+      <DesktopEnvironmentNotice />
       <DesktopPermissions />
       <ErrorBanner message={error} />
       <Section

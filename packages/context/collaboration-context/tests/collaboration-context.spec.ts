@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import * as CollaborationContext from '../src/index.ts'
 import { renderParticipantNotice } from '../src/participant.ts'
@@ -21,10 +21,11 @@ const PARTICIPANT = {
   },
 }
 
-function projectMessage(text = 'Ship it') {
+function projectMessage(text = 'Ship it', kind: 'user' | 'user-question-reply' = 'user') {
   return createUserMessage({
     content: [{ type: 'text' as const, text }],
-    source: { kind: 'user', participant: PARTICIPANT } as never,
+    source: { kind, participant: PARTICIPANT,
+      ...(kind === 'user-question-reply' ? { callId: ToolCallId('continued-question'), outcome: 'answered' } : {}) } as never,
   })
 }
 
@@ -55,10 +56,10 @@ async function setup() {
 }
 
 describe('collaboration context', () => {
-  it('prepends a durable notice to each final project participant message', async () => {
+  it.each(['user', 'user-question-reply'] as const)('prepends a durable notice to each final project participant message from %s', async (kind) => {
     const { ctx, agent } = await setup()
-    const first = projectMessage('First')
-    const second = projectMessage('Second')
+    const first = projectMessage('First', kind)
+    const second = projectMessage('Second', kind)
     const decision = await agentEvents(ctx, agent).waterfall(
       'agent/pre-step',
       { messages: [first, second], turn: 1, step: 1, signal: SIGNAL },

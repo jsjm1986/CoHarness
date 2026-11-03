@@ -1,0 +1,13 @@
+{
+  "name": "model-tool-doc-pair",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write docs/tool-catalog.md",
+  "startedAt": "2026-10-23T19:30:37.033961+00:00",
+  "seconds": 2.492,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e5b6e79a0bf0f8adc5f775022697cac8446379370bc4e60bda721f456e00a479",
+  "inputsAfter": "e5b6e79a0bf0f8adc5f775022697cac8446379370bc4e60bda721f456e00a479",
+  "outputSha256": "00c355a2f411fda89c5fc19340eca2993df5be5eb24746bfc8b7f5f018a2a6de",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write docs/tool-catalog.md\nverify-translation-pairing: recorded docs/tool-catalog.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

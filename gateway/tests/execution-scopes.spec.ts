@@ -1,12 +1,14 @@
 /** Immutable request participants over real Gateway HTTP and PostgreSQL. */
+import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { resolve } from 'node:path'
+import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { verifyExecutionAttribution, type ExecutionIdentityState } from '../src/execution-identity.ts'
 import { createExecutionFixture, type Receipt } from './execution-fixture.ts'
 
-const databaseUrl = process.env.HGW_TEST_DATABASE_URL
+const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
 let pool: Pool
 const cleanup: Array<() => Promise<void>> = []
@@ -77,6 +79,32 @@ describePg('current execution scopes', () => {
     expect(editing.actors).toHaveLength(2)
     expect((await f.authorize(id, editing)).status).toBe(403)
     await expect(pool.query('UPDATE harness.execution_scopes SET unverified=false WHERE id=$1', [both.scopeId])).rejects.toThrow(/immutable/u)
+  })
+
+  it('refuses old Session witnesses after replacing the same account Runtime', async () => {
+    const f = await fixture(), runtime = f.personal
+    const id = await f.session(runtime), receipt = await f.admit(id, f.admin, runtime)
+    expect((await f.call('enter', { sessionId: id, inputId: receipt.inputId, messageId: receipt.messageId,
+      contentHash: receipt.contentHash }, undefined, runtime)).status).toBe(200)
+    const target = { kind: 'user' as const, id: runtime.id, runtimeId: runtime.runtimeId }
+    await f.instances.markStopped(target, runtime.generation)
+    await pool.query('DELETE FROM harness.instances WHERE runtime_id=$1', [runtime.runtimeId])
+    await f.instances.initialize()
+    const nextTarget = await f.instances.resolveTarget({ kind: 'user', id: runtime.id })
+    const token = randomUUID(), generation = await f.instances.beginStart(nextTarget, Date.now(), createHash('sha256').update(token).digest())
+    await f.instances.markReady(nextTarget, generation)
+    const next = { ...runtime, token, generation, runtimeId: nextTarget.runtimeId! }
+    expect(next.runtimeId).not.toBe(runtime.runtimeId)
+    expect((await f.call('register-session', { sessionId: id }, undefined, next)).status).toBe(200)
+    expect(await f.call('capture', { sessionId: id }, undefined, next)).toMatchObject({ status: 200, body: { inputs: [], actors: [] } })
+    expect((await f.call('enter', { sessionId: id, inputId: receipt.inputId, messageId: receipt.messageId,
+      contentHash: receipt.contentHash }, undefined, next)).status).toBe(403)
+    const records = (await pool.query('SELECT runtime_id,actor_witnesses FROM harness.execution_sessions WHERE organization_id=$1 AND session_id=$2',
+      [f.organizationId, id])).rows
+    expect(records).toHaveLength(2)
+    expect(records.find(row => row.runtime_id === runtime.runtimeId)?.actor_witnesses).toEqual({ [f.admin.uuid]: receipt.inputId })
+    expect(records.find(row => row.runtime_id === next.runtimeId)?.actor_witnesses).toEqual({})
+    await f.session(next)
   })
 
   it('keeps delayed children and relays bound to their original initiator after a newer turn', async () => {

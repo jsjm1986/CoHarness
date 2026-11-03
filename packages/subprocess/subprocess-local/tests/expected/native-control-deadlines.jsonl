@@ -1,0 +1,4 @@
+{"operation":"process-query","timedOut":true,"helperClosed":true,"targetAlive":true}
+{"operation":"ordinary-termination","timedOut":true,"helperClosed":true,"targetAlive":true}
+{"operation":"terminal-termination","timedOut":true,"helperClosed":true,"targetAlive":true}
+{"operation":"verified-workload-exit","targetClosed":true}

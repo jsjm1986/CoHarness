@@ -1,0 +1,10 @@
+{"label":"legacy-before-foreign-scope","status":200,"state":"queued","error":null}
+{"label":"legacy-after-foreign-scope","status":200,"state":"queued","error":null}
+{"label":"legacy-queued-poll","states":["queued","queued"]}
+{"label":"own-scoped-session-omits-scope","status":403,"state":null,"error":"execution-forbidden"}
+{"label":"foreign-immutable-scope","status":403,"state":null,"error":"execution-forbidden"}
+{"label":"foreign-computer-credential","status":401,"state":null,"error":"invalid-runtime-token"}
+{"label":"own-immutable-scope-a","status":200,"state":"queued","error":null}
+{"label":"own-immutable-scope-b","status":200,"state":"queued","error":null}
+{"label":"own-scoped-transition-refuses-legacy","states":["refused","refused"]}
+{"label":"quiescent-node-queues","queued":[0,0]}

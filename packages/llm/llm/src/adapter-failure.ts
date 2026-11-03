@@ -1,15 +1,23 @@
 /**
- * Normalization for values thrown by a final LLM adapter boundary.
+ * Normalization for model admission and final adapter failures.
  *
  * @module @deepseek-ai/dsh-llm/adapter-failure
  */
 
 import { HarnessError } from './error.ts'
+import { ResourceAdmissionError } from '@deepseek-ai/dsh-resource-budget'
 import type { LlmFailure } from './types.ts'
 
+const RESOURCE_ADMISSION_CODES = {
+  unavailable: 'RESOURCE_BUDGET_UNAVAILABLE',
+  cancelled: 'ABORTED',
+  expired: 'RESOURCE_ADMISSION_EXPIRED',
+  refused: 'RESOURCE_ADMISSION_REFUSED',
+} as const satisfies Record<ResourceAdmissionError['reason'], string>
+
 /**
- * Detach serializable provider facts from a value thrown by an adapter.
- * @param value - arbitrary value thrown during adapter dispatch or iteration.
+ * Detach serializable facts from a model admission or adapter failure.
+ * @param value - arbitrary value thrown during admission, adapter dispatch, or iteration.
  * @returns immutable provider-neutral facts suitable for a terminal finish chunk.
  * @internal
  */
@@ -23,8 +31,20 @@ export function normalizeLlmFailure(value: unknown): LlmFailure {
   if (carried !== undefined && carried.code === ownErrorCode(error)) return carried
   return Object.freeze({
     message: errorMessage(error),
-    code: harnessErrorCode(error),
+    code: resourceAdmissionCode(error) ?? harnessErrorCode(error),
   })
+}
+
+/** Classify only owned admission errors with a readable data-backed reason. */
+function resourceAdmissionCode(error: Error): string | undefined {
+  try {
+    if (!(error instanceof ResourceAdmissionError)) return undefined
+    const reason: unknown = Object.getOwnPropertyDescriptor(error, 'reason')?.value
+    if (typeof reason !== 'string' || !Object.hasOwn(RESOURCE_ADMISSION_CODES, reason)) return undefined
+    return RESOURCE_ADMISSION_CODES[reason as keyof typeof RESOURCE_ADMISSION_CODES]
+  } catch (_admissionErrorReflectionFailed) {
+    return undefined
+  }
 }
 
 /** Render a non-Error throw without letting hostile coercion escape normalization. */

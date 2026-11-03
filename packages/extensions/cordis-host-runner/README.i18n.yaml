@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/cordis-host-runner/README.md
 document:
-  en: 9e07844206a5873b6649b08933b194740a111a68
-  zh: 95554139e7afb90ff52229d3212919963dfe514c
+  en: 1abc75b47fb9c5e23d3147584c231733649e2b08
+  zh: 9a86654da79e200d55da6c75c7b17b7d7c429f0d
 /:
   en: b0ce54498070976a
   zh: 61495d48365178df
@@ -33,8 +33,8 @@ document:
   en: 4204585e094bffe6
   zh: a082d326785e11b8
 /deepseek-ai-dsh-cordis-host-runner/export-shape:
-  en: 58e1bafaa16d6ad4
-  zh: 1baf2a37023a1d46
+  en: 938ebe6ad314c94d
+  zh: 64f1523967a85f77
 /deepseek-ai-dsh-cordis-host-runner/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

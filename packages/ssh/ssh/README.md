@@ -29,7 +29,7 @@ Compose this service with [`fs-ssh`](../fs-ssh/README.md), [`subprocess-ssh`](..
 
 ### Deployment prerequisites
 
-Both endpoints require Linux or macOS. The local `ssh` command must support connection multiplexing and Unix-socket forwarding; the server must permit that forwarding. Configure the alias, credentials and known-host entry before startup: the service enables `BatchMode`, requires strict host-key checking, disables agent forwarding and adds no interactive authentication flow.
+Both endpoints require Linux or macOS. The local `ssh` command must support connection multiplexing and Unix-socket forwarding; the server must permit that forwarding. Consumers forwarding a host service to a remote loopback port also require TCP remote forwarding on the server with the requested loopback binding (`GatewayPorts no` or `clientspecified`). Configure the alias, credentials and known-host entry before startup: the service enables `BatchMode`, requires strict host-key checking, disables agent forwarding and adds no interactive authentication flow.
 
 Install an [SSH helper executable archive](../ssh-helper-runtime/README.md), or the built helper script with its matching Node dependencies. Keep the runtime outside the workspace and writable temporary roots. They must also remain outside a backend’s replaced temporary tree, such as bwrap’s private `/tmp`; the workspace may still be under `/tmp`. Digest verification detects an unexpected installed artifact after helper startup; it does not make writable deployment files safe to execute or authenticate a malicious SSH host.
 
@@ -56,13 +56,19 @@ Pass the verified `ctx.ssh.ptcLaunch` as the `launch` configuration of [`NodePtc
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The OpenSSH master carries private administrative RPC. Each program stream uses a separate forwarded Unix socket and an independent SSH channel. Program stdout cannot forge administrative replies or occupy the control stream’s channel window. SSH transport congestion still affects the shared connection.
+The master and forwarding-control commands run through a privately isolated local subprocess provider, retaining host execution even when the public subprocess service uses SSH. Managed transports request infrastructure process admission before allocation and keep accounting through managed-range quiescence. Their environment uses the subprocess credential scrubber; configured askpass paths remain explicit.
+
+The connection retains each subprocess provider through `retainConsumer()`. Its returned disposer joins cleanup already in progress and removes the consumer only after success. Shutdown rejects ordinary new requests while admitted process termination and wait remain available; it drains these consumers before closing the helper and local transport. Host carrier provider disposal still runs after failed remote cleanup.
+
+`forwardLoopback()` allocates a remote `127.0.0.1` TCP listener for one local loopback service. Its retained disposer drains the local consumer, cancels the original forwarding request and confirms remote cancellation through a later helper round trip. Caller cancellation waits for an allocation already sent to OpenSSH before rolling it back; the administrative deadline still applies. Malformed allocation results or unconfirmed cleanup invalidate the connection and join its local process. A failed owner remains retained for shutdown reporting. Concurrent owners cannot share the same local service port.
+
+The OpenSSH master carries private administrative RPC. Each program stream uses a separate forwarded Unix socket and an independent SSH channel. Cancellation after successful forwarding still removes that reservation. Failed forwarding cancellation or local socket-path removal invalidates the connection and waits for native transport observation before reporting cleanup. Program stdout cannot forge administrative replies or occupy the control stream’s channel window. SSH transport congestion still affects the shared connection.
 
 Each stream reservation has a random 256-bit TLS pre-shared key carried only by administrative RPC. TLS authenticates both endpoints and protects every stream byte; the key is never sent as a stream preface. Socket directories are private (`0700`) and sockets use `0600`. Replacing a writable socket path cannot impersonate an endpoint or reveal the stream key; an attacker can still interrupt service or relay opaque TLS records.
 
 Connection disposal joins forwarding and cancellation subprocesses and partially established streams before removing local resources. Transport loss rejects pending operations and invalidates the connection. The helper starts managed cleanup on SSH EOF, termination signals or heartbeat expiry. A disconnected client cannot confirm the remote outcome; operations are never reconnected or replayed automatically.
 
-Failed startup and process results release their reservations after native quiescence; the bounded completion cache preserves the original rejection for later result reads. Helper shutdown also joins endpoint and directory cleanup already in progress.
+Failed startup and process results release their reservations after native quiescence; the bounded completion cache preserves the original rejection for later result reads. Helper shutdown shares one cleanup attempt across callers and retains failed endpoint or directory cleanup for retry. Ordinary operations remain refused after shutdown begins; a later close request can retry cleanup without replaying program effects. The helper disposes local providers and removes its private root only after process cleanup succeeds.
 
 For terminals opting into shell activity observation, root exit retains the reservation and its remaining work. Activity RPC continues to reach the provider; explicit termination awaits quiescence before releasing endpoints and recording the completed result. Helper connection disposal and lease expiry retain their existing termination authority.
 

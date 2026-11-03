@@ -1,0 +1,11 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, retiredCleanupReady]
+- insert:
+    - id: retired-cleanup-ptc
+      name: '@deepseek-ai/dsh-ptc-runtime-node'
+    - id: retired-cleanup-runtime
+      name: './runtime.mjs'
+    - id: retired-cleanup-model
+      name: './model.mjs'

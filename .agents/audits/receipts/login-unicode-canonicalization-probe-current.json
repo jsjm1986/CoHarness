@@ -1,0 +1,13 @@
+{
+  "name": "login-unicode-canonicalization-probe-current",
+  "cwd": "gateway",
+  "command": "env TSX_TSCONFIG_PATH=tsconfig.run.json node --import tsx/esm --input-type=module -",
+  "startedAt": "2026-10-23T19:12:13.875112+00:00",
+  "seconds": 1.528,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c5d2fd22fd7230a49fa49b4a7844579f34638cb0b5b2f2091b7ac85bb3f81291",
+  "inputsAfter": "c5d2fd22fd7230a49fa49b4a7844579f34638cb0b5b2f2091b7ac85bb3f81291",
+  "outputSha256": "542bfeb3c910e712f8af1eee25d0d8a92fb3fd6d8e9326642ae5ade176d7083b",
+  "outputTail": "{\"version\":\"17.6 (Debian 17.6-2.pgdg12+1)\",\"folded\":\"client\",\"same_identity\":true,\"javascriptFolded\":\"cli̇ent\"}\n"
+}

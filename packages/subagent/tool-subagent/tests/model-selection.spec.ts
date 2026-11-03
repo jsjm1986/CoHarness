@@ -18,7 +18,7 @@ import {
   preflightChildLlmRoute,
   requestedAgentOptions,
 } from '../src/model-selection.ts'
-import { callSubagent, modelSelectionSetupAgent, setup, text } from './harness.ts'
+import { callSubagent, disposeSetupProvider, modelSelectionSetupAgent, setup, text } from './harness.ts'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const REASONING = {
@@ -476,4 +476,60 @@ describe('dsh-tool-subagent model selection', () => {
       assertAllowedModelRoutes([{ provider: 'a', model: 'm' }, { provider: 'a', model: 'm' }])
     }).toThrow('repeats route')
   })
+})
+
+
+it.each([true, false])('uses provider defaults for effort-only selection with route allowed=%s', async (allowed) => {
+  const requests: SubagentStartRequest[] = []
+  const model = allowed ? 'child-model' : 'unavailable-default-model'
+  const ctx = await setup({ provider: 'mock', withModelSelection: true,
+    parentAgentOptions: { provider: 'alpha', model: 'parent-model', reasoningEffort: ReasoningEffortId('high') } },
+  { agentRouteDefaults: { provider: 'alpha', model }, onStart: (request) => { requests.push(request) } })
+  const adapter = new MockAdapter([], REASONING), resolve = vi.spyOn(adapter, 'resolveModel')
+  ctx.llm.registerAdapter(['alpha'], adapter)
+  const schema = ctx.tools.schemas(modelSelectionSetupAgent(ctx)).find(entry => entry.name === 'subagent')
+  expect(schema?.description).toContain('route defaults')
+  const result = await callSubagent(ctx, { description: 'provider default effort', prompt: 'work', reasoning_effort: 'low', cwd: process.cwd() })
+  expect(result.isError, text(result)).toBe(!allowed)
+  if (allowed) {
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.agentOptions).toEqual({ provider: 'alpha', model, reasoningEffort: 'low' })
+    expect(requests[0]?.cwd).toBe(process.cwd())
+    expect(resolve.mock.calls[0]?.slice(0, 2)).toEqual(['alpha', model])
+  } else {
+    expect(text(result)).toContain('is not allowed for this Session')
+    expect(requests).toHaveLength(0)
+    expect(resolve).not.toHaveBeenCalled()
+  }
+})
+
+it('rejects configured child options unsupported by the registered provider before starting a child', async () => {
+  let starts = 0
+  await expect(setup({ provider: 'mock', agentOptions: { provider: 'alpha', model: 'child-model' } },
+    { capabilities: { agentOptions: false }, onStart: () => { starts++ } }))
+    .rejects.toThrow('does not support child agentOptions')
+  expect(starts).toBe(0)
+})
+
+it('refuses provider replacement while resolving a selected child model', async () => {
+  let starts = 0
+  const ctx = await setup({ provider: 'mock', withModelSelection: true }, { onStart: () => { starts++ } })
+  const entered = Promise.withResolvers<undefined>(), finish = Promise.withResolvers<undefined>()
+  const adapter = new MockAdapter([], REASONING), originalResolve = adapter.resolveModel.bind(adapter)
+  vi.spyOn(adapter, 'resolveModel').mockImplementation(async (provider, model) => {
+    entered.resolve(undefined); await finish.promise
+    return originalResolve(provider, model)
+  })
+  ctx.llm.registerAdapter(['alpha'], adapter)
+  const execution = callSubagent(ctx, { description: 'replace during metadata', prompt: 'work', provider: 'alpha', model: 'child-model' })
+  try {
+    await entered.promise
+    await disposeSetupProvider(ctx)
+    await mock.mountScriptedProvider(ctx, { name: 'mock', onStart: () => { starts++ } })
+    finish.resolve(undefined)
+    const result = await execution
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('changed while resolving the child LLM route')
+    expect(starts).toBe(0)
+  } finally { finish.resolve(undefined); await execution }
 })

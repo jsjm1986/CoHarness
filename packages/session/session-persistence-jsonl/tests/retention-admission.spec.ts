@@ -25,6 +25,8 @@ it('refuses an event before Session commit when the live pending-event capacity 
 
     expect(() => session.append('session/end-seed', {})).toThrow(/pending.event.*limit|pending.event.*capacity/iu)
     expect(session.seq).toBe(2)
+    await expect(writer.append([{ type: 'session/end-seed', seq: SessionSeq(2), time: 0, data: {} }]))
+      .rejects.toThrow(/new event refused/iu)
     await expect(ctx.sessions.flush(session)).rejects.toThrow(/new event refused/iu)
     const reader = await ctx.sessionPersistence.open(session.id, 'read')
     try {

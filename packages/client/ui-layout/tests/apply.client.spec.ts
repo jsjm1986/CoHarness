@@ -59,6 +59,7 @@ describe('ui-layout client apply', () => {
     expect(slots.spec('sidebar')).toEqual({ kind: 'single', scope: 'root' })
     expect(slots.spec('main')).toEqual({ kind: 'keyed', scope: 'root' })
     expect(slots.spec('rightbar')).toEqual({ kind: 'single', scope: 'root' })
+    expect(slots.spec('shell.mobile.header.context')).toEqual({ kind: 'list', scope: 'root' })
     expect(slots.spec('shell.mobile.header.actions')).toEqual({ kind: 'list', scope: 'session' })
   })
 
@@ -159,6 +160,7 @@ describe('ui-layout client apply', () => {
     expect(ctx.get('layout')).toBeUndefined()
     expect(slots.entries('root')).toHaveLength(0)
     expect(slots.spec('sidebar')).toBeUndefined()
+    expect(slots.spec('shell.mobile.header.context')).toBeUndefined()
     expect(slots.spec('shell.mobile.header.actions')).toBeUndefined()
     // The built-in root declaration survives entry teardown (runtime-owned).
     expect(slots.spec('root')).toEqual({ kind: 'single', scope: 'root' })

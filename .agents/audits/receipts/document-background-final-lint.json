@@ -1,0 +1,14 @@
+{
+  "name": "document-background-final-lint",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts gateway/src/index.ts gateway/src/documents-local.ts gateway/src/server.ts gateway/src/runtime-api.ts gateway/src/runtime-document-store.ts gateway/tests/runtime-api.spec.ts gateway/tests/server.spec.ts gateway/tests/fixtures/document-stream-built.mjs gateway/tests/fixtures/document-background-writes.mjs scripts/build-production.ts scripts/gateway-runtime-packages.ts scripts/gateway-runtime-packages.spec.ts packages/attachment/userdoc-local/src/upload.ts packages/attachment/userdoc-local/src/local-fs.ts packages/attachment/userdoc-local/src/index.ts packages/attachment/userdoc-local/tests/local-fs.spec.ts",
+  "startedAt": "2026-10-26T20:27:31.528074+00:00",
+  "seconds": 6.229,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c06e873e987ed1fe067d5f076f2166a291c7e272b996c8169246f8ea8d6dbdee",
+  "inputsAfter": "c06e873e987ed1fe067d5f076f2166a291c7e272b996c8169246f8ea8d6dbdee",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

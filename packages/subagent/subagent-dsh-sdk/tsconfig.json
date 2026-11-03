@@ -40,6 +40,15 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../context/resource-budget"
+    },
+    {
+      "path": "../../context/execution-authority"
+    },
+    {
+      "path": "../../util/brand"
     }
   ]
 }

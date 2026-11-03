@@ -1,0 +1,14 @@
+{
+  "name": "document-private-linux-lifecycle",
+  "cwd": ".",
+  "command": "limactl shell redroid -- sudo -n -- /tmp/coharness-document-audit.xhw1BMPE/node-v24.19.0-linux-arm64/bin/node /tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs --uid",
+  "startedAt": "2026-10-26T23:22:53.230774+00:00",
+  "seconds": 2.368,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d88e0c7941a6e8cafc60c54fa42c5f504ad2e39e023d2f4332132cb21f1a5c36",
+  "inputsAfter": "d88e0c7941a6e8cafc60c54fa42c5f504ad2e39e023d2f4332132cb21f1a5c36",
+  "postgresToolDirectory": null,
+  "outputSha256": "dbdb4e537c723a32d03993fc54e1e063b15417a8e3fbf7cda925ff6779ef902d",
+  "outputTail": "{\"operation\":\"legacy-cross-uid\",\"ordinary\":\"EACCES\",\"actor\":\"EACCES\"}\n{\"operation\":\"publish\",\"outsidePreserved\":true,\"foreignTouched\":false,\"refused\":true}\n{\"operation\":\"capture\",\"outsidePreserved\":true,\"foreignTouched\":false,\"refused\":true}\n{\"operation\":\"detach\",\"outsidePreserved\":true,\"foreignTouched\":false,\"refused\":true}\n{\"operation\":\"identified-lifecycle\",\"renamed\":true,\"moved\":true,\"restored\":true,\"purged\":true}\n"
+}

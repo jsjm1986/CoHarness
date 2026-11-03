@@ -49,6 +49,12 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../web/web-search-deepseek"
+    },
+    {
+      "path": "../../web/web-search-perplexity"
     }
   ]
 }

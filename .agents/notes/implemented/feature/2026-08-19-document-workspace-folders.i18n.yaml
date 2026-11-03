@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-document-workspace-folders.md
 document:
-  en: e39ddb32bf94ba32c6b14744f6df256b22b429bb
-  zh: 02485c8d30d42ae8bb7d437bd878e88bdc0589c7
+  en: 6cfd6c85153b70ee684dab468f9f683d11cdb974
+  zh: 3a83f98d26565f9adee2a594f374ce228d47091f
 /agent-note-document-workspace-folders-and-migration:
   en: ab363c8c9e700bb9
   zh: d62269be99ce818a
@@ -15,17 +15,17 @@ document:
   en: e39d03506b4b217e
   zh: c84fb4f970e3c736
 /agent-note-document-workspace-folders-and-migration/decision/storage-and-migration:
-  en: fe587d296b6a1bd1
-  zh: 2f6d10c3ad56f986
+  en: 9b090a62e3ecb8b7
+  zh: 4559fad50f9f2f50
 /agent-note-document-workspace-folders-and-migration/decision/operations-and-ownership:
-  en: 591e2243ac95b843
-  zh: 329ca6082bbbbbdb
+  en: fd75dfd97969b80a
+  zh: b607b5ac9087ce64
 /agent-note-document-workspace-folders-and-migration/verification:
-  en: 6b2aaad8671fb7b8
-  zh: c205e35e64900086
+  en: a78aaab0fb322557
+  zh: 0f6395c7a073c33a
 /agent-note-document-workspace-folders-and-migration/alternatives-considered:
-  en: 2477ec232e02d3a9
-  zh: b38591db409a3f9c
+  en: fa4ddcebaf88c540
+  zh: 6b8af3e55a1319fc
 /agent-note-document-workspace-folders-and-migration/consequences:
   en: 26280ead9702c5e0
   zh: ee866f0d4ac30dd9

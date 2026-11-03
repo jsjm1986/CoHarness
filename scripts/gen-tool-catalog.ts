@@ -235,13 +235,15 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-experimental-browser-use-stagehand-native',
     dir: 'browser-use-stagehand-native',
     source: 'packages/experimental/browser-use-stagehand-native/src/index.ts',
-    requires: ['ctx.browserUse', 'ctx.agents', 'ctx.tools', 'ctx.systemPrompt'],
-    writes: ['tool/call', 'tool/result'],
+    requires: ['ctx.browserUse', 'ctx.agents', 'ctx.tools', 'ctx.systemPrompt', 'ctx.llm', 'ctx.attachments'],
+    writes: ['tool/call', 'tool/result', 'browser-use/stagehand-llm-request'],
     async mount(ctx) {
       await ctx.plugin(BrowserUseRegistry)
       await ctx.plugin(AgentRegistry)
+      await ctx.plugin(LlmRuntime)
+      await ctx.plugin(CatalogAttachmentStore)
       await ctx.plugin(StagehandBrowserTools, {
-        mode: 'launch', model: { modelName: 'openai/gpt-5.4-mini', apiKey: 'catalog-placeholder' },
+        mode: 'launch', model: { provider: 'catalog-placeholder', model: 'browser-model' },
       })
     },
   },

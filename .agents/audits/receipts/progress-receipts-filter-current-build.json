@@ -1,0 +1,14 @@
+{
+  "name": "progress-receipts-filter-current-build",
+  "cwd": "gateway",
+  "command": "npm run build",
+  "startedAt": "2026-10-23T22:27:36.918805+00:00",
+  "seconds": 5.122,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "227c1eee83722d03f2612c15823c3b4c1477792a0acfb58534ac74adb490a941",
+  "inputsAfter": "227c1eee83722d03f2612c15823c3b4c1477792a0acfb58534ac74adb490a941",
+  "postgresToolDirectory": null,
+  "outputSha256": "898095a3ceeb02add8ff851ae671d7fc499316aab1c64f358d6b61663d57feb4",
+  "outputTail": "\n> build\n> tsc -p tsconfig.build.json\n\n"
+}

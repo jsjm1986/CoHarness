@@ -1,0 +1,14 @@
+{
+  "name": "document-reuse-valid-protocol-built-characterization",
+  "cwd": "gateway",
+  "command": "node ../.agents/audits/.local/document-reuse-probe.mjs",
+  "startedAt": "2026-10-25T01:37:25.972690+00:00",
+  "seconds": 2.417,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8301c9c40da476c684889e5bb0624131e29af5978697ce921d4542e728ad0a5f",
+  "inputsAfter": "8301c9c40da476c684889e5bb0624131e29af5978697ce921d4542e728ad0a5f",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "4a3d25c6692c89f248da814a166c2e6ce335f153e9944db155c4875c2117a679",
+  "outputTail": "{\n  \"purgedPathReused\": true,\n  \"newPurgedPathVisibleInCatalog\": false,\n  \"newPurgedPathTrashStatus\": 200,\n  \"newPurgedPathTrashBody\": \"{\\\"version\\\":1,\\\"document\\\":{\\\"docId\\\":\\\"purged-reuse.txt\\\",\\\"directoryId\\\":\\\"\\\",\\\"name\\\":\\\"purged-reuse.txt\\\",\\\"trashedAt\\\":1792892248253,\\\"purgeAfter\\\":1795484248253,\\\"bytes\\\":3,\\\"mediaType\\\":\\\"text/plain\\\",\\\"modifiedAt\\\":1792892248199.72}}\",\n  \"retainedTrashPathReused\": true,\n  \"newRetainedTrashPathTrashStatus\": 200,\n  \"newRetainedTrashPathTrashBody\": \"{\\\"version\\\":1,\\\"document\\\":{\\\"docId\\\":\\\"trash-reuse.txt\\\",\\\"directoryId\\\":\\\"\\\",\\\"name\\\":\\\"trash-reuse.txt\\\",\\\"trashedAt\\\":1792892248302,\\\"purgeAfter\\\":1795484248302,\\\"bytes\\\":5,\\\"mediaType\\\":\\\"text/plain\\\",\\\"modifiedAt\\\":1792892248260.2078}}\"\n}\n"
+}

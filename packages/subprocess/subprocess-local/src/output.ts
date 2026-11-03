@@ -40,20 +40,16 @@ let defaultSpillDir: string | undefined
  * external cleanup).
  */
 function privateSpillDir(): string {
-  defaultSpillDir ??= mkdtempSync(join(tmpdir(), 'dsh-subprocess-'))
+  if (defaultSpillDir === undefined) {
+    const directory = mkdtempSync(join(tmpdir(), 'dsh-subprocess-'))
+    defaultSpillDir = directory
+    /* v8 ignore next 3 -- Isolated Node process tests verify empty-directory removal and completed-file retention at exit. */
+    process.once('exit', () => {
+      try { rmdirSync(directory) } catch (_spillDirectoryNotEmptyOrUnavailable) { /* Exit cleanup must preserve the host's status. */ }
+    })
+  }
   return defaultSpillDir
 }
-
-// The per-process spill directory is removed at process exit when it holds no
-// completed spill file: a directory that never spilled is empty and is safe to
-// remove, while a directory holding completed spill files keeps them (their
-// content is retained until an external cleanup). A SIGKILLed process cannot
-// run this at all; its residue is left to OS temp hygiene.
-/* v8 ignore next 4 -- exit listeners run after the coverage dump; removal is verified by the CI /tmp residue measurement. */
-process.once('exit', () => {
-  if (defaultSpillDir === undefined) return
-  try { rmdirSync(defaultSpillDir) } catch { /* best-effort: ENOENT/ENOTEMPTY/EBUSY/EPERM must not change the exit code. */ }
-})
 
 /**
  * The stderr reporter used when no owner supplies one: a bare
@@ -208,9 +204,9 @@ export class OutputCollector {
         const fd = openSync(file, 'wx', 0o600)
         this.spillFile = file
         this.spillFd = fd
-        for (const prior of this.chunks) writeSync(fd, prior)
+        for (const prior of this.chunks) this.writeSpillChunk(fd, prior)
       }
-      writeSync(this.spillFd, chunk)
+      this.writeSpillChunk(this.spillFd, chunk)
     } catch (error) {
       // ENOENT (spill directory removed by a temp cleaner), EACCES/EPERM,
       // EMFILE, or ENOSPC: the spill file is a recovery aid, not a
@@ -223,6 +219,16 @@ export class OutputCollector {
         // must not become the uncaught exception this path exists to prevent.
         process.stderr.write(`dsh-subprocess-local: spill failure reporter threw: ${String(reporterFailure)}\n`)
       }
+    }
+  }
+
+  /** Complete one append or let spillAll discard an incomplete recovery file. */
+  private writeSpillChunk(fd: number, chunk: Buffer): void {
+    let offset = 0
+    while (offset < chunk.length) {
+      const written = writeSync(fd, chunk, offset, chunk.length - offset)
+      if (written === 0) throw new Error('Subprocess spill write made no progress.')
+      offset += written
     }
   }
 

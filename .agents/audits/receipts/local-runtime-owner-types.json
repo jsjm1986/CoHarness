@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-owner-types",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/tsc --noEmit -p tsconfig.build.json",
+  "startedAt": "2026-10-24T18:40:21.256783+00:00",
+  "seconds": 3.24,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c9e18adb94d6b9742ffcf2274c2934ebcb415c6b0dc716202d34c14e8064bdc2",
+  "inputsAfter": "c9e18adb94d6b9742ffcf2274c2934ebcb415c6b0dc716202d34c14e8064bdc2",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

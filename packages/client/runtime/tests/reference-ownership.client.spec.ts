@@ -24,6 +24,110 @@ async function bench() {
 }
 
 describe('Session reference ownership', () => {
+  it('keeps navigation pending while reconnect replaces the initial history request', async () => {
+    const { api, sessions } = await bench()
+    const obsolete = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    const replacement = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    const replacementStarted = deferred<undefined>()
+    let calls = 0
+    api.onHistory = () => {
+      if (++calls === 1) return obsolete.promise
+      replacementStarted.resolve(undefined)
+      return replacement.promise
+    }
+    const commit = vi.fn(() => { sessions.open(id) })
+    const navigation = commitSessionNavigation(sessions, id, sessions.beginNavigation(), commit)
+    let outcome = 'pending'
+    const observed = navigation.then(() => { outcome = 'committed' }, (error: unknown) => { outcome = String(error) })
+    const oldSignal = api.lastHistorySignal!
+    oldSignal.addEventListener('abort', () => { obsolete.reject(oldSignal.reason) }, { once: true })
+    try {
+      sessions.handleConnected()
+      await replacementStarted.promise
+      // The aborted read and its readiness callbacks settle before the next task.
+      await new Promise(resolve => setTimeout(resolve, 0))
+      expect(outcome).toBe('pending')
+      expect(commit).not.toHaveBeenCalled()
+      replacement.resolve(ok({ events: [], hasMore: false }))
+      await expect(navigation).resolves.toBe(true)
+      expect(commit).toHaveBeenCalledOnce()
+      expect(sessions.list.getSnapshot().current).toBe(id)
+    } finally {
+      replacement.resolve(ok({ events: [], hasMore: false }))
+      await observed
+    }
+  })
+
+  it('reports the current history denial when reconnect supersedes an opening', async () => {
+    const { api, sessions } = await bench()
+    const obsolete = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    const replacement = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    const replacementStarted = deferred<undefined>()
+    let calls = 0
+    api.onHistory = () => {
+      if (++calls === 1) return obsolete.promise
+      replacementStarted.resolve(undefined)
+      return replacement.promise
+    }
+    const commit = vi.fn()
+    const navigation = commitSessionNavigation(sessions, id, sessions.beginNavigation(), commit)
+    const observed = navigation.then(() => undefined, () => undefined)
+    const oldSignal = api.lastHistorySignal!
+    oldSignal.addEventListener('abort', () => { obsolete.reject(oldSignal.reason) }, { once: true })
+    try {
+      sessions.handleConnected()
+      await replacementStarted.promise
+      await new Promise(resolve => setTimeout(resolve, 0))
+      replacement.resolve({ rpcId: 'current-history' as never, result: {
+        ok: false, error: { code: 'collaboration-forbidden', message: 'Current Session access revoked', details: { action: 'read', reason: 'forbidden' } },
+      } })
+      await expect(navigation).rejects.toThrow('Current Session access revoked')
+      expect(commit).not.toHaveBeenCalled()
+      expect(sessions.retainInfo(id).getSnapshot().referenceCount).toBe(0)
+    } finally {
+      replacement.resolve(ok({ events: [], hasMore: false }))
+      await observed
+    }
+  })
+
+  it('cancels one reconnect waiter without completing another before its history', async () => {
+    const { api, sessions } = await bench()
+    const obsolete = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    const replacement = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    const replacementStarted = deferred<undefined>()
+    let calls = 0
+    api.onHistory = () => {
+      if (++calls === 1) return obsolete.promise
+      replacementStarted.resolve(undefined)
+      return replacement.promise
+    }
+    const controller = new AbortController()
+    const first = sessions.retain(id, { source: 'controllerOperation', signal: controller.signal })
+    const second = sessions.retain(id, { source: 'workbench' })
+    let secondSettled = false
+    void second.ready.then(() => { secondSettled = true }, () => { secondSettled = true })
+    const oldSignal = api.lastHistorySignal!
+    oldSignal.addEventListener('abort', () => { obsolete.reject(oldSignal.reason) }, { once: true })
+    try {
+      sessions.handleConnected()
+      await replacementStarted.promise
+      const reason = new Error('Only this navigation was superseded')
+      controller.abort(reason)
+      await expect(first.ready).rejects.toBe(reason)
+      first.release()
+      await new Promise(resolve => setTimeout(resolve, 0))
+      expect(secondSettled).toBe(false)
+      expect(api.lastHistorySignal?.aborted).toBe(false)
+      replacement.resolve(ok({ events: [], hasMore: false }))
+      await expect(second.ready).resolves.toBe(second.binding)
+      expect(second.binding.session.getSnapshot().openState).toBe('open')
+    } finally {
+      replacement.resolve(ok({ events: [], hasMore: false }))
+      first.release()
+      second.release()
+    }
+  })
+
   it('commits navigation only after history succeeds and transfers ownership to the view', async () => {
     const { api, sessions } = await bench()
     const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()

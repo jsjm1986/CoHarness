@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-hmr-pending-watch-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-hmr-pending-watch-ownership.md
+document:
+  en: ddbda1752529e20b1bdff4c983c95e97bd5ef1a9
+  zh: d03f9233c0ee7ec265ac0426cc4b34224a2bae24
+/agent-note-hmr-owns-configuration-watches-before-readiness:
+  en: b6f2c536103347d9
+  zh: f07331ec1727774f
+/agent-note-hmr-owns-configuration-watches-before-readiness/problem:
+  en: b820fed9debcca74
+  zh: f250cd470e8f36e8
+/agent-note-hmr-owns-configuration-watches-before-readiness/decision:
+  en: 09c4c1002aeb8201
+  zh: 6ab9b03afcf76df7
+/agent-note-hmr-owns-configuration-watches-before-readiness/consequences:
+  en: 88df0a05d64dcecb
+  zh: 18924b095b167343
+/agent-note-hmr-owns-configuration-watches-before-readiness/verification:
+  en: bd2a2761cba66604
+  zh: aaf3429eee4b6469
+/agent-note-hmr-owns-configuration-watches-before-readiness/alternatives-considered:
+  en: 95b0acb943d521c9
+  zh: bb81338f1e2f487d

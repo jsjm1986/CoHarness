@@ -39,7 +39,7 @@ import {
 } from '@deepseek-ai/dsh-app-boot'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { installProxyFromEnvironment } from '@deepseek-ai/dsh-http-proxy'
-import { DSH_LAUNCH_ENVIRONMENT_KEY, type LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
+import { DSH_LAUNCH_ENVIRONMENT_KEY, launchedByGateway, type LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
 import { provideCmdline, type AppReady } from '@deepseek-ai/dsh-cmdline'
 import { createProcessShutdown, type ProcessShutdown } from './process-shutdown.ts'
 
@@ -326,7 +326,8 @@ export interface RunProfileOptions {
 
 /**
  * Boot one profile invocation end to end and leave process lifetime to the
- * mounted plugins (or to a one-shot runner the composition mounts).
+ * mounted plugins (or to a one-shot runner the composition mounts). Inherited
+ * Gateway channels require managed authorization before SDK bootstrap or profile entries run.
  * @param options - environment snapshot, profile name, overlays, and the booted app's own arguments.
  * @returns the settled root context and the shutdown controller.
  * @throws after disposing startup resources; cleanup failures retain the original error.
@@ -397,7 +398,25 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       hostCtx.provide('profileContext', profileContext)
       // Before any config-tree entry mounts, so plugins resolve all launch-time
       // environment values from the same immutable launch snapshot.
-      hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, options.environment)
+      const parentBootstrap = process.env.DSH_SDK_PARENT_BOOTSTRAP
+      const privateParentName = (name: string): boolean =>
+        ['DSH_SDK_PARENT_BOOTSTRAP', 'DSH_SDK_PARENT_CONTROL'].includes(name.toUpperCase())
+      hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, parentBootstrap === undefined ? options.environment : {
+        get: name => privateParentName(name) ? undefined : options.environment.get(name),
+        getFrom: (name, sources) => privateParentName(name) ? undefined : options.environment.getFrom(name, sources),
+      } satisfies LaunchEnvironmentSnapshot)
+      if (launchedByGateway(options.environment)) {
+        for (const key of ['modelAccessRequired', 'resourceBudgetRequired', 'executionAuthorityRequired'] as const) {
+          hostCtx.effect(() => hostCtx.provide(key, true), `managed launch: ${key}`)
+        }
+      }
+      if (parentBootstrap !== undefined) {
+        delete process.env.DSH_SDK_PARENT_BOOTSTRAP
+        const moduleUrl = new URL(parentBootstrap)
+        if (moduleUrl.protocol !== 'file:') throw new TypeError('SDK parent bootstrap must be a local module URL.')
+        // Managed admission precedes every profile plugin, including startup probes.
+        await hostCtx.plugin(await import(moduleUrl.href))
+      }
       await hostCtx.plugin(PluginPackages, resolutionMode === 'link' ? {} : {
         resolution: composed.resolution,
         behavior: resolutionMode === 'dual' ? 'verify' : 'enforce',

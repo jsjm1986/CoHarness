@@ -1,0 +1,317 @@
+{
+  "finding": "B450",
+  "status": "fixed_verified_named_parent_exit_and_late_cleanup_complete_core_entry_and_global_review_open",
+  "updatedAt": "2026-11-01T18:55:52.290863+00:00",
+  "baseline": {
+    "status": "passed",
+    "startedAt": "2026-11-01T18:40:15.258375+00:00",
+    "finishedAt": "2026-11-01T18:40:20.684772+00:00",
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-latest-origin-fetch.json"
+  },
+  "problem": "Original-parent recovery cleared its retained operations on scope exit without retrying them. Session-only shutdown therefore left real child responses open while the surrounding Runtime stayed live. Hand-back during parent cleanup, including from a retired Core, was skipped because a departing parent could not create effects. A first hand-back after the parent left had no retry owner that would act immediately.",
+  "fix": "Parent recovery retries and joins retained operations before releasing its listeners. A host-only cleanup-retain offer lets one existing exact-parent recovery accept original-owner retry and release-confirmation operations during drainage without acquiring a run handle. Batches re-collect late transfers. If a departing parent has no accepting recovery, its original adopted lease starts its coalescing retry; failures remain owned, reported and occupied. Existing exact runtime/parent handle authorization remains enforced.",
+  "compatibility": {
+    "newHostContextEvent": "subagent/cleanup-retain",
+    "newRemoteOrToolJsonFields": false,
+    "sessionFormatOrSchemaChange": false,
+    "originalRunOwnershipPreserved": true,
+    "b449FourGatewaySourcesUnchanged": true,
+    "rootProductionMutation": false
+  },
+  "verification": {
+    "distinctPassingNamedCases": 780,
+    "packageCases": 768,
+    "typescriptRunnableCases": 8,
+    "pythonRunnableCases": 4,
+    "versionRepeatsAddedToCount": false,
+    "parameterRowCounting": "Within each source test file, repeated printed titles are indexed by parameter-row occurrence. Four inspected it.each definitions contain different limit/request/route/empty-field values, totaling11 distinct rows under4 titles; cross-version runs are not added.",
+    "sourceReport": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-final-source-cases.json",
+    "packageReport": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-final-claim-cases.json",
+    "pythonReport": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-final-python.xml",
+    "newBuiltCasesEachNode22And24": 4,
+    "nativeProof": "Actual Workflow/Ralph requests open a native loopback child response, fail foreground cleanup, optionally retire Core, then SDK server-only shutdown closes the original response before returning while its host remains live. One original child is started;3/4 pre-shutdown attempts become4/5 after confirmed closure.",
+    "originalSourceAndBuilt": "Each complete predecessor reproduces4 actual physical-cleanup assertion failures after successful startup, task reply and pre-shutdown evidence. Startup failures are excluded. Original source and bundle hashes match the B448 carrier.",
+    "unitInterleavings": "Parent live/retired Core, paused physical closure and idle veto, continuing failure retention, same/retired-Core transfer during parent drain, first transfer during/after parent exit, multiple existing recoveries claiming once, and reported failed late retry.",
+    "changedCoverage": {
+      "packages/subagent/subagent/src/index.ts": {
+        "changedExecutableStatements": 15,
+        "coveredStatements": 15,
+        "changedBranchArms": 8,
+        "coveredBranchArms": 8,
+        "uncoveredStatementLines": [],
+        "uncoveredBranchLines": []
+      },
+      "packages/subagent/subagent/src/retained-cleanup.ts": {
+        "changedExecutableStatements": 35,
+        "coveredStatements": 35,
+        "changedBranchArms": 17,
+        "coveredBranchArms": 17,
+        "uncoveredStatementLines": [],
+        "uncoveredBranchLines": []
+      }
+    },
+    "recoveryHelperCoverage": {
+      "lines": {
+        "total": 30,
+        "covered": 30,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 14,
+        "covered": 14,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 42,
+        "covered": 42,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 23,
+        "covered": 23,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "completeCoreEntryCoverage": {
+      "lines": {
+        "total": 238,
+        "covered": 220,
+        "skipped": 0,
+        "pct": 92.43
+      },
+      "functions": {
+        "total": 65,
+        "covered": 63,
+        "skipped": 0,
+        "pct": 96.92
+      },
+      "statements": {
+        "total": 271,
+        "covered": 251,
+        "skipped": 0,
+        "pct": 92.61
+      },
+      "branches": {
+        "total": 128,
+        "covered": 112,
+        "skipped": 0,
+        "pct": 87.5
+      }
+    },
+    "completeCoreEntryThresholdPassed": false,
+    "checks": [
+      {
+        "name": "parent-final-claim-coverage",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-final-claim-coverage.json"
+      },
+      {
+        "name": "parent-claim-normal-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-claim-normal-build.json"
+      },
+      {
+        "name": "parent-final-normal-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-final-normal-build.json"
+      },
+      {
+        "name": "parent-clean-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-clean-lint.json"
+      },
+      {
+        "name": "parent-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-python-lint.json"
+      },
+      {
+        "name": "parent-final-built-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-final-built-node22.json"
+      },
+      {
+        "name": "parent-final-built-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-final-built-node24.json"
+      },
+      {
+        "name": "parent-final-python-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-final-python-sdk.json"
+      },
+      {
+        "name": "parent-final-source-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-final-source-sdk.json"
+      },
+      {
+        "name": "parent-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-doc-quick.json"
+      },
+      {
+        "name": "parent-metadata-check",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-metadata-check.json"
+      },
+      {
+        "name": "parent-config-check",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-config-check.json"
+      },
+      {
+        "name": "parent-export-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-export-docs.json"
+      },
+      {
+        "name": "parent-latest-origin-fetch",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-latest-origin-fetch.json"
+      },
+      {
+        "name": "parent-original-source-scope-final",
+        "status": "expected_original_physical_cleanup_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-original-source-scope-final.json"
+      },
+      {
+        "name": "parent-original-built-dependencies-final",
+        "status": "expected_original_physical_cleanup_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-original-built-dependencies-final.json"
+      },
+      {
+        "name": "parent-final-core-entry-measurement",
+        "status": "failed_complete_core_entry_100_percent_threshold_with_768_passing_cases",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-final-core-entry-measurement.json"
+      },
+      {
+        "name": "parent-final-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-final-repository-references.json"
+      }
+    ],
+    "intermediateFailuresRetained": [
+      "Two initial parent-exit regressions, two same/retired late-transfer regressions and two first-late-transfer regressions failed on their intended cleanup assertions before repair.",
+      "A first partial package run passed766 assertions but exposed an uncovered recovery claim branch; a legal multiple-recovery case filled it. Final package gate passes768 cases and helper100%all4metrics.",
+      "The fixture initially imported a bare Cordis package unavailable to the built profile, then tried to read a const enum absent from compiled JavaScript. It uses an owned parent-scope exit observer and host-scope observer instead; no product callback or lifecycle method is monkeypatched.",
+      "An Agent disposed-event marker observed publication timing rather than scope entry; only the stage marker differed while closure succeeded. The final observer follows actual parent scope teardown and preserves the original cleanup expectation.",
+      "The old private compiled carrier needed its own package dependency links; only successful-startup physical cleanup assertion failures count as predecessor evidence.",
+      "Scoped lint corrected three callback parentheses, one multiline type delimiter, and opaque callback state storage. The offer record preserves the synchronous claim behavior and passes lint."
+    ],
+    "postflight": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/postflight.json"
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/parent-cleanup-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.zh.md",
+    "apps/cli/tests/profiles/sdk/parent-subagent-cleanup.expected.e2e.ts",
+    "docs/subsystems/subagent.i18n.yaml",
+    "docs/subsystems/subagent.md",
+    "docs/subsystems/subagent.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/parent-subagent-cleanup/expected.json",
+    "examples/headless-agent/tests/fixtures/parent-subagent-cleanup/model.mjs",
+    "examples/headless-agent/tests/fixtures/parent-subagent-cleanup/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/parent-subagent-cleanup/runtime.cordis.yml",
+    "examples/headless-agent/tests/fixtures/parent-subagent-cleanup/runtime.mjs",
+    "packages/extensions/tool-cordis/src/api-catalog.ts",
+    "packages/subagent/subagent/README.i18n.yaml",
+    "packages/subagent/subagent/README.md",
+    "packages/subagent/subagent/README.zh.md",
+    "packages/subagent/subagent/src/index.ts",
+    "packages/subagent/subagent/src/retained-cleanup.ts",
+    "packages/subagent/subagent/tests/run-cleanup.spec.ts",
+    "python/sdk/tests/test_parent_subagent_cleanup_expected.py"
+  ],
+  "removedPaths": [],
+  "readOnlyPrerequisiteCount": 268,
+  "artifactReferences": {
+    "apps/cli/lib/bin.js": "a3f373cfa7a3a84aa5fb6e25c3db5b2cb9b338afe986169c00fcc38ea0044455",
+    "packages/boot/app-boot/lib/index.js": "e7527dacdd9bc28e1a95536f3930f042ebbac186b16393059469ac7f3a537b80",
+    "packages/bundle/sdk-minimal/lib/index.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "packages/core/agent-loop/lib/index.js": "4d9e306e15bd8a750ff97bd48c6253a45f2faa49edf5b41ac88b37c2b0f0e882",
+    "packages/core/agent/lib/index.js": "4ffa8768f1ed50640eaba1ef6cddd9183c824a5a183208e3012a4f86ed27fa18",
+    "packages/extensions/tool-cordis/lib/index.js": "a8db112aaa38e65f1c4a25ff4215d876df687c4f079ad38faaa8c83a9bd01cb8",
+    "packages/extensions/tool-cordis/lib/types/api-catalog.d.ts": "751ebac54d1c2d0a694d18973b2d1a95f901b8dda3ed49eb6303795a30c8dc4e",
+    "packages/extensions/tool-cordis/lib/types/api-catalog.js": "334764efe25e6aa5156df7b9dc104d54c7e3087f01c4db9e1109d22d29fe6ed3",
+    "packages/extensions/tool-cordis/lib/types/index.d.ts": "af71d264ee9c5c04b991eeb6c75c7b02137bc0281cd576b6db3f8e7f8d49ae57",
+    "packages/extensions/tool-cordis/lib/types/index.js": "a96b33268cd03e577cdfc62f32c55ebc380e98d7ba3006789feb65cd2480dfc6",
+    "packages/jobs/jobs-local/lib/index.js": "376e13f6ad2eb71dd76dee6f3098d4d596ea34a28c8c95603014dd00eeb92c81",
+    "packages/jobs/tool-jobs/lib/index.js": "d09749a36d2b6247ac32a476fb2947c1fe32fe95ea4444bbd768901c6b838c0b",
+    "packages/ptc-runtime/ptc-runtime-node/lib/index.js": "9b01e82609461ca27c7353386722a523bed4ebbed0f326d6ccc803c620032fa6",
+    "packages/sdk/client/lib/index.js": "7099941321aa5a129caed823ac18c4749ac269dba7705c5ce6274b0276f51aad",
+    "packages/sdk/server/lib/index.js": "c94739bc12898d337ca362ef657464e2aa06d117cec7c90395fc37a03abd4196",
+    "packages/subagent/subagent/lib/index.js": "7ba1e71c5ec1cde8540e1b7eb04845a16e9a1be13ef9c4ddd79e72a4edd4cf0a",
+    "packages/subagent/subagent/lib/types/index.d.ts": "e45e23b6d568af68cb0c5e4b035308b951469698975b19fa8a616d4b5463f66d",
+    "packages/subagent/subagent/lib/types/index.js": "9efc45e8b8874ab9e2a1c2b35860be1dfc47e06c629560e7059079efa528e710",
+    "packages/subagent/subagent/lib/types/internal.d.ts": "910db97a43b6dd599126d6c7cf9057b2c007120bcf9dd761bcf1439aa2e45291",
+    "packages/subagent/subagent/lib/types/internal.js": "9e629487ae14104c2d46269197692279bf5c1a5209af0b2a56ee0865ac477afb",
+    "packages/subagent/subagent/lib/types/retained-cleanup.d.ts": "612a42281e3890f569f17ff5a8a34cbd14b62efde68bf7b4578bfce7bf0bebf3",
+    "packages/subagent/subagent/lib/types/retained-cleanup.js": "f3faf639884fea1af4ddcf84386170e8e41926d229b7fd131425b7bba71924a1",
+    "packages/subagent/subagent/lib/types/run-lease.d.ts": "b4a73727a97ba0369cf20f99633cef031ba8a9b3671b7ef427021ffc91fa2037",
+    "packages/subagent/subagent/lib/types/run-lease.js": "68a420195cd7358362a8edd97d9a4cfd4c766e836d1f32e25e467d2b9ec7fa63",
+    "packages/subagent/subagent/lib/types/types.d.ts": "fe23d6fbb40919d51ec2b1a65934249b074f6d3b9794847d58dfe453f6887501",
+    "packages/subagent/subagent/lib/types/types.js": "74c4a6ef14ae2c83292457c179e22fc44885e5d92976595089107527c160f9cd",
+    "packages/subagent/tool-subagent/lib/index.js": "1dc73f2d5ed54577b5243fdc5ea6bca03a032c999982ed1dadfa76d2905a7bcf",
+    "packages/subagent/tool-subagent/lib/types/index.d.ts": "8b09f71db58a223e7e965f4f5775d97941851d5d6dd8d92b3e6a83d54b6eea5c",
+    "packages/subagent/tool-subagent/lib/types/index.js": "f14f7d6c2b92d72524008f154c40ee55031fe4c08b113c250b05b07b8c6021cf",
+    "packages/workflow/tool-ralph/lib/index.js": "657f8d26e9bba0ed6a953351c3133c0042e3e5d33e145a265988e58308b50c47",
+    "packages/workflow/tool-ralph/lib/types/index.d.ts": "aca7d199ca84ddfa327b1f198767482d647cadab731176dbfc66466eb2064d1a",
+    "packages/workflow/tool-ralph/lib/types/index.js": "5eb5bd99e37fbefec07703d7b6d28e0e98e90f0bdf07ca2e5d8f09e1fbad4736",
+    "packages/workflow/tool-workflow/lib/index.js": "b67d1ca2c2f20b0ae0162ab79977cacac34358ec0dbdbf72329da00d5dcba466",
+    "packages/workflow/tool-workflow/lib/types/index.d.ts": "580add4796ea967c51f79558608ef6472780a393c046e20673751437d41df549",
+    "packages/workflow/tool-workflow/lib/types/index.js": "63ba6b1738032618f6894e342b488ff9a6ddd24a27f58c7f12a3ba303095411b",
+    "packages/workflow/tool-workflow/lib/types/record.d.ts": "b76ec5244084c6bc7a23bf099fab530280c818b7c4b87866d0d675960fa521a6",
+    "packages/workflow/tool-workflow/lib/types/record.js": "a796561d1ce5a65fcaeb4c62f20694dfade02a92102534306ed0c6c7ccbfa8f6",
+    "packages/workflow/workflow-ptc/lib/index.js": "c3d9578dcdaa08430018fc72848d587d98f457d695b2200dd5a385d758a4b373",
+    "packages/workflow/workflow-ptc/lib/types/index.d.ts": "7fb2a61124763eed3629d93eb1d0e95de4de7a2e68697961b740f959eda81c54",
+    "packages/workflow/workflow-ptc/lib/types/index.js": "4faffdf81ad5a92ec4b99070ec2775362af9ce7711da3f0e2ff3f0e63e0a70e5",
+    "packages/workflow/workflow/lib/index.js": "fa7c0ac38c714b7230c41fa38d22524923c1237940fbfa416f63d3e1b37fde8b",
+    "packages/workflow/workflow/lib/types/index.d.ts": "91b595cdbb6d70e398d68b7529e4980f74f4651cea24a65f286201926dee1b15",
+    "packages/workflow/workflow/lib/types/index.js": "889279d97ad94551d2dcc2e945f0d4363e6056d3d175ae3dabd6cc889d1cd54d"
+  },
+  "noteReview": {
+    "action": "updated existing subagent admission/cleanup note and its bilingual pair",
+    "newNotes": 0,
+    "archivedNotesChanged": false
+  },
+  "remaining": [
+    "All12 business domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Prioritize B451: independently reproduce and confirm the peer-reported exact Admin Runtime stop/restart refusal for the protected central project. Compare with the existing project instance stop route and design. Keep delete/retire/archive/destructive protections and current generation/administrator fences. Deliver a separate patch; never mix it into the B449 frozen handoff.",
+    "B449 REAL-048 production verification remains peer-owned and open until the actual B task/history read proves recovery. Peer reports matched isolated R34 compilation,217 Gateway cases,79 codec cases, all20 doc leaves, two healthy activated nodes and completed maintenance convergence; Root has not independently verified the production task.",
+    "Complete Core index still fails100%threshold:92.61%statements,87.50%branches,96.92%functions,92.43%lines after768 passing cases. Recovery helper is100%all4metrics; changed50 statements/25 branch arms are covered. No baseline, exclusion or threshold was weakened.",
+    "Continue resource/model/tool/Inspector authorization, queued continuation and permission withdrawal, stale-parent admission, background Workflow/Job termination and session writer shutdown. B450 covers named parent-exit and late adopted-cleanup paths only.",
+    "Preserve B417 required-on-read matching writers/readers/SDKs and immutable Session generations when assembling the full Root/peer union; B450 is not a standalone R34 Runtime replacement.",
+    "Official paid Responses validation remains deferred by the user."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": {
+    "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T175331Z/B416-B450-integration-index.json",
+    "findings": 35,
+    "capsules": 28,
+    "frozenDeltaVersions": 626,
+    "presentPaths": 368,
+    "currentSourceDriftPaths": [
+      "packages/context/gateway-runtime/src/index.ts"
+    ]
+  },
+  "handoff": {
+    "sentAt": "2026-11-01T18:55:52.290863+00:00",
+    "status": "single_concrete_completion_packet_sent_to_existing_peer",
+    "scope": "B450 retained-parent cleanup belongs to the full matching Root/peer union; do not hotpatch it alone into R34. B449 four Gateway sources are unchanged. Next B451 is an independent exact Admin central-project stop review.",
+    "productionAcceptanceClaimed": false
+  }
+}

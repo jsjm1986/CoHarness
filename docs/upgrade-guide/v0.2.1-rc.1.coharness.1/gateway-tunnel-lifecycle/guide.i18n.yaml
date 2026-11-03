@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/gateway-tunnel-lifecycle/guide.md
+document:
+  en: 0223d61ff3d123e11e44de343069f55f3a3d8bf4
+  zh: 821f153c571f17248b79351ad91d5533cd73bb07
+/:
+  en: d34d814270fdb113
+  zh: b6b5bdf21a893ab1
+/managed-tunnels-retain-cleanup-and-provisioning-state:
+  en: fda6abe23e13fa10
+  zh: a16a355df0a4deb6
+/managed-tunnels-retain-cleanup-and-provisioning-state/change:
+  en: 7efeca116d77963f
+  zh: c9f6a94ea62f56aa
+/managed-tunnels-retain-cleanup-and-provisioning-state/migration:
+  en: 045c24ca3261ea32
+  zh: 4a5ac6af0daf58b6

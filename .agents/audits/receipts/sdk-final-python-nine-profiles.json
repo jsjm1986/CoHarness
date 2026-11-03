@@ -1,0 +1,14 @@
+{
+  "name": "sdk-final-python-nine-profiles",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest -q python/sdk/tests/test_sdk_child_process_admission.py python/sdk/tests/test_scoped_sdk_model_admission.py python/sdk/tests/test_external_model_admission.py",
+  "startedAt": "2026-10-24T17:53:21.913077+00:00",
+  "seconds": 23.617,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e53d8a23bb5e68834a920db580e7ad2e2fbd0a5da0f53d3e16f332f3735461a3",
+  "inputsAfter": "e53d8a23bb5e68834a920db580e7ad2e2fbd0a5da0f53d3e16f332f3735461a3",
+  "postgresToolDirectory": null,
+  "outputSha256": "585ba42829657b9e2d56f8614be6c3365a8405474eed008559511ab50f2ffcfb",
+  "outputTail": ".........                                                                [100%]\n"
+}

@@ -330,7 +330,7 @@ export function normalizeStdout(
 /**
  * Normalize a session JSONL log into a stable expected output: the header line's
  * volatile fields (`createdAt`, `id`, `cwd`) are zeroed/scrubbed; event,
- * historical packed-row, embedded Assistant-stream, goal lifecycle, and
+ * historical packed-row, embedded Assistant-stream, goal/job lifecycle, and
  * catalog child-creation clocks are zeroed; and all volatile strings are
  * scrubbed. Projected inputs remain
  * projected. Packed `data.dt` gaps are normalized even when the projected row
@@ -385,6 +385,12 @@ export function normalizeSessionLog(
       const data = record.data as Record<string, unknown>
       if ('createdAt' in data) data.createdAt = 0
       if ('updatedAt' in data) data.updatedAt = 0
+    }
+    if ((record.type === 'job/registered' || record.type === 'job/settled')
+      && record.data !== null && typeof record.data === 'object') {
+      const data = record.data as Record<string, unknown>
+      if (typeof data.startedAt === 'number') data.startedAt = 0
+      if (record.type === 'job/settled' && typeof data.finishedAt === 'number') data.finishedAt = 0
     }
     if (record.type === 'subagent/catalog' && record.data !== null && typeof record.data === 'object') {
       const data = record.data as Record<string, unknown>

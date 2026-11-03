@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-current-plain-node-denial",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/verify-sdk-child-model-policy.mjs",
+  "startedAt": "2026-10-24T16:38:19.117414+00:00",
+  "seconds": 0.809,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b218c30836b34614670b4765fad1649093cb0b77c3e07c9208bd220c24e59483",
+  "inputsAfter": "b218c30836b34614670b4765fad1649093cb0b77c3e07c9208bd220c24e59483",
+  "postgresToolDirectory": null,
+  "outputSha256": "5b60bb7ac32aabb24662d1c269cd7be278b51bbe335a6018617c14fa6b6ef8fa",
+  "outputTail": "{\"actualChildProcess\":true,\"childExecutedModel\":false,\"parentModelPolicyAllows\":false,\"requiredResourceAcquisitions\":3,\"modelAcquisitionsDuringChild\":1,\"processAcquisitions\":1,\"released\":3,\"result\":\"error\"}\n"
+}

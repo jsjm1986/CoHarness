@@ -25,6 +25,7 @@ kind: "package-reference"
 <a id="runtime-contract"></a>
 ## 运行时约定
 
+- 带有项目参与者元数据的普通人类输入和已继续问题的回复会收到相同的归属提示。
 - 参与者快照包含消息准入时由协作 authority 提供的认证用户 id、用户名、显示名、角色、项目 id/名称和项目 `ro`/`rw` 模式。
 - 每条插入的 `user/message` 使用插件来源 `collaboration-context`，引用紧随其后的参与者消息 id，并保存同一份参与者快照。包 invariant 要求两者保持相邻、文本与 renderer 完全一致，且参与者必须属于项目 scope。
 - 格式错误的参与者元数据会在模型准入前抛错，而不会静默丢弃归属信息。个人消息和不含参与者元数据的消息保持不变。

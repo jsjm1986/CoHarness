@@ -1,0 +1,14 @@
+{
+  "name": "conversation-writer-note-budget-final",
+  "cwd": ".",
+  "command": "pnpm run verify-doc-budgets",
+  "startedAt": "2026-10-24T00:59:38.688433+00:00",
+  "seconds": 2.12,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0b0fb548073dd27bdb3afa14f4bfd47662e86a23350ed052d35e4e56c189e308",
+  "inputsAfter": "0b0fb548073dd27bdb3afa14f4bfd47662e86a23350ed052d35e4e56c189e308",
+  "postgresToolDirectory": null,
+  "outputSha256": "9ada1148db3727a6cec3cd7554d7b64568079137376bd0d09ebb712531b1f852",
+  "outputTail": "$ tsx scripts/verify-doc-budgets.ts\nverify-doc-budgets: 8 budgeted docs within ceiling.\n"
+}

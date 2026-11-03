@@ -3,6 +3,7 @@
 # also steer `pnpm pack` and has silently dropped payload from tarballs before.
 packages/*/bin/
 packages/*/lib/
+/test/bin/
 
 /.claude/
 /.release/

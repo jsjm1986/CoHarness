@@ -9,6 +9,8 @@ English | [中文](README.zh.md)
 
 `AgentHandle.tryDisposeIdle()` refuses a running turn, maintenance, pending inbox input, live children or plugin-owned resources. Successful idle release closes input before teardown. Hold `ctx.agents.reserveRemoval(ids)` through persistent deletion and its acknowledgement; `reserveUse(ids)` protects asynchronous lifecycle lookup. These reservations do not grant authority over another owner’s handle.
 
+`runtime/idle-release-check` is a synchronous Host-wide veto for background work and future obligations outside one Agent. Plugins return `busy` until work and cleanup settle, including while a timer is waiting. `agent/idle-release-check` remains the exact-Agent resource probe; its loop provider also refuses maintenance and queued input even when public status is idle. These probes inform automatic process release and preserve the existing explicit-disposal rules.
+
 ## Summary
 
 Use `dsh-agent` to create or resume live agents, send follow-up or steering input, inject model-facing context, cancel work, and wait for idle completion. Plugins, UI, hooks, and orchestrators can also observe or intercept agent activity and apply capabilities to one agent without affecting others. Choose it when code needs to control or extend live agents through the public `Agent` API. Pair it with an agent driver such as `dsh-agent-loop`; this package does not create model requests by itself. Initiator attribution is process-local and must be carried explicitly across workers, processes, durable queues, and restarts.
@@ -49,14 +51,16 @@ await handle.dispose()   // stops the loop, unregisters, removes the session, un
 The handle's methods route identified user-role messages into the agent's inbox. `followup()` queues an ordinary next-turn prompt and wakes the driver; `steer()` submits next-step input and wakes it; `inject()` adds model-facing context without waking the driver, so it lands in the next admitted step. `cancel(cause)` aborts the active activity and, unless `keepInbox` is set, clears pending work; `whenIdle()` resolves after the whole agent reaches quiescence.
 
 ```text
-handle.agent.followup({
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+
+handle.agent.followup(createUserMessage({
   content: [{ type: 'text', text: 'Summarize this workspace.' }],
   source: { kind: 'user' },
-})
-handle.agent.steer({
+}))
+handle.agent.steer(createUserMessage({
   content: [{ type: 'text', text: 'Focus on the tests.' }],
   source: { kind: 'user' },
-})
+}))
 await handle.agent.whenIdle()
 ```
 
@@ -65,6 +69,8 @@ await handle.agent.whenIdle()
 `Agent.ctx` is the agent's scoped context: registrations made through it (tools, prompt sections, variables, event listeners, restrictions) apply to that agent alone and unwind on disposal. The same mechanism is what agent presets use to give one session a different capability set without affecting its neighbors.
 
 ### Intercept or observe work in flight
+
+Observe-only agent notifications contain each thrown or rejected value, including failures whose string conversion throws. Their warnings use `[unrenderable thrown value]` when needed, so later observers and cancellation can continue. Awaited `agent/created` listeners retain their publication veto.
 
 The `agent/*` events let plugins act on live work without depending on the loop package. `agent/pre-step` can reject a proposed step or replace the messages entering it; `agent/request-error` lets a listener retry a failed model request; `agent/turn-stopping` runs before an otherwise completed turn closes and can steer to keep it open. `agent/assistant-stream` carries one process-local Assistant attempt's ordered start, transient chunk, and end frames. Start names the attempt's turn and step, chunk indexes are dense from zero, and `end.index` is the next chunk position. The loop commits the complete compact stream as one `assistant/message` or `assistant/attempt` before a committed end frame, so the live event remains presentation data rather than the replay source. `agent/status`, `agent/created`, and `agent/disposed` drive UI and coordination state, and the per-message `agent/inbox/*` notifications keep inbox projections in sync. Exact signatures, dispatch modes, and payload contracts live in the generated region of the [core subsystem page](../../../docs/subsystems/core.md#cordis-surface).
 

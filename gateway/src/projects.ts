@@ -3,6 +3,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import type Database from 'better-sqlite3'
 import type { GatewayConfig } from './config.ts'
 import { assertProjectImportPathAllowed } from './project-directories.ts'
+import { CollaborationDeniedError } from './collaboration.ts'
 
 export type GrantMode = 'ro' | 'rw'
 
@@ -207,36 +208,36 @@ export class ProjectService {
     private readonly cfg: GatewayConfig,
   ) {}
 
-  create(input: { name: string; path?: string; createdBy: number }): ProjectRow {
+  /** Import or allocate with current administrator authority; actor omission permits trusted internal maintenance. */
+  create(input: { name: string; path?: string; createdBy: number; actorUserId?: number }): ProjectRow {
+    if (input.actorUserId !== undefined && input.createdBy !== input.actorUserId) throw new CollaborationDeniedError('forbidden')
     const requestedPath = input.path?.trim()
-    const managed = requestedPath === undefined || requestedPath === ''
-      ? ensureManagedProjectDirectory(this.cfg, input.name)
-      : undefined
-    const canonical = managed !== undefined ? managed.path : resolveProjectDirectory(requestedPath!)
-    this.assertNotReserved(canonical)
+    const name = normalizeProjectName(input.name)
     return this.insert({
-      name: managed?.name ?? normalizeProjectName(input.name),
-      path: canonical,
-      canonical,
+      name,
+      resolveDirectory: () => requestedPath === undefined || requestedPath === ''
+        ? ensureManagedProjectDirectory(this.cfg, name).path : resolveProjectDirectory(requestedPath),
       createdBy: input.createdBy,
       origin: 'admin',
       ownerUserId: null,
+      actorUserId: input.actorUserId,
     })
   }
 
-  /** Create an owned project directory below the configured managed root. */
-  createManaged(input: { name: string; ownerUserId: number; createdBy?: number }): ProjectRow {
+  /** Create a self-owned authenticated project; omitted actorUserId permits trusted internal maintenance. */
+  createManaged(input: { name: string; ownerUserId: number; createdBy?: number; actorUserId?: number }): ProjectRow {
+    if (input.actorUserId !== undefined && (input.actorUserId !== input.ownerUserId
+      || input.createdBy !== undefined && input.createdBy !== input.actorUserId)) throw new CollaborationDeniedError('forbidden')
     const name = normalizeProjectName(input.name)
     const canonical = this.allocateManagedDirectory(name)
     try {
-      this.assertNotReserved(canonical, true)
       return this.insert({
         name,
-        path: canonical,
-        canonical,
+        resolveDirectory: () => canonical,
         createdBy: input.createdBy ?? input.ownerUserId,
         origin: 'user',
         ownerUserId: input.ownerUserId,
+        actorUserId: input.actorUserId,
       })
     } catch (error) {
       // The directory is not a project until the transaction commits.
@@ -247,25 +248,32 @@ export class ProjectService {
 
   private insert(input: {
     name: string
-    path: string
-    canonical: string
+    resolveDirectory: () => string
     createdBy: number
     origin: ProjectOrigin
     ownerUserId: number | null
+    actorUserId?: number
   }): ProjectRow {
     const now = Date.now()
+    let canonical: string | undefined
     const insert = this.db.transaction(() => {
+      if (input.actorUserId !== undefined) {
+        if (input.origin === 'admin') this.assertAdministrator(input.actorUserId)
+        else this.assertActiveAccount(input.actorUserId)
+      }
+      canonical = input.resolveDirectory()
+      this.assertNotReserved(canonical, input.origin === 'user')
       const info = this.db.prepare(
         `INSERT INTO projects(name, path, created_by, origin, owner_user_id, model_access_default_allowed, created_at, updated_at)
          VALUES(?, ?, ?, ?, ?, 1, ?, ?)`,
-      ).run(input.name, input.canonical, input.createdBy, input.origin, input.ownerUserId, now, now)
+      ).run(input.name, canonical, input.createdBy, input.origin, input.ownerUserId, now, now)
       const id = Number(info.lastInsertRowid)
       this.db.prepare(`INSERT INTO project_members(project_id, user_id, mode) VALUES(?, ?, 'rw')`)
         .run(id, input.ownerUserId ?? input.createdBy)
       return {
         id,
         name: input.name,
-        path: input.canonical,
+        path: canonical,
         memberCount: 1,
         origin: input.origin,
         modelAccessDefaultAllowed: true,
@@ -274,9 +282,9 @@ export class ProjectService {
       }
     })
     try {
-      return insert()
+      return insert.immediate()
     } catch (error) {
-      this.rethrowUnique(error, input.name, input.canonical)
+      this.rethrowUnique(error, input.name, canonical)
     }
   }
 
@@ -323,21 +331,40 @@ export class ProjectService {
     }
   }
 
-  rename(id: number, name: string): void {
+  rename(id: number, name: string, actorUserId?: number): void {
     const normalized = normalizeProjectName(name)
     try {
-      this.db.prepare(`UPDATE projects SET name = ?, updated_at = ? WHERE id = ?`).run(normalized, Date.now(), id)
+      this.db.transaction(() => {
+        if (actorUserId !== undefined) {
+          const actor = this.db.prepare(`SELECT u.role,u.status,p.owner_user_id ownerUserId,
+            EXISTS(SELECT 1 FROM project_members m WHERE m.project_id=p.id AND m.user_id=u.id) member
+            FROM users u JOIN projects p ON p.id=? WHERE u.id=?`).get(id, actorUserId) as {
+              role: 'admin' | 'user'; status: 'active' | 'disabled'; ownerUserId: number | null; member: number
+            } | undefined
+          if (actor === undefined && this.db.prepare('SELECT 1 FROM projects WHERE id=?').get(id) === undefined) {
+            throw new Error(`unknown project ${String(id)}`)
+          }
+          if (actor === undefined || actor.status !== 'active'
+            || actor.role !== 'admin' && (actor.ownerUserId !== actorUserId || !actor.member)) {
+            throw new CollaborationDeniedError('forbidden')
+          }
+        }
+        this.db.prepare(`UPDATE projects SET name = ?, updated_at = ? WHERE id = ?`).run(normalized, Date.now(), id)
+      })()
     } catch (error) {
       this.rethrowUnique(error, normalized)
     }
   }
 
-  remove(id: number): number[] {
-    const ids = (this.db.prepare(
-      `SELECT user_id AS userId FROM project_members WHERE project_id = ?`,
-    ).all(id) as Array<{ userId: number }>).map(r => r.userId).sort((a, b) => a - b)
-    this.db.prepare(`DELETE FROM projects WHERE id = ?`).run(id)
-    return ids
+  remove(id: number, actorUserId?: number): number[] {
+    return this.db.transaction(() => {
+      this.assertAdministrator(actorUserId)
+      const ids = (this.db.prepare(
+        `SELECT user_id AS userId FROM project_members WHERE project_id = ?`,
+      ).all(id) as Array<{ userId: number }>).map(r => r.userId).sort((a, b) => a - b)
+      this.db.prepare(`DELETE FROM projects WHERE id = ?`).run(id)
+      return ids
+    }).immediate()
   }
 
   membershipsFor(userId: number): UserProjectMembership[] {
@@ -348,48 +375,77 @@ export class ProjectService {
     ).all(userId) as UserProjectMembership[]
   }
 
-  setMember(projectId: number, userId: number, mode: GrantMode): void {
-    const owner = this.db.prepare(`SELECT owner_user_id AS ownerUserId FROM projects WHERE id = ?`)
-      .get(projectId) as { ownerUserId: number | null } | undefined
-    if (owner?.ownerUserId === userId && mode !== 'rw') throw new Error('owner-must-be-rw')
-    this.db.prepare(
-      `INSERT INTO project_members(project_id, user_id, mode) VALUES(?, ?, ?)
-       ON CONFLICT(project_id, user_id) DO UPDATE SET mode = excluded.mode`,
-    ).run(projectId, userId, mode)
-  }
-
-  removeMember(projectId: number, userId: number): void {
-    const owner = this.db.prepare(`SELECT owner_user_id AS ownerUserId FROM projects WHERE id = ?`)
-      .get(projectId) as { ownerUserId: number | null } | undefined
-    if (owner?.ownerUserId === userId) throw new Error('owner-protected')
-    this.db.prepare(`DELETE FROM project_members WHERE project_id = ? AND user_id = ?`).run(projectId, userId)
-  }
-
-  /** Create a pending invitation for the project owner or an active administrator. */
-  createInvitation(input: { projectId: number; inviteeUserId: number; inviterUserId: number; mode: GrantMode }): ProjectInvitation {
-    const project = this.db.prepare(`SELECT id FROM projects WHERE id = ?`).get(input.projectId)
-    if (project === undefined) throw new Error('project-not-found')
-    const inviter = this.db.prepare(`SELECT role,status FROM users WHERE id = ?`).get(input.inviterUserId) as
+  /** Require the current administrator when an authenticated actor is supplied. */
+  private assertAdministrator(actorUserId: number | undefined): void {
+    if (actorUserId === undefined) return
+    const actor = this.db.prepare('SELECT role,status FROM users WHERE id=? AND deleted_at IS NULL').get(actorUserId) as
       { role: 'admin' | 'user'; status: 'active' | 'disabled' } | undefined
-    const owner = this.db.prepare(`SELECT owner_user_id AS ownerUserId FROM projects WHERE id = ?`).get(input.projectId) as
-      { ownerUserId: number | null } | undefined
-    if (inviter === undefined || inviter.status !== 'active'
-      || (inviter.role !== 'admin' && owner?.ownerUserId !== input.inviterUserId)) {
-      throw new Error('invitation-forbidden')
-    }
-    const invitee = this.db.prepare(`SELECT status FROM users WHERE id = ?`).get(input.inviteeUserId) as
+    if (actor?.role !== 'admin' || actor.status !== 'active') throw new CollaborationDeniedError('forbidden')
+  }
+
+  /** Retain current account availability inside the caller's SQLite write transaction. */
+  private assertActiveAccount(userId: number): void {
+    const user = this.db.prepare('SELECT status FROM users WHERE id=? AND deleted_at IS NULL').get(userId) as
       { status: 'active' | 'disabled' } | undefined
-    if (invitee === undefined) throw new Error('user-not-found')
-    if (invitee.status !== 'active') throw new Error('user-disabled')
-    const member = this.db.prepare(`SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?`)
-      .get(input.projectId, input.inviteeUserId)
-    if (member !== undefined) throw new Error('invitation-already-member')
-    const now = Date.now()
+    if (user === undefined || user.status !== 'active') throw new CollaborationDeniedError('forbidden')
+  }
+
+  setMember(projectId: number, userId: number, mode: GrantMode, actorUserId?: number): void {
+    this.db.transaction(() => {
+      this.assertAdministrator(actorUserId)
+      const owner = this.db.prepare(`SELECT owner_user_id AS ownerUserId FROM projects WHERE id = ?`)
+        .get(projectId) as { ownerUserId: number | null } | undefined
+      if (owner === undefined) throw new Error(`unknown project ${String(projectId)}`)
+      if (owner.ownerUserId === userId && mode !== 'rw') throw new Error('owner-must-be-rw')
+      this.db.prepare(
+        `INSERT INTO project_members(project_id, user_id, mode) VALUES(?, ?, ?)
+         ON CONFLICT(project_id, user_id) DO UPDATE SET mode = excluded.mode`,
+      ).run(projectId, userId, mode)
+      this.db.prepare(`UPDATE project_invitations SET status='revoked',responded_at=?
+        WHERE project_id=? AND invitee_user_id=? AND status='pending'`).run(Date.now(), projectId, userId)
+    })()
+  }
+
+  removeMember(projectId: number, userId: number, actorUserId?: number): void {
+    this.db.transaction(() => {
+      this.assertAdministrator(actorUserId)
+      const owner = this.db.prepare(`SELECT owner_user_id AS ownerUserId FROM projects WHERE id = ?`)
+        .get(projectId) as { ownerUserId: number | null } | undefined
+      if (owner?.ownerUserId === userId) throw new Error('owner-protected')
+      this.db.prepare(`DELETE FROM project_members WHERE project_id = ? AND user_id = ?`).run(projectId, userId)
+      this.db.prepare(`UPDATE project_invitations SET status='revoked',responded_at=?
+        WHERE project_id=? AND invitee_user_id=? AND status='pending'`).run(Date.now(), projectId, userId)
+    })()
+  }
+
+  /** Create a pending invitation for the owner or an active administrator, retiring any expired predecessor. */
+  createInvitation(input: { projectId: number; inviteeUserId: number; inviterUserId: number; mode: GrantMode }): ProjectInvitation {
     try {
-      const result = this.db.prepare(`INSERT INTO project_invitations(
-        project_id,invitee_user_id,inviter_user_id,mode,status,created_at
-      ) VALUES(?,?,?,?, 'pending',?)`).run(input.projectId, input.inviteeUserId, input.inviterUserId, input.mode, now)
-      return this.invitation(Number(result.lastInsertRowid))
+      const id = this.db.transaction(() => {
+        this.assertActiveAccount(input.inviterUserId)
+        const project = this.db.prepare(`SELECT owner_user_id AS ownerUserId FROM projects WHERE id = ?`).get(input.projectId) as
+          { ownerUserId: number | null } | undefined
+        if (project === undefined) throw new Error('project-not-found')
+        const inviter = this.db.prepare(`SELECT role FROM users WHERE id = ?`).get(input.inviterUserId) as
+          { role: 'admin' | 'user' } | undefined
+        if (inviter === undefined || inviter.role !== 'admin' && project.ownerUserId !== input.inviterUserId) throw new Error('invitation-forbidden')
+        const invitee = this.db.prepare(`SELECT status FROM users WHERE id = ? AND deleted_at IS NULL`).get(input.inviteeUserId) as
+          { status: 'active' | 'disabled' } | undefined
+        if (invitee === undefined) throw new Error('user-not-found')
+        if (invitee.status !== 'active') throw new Error('user-disabled')
+        const member = this.db.prepare(`SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?`)
+          .get(input.projectId, input.inviteeUserId)
+        if (member !== undefined) throw new Error('invitation-already-member')
+        const now = Date.now()
+        this.db.prepare(`UPDATE project_invitations SET status='expired',responded_at=?
+          WHERE project_id=? AND invitee_user_id=? AND status='pending' AND expires_at<=?`)
+          .run(now, input.projectId, input.inviteeUserId, now)
+        const result = this.db.prepare(`INSERT INTO project_invitations(
+          project_id,invitee_user_id,inviter_user_id,mode,status,created_at
+        ) VALUES(?,?,?,?, 'pending',?)`).run(input.projectId, input.inviteeUserId, input.inviterUserId, input.mode, now)
+        return Number(result.lastInsertRowid)
+      }).immediate()
+      return this.invitation(id)
     } catch (error) {
       if (isCodedError(error) && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
         throw new Error('invitation-already-pending')
@@ -412,8 +468,9 @@ export class ProjectService {
 
   countPendingInvitations(userId: number): number {
     return (this.db.prepare(
-      `SELECT COUNT(*) AS n FROM project_invitations WHERE invitee_user_id = ? AND status = 'pending'`,
-    ).get(userId) as { n: number }).n
+      `SELECT COUNT(*) AS n FROM project_invitations WHERE invitee_user_id = ? AND status = 'pending'
+        AND (expires_at IS NULL OR expires_at>?)`,
+    ).get(userId, Date.now()) as { n: number }).n
   }
 
   acceptInvitation(id: string, userId: number): void {
@@ -421,6 +478,7 @@ export class ProjectService {
     const invitationId = Number(id)
     if (!Number.isSafeInteger(invitationId)) throw new Error('invitation-not-found')
     const result = this.db.transaction(() => {
+      this.assertActiveAccount(userId)
       const invitation = this.db.prepare(`SELECT project_id AS projectId, invitee_user_id AS inviteeUserId,
         mode,status,expires_at AS expiresAt FROM project_invitations WHERE id = ?`).get(invitationId) as {
         projectId: number; inviteeUserId: number; mode: GrantMode; status: ProjectInvitationStatus; expiresAt: number | null
@@ -434,12 +492,12 @@ export class ProjectService {
         return 'expired' as const
       }
       this.db.prepare(`INSERT INTO project_members(project_id,user_id,mode) VALUES(?,?,?)
-        ON CONFLICT(project_id,user_id) DO UPDATE SET mode=excluded.mode`).run(
+        ON CONFLICT(project_id,user_id) DO NOTHING`).run(
         invitation.projectId, userId, invitation.mode,
       )
       this.db.prepare(`UPDATE project_invitations SET status='accepted',responded_at=? WHERE id=?`).run(Date.now(), invitationId)
       return 'accepted' as const
-    })()
+    }).immediate()
     if (result === 'expired') throw new Error('invitation-expired')
   }
 
@@ -459,7 +517,8 @@ export class ProjectService {
       id: String(row.id), projectId: row.projectId, projectName: row.projectName,
       invitee: { id: row.inviteeId, username: row.inviteeUsername, displayName: row.inviteeDisplayName },
       inviter: { id: row.inviterId, username: row.inviterUsername, displayName: row.inviterDisplayName },
-      mode: row.mode, status: row.status,
+      mode: row.mode,
+      status: row.status === 'pending' && row.expiresAt !== null && row.expiresAt <= Date.now() ? 'expired' : row.status,
       expiresAt: row.expiresAt === null ? null : new Date(row.expiresAt).toISOString(),
       createdAt: new Date(row.createdAt).toISOString(),
       respondedAt: row.respondedAt === null ? null : new Date(row.respondedAt).toISOString(),

@@ -1,0 +1,14 @@
+{
+  "name": "sdk-never-started-process-cleanup-before",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/reproduce-sdk-failed-spawn.mjs",
+  "startedAt": "2026-10-24T10:29:51.573855+00:00",
+  "seconds": 2.214,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "47762303135d4da3efe2d90c10214b649e721689328adb777e2d6fe56f0475e0",
+  "inputsAfter": "47762303135d4da3efe2d90c10214b649e721689328adb777e2d6fe56f0475e0",
+  "postgresToolDirectory": null,
+  "outputSha256": "d00798258a03144541fa1c5a758e9531429445a3839f1620b8dcf2dbbd82b236",
+  "outputTail": "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:\n\n  assert(failure instanceof AggregateError)\n\n    at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/.agents/audits/.local/reproduce-sdk-failed-spawn.mjs:14:2 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '==',\n  diff: 'simple'\n}\n\nNode.js v25.8.1\n"
+}

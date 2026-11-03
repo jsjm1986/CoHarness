@@ -15,6 +15,7 @@ import { bridge, DEFAULT_MAX_REQUEST_BODY_BYTES } from './http-bridge.ts'
 import { assertTrustedAuthority } from './api-request-trust.ts'
 import { bindRequestInteractions } from '@deepseek-ai/dsh-host-apiproxy/api/request-scope'
 import { BrowserAuth } from './browser-auth.ts'
+import { DEFAULT_BROWSER_RPC_TIMEOUT_MS } from './browser-timing.ts'
 import { HostConnectionService } from './rpc-host.ts'
 import { rejectWebSocketUpgrade, WebSocketDownlinks } from './websocket-downlink.ts'
 
@@ -108,6 +109,8 @@ export const inject = ['credentials']
 
 /** Plugin config: the deployment's non-loopback serving authorities. */
 export interface ConnectionConfig {
+  /** Deadline for bounded browser unary RPC calls in milliseconds. */
+  rpcTimeoutMs?: number
   /** Browser generation recovery timing delivered through the served index. */
   recovery?: {
     /** First retry delay cap in milliseconds. */
@@ -145,6 +148,7 @@ export interface ConnectionConfig {
 }
 
 export const Config: z<ConnectionConfig> = z.object({
+  rpcTimeoutMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_BROWSER_RPC_TIMEOUT_MS),
   recovery: z.object({
     backoffBaseMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(500),
     backoffFactor: z.number().min(1).default(2),
@@ -245,6 +249,10 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
     config?.historyPageTargetBytes ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
   const websocketHeartbeatIntervalMs = config?.websocketHeartbeatIntervalMs ?? 30_000
   const recovery = config?.recovery ?? {}
+  const rpcTimeoutMs = config?.rpcTimeoutMs ?? DEFAULT_BROWSER_RPC_TIMEOUT_MS
+  if (!Number.isSafeInteger(rpcTimeoutMs) || rpcTimeoutMs < 1 || rpcTimeoutMs > MAX_TIMER_DELAY_MS) {
+    throw new Error(`client-connection rpcTimeoutMs must be a positive safe integer no greater than ${MAX_TIMER_DELAY_MS}`)
+  }
   if (!Number.isSafeInteger(maxRequestBodyBytes) || maxRequestBodyBytes < 1) {
     throw new Error('client-connection maxRequestBodyBytes must be a positive safe integer')
   }
@@ -280,6 +288,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
     assertImageBodyCapacity(webCtx, maxRequestBodyBytes)
     webCtx.on('webserver/index-inject', (table: IndexInjection[]) => {
       table.push({ kind: 'global', name: '__DSH_CONNECTION_RECOVERY__', value: recovery })
+      table.push({ kind: 'global', name: '__DSH_CONNECTION_RPC_TIMEOUT_MS__', value: rpcTimeoutMs })
     })
     const fetchHandler = connection.createSharedFetchHandler(API_PATH, {
       async fetch(request) {

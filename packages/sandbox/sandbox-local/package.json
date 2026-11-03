@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-sandbox-local",
-  "description": "Local process-sandbox backends for the DeepSeek Harness sandbox seam: bwrap, the npm-distributed landlock-run launcher, macOS Seatbelt, or the Windows ACL restricted-token runner \u2014 functionally probed, fail-closed",
+  "description": "Local process-sandbox backends for the DeepSeek Harness sandbox seam: bwrap, the npm-distributed landlock-run launcher, macOS Seatbelt, or the Windows ACL restricted-token runner — functionally probed, fail-closed",
   "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
@@ -23,9 +23,9 @@
     "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {

@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-backup-doc-pairs-write",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write gateway/README.md .agents/notes/implemented/architecture/2026-10-25-local-runtime-supervisor.md",
+  "startedAt": "2026-10-24T19:35:50.509546+00:00",
+  "seconds": 2.437,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cdf35354e18acbb5c3af03b93a7abb3cf7b06f5e9362c327f1543a4b53d25643",
+  "inputsAfter": "b5614c2316575bae79fb3b09431bdc7ecd84de7f05c06ec2f97caf558b465a0d",
+  "postgresToolDirectory": null,
+  "outputSha256": "5490f2b49343904c037d4f013d36f7db54c8a4700c4274cd165c76295e290680",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-25-local-runtime-supervisor.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 2 record(s) written; run the check to validate the pairs.\n"
+}

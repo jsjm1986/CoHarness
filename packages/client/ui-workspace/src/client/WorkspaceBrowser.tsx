@@ -9,18 +9,18 @@
  * menu in between; the flow and its error dialog live in WorkspacePicker
  * (same package — direct composition, no slot between them).
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import clsx from 'clsx'
 import {
   Button, IconArchiveCheckOutline16, IconArchiveOffOutline16, IconArchiveOutline16,
-  IconChevronsUpDownOutline16, IconClockOutline16,
+  IconChevronsUpDownOutline16, IconClockOutline16, IconChevronRightOutline14, IconFollowsystemOutline16,
   IconCloseFill14, IconFlatListOutline16, IconFolderClose16, IconPersonalizationOutline16,
-  IconProjectAddOutline16, IconQueueOutline14, IconSearchOutline16, IconWorkspaceTreeOutline16,
+  IconProjectAddOutline16, IconPlusOutline16, IconLoadingOutline16, IconQueueOutline14, IconSearchOutline16, IconWorkspaceTreeOutline16,
   Menu, Modal, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
-  SessionId, SessionListState, SessionSearchResultItem, WorkspaceId, WorkspaceView,
+  SessionId, SessionListState, SessionRuntimeTarget, SessionSearchResultItem, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { WorkspaceBrowserProps } from './contract/slots.ts'
@@ -33,6 +33,7 @@ import {
 } from './tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './rows/Rows.tsx'
 import { FLAT_SESSION_ORDER_KEY } from './stores.ts'
+import { runtimeAccountKey } from './pin-order.ts'
 import { WorkspacePickFlow } from './WorkspacePicker.tsx'
 import { AnimatedRows } from './rows/AnimatedRows.tsx'
 import css from './WorkspaceBrowser.module.css'
@@ -53,6 +54,16 @@ const SEARCH_QUERY_MAX_CODE_UNITS = 500
 const SESSION_WATERMARK_BASE = 5
 /** Highest watermark that attention-bearing Sessions raise automatically; Show more and search reveals may exceed it. */
 const SESSION_WATERMARK_AUTO_MAX = 50
+
+/** Keep each computer's grouping, drag targets and empty state inside its exact Runtime. */
+function listForRuntime(list: SessionListState, runtimeId?: string): SessionListState {
+  if (runtimeId === undefined) return list
+  const matching = (rows: SessionListState['byId']) => Object.fromEntries(Object.entries(rows)
+    .filter(([, row]) => row.runtime?.runtimeId === runtimeId)) as SessionListState['byId']
+  const byId = matching(list.byId)
+  return { ...list, ids: list.ids.filter(id => byId[id] !== undefined), byId, archivedById: matching(list.archivedById),
+    current: list.current !== undefined && byId[list.current] !== undefined ? list.current : undefined }
+}
 
 /** Show the blank row plus the first `watermark` non-blank rows, in list order. */
 function watermarkRows(sessions: readonly SessionNode[], watermark: number): {
@@ -306,6 +317,9 @@ type SessionTreeProps = Pick<
   WorkspaceBrowserProps,
   'useSessions' | 'startSession' | 'insertWorkspaceBefore' | 'insertSessionBefore' | 'renderSlot' | 't' | 'usePanelInfo'
 > & {
+  runtimeId?: string | undefined
+  /** The computer has not published a Workspace directory; an empty list is still unknown. */
+  directoryPending?: boolean | undefined
   open: (sessionId: SessionId) => void
   /** Host account home for POSIX hover-path abbreviation. */
   home?: string | undefined
@@ -347,12 +361,12 @@ type SessionTreeProps = Pick<
 }
 
 /** The list-empty placeholder — a glyph over the text; the archived-only view names its filter and offers the way back. */
-function EmptySessions({ rowState, onLeaveArchivedOnly, t }: Pick<SessionTreeProps, 'rowState' | 'onLeaveArchivedOnly' | 't'>) {
+function EmptySessions({ rowState, onLeaveArchivedOnly, t, directoryPending }: Pick<SessionTreeProps, 'rowState' | 'onLeaveArchivedOnly' | 't' | 'directoryPending'>) {
   const archivedOnly = rowState.archivedFilter === 'only'
   return (
     <div className={css.empty} data-row-key="empty">
       {archivedOnly ? <IconArchiveOutline16 size={24} /> : <IconQueueOutline14 size={24} />}
-      <div>{archivedOnly ? t('empty.noneArchived') : t('empty.none')}</div>
+      <div>{archivedOnly ? t('empty.noneArchived') : t(directoryPending ? 'computers.notSynced' : 'empty.none')}</div>
       {archivedOnly && (
         <button type="button" className={css.emptyAction} onClick={onLeaveArchivedOnly}>
           {t('empty.viewOthers')}
@@ -368,9 +382,11 @@ function SessionTree({
   onRenameRequest, onDeleteRequest, onSessionRenameRequest, revealSessionId, onSessionRevealed,
   insertWorkspaceBefore, insertSessionBefore, orderBy, workspaceReady, newShortcut,
   groupExpansion, setGroupExpanded,
-  sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, home, renderSlot, t,
+  sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder,
+  home, renderSlot, t, runtimeId, directoryPending,
 }: SessionTreeProps) {
-  const list = useSessions(s => s)
+  const source = useSessions(s => s)
+  const list = useMemo(() => listForRuntime(source, runtimeId), [source, runtimeId])
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const current = panelActive ? undefined : list.current
   const currentBlank = current !== undefined && list.byId[current]?.blank === true ? current : undefined
@@ -807,7 +823,8 @@ function SessionTree({
         ready={list.phase === 'ready' && workspaceReady && !nativeDragActive}
         resetKey={JSON.stringify([orderBy, watermarkMotionKey])}
       >
-        {groups.length === 0 && <EmptySessions rowState={rowState} onLeaveArchivedOnly={onLeaveArchivedOnly} t={t} />}
+        {groups.length === 0 && <EmptySessions rowState={rowState} onLeaveArchivedOnly={onLeaveArchivedOnly}
+          t={t} directoryPending={directoryPending} />}
         {rootGroups.map(group => renderGroup(group, 0))}
       </AnimatedRows>
       <span className={css.fade} />
@@ -818,7 +835,8 @@ function SessionTree({
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
   useSessions, usePanelInfo, open, onSessionRenameRequest, revealSessionId, onSessionRevealed, rowState,
-  orderBy, workspaceReady, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, renderSlot, t,
+  orderBy, workspaceReady, sessionOrderByAccount, sessionUpdatedAtByAccount,
+  syncSessionOrderAccount, setSessionOrder, renderSlot, t, runtimeId, directoryPending,
 }: Pick<
   SessionTreeProps,
   | 'useSessions'
@@ -836,14 +854,18 @@ function FlatList({
   | 'setSessionOrder'
   | 'renderSlot'
   | 't'
+  | 'runtimeId'
+  | 'directoryPending'
 >) {
-  const list = useSessions(s => s)
+  const source = useSessions(s => s)
+  const list = useMemo(() => listForRuntime(source, runtimeId), [source, runtimeId])
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const current = panelActive ? undefined : list.current
   // Complete account membership in recency order — the flat list's natural
   // baseline. Archives stay members so an unarchive restores position;
   // deriveFlat sections the pinned block ahead of the supplied order.
-  const sessionIds = useMemo(() => orderByRecency(sessionMemberIds(list), sessionSummaries(list)), [list])
+  const sessionIds = useMemo(() => orderByRecency(sessionMemberIds(list, rowState.inputDraftSessionIds), sessionSummaries(list)),
+    [list, rowState.inputDraftSessionIds])
   const previousOrderBy = useRef(orderBy)
   useEffect(() => {
     if (list.phase !== 'ready') return
@@ -897,7 +919,7 @@ function FlatList({
         resetKey={orderBy}
       >
         {rows.length === 0 && (
-          <div className={css.empty} data-row-key="empty">{t('empty.none')}</div>
+          <div className={css.empty} data-row-key="empty">{t(directoryPending ? 'computers.notSynced' : 'empty.none')}</div>
         )}
         {rows.map((node) => {
           const active = drag !== null && drag.pinned === node.pinned
@@ -1055,6 +1077,7 @@ export function WorkspaceBrowser({
   useHostDescription,
   useViewport,
   useCurrentSessions,
+  useInputDraftSessions,
   useWorkspaceShortcuts,
   useShortcuts,
   renderSlot,
@@ -1065,8 +1088,26 @@ export function WorkspaceBrowser({
   closeAddWorkspace,
   setDirectoryBusy,
   dismissForkError,
+  refreshComputers,
+  startRuntimeSession,
 }: WorkspaceBrowserProps) {
+  const computerGroups = useWorkspaces(state => state.computerGroups)
+  const workspaceRuntimeIds = useWorkspaces(state => state.workspaceRuntimeIds)
+  const directoryState = useWorkspaces(state => state.directoryState)
+  const activeComputer = useCurrentSessions(state => state.current === undefined ? undefined : state.byId[state.current]?.runtime?.nodeId)
+  const [expandedComputers, setExpandedComputers] = useState<Readonly<Record<string, boolean>>>({})
+  const [showAllComputers, setShowAllComputers] = useState(false)
+  const computerRegionId = useId()
+  const pendingRuntime = useRef(new Set<string>())
+  const [busyRuntimes, setBusyRuntimes] = useState<ReadonlySet<string>>(new Set())
+  const [runtimeWorkspacePicker, setRuntimeWorkspacePicker] = useState<SessionRuntimeTarget | null>(null)
+  const runtimeWorkspaceAnchor = useRef<HTMLButtonElement | null>(null)
+  const currentSessionId = useCurrentSessions(state => state.current)
+  useEffect(() => {
+    if (activeComputer !== undefined) setExpandedComputers(previous => ({ ...previous, [activeComputer]: true }))
+  }, [activeComputer])
   const [navigationError, setNavigationError] = useState<string | null>(null)
+  const [navigationPending, setNavigationPending] = useState(false)
   const navigationAttempt = useRef(0)
   useEffect(() => () => { navigationAttempt.current++ }, [])
   // The Session list's archived partition merges every pooled runtime's set;
@@ -1087,12 +1128,16 @@ export function WorkspaceBrowser({
     }
     const attempt = ++navigationAttempt.current
     setNavigationError(null)
+    setNavigationPending(true)
     const report = (error: unknown): void => {
       if (attempt !== navigationAttempt.current) return
       setNavigationError(error instanceof Error ? error.message : String(error))
     }
-    try { void Promise.resolve(open(sessionId)).catch(report) }
-    catch (error) { report(error) }
+    try {
+      void Promise.resolve(open(sessionId)).catch(report).finally(() => {
+        if (attempt === navigationAttempt.current) setNavigationPending(false)
+      })
+    } catch (error) { report(error); setNavigationPending(false) }
   }
   const [revealSessionId, setRevealSessionId] = useState<SessionId | undefined>(undefined)
   const openSearchResult = (sessionId: SessionId): void => {
@@ -1122,9 +1167,10 @@ export function WorkspaceBrowser({
   // Persisted view blobs written before the archived filter existed rehydrate
   // without the field; they read as the default hide-archived view.
   const archivedFilter = useStore(s => s.archivedFilter ?? 'default')
+  const inputDraftSessionIds = useInputDraftSessions(ids => ids)
   const rowState = useMemo<SessionRowState>(
-    () => ({ pinnedSessionIds, archivedSessionIds, archivedFilter }),
-    [archivedSessionIds, archivedFilter, pinnedSessionIds],
+    () => ({ pinnedSessionIds, archivedSessionIds, archivedFilter, inputDraftSessionIds }),
+    [archivedSessionIds, archivedFilter, pinnedSessionIds, inputDraftSessionIds],
   )
   // Live occupancy of this surface's directory-flow hole (the same source the
   // flow reads): a composition without a picking affordance can add nothing.
@@ -1142,10 +1188,13 @@ export function WorkspaceBrowser({
   const currentBlankWorkspaceId = useCurrentSessions(state => currentBlankSessionId === undefined
     ? undefined
     : state.byId[currentBlankSessionId]?.workspaceId)
+  const currentBlankRuntime = useCurrentSessions(state => currentBlankSessionId === undefined
+    ? undefined : state.byId[currentBlankSessionId]?.runtime?.runtimeId)
+  const localAccount = (key: string): string => runtimeAccountKey(key, computerGroups === undefined ? undefined : currentBlankRuntime)
   const currentBlankAccount = currentBlankSessionId === undefined
     ? undefined
     : (workspaces.find(workspace => workspace.sessionIds.includes(currentBlankSessionId))
-      ?.workspaceId as string | undefined) ?? currentBlankWorkspaceId ?? UNGROUPED_KEY
+      ?.workspaceId as string | undefined) ?? currentBlankWorkspaceId ?? localAccount(UNGROUPED_KEY)
   const promotedBlank = useRef<{ sessionId: SessionId; accountKey: string } | undefined>(undefined)
   useEffect(() => {
     if (currentBlankSessionId === undefined || currentBlankAccount === undefined) {
@@ -1155,7 +1204,8 @@ export function WorkspaceBrowser({
     if (promotedBlank.current?.sessionId === currentBlankSessionId
       && promotedBlank.current.accountKey === currentBlankAccount) return
     promotedBlank.current = { sessionId: currentBlankSessionId, accountKey: currentBlankAccount }
-    for (const accountKey of new Set([currentBlankAccount, FLAT_SESSION_ORDER_KEY])) {
+    const flatAccount = runtimeAccountKey(FLAT_SESSION_ORDER_KEY, computerGroups === undefined ? undefined : currentBlankRuntime)
+    for (const accountKey of new Set([currentBlankAccount, flatAccount])) {
       // No saved order yet: keep the account's natural baseline — the Host
       // member order for Workspace accounts — so promotion fronts the blank
       // without imposing recency on a list the user never arranged. The
@@ -1169,15 +1219,18 @@ export function WorkspaceBrowser({
         ...previous.filter(id => id !== currentBlankSessionId),
       ])
     }
-  }, [actions.setSessionOrder, currentBlankAccount, currentBlankSessionId, sessionOrderByAccount, workspaces])
+  }, [actions.setSessionOrder, computerGroups, currentBlankAccount, currentBlankRuntime,
+    currentBlankSessionId, sessionOrderByAccount, workspaces])
   useEffect(() => {
     if (workspacePhase !== 'ready') return
     actions.retainAccountKeys([
       UNGROUPED_KEY,
       FLAT_SESSION_ORDER_KEY,
+      ...(computerGroups ?? []).flatMap(group => [UNGROUPED_KEY, FLAT_SESSION_ORDER_KEY]
+        .map(key => runtimeAccountKey(key, group.runtime.runtimeId))),
       ...workspaces.map(workspace => workspace.workspaceId as string),
     ])
-  }, [actions.retainAccountKeys, workspacePhase, workspaces])
+  }, [actions.retainAccountKeys, computerGroups, workspacePhase, workspaces])
   // The query outlives the tree and the input (both wide-only) so collapsing
   // does not silently drop an in-progress filter.
   const [query, setQuery] = useState('')
@@ -1191,6 +1244,7 @@ export function WorkspaceBrowser({
   })
   const searchRoot = useRef<HTMLDivElement | null>(null)
   const searchInput = useRef<HTMLInputElement | null>(null)
+  const searchButton = useRef<HTMLButtonElement | null>(null)
   // Workspace commands own the picker's opening state: the ＋ button and the
   // `workspace.add` command publish into one request, and the flow consumes
   // it through `closeAddWorkspace`.
@@ -1354,6 +1408,131 @@ export function WorkspaceBrowser({
     })
   }
 
+  const renderRuntime = (runtimeId?: string, directoryPending?: boolean): ReactNode => {
+    const accountKey = (key: string): string => runtimeAccountKey(key, runtimeId)
+    const orders = Object.fromEntries([
+      ...Object.entries(sessionOrderByAccount).filter(([key]) => key !== UNGROUPED_KEY && key !== FLAT_SESSION_ORDER_KEY),
+      ...[UNGROUPED_KEY, FLAT_SESSION_ORDER_KEY].flatMap((key) => {
+        const saved = sessionOrderByAccount[accountKey(key)]
+        return saved === undefined ? [] : [[key, saved] as const]
+      }),
+    ])
+    const timestamps = { ...sessionUpdatedAtByAccount, [UNGROUPED_KEY]: sessionUpdatedAtByAccount[accountKey(UNGROUPED_KEY)] ?? {},
+      [FLAT_SESSION_ORDER_KEY]: sessionUpdatedAtByAccount[accountKey(FLAT_SESSION_ORDER_KEY)] ?? {} }
+    const syncOrder = (key: string, order: string[], times: Record<string, number>): void => {
+      actions.syncSessionOrderAccount(accountKey(key), order, times)
+    }
+    const setOrder = (key: string, order: string[]): void => { actions.setSessionOrder(accountKey(key), order) }
+    return groupBy === 'flat'
+      ? <FlatList useSessions={useCurrentSessions} usePanelInfo={usePanelInfo} open={guardedOpen}
+        runtimeId={runtimeId} directoryPending={directoryPending}
+        onSessionRenameRequest={requestSessionRename} revealSessionId={revealSessionId} onSessionRevealed={acknowledgeSessionReveal}
+        rowState={rowState} orderBy={orderBy} workspaceReady={workspacePhase === 'ready'}
+        sessionOrderByAccount={orders} sessionUpdatedAtByAccount={timestamps}
+        syncSessionOrderAccount={syncOrder} setSessionOrder={setOrder} renderSlot={renderSlot} t={t} />
+      : <SessionTree useSessions={useCurrentSessions} usePanelInfo={usePanelInfo} runtimeId={runtimeId} directoryPending={directoryPending}
+        onSessionRenameRequest={requestSessionRename} revealSessionId={revealSessionId} onSessionRevealed={acknowledgeSessionReveal}
+        newShortcut={newShortcut} workspaces={runtimeId === undefined ? workspaces
+          : workspaces.filter(item => workspaceRuntimeIds?.[item.workspaceId] === runtimeId)}
+        nestWorkspaces={groupBy === 'workspace-tree'} groupExpansion={{ ...groupExpansion, [UNGROUPED_KEY]: groupExpansion[accountKey(UNGROUPED_KEY)] ?? false }} setGroupExpanded={(key, expanded) => { actions.setGroupExpanded(accountKey(key), expanded) }}
+        sessionOrderByAccount={orders} sessionUpdatedAtByAccount={timestamps}
+        syncSessionOrderAccount={syncOrder} setSessionOrder={setOrder}
+        rowState={rowState} onLeaveArchivedOnly={() => { actions.setArchivedFilter('default') }} startSession={startSession} open={guardedOpen}
+        workspaceReady={workspacePhase === 'ready'} insertWorkspaceBefore={insertWorkspaceBefore} insertSessionBefore={insertSessionBefore}
+        orderBy={orderBy} home={home} renderSlot={renderSlot} t={t}
+        onRenameRequest={(workspaceId, currentTitle) => {
+          setRenameTarget({ workspaceId, currentTitle }); setRenameDraft(currentTitle); setRenameError(null)
+        }}
+        onDeleteRequest={(workspaceId, title) => { setDeleteTarget({ workspaceId, title }); setDeleteError(null) }} />
+  }
+  const computersById = new Map<string, { id: string; name: string; runtimes: NonNullable<typeof computerGroups>[number][] }>()
+  for (const group of computerGroups ?? []) {
+    const id = group.runtime.nodeId
+    const computer = computersById.get(id) ?? { id, name: group.runtime.nodeName, runtimes: [] }
+    computer.runtimes.push(group); computersById.set(id, computer)
+  }
+  const computers = [...computersById.values()]
+  const matchingComputers = normalizedQuery === '' ? computers : computers.filter(computer => computer.name.toLowerCase().includes(normalizedQuery.toLowerCase()))
+  const visibleComputers = showAllComputers || normalizedQuery !== '' ? matchingComputers : matchingComputers.filter((computer, index) => index < 5 || computer.id === activeComputer)
+  const startComputerSession = (target: SessionRuntimeTarget, workspaceId?: WorkspaceId): void => {
+    const id = target.runtimeId
+    if (id === undefined || startRuntimeSession === undefined || pendingRuntime.current.has(id)) return
+    pendingRuntime.current.add(id)
+    setBusyRuntimes(new Set(pendingRuntime.current))
+    setNavigationError(null)
+    void startRuntimeSession(target, workspaceId).catch((error: unknown) => {
+      if (error instanceof Error && error.name === 'AbortError') return
+      setNavigationError(error instanceof Error ? error.message : String(error))
+    }).finally(() => { pendingRuntime.current.delete(id); setBusyRuntimes(new Set(pendingRuntime.current)) })
+  }
+  const renderRuntimeCreate = (group: NonNullable<typeof computerGroups>[number], iconOnly: boolean): ReactNode => {
+    if (startRuntimeSession === undefined) return null
+    const id = group.runtime.runtimeId, busy = busyRuntimes.has(id)
+    const label = t(busy ? 'computers.opening' : 'computers.newSession')
+    const button = <button type="button" className={iconOnly ? css.computerNew : undefined} aria-label={label}
+      disabled={busy || group.status !== 'active'} aria-busy={busy} onClick={(event) => {
+        if (pendingRuntime.current.has(id)) return
+        const choices = workspaces.filter(workspace => workspaceRuntimeIds?.[workspace.workspaceId] === id)
+        const current = choices.find(workspace => currentSessionId !== undefined && workspace.sessionIds.includes(currentSessionId))
+        if (current !== undefined || choices.length <= 1) {
+          startComputerSession(group.runtime, (current ?? choices[0])?.workspaceId)
+        } else {
+          runtimeWorkspaceAnchor.current = event.currentTarget
+          setRuntimeWorkspacePicker(group.runtime)
+        }
+      }}>{iconOnly ? <IconPlusOutline16 size={14} /> : label}</button>
+    return iconOnly ? <Tooltip label={label} side="right">{button}</Tooltip> : button
+  }
+  const renderComputers = (): ReactNode => <div className={css.computerList}>
+    <Menu open={runtimeWorkspacePicker !== null && computerGroups?.some(group => group.status === 'active'
+      && group.runtime.runtimeId === runtimeWorkspacePicker.runtimeId) === true}
+    anchor={null} portal side="right"
+    getAnchorRect={() => runtimeWorkspaceAnchor.current?.getBoundingClientRect() ?? null}
+    items={workspaces.filter(workspace => workspaceRuntimeIds?.[workspace.workspaceId] === runtimeWorkspacePicker?.runtimeId)
+      .map(workspace => ({ id: workspace.workspaceId, label: workspace.title, icon: <IconFolderClose16 size={16} /> }))}
+    onClose={() => { setRuntimeWorkspacePicker(null) }}
+    onSelect={(workspaceId) => {
+      const target = runtimeWorkspacePicker
+      setRuntimeWorkspacePicker(null)
+      if (target !== null) startComputerSession(target, workspaceId as WorkspaceId)
+    }} />
+    {directoryState === 'error' && <div className={css.computerNotice} role="status">
+      <span>{t('computers.refreshFailed')}</span><button type="button" onClick={() => { void refreshComputers?.() }}>{t('computers.retry')}</button>
+    </div>}
+    {visibleComputers.map((computer) => {
+      const expanded = expandedComputers[computer.id] ?? computer.id === activeComputer
+      const onlyRuntime = computer.runtimes[0]
+      return <section key={computer.id} className={css.computerSection} aria-label={computer.name}>
+        <div className={css.computerHeader}><button type="button" className={css.computerHeading} aria-expanded={expanded}
+          aria-controls={`${computerRegionId}-${computer.id}`} title={computer.name}
+          onClick={() => {
+            setExpandedComputers(previous => ({ ...previous, [computer.id]: !expanded }))
+            if (!expanded) void refreshComputers?.()
+          }}>
+          <IconChevronRightOutline14 className={expanded ? css.computerExpanded : undefined} size={12} />
+          <IconFollowsystemOutline16 size={14} />
+          <span className={css.computerName}>{computer.name}</span>
+          {computer.runtimes.every(item => item.status !== 'active') && <span className={css.computerState}>{t('computers.offline')}</span>}
+        </button>
+        {expanded && computer.runtimes.length === 1 && onlyRuntime !== undefined && renderRuntimeCreate(onlyRuntime, true)}
+        </div>
+        {expanded && <div className={css.computerBody} id={`${computerRegionId}-${computer.id}`}>{computer.runtimes.map(group => <div key={group.runtime.runtimeId}>
+          {computer.runtimes.length > 1 && <div className={css.runtimeActions}>
+            <span>{t('computers.runtime', { name: group.runtime.runtimeId.slice(0, 8) })}</span>
+            {renderRuntimeCreate(group, false)}
+          </div>}
+          {renderRuntime(group.runtime.runtimeId, group.syncedAt === null && group.items.length === 0)}
+        </div>)}</div>}
+      </section>
+    })}
+    {!showAllComputers && normalizedQuery === '' && computers.length > visibleComputers.length
+      && <button type="button" className={css.moreComputers} onClick={() => { setShowAllComputers(true) }}>
+        {t('computers.showAll', { n: computers.length })}
+      </button>}
+    {showAllComputers && normalizedQuery === '' && computers.length > 5 && <button type="button" className={css.moreComputers}
+      onClick={() => { setShowAllComputers(false) }}>{t('computers.showLess')}</button>}
+  </div>
+
   return (
     <div className={clsx(css.root, !wide && css.rail, workbenchMode && css.workbenchMode)}>
       {workbenchMode && wide && (
@@ -1364,6 +1543,9 @@ export function WorkspaceBrowser({
       <div className={css.sectionHeader}>
         {wide && (
           <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>
+            {navigationPending && <span role="status" aria-label={t('navigation.opening')} className={css.navigationPending}>
+              <IconLoadingOutline16 size={12} />
+            </span>}
             {groupBy === 'flat' ? t('section.sessions') : t('section.workspaces')}
           </span>
         )}
@@ -1381,6 +1563,7 @@ export function WorkspaceBrowser({
               <Tooltip label={t('search')} shortcutKeys={searchShortcut?.keys} side="bottom" delayMs={500} disabled={searchExpanded}>
                 <button
                   type="button"
+                  ref={searchButton}
                   className={css.searchButton}
                   aria-label={t('search.sessions.aria')}
                   aria-keyshortcuts={searchShortcut?.aria}
@@ -1396,15 +1579,17 @@ export function WorkspaceBrowser({
                 ref={searchInput}
                 className={css.searchInput}
                 type="text"
-                placeholder={t('search.placeholder')}
+                placeholder={t(computerGroups === undefined ? 'search.placeholder' : 'search.personalPlaceholder')}
                 maxLength={SEARCH_QUERY_MAX_CODE_UNITS}
                 value={query}
                 tabIndex={searchExpanded ? 0 : -1}
+                aria-hidden={!searchExpanded}
                 onChange={(e) => { setQuery(sanitizeSearchQuery(e.target.value)) }}
                 onKeyDown={(e) => {
                   if (e.key !== 'Escape') return
                   setQuery('')
                   setSearchExpanded(false)
+                  searchButton.current?.focus({ preventScroll: true })
                 }}
               />
               {searchExpanded && (
@@ -1416,6 +1601,7 @@ export function WorkspaceBrowser({
                     e.stopPropagation()
                     setQuery('')
                     setSearchExpanded(false)
+                    searchButton.current?.focus({ preventScroll: true })
                   }}
                 >
                   <IconCloseFill14 />
@@ -1498,8 +1684,11 @@ export function WorkspaceBrowser({
       {/* Always-mounted seat keeps the region's flex slot while the list
           itself is wide-only. */}
       {navigationError !== null && <div className={css.renameError} role="alert">{navigationError}</div>}
-      <div className={clsx(css.listArea, workbenchMode && css.workbenchListHidden)}>
-        {wide && (normalizedQuery !== ''
+      {wide && computerGroups === undefined && directoryState === 'error' && <div className={css.computerNotice} role="status">
+        <span>{t('computers.refreshFailed')}</span><button type="button" onClick={() => { void refreshComputers?.() }}>{t('computers.retry')}</button>
+      </div>}
+      <div className={clsx(css.listArea, workbenchMode && css.workbenchListHidden)} aria-busy={navigationPending || undefined}>
+        {wide && (computerGroups !== undefined && (normalizedQuery === '' || matchingComputers.length > 0) ? renderComputers() : normalizedQuery !== ''
           ? (
             <SearchResults
               useSessions={useCurrentSessions}

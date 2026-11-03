@@ -19,6 +19,8 @@ export interface PaneIdentity {
   /** Workspace the session lives in; empty when nothing resolves. */
   readonly workspaceName: string
   readonly tone: ScopeTone
+  readonly computerName?: string
+  readonly runtimeId?: string
 }
 
 /**
@@ -48,7 +50,10 @@ export function paneIdentity(
   const scopeName = summary?.workspaceName ?? (runtime?.kind === 'project' ? '' : personal)
   const workspaceName = workspaces.items.find(item => item.sessionIds.includes(sessionId))?.title
     ?? workspaceTitleOf(summary?.cwd ?? '')
-  return { title: summary?.displayTitle ?? untitled, scopeName, workspaceName, tone }
+  return { title: summary?.displayTitle ?? untitled, scopeName, workspaceName, tone,
+    ...(summary?.runtime?.nodeName === undefined ? {} : { computerName: summary.runtime.nodeName }),
+    ...(summary?.runtime?.runtimeId === undefined ? {} : { runtimeId: summary.runtime.runtimeId }),
+  }
 }
 
 /** Render a 20px tinted space tile with the scope's mark: the personal and

@@ -3,6 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationViewport } from '@deepseek-ai/dsh-client-runtime/client'
+import { clientSessionKey, parseClientSessionKey, type SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -35,20 +36,27 @@ const namespace = 'projectActivity'
 export const inject = ['slots', 'locale', 'sidebarRightTabs', 'projectUiPolicy', 'sessions', 'conversationViewport']
 
 /**
- * Client plugin body: dictionaries, the scope-gated tab type, and the two
- * keyed seats. The type definition follows `projectUiPolicy.scope` — the feed
- * exists only while the shared project scope is active — while the keyed body
- * and title registrations stay mounted; without a live tab they are inert.
+ * Client plugin body: dictionaries, the project-Session tab type and keyed seats.
+ * Session ownership selects the type; unqualified standalone Sessions use the
+ * page policy. Each body captures its Runtime for requests and source links.
  * @param ctx - client root context.
  */
 export function apply(ctx: Context): void {
   const t = ctx.locale.bind(namespace)
   const store = createActivityStore()
+  const targetFor = (sessionId: SessionId | undefined): SessionRuntimeTarget | undefined => {
+    const owner = sessionId === undefined ? undefined
+      : ctx.sessions.runtimeIdentityFor?.(sessionId) ?? parseClientSessionKey(sessionId)?.runtime
+    if (owner !== undefined) return owner
+    const policy = ctx.projectUiPolicy.getSnapshot()
+    return policy.scope === 'project' && policy.projectId !== undefined
+      ? { kind: 'project', projectId: policy.projectId } : undefined
+  }
   ctx.effect(() => ctx.locale.register(namespace, { zh, en }), 'ui-project-activity.copy')
   ctx.effect(() => {
     let disposeType: (() => void) | undefined
     const sync = (): void => {
-      const inProject = ctx.projectUiPolicy.getSnapshot().scope === 'project'
+      const inProject = targetFor(ctx.sessions.list.getSnapshot().current)?.kind === 'project'
       if (inProject && disposeType === undefined) {
         disposeType = ctx.sidebarRightTabs.register(activityDefinition(t))
       } else if (!inProject && disposeType !== undefined) {
@@ -58,12 +66,14 @@ export function apply(ctx: Context): void {
       }
     }
     sync()
-    const unsubscribe = ctx.projectUiPolicy.subscribe(sync)
-    return () => { unsubscribe(); disposeType?.() }
+    const unsubscribePolicy = ctx.projectUiPolicy.subscribe(sync)
+    const unsubscribeSessions = ctx.sessions.list.subscribe(sync)
+    return () => { unsubscribePolicy(); unsubscribeSessions(); disposeType?.() }
   }, 'ui-project-activity.scope')
   ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
     name: 'sidebar.right.pane.tab', key: ACTIVITY_ID, locale: namespace, store,
-    inject: (_sessionId, actions): ActivityInjected => {
+    inject: (sessionId, actions): ActivityInjected => {
+      const target = targetFor(sessionId)
       let inFlight: AbortController | undefined
       let journalPoll: AbortController | undefined
       const load = async (before: string | undefined): Promise<void> => {
@@ -72,7 +82,8 @@ export function apply(ctx: Context): void {
         inFlight = controller
         actions.loading()
         try {
-          const page = await fetchActivity(before, controller.signal)
+          const page = await fetchActivity(before, controller.signal, target)
+          if (controller.signal.aborted) return
           if (before === undefined) actions.refreshed(page.items, page.nextBefore)
           else actions.appended(page.items, page.nextBefore)
         } catch {
@@ -93,10 +104,9 @@ export function apply(ctx: Context): void {
       }
       const readJournal = async (signal: AbortSignal): Promise<boolean> => {
         try {
-          const page = await fetchProgress(signal)
+          const page = await fetchProgress(signal, target)
           if (signal.aborted) return true
           actions.progressLoaded(page)
-          if (page.status.generating) void pollJournal()
           return !page.status.generating
         } catch {
           if (!signal.aborted) actions.progressFailed()
@@ -109,27 +119,23 @@ export function apply(ctx: Context): void {
           const controller = new AbortController()
           journalPoll = controller
           void load(undefined)
-          void readJournal(controller.signal)
+          void readJournal(controller.signal).then((complete) => {
+            if (!complete && !controller.signal.aborted) void pollJournal()
+          })
         },
         loadMore: (before) => { void load(before) },
         generate: () => {
-          void generateProgress()
+          void generateProgress(target)
             .then(() => pollJournal())
             .catch(() => { actions.progressFailed() })
         },
-        reveal: (sessionId, seq) => {
+        reveal: (sourceSessionId, seq) => {
           const viewport: ConversationViewport | undefined = ctx.get('conversationViewport')
           if (viewport === undefined) return
-          // The feed carries wire session ids; the pane set and the sessions
-          // list key rows by the runtime-scoped client identity, so translate
-          // through the project runtime target the feed belongs to.
-          const policy = ctx.projectUiPolicy.getSnapshot()
-          const raw = sessionId as SessionId
-          const target = policy.scope === 'project' && policy.projectId !== undefined
-            ? ctx.sessions.keyFor?.(raw, { kind: 'project', projectId: policy.projectId }) ?? raw
-            : raw
-          if (seq === null) viewport.replaceActive(target)
-          else viewport.reveal(target, seq)
+          const raw = sourceSessionId as SessionId
+          const key = target === undefined ? raw : ctx.sessions.keyFor?.(raw, target) ?? clientSessionKey(target, raw)
+          if (seq === null) viewport.replaceActive(key)
+          else viewport.reveal(key, seq)
         },
       }
     },

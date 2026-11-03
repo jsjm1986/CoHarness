@@ -1,0 +1,610 @@
+{
+  "recordedAt": "2026-10-28T22:09:43.698321+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "findings": [
+    "B272",
+    "B273",
+    "B274"
+  ],
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "baseline": {
+    "fetchPassed": true,
+    "aheadOfOriginMaster": 139,
+    "behindOriginMaster": 0,
+    "sharedUncommittedWorkPreserved": true
+  },
+  "causalNegatives": [
+    {
+      "receipt": {
+        "name": "webhook-administrator-compiled-causal-before",
+        "status": "failed",
+        "startedAt": "2026-10-28T21:38:30.431499+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:52952/hgw_account_push_final_test",
+          "DSH_AUDIT_ACCOUNT_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-push-final-migrations-20261029",
+          "DSH_EXAMPLE_MODE=lib",
+          "DSH_GATEWAY_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-push-artifact-final-20261029/lib",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/webhook-administration-transcript.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-28T21:38:41.712032+00:00"
+      },
+      "businessCounterexamples": 48,
+      "currentAdministratorControls": 8
+    },
+    {
+      "receipt": {
+        "name": "webhook-configuration-postgres-causal-before",
+        "status": "failed",
+        "startedAt": "2026-10-28T21:45:13.886717+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:52952/hgw_webhook_authority_test",
+          "DSH_AUDIT_ACCOUNT_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/webhook-authority-migrations-20261029",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/webhook-admission-postgres.spec.ts",
+          "--maxWorkers=2",
+          "-t",
+          "rejects captured|rejects stale administrator|rechecks the initiating administrator"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-28T21:45:15.064687+00:00"
+      },
+      "businessCounterexamples": 5,
+      "currentActorRecheckControl": 1
+    },
+    {
+      "receipt": {
+        "name": "webhook-configuration-compiled-causal-before",
+        "status": "failed",
+        "startedAt": "2026-10-28T21:44:00.248286+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:52952/hgw_account_push_final_test",
+          "DSH_AUDIT_ACCOUNT_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-push-final-migrations-20261029",
+          "DSH_EXAMPLE_MODE=lib",
+          "DSH_GATEWAY_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-push-artifact-final-20261029/lib",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/webhook-administration-transcript.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-28T21:44:11.757783+00:00"
+      },
+      "additionalPublicIntakeCounterexamples": 4
+    },
+    {
+      "receipt": {
+        "name": "webhook-lossless-json-compiled-causal-before",
+        "status": "failed",
+        "startedAt": "2026-10-28T21:58:21.543093+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:52952/hgw_webhook_emitted_test",
+          "DSH_AUDIT_ACCOUNT_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/webhook-final-migrations-20261029",
+          "DSH_EXAMPLE_MODE=lib",
+          "DSH_GATEWAY_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/webhook-authority-artifact-20261029/lib",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/webhook-administration-transcript.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-28T21:58:34.033647+00:00"
+      },
+      "additionalJsonPersistenceCounterexamples": 1,
+      "otherHttpControls": 63
+    }
+  ],
+  "behavior": [
+    "Endpoint management, privileged diagnostics and redispatch retain current active administrator eligibility through their database transaction.",
+    "Provider admission retains active organization and enabled endpoint plus exact captured revision, executor and target; refusal leaves budget and receipt uncommitted.",
+    "Explicit current-administrator replay of a disabled endpoint remains allowed without reopening public intake.",
+    "Parsed payloads must survive JSON serialization losslessly before reservation; nonfinite numbers and negative zero reject400, ordinary finite JSON remains accepted.",
+    "Original receipt identity and body/transport aliases remain intact across a real endpoint revision change; direct receipt fixtures now register real endpoints."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "webhook-final-source-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-28T21:51:36.398713+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:52952/hgw_webhook_compatibility_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/webhook-admission-postgres.spec.ts",
+          "tests/webhook-administration-transcript.spec.ts",
+          "tests/webhook.spec.ts",
+          "tests/execution.spec.ts",
+          "tests/admin-api.spec.ts",
+          "tests/admin-business-postgres.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "-t",
+          "webhook",
+          "--coverage",
+          "--coverage.include=src/postgres/webhook-endpoint-service.ts",
+          "--coverage.include=src/postgres/webhook-delivery-service.ts",
+          "--coverage.include=src/webhook-intake.ts",
+          "--coverage.include=src/postgres/administrator-authority.ts",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/webhook-final-source-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T21:51:56.302069+00:00"
+      },
+      {
+        "name": "webhook-lossless-json-current-source",
+        "status": "passed",
+        "startedAt": "2026-10-28T21:59:10.236366+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:52952/hgw_webhook_compatibility_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/webhook.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "-t",
+          "retains signed JSON"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T21:59:12.629395+00:00"
+      },
+      {
+        "name": "webhook-library-and-adapter-source",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:02:02.040924+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "packages/webhook/webhook",
+          "packages/webhook/webhook-github",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:02:05.499828+00:00"
+      },
+      {
+        "name": "webhook-json-private-artifact-build",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:00:26.268723+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/build-webhook-json-artifact-r2.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:00:28.494131+00:00"
+      },
+      {
+        "name": "webhook-lossless-json-built-node22",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:02:00.888854+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:52952/hgw_webhook_json_test",
+          "DSH_AUDIT_ACCOUNT_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/webhook-json-migrations-r2-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-webhook-administration-replay.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/webhook-json-artifact-r2-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:02:14.140069+00:00"
+      },
+      {
+        "name": "webhook-lossless-json-built-node24",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:03:01.870452+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:52952/hgw_webhook_json_test",
+          "DSH_AUDIT_ACCOUNT_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/webhook-json-migrations-r2-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-webhook-administration-replay.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/webhook-json-artifact-r2-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:03:14.828684+00:00"
+      },
+      {
+        "name": "webhook-json-final-gateway-types",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:03:03.536141+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-preferences-typecheck.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:03:07.096780+00:00"
+      },
+      {
+        "name": "webhook-final-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-28T21:54:29.405522+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/admin-api.ts",
+          "gateway/src/postgres/webhook-endpoint-service.ts",
+          "gateway/src/postgres/webhook-delivery-service.ts",
+          "gateway/src/webhook-intake.ts",
+          "gateway/tests/webhook.spec.ts",
+          "gateway/tests/execution.spec.ts",
+          "gateway/tests/admin-api.spec.ts",
+          "gateway/tests/admin-business-postgres.spec.ts",
+          "gateway/tests/webhook-admission-postgres.spec.ts",
+          "gateway/tests/webhook-administration-transcript.spec.ts",
+          "gateway/tests/postgres-suite.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T21:54:30.850850+00:00"
+      },
+      {
+        "name": "webhook-json-final-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:03:39.387369+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/webhook-intake.ts",
+          "gateway/tests/webhook.spec.ts",
+          "gateway/tests/webhook-administration-transcript.spec.ts",
+          "gateway/tests/webhook-admission-postgres.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:03:40.657321+00:00"
+      },
+      {
+        "name": "webhook-reviewed-doc-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-28T21:51:07.084178+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          "gateway/README.md",
+          ".agents/notes/implemented/bug-fix/2026-10-29-webhook-admission-authority.md",
+          ".agents/notes/implemented/architecture/2026-09-23-webhook-execution-identity.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/webhook-admission/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T21:51:07.598410+00:00"
+      },
+      {
+        "name": "webhook-json-reviewed-doc-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:03:03.005136+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          "gateway/README.md",
+          ".agents/notes/implemented/bug-fix/2026-10-29-webhook-admission-authority.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/webhook-admission/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:03:03.498041+00:00"
+      },
+      {
+        "name": "webhook-json-final-doc-quick",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:05:11.977700+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:06:26.139300+00:00"
+      },
+      {
+        "name": "webhook-current-required-suite-registry",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:06:31.073978+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:06:31.469892+00:00"
+      },
+      {
+        "name": "audit-baseline-current-fetch",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:06:05.562003+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:06:09.081015+00:00"
+      },
+      {
+        "name": "account-push-webhook-private-postgres-cleanup",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:07:58.563896+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/close-account-push-webhook-postgres.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:07:59.066795+00:00"
+      }
+    ],
+    "sourceFocusedCohort": {
+      "testsPassed": 33,
+      "testsOutsideScopeSkipped": 226,
+      "files": 6,
+      "commandFilter": "webhook",
+      "coverage": {
+        "total": {
+          "lines": {
+            "total": 355,
+            "covered": 326,
+            "skipped": 0,
+            "pct": 91.83
+          },
+          "statements": {
+            "total": 413,
+            "covered": 359,
+            "skipped": 0,
+            "pct": 86.92
+          },
+          "functions": {
+            "total": 57,
+            "covered": 56,
+            "skipped": 0,
+            "pct": 98.24
+          },
+          "branches": {
+            "total": 306,
+            "covered": 236,
+            "skipped": 0,
+            "pct": 77.12
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "gateway/src/webhook-intake.ts": {
+          "lines": {
+            "total": 163,
+            "covered": 138,
+            "skipped": 0,
+            "pct": 84.66
+          },
+          "functions": {
+            "total": 18,
+            "covered": 17,
+            "skipped": 0,
+            "pct": 94.44
+          },
+          "statements": {
+            "total": 182,
+            "covered": 149,
+            "skipped": 0,
+            "pct": 81.86
+          },
+          "branches": {
+            "total": 152,
+            "covered": 105,
+            "skipped": 0,
+            "pct": 69.07
+          }
+        },
+        "gateway/src/postgres/administrator-authority.ts": {
+          "lines": {
+            "total": 6,
+            "covered": 6,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 1,
+            "covered": 1,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 7,
+            "covered": 6,
+            "skipped": 0,
+            "pct": 85.71
+          },
+          "branches": {
+            "total": 8,
+            "covered": 7,
+            "skipped": 0,
+            "pct": 87.5
+          }
+        },
+        "gateway/src/postgres/webhook-delivery-service.ts": {
+          "lines": {
+            "total": 79,
+            "covered": 76,
+            "skipped": 0,
+            "pct": 96.2
+          },
+          "functions": {
+            "total": 13,
+            "covered": 13,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 95,
+            "covered": 88,
+            "skipped": 0,
+            "pct": 92.63
+          },
+          "branches": {
+            "total": 69,
+            "covered": 61,
+            "skipped": 0,
+            "pct": 88.4
+          }
+        },
+        "gateway/src/postgres/webhook-endpoint-service.ts": {
+          "lines": {
+            "total": 107,
+            "covered": 106,
+            "skipped": 0,
+            "pct": 99.06
+          },
+          "functions": {
+            "total": 25,
+            "covered": 25,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 129,
+            "covered": 116,
+            "skipped": 0,
+            "pct": 89.92
+          },
+          "branches": {
+            "total": 77,
+            "covered": 63,
+            "skipped": 0,
+            "pct": 81.81
+          }
+        }
+      },
+      "coverageMeasuredBeforeJsonSupplement": true
+    },
+    "sourceJsonSupplement": {
+      "testsPassed": 5,
+      "testsOutsideScopeSkipped": 17,
+      "files": 1
+    },
+    "libraryAndAdapterCases": 85,
+    "compiledHttpObservationsPerNode": 64,
+    "compiledNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "privateBuildSourceDriftDuringBuild": [],
+    "ownedSourceChangedAfterBuild": [
+      "gateway/src/server.ts",
+      "gateway/src/webhook-intake.ts",
+      "gateway/src/postgres/webhook-endpoint-service.ts",
+      "gateway/src/postgres/webhook-delivery-service.ts"
+    ],
+    "currentWholeFileCoverageComplete": false,
+    "manualUpgradeGuideFormatRecord": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-push-webhook-guide-format.json",
+    "finalRepositoryReferences": {
+      "name": "account-push-webhook-final-repository-references",
+      "status": "passed",
+      "startedAt": "2026-10-28T22:11:09.293259+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "pnpm",
+        "run",
+        "verify-repository-references"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T22:11:24.669041+00:00"
+    }
+  },
+  "snapshot": {
+    "fixture": "gateway/tests/fixtures/webhook-administration.mjs",
+    "golden": "gateway/tests/expected/projects/webhook-administration-authority.jsonl",
+    "actualAuthentication": true,
+    "actualGatewayHandlers": true,
+    "actualPostgresServices": true,
+    "modelAndCloudApiCalled": false
+  },
+  "coordination": {
+    "peerTitle": "多电脑连接架构",
+    "endpointRuntimeIdHandoff": "The peer owns subsequent exact RuntimeId and node binding, retaining current actor/revision admission. Existing context-free receipt fixtures now bind registered endpoints; peer may extend them for runtime binding.",
+    "peerRegressionFollowup": "The full admin-api cohort exposed4RuntimeTarget/grants regressions in peer-owned changes. Peer reports3resolved and numeric deletion compatibility still being repaired. The33focused acceptance does not claim these unrelated branches pass.",
+    "futureFeatureAcceptance": "New multi-computer migrations and runtime dispatch still require independent review; the immutable001–093test snapshot is not whole-feature acceptance."
+  },
+  "noteReview": {
+    "new": [
+      ".agents/notes/implemented/bug-fix/2026-10-29-webhook-admission-authority.md"
+    ],
+    "partiallySupersededKeptActive": [
+      "2026-09-23-webhook-execution-identity"
+    ],
+    "keptIndependent": [
+      "2026-09-25-webhook-structured-repository-filter"
+    ],
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false
+  },
+  "cleanup": {
+    "ownedContainerAndVolumeRemoved": true,
+    "openConnectionsBeforeClose": 0,
+    "productionPortExcluded": 5432,
+    "peerPortExcluded": 55699,
+    "otherContainersModified": false
+  },
+  "limitations": [
+    "All12original audit domains remain in_progress.",
+    "Root allocation and directory/platform acceptance gaps remain open.",
+    "Real model API and actual push/cloud validation remain human-deferred.",
+    "Current full-file coverage and the peer multi-computer feature review remain incomplete."
+  ]
+}

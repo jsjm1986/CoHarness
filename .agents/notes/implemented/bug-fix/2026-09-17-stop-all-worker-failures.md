@@ -18,7 +18,7 @@ A rejected stop can exhaust the bounded worker pool while tracked runtimes remai
 
 ## Consequences
 
-Stop failures remain visible without abandoning queued work solely because of rejection. systemd remains a no-op; [local exit force cleanup](2026-08-18-gateway-startup-resilience.md) and the external shutdown deadline remain unchanged. Deadline expiry or a stop that never settles can prevent complete draining; this is not an indefinite all-attempt guarantee.
+Stop failures remain visible without abandoning queued work solely because of rejection. systemd retains its units; local assignments use [recoverable supervision](../architecture/2026-10-25-local-runtime-supervisor.md), including adopted survivors, and retain the external shutdown deadline. Deadline expiry or a stop that never settles can prevent complete draining; this is not an indefinite all-attempt guarantee.
 
 ## Testing
 

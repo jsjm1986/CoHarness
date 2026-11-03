@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/computer-use/computer-use/README.md
 document:
-  en: d8d9ce4bc0aef6ff1e34ade092ad257a80c5d1bf
-  zh: f626a5d27c0056b4ed10e263bd560faf99792e18
+  en: 82a0dabbe1a5c56c517eff68f34344b585a754d0
+  zh: 738cf0ce4701a365adf2310f884d6f4815bc894d
 /:
   en: 5c5d7b5f1329ac1b
   zh: b68d332df957109f
@@ -18,8 +18,8 @@ document:
   en: d152484eb41ac6b4
   zh: 405b30feaf48c087
 /deepseek-ai-dsh-computer-use/use-this-package:
-  en: 79e69ce219675940
-  zh: 091953d77dd9b8a9
+  en: dade90d8168af948
+  zh: d9bae6300151b264
 /deepseek-ai-dsh-computer-use/understand-the-implementation:
   en: 4b65c4eb26c6abcc
   zh: afd0ecfd789cf7ff

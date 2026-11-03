@@ -1,0 +1,14 @@
+{
+  "name": "native-model-operation-doc-graphs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-doc-graphs.ts",
+  "startedAt": "2026-10-24T07:37:11.347726+00:00",
+  "seconds": 17.772,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "inputsAfter": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "postgresToolDirectory": null,
+  "outputSha256": "3041e3536fb94f4532f99d25974235c4705410665d43ce7c0ff9bbc675e98ece",
+  "outputTail": "gen-doc-graphs: wrote 9 graph doc(s).\n"
+}

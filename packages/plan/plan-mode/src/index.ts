@@ -15,6 +15,8 @@
  * The exit tool remains registered while plan mode is inactive, so entering
  * or leaving plan mode changes only the prompt section, not the request tool
  * catalog.
+ * Command messages retain verified input attribution before mode selection;
+ * cancelled or withdrawn input preparation changes no mode and queues no message.
  *
  * See packages/plan/plan-mode/README.md.
  *
@@ -23,6 +25,7 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
+import { executionAuthorityOf, sameExecutionAuthority } from '@deepseek-ai/dsh-execution-authority'
 import { z as zod } from 'zod'
 import type { ZodType } from 'zod'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
@@ -135,7 +138,7 @@ const planProjectionSchema: ZodType<PlanProjection> = zod.object({
 /** Projection of logged plan selections and committed mode. */
 export const planProjectionDefinition = {
   key: 'plan',
-  stateVersion: 3,
+  stateVersion: 4,
   stateSchema: planUnitStateSchema,
   init: () => ({ active: false, wanted: null, running: null, activeAtLastHeader: null }),
   apply: (state, event) => {
@@ -145,7 +148,8 @@ export const planProjectionDefinition = {
       return { ...state, running: { commandId: event.data.commandId, wanted } }
     }
     if (event.type === 'command/done' && event.data.commandId === state.running?.commandId) {
-      const wanted = event.data.kind === 'success' && state.running.wanted !== state.active
+      if (event.data.kind === 'error') return { ...state, running: null }
+      const wanted = state.running.wanted !== state.active
         ? state.running.wanted
         : null
       return { ...state, wanted, running: null }
@@ -232,7 +236,7 @@ export class PlanModeController extends Service {
         name: 'plan',
         description: 'Enter or leave plan mode',
         input: { hint: '[off|message]', attachments: true },
-        handler: ({ agent, rawInput, attachments }) => {
+        handler: async ({ agent, rawInput, attachments, signal }) => {
           const message = rawInput.trim()
           if (message === 'off' && attachments.length > 0) {
             return { kind: 'error', text: 'Attachments cannot accompany /plan off.' }
@@ -254,16 +258,32 @@ export class PlanModeController extends Service {
                   : { kind: 'success', text: 'Plan mode is already inactive.' }
             }
           }
-          const outcome = this.set(agent, true)
+          let input: UserMessage | undefined
           if (message !== '' || attachments.length > 0) {
-            agent.steer(createUserMessage({
+            const authority = executionAuthorityOf(commandCtx)
+            const registry = commandCtx.get('agents')
+            const proposed = createUserMessage({
               content: [
                 ...attachments,
                 ...(message === '' ? [] : [{ type: 'text' as const, text: message }]),
               ],
               source: { kind: 'user' },
-            }))
+            })
+            input = authority === undefined ? proposed : await authority.stamp(agent.session, proposed)
+            signal.throwIfAborted()
+            if (disposed) {
+              throw new Error('the plan-mode service was reloaded while preparing input; retry the command')
+            }
+            if (!sameExecutionAuthority(executionAuthorityOf(commandCtx), authority)) {
+              throw new Error('plan input authorization changed before applying the command')
+            }
+            const currentRegistry = commandCtx.get('agents')
+            if ((registry !== undefined || currentRegistry !== undefined) && currentRegistry?.get(agent.id) !== agent) {
+              throw new Error('the calling agent changed while preparing plan input')
+            }
           }
+          const outcome = this.set(agent, true)
+          if (input !== undefined) agent.steer(input)
           return {
             kind: 'success',
             text: outcome === 'committed'
@@ -343,6 +363,10 @@ export class PlanModeController extends Service {
         // an approved selection could never be appended, so fail and keep planning.
         if (disposed) {
           throw new Error('the plan-mode service was reloaded while the plan was under review; present the plan again')
+        }
+        exec.signal.throwIfAborted()
+        if (ctx.get('agents')?.get(agent.id) !== agent) {
+          throw new Error('the calling agent changed while the plan was under review; present the plan again')
         }
         const reviewItems = answer.answers.filter(entry => entry.id === REVIEW_ID)
         const item = reviewItems.length === 1 ? reviewItems[0] : undefined

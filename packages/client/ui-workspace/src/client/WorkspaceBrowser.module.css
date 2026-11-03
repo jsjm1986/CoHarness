@@ -324,6 +324,83 @@
   overflow: visible;
 }
 
+.computerList {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--dsw-space-2) var(--dsw-space-4) 0;
+}
+.computerSection + .computerSection { margin-top: var(--dsw-space-3); }
+.navigationPending { display: inline-flex; margin-right: var(--dsw-space-1); vertical-align: middle; }
+.navigationPending svg { animation: navigationSpin 1s linear infinite; }
+@keyframes navigationSpin { to { transform: rotate(360deg); } }
+.computerHeader { display: flex; align-items: center; gap: var(--dsw-space-1); }
+.computerHeading {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-1);
+  min-height: 32px;
+  padding: var(--dsw-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.computerNew {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+.computerNew:disabled { cursor: default; opacity: 0.5; }
+.computerNew:focus-visible,
+.computerHeading:focus-visible,
+.runtimeActions button:focus-visible,
+.moreComputers:focus-visible { outline: 2px solid var(--dsw-alias-border-l4); outline-offset: -2px; }
+:global([data-viewport='compact']) .computerHeading,
+:global([data-viewport='compact']) .computerNew,
+:global([data-viewport='compact']) .runtimeActions button,
+:global([data-viewport='compact']) .moreComputers { min-height: var(--dsw-touch-target); }
+:global([data-viewport='compact']) .computerNew { width: var(--dsw-touch-target); }
+.computerName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.computerExpanded { transform: rotate(90deg); }
+.computerState { margin-left: auto; color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.computerBody { padding-left: var(--dsw-space-2); }
+.computerBody .list { flex: none; overflow: visible; scrollbar-gutter: auto; }
+.computerBody .fade { display: none; }
+.runtimeActions { display: flex; align-items: center; gap: var(--dsw-space-2); padding: 0 var(--dsw-space-2); font-size: 12px; color: var(--dsw-alias-label-secondary); }
+.runtimeActions button { margin-left: auto; }
+.runtimeActions button,
+.moreComputers,
+.computerNotice button {
+  background: transparent;
+  border: 0;
+  padding: var(--dsw-space-1);
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.computerNotice { margin: var(--dsw-space-2); font-size: 12px; line-height: 1.5; color: var(--dsw-alias-label-secondary); }
+.moreComputers { margin: var(--dsw-space-2) 0; width: 100%; text-align: left; font-size: 13px; }
+@media (hover: hover) {
+  .computerHeading:hover,
+  .computerNew:not(:disabled):hover,
+  .runtimeActions button:hover,
+  .moreComputers:hover { background: var(--dsw-alias-interactive-bg-hover); }
+}
+
 /* The workbench is a separate navigation surface. Keep this owner mounted
    for lifecycle stability, but hide its ordinary Workspace history chrome. */
 .workbenchMode .sectionHeader,
@@ -407,6 +484,13 @@
      keeps only its top band — 8px stays within the space-1 pad plus a row's
      own padding — so the two do not double up. */
   mask-image: linear-gradient(to bottom, transparent, black 8px);
+}
+
+/* Computer sections share the directory's scrollport and bottom clearance. */
+.computerBody .list,
+:global([data-viewport='compact']) .computerBody .list {
+  padding-bottom: 0;
+  mask-image: none;
 }
 
 /* Session cells sit contiguous; an inset hairline carries the rhythm a 2px
@@ -613,6 +697,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .navigationPending svg { animation: none; }
   .wide {
     animation: none;
   }

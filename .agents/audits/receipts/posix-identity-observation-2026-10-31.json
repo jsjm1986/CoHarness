@@ -1,0 +1,376 @@
+{
+  "finding": "B367",
+  "status": "fixed_named_posix_identity_observation_scope",
+  "updatedAt": "2026-10-30T20:33:06.075878+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T195111Z",
+  "sourcePaths": [
+    "packages/subprocess/subprocess-local/src/process-inspector.ts",
+    "packages/subprocess/subprocess-local/tests/process-inspector.spec.ts",
+    "packages/subprocess/subprocess-local/tests/identity-observation.spec.ts",
+    "packages/subprocess/subprocess-local/tests/fixtures/identity-observation.mjs",
+    "packages/subprocess/subprocess-local/tests/expected/identity-observation.jsonl",
+    "packages/bundle/web-app/tests/web-app.spec.ts",
+    "packages/subprocess/subprocess-local/README.md",
+    "packages/subprocess/subprocess-local/README.zh.md",
+    "packages/subprocess/subprocess-local/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/subprocess/subprocess-local/src/process-inspector.ts": "36959276565033d06d63a37dd5d485bad5fa9b5ea8e82e3c5d159a0b240efd93",
+    "packages/subprocess/subprocess-local/tests/process-inspector.spec.ts": "6397da542cd9c66f77b831df3bd7097651eac316630470cd3dd6f10b3666a906",
+    "packages/subprocess/subprocess-local/tests/identity-observation.spec.ts": "8ceb136536f9a1c0d7691d50b25648d7d0f8cac3a955dd599cc3c943861feff3",
+    "packages/subprocess/subprocess-local/tests/fixtures/identity-observation.mjs": "2a0fbadfcdd77b8d009849a33a3d1f6773de650107e3840e67d6b8c003dcc7e3",
+    "packages/subprocess/subprocess-local/tests/expected/identity-observation.jsonl": "ed9768cc5f74a70905570c7fc23255414fdcc52e9165a3b974c44b9400d3febc",
+    "packages/bundle/web-app/tests/web-app.spec.ts": "2e6596d5d1f868aadd08cdbed4aba30ae1aa7860fd273ad9b3afccb5fb12b412",
+    "packages/subprocess/subprocess-local/README.md": "2dcf326cc339223ac89b8378fd965d3959b436c9e8207293b9b77f96354e894b",
+    "packages/subprocess/subprocess-local/README.zh.md": "d381c3dc48206297f9c350ed778c136534901453a4313daa02c368d62d618c80",
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "df6712f62b6a279a7b5acb99f63877474dde1e25060a90d793f60cf72c675e65",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md": "26b7c675d8cca3592abab5818a6935725aed4c5ba977737ebfa1332ab178f9b7",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.zh.md": "a8ae0e5b1db23846d7884201c4ec3919a0797cb29c74701fc858e2dd3762bd97",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.i18n.yaml": "1412dc74b5371048c364d9062785edc92c246691ab8fd808741973533d6eb549"
+  },
+  "compiledArtifactHashes": {
+    "packages/subprocess/subprocess-local/lib/index.js": "4bd61fe21b0f77f5815c4aada8a800358ddd00ccea34665db5d9970ac6ebfc7a",
+    "packages/subprocess/subprocess-local/lib/runner-launch-D1SN2INp.js": "ec2ae84c375f8c4310e90a0610099183a46dac4c0933eb1bb0097530f5003198",
+    "packages/subprocess/subprocess-local/lib/types/process-inspector.js": "4b0540ccea2d5c524080d275d4f81ab05ca540a4da6ffb33df3b1f75e0f81928"
+  },
+  "repair": "Incomplete POSIX snapshots reject an absent identity instead of returning false. Visible rows retain their own identity/state evidence. Linux direct identity reads accept ENOENT/ESRCH absence, propagate other read failures, and refuse malformed or PID-mismatched stat data. Enumeration rejects rows whose parsed PID differs from the requested file and marks the table incomplete. Identity-fenced signalling propagates unknown observation without sending a signal.",
+  "causalEvidence": {
+    "posix-identity-unknown-source-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T20:04:42.818185+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/subprocess/subprocess-local/tests/process-inspector.spec.ts",
+        "-t",
+        "known identity as exited|identity absence from",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T20:04:43.985800+00:00"
+    },
+    "posix-identity-owned-process-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T20:07:55.153874+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/subprocess/subprocess-local/tests/identity-observation.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T20:07:56.375931+00:00"
+    },
+    "posix-stat-row-mismatch-source-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T20:11:13.957686+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/subprocess/subprocess-local/tests/process-inspector.spec.ts",
+        "-t",
+        "stat data as identity evidence",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T20:11:15.520903+00:00"
+    }
+  },
+  "negativeWitness": "Four controlled Linux/macOS identity cases fail. A real owned child remains alive while old live/snapshot/signalling queries all fail to report unavailable observation; the normal and restored exact-signal controls pass. A separate wrong-PID snapshot incorrectly reports complete before the reader repair.",
+  "verification": {
+    "uniqueRelatedSourceCases": 144,
+    "inspectorAndTerminalCases": 87,
+    "webStartupCases": 56,
+    "nativePtyVitestCases": 1,
+    "nativePtyScenarios": 5,
+    "coverage": {
+      "changedFile": "packages/subprocess/subprocess-local/src/process-inspector.ts",
+      "statements": [
+        178,
+        178
+      ],
+      "branches": [
+        140,
+        140
+      ],
+      "functions": [
+        44,
+        44
+      ],
+      "lines": [
+        142,
+        142
+      ],
+      "allFourMetrics": 100,
+      "newExemptions": 0,
+      "existingThinOsBindingExemptionUnchanged": true
+    },
+    "runnableIdentityStages": 3,
+    "identityCases": [
+      "known-live control",
+      "unavailable observation refuses all three APIs without a signal",
+      "restored observation signals and joins the same child"
+    ],
+    "compiledMacNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "compiledScope": "The emitted observer module executes against actual owned kernel processes. Separate real Loader/nativePTY transcripts execute the rebuilt public provider bundle through five scenarios on Node22/24.",
+    "compiledLinux": {
+      "node": "22.22.1",
+      "platform": "linux/arm64",
+      "uid": 1000,
+      "network": "none",
+      "repositoryMount": "read-only",
+      "imageId": "sha256:8094c002d08262dba12645a3b4a15cd6cd627d30bc782f53229a2ec13ee22a00",
+      "ownedContainerRemoved": true
+    },
+    "fixtureOwnership": "A finite parent watchdog owns its child; the child also exits on parent IPC disconnection. Real-process fixtures inject only the unavailable OS observation.",
+    "repeatedExecutionsAreNotNewCases": true,
+    "docQuickGates": 20,
+    "checks": {
+      "posix-identity-observation-source-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:11:29.948760+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/process-inspector.spec.ts",
+          "packages/subprocess/subprocess-local/tests/terminal.spec.ts",
+          "packages/subprocess/subprocess-local/tests/identity-observation.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/subprocess/subprocess-local/src/process-inspector.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T195111Z/posix-identity-complete-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:11:39.256223+00:00"
+      },
+      "posix-identity-fixture-final": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:29:59.993864+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/identity-observation.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:30:01.307042+00:00"
+      },
+      "posix-identity-lint-repaired": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:14:36.186267+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/subprocess/subprocess-local/src/process-inspector.ts",
+          "packages/subprocess/subprocess-local/tests/process-inspector.spec.ts",
+          "packages/subprocess/subprocess-local/tests/identity-observation.spec.ts",
+          "packages/bundle/web-app/tests/web-app.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:14:37.973845+00:00"
+      },
+      "posix-identity-pairing": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:12:49.514283+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "--write",
+          "packages/subprocess/subprocess-local/README.md",
+          ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:12:52.917653+00:00"
+      },
+      "posix-identity-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:14:36.186259+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:15:05.467902+00:00"
+      },
+      "posix-identity-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:16:21.598535+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/identity-observation.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:16:22.871604+00:00"
+      },
+      "posix-identity-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:16:21.598535+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/identity-observation.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:16:22.822033+00:00"
+      },
+      "posix-identity-built-linux22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:18:59.518601+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T195111Z/posix-identity-linux-replay.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:18:59.911775+00:00"
+      },
+      "posix-identity-source-pty": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:18:59.518598+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:19:03.668722+00:00"
+      },
+      "posix-identity-built-pty-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:25:01.217403+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:25:05.442319+00:00"
+      },
+      "posix-identity-built-pty-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:25:01.217403+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:25:05.443570+00:00"
+      },
+      "web-startup-review-source-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:02:08.783049+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/bundle/web-app/tests",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/bundle/web-app/src/index.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T195111Z/web-startup-review-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:02:19.811376+00:00"
+      }
+    }
+  },
+  "fullBuild": {
+    "status": "peer_gui_type_convergence_pending",
+    "initialReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T195111Z/posix-identity-build.json",
+    "latestReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T195111Z/posix-identity-build-after-peer-schema.json",
+    "latest": "Native addon,Hostcompiler andHostbundle pass; Clientcompiler andHostaggregate fail; remaining3gates skipped.",
+    "initialSchemaError": "Peer-owned desktop.schema.ts occupancy indexed the new unavailable branch; later read confirms corrected consumer.",
+    "remainingErrors": [
+      "packages/client/ui-permission-presets/src/client/DesktopConfirmationAction.tsx:6 missing DesktopStatus export",
+      "packages/experimental/computer-use-cua-driver-native/tests/headless.spec.ts:28 ToolExecution lacks rootCallId/token",
+      "packages/util/native-command/tests/desktop-environment.spec.ts:57/59 false result incompatible with inferred true literal"
+    ],
+    "rootDoesNotOverwritePeerFiles": true
+  },
+  "additionalReview": {
+    "initialResourceGrant": {
+      "status": "existing_official_client_requalification_verified_by_source",
+      "paths": [
+        "gateway/src/runtime-resource-api.ts",
+        "packages/context/gateway-runtime/src/resource-budget.ts"
+      ],
+      "finding": "The initial active accounting response is not directly delivered. acceptStatus posts statuses before resolving the lease, and the coordinator checks stored origin eligibility there. No privilege-bypass finding is assigned to the apparent request/status asymmetry.",
+      "limits": "This source inspection does not certify every origin or an assembled PostgreSQL lock-wait scenario."
+    },
+    "webReadinessReplacement": {
+      "status": "existing_owner_guard_verified_with_added_controlled_test",
+      "test": "publishes only the replacement URL when its first owner unloads before readiness",
+      "evidence": "The old owner demonstrably enters Loader settlement before disposal. Only the replacement URL opens/prints. Required injected Connection access is unavailable from the disposed consumer before its announcement can commit.",
+      "candidateReceipts": [
+        "web-startup-owner-source-negative.json",
+        "web-startup-owner-source-barrier-negative.json"
+      ],
+      "receiptNamingCorrection": "Both candidate runs pass; their negative label is not evidence of a pre-fix failure. No production web-app change is made.",
+      "coverage": "Existing production index remains100percent:69statements,42branches,18functions,64lines;56related cases pass."
+    }
+  },
+  "documentation": {
+    "pairedStems": 2,
+    "updatedOwningNote": ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md",
+    "newNotes": 0,
+    "fullySupersededActiveNotes": [],
+    "frozenArchivesEdited": false,
+    "upgradeGuide": "No export/configuration/wire/data-format change. The documented identity API already requires unknown observations to throw; the implementation now follows it."
+  },
+  "limits": [
+    "Existing terminal completeness guards already preserve reservations under partial scans. No previous terminal capacity-release or cross-account exploit is claimed for B367.",
+    "Linux direct absence assumes proc is mounted for the Runtime PID namespace. Observation input is deliberately made unavailable in the fixture; no privileged proc mount change is performed.",
+    "The change does not strengthen fallback containment, PID birth-time precision, namespace proof or process-table atomicity. Native inspection-command deadlines and B25complete-range/platform acceptance remain open.",
+    "The full repository build is not green while the peer GUI/type work converges. No peer-owned file is edited, no deployment/live database is mutated, and no real paid model call is made by root.",
+    "Physical Windows and the root provider-specific real Responses verification remain unaccepted/deferred. All12original domains and B04/B25remain in progress."
+  ]
+}

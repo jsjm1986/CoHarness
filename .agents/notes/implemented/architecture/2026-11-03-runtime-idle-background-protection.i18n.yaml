@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-03-runtime-idle-background-protection.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-03-runtime-idle-background-protection.md
+document:
+  en: 631b3f5f7c7b248072b9d480b27f4f8ff3543f98
+  zh: fa18811f66cb2f5c3656a80418c1d280b417d0f8
+/agent-note-runtime-idle-release-preserves-background-work:
+  en: 063e60ff15142f2a
+  zh: d224246284d6e4d4
+/agent-note-runtime-idle-release-preserves-background-work/problem:
+  en: 99840d1c4f50e610
+  zh: e37f0af0f37df075
+/agent-note-runtime-idle-release-preserves-background-work/decision:
+  en: 9821e97929da7f21
+  zh: 4869b01fb904fd1d
+/agent-note-runtime-idle-release-preserves-background-work/alternatives-considered:
+  en: 5dd3365932944555
+  zh: 2cb0e974e0807fc9
+/agent-note-runtime-idle-release-preserves-background-work/consequences:
+  en: e72a132f9b8b971f
+  zh: a46cd1a84a12ddef

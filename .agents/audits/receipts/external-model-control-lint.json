@@ -1,0 +1,14 @@
+{
+  "name": "external-model-control-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/subagent/subagent/src/external-model.ts packages/subagent/subagent/src/out-of-process.ts packages/subagent/subagent/tests/external-model.spec.ts packages/subagent/subagent-codex packages/subagent/subagent-claude-code packages/subagent/subagent-acp examples/headless-agent/tests/external-model-admission.snapshot.ts",
+  "startedAt": "2026-10-24T17:06:31.482321+00:00",
+  "seconds": 7.207,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1345ea06bc8e47a01c5e629368a55777bde7fb7415c5c4b7173b35db96d84cf9",
+  "inputsAfter": "1345ea06bc8e47a01c5e629368a55777bde7fb7415c5c4b7173b35db96d84cf9",
+  "postgresToolDirectory": null,
+  "outputSha256": "f6d570a8d05140ee691deaa880fd79c70163a8bc49cf831a923070f771bd24de",
+  "outputTail": "packages/subagent/subagent/tests/external-model.spec.ts:8:75: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\nexamples/headless-agent/tests/external-model-admission.snapshot.ts:11:97: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/subagent/subagent-codex/tests/real-product.spec.ts:226:19: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/subagent/subagent/tests/external-model.spec.ts:20:20: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\npackages/subagent/subagent/tests/external-model.spec.ts:28:18: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\npackages/subagent/subagent/tests/external-model.spec.ts:31:18: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\n"
+}

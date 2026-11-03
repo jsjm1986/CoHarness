@@ -1,0 +1,14 @@
+{
+  "name": "model-operation-core-measured",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/llm/llm --config .agents/audits/.local/model-operation-core-coverage.config.mts --retry=0 --coverage.enabled --coverage.provider=v8 --coverage.include=packages/llm/llm/src/index.ts --coverage.reporter=json --coverage.reporter=text --coverage.reportsDirectory=.agents/audits/.local/model-operation-core-measured",
+  "startedAt": "2026-10-24T06:04:40.778708+00:00",
+  "seconds": 20.435,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6497141ad81261e1bb4fa80119e860a33d64c87fa2f65b1fd54201997be1308b",
+  "inputsAfter": "6497141ad81261e1bb4fa80119e860a33d64c87fa2f65b1fd54201997be1308b",
+  "postgresToolDirectory": null,
+  "outputSha256": "66706c0608b2a077e319d64ba4563471a6a45f9ad7df1a8feccae5d23e5d3527",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  56 passed (56)\n      Tests  1392 passed (1392)\n   Start at  14:04:54\n   Duration  6.82s (transform 11.97s, setup 1.72s, import 23.87s, tests 17.09s, environment 6ms)\n\n % Coverage report from v8\n----------|---------|----------|---------|---------|-------------------\nFile      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n----------|---------|----------|---------|---------|-------------------\nAll files |   99.74 |    98.13 |     100 |   99.71 |                   \n index.ts |   99.74 |    98.13 |     100 |   99.71 | 774               \n----------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 99.74% ( 393/394 )\nBranches     : 98.13% ( 315/321 )\nFunctions    : 100% ( 88/88 )\nLines        : 99.71% ( 349/350 )\n================================================================================\nERROR: Coverage for lines (99.71%) does not meet global threshold (100%) for packages/llm/llm/src/index.ts\nERROR: Coverage for statements (99.74%) does not meet global threshold (100%) for packages/llm/llm/src/index.ts\nERROR: Coverage for branches (98.13%) does not meet global threshold (100%) for packages/llm/llm/src/index.ts\n"
+}

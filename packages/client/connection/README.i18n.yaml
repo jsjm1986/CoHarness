@@ -3,23 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/connection/README.md
 document:
-  en: e4b537dbcfad4f2fae14130f7ff1e5abba2627dc
-  zh: e839f4bf8bef85cab265838fd360988fb39f9e2f
+  en: c2f1f2df49b338eeba30768f8e2c7960f0c95292
+  zh: b074dcb35b882c95f3c2a35fbb6dd6b8ae16fdb6
 /:
   en: 4a0ddd1fb131c25a
   zh: 61495d48365178df
 /deepseek-ai-dsh-client-connection:
-  en: 3d7e86286ad949de
-  zh: 6d466a785d251a4b
+  en: 9df79f474fcadc88
+  zh: 13a25307adfe5790
 /deepseek-ai-dsh-client-connection/summary:
-  en: a83b5e9fd1968062
-  zh: ac68628e185a4bff
+  en: 8dcc421899933e66
+  zh: fc8197f472c408c1
 /deepseek-ai-dsh-client-connection/table-of-contents:
   en: a86097c423b843fb
   zh: 547b898405239ede
 /deepseek-ai-dsh-client-connection/host-configuration:
-  en: 38e00b03e9ebd49b
-  zh: 32e48477a6368541
+  en: 1d773ce04cf840f7
+  zh: 0ab78fd02f9e21c1
 /deepseek-ai-dsh-client-connection/api-browser-trust-fence:
   en: 390ffe5458b41f74
   zh: fffe8ab0bb6322f8

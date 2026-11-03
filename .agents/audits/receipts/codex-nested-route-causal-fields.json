@@ -1,0 +1,14 @@
+{
+  "name": "codex-nested-route-causal-fields",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts -t 'member delegates a one-shot'",
+  "startedAt": "2026-10-25T13:58:46.663953+00:00",
+  "seconds": 2.97,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0c555c053631e99ade1895eab18d49db7f2437fd66952625168fbfd3d906e8af",
+  "inputsAfter": "0c555c053631e99ade1895eab18d49db7f2437fd66952625168fbfd3d906e8af",
+  "postgresToolDirectory": null,
+  "outputSha256": "6b2124cd69cac420752d3b785d743bbdeb245ee7e76acb4b3226d595509297eb",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts (14 tests | 1 failed | 13 skipped) 22ms\n   × inherits a managed member upstream when the member delegates a one-shot run 21ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts > inherits a managed member upstream when the member delegates a one-shot run\nAssertionError: expected { provider: 'codex-member', …(5) } to match object { provider: 'parent-responses', …(1) }\n(4 matching properties omitted from actual)\n\n- Expected\n+ Received\n\n  {\n-   \"model\": \"m\",\n-   \"provider\": \"parent-responses\",\n+   \"model\": \"codex\",\n+   \"provider\": \"codex-member\",\n  }\n\n ❯ packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts:127:21\n    125|     const call = vi.mocked(startManagedCodexModel).mock.calls[0]!\n    126|     expect(call[1]).toBe(member)\n    127|     expect(call[2]).toMatchObject({ provider: 'parent-responses', mode…\n       |                     ^\n    128|   } finally { await run.dispose() }\n    129| })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 13 skipped (14)\n   Start at  21:58:48\n   Duration  1.27s (transform 925ms, setup 30ms, import 1.14s, tests 22ms, environment 0ms)\n\n"
+}

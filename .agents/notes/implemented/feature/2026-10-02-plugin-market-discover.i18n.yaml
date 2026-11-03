@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md
 document:
-  en: 505ea944e6f323341220f597b4f074c88e1c2a03
-  zh: f924fb064180d2220ca764ae4a9175dc8fd775a2
+  en: d810ef2662994daea2eb1cf649b03538956179da
+  zh: b8050a4f893e4ba535d7b975d41b4a0c6812a4bb
 /agent-note-plugin-market-discover-page-and-index-reader:
   en: e226087ae345768b
   zh: b043fa6c793fd684
@@ -12,8 +12,8 @@ document:
   en: 329c6ff947559b11
   zh: 5c4c1053236d319b
 /agent-note-plugin-market-discover-page-and-index-reader/decision:
-  en: cc4d17a51dd479b7
-  zh: 1fecf669b117f51c
+  en: 62c62646e3586206
+  zh: 9b54e990aef23df6
 /agent-note-plugin-market-discover-page-and-index-reader/alternatives-considered:
   en: 62e7691dc8efd5c0
   zh: b13769634979b950

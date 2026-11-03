@@ -1,0 +1,149 @@
+{
+  "findings": [
+    "B421"
+  ],
+  "status": "fixed_verified_named_speech_settings_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T01:37:47.220057+00:00",
+  "baseline": {
+    "remote": "origin/master",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-origin-final.json",
+    "fetchedAt": "2026-11-01T01:35:26.121344+00:00",
+    "dirtyWorkspacePreserved": true
+  },
+  "problem": "Speech cached a namespace scope after its Settings provider withdrew or changed, exposing stale selection and dispatching writes to a disposed provider.",
+  "fix": "An optional injection owns namespace registration, watcher and scope; withdrawal publishes composition defaults and refuses writes, replacement binds new storage. Registry shutdown cancels/joins its own work before releasing the optional binding.",
+  "verification": {
+    "distinctRelatedTests": 132,
+    "packageTests": 126,
+    "speechFocusedTests": 16,
+    "typescriptSdkScenarios": 3,
+    "pythonSdkScenarios": 3,
+    "repeatVersionRunsNotAdded": true,
+    "transports": "Actual FileSettings and Loader within the actual SDK application; no recognition or external model call.",
+    "normalPassedChecks": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-related.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-observer-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-sdk-source-ready.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-sdk-node22.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-sdk-node24.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-sdk-python.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-tsc.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-bundle.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-host-types.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-pairing.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-docs.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-lint-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-python-lint.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-origin-final.json"
+    ],
+    "negativeChecks": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-owner-negative.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-sdk-old-source.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-sdk-old-node22.json"
+    ],
+    "counterfactual": "Complete unchanged original speech package in source and built modes fails all3 actual SDK scenarios for stale reads and disposed writes.",
+    "coverage": {
+      "lines": {
+        "total": 87,
+        "covered": 87,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 31,
+        "covered": 30,
+        "skipped": 0,
+        "pct": 96.77
+      },
+      "statements": {
+        "total": 111,
+        "covered": 110,
+        "skipped": 0,
+        "pct": 99.09
+      },
+      "branches": {
+        "total": 42,
+        "covered": 41,
+        "skipped": 0,
+        "pct": 97.61
+      }
+    },
+    "coverageScope": "Additional non-gating measurement of an existing CI-exempt file; repository acceptance policy unchanged. Normal scoped coverage omits this debt file and is not claimed as100%.",
+    "documentation": "20 quick gates passed; full doc-sync was not run.",
+    "fixtureCorrectionsExcluded": "SDK setup initially resolved an included Loader id at the root and did not await a replacement fiber. Corrected fixture traverses actual entries and waits the actual startup lifetime. Observer iterator return typing and arrow formatting corrected for lint.",
+    "resources": {
+      "productionOsAllocationsAdded": 0,
+      "paidRequests": 0,
+      "recognitionInvocations": 0,
+      "postgresDatabasesAdded": 0,
+      "ownership": "SDK processes, nested Boot Host, optional injection, namespace watcher and observers are owned, canceled and joined; temporary files removed."
+    }
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T011333Z/speech-settings-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-speech-settings-provider-lifetime.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-speech-settings-provider-lifetime.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-speech-settings-provider-lifetime.zh.md",
+    "apps/cli/tests/profiles/sdk/speech-settings-owner.expected.e2e.ts",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/speech-settings-lifetime/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/speech-settings-lifetime/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/speech-settings-lifetime/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/speech-settings-owner/expected.json",
+    "examples/headless-agent/tests/fixtures/speech-settings-owner/model.mjs",
+    "examples/headless-agent/tests/fixtures/speech-settings-owner/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/speech-settings-owner/runtime.cordis.yml",
+    "packages/experimental/speech-to-text/README.i18n.yaml",
+    "packages/experimental/speech-to-text/README.md",
+    "packages/experimental/speech-to-text/README.zh.md",
+    "packages/experimental/speech-to-text/src/index.ts",
+    "packages/experimental/speech-to-text/tests/configuration.spec.ts",
+    "python/sdk/tests/test_speech_settings_owner_expected.py"
+  ],
+  "readOnlyPrerequisiteCount": 4212,
+  "runtimeReferences": 1,
+  "mergeRequirement": "Apply only17 sourceDeltaPaths. Prerequisites are read-only context and must not overwrite newer peer code. The normal lib/index.js is a comparison artifact; rebuild from matching current source. This packet does not alter node-service, model governance, Session event vocabulary, persisted generations or database versions.",
+  "notes": {
+    "reviewedActiveRecords": [
+      ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md",
+      ".agents/notes/implemented/bug-fix/2026-11-01-speech-settings-provider-lifetime.md"
+    ],
+    "classification": "retain both active",
+    "rationale": "The architecture note owns the larger voice capability. The new bug note records independent preference-provider ownership, watcher cleanup and why storage replacement must not restart recognition. These remain useful lifecycle decisions. No archived notes are edited."
+  },
+  "peerReport": {
+    "status": "peer_reported_not_root_reverified",
+    "release": "R23",
+    "schemaVersion": 103,
+    "maintenanceEpoch": 100,
+    "REAL040": "Native five-field font save/reload/cross-Runtime read accepted; UI values restored through revision30.",
+    "nativeBusinessAcceptance": "Peer reports account27 creation, forced password change, old-password401, A-only grants, individual Flash exception, workspace creation and real Flash+Bash file creation succeeded after host resource pressure recovered.",
+    "latestNodeState": {
+      "agentEpoch": 48,
+      "projectBRuntimeGeneration": 17
+    },
+    "stateCaution": "Agent invalid-response exit and automatic restart make the earlier epoch47/generation16 unsuitable for current diagnosis.",
+    "remaining": "REAL042 node-service503 capacity/release still under peer investigation. R24 review-error copy has10 owned workspace-changes/ui-deliverables source edits with85 tests, not built/deployed.",
+    "rootIntegrationPending": [
+      "B416",
+      "B417",
+      "B418",
+      "B419",
+      "B420",
+      "B421"
+    ],
+    "protectedState": "Peer reports both43-character drafts and Admin unsaved address retained; old QA Chrome remains only suspended."
+  },
+  "remaining": [
+    "Integrate B421 through the peer matching build, applying only17 sourceDeltaPaths. Read-only prerequisites and the reference bundle must not overlay newer peer source. Earlier B416/B417/B418/B419/B420 remain independently pending.",
+    "Continue remaining direct resource consumers. Inspect SenseVoice preparation completion/cancellation adjacency and metadata/result publication; this is an unverified next review hypothesis, not a confirmed remaining bug.",
+    "Continue translator purpose/trace and interactive attribution, auxiliary/extension model ownership, diagnostic and database argument privacy, filesystem/document races, cross-account/computer access and native containment. All12 domains and B04/B25 remain open.",
+    "Existing coverage debt stays explicit. Speech index diagnostic lines100%,statements99.09%,branches97.61%,functions96.77%; its existing Loader event callback and alternate owner-guard outcome remain unmeasured. No CI exclusion, threshold or policy was weakened.",
+    "Peer owns remaining multi-computer acceptance and node-service503 investigation. Use the latest reported epoch48/generation17 rather than stale node state; REAL040 is peer-reported accepted. Do not duplicate reserved code edits or repeatedly poll.",
+    "Official paid Responses verification remains deferred. No root paid inference, ASR asset download, native model inference or production deployment is claimed."
+  ],
+  "globalReviewComplete": false
+}

@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-published-persistence-gates-launcher",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm exec tsx .agents/audits/.local/native-model-static-checks.mts",
+  "startedAt": "2026-10-25T03:38:30.103353+00:00",
+  "seconds": 205.068,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3915166ecd7a16e79402e71568e5c0b510ae0a366e8c6a3d58daf74ef27b2450",
+  "inputsAfter": "3915166ecd7a16e79402e71568e5c0b510ae0a366e8c6a3d58daf74ef27b2450",
+  "postgresToolDirectory": null,
+  "outputSha256": "ac12c28801e1250854232460ae65bf4d4da4d7e8411c5636a9c88c6a05e9c43b",
+  "outputTail": "run-gates: native-model-published-and-persistence running 13 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start cordis catalog\nrun-gates: PASS cordis catalog (7.24s)\nrun-gates: start export jsdoc\nrun-gates: PASS export jsdoc (4.54s)\nrun-gates: start config catalog\n\n== FAILED config catalog (1.60s) ==\ncommand: pnpm run verify-config-catalog\noutcome: exit 1\n$ tsx scripts/gen-config-catalog.ts --check\ngen-config-catalog: stale — docs/config-catalog.md, docs/config-catalog.zh.md, docs/config-catalog.i18n.yaml. Run `pnpm run gen-config-catalog` and commit the result.\n[ELIFECYCLE] Command failed with exit code 1.\nrun-gates: start persistence catalog\nrun-gates: PASS persistence catalog (9.74s)\nrun-gates: start persistence type history\nrun-gates: PASS persistence type history (7.16s)\nrun-gates: start released persistence history\nrun-gates: PASS released persistence history (1.35s)\nrun-gates: start Session format catalog\nrun-gates: PASS Session format catalog (0.35s)\nrun-gates: start subsystem pages\nrun-gates: PASS subsystem pages (0.52s)\nrun-gates: start knip\n\n== FAILED knip (32.31s) ==\ncommand: pnpm run knip\noutcome: exit 1\n$ knip --config knip.config.ts --treat-config-hints-as-errors\nUnused devDependencies (2)\n@deepseek-ai/dsh-app-boot       packages/subagent/subagent-dsh-sdk/package.json:55:6\n@deepseek-ai/dsh-tool-subagent  packages/subagent/subagent-dsh-sdk/package.json:72:6\nConfiguration hints (1)\ntests/fixtures/loader/*.ts  packages/subagent/subagent-dsh-sdk  knip.config.ts  Refine entry pattern (no matches)\n[ELIFECYCLE] Command failed with exit code 1.\nrun-gates: start publint\nrun-gates: PASS publint (4.77s)\nrun-gates: start constraints\nrun-gates: PASS constraints (1.08s)\nrun-gates: start package dependencies\nrun-gates: PASS package dependencies (129.46s)\nrun-gates: start node-next types\nrun-gates: PASS node-next types (3.49s)\n\nrun-gates: 11 passed, 2 failed, 0 skipped in 203.59s.\nrun-gates: unsuccessful gates:\n  - FAILED config catalog (1.60s, exit 1)\n    pnpm run verify-config-catalog\n  - FAILED knip (32.31s, exit 1)\n    pnpm run knip\n"
+}

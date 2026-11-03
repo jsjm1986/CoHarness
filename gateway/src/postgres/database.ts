@@ -1,3 +1,4 @@
+import { backfillConversationQueryFieldsV1 } from './conversation-query-migration-v1.ts'
 import { createHash } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -257,6 +258,17 @@ export function errorCodeForDiagnostics(error: unknown): string {
   return errorCode(error) ?? 'unknown'
 }
 
+/**
+ * Recognize a bounded statement or transaction refused by PostgreSQL contention.
+ * This classification never permits replay of an operation with an unknown commit result.
+ * @param error - failure returned by the database driver.
+ * @returns whether the caller can report temporary unavailability without disclosing SQL.
+ */
+export function isDatabaseContentionError(error: unknown): boolean {
+  const code = errorCode(error)
+  return code === '55P03' || code === '57014' || code === '40P01' || code === '40001'
+}
+
 /** Whether one startup failure can reasonably clear without changing configuration. */
 export function isTransientDatabaseError(error: unknown): boolean {
   const seen = new Set<unknown>()
@@ -367,16 +379,35 @@ async function connectWithSignal(pool: Pool, signal?: AbortSignal): Promise<Pool
   })
 }
 
+/** Per-transaction lock waiting; all other pool timeout settings remain effective. */
+export interface PostgresTransactionOptions {
+  /** Use the statement timeout for expected serialized work; an unlimited statement retains the pool lock timeout. */
+  readonly lockWait?: 'statement'
+}
+
+/**
+ * Commit one operation on an owned client; a failed operation is never replayed.
+ * @param pool - database connection pool.
+ * @param operation - database work retaining its client until settlement.
+ * @param signal - optional cancellation checked before committing.
+ * @param options - lock waiting for work that deliberately serializes with other transactions.
+ * @returns the operation result after commit acknowledgement.
+ */
 export async function transaction<T>(
   pool: Pool,
   operation: (client: PoolClient) => Promise<T>,
   signal?: AbortSignal,
+  options?: PostgresTransactionOptions,
 ): Promise<T> {
   const client = await connectWithSignal(pool, signal)
   let failure: Error | null = null
   try {
     signal?.throwIfAborted()
     await client.query('BEGIN')
+    if (options?.lockWait === 'statement') {
+      await client.query(`SELECT set_config('lock_timeout',CASE WHEN current_setting('statement_timeout')='0'
+        THEN current_setting('lock_timeout') ELSE current_setting('statement_timeout') END,true)`)
+    }
     signal?.throwIfAborted()
     const result = await operation(client)
     signal?.throwIfAborted()
@@ -460,7 +491,12 @@ export async function migrationPlan(pool: Pool, directory: string): Promise<Migr
   return { applied, pending, drifted, current: migrations.at(-1)?.version ?? 0 }
 }
 
-/** Apply immutable SQL migrations under one PostgreSQL advisory lock. */
+/**
+ * Apply checksummed SQL and associated versioned backfills in atomic migration transactions.
+ * @param pool - database whose advisory lock serializes all migration runners.
+ * @param directory - complete, immutable SQL migration sequence matching this Gateway.
+ * @returns versions applied by this runner and the latest supported version.
+ */
 export async function runMigrations(pool: Pool, directory: string): Promise<{ applied: number[]; current: number }> {
   const migrations = await migrationFiles(directory)
   const client = await connectFromPool(pool)
@@ -509,6 +545,7 @@ export async function runMigrations(pool: Pool, directory: string): Promise<{ ap
       await client.query('BEGIN')
       try {
         await client.query(migration.sql)
+        if (migration.version === 100) await backfillConversationQueryFieldsV1(client)
         await client.query(
           'INSERT INTO harness.schema_migrations(version,name,checksum) VALUES($1,$2,$3)',
           [migration.version, migration.name, migration.checksum],

@@ -7,6 +7,9 @@ import WorkflowEngineDefault, {
   WorkflowEngine,
 } from '../src/index.ts'
 import type { WorkflowRun, WorkflowRunInfo, WorkflowStartRequest } from '../src/index.ts'
+import { agentCarrier } from '@deepseek-ai/dsh-agent'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import { SessionId } from '@deepseek-ai/dsh-session'
 
 /** A minimal concrete subclass exposing the protected emit helper for tests. */
 class StubEngine extends WorkflowEngine {
@@ -23,6 +26,57 @@ class StubEngine extends WorkflowEngine {
 const INFO: WorkflowRunInfo = { id: WorkflowRunId('run-1'), meta: { name: 'w', description: 'd' } }
 
 describe('dsh-workflow (interface)', () => {
+  it('retains the exact foreground parent until withdrawal joins cleanup', async () => {
+    const ctx = new Context(), scope = ctx.plugin(StubEngine)
+    await scope.await()
+    const engine = ctx.workflowEngine
+    const parent = { id: SessionId('foreground-parent') } as Agent
+    const replacement = { ...parent } as Agent
+    const entered = Promise.withResolvers<AbortSignal>(), released = Promise.withResolvers<undefined>()
+    const pending = engine.withForeground(parent, new AbortController().signal, async (signal) => {
+      entered.resolve(signal)
+      await released.promise
+      return 'cleaned'
+    })
+    const signal = await entered.promise
+    const withdrawing = scope.dispose()
+    try {
+      await vi.waitFor(() => { expect(signal.aborted).toBe(true) })
+      expect(ctx.bail(agentCarrier(parent), 'agent/idle-release-check', { agent: parent })).toBe('busy')
+      expect(ctx.bail(agentCarrier(replacement), 'agent/idle-release-check', { agent: replacement })).toBeUndefined()
+      const refused = vi.fn(async () => 'unstarted')
+      await expect(engine.withForeground(parent, new AbortController().signal, refused)).rejects.toThrow('being withdrawn')
+      expect(refused).not.toHaveBeenCalled()
+      released.resolve(undefined)
+      expect(await pending).toBe('cleaned')
+      await withdrawing
+      expect(ctx.bail(agentCarrier(parent), 'agent/idle-release-check', { agent: parent })).toBeUndefined()
+    } finally {
+      released.resolve(undefined)
+      await pending
+      await withdrawing
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('rejects cancelled admission and releases failed Consumers without closing the engine', async () => {
+    const ctx = new Context()
+    await ctx.plugin(StubEngine)
+    const engine = ctx.workflowEngine, parent = { id: SessionId('foreground-parent') } as Agent
+    const caller = new AbortController(), refused = vi.fn(async () => 'unstarted')
+    const failure = new Error('caller cancelled')
+    try {
+      caller.abort(failure)
+      await expect(engine.withForeground(parent, caller.signal, refused)).rejects.toBe(failure)
+      expect(refused).not.toHaveBeenCalled()
+      await expect(engine.withForeground(parent, new AbortController().signal, () => Promise.reject(failure))).rejects.toBe(failure)
+      expect(ctx.bail(agentCarrier(parent), 'agent/idle-release-check', { agent: parent })).toBeUndefined()
+      await expect(engine.withForeground(parent, new AbortController().signal, async () => 'next')).resolves.toBe('next')
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('WorkflowRunId brands a string (identity at runtime)', () => {
     expect(WorkflowRunId('abc')).toBe('abc')
   })

@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../../../native/system/packages/entry"
+    },
+    {
       "path": "../userdoc"
     },
     {
@@ -28,6 +31,9 @@
     },
     {
       "path": "../../util/managed-data"
+    },
+    {
+      "path": "../../util/values"
     }
   ]
 }

@@ -1,0 +1,171 @@
+{
+  "at": "2026-10-31T02:57:03.544318+00:00",
+  "findings": [
+    "B385"
+  ],
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z",
+  "sourcePaths": [
+    "packages/llm/llm/src/index.ts",
+    "packages/llm/llm/src/resource-owner.ts",
+    "packages/llm/llm/tests/resource-policy.spec.ts",
+    "packages/llm/llm/tests/resource-owner-example.host.spec.ts",
+    "packages/llm/llm/tests/fixtures/resource-owner.mjs",
+    "packages/llm/llm/tests/expected/resource-owner.jsonl",
+    "packages/llm/llm/README.md",
+    "packages/llm/llm/README.zh.md",
+    "packages/llm/llm/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.md",
+    ".agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.zh.md",
+    ".agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-resource-ownership/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-resource-ownership/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-resource-ownership/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/llm/llm/src/index.ts": "4b29d3518b00a3d7f15e913a1d0ef238fde1c90bff0452d34993b1371963dd7d",
+    "packages/llm/llm/src/resource-owner.ts": "9f82c09f55cb7d31ddd48650470b2f434e9b0471958b8f031e82c0e21b27c7e5",
+    "packages/llm/llm/tests/resource-policy.spec.ts": "a135d82a1bb20352dad2e0ec874e01e5a76cc8582544c587390b0ab8ee48a0a3",
+    "packages/llm/llm/tests/resource-owner-example.host.spec.ts": "dcf781d64462d37c091c4515df1aa0332816697b7d626cefef2bc595cad9e4e8",
+    "packages/llm/llm/tests/fixtures/resource-owner.mjs": "b376a5bf2e125e1cf71851c733a78af3bf1729e5edaea401a91319655c3b59a0",
+    "packages/llm/llm/tests/expected/resource-owner.jsonl": "860f710698161abcbdf2981d4fff22a84ccce511fe1788c71668bfbe6256b910",
+    "packages/llm/llm/README.md": "6f5ecf71d686916fcc43611fe3e5649bd444d3c8da97913138a24976fb47d7d8",
+    "packages/llm/llm/README.zh.md": "88ba7ec758b841a4fd3f2aba0cd86d7ef4ce97bd9d34c308eb7d70de1c6d1c0d",
+    "packages/llm/llm/README.i18n.yaml": "7fa5032b6713db6bbde54cc88e88ec7ee90f9746346ab2f30989d05398e8d249",
+    ".agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.md": "b79674d71054a14f3c8b3ed8f5099b64553e10474a4ddbafb820a0077b4ac7de",
+    ".agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.zh.md": "bed0a30b461e4c8c3e7d5ac5bf22ad4fb022e5a6a80ba5d863b983d2bcd06fbe",
+    ".agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.i18n.yaml": "e9a59129fbecf8458d0588f17b408ec33b530ef2cb0a58967e351ffc378bdb35",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-resource-ownership/guide.md": "1fd2ba4698700ba3072425fe48eb5748408e32db2478bbd8840876d1d249e8e7",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-resource-ownership/guide.zh.md": "14a582702db2302b40ad2891dbdc162060a23c53b296d7a92c7024f316c23006",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-resource-ownership/guide.i18n.yaml": "944ce193a0030fd9c3ae10e091777f5b5757b5d952c51704783fb4a7b58dbcc4"
+  },
+  "causalEvidence": "Two queued-admission tests fail before the source fix. The immutable old compiled LLM bundle sends one real loopback HTTP request in each of three Loader scenarios: withdrawal while queued, replacement while queued and replacement during a credential wait. The same fixture with updated source and built artifacts sends zero HTTP requests, releases each original permit once and never acquires replacement capacity.",
+  "implementation": "Capture resource provider identity and its required flag before stream middleware. Recheck the same underlying Cordis Service before and after preparation/admission/authorization and immediately before guarded physical dispatch. Refuse replacement/withdrawal with RESOURCE_BUDGET_UNAVAILABLE and release the original grant. Orchestration does not reserve a model permit and its nested physical requests use their own current resource owner.",
+  "verification": {
+    "checks": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-final-core-coverage.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-final-client-aggregate.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-built-node22.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-node24-owner-coverage.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-sdk-projections.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-python-projections.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-final-lint.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-host-types.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-final-pairing-check.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-guide.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-export-jsdoc.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-origin-fetch.json"
+    ],
+    "uniqueCases": 399,
+    "cases": {
+      "llm": 386,
+      "typescriptSdkSnapshots": 8,
+      "pythonSdkSnapshots": 5
+    },
+    "resourceOwnerCoverage": {
+      "statements": [
+        6,
+        6
+      ],
+      "branches": [
+        8,
+        8
+      ],
+      "functions": [
+        3,
+        3
+      ],
+      "lines": [
+        6,
+        6
+      ]
+    },
+    "spineCoverage": {
+      "statements": [
+        400,
+        404
+      ],
+      "branches": [
+        320,
+        326
+      ],
+      "functions": [
+        91,
+        91
+      ],
+      "lines": [
+        357,
+        359
+      ],
+      "limitation": "LLM index.ts remains in the existing coverage baseline. Scoped measurement is not a whole-file 100% gate; legacy uncovered paths remain. No global coverage rule or exemption was changed."
+    },
+    "builtReplay": "The Loader loopback transcript passes on Node22 and Node24. The old bundle was loaded from a private immutable copy; shared source and artifacts were never reverted.",
+    "build": {
+      "earlierFullPass": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-final-build.json",
+      "latestFullAttempt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-comment-final-build.json",
+      "latestFullResult": "7 gates passed; client aggregate failed at a new peer-owned ui-agent-preset test optional-property type error.",
+      "recovery": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-final-client-aggregate.json",
+      "result": "The failed client aggregate passed after the peer correction. The other 7 passed gates were not repeated. An earlier UI-documents test brand error had also been fixed by the peer."
+    },
+    "documentation": {
+      "initialQuickGates": {
+        "passed": 19,
+        "failed": 1,
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-doc-quick.json"
+      },
+      "recovery": "Corrected this guide pair's localized anchor mismatch, recorded the pair and passed the repository translation pairing check. The other 19 passed gates were not repeated.",
+      "finalPairingReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T022405Z/model-resource-owner-final-pairing-check.json",
+      "fullDocSync": "not_claimed"
+    },
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "noteReview": {
+    "owner": ".agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.md",
+    "decision": "Updated the existing ordinary/native model-operation policy note. SDK transport, external member control and cold Runtime admission remain separately owned decisions; no frozen archive was edited.",
+    "upgradeGuide": "The model-resource-ownership guide covers live provider replacement for both standalone and managed model streams; startup registration remains in the separate existing managed-resource-admission guide. The new English guide is 222 words."
+  },
+  "baseline": {
+    "at": "2026-10-31T02:51:28.022643+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "peerThread": "multi-computer architecture chat",
+    "peerReportedRelease": "R6 on mac-mini and Ubuntu; auth-only incremental deployment, schema102 and epoch83.",
+    "peerReportedVerification": "19 real PostgreSQL auth cases and 8-concurrent token performance 7932.94ms to 963.68ms; page performance remains REAL-001 open.",
+    "independentlyVerifiedByThisBatch": false,
+    "rootReleaseStatus": "B385 is verified after B379-B384, outside the peer frozen R7; root did not deploy.",
+    "reservedPeerPaths": [
+      "gateway/src/postgres/auth-service.ts",
+      "gateway/tests/auth-postgres.spec.ts",
+      "Gateway HTML and real Web assembly fixtures",
+      "topology/node access, CUA and migration101/102",
+      "the three resource-budget files and late UI authorization hydration",
+      "packages/client/runtime",
+      "ui-conversation",
+      "test-support/client-runtime",
+      "apps/web/tests/workspace-history-entry.e2e.ts",
+      "packages/client/ui-documents",
+      "packages/client/ui-agent-preset",
+      "packages/client/runtime Session/navigation/input state"
+    ],
+    "handoff": "One receipt and source-hash handoff after verification; no repeated progress messages.",
+    "latestReadOnlyPeerSnapshot": "Peer reports a real collaborative project write succeeded on computer A; owner and readonly members saw the response, readonly had no send entry, and computer B draft remained independent. Root did not independently reproduce this report.",
+    "peerCandidateStatus": "Peer reports R7 candidate and GUI work are in progress, not deployed. It plans to integrate the frozen root candidate and preserve matched parent/child artifacts.",
+    "peerNewRace": "REAL-013: navigation can submit the previous Session composer while creating a new Session. Peer owns originating-Session input hold and its GUI/real Web regressions. No root acceptance of that fix is claimed.",
+    "productionPerformance": "Peer reports direct QA TLS to actual A Gateway reaches the workbench in about one second; public-entry performance still fails independently. No root verification is claimed.",
+    "peerLatestReported": "Peer corrected its UserDocScope node ID types and retains navigation/input hold, preset ownership, steering receipt and document transfer work. These are peer reports, not root release acceptance."
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Review subprocess/terminal resource ownership between queued permit completion and physical allocation.",
+    "Valid resource-only managed Codex routing, remaining admission error classification and business/permissions review remain open.",
+    "LLM index.ts retains legacy coverage debt; no whole-file 100% claim.",
+    "No new PostgreSQL, physical Linux/Windows, paid API or root deployment acceptance. Revalidate owned database identity/mapping before any later DB test.",
+    "Peer R7 and real Web navigation/document/steering fixes remain separately owned. No full doc-sync claim."
+  ]
+}

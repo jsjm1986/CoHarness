@@ -3,8 +3,9 @@
   - button "Open plan in sidebar":
     - text: View full plan
     - img
-  - heading "Add --greeting flag to CLI" [level=3]
-  - paragraph: Locate the CLI entry point (e.g., cli.py, main.go, index.js etc.) and find the argument parser definition (argparse, click, cobra, yargs, or similar).
+  - group "Plan review":
+    - heading "Add --greeting flag to CLI" [level=3]
+    - paragraph: Locate the CLI entry point (e.g., cli.py, main.go, index.js etc.) and find the argument parser definition (argparse, click, cobra, yargs, or similar).
   - status
   - button "Request changes":
     - img

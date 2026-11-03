@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-persistence-format-facts",
+  "cwd": ".",
+  "command": "pnpm run verify-persistence-formats --write",
+  "startedAt": "2026-10-23T19:03:23.311723+00:00",
+  "seconds": 6.394,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6d61ddbf690f2c8ff21d01f7043b963c2b8ee988854d94083a84619b225e347f",
+  "inputsAfter": "6d61ddbf690f2c8ff21d01f7043b963c2b8ee988854d94083a84619b225e347f",
+  "outputSha256": "abea4420bc1b24bae44b5bfd7658f7d91380ae57cd0979f48b72d23f2205cd5b",
+  "outputTail": "$ tsx scripts/persistence-formats.ts --write\nPersistence formats: v0 through v7 verified (8 complete references). Refreshed 3 files.\n"
+}

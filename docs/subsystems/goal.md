@@ -50,7 +50,7 @@ interface GoalSnapshot extends GoalRef {
   readonly phase: GoalPhase
   /** Present exactly while `phase` is `blocked`. */
   readonly blockedReason?: GoalBlockReason
-  /** Total admitted goal-round cap. */
+  /** Total admitted goal-round cap; edits may lower it below the retained admitted count. */
   readonly maxGoalRounds: number
 }
 ```

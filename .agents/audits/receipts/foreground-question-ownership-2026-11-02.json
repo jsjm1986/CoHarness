@@ -1,0 +1,171 @@
+{
+  "findings": [
+    "B479",
+    "B480"
+  ],
+  "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+  "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T145614Z/B479-B480-foreground-question-ownership.delta.tar.gz",
+  "archiveSha256": "5d4175f18ea4fea542a4989a640a946d5d79c249e693480fabc478fb8267ee99",
+  "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T145614Z/B479-B480-foreground-question-ownership-capsule-jp6__jmz",
+  "manifestSha256": "50791d631c659d1fa33363f31b32f31e68010fddfb69162665137807766c1d6e",
+  "ownedChanges": 31,
+  "verification": {
+    "normalCases": 196,
+    "functionalCases": 186,
+    "coverageRosterCases": 10,
+    "additionalToolAndGoalConsumerCases": 46,
+    "apiProxyConsumerCases": 3,
+    "archivePolicyCases": 9,
+    "normalWholeFileCoverage": {
+      "total": {
+        "lines": {
+          "total": 337,
+          "covered": 337,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 395,
+          "covered": 395,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 63,
+          "covered": 63,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 284,
+          "covered": 284,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/user-questions/src/index.ts": {
+        "lines": {
+          "total": 183,
+          "covered": 183,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 38,
+          "covered": 38,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 224,
+          "covered": 224,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 144,
+          "covered": 144,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/plan/plan-mode/src/index.ts": {
+        "lines": {
+          "total": 154,
+          "covered": 154,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 25,
+          "covered": 25,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 171,
+          "covered": 171,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 140,
+          "covered": 140,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "originalForegroundFailures": 7,
+    "originalPlanFailures": 3,
+    "originalRealLoaderCancelledReview": "failed_after_positive_approval_control",
+    "sourceNode22": "passed",
+    "normallyBuiltNode24Loader": "passed",
+    "wholeHostTypes": "passed",
+    "coverageExemptionsAdded": 0,
+    "sessionFormatChanged": false,
+    "publicSignaturesChanged": false,
+    "answererSignalObjectIdentityMayChange": true,
+    "modelApiCalls": 0,
+    "sharedIntegration": [
+      "Regenerate the shared runtime API catalog from the matched source.",
+      "The relationship generator currently refuses the unclassified new connection service; peer owns connection classification."
+    ]
+  },
+  "wholeProjectComplete": false,
+  "recordedAt": "2026-11-02T16:13:03.351358+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T145614Z",
+  "sourcePaths": [
+    ".agents/notes/implemented/bug-fix/2026-08-01-ask-user-delegated-caller-guard.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-08-01-ask-user-delegated-caller-guard.md",
+    ".agents/notes/implemented/bug-fix/2026-08-01-ask-user-delegated-caller-guard.zh.md",
+    "docs/subsystems/user-questions.i18n.yaml",
+    "docs/subsystems/user-questions.md",
+    "docs/subsystems/user-questions.zh.md",
+    "packages/interaction/tool-ask-user/tests/tool-ask-user.spec.ts",
+    "packages/interaction/user-questions/README.i18n.yaml",
+    "packages/interaction/user-questions/README.md",
+    "packages/interaction/user-questions/README.zh.md",
+    "packages/interaction/user-questions/src/index.ts",
+    "packages/interaction/user-questions/src/types.ts",
+    "packages/interaction/user-questions/tests/user-questions.spec.ts",
+    "packages/plan/plan-mode/README.i18n.yaml",
+    "packages/plan/plan-mode/README.md",
+    "packages/plan/plan-mode/README.zh.md",
+    "packages/plan/plan-mode/src/index.ts",
+    "packages/plan/plan-mode/tests/plan-mode.spec.ts",
+    "packages/interaction/user-questions/tests/foreground-lifetime.spec.ts",
+    "packages/interaction/user-questions/tests/foreground-loader.spec.ts",
+    "packages/interaction/user-questions/tests/fixtures/foreground-driver.mjs",
+    "packages/interaction/user-questions/tests/expected/foreground.jsonl",
+    "packages/plan/plan-mode/tests/review-owner.spec.ts",
+    "examples/headless-agent/tests/fixtures/interaction/question-lifetime/cordis.yml",
+    "examples/headless-agent/tests/fixtures/interaction/question-lifetime/model.mjs",
+    ".agents/notes/implemented/bug-fix/2026-11-02-foreground-question-ownership.md",
+    ".agents/notes/implemented/bug-fix/2026-11-02-foreground-question-ownership.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-11-02-foreground-question-ownership.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/foreground-question-lifetimes/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/foreground-question-lifetimes/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/foreground-question-lifetimes/guide.i18n.yaml"
+  ],
+  "productionWrites": false,
+  "realApiValidation": "deferred_by_user",
+  "remaining": [
+    "Whole-project business and permission review remains in progress.",
+    "Shared catalogs require the peer connection classification and matching regeneration."
+  ],
+  "dependencyAddendum": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T145614Z/question-predecessor-dependency-addendum.json",
+  "standaloneR44Hotfix": false,
+  "requiredPredecessorCapsules": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-capsule.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-participant-capsule.json"
+  ],
+  "matchedR44CoreIntegrationReceipt": "receipts/r44-question-command-matched-core-2026-11-03.json",
+  "singleFileAfterIsStandalone": false
+}

@@ -1,0 +1,14 @@
+{
+  "name": "native-model-operation-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/llm/llm/tsconfig.json packages/llm/llm-pi-ai/tsconfig.json packages/subagent/subagent-codex/tsconfig.json",
+  "startedAt": "2026-10-25T02:06:39.839971+00:00",
+  "seconds": 7.484,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1034a9767521d2b74bdeea423c4373f1aa5ee168fb60d882bb0318a6ed2ad943",
+  "inputsAfter": "1034a9767521d2b74bdeea423c4373f1aa5ee168fb60d882bb0318a6ed2ad943",
+  "postgresToolDirectory": null,
+  "outputSha256": "bc2345c0159e741ad7f744d851e986ac819504acfbd431bff74568279cb0ac9c",
+  "outputTail": "packages/llm/llm-pi-ai/src/native-stream.ts(88,18): error TS18048: 'response' is possibly 'undefined'.\npackages/llm/llm-pi-ai/src/native-stream.ts(88,87): error TS18048: 'response' is possibly 'undefined'.\npackages/llm/llm-pi-ai/src/native-stream.ts(89,15): error TS18048: 'response' is possibly 'undefined'.\npackages/llm/llm-pi-ai/src/native-stream.ts(89,42): error TS18048: 'response' is possibly 'undefined'.\npackages/llm/llm-pi-ai/src/native-stream.ts(89,77): error TS18048: 'response' is possibly 'undefined'.\npackages/llm/llm-pi-ai/src/native-stream.ts(90,18): error TS18048: 'response' is possibly 'undefined'.\npackages/llm/llm-pi-ai/src/native-stream.ts(90,105): error TS18048: 'response' is possibly 'undefined'.\npackages/llm/llm-pi-ai/src/native-stream.ts(99,22): error TS18048: 'response' is possibly 'undefined'.\n"
+}

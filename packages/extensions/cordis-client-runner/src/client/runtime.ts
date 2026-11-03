@@ -19,7 +19,7 @@ import type { Loader } from '@deepseek-ai/cordis-plugin-loader'
 import type {
   CordisDynamicPackageId, CordisDynamicPluginId, CordisDynamicPluginRunId, DynamicCordisPackage,
 } from '@deepseek-ai/dsh-api-remotes/client'
-import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
+import type { ConnectionRuntimeTarget, SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import type { ClientModuleSystem } from '@deepseek-ai/dsh-client-modules/client'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { DynamicCordisStyles, evaluateClientHalf, DYNAMIC_CLIENT_REDIRECTS } from './evaluator.ts'
@@ -114,6 +114,12 @@ interface LivePackage {
 
 /** Runner dependencies, resolved by the plugin entry at activation. */
 export interface DynamicCordisRunnerEnv {
+  /** Browser-only namespace for a non-bootstrap Runtime's contributions. */
+  namespace?: string | undefined
+  /** Runtime whose services each dynamic plugin reads through its own fiber. */
+  runtime?: { readonly target?: ConnectionRuntimeTarget | undefined } | undefined
+  /** Allocate shadowing ranks shared by all Runtime runners in this document. */
+  allocatePriority?: (() => number) | undefined
   /** The client root context (service reads and the guard's fiber owner). */
   ctx: Context
   /** Client cordis Loader: dynamic packages become entries under it. */
@@ -155,8 +161,8 @@ export interface DynamicCordisRunnerEnv {
 }
 
 /** Module-table id of one package (also its loader entry name and fiber name). */
-function moduleIdOf(id: CordisDynamicPluginId): string {
-  return `dyn/${id}`
+function moduleIdOf(id: CordisDynamicPluginId, namespace?: string): string {
+  return `dyn/${namespace === undefined ? '' : `${namespace}/`}${id}`
 }
 
 /* jscpd:ignore-start -- client and host runner halves keep symmetric wiring;
@@ -424,7 +430,7 @@ export class DynamicCordisPackageRunner {
       name: half.name,
     }
     const surface = this.guardedSurface(pkg, half.agentId, plugin, ledger)
-    const moduleId = moduleIdOf(half.pluginId)
+    const moduleId = moduleIdOf(half.pluginId, this.env.namespace)
     // Invalidate-then-register keeps re-loading legal: the module table throws
     // loudly on a duplicate factory registration.
     this.env.modules.invalidate(moduleId)
@@ -539,19 +545,21 @@ export class DynamicCordisPackageRunner {
     }
     const guarded = (ctx: unknown): Context => dynamicCordisContext(ctx as Context, {
       pkg,
+      namespace: this.env.namespace,
+      runtime: this.env.runtime,
       ledger,
       claim,
-      allocatePriority: () => --this.nextPriority,
+      allocatePriority: this.env.allocatePriority ?? (() => --this.nextPriority),
       reportFailure: (error) => {
         this.env.reportGuardFailure(agentId, pkg.pluginId, pkg.pluginRunId, errorDetails(error))
       },
     })
     if (typeof plugin === 'function') {
-      return { name: moduleIdOf(pkg.pluginId), apply: (ctx: unknown) => plugin(guarded(ctx)) }
+      return { name: moduleIdOf(pkg.pluginId, this.env.namespace), apply: (ctx: unknown) => plugin(guarded(ctx)) }
     }
     return {
       ...plugin,
-      name: moduleIdOf(pkg.pluginId),
+      name: moduleIdOf(pkg.pluginId, this.env.namespace),
       apply: (ctx: unknown, config?: unknown) => plugin.apply(guarded(ctx), config),
     }
   }
@@ -579,7 +587,7 @@ export class DynamicCordisPackageRunner {
     // Entry removal disposes the fiber (slot entries and facade effects
     // cascade); the factory invalidation makes a later re-load legal.
     await this.removeEntry(entryId)
-    this.env.modules.invalidate(moduleIdOf(id))
+    this.env.modules.invalidate(moduleIdOf(id, this.env.namespace))
     styles.dispose()
   }
 }

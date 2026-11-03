@@ -1,0 +1,14 @@
+{
+  "name": "trash-safety-assembled-built",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/userdoc-migration.snapshot.ts --retry=0",
+  "startedAt": "2026-10-24T04:49:13.789852+00:00",
+  "seconds": 4.792,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "db7e56a763628ba87d1cdef67d5cae5a083620ef0bc58ecad9227fe07f7c27ce",
+  "inputsAfter": "db7e56a763628ba87d1cdef67d5cae5a083620ef0bc58ecad9227fe07f7c27ce",
+  "postgresToolDirectory": null,
+  "outputSha256": "a9d22a8c204e196501d6e40baf33c6fba36e00049caaf39f5a1292b50c5c6696",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  12:49:15\n   Duration  2.82s (transform 350ms, setup 54ms, import 394ms, tests 2.28s, environment 0ms)\n\n"
+}

@@ -3,11 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write apps/cli/reference/README.md
 document:
-  en: 6a04f00299ec53e4826dbc23ad137bc42f5dabd6
-  zh: f68f968bcba6f80068f176b75327b8ca27ed6cb7
+  en: ac09ef76bffa15fda1973a8410550fcd609c5086
+  zh: 449f8c3307c5e44755d83ba5a54bfbb96aa5b565
 /dsh-cli-behavior-reference:
-  en: d25712a65d21ab45
-  zh: b1c57b706bc64085
+  en: 6929889d19279f70
+  zh: 7e3a4de9675103e6
+/dsh-cli-behavior-reference/managed-launch:
+  en: 971e86f18aef0163
+  zh: f24a7ad3dba6235a
 /dsh-cli-behavior-reference/profile-boot:
   en: b474a6fc3c98837d
   zh: 9522b4df8e212f0a

@@ -1,4 +1,4 @@
-import { closeSync, constants, fchmodSync, lstatSync, mkdirSync, openSync, realpathSync, writeFileSync } from 'node:fs'
+import { closeSync, constants, fchmodSync, fchownSync, lstatSync, mkdirSync, openSync, realpathSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { GatewayConfig } from './config.ts'
 import type { EffectiveGrant } from './projects.ts'
@@ -42,6 +42,7 @@ export function writeRuntimeGrantsFile(dshHome: string, grants: EffectiveGrant[]
   const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | noFollow, 0o600)
   try {
     writeFileSync(fd, JSON.stringify(grants, null, 2), { encoding: 'utf8' })
+    fchownSync(fd, homeEntry.uid, homeEntry.gid)
     fchmodSync(fd, 0o600)
   } finally {
     closeSync(fd)
@@ -91,34 +92,71 @@ export class GrantRestartError extends Error {
 }
 
 /**
- * Recompute a user's grants file; restart the instance only when it is `ready` or `starting`.
+ * Recompute a user's grants file; restart an active owner's instance when it is `ready` or `starting`; disabled owners stop without restarting.
  * Restart failure writes `admin.instances.restart-failed` (actor as `userId`) then rethrows
  * as {@link GrantRestartError}; an audit-write failure replaces the restart error instead.
  * @param deps - cfg, projects, users, instances, audit
  * @param userId - user whose grants changed
  * @param actorId - admin who triggered the change
- * @returns `'restarted'` after stop+start; `'written'` when the instance was already stopped
+ * @returns `'restarted'` after stop+start, `'written'` for a stopped instance or disabled owner after stop, or `'deleted'` after a confirmed concurrent account deletion.
  */
 export async function applyGrantsToUser(
   deps: Pick<GatewayDeps, 'cfg' | 'projects' | 'users' | 'instances' | 'audit'>,
   userId: number,
   actorId: number,
-): Promise<'restarted' | 'written'> {
+): Promise<'restarted' | 'written' | 'deleted'> {
   const user = await deps.users.getById(userId)
-  if (user === null) throw new Error(`no user ${userId}`)
-  writeGrantsFile(deps.cfg, user.username, await runtimeDirectoryGrants(user, deps.projects))
-  const state = await deps.instances.stateOf(userId)
-  if (state !== 'ready' && state !== 'starting') return 'written'
-  try {
-    await deps.instances.stop(userId, 'access-change')
-    await deps.instances.ensureRunning(user)
-    return 'restarted'
-  } catch (error) {
-    await deps.audit.write({
-      userId: actorId,
-      action: 'admin.instances.restart-failed',
-      detail: JSON.stringify({ userId, error: String(error) }),
-    })
-    throw new GrantRestartError(error instanceof Error ? error.message : String(error), { cause: error })
+  if (user === null) {
+    if (await confirmedDeleted(deps.users, userId)) return 'deleted'
+    throw new Error(`no user ${userId}`)
+  }
+  const targets = deps.instances.targetsForOwner === undefined ? [{ kind: 'user' as const, id: userId }]
+    : await deps.instances.targetsForOwner(userId)
+  let restarted = false
+  const projectionFailures: unknown[] = []
+  const restartFailures: unknown[] = []
+  for (const target of targets) {
+    try {
+      const storage = await deps.instances.storageOf?.(target)
+      if (storage?.provisioning === 'preparing') continue
+      const subject = { ...user, ...storage, runtimeId: target.runtimeId }
+      writeRuntimeGrantsFile(storage?.dshHome ?? join(deps.cfg.usersRoot, user.username, 'dsh'),
+        await runtimeDirectoryGrants(subject, deps.projects), deps.cfg.usersRoot)
+      const address = target.runtimeId === undefined ? userId : target
+      const state = await deps.instances.stateOf(address)
+      if (state !== 'ready' && state !== 'starting') continue
+      try {
+        await deps.instances.stop(address, 'access-change')
+        if (user.status !== 'active') continue
+        await deps.instances.ensureRunning(subject)
+        restarted = true
+      } catch (error) {
+        if (await confirmedDeleted(deps.users, userId, { error })) return 'deleted'
+        await deps.audit.write({ userId: actorId, action: 'admin.instances.restart-failed',
+          detail: JSON.stringify({ userId, runtimeId: target.runtimeId, error: String(error) }) })
+        restartFailures.push(error)
+      }
+    } catch (error) {
+      if (await confirmedDeleted(deps.users, userId, { error })) return 'deleted'
+      projectionFailures.push(error)
+    }
+  }
+  if (projectionFailures.length > 0) {
+    const failures = [...projectionFailures, ...restartFailures]
+    throw failures.length === 1 ? failures[0] : new AggregateError(failures, 'Personal Runtime grant application failed')
+  }
+  if (restartFailures.length > 0) {
+    const cause = restartFailures.length === 1 ? restartFailures[0] : new AggregateError(restartFailures, 'Personal Runtime restart failed')
+    throw new GrantRestartError(cause instanceof Error ? cause.message : String(cause), { cause })
+  }
+  if (await confirmedDeleted(deps.users, userId)) return 'deleted'
+  return restarted ? 'restarted' : 'written'
+}
+
+/** Only an authoritative tombstone classifies deletion; failed verification preserves both failures. */
+async function confirmedDeleted(users: GatewayDeps['users'], userId: number, failed?: { error: unknown }): Promise<boolean> {
+  try { return await users.isDeleted?.(userId) === true } catch (error) {
+    if (failed === undefined) throw error
+    throw new AggregateError([failed.error, error], 'Grant application failed and account deletion could not be verified')
   }
 }

@@ -108,27 +108,28 @@ describe('status and resolve (per key)', () => {
 })
 
 describe('epoch guard (per key)', () => {
-  it('a superseded pull cannot overwrite the newer one (old resolves after new)', async () => {
-    const { dir, pull } = bench()
+  it('a superseded pull cannot publish while its replacement waits to start', async () => {
+    const { dir, pull, countOf } = bench()
     const first = dir.refresh(S1)
     const second = dir.refresh(S1)
-    pull(S1, 1).resolve(CMDS)
-    await second
-    expect(dir.resolve(S1, 'plan')).toBeDefined()
     pull(S1, 0).resolve([{ name: 'stale', description: 'old world' }])
-    await first
+    await expect.poll(() => countOf(S1)).toBe(2)
+    expect(dir.resolve(S1, 'stale')).toBeUndefined()
+    pull(S1, 1).resolve(CMDS)
+    await Promise.all([first, second])
     expect(dir.resolve(S1, 'stale')).toBeUndefined()
     expect(dir.resolve(S1, 'plan')).toBeDefined()
   })
 
-  it('a superseded failure cannot demote the newer success', async () => {
-    const { dir, pull } = bench()
+  it('a superseded failure waits for the requested replacement', async () => {
+    const { dir, pull, countOf } = bench()
     const first = dir.refresh(S1)
     const second = dir.refresh(S1)
-    pull(S1, 1).resolve(CMDS)
-    await second
     pull(S1, 0).reject(new Error('late failure'))
-    await first
+    await expect.poll(() => countOf(S1)).toBe(2)
+    expect(dir.status(S1)).toBe('pending')
+    pull(S1, 1).resolve(CMDS)
+    await Promise.all([first, second])
     expect(dir.status(S1)).toBe('ready')
     expect(dir.resolve(S1, 'plan')).toBeDefined()
   })
@@ -137,7 +138,7 @@ describe('epoch guard (per key)', () => {
     const { dir, pull } = bench()
     const one = dir.refresh(S1)
     void dir.refresh(S2)
-    void dir.refresh(S2) // supersedes the s2 pull only
+    void dir.refresh(S2) // invalidates the s2 pull only
     pull(S1, 0).resolve(CMDS)
     await one
     expect(dir.status(S1)).toBe('ready')
@@ -313,10 +314,11 @@ describe('ensureReady (per key)', () => {
   })
 
   it('keeps waiting across a superseded pull and settles on the winner', async () => {
-    const { dir, pull } = bench()
+    const { dir, pull, countOf } = bench()
     const wait = dir.ensureReady(S1, signal())
-    void dir.refresh(S1) // supersedes pull #0 with pull #1
+    void dir.refresh(S1)
     pull(S1, 0).resolve([{ name: 'stale', description: 'loser' }])
+    await expect.poll(() => countOf(S1)).toBe(2)
     pull(S1, 1).resolve(CMDS)
     await expect(wait).resolves.toEqual(CMDS)
   })

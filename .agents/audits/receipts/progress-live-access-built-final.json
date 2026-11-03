@@ -1,0 +1,14 @@
+{
+  "name": "progress-live-access-built-final",
+  "cwd": "gateway",
+  "command": "node tests/run-built-resource-admission.mjs",
+  "startedAt": "2026-10-23T23:13:02.456176+00:00",
+  "seconds": 16.171,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2ea960427861b38ad162c38d11ee5badb98b02cc8b0aae56a21be6f7deed2623",
+  "inputsAfter": "c81afa7d008411cfe45025aef554e331395178e387ae27705a28530b3b0c552a",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "e1afc64cf5076aa337af979efb8d56b5255a14b059342518fb33f428182ab284",
+  "outputTail": "{\"freshPressureRequired\":true,\"sharedCreditSpent\":true,\"cancellationBeforeAllocation\":true,\"activeAssignmentPreserved\":true}\nfile:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/tests/fixtures/project-progress-built.mjs:124\n  if (failures.length > 0) throw new AggregateError(failures, 'Compiled progress acceptance failed')\n                                 ^\n\nAggregateError: Compiled progress acceptance failed\n    at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/tests/fixtures/project-progress-built.mjs:124:34 {\n  [errors]: [\n    AssertionError [ERR_ASSERTION]: compiled digest did not settle\n        at waitFor (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/tests/fixtures/project-progress-built.mjs:78:48)\n        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n        at async file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/tests/fixtures/project-progress-built.mjs:106:3 {\n      generatedMessage: false,\n      code: 'ERR_ASSERTION',\n      actual: false,\n      expected: true,\n      operator: '==',\n      diff: 'simple'\n    }\n  ]\n}\n\nNode.js v25.8.1\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: compiled Gateway admission acceptance failed\n\n1 !== 0\n\n    at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/tests/run-built-resource-admission.mjs:14:10\n    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)\n    at async node:internal/modules/esm/loader:639:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: 1,\n  expected: 0,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v25.8.1\n"
+}

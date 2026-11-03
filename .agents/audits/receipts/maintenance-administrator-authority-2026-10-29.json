@@ -1,0 +1,464 @@
+{
+  "recordedAt": "2026-10-29T01:10:42.211107+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "findings": [
+    "B291",
+    "B292",
+    "B293",
+    "B294"
+  ],
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "baseline": {
+    "fetch": {
+      "name": "audit-baseline-after-maintenance-fetch",
+      "status": "passed",
+      "startedAt": "2026-10-29T01:09:45.330561+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "git",
+        "fetch",
+        "origin",
+        "master"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T01:09:48.966001+00:00"
+    },
+    "aheadOfOriginMaster": 139,
+    "behindOriginMaster": 0,
+    "sharedUncommittedWorkPreserved": true
+  },
+  "causalNegatives": [
+    {
+      "name": "maintenance-administration-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T00:58:45.401867+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+        "DSH_AUDIT_MAINTENANCE_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-maintenance-replay.py",
+        "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+        "src",
+        "maintenance-administration-causal-before"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T00:58:52.236702+00:00"
+    },
+    {
+      "name": "maintenance-transition-atomicity-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T01:04:11.773502+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+        "../node_modules/.bin/vitest",
+        "run",
+        "--config",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/maintenance-negative.config.mjs",
+        "-t",
+        "retains administrator eligibility|records one entry|rolls back",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T01:04:12.745667+00:00"
+    }
+  ],
+  "businessCounterexamples": {
+    "actualHttpObservations": 36,
+    "withdrawnAdministratorAcceptances": 30,
+    "backupVerificationWithdrawnBeforeRegistration": 1,
+    "ordinaryCurrentAdministratorControls": 5,
+    "preRepairEmittedClass": {
+      "missingRetainedAuthority": 1,
+      "duplicateWindowEntryRows": 1,
+      "partiallyCommittedEnterExitNodeTransitionsAfterLedgerFailure": 3,
+      "scope": "Private pre-repair Gateway compiler output with an explicitly declared diagnostic test config; it does not replace current source acceptance."
+    }
+  },
+  "behavior": [
+    "Deployment administration reads and manual transitions retain the authenticated current active organization administrator until transaction commit; foreign actors and browser actor fields grant no authority.",
+    "Maintenance entry, exit and node declarations serialize their control-row work and commit each accepted state with its operation row. Concurrent entrants produce one maintenance epoch and one entry operation; ledger failure rolls back the transition.",
+    "Administrative state, operations, actor and transition work use the same acquired backend and support one available checkout. Unexpected database failures return safe503 with diagnostic causes retained for server logging.",
+    "Restore registration checks and retains an organization-owned verified complete backup until its pending row commits. Eligibility withdrawn before admission refuses the request; an accepted pending request remains subject to the independent applier recovery checks.",
+    "Explicit null remains reserved for trusted standalone-applier administration. Existing maintenance mode, write epoch, quiescence, restore lease and recovery semantics are preserved."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "maintenance-administration-final-source-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:07:03.572242+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+          "DSH_AUDIT_MAINTENANCE_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/maintenance-administration-postgres.spec.ts",
+          "tests/maintenance-administration-transcript.spec.ts",
+          "tests/deployment.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--coverage",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/maintenance-administration-final-source-coverage",
+          "--coverage.include=src/postgres/maintenance-service.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:07:19.386583+00:00"
+      },
+      {
+        "name": "maintenance-existing-data-regressions",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:05:25.649149+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_regression_test",
+          "HGW_TEST_PG_DUMP_COMMAND=[\"/opt/homebrew/opt/libpq@18/bin/pg_dump\"]",
+          "HGW_TEST_PG_RESTORE_COMMAND=[\"/opt/homebrew/opt/libpq@18/bin/pg_restore\"]",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/maintenance.spec.ts",
+          "tests/deployment-backups.spec.ts",
+          "tests/deployment-restore.spec.ts",
+          "tests/node-config-process.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:06:01.537251+00:00"
+      },
+      {
+        "name": "maintenance-final-gateway-types",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:07:44.533429+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-preferences-typecheck.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:07:45.784001+00:00"
+      },
+      {
+        "name": "maintenance-final-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:07:03.572245+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/postgres/maintenance-service.ts",
+          "gateway/src/admin-api.ts",
+          "gateway/src/server.ts",
+          "gateway/tests/maintenance-administration-postgres.spec.ts",
+          "gateway/tests/maintenance-administration-transcript.spec.ts",
+          "gateway/tests/fixtures/maintenance-administration.mjs",
+          "gateway/tests/deployment.spec.ts",
+          "gateway/tests/maintenance.spec.ts",
+          "gateway/tests/postgres-suite.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:07:05.062836+00:00"
+      },
+      {
+        "name": "maintenance-private-artifact-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:07:44.533434+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/build-maintenance-administration-artifact.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:07:47.111117+00:00"
+      },
+      {
+        "name": "maintenance-built-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:08:15.445402+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+          "DSH_AUDIT_MAINTENANCE_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-maintenance-replay.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "lib",
+          "maintenance-built-node22",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/maintenance-administration-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:08:22.567309+00:00"
+      },
+      {
+        "name": "maintenance-built-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:08:52.191744+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+          "DSH_AUDIT_MAINTENANCE_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-maintenance-replay.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "lib",
+          "maintenance-built-node24",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/maintenance-administration-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:09:01.071959+00:00"
+      },
+      {
+        "name": "maintenance-reviewed-doc-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:06:35.684584+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          ".agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md",
+          "gateway/README.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/maintenance-administrator-authority/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:06:36.126430+00:00"
+      },
+      {
+        "name": "maintenance-guide-pair-link-record",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:08:45.124275+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/maintenance-administrator-authority/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:08:45.285861+00:00"
+      },
+      {
+        "name": "maintenance-repaired-translation-check",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:08:52.191765+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:09:03.168110+00:00"
+      },
+      {
+        "name": "maintenance-repaired-markdown-links",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:08:52.191779+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-md-links.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:09:08.768674+00:00"
+      },
+      {
+        "name": "audit-baseline-after-maintenance-fetch",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:09:45.330561+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "master"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:09:48.966001+00:00"
+      }
+    ],
+    "source": {
+      "cases": 20,
+      "files": 4,
+      "actualPostgresAuthorityAndStateCases": 8,
+      "actualHttpGoldenObservations": 36,
+      "coverage": {
+        "total": {
+          "lines": {
+            "total": 137,
+            "covered": 84,
+            "skipped": 0,
+            "pct": 61.31
+          },
+          "statements": {
+            "total": 162,
+            "covered": 93,
+            "skipped": 0,
+            "pct": 57.4
+          },
+          "functions": {
+            "total": 38,
+            "covered": 26,
+            "skipped": 0,
+            "pct": 68.42
+          },
+          "branches": {
+            "total": 116,
+            "covered": 57,
+            "skipped": 0,
+            "pct": 49.13
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/maintenance-service.ts": {
+          "lines": {
+            "total": 137,
+            "covered": 84,
+            "skipped": 0,
+            "pct": 61.31
+          },
+          "functions": {
+            "total": 38,
+            "covered": 26,
+            "skipped": 0,
+            "pct": 68.42
+          },
+          "statements": {
+            "total": 162,
+            "covered": 93,
+            "skipped": 0,
+            "pct": 57.4
+          },
+          "branches": {
+            "total": 116,
+            "covered": 57,
+            "skipped": 0,
+            "pct": 49.13
+          }
+        }
+      },
+      "coverageScope": "Named administrative cases measure61.31percentlines/49.13percentbranches of the whole maintenance service. The41existing data/process regression cases pass separately without coverage instrumentation. Full-file coverage remains incomplete; this is not the root per-file100percent CI gate."
+    },
+    "compiled": {
+      "nodes": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "actualHttpObservationsPerNode": 36,
+      "goldenMatched": true
+    },
+    "existingMaintenanceBackupRestoreAndProcessRegressionCases": 41,
+    "docs": {
+      "aggregateReceipt": {
+        "name": "maintenance-final-doc-quick",
+        "status": "failed",
+        "startedAt": "2026-10-29T01:07:03.572250+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-29T01:08:18.596342+00:00"
+      },
+      "aggregatePassed": false,
+      "gatesInitiallyPassed": 19,
+      "failure": "One new guide translated link had a fragment only on the English side. Both references now target their paired Gateway README; the reviewed sidecar was recorded again.",
+      "repairChecks": [
+        "maintenance-guide-pair-link-record",
+        "maintenance-repaired-translation-check",
+        "maintenance-repaired-markdown-links"
+      ],
+      "guideTriplet": "Direct current-version/frontmatter/headings/newline/Englishwordbudget checks pass. There is no verify-upgrade-guides command in this checkout."
+    },
+    "obsoleteAssertions": "One legacy deployment-unit stop assertion omitted the manual reason and initiating administrator introduced by B255. The expected call now includes both existing arguments; runtime production routing is unchanged."
+  },
+  "sourceHashes": {
+    "gateway/src/postgres/maintenance-service.ts": "6d50da2c40acb1c9766d7c32a6ec2b1c7039e2422f1b0e0164257ef8622e3a16",
+    "gateway/src/admin-api.ts": "c1a25930a46f3e8e78018bcdcde6b8ee74e794899bc307bb7d01d05d8ac2b880",
+    "gateway/src/server.ts": "e218f65e04220d201ef2c1073ceb72355094ad57b04543167e1c71f9baea8f74",
+    "gateway/tests/maintenance-administration-postgres.spec.ts": "21d56a72a5c1694ef735aaebbe3409d98215d6335d676af9d5f1e02bb0a53453",
+    "gateway/tests/maintenance-administration-transcript.spec.ts": "e0f9a388f498d0a4b1f8b6f9e9370e5974e4cb4f74767876aa30310d435f732a",
+    "gateway/tests/fixtures/maintenance-administration.mjs": "a2507e1f9c70c3b60cc42aed852b622b0984a51a3c2fab7adb01caf7b77d96ff",
+    "gateway/tests/expected/projects/maintenance-administration.jsonl": "7a58f3139f17079abb55d65ceba8db48b022fb4f31762d39884c916aba681a32",
+    "gateway/tests/deployment.spec.ts": "cfb35184ad2fb300631f7e40f3555750e068570d62341e49fba52461412592dd",
+    "gateway/tests/maintenance.spec.ts": "7254d2c559baf44f3b44d9a6640ab8e7bf75bb3a914b6007b781bbab691423d1",
+    "gateway/tests/postgres-suite.spec.ts": "04e60372e197799e59cabaf1cb64e7f656c9aac052f735793c0075c4abd0a048",
+    "gateway/package.json": "5d35c39e6c582fee393497c6f9c09c2775ba16af721dd220eb989ac88e1bb250"
+  },
+  "artifacts": {
+    "privateGateway": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/maintenance-administration-artifact-20261029/lib",
+    "metadata": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/maintenance-administration-build-inputs-20261029.json",
+    "migrationSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029"
+  },
+  "noteReview": {
+    "extendedExisting": [
+      ".agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md"
+    ],
+    "new": [],
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false
+  },
+  "database": {
+    "ownerFile": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-postgres-owner-20261029.json",
+    "port": 61597,
+    "status": "Retained for the next independent Runtime reporting and permission review. Final resource cleanup is pending.",
+    "excludedPorts": [
+      5432,
+      55699
+    ]
+  },
+  "limitations": [
+    "All12original domains remain in_progress; B04allocations and B25nativecontainment remain open.",
+    "Full-file coverage and independent multi-computer business acceptance remain incomplete.",
+    "Real model API and actual cloud delivery remain human-deferred."
+  ],
+  "subsequentOwnedDatabaseCleanup": {
+    "receipt": "receipts/workbench-computer-permissions-2026-10-29.json",
+    "port": 61597,
+    "containerAndVolumeRemoved": true,
+    "openClientConnectionsBeforeClose": 0
+  },
+  "subsequentDocumentationAggregateAcceptance": {
+    "receipt": "receipts/workbench-computer-permissions-2026-10-29.json",
+    "command": "workbench-computer-final-doc-quick",
+    "status": "passed",
+    "passedGates": 20,
+    "originalFailedCommandPreserved": true
+  }
+}

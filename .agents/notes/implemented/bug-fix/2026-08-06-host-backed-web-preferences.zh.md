@@ -18,7 +18,7 @@ Web 的 Appearance、Language 和繁忙态 Enter 偏好原本存在浏览器 `lo
 
 用户变更会同步更新实时服务，并经 `scope.set` 将一项 `settings.mutate` 路径操作排入队列。scope 会串行处理手势，以最新已知 namespace revision 作为 `expectedRevision` 发送，记录每次成功写入的 revision，并且只允许最新写入的结算结果重新发布实时状态。最新写入被拒或失败时，scope 会重新加载 Host 状态。插件释放会拒绝新工作、跳过已排队操作、抑制运行中操作发布状态，并等待该操作结算后才让插件达到完全停稳。
 
-对于账户级字段，客户端在 Gateway 暴露账户偏好 transport 时绑定该 transport；只有该 transport 明确不支持时才回退到 Host settings。Host 特权方法栅栏仍要求回环 `Host` 头；网关把 `Host`/`Origin` 改写成实例回环后，公网页才能写入。被拒绝的 describe 停在内存默认值。动态第三方主题 id 仍是内置 Host schema 之外的进程内扩展；移除其中一个会重置实时注册表，但不会替换上一个持久化的内置偏好。
+对于账户级字段，客户端在 Gateway 暴露账户偏好 transport 时绑定该 transport；只有该 transport 明确不支持时才回退到 Host settings。账户与 Host 合并的命名空间保留各字段独立的可用性：控件与直接字体写入通过 mutation 所用的同一字段路由表解析存储来源。命名空间的账户可写性不能授权 Host 字体字段；另加镜像或将这些字段移入账户存储会重复生命周期管理或改变归属。Host 特权方法栅栏仍要求回环 `Host` 头；网关把 `Host`/`Origin` 改写成实例回环后，公网页才能写入。被拒绝的 describe 停在内存默认值。动态第三方主题 id 仍是内置 Host schema 之外的进程内扩展；移除其中一个会重置实时注册表，但不会替换上一个持久化的内置偏好。
 
 ## 曾考虑的替代方案
 

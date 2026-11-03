@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../attachment/attachment"
     },
     {
@@ -16,6 +25,9 @@
     },
     {
       "path": "../../context/execution-authority"
+    },
+    {
+      "path": "../../context/resource-budget"
     },
     {
       "path": "../../core/agent"
@@ -94,15 +106,6 @@
     },
     {
       "path": "../../workspace/workspace"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
     }
   ]
 }

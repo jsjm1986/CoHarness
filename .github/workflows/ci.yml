@@ -434,11 +434,11 @@ jobs:
         env:
           POSTGRES_USER: hgw
           POSTGRES_PASSWORD: hgw
-          POSTGRES_DB: hgw_execution
+          POSTGRES_DB: hgw_execution_test
         ports:
           - 5432/tcp
         options: >-
-          --health-cmd "pg_isready -U hgw -d hgw_execution"
+          --health-cmd "pg_isready -U hgw -d hgw_execution_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
@@ -535,7 +535,7 @@ jobs:
         id: gateway-execution
         if: needs.pr-scope.outputs.gateway_mode == 'full'
         env:
-          HGW_TEST_DATABASE_URL: postgres://hgw:hgw@127.0.0.1:${{ job.services.execution-postgres.ports['5432'] }}/hgw_execution
+          HGW_TEST_DATABASE_URL: postgres://hgw:hgw@127.0.0.1:${{ job.services.execution-postgres.ports['5432'] }}/hgw_execution_test
         run: pnpm run test:gateway:execution
 
       - name: Record Gateway execution evidence
@@ -554,6 +554,22 @@ jobs:
       # below owns skip/focused/full browser verification.
       - name: Run keyless compatibility, snapshot, and artifact gates
         run: pnpm run check:ci:consumers:scoped
+
+      - name: Test compiled Gateway and Web lifecycle
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        env:
+          HGW_TEST_DATABASE_URL: postgres://hgw:hgw@127.0.0.1:${{ job.services.execution-postgres.ports['5432'] }}/hgw_execution_test
+        run: |
+          npm --prefix gateway run test:built-web-assembly
+          node gateway/tests/run-built-node-agent.mjs
+      - name: Test compiled Gateway control ownership
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        run: |
+          node gateway/tests/run-built-local-supervision.mjs
+          node gateway/tests/run-built-systemd-control.mjs
+          node gateway/tests/fixtures/node-configuration-health.mjs lib
+          node gateway/tests/fixtures/local-boot-identity.mjs lib
+          node gateway/tests/fixtures/runtime-readiness-lifecycle.mjs lib
       - name: Summarize golden changes and replay status
         if: always()
         env:

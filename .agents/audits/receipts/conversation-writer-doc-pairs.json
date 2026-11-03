@@ -1,0 +1,14 @@
+{
+  "name": "conversation-writer-doc-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-conversation-writer-locks.md .agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md .agents/notes/implemented/feature/2026-10-10-steward-admin-layered-admission.md gateway/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/conversation-writer-authorization/guide.md",
+  "startedAt": "2026-10-24T00:49:16.461376+00:00",
+  "seconds": 4.276,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bf87507ee6ce2ff08f3ecdc620294a56ab5d343c05b2e2a0aa48e26ff595e79e",
+  "inputsAfter": "f6bc829ecd76d212ac13f7d50c07aa6a8fe0d7c2d8615d6dceabf313a7d2f461",
+  "postgresToolDirectory": null,
+  "outputSha256": "c66b277685f370dcd260f2990b87606d866fe224af981fe4a1271c1c20e4522a",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/bug-fix/2026-10-24-conversation-writer-locks.md .agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md .agents/notes/implemented/feature/2026-10-10-steward-admin-layered-admission.md gateway/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/conversation-writer-authorization/guide.md\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-24-conversation-writer-locks.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-10-10-steward-admin-layered-admission.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/conversation-writer-authorization/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 5 record(s) written; run the check to validate the pairs.\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-native-focused",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/tunnel-supervisor.spec.ts tests/tunnel-access.spec.ts tests/local-runtime-launcher.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T21:34:45.912029+00:00",
+  "seconds": 8.182,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f9a82a410abba325b6b12290f0c0f3e6c10283b9ee01f0f2f56afb422c3a5ad9",
+  "inputsAfter": "f9a82a410abba325b6b12290f0c0f3e6c10283b9ee01f0f2f56afb422c3a5ad9",
+  "postgresToolDirectory": null,
+  "outputSha256": "ced9468551e570225aa2e5545c7c615bb2de126dfdc60e44533eb9b2132507b7",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  35 passed (35)\n   Start at  05:34:47\n   Duration  6.28s (transform 371ms, setup 0ms, import 524ms, tests 9.74s, environment 0ms)\n\n"
+}

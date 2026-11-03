@@ -1,0 +1,14 @@
+{
+  "name": "document-lifecycle-built-resource-consumers",
+  "cwd": "gateway",
+  "command": "node tests/run-built-resource-admission.mjs",
+  "startedAt": "2026-10-24T02:51:37.900127+00:00",
+  "seconds": 3.474,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "636ca765b12030db43535afb2f4be798770c746ccf351c1d9454bc5183e8e53c",
+  "inputsAfter": "636ca765b12030db43535afb2f4be798770c746ccf351c1d9454bc5183e8e53c",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "f1251ef62a2a67297459cd5179afc9f5c40f8ff6fd14175e7035de27633c4e88",
+  "outputTail": "{\"freshPressureRequired\":true,\"sharedCreditSpent\":true,\"cancellationBeforeAllocation\":true,\"activeAssignmentPreserved\":true}\n{\"compiledGatewayModel\":true,\"kernelOwnerLoaded\":true,\"waitedForNodeGrant\":true,\"exactRequestEvidence\":true,\"sessionFormatReconstruction\":true,\"liveAccessCancellation\":true,\"deploymentHeaders\":true,\"harnessAttribution\":true,\"disjointTokenTotal\":17,\"releasedAfterCompletion\":true}\n"
+}

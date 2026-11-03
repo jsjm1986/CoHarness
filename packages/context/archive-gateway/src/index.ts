@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-host-apiproxy'
 import type {} from '@deepseek-ai/dsh-workspace-changes'
 import { foldSessionTitle } from '@deepseek-ai/dsh-session-title'
 import type { ArchivedSessionEntry, WorkspaceArchiveSnapshot, WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
+import { requireArchiveResponse } from './response.ts'
 
 export const name = 'archive-gateway'
 export const inject = ['connection', 'gatewayRuntime', 'workspaceRegistry']
@@ -800,7 +801,7 @@ export function apply(ctx: Context, config: Config): void {
           }),
           signal: abort.signal,
         })
-        if (!response.ok) throw new Error(`archive snapshot rejected with HTTP ${String(response.status)}`)
+        requireArchiveResponse(response, 'archive snapshot rejected')
         for (const command of archiveCommands(await readGatewayResponseJson(response, ARCHIVE_RESPONSE_MAX_BYTES))) {
           commands.set(command.id, command)
         }
@@ -812,7 +813,7 @@ export function apply(ctx: Context, config: Config): void {
             body: JSON.stringify({ commandId: command.id, revision: snapshot.revision, ...(error === undefined ? {} : { error }) }),
             signal: abort.signal,
           })
-          if (!ack.ok) { await ack.body?.cancel(); throw new Error(`archive command acknowledgement failed with HTTP ${String(ack.status)}`) }
+          requireArchiveResponse(ack, 'archive command acknowledgement failed')
           const value: unknown = await readGatewayResponseJson(ack, 1024)
           if (value === null || typeof value !== 'object' || !('acknowledged' in value) || value.acknowledged !== true) {
             throw new Error('archive command acknowledgement was not confirmed')
@@ -862,10 +863,7 @@ export function apply(ctx: Context, config: Config): void {
       pollTimer = setTimeout(() => {
         poll = (async () => {
           const response = await gateway.request('/internal/runtime/archive/pending', { method: 'GET', signal: abort.signal })
-          if (!response.ok) {
-            await response.body?.cancel()
-            throw new Error(`archive command probe rejected with HTTP ${String(response.status)}`)
-          }
+          requireArchiveResponse(response, 'archive command probe rejected')
           const value: unknown = await readGatewayResponseJson(response, 1024)
           if (value === null || typeof value !== 'object' || !('pending' in value) || typeof value.pending !== 'boolean') {
             throw new Error('archive command probe returned an invalid response')

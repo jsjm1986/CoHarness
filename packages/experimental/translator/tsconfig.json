@@ -43,6 +43,9 @@
     },
     {
       "path": "../../util/launch-environment"
+    },
+    {
+      "path": "../../settings/settings"
     }
   ]
 }

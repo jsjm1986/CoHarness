@@ -44,7 +44,7 @@ describe('conversation compact chrome', () => {
     expect(input).toContain('.primary')
     expect(input).toContain('.documentRail')
     expect(input).toContain('.documentStatus')
-    expect(input).toContain('width: 40px')
+    expect(input).toContain('width: var(--dsw-touch-target)')
     expect(input).toContain('width: 36px')
     expect(input).toContain('var(--dsw-mobile-icon-secondary)')
     expect(input).toContain('flex-wrap: wrap')
@@ -70,8 +70,8 @@ describe('conversation compact chrome', () => {
     expect(contextMeter).toContain('var(--dsw-mobile-sheet-radius)')
     const actions = readFileSync(fileURLToPath(new URL('../src/client/chat/MessageIconActions.module.css', import.meta.url)), 'utf8')
     expect(actions).toContain('flex-wrap: wrap')
-    // Compact drops to 40px targets (the composer's compromise): the full
-    // 44px touch target stays on coarse pointers that are not compact.
+    // Message actions retain their compact 40px geometry; coarse pointers
+    // outside the compact layout use the shared 44px target.
     expect(actions).toMatch(/@media\s*\(pointer:\s*coarse\)[^{]*\{[^@]*width:\s*var\(--dsw-touch-target\)/u)
     expect(actions).toMatch(/\[data-viewport='compact'\]\s*\)\s*\.action\s*\{[^}]*min-width:\s*40px/u)
     // Phone keeps the primary figure per stats pill; speed and cache-hit

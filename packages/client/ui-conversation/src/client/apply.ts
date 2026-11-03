@@ -6,6 +6,7 @@ import { resolveSlotLabel, type BoundActions } from '@deepseek-ai/dsh-client-ui-
 import {
   createSnapshotStore, resolveWorkspacePath, workspacePathForResource, workspaceResourceAddress, type ISessions, type SessionId,
   permissionAvailabilitySource, permissionUnavailableReason, commitSessionNavigation,
+  sessionPersistenceKey, parseClientSessionKey, runtimeTargetKey,
   type ObservableSnapshot, type ProjectUiPolicySnapshot,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
@@ -201,7 +202,29 @@ export function apply(ctx: Context): void {
   const t = ctx.locale.bind(NS)
 
   // Apply-time construction keeps store identity bound to this fiber.
-  const chatStore = createChatStore()
+  const persistenceListeners = new Set<() => void>()
+  const refreshPersistence = (): void => { for (const listener of [...persistenceListeners]) listener() }
+  ctx.effect(() => {
+    const stops = [connection.hostDescription.subscribe(refreshPersistence), sessions.list.subscribe(refreshPersistence)]
+    return () => { for (const stop of stops) stop() }
+  }, 'ui-conversation: chat persistence ownership')
+  ctx.inject(['projectUiPolicy'], inner => inner.effect(() => {
+    const stop = inner.projectUiPolicy.subscribe(refreshPersistence)
+    refreshPersistence()
+    return () => { stop(); refreshPersistence() }
+  }, 'ui-conversation: verified chat account'))
+  const chatStore = createChatStore({
+    key: (sessionId, intent) => {
+      const required = connection.hostDescription.getSnapshot()?.executionAuthorityRequired
+      const owner = sessionPersistenceKey(sessions, sessionId, required, ctx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId, intent)
+      if (owner === undefined) return undefined
+      return required === false ? `dsh.conversation.chat.${sessionId}` : `dsh.conversation.chat.scoped.v1.${encodeURIComponent(owner)}`
+    },
+    subscribe: (listener) => { persistenceListeners.add(listener); return () => { persistenceListeners.delete(listener) } },
+    onDispose: (dispose) => { ctx.effect(() => dispose, 'ui-conversation: persisted chat stores') },
+    readDraft: readPersistedDraft,
+    restoreDraft: (id, draft) => { inputHub.peek(id)?.setDraft(draft) },
+  })
   const conversationSettings = ctx.settingsScope.bind<ConversationSettings>({
     namespace: CONVERSATION_SETTINGS_NAMESPACE,
     source: 'account-or-host',
@@ -337,7 +360,7 @@ export function apply(ctx: Context): void {
 
   // The per-session input machine registry (SessionInputResolver face; published as
   // ctx.conversation.input by the service below sharing this one instance).
-  const inputHub = new InputHub(ctx, t)
+  const inputHub = new InputHub(ctx, t, id => chatStore.canRestoreDraft(id))
 
   // The composer-block registry: a plugin that knows a session cannot send —
   // ui-model-selection, when no adapter serves the session's route — raises a block
@@ -506,7 +529,7 @@ export function apply(ctx: Context): void {
     const sync = (): void => {
       const required = connection.hostDescription.getSnapshot()?.executionAuthorityRequired
       const account = inner.projectUiPolicy.getSnapshot().verifiedAccountId
-      viewport.setPersistenceScope(required === false ? 'local' : required === true && account !== undefined ? `account:${account}` : undefined)
+      viewport.setPersistenceScope(required === false ? 'local' : account !== undefined ? `account:${account}` : undefined)
     }
     const stopHost = connection.hostDescription.subscribe(sync)
     const stopIdentity = inner.projectUiPolicy.subscribe(sync)
@@ -537,6 +560,7 @@ export function apply(ctx: Context): void {
       'conversation.input.right': { kind: 'list', scope: 'session' },
       'conversation.hero.brand.mark': { kind: 'single', scope: 'root' },
       'conversation.hero.workspace': { kind: 'single', scope: 'root' },
+      'conversation.hero.context': { kind: 'list', scope: 'root' },
       'conversation.hero.agentPreset': { kind: 'single', scope: 'root' },
     },
     slots: {
@@ -550,45 +574,56 @@ export function apply(ctx: Context): void {
       },
       selectWorkspace: async (workspaceId, options: WorkspaceSelectionOptions = {}) => {
         const navigation = AbortSignal.any([sessions.beginNavigation(), lifetime.signal])
-        const nextId = await workspaces.openWorkspace(workspaceId)
-        if (navigation.aborted) return
-        const archived = (id: SessionId): boolean => sessions.list.getSnapshot().archivedById[id] !== undefined
+        const target = workspaces.runtimeForWorkspace?.(workspaceId)
+        const select = async (): Promise<void> => {
+          const nextId = await workspaces.openWorkspace(workspaceId)
+          if (navigation.aborted) return
+          if (target !== undefined && sessions.ensureSession !== undefined) {
+            const raw = sessions.runtimeIdentityFor?.(nextId) === undefined
+              ? parseClientSessionKey(nextId)?.sessionId : undefined
+            if (raw !== undefined && !await sessions.ensureSession(target, raw, navigation)) throw new Error(t('placeholder.unavailable'))
+          }
+          const archived = (id: SessionId): boolean => sessions.list.getSnapshot().archivedById[id] !== undefined
           || workspaces.list.getSnapshot().archivedSessionIds.includes(id)
-        if (archived(nextId)) throw new Error(t('placeholder.unavailable'))
-        await commitSessionNavigation(sessions, nextId, navigation, () => {
           if (archived(nextId)) throw new Error(t('placeholder.unavailable'))
-          sessions.open(nextId)
-          if (sessionId !== undefined && nextId !== sessionId) {
-            if (options.discardDraft === true) {
-              inputHub.discardDraft(sessionId)
-            } else {
+          await commitSessionNavigation(sessions, nextId, navigation, () => {
+            if (archived(nextId)) throw new Error(t('placeholder.unavailable'))
+            sessions.open(nextId)
+            if (sessionId !== undefined && nextId !== sessionId) {
+              if (options.discardDraft === true) {
+                inputHub.discardDraft(sessionId)
+              } else if (runtimeTargetKey(sessions.runtimeIdentityFor?.(sessionId) ?? { kind: 'personal' })
+              === runtimeTargetKey(sessions.runtimeIdentityFor?.(nextId) ?? { kind: 'personal' })) {
               // Carry the draft with its structured references and settled
               // attachments into the opened session; an in-flight document
               // upload cannot move without aborting it, so those stay behind.
-              const from = inputHub.shell(sessionId)
-              const to = inputHub.shell(nextId)
-              const draft = from.draftSnapshot()
-              const { imageIds, documentIds } = from.snapshot
-              if (imageIds.length === 0 || to.addImages(imageIds)) {
-                if (draft.text !== '' || draft.references.length > 0) {
-                  to.setDraft(draft)
-                  from.setDraft('')
+                const from = inputHub.shell(sessionId)
+                const to = inputHub.shell(nextId)
+                const draft = from.draftSnapshot()
+                const { imageIds, documentIds } = from.snapshot
+                if (imageIds.length === 0 || to.addImages(imageIds)) {
+                  if (draft.text !== '' || draft.references.length > 0) {
+                    to.setDraft(draft)
+                    from.setDraft('')
+                  }
+                  for (const id of imageIds) from.removeImage(id)
+                  const conversation = concreteConversation(ctx)
+                  const moved: DraftDocumentId[] = []
+                  for (const doc of conversation.documentStore(sessionId).getSnapshot()) {
+                    if (!documentIds.includes(doc.id) || doc.status !== 'ready' || doc.docId === undefined) continue
+                    const ref = { docId: doc.docId, name: doc.name, bytes: doc.bytes, mediaType: doc.mediaType }
+                    if (!conversation.attachDocument(nextId, ref)) continue
+                    from.removeDocument(doc.id)
+                    moved.push(doc.id)
+                  }
+                  conversation.releaseDraftDocuments(sessionId, moved)
                 }
-                for (const id of imageIds) from.removeImage(id)
-                const conversation = concreteConversation(ctx)
-                const moved: DraftDocumentId[] = []
-                for (const doc of conversation.documentStore(sessionId).getSnapshot()) {
-                  if (!documentIds.includes(doc.id) || doc.status !== 'ready' || doc.docId === undefined) continue
-                  const ref = { docId: doc.docId, name: doc.name, bytes: doc.bytes, mediaType: doc.mediaType }
-                  if (!conversation.attachDocument(nextId, ref)) continue
-                  from.removeDocument(doc.id)
-                  moved.push(doc.id)
-                }
-                conversation.releaseDraftDocuments(sessionId, moved)
               }
             }
-          }
-        })
+          })
+        }
+        if (target !== undefined && sessions.usingRuntime !== undefined) await sessions.usingRuntime(target, navigation, select)
+        else await select()
       },
       setDisplayWidth: (value) => { displaySettings.setWidth(value) },
     }),

@@ -1,11 +1,14 @@
 /** Deployment-owned file selection, combining database runtime ownership and provider records. */
 import { lstat } from 'node:fs/promises'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { readManagedDataPaths, registerManagedDataPath, type ManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import type { GatewayConfig } from '../config.ts'
 import { normalizeManagedRoots } from '../managed-files.ts'
+import { nodeControlPaths } from '../node-control-paths.ts'
 import { MaintenanceError, PostgresMaintenanceService } from './maintenance-service.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
+import { personalRuntimeLayout, type PersonalRuntimeStorageLayout } from '../runtime-layout.ts'
+import type { RuntimeId } from '../runtime-catalog.ts'
 
 interface RuntimeDataOwner {
   runtime: string
@@ -57,17 +60,24 @@ async function runtimeDataOwners(context: PostgresRuntimeContext, cfg: GatewayCo
   if (topology.rows[0]?.organizations !== '1' || topology.rows[0]?.nodes !== '1') {
     throw new MaintenanceError(409, 'backup-requires-data-bundles-from-every-database-node')
   }
-  const users = await context.pool.query<{ public_id: string; username: string; home_path: string; generation: number }>(
-    `SELECT u.public_id::text,u.username::text,u.home_path,COALESCE(i.generation,0) generation FROM harness.users u
-      LEFT JOIN harness.instances i ON i.user_id=u.id AND i.organization_id=u.organization_id
-      WHERE u.organization_id=$1 AND (i.assigned_node_id=$2 OR i.assigned_node_id IS NULL)`, [context.organizationId, context.nodeId])
+  const users = await context.pool.query<{ public_id: string; username: string; home_path: string; generation: number;
+    runtime_id: RuntimeId | null; storage_layout: PersonalRuntimeStorageLayout | null }>(
+    `SELECT u.public_id::text,u.username::text,COALESCE(account.home_path,u.home_path) home_path,
+      environment.id runtime_id,environment.storage_layout,COALESCE(i.generation,0) generation FROM harness.users u
+      LEFT JOIN harness.node_user_accounts account ON account.organization_id=u.organization_id AND account.user_id=u.id AND account.node_id=$2
+      LEFT JOIN harness.runtime_environments environment ON environment.organization_id=u.organization_id AND environment.owner_kind='user'
+        AND environment.owner_id=u.id AND environment.node_id=$2
+      LEFT JOIN harness.instances i ON i.runtime_id=environment.id AND i.organization_id=u.organization_id
+      WHERE u.organization_id=$1`, [context.organizationId, context.nodeId])
   const projects = await context.pool.query<{ public_id: string; local_path: string; generation: number }>(
     `SELECT p.public_id::text,m.local_path,COALESCE(i.generation,0) generation FROM harness.projects p
       JOIN harness.project_mounts m ON m.project_id=p.id AND m.organization_id=p.organization_id
       LEFT JOIN harness.instances i ON i.project_id=p.id AND i.organization_id=p.organization_id AND i.assigned_node_id=m.node_id
       WHERE p.organization_id=$1 AND m.node_id=$2`, [context.organizationId, context.nodeId])
   return [
-    ...users.rows.map(row => ({ runtime: `user:${row.public_id}`, dshHome: join(cfg.usersRoot, row.username, 'dsh'), home: row.home_path, generation: row.generation })),
+    ...users.rows.map(row => ({ runtime: row.storage_layout === 'isolated' ? `runtime:${row.runtime_id}` : `user:${row.public_id}`,
+      dshHome: personalRuntimeLayout(cfg, { username: row.username, ...(row.runtime_id === null ? {} : { runtimeId: row.runtime_id }),
+        storageLayout: row.storage_layout ?? 'legacy' }).dshHome, home: row.home_path, generation: row.generation })),
     ...projects.rows.map(row => ({ runtime: `project:${row.public_id}`, dshHome: join(cfg.projectRuntimesRoot, row.public_id, 'dsh'), home: row.local_path, generation: row.generation })),
   ]
 }
@@ -82,9 +92,60 @@ async function approvedRoots(cfg: GatewayConfig): Promise<ManagedDataPath[]> {
   return readManagedDataPaths(cfg.managedDataApprovalFile)
 }
 
+async function documentRoots(cfg: GatewayConfig): Promise<ManagedDataPath[]> {
+  const inventory = join(cfg.stateRoot, 'document-identity-roots.jsonl')
+  if (!await exists(inventory)) return []
+  const [file, parent] = await Promise.all([lstat(inventory), lstat(cfg.stateRoot)])
+  const owner = process.getuid?.()
+  if (!file.isFile() || file.isSymbolicLink() || !parent.isDirectory() || parent.isSymbolicLink()
+    || owner === undefined || file.uid !== owner || parent.uid !== owner
+    || (file.mode & 0o077) !== 0 || (parent.mode & 0o077) !== 0) {
+    throw new MaintenanceError(409, 'document-identity-inventory-must-be-gateway-owned')
+  }
+  const roots = readManagedDataPaths(inventory)
+  const domains = new Map<string, Set<string>>()
+  const retired = new Set<string>()
+  for (const row of roots) {
+    const control = /^gateway-document-(scope|retirement)\/([a-f0-9]{64})$/u.exec(row.owner)
+    if (control !== null) {
+      const directory = control[1] === 'scope' ? '.scope-bindings' : '.retired'
+      if (row.kind !== 'file' || resolve(row.path) !== resolve(cfg.stateRoot, 'document-identities', directory, `${control[2]}.json`)) {
+        throw new MaintenanceError(409, 'document-identity-control-location-changed')
+      }
+      if (control[1] === 'retirement') retired.add(control[2]!)
+      continue
+    }
+    const parsed = /^gateway-documents\/([a-f0-9]{64})\/(public|metadata|files)$/u.exec(row.owner)
+    if (parsed === null || row.kind !== 'directory') throw new MaintenanceError(409, 'document-identity-inventory-invalid')
+    const names = domains.get(parsed[1]!) ?? new Set<string>()
+    if (names.has(parsed[2]!)) throw new MaintenanceError(409, 'document-identity-inventory-ambiguous')
+    names.add(parsed[2]!); domains.set(parsed[1]!, names)
+    if (parsed[2] === 'metadata' && resolve(row.path) !== resolve(cfg.stateRoot, 'document-identities', parsed[1]!)) {
+      throw new MaintenanceError(409, 'document-identity-metadata-location-changed')
+    }
+  }
+  if ([...domains.values()].some(names => names.size !== 3)) throw new MaintenanceError(409, 'document-identity-inventory-incomplete')
+  if ([...retired].some(key => !domains.has(key))) throw new MaintenanceError(409, 'document-identity-inventory-incomplete')
+  return [{ owner: 'gateway-document-inventory', kind: 'file', path: inventory }, ...roots]
+}
+
 function ancestor(parent: string, child: string): boolean {
   const tail = relative(parent, child)
   return tail === '' || (!isAbsolute(tail) && tail !== '..' && !tail.startsWith(`..${sep}`))
+}
+
+async function applicationDataRoots(paths: ManagedDataPath[], configurations: readonly GatewayConfig[]): Promise<ManagedDataPath[]> {
+  const roots = await normalizeManagedRoots(paths)
+  const controls = await normalizeManagedRoots(configurations.flatMap(cfg => [
+    ...Object.values(nodeControlPaths(cfg.stateRoot)).map(path => ({ owner: 'node-process-control', kind: 'directory' as const, path })),
+    { owner: 'node-connection-control', kind: 'file' as const, path: cfg.nodeConnectionFile },
+    { owner: 'node-connection-control', kind: 'directory' as const, path: join(dirname(cfg.nodeConnectionFile), 'node-credentials') },
+  ]))
+  if (roots.some(root => controls.some(control => ancestor(control.path, root.path)
+    || root.kind === 'directory' && ancestor(root.path, control.path)))) {
+    throw new MaintenanceError(409, 'managed-data-root-overlaps-runtime-control')
+  }
+  return roots
 }
 
 async function validatedRuntimeRoot(row: ManagedDataPath, runtime: RuntimeDataOwner, approvals: ManagedDataPath[]): Promise<ManagedDataPath> {
@@ -137,6 +198,7 @@ export async function reviewedDeploymentInventory(context: PostgresRuntimeContex
     const value = await validatedRuntimeRoot(row, runtime, approvals)
     return { ...value, owner: row.owner }
   }))
+  await applicationDataRoots(canonical, [cfg])
   const inventory = join(runtime.dshHome, 'managed-data.jsonl')
   return { inventory, records: canonical }
 }
@@ -150,7 +212,9 @@ export async function reviewedDeploymentInventory(context: PostgresRuntimeContex
 export async function collectDeploymentData(context: PostgresRuntimeContext, cfg: GatewayConfig): Promise<ManagedDataPath[]> {
   const runtimes = await runtimeDataOwners(context, cfg)
   const approvals = await approvedRoots(cfg)
+  const documents = await documentRoots(cfg)
   const roots: ManagedDataPath[] = [
+    ...documents,
     { owner: 'gateway-principal', kind: 'directory', path: cfg.principalKeyDir },
     { owner: 'gateway-runtime-credentials', kind: 'directory', path: cfg.runtimeCredentialDir },
     { owner: 'gateway-tunnel-credentials', kind: 'file', path: cfg.tunnelCredentialKeyFile },
@@ -166,7 +230,9 @@ export async function collectDeploymentData(context: PostgresRuntimeContext, cfg
     const inventory = join(runtime.dshHome, 'managed-data.jsonl')
     if (!await exists(inventory)) {
       if (runtime.generation === 0 && !await exists(runtime.dshHome)
-        && !await exists(join(runtime.home, 'documents')) && !await exists(join(runtime.home, 'uploads'))
+        && (!await exists(join(runtime.home, 'documents')) || documents.some(row => row.owner.endsWith('/public')
+          && resolve(row.path) === resolve(runtime.home, 'documents')))
+        && !await exists(join(runtime.home, 'uploads'))
         && !await exists(join(runtime.home, '.dsh', 'external-members'))) continue
       throw new MaintenanceError(409, `managed-data-inventory-missing:${runtime.runtime}`)
     }
@@ -178,7 +244,7 @@ export async function collectDeploymentData(context: PostgresRuntimeContext, cfg
     }
     roots.push({ owner: `${runtime.runtime}/model-governance`, kind: 'directory', path: join(runtime.dshHome, 'model-governance-outbox') })
   }
-  return normalizeManagedRoots(roots)
+  return applicationDataRoots(roots, [cfg])
 }
 
 /** A prepared inventory keeps custom paths and database-owned workspaces in their existing locations. */
@@ -251,5 +317,5 @@ export async function planDeploymentDataRelocation(context: PostgresRuntimeConte
     .filter(key => current[key] !== next[key]).map(key => resolve(current[key]))
   const runtimeSources = owners.filter(owner => runtimes.some(runtime => runtime.runtime === owner.runtime && runtime.dshHome !== runtime.nextHome))
     .map(owner => resolve(owner.dshHome))
-  return { roots: await normalizeManagedRoots(mapped), copies, inventories, movements, configuredSources, runtimeSources }
+  return { roots: await applicationDataRoots(mapped, [current, next]), copies, inventories, movements, configuredSources, runtimeSources }
 }

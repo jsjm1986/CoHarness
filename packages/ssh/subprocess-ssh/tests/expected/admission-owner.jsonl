@@ -1,0 +1,10 @@
+{"kind":"process","phase":"prepare","change":"withdrawn","reason":"unavailable","starts":0,"created":false,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"kind":"process","phase":"prepare","change":"replaced","reason":"unavailable","starts":0,"created":false,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"kind":"process","phase":"connect","change":"withdrawn","reason":"unavailable","starts":0,"created":false,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"kind":"process","phase":"connect","change":"replaced","reason":"unavailable","starts":0,"created":false,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"kind":"terminal","phase":"prepare","change":"withdrawn","reason":"unavailable","starts":0,"created":false,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"kind":"terminal","phase":"prepare","change":"replaced","reason":"unavailable","starts":0,"created":false,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"kind":"terminal","phase":"connect","change":"withdrawn","reason":"unavailable","starts":0,"created":false,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"kind":"terminal","phase":"connect","change":"replaced","reason":"unavailable","starts":0,"created":false,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"kind":"process","phase":"prepare","change":"unchanged","reason":null,"starts":1,"created":true,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"kind":"terminal","phase":"prepare","change":"unchanged","reason":null,"starts":1,"created":true,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}

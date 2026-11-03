@@ -1,0 +1,14 @@
+{
+  "name": "native-search-coverage-enforced-current",
+  "cwd": ".",
+  "command": "pnpm exec vitest run packages/web/web-search-deepseek/tests scripts/coverage-baseline.spec.ts --coverage '--coverage.include=packages/web/web-search-deepseek/src/{admission,index}.ts' --coverage.reportsDirectory=.agents/audits/.local/native-search-coverage-enforced-current --coverage.reporter=text --coverage.reporter=json --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T03:38:13.488083+00:00",
+  "seconds": 15.865,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3be91457491ba87471ce39725681b096b2224e00588f036e3526080a8ae3042f",
+  "inputsAfter": "3be91457491ba87471ce39725681b096b2224e00588f036e3526080a8ae3042f",
+  "postgresToolDirectory": null,
+  "outputSha256": "a8c6c338fdc2eb49aad2596efcb1325f2c47344f683f911fd756f87134aa8df1",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  6 passed (6)\n      Tests  80 passed (80)\n   Start at  11:38:27\n   Duration  1.41s (transform 724ms, setup 148ms, import 1.04s, tests 295ms, environment 0ms)\n\n % Coverage report from v8\n--------------|---------|----------|---------|---------|-------------------\nFile          | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n--------------|---------|----------|---------|---------|-------------------\n--------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 58/58 )\nBranches     : 100% ( 37/37 )\nFunctions    : 100% ( 15/15 )\nLines        : 100% ( 50/50 )\n================================================================================\n"
+}

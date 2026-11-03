@@ -7,12 +7,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
 import * as Connection from '@deepseek-ai/dsh-client-connection'
+import { GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 import LocalCredentials from '@deepseek-ai/dsh-credentials-local'
 import LocalUserDocStore from '@deepseek-ai/dsh-userdoc-local'
 import * as UserDocHttp from '../src/index.ts'
@@ -27,7 +28,7 @@ afterEach(async () => {
   root = undefined
 })
 
-async function load(compression: 'none' | 'gzip' = 'none'): Promise<Context> {
+async function load(compression: 'none' | 'gzip' = 'none', catalog?: () => Promise<Response>): Promise<Context> {
   root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-http-loader-'))
   const uploads = join(root, 'uploads')
   const config = join(root, 'cordis.yml')
@@ -45,6 +46,7 @@ async function load(compression: 'none' | 'gzip' = 'none'): Promise<Context> {
     "- name: '@deepseek-ai/dsh-userdoc-local'",
     '  config:',
     `    uploadRoot: ${JSON.stringify(uploads)}`,
+    ...(catalog === undefined ? [] : ['- name: test-catalog']),
     "- name: '@deepseek-ai/dsh-host-userdoc-http'",
     '',
   ].join('\n'))
@@ -58,6 +60,14 @@ async function load(compression: 'none' | 'gzip' = 'none'): Promise<Context> {
     ['@deepseek-ai/dsh-client-connection', Connection],
     ['@deepseek-ai/dsh-userdoc-local', LocalUserDocStore],
     ['@deepseek-ai/dsh-host-userdoc-http', UserDocHttp],
+    ['test-catalog', { name: 'test-catalog', apply(ctx: Context) {
+      if (catalog === undefined) throw new Error('The catalog fixture requires its request callback.')
+      const runtime = Object.create(GatewayRuntime.prototype) as GatewayRuntime
+      Object.defineProperty(runtime, 'identity', { value: { kind: 'user', id: 7, generation: 1 } })
+      runtime.current = () => undefined
+      runtime.request = catalog
+      ctx.provide('gatewayRuntime', runtime)
+    } }],
   ])
   context.loader.internal = {
     version: 'v2',
@@ -100,6 +110,68 @@ function authenticatedFetch(ctx: Context, origin: string): typeof fetch {
 }
 
 describe('real Loader composition', () => {
+  it('retains an admitted document read while the owning HTTP plugin unloads', async () => {
+    const ctx = await load()
+    const origin = `http://127.0.0.1:${String(ctx.webServer.port)}`
+    const fetch = authenticatedFetch(ctx, origin)
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const original = LocalUserDocStore.prototype.list.bind(ctx.userDocs)
+    const reading = vi.spyOn(LocalUserDocStore.prototype, 'list').mockImplementation(async (signal) => {
+      entered.resolve(undefined)
+      await release.promise
+      return original(signal)
+    })
+    let stopped = false
+    const pending = fetch(`${origin}/api/documents`)
+    try {
+      await entered.promise
+      const entry = [...ctx.loader.entries()].find(item => item.options.name === '@deepseek-ai/dsh-host-userdoc-http')!
+      const stopping = entry.fiber!.dispose().then(() => { stopped = true })
+      expect((await fetch(`${origin}/api/documents`)).status).toBe(404)
+      expect(stopped).toBe(false)
+      release.resolve(undefined)
+      const response = await pending
+      expect(response.status).toBe(200)
+      expect(await response.json()).toMatchObject({ documents: [] })
+      await stopping
+    } finally {
+      release.resolve(undefined)
+      reading.mockRestore()
+      await pending
+    }
+  })
+
+  it('retains queued catalog delivery after removing the HTTP route', async () => {
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    let delivered = false
+    const ctx = await load('none', async () => {
+      entered.resolve(undefined)
+      await release.promise
+      delivered = true
+      return Response.json({ version: 1, accepted: 0 })
+    })
+    const origin = `http://127.0.0.1:${String(ctx.webServer.port)}`
+    const fetch = authenticatedFetch(ctx, origin)
+    try {
+      const listed = await fetch(`${origin}/api/documents`)
+      expect(listed.status).toBe(200)
+      expect(await listed.json()).toMatchObject({ documents: [] })
+      await entered.promise
+      let deliveredWhenStopped: boolean | undefined
+      const entry = [...ctx.loader.entries()].find(item => item.options.name === '@deepseek-ai/dsh-host-userdoc-http')!
+      const stopping = entry.fiber!.dispose().then(() => { deliveredWhenStopped = delivered })
+      expect((await fetch(`${origin}/api/documents`)).status).toBe(404)
+      expect(deliveredWhenStopped).toBeUndefined()
+      release.resolve(undefined)
+      await stopping
+      expect(deliveredWhenStopped).toBe(true)
+    } finally {
+      release.resolve(undefined)
+    }
+  })
+
   it('serves through Connection and removes the subtree when its owning plugin unloads', { timeout: 60_000 }, async () => {
     const ctx = await load()
     const origin = `http://127.0.0.1:${String(ctx.webServer.port)}`

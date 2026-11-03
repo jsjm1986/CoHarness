@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-lint-repaired",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/experimental/browser-use-stagehand-native/src/model.ts packages/experimental/browser-use-stagehand-native/src/index.ts packages/experimental/browser-use-stagehand-native/src/worker.ts packages/experimental/browser-use-stagehand-native/src/worker-client.ts packages/experimental/browser-use-stagehand-native/src/native.ts packages/experimental/browser-use-stagehand-native/tests/model.spec.ts packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts packages/experimental/browser-use-stagehand-native/tests/worker.spec.ts packages/experimental/browser-use-stagehand-native/tests/fixtures/stagehand.ts packages/experimental/browser-use-stagehand-native/tests/provider.spec.ts plugins/dsh-model-governance/tests/execution-billing.spec.ts snapshots/sdk/sdk.snapshot.ts",
+  "startedAt": "2026-10-23T18:38:19.557003+00:00",
+  "seconds": 5.282,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "inputsAfter": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

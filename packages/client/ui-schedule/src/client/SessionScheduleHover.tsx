@@ -13,7 +13,7 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-cli
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { formatScheduleFrequency, nextRunParts, orderScheduleRecords, taskName } from './schedule-format.ts'
 import {
-  useSessionScheduleFacts, type SessionScheduleCatalogObservable,
+  useRuntimeScheduleFacts, type SessionScheduleCatalogObservable,
 } from './session-schedule-state.ts'
 import { NS } from './locales.ts'
 import css from './SessionScheduleMark.module.css'
@@ -23,8 +23,8 @@ export const SESSION_HOVER_TASK_LIMIT = 2
 
 /** Injected share of the Session-row hover-card task section: the shared Host task catalog. */
 export interface SessionScheduleHoverInjected {
-  /** One catalog shared by every row; the renderer binds it to the `useCatalog` selector hook. */
-  readonly hooks: { readonly catalog: SessionScheduleCatalogObservable }
+  /** Runtime catalog resolved by the row's qualified Session identity. */
+  readonly keyedHooks: { readonly runtimeCatalog: (sessionId: string) => SessionScheduleCatalogObservable }
 }
 
 /** Full props of the Session-row hover-card task section. */
@@ -37,14 +37,14 @@ export type SessionScheduleHoverProps =
  * The reference clock is sampled once per mount: the card is a long-hover
  * preview, so its "next run" text must not drift while the pointer rests.
  * @param props.sessionId - Session this row shows.
- * @param props.useCatalog - selector hook over the shared Host task catalog.
+ * @param props.useRuntimeCatalog - keyed selector over the owning Runtime catalog.
  * @param props.t - Schedule catalog locale seat.
  * @returns the task rows plus an omission line, or nothing without an active task.
  */
 export function SessionScheduleHover({
-  sessionId, useCatalog, t,
+  sessionId, useRuntimeCatalog, t,
 }: SessionScheduleHoverProps) {
-  const facts = useSessionScheduleFacts(useCatalog, sessionId)
+  const facts = useRuntimeScheduleFacts(useRuntimeCatalog, sessionId)
   const [now] = useState(() => Date.now())
   if (!facts.hasActive) return null
   const ordered = orderScheduleRecords(facts.records, now)

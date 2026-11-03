@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-remote-baseline-final",
+  "cwd": ".",
+  "command": "git fetch origin --prune",
+  "startedAt": "2026-10-26T23:03:43.153494+00:00",
+  "seconds": 4.979,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "inputsAfter": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

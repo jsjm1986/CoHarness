@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-28-gateway-fixture-state-isolation.md
 document:
-  en: 6f326a5d351307712f27c5463b8494968b75c1c0
-  zh: cdd4e20cdd9efdf44c74788889906399ca7fb8e8
+  en: d51df57c70fd5adcfa48291cbb49dbf6f2479e49
+  zh: f276f8bd3a8dce71859f6ecc7fd2b49dd094d949
 /agent-note-gateway-fixture-state-isolation:
   en: 3f1939804f3a8039
   zh: 6a074e22b4b7b9b1
@@ -12,8 +12,8 @@ document:
   en: 26c84625d04f11b1
   zh: 70f045250f92e4a0
 /agent-note-gateway-fixture-state-isolation/decision:
-  en: 8d390dacf55cfbf6
-  zh: 1f60ec76f21c0c0e
+  en: f78f7304dec69239
+  zh: 603a81feb536d27d
 /agent-note-gateway-fixture-state-isolation/alternatives-considered:
   en: 1a8b8f7b0104a325
   zh: 9b8bdd6444c2014f

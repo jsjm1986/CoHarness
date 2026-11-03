@@ -1,0 +1,16 @@
+- id: llm-deepseek
+  disabled: true
+- id: tools
+  config:
+    mode: native
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, managedCodexModelReady]
+- insert:
+    - id: managed-codex-checkpoint
+      name: '@deepseek-ai/dsh-session-checkpoint-policy'
+    - id: managed-codex-subagents
+      name: '@deepseek-ai/dsh-subagent'
+    - id: managed-codex-fixture
+      name: '../managed-codex-model/plugin.mjs'
+      config:
+        persistentMember: true

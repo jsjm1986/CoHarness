@@ -1,0 +1,18 @@
+{
+  "headless": {
+    "reason": "headless",
+    "guidance": "This server has no detected graphical desktop.",
+    "logged": true,
+    "driverRegistered": false,
+    "authorityPublished": false,
+    "tools": []
+  },
+  "disabled": {
+    "reason": "disabled",
+    "guidance": "No computer-use desktop driver is enabled in this runtime.",
+    "logged": true,
+    "driverRegistered": false,
+    "authorityPublished": false,
+    "tools": []
+  }
+}

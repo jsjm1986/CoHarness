@@ -1,0 +1,14 @@
+{
+  "name": "archive-loader-and-admission-shaped-input",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent/tests/archive-admission.spec.ts packages/workflow/tool-workflow/tests/failure-loader.spec.ts",
+  "startedAt": "2026-10-26T09:09:22.989827+00:00",
+  "seconds": 5.422,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a4114e9b517bf396546e5aca0b759e80279bff3ea7e9aa38017d62016482b76b",
+  "inputsAfter": "a4114e9b517bf396546e5aca0b759e80279bff3ea7e9aa38017d62016482b76b",
+  "postgresToolDirectory": null,
+  "outputSha256": "0eca3f72f6e847e099826bc154f3e147be7d1ce49054c7470efaddb8a906ce5c",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/workflow/tool-workflow/tests/failure-loader.spec.ts (1 test | 1 failed) 907ms\n   × contains unrenderable background failures through the Loader and native workflow process 906ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/workflow/tool-workflow/tests/failure-loader.spec.ts > contains unrenderable background failures through the Loader and native workflow process\nError: Command failed: /Users/a1234/.nvm/versions/node/v25.8.1/bin/node --import file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/esm/index.mjs /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/workflow/tool-workflow/tests/fixtures/failure-driver.mjs src\n(node:91824) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\nWarning: Detected unsettled top-level await at /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/workflow/tool-workflow/tests/fixtures/failure-driver.mjs:172\n    await gate.entered.promise\n    ^\n\n\n\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 1 passed (2)\n      Tests  1 failed | 4 passed (5)\n   Start at  17:09:26\n   Duration  1.74s (transform 1.37s, setup 87ms, import 1.59s, tests 927ms, environment 0ms)\n\n"
+}

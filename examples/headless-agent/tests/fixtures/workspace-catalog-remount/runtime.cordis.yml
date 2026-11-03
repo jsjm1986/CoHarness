@@ -1,0 +1,7 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, workspaceCatalogRemountReady]
+- insert:
+    - id: workspace-catalog-remount-model
+      name: './model.mjs'

@@ -56,8 +56,24 @@ describe.skipIf(!built)('experimental Inspector built artifact', () => {
     const script = `
       const { startInspector } = await import('@deepseek-ai/dsh-experimental-inspector')
       const { default: WebSocket } = await import('ws')
+      const { default: assert } = await import('node:assert/strict')
       globalThis.__builtInspectorProbe = 42
-      const inspector = await startInspector({ port: 0, captureFetch: false, startupTimeoutMs: ${String(test.task.timeout)} })
+      const granted = Promise.withResolvers(), requested = Promise.withResolvers()
+      const permit = new AbortController()
+      let allocations = 0, completions = 0, ready = false
+      const opening = startInspector({ port: 0, captureFetch: false, startupTimeoutMs: ${String(test.task.timeout)} }, {
+        budget: { acquire(request) {
+          allocations++
+          assert.equal(request.kind, 'process')
+          assert.equal(request.origin, 'infrastructure')
+          requested.resolve()
+          return granted.promise
+        } },
+      }).then(handle => { ready = true; return handle })
+      await Promise.race([requested.promise, opening.then(() => { throw new Error('Worker bypassed admission') })])
+      assert.equal(ready, false)
+      granted.resolve({ signal: permit.signal, async release() { completions++ }, async uncertain() { throw new Error('Unexpected uncertain termination') } })
+      const inspector = await opening
       const socket = new WebSocket(inspector.endpoint.webSocketDebuggerUrl)
       try {
         await new Promise((resolve, reject) => {
@@ -83,6 +99,8 @@ describe.skipIf(!built)('experimental Inspector built artifact', () => {
       } finally {
         socket.terminate()
         await inspector.close()
+        assert.equal(allocations, 1)
+        assert.equal(completions, 1)
       }
     `
     const stdout = await run(process.execPath, ['--input-type=module', '-e', script], consumer)

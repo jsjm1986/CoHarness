@@ -1,0 +1,773 @@
+{
+  "findings": [
+    "B242"
+  ],
+  "status": "fixed_named_business_acceptance_verified_remaining_full_review_open",
+  "updatedAt": "2026-10-28T11:28:04.013930+00:00",
+  "scope": "Administrator default-directory creation and existing-directory import after authenticated actor revocation. This does not certify project deletion, runtime stop authorization or the concurrent new runtime directory feature.",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchedAt": "2026-10-28T11:22:21.640091+00:00",
+    "preExistingDirtyEditsPreserved": true
+  },
+  "negativeControls": {
+    "actualEmittedHttp": "10of12 stale actor role/account/membership/organization flows create/import with200; deleted acting accounts return400. All6 default-directory flows allocate a newly created directory, including the deleted actor. A wrongly accepted import occupies the path and causes the later current administrator request to conflict409. Imported bytes remain intact.",
+    "sqlite": "Demoted, disabled and deleted actors create both managed and imported projects; a different authenticated creator is also accepted. The first deleted-account fixtures incorrectly attempted to remove the only administrator and failed the last-admin safeguard; corrected two-administrator fixtures reproduce both deleted-actor failures.",
+    "authorityProof": "The fixture freezes the actual database-backed authentication result, commits revocation through the real service/database, then releases the HTTP request. Browser actor/creator body fields are deliberately spoofed."
+  },
+  "fixes": [
+    "The authenticated admin HTTP path passes its own actor id to create; supplied service actor and creator must match. Omitted actor remains explicitly trusted internal maintenance.",
+    "PostgreSQL retains the active account and organization membership, including the administrator role, before the node allocation lock. It checks organization availability after waiting and before resolving or allocating the administrator directory.",
+    "Administrator directory resolution happens inside the authorized insert transaction. The same caller-owned connection checks reserved paths, inserts the mount/membership and assigns the port. User-owned directory cleanup retains its uncertain-commit rule.",
+    "SQLite verifies current non-deleted administrator authority, resolves and checks the directory, and inserts under one immediate transaction. Authenticated user-owned creation retains its separate active-account check.",
+    "Register the new real HTTP replay in test:postgres and the additive-schema corpus guard."
+  ],
+  "acceptance": {
+    "sourceBeforeConcurrentEntryChanges": {
+      "testsPassed": 326,
+      "filesPassed": 16,
+      "skipped": 0,
+      "includes": [
+        "17 PostgreSQL authority, foreign creator and queue cases",
+        "9 SQLite creation/attribution cases",
+        "12 assembled administrator HTTP observations",
+        "existing account/invitation/membership/deletion and server/governance/Steward regressions"
+      ]
+    },
+    "sourceAfterConcurrentEntryChanges": {
+      "testsPassed": 80,
+      "filesPassed": 3,
+      "skipped": 0,
+      "scope": "Current source provisioning transcript, server and configuration tests; overlaps the326-case report and must not be summed as406 distinct cases."
+    },
+    "actualHttpObservationsPerRuntime": {
+      "total": 42,
+      "provisioning": 12,
+      "account": 11,
+      "invitation": 6,
+      "deletion": 1,
+      "administrator": 6,
+      "manager": 6
+    },
+    "plainNode22": "v22.22.1 all6 real HTTP transcripts passed before and after the common server/config changes",
+    "plainNode24": "v24.19.0 all6 real HTTP transcripts passed before and after the common server/config changes",
+    "sqlite": "37 source project cases and the existing plain-Node compiled invitation replay pass on host Node25.8.1, matching its installed native ABI. The existing real SQLite Gateway directory-import snapshot also passes. No Node22/24 native SQLite claim is made.",
+    "resultingState": [
+      "all12 revoked provisioning requests403",
+      "no catalog project, new administrator directory or success audit after refusal",
+      "exact403 failed-attempt audit",
+      "current administrator can create/import200 after the refusal",
+      "server-selected creator, admin origin and no fabricated owner",
+      "imported file bytes retained",
+      "admitted single-connection creation completes before queued role revocation; the subsequent attempt is refused",
+      "organization disablement during node-allocation waiting refuses creation without allocating a directory",
+      "response-read failure, lost commit acknowledgement and user directory rollback regressions retained"
+    ],
+    "scopedLint": "passed",
+    "gatewayNoEmitAtRecordedSnapshot": "passed",
+    "gatewayDirectBuildAtRecordedSnapshot": "passed",
+    "documentation": "3 bilingual pairs,20 quick gates, direct current-version guide/frontmatter/headings/triplet/416-word check and changed-path whitespace/newlines pass",
+    "schemaChanged": false,
+    "wireRequestFieldsChanged": false,
+    "sessionOrSdkChanged": false,
+    "liveModelApiCalled": false
+  },
+  "concurrentWork": {
+    "paths": [
+      "gateway/src/server.ts",
+      "gateway/src/config.ts",
+      "gateway/src/index.ts",
+      "gateway/src/runtime-catalog.ts",
+      "gateway/src/postgres/runtime-catalog.ts"
+    ],
+    "preserved": true,
+    "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-concurrent-source-before.json",
+    "observation": "After the initial passing326-case acceptance, unrelated runtime-directory additions changed the shared server/configuration. The80-case compatibility and both42-observation compiled replays pass on those entry changes. During that verification only postgres/runtime-catalog.ts changed; every project-fix source and the server/config/index files remained stable.",
+    "unsuccessfulAggregate": "project-provisioning-concurrent-acceptance intentionally exits1 for that external input movement despite all leaf checks passing. It is not relabeled as passing. Latest full Gateway noEmit/build were then run after the provider edit.",
+    "subsequentChangedInputs": {
+      "gateway/src/server.ts": {
+        "sha256": "defb33c6934e4c600ecc3f0b49854d3171e4f53ee0439e4bfffea0a6f08996b1",
+        "mtime": "2026-10-28T11:24:59.915378+00:00"
+      },
+      "gateway/src/runtime-catalog.ts": {
+        "sha256": "1e30b278499d05ab25a1be035ee828f85a41d5746fd25de051ec40891573de2d",
+        "mtime": "2026-10-28T11:24:59.913174+00:00"
+      },
+      "gateway/src/postgres/runtime-catalog.ts": {
+        "sha256": "fd8024518c523dc039ff6ac88cc498f3bfdc584f644aba02c1e24c5fb961602b",
+        "mtime": "2026-10-28T11:24:59.913624+00:00"
+      }
+    },
+    "remaining": "The independent runtime-directory feature itself is outside this named fix acceptance and remains to be audited. Further shared-entry edits after the recorded checks are explicitly unverified by those earlier results. No shared file was reverted."
+  },
+  "coverage": {
+    "report": "gateway/coverage/project-provisioning-20261028/coverage-summary.json",
+    "metrics": {
+      "total": {
+        "statements": 55.36,
+        "branches": 52.03,
+        "functions": 77.58,
+        "lines": 61.02
+      },
+      "gateway/src/admin-api.ts": {
+        "statements": 42.66,
+        "branches": 42.46,
+        "functions": 68.18,
+        "lines": 48.94
+      },
+      "gateway/src/projects.ts": {
+        "statements": 85.36,
+        "branches": 73.02,
+        "functions": 95.83,
+        "lines": 87.25
+      },
+      "gateway/src/server.ts": {
+        "statements": 57.81,
+        "branches": 54.94,
+        "functions": 65.9,
+        "lines": 61.98
+      },
+      "gateway/src/services.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "gateway/src/postgres/project-management-authority.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "gateway/src/postgres/project-service.ts": {
+        "statements": 80.78,
+        "branches": 74.35,
+        "functions": 88.23,
+        "lines": 87.6
+      }
+    },
+    "scope": "326-case diagnostic report before concurrent server/config changes. The current project-service, projects and admin-api hashes match the measured sources. services.ts received a documentation-only clarification with unchanged emitted JavaScript; server coverage is historical after its new routes were added.",
+    "remaining": "Whole classes and administrator/server dispatchers remain below100percent; this is not the CI100percent gate or complete-file review.",
+    "thresholdsLowered": false,
+    "exclusionsAdded": false
+  },
+  "notes": {
+    "updatedExisting": [
+      ".agents/notes/implemented/bug-fix/2026-10-23-project-creation-transactions.md"
+    ],
+    "new": [],
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false,
+    "reason": "Administrator authority before directory ownership extends the existing project creation transaction decision; current manager/credential authority remains independently active."
+  },
+  "currentNamedRegressions": [
+    "B232",
+    "B233",
+    "B234",
+    "B235",
+    "B236",
+    "B237",
+    "B238",
+    "B239",
+    "B240",
+    "B241"
+  ],
+  "unsuccessfulEvidencePreserved": [
+    "Both original before-fix actual HTTP receipts retain exit1 and all12 actual observations.",
+    "The first SQLite deleted cases hit the last-admin fixture error; corrected negative cases prove the actual defect.",
+    "The first repaired157-case run records156 passes and one reserved-directory refusal because the new import fixture selected a parent containing reserved paths. The corrected eligible child fixture passes all157; no product path safeguard was weakened.",
+    "The compatibility aggregate failed only its source-movement check; all individual test/build leaves passed, and the moving independent feature was preserved."
+  ],
+  "limitations": [
+    "All12 business domains and full-file coverage remain in progress.",
+    "Administrator project deletion must still be reviewed together with runtime stop admission and grant lifetimes.",
+    "The independent runtime-directory additions are preserved and are not declared fully audited.",
+    "No new speed benchmark, native Windows execution or model API success validation is claimed. Real model API validation remains user-deferred."
+  ],
+  "cleanup": {
+    "owned": true,
+    "name": "hgw-project-provision-791aa00e",
+    "database": "hgw_projects_test",
+    "productionPortExcluded": 5432,
+    "createdAt": "2026-10-28T11:10:07.633459+00:00",
+    "status": "stopped_and_removed_after_verification",
+    "id": "ae95908fddbe64e508cefad4ec5521dc29f446af9d13a222902bfa16eacff9b0",
+    "port": 60391,
+    "url": "postgresql://postgres@127.0.0.1:60391/hgw_projects_test",
+    "version": "PostgreSQL 18.6 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+    "cleanedAt": "2026-10-28T11:23:02.069678+00:00",
+    "productionDataAccessed": false,
+    "verifiedScopes": [
+      "B242"
+    ]
+  },
+  "commandReceipts": [
+    {
+      "name": "project-provisioning-before-emitted-negative",
+      "status": "failed",
+      "startedAt": "2026-10-28T11:10:57.801966+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:60391/hgw_projects_test",
+        "DSH_EXAMPLE_MODE=lib",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/project-provisioning-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T11:11:01.652310+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-before-emitted-negative.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-before-emitted-negative.log"
+    },
+    {
+      "name": "project-provisioning-before-emitted-observations",
+      "status": "failed",
+      "startedAt": "2026-10-28T11:12:08.724730+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-emitted-before-driver.py"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T11:12:11.283527+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-before-emitted-observations.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-before-emitted-observations.log"
+    },
+    {
+      "name": "project-provisioning-before-sqlite-negative",
+      "status": "failed",
+      "startedAt": "2026-10-28T11:12:15.505081+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/projects.spec.ts",
+        "--maxWorkers=2",
+        "-t",
+        "current SQLite administrator to provision|SQLite administrator creation attributed"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T11:12:17.018813+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-before-sqlite-negative.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-before-sqlite-negative.log"
+    },
+    {
+      "name": "project-provisioning-before-sqlite-deleted-negative",
+      "status": "failed",
+      "startedAt": "2026-10-28T11:12:37.741627+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/projects.spec.ts",
+        "--maxWorkers=2",
+        "-t",
+        "current SQLite administrator to provision.*deleted"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T11:12:38.780501+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-before-sqlite-deleted-negative.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-before-sqlite-deleted-negative.log"
+    },
+    {
+      "name": "project-provisioning-source-initial",
+      "status": "failed",
+      "startedAt": "2026-10-28T11:13:38.734103+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:60391/hgw_projects_test",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/project-service-postgres.spec.ts",
+        "tests/projects.spec.ts",
+        "tests/project-provisioning-transcript.spec.ts",
+        "tests/postgres-suite.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T11:13:50.794280+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-source-initial.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-source-initial.log"
+    },
+    {
+      "name": "project-provisioning-source-current",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:14:23.496602+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:60391/hgw_projects_test",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/project-service-postgres.spec.ts",
+        "tests/projects.spec.ts",
+        "tests/project-provisioning-transcript.spec.ts",
+        "tests/postgres-suite.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:14:36.650839+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-source-current.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-source-current.log"
+    },
+    {
+      "name": "project-provisioning-types-initial",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:14:48.040282+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:14:51.918190+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-types-initial.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-types-initial.log"
+    },
+    {
+      "name": "project-provisioning-final-acceptance",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:17:33.575096+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-project-provisioning.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:19:51.874554+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-acceptance.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-acceptance.log"
+    },
+    {
+      "name": "project-provisioning-final-build",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:17:58.379535+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--project",
+        "tsconfig.build.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:18:00.648627+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-build.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-build.log"
+    },
+    {
+      "name": "project-provisioning-final-doc-pairs",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:18:15.198117+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/tsx",
+        "scripts/verify-translation-pairing.ts",
+        "--write",
+        "gateway/README.md",
+        ".agents/notes/implemented/bug-fix/2026-10-23-project-creation-transactions.md",
+        "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.md"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:18:15.845947+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-doc-pairs.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-doc-pairs.log"
+    },
+    {
+      "name": "project-provisioning-final-doc-quick",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:18:15.874107+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "pnpm",
+        "run",
+        "test:docs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:19:51.865322+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-doc-quick.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-doc-quick.log"
+    },
+    {
+      "name": "project-provisioning-final-emitted-node22",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:18:00.681133+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:60391/hgw_projects_test",
+        "DSH_EXAMPLE_MODE=lib",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/project-provisioning-transcript.spec.ts",
+        "tests/project-account-admission-transcript.spec.ts",
+        "tests/project-invitation-admission-transcript.spec.ts",
+        "tests/project-deletion-transcript.spec.ts",
+        "tests/project-administration-transcript.spec.ts",
+        "tests/project-management-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:18:06.421748+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-emitted-node22.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-emitted-node22.log"
+    },
+    {
+      "name": "project-provisioning-final-emitted-node24",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:18:06.448604+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:60391/hgw_projects_test",
+        "DSH_EXAMPLE_MODE=lib",
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/project-provisioning-transcript.spec.ts",
+        "tests/project-account-admission-transcript.spec.ts",
+        "tests/project-invitation-admission-transcript.spec.ts",
+        "tests/project-deletion-transcript.spec.ts",
+        "tests/project-administration-transcript.spec.ts",
+        "tests/project-management-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:18:12.113305+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-emitted-node24.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-emitted-node24.log"
+    },
+    {
+      "name": "project-provisioning-final-emitted-sqlite-host",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:18:12.154728+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/sqlite-invitation-admission-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:18:12.762839+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-emitted-sqlite-host.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-emitted-sqlite-host.log"
+    },
+    {
+      "name": "project-provisioning-final-existing-snapshot",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:18:12.789152+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_SNAPSHOT_MAX_CONCURRENCY=1",
+        "pnpm",
+        "run",
+        "test:snapshot",
+        "gateway/tests/admin-project-directory.snapshot.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:18:15.168820+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-existing-snapshot.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-existing-snapshot.log"
+    },
+    {
+      "name": "project-provisioning-final-lint",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:17:33.626753+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_OXLINT_THREADS=1",
+        "node_modules/.bin/tsx",
+        "scripts/run-oxlint.ts",
+        "gateway/src/postgres/project-service.ts",
+        "gateway/src/projects.ts",
+        "gateway/src/services.ts",
+        "gateway/src/admin-api.ts",
+        "gateway/tests/project-service-postgres.spec.ts",
+        "gateway/tests/projects.spec.ts",
+        "gateway/tests/fixtures/project-provisioning.mjs",
+        "gateway/tests/project-provisioning-transcript.spec.ts",
+        "gateway/tests/postgres-suite.spec.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:17:35.145129+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-lint.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-lint.log"
+    },
+    {
+      "name": "project-provisioning-final-source-coverage",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:17:35.173855+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:60391/hgw_projects_test",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/project-service-postgres.spec.ts",
+        "tests/projects.spec.ts",
+        "tests/project-provisioning-transcript.spec.ts",
+        "tests/project-account-admission-transcript.spec.ts",
+        "tests/project-invitation-admission-transcript.spec.ts",
+        "tests/sqlite-invitation-admission-transcript.spec.ts",
+        "tests/project-deletion-transcript.spec.ts",
+        "tests/project-administration-transcript.spec.ts",
+        "tests/project-management-transcript.spec.ts",
+        "tests/admin-api.spec.ts",
+        "tests/project-model-settings.spec.ts",
+        "tests/model-governance-integration.spec.ts",
+        "tests/steward.spec.ts",
+        "tests/server.spec.ts",
+        "tests/postgres-suite.spec.ts",
+        "tests/postgres-test-database.spec.ts",
+        "--maxWorkers=2",
+        "--coverage",
+        "--coverage.include=src/projects.ts",
+        "--coverage.include=src/postgres/project-service.ts",
+        "--coverage.include=src/postgres/project-management-authority.ts",
+        "--coverage.include=src/services.ts",
+        "--coverage.include=src/admin-api.ts",
+        "--coverage.include=src/server.ts",
+        "--coverage.reportsDirectory=coverage/project-provisioning-20261028",
+        "--coverage.reporter=json",
+        "--coverage.reporter=json-summary",
+        "--coverage.reporter=text"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:17:54.780287+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-source-coverage.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-source-coverage.log"
+    },
+    {
+      "name": "project-provisioning-final-types",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:17:54.818749+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:17:58.350509+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-types.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-final-types.log"
+    },
+    {
+      "name": "project-provisioning-concurrent-acceptance",
+      "status": "failed",
+      "startedAt": "2026-10-28T11:21:31.139097+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-project-provisioning-concurrent.py"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T11:21:50.825435+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-concurrent-acceptance.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-concurrent-acceptance.log"
+    },
+    {
+      "name": "project-provisioning-concurrent-build",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:21:36.398059+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--project",
+        "tsconfig.build.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:21:38.735656+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-concurrent-build.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-concurrent-build.log"
+    },
+    {
+      "name": "project-provisioning-concurrent-emitted-node22",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:21:38.764865+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:60391/hgw_projects_test",
+        "DSH_EXAMPLE_MODE=lib",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/project-provisioning-transcript.spec.ts",
+        "tests/project-account-admission-transcript.spec.ts",
+        "tests/project-invitation-admission-transcript.spec.ts",
+        "tests/project-deletion-transcript.spec.ts",
+        "tests/project-administration-transcript.spec.ts",
+        "tests/project-management-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:21:44.693492+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-concurrent-emitted-node22.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-concurrent-emitted-node22.log"
+    },
+    {
+      "name": "project-provisioning-concurrent-emitted-node24",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:21:44.720859+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:60391/hgw_projects_test",
+        "DSH_EXAMPLE_MODE=lib",
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/project-provisioning-transcript.spec.ts",
+        "tests/project-account-admission-transcript.spec.ts",
+        "tests/project-invitation-admission-transcript.spec.ts",
+        "tests/project-deletion-transcript.spec.ts",
+        "tests/project-administration-transcript.spec.ts",
+        "tests/project-management-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:21:50.813519+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-concurrent-emitted-node24.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-concurrent-emitted-node24.log"
+    },
+    {
+      "name": "project-provisioning-concurrent-source",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:21:31.195418+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:60391/hgw_projects_test",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/project-provisioning-transcript.spec.ts",
+        "tests/server.spec.ts",
+        "tests/config.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:21:36.367691+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-concurrent-source.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-concurrent-source.log"
+    },
+    {
+      "name": "project-provisioning-concurrent-types",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:21:06.314031+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:21:10.083467+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-concurrent-types.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-concurrent-types.log"
+    },
+    {
+      "name": "project-provisioning-latest-types",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:23:02.097622+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:23:06.306402+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-latest-types.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-latest-types.log"
+    },
+    {
+      "name": "project-provisioning-latest-build",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:23:52.479864+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--project",
+        "tsconfig.build.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:23:54.408448+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-latest-build.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-latest-build.log"
+    },
+    {
+      "name": "project-provisioning-baseline-fetch",
+      "status": "passed",
+      "startedAt": "2026-10-28T11:22:17.887542+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "git",
+        "fetch",
+        "origin"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T11:22:21.640091+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-baseline-fetch.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-provisioning-baseline-fetch.log"
+    }
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "sourceSha256": {
+    "gateway/src/postgres/project-service.ts": "0577f05fa397e9f08a8f749de72139248788c54e115cb338d9e506cedae5a11a",
+    "gateway/src/projects.ts": "96b1a3d5fcb9b691dd110c2369b8b2cae233c95115455a6788abfc444dd14ef7",
+    "gateway/src/services.ts": "a694d863ad36900cb2d60044a959f621e7047a3902b93695e636a3f8fa74481d",
+    "gateway/src/admin-api.ts": "492581ab3dc0d4ca2d571b759c440e386fc07a912b36ba4eede965dd84f87311"
+  },
+  "validationSha256": {
+    "gateway/tests/project-service-postgres.spec.ts": "f3ea371fd5fbbad61e82baba021a569a73422dc1150cd705367a3ad557d4d3dc",
+    "gateway/tests/projects.spec.ts": "38d01bbe05b7b26a61a2faa05a49dc6e45b5b839af0dd705b2b5986502dd44cf",
+    "gateway/tests/project-provisioning-transcript.spec.ts": "2f280cf446089b0061b44616a379ad3df3d64e1cd06d158016d32e2203c3bf03",
+    "gateway/tests/fixtures/project-provisioning.mjs": "4318950d7eb37f7a078a84f1c2b01cbbfd4017d5205e6a83fb5204b8dd47530c",
+    "gateway/tests/expected/projects/provisioning.jsonl": "656b9c53b5366fb90da4afda710836c85399c380dfbd2fcea8568c1abc35d188",
+    "gateway/tests/postgres-suite.spec.ts": "ad5352cebbac2eb2075e7abbace391474859bdb91ba19b2897a3f283e7f6a245",
+    "gateway/package.json": "57982920f9fedace00a550316a15378b8ab188a052192c3b5333238951c5aeb7"
+  },
+  "documentationSha256": {
+    "gateway/README.md": "5fad14f74cc0d719c552fa6ba8a681d691729e1e7b09051e043a66e82d1ad1d1",
+    "gateway/README.zh.md": "c7e8e8f2b4be284f7757e9e8fb8e4adec1c490b2a23fc65809c02d638a0eab53",
+    "gateway/README.i18n.yaml": "6f250b5769031d8c625581ec7c77063242735ac08dac345e9fe097c92ff00a5f",
+    ".agents/notes/implemented/bug-fix/2026-10-23-project-creation-transactions.md": "cc361a36e9db4615352e5b199a01183464ee6aa182ff1ed34161a39b06b2b93e",
+    ".agents/notes/implemented/bug-fix/2026-10-23-project-creation-transactions.zh.md": "2f6298425508c1042ceca85d6fc2941b1411ccd2ec7435cbc55d4e5b102bbf4f",
+    ".agents/notes/implemented/bug-fix/2026-10-23-project-creation-transactions.i18n.yaml": "68c0975b346b9f460e9aaf2f3309cba1bf41c4b5c1c0bf79b9e76a8fa48d314a",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.md": "5ed8fafba2276b746e57173ac9292cf50b57e20a1099582c7941797726e26418",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.zh.md": "94aa9b105285ff4b44b52ac34cc3708c981d8cc5932904c74c83fb78344224e1",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.i18n.yaml": "0cd79d663958de9cb84bedc20726dafc654432bee01b644849cd33fa3f1a1521"
+  },
+  "verifiedRegressionEntrySha256": {
+    "gateway/src/server.ts": "cd29a28fc5cc068f1570db7804420bff0d33bfcd272eaf9877fcb7e2b1955ccc",
+    "gateway/src/config.ts": "21b531bc03e7f7e256146ca4e23377a9ba38ac9233fd846fc908acd13d5c44c7",
+    "gateway/src/index.ts": "d90a2a17fe8af3ff41ffee5d654e9491e4ec61cea7c4de20078c1c6c8df5fa35",
+    "gateway/src/runtime-catalog.ts": "1c963bd6b58c5901bd68d30ab6a982130d259a698f033ab37e2466168f699a18"
+  },
+  "currentRegressionEntrySha256": {
+    "gateway/src/server.ts": "defb33c6934e4c600ecc3f0b49854d3171e4f53ee0439e4bfffea0a6f08996b1",
+    "gateway/src/config.ts": "21b531bc03e7f7e256146ca4e23377a9ba38ac9233fd846fc908acd13d5c44c7",
+    "gateway/src/index.ts": "d90a2a17fe8af3ff41ffee5d654e9491e4ec61cea7c4de20078c1c6c8df5fa35",
+    "gateway/src/runtime-catalog.ts": "1e30b278499d05ab25a1be035ee828f85a41d5746fd25de051ec40891573de2d"
+  },
+  "emittedSha256": {
+    "gateway/lib/postgres/project-service.js": "3ac795c0f5e70800ac326e1eacf7026a83524b85897a15e2b089710bb8432064",
+    "gateway/lib/projects.js": "1cf7d3f9afb61bbdd7e32d6e71a9939978d8e74c1a9ead155472ab5b575d48eb",
+    "gateway/lib/services.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "gateway/lib/admin-api.js": "2cc91cd79ce859820a76f2f7d14e6482e049b252494f8551193bfe9782f05e93",
+    "gateway/lib/server.js": "7c2ebc69accd480048977991e72ab86c5b5d49cb9a80d11a434f0898b6fe47ac"
+  }
+}

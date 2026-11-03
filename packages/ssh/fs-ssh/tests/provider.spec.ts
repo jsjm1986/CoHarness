@@ -148,6 +148,27 @@ describe('SSH filesystem provider', () => {
     expect(dispatch.mock.calls.map(([method]) => method)).toEqual(['fs.stream', 'fs.next', 'fs.next', 'fs.next'])
   })
 
+  it.each(['return', 'throw'] as const)('leaves remote stream capacity unused after %s before the first pull', async (method) => {
+    const { fs, dispatch } = await setup()
+    dispatch.mockResolvedValue(streamId)
+    const iterator = (await fs.streamText(target))[Symbol.asyncIterator]()
+    const failure = new Error('discard unread stream')
+    if (method === 'return') expect(await iterator.return?.()).toEqual({ done: true, value: undefined })
+    else await expect(iterator.throw?.(failure)).rejects.toBe(failure)
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
+  it('refuses cancellation before the first pull without reserving a remote iterator', async () => {
+    const { fs, dispatch } = await setup()
+    dispatch.mockResolvedValue(streamId)
+    const controller = new AbortController()
+    const iterator = (await fs.streamText(target, controller.signal))[Symbol.asyncIterator]()
+    const failure = new Error('cancel unread stream')
+    controller.abort(failure)
+    await expect(iterator.next()).rejects.toBe(failure)
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
   it.each([false, true])('closes the remote iterator after an early consumer stop (close fails: %s)', async (closeFails) => {
     const { fs, dispatch } = await setup()
     dispatch.mockResolvedValueOnce(streamId).mockResolvedValueOnce({ done: false, value: 'first' })

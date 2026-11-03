@@ -1,0 +1,14 @@
+{
+  "name": "orchestration-consumers-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/session/session-checkpoint-policy/src/index.ts packages/session/session-checkpoint-policy/tests/session-checkpoint-policy.spec.ts packages/session/session-title/src/index.ts packages/session/session-title/tests/provider.spec.ts packages/test-support/llm-replay/src/index.ts packages/test-support/llm-replay/tests/llm-replay.spec.ts",
+  "startedAt": "2026-10-25T07:02:08.918873+00:00",
+  "seconds": 9.339,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ce2343a15ec32f7e49529f5f1f6a8091303d72eeba912e031852e378431efdbd",
+  "inputsAfter": "ce2343a15ec32f7e49529f5f1f6a8091303d72eeba912e031852e378431efdbd",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -1,0 +1,151 @@
+{
+  "recordedAt": "2026-10-29T21:28:29.974335+00:00",
+  "finding": "B333",
+  "status": "fixed_and_verified_for_named_scope",
+  "wholeProjectComplete": false,
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z",
+  "causalNegativeControl": "progress-node-affinity-negative-credit-complete.json",
+  "beforeSourceSha256": "5c503647e38f15e6fab5665457428a4cdcbfb47a55cd8e4a941fcee013e22f9a",
+  "migrationContext": "Negative control explicitly used the captured complete001-097 migration set while a peer-owned099 temporarily precedes missing098; final acceptance must use the restored current migration sequence.",
+  "coordination": "Requested one concrete migration-number reconciliation after actual runMigrations startup failure. B331 schema remains outside the shared source tree.",
+  "sourcePaths": [
+    "gateway/src/postgres/progress-service.ts",
+    "gateway/tests/fixtures/progress-node-affinity.mjs",
+    "gateway/tests/progress-node-affinity-transcript.spec.ts",
+    "gateway/tests/expected/progress-node-affinity.jsonl",
+    "gateway/package.json",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/README.i18n.yaml",
+    ".agents/notes/implemented/feature/2026-10-21-project-progress-journal.md",
+    ".agents/notes/implemented/feature/2026-10-21-project-progress-journal.zh.md",
+    ".agents/notes/implemented/feature/2026-10-21-project-progress-journal.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml"
+  ],
+  "checks": [
+    {
+      "name": "progress-node-current-source-transcript",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/progress-node-current-source-transcript.json"
+    },
+    {
+      "name": "progress-node-adjacent-coverage",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/progress-node-adjacent-coverage.json"
+    },
+    {
+      "name": "progress-node-private-build",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/progress-node-private-build.json"
+    },
+    {
+      "name": "progress-node-final-compiled22",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/progress-node-final-compiled22.json"
+    },
+    {
+      "name": "progress-node-final-compiled24",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/progress-node-final-compiled24.json"
+    },
+    {
+      "name": "progress-node-scoped-types",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/progress-node-scoped-types.json"
+    },
+    {
+      "name": "progress-node-full-types-final",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/progress-node-full-types-final.json"
+    },
+    {
+      "name": "progress-node-lint",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/progress-node-lint.json"
+    },
+    {
+      "name": "progress-node-fixture-lint-final",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/progress-node-fixture-lint-final.json"
+    },
+    {
+      "name": "progress-node-pairing",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/progress-node-pairing.json"
+    },
+    {
+      "name": "progress-node-docs",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/progress-node-docs.json"
+    },
+    {
+      "name": "progress-node-latest-fetch",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/progress-node-latest-fetch.json"
+    }
+  ],
+  "validation": {
+    "uniqueSelectedCases": 52,
+    "adjacentCases": 51,
+    "newTranscriptCases": 1,
+    "compiledPlainNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "transcriptEntries": 3,
+    "currentMigrations": "001-098, including the peer workspace catalog; each child database is allocated and dropped independently.",
+    "coverage": {
+      "lines": {
+        "total": 370,
+        "covered": 342,
+        "skipped": 0,
+        "pct": 92.43
+      },
+      "statements": {
+        "total": 442,
+        "covered": 385,
+        "skipped": 0,
+        "pct": 87.1
+      },
+      "functions": {
+        "total": 84,
+        "covered": 76,
+        "skipped": 0,
+        "pct": 90.47
+      },
+      "branches": {
+        "total": 334,
+        "covered": 276,
+        "skipped": 0,
+        "pct": 82.63
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "coverageLimit": "Partial file coverage measured by the two adjacent source suites. Child-process transcript correctness is verified separately; this is not a100% or whole-project coverage claim.",
+    "model": "Real local HTTP and production request/billing/admission services use a fixture-owned completion endpoint. No real provider credentials, public push or external model verification.",
+    "ownership": "Two logical computer identities on one macOS host use separate real node budgets and Gateway kernel owners. No new physical multi-host transport acceptance."
+  },
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/progress-node-final-source-artifact-hashes.json",
+  "initialFailures": {
+    "migrationGap": "Transient peer099 was renumbered098; no placeholder Session migration published.",
+    "fixtureProviderPrefix": "Corrected test provider to the registered org- prefix.",
+    "budgetObservation": "Negative control grants four actual node credits so both source candidates can reach the controlled endpoint; one-credit attempts remain preserved.",
+    "fullTypes": "Initial failure came from the peer workspace dependency being unlinked; full Gateway strict checking passed after that link appeared.",
+    "fixtureLint": "Moved final aggregate failure outside finally; final source/compiled snapshots preserve awaited cleanup."
+  },
+  "noteReview": {
+    "updatedExisting": "implemented/feature/2026-10-21-project-progress-journal.md",
+    "retainedActive": true,
+    "newNotes": 0,
+    "archivedOrDeletedNotes": 0,
+    "reason": "Existing journal decision continues to own inference authority, source privacy and immutable request evidence; fixed computer qualification extends that authority without superseding another active note."
+  },
+  "remaining": "B331/099 is still isolated and unpublished; remaining resource, permission, platform/transport and all original project domains remain in progress."
+}

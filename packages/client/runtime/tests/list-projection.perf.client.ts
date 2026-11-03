@@ -19,7 +19,7 @@ async function sample(): Promise<object> {
   const ids = Array.from({ length: ROWS }, (_, index) => `projection-${String(index)}` as SessionId)
   api.onList = async () => ok({ items: ids.map(sessionId => ({ sessionId, updatedAt: 1, running: false, blank: false })) })
   const connection: ConnectionHandle = {
-    api, isLoopback: true, interactions: 'none',
+    metadataTiming: { requestTimeoutMs: 15000, retryAfterMs: 10000 }, api, isLoopback: true, interactions: 'none',
     hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
     state: { getSnapshot: () => undefined, subscribe: () => () => {} },
     rpc: { call: () => Promise.reject(new Error('unexpected diagnostic RPC')) },

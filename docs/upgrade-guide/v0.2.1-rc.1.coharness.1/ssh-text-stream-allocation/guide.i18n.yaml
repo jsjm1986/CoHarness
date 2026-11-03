@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-text-stream-allocation/guide.md
+document:
+  en: 804feeb2bbda01c1a4e65cca339088b1481b3074
+  zh: a1fc0b18f27693aad848cfb377b06a5ca2dda8b5
+/:
+  en: aa61eb407a70f941
+  zh: dc0c7443b4d5f6de
+/consume-ssh-text-streams-before-allocating-remote-capacity:
+  en: 44ecc13852fdafa3
+  zh: 114ffb780346d4b9
+/consume-ssh-text-streams-before-allocating-remote-capacity/change:
+  en: 5a0bd33a92969116
+  zh: 814adc2c8278718f
+/consume-ssh-text-streams-before-allocating-remote-capacity/migration:
+  en: a0bde56c9a31fc25
+  zh: dc2ec2f0a6719cfb

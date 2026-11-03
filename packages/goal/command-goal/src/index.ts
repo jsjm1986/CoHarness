@@ -3,7 +3,7 @@
  * @module @deepseek-ai/dsh-command-goal
  */
 
-import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
+import { executionAuthorityOf, sameExecutionAuthority } from '@deepseek-ai/dsh-execution-authority'
 import type { Context } from '@deepseek-ai/cordis'
 import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
@@ -201,9 +201,16 @@ export function apply(ctx: Context): void {
       const command = parseGoalCommand(invocation.rawInput)
       if (command.kind !== 'create' && command.kind !== 'edit' && command.kind !== 'resume') return executeGoalCommand(ctx, invocation)
       const authority = executionAuthorityOf(ctx)
-      return authority === undefined ? executeGoalCommand(ctx, invocation)
+      const execute = () => {
+        invocation.signal.throwIfAborted()
+        if (!sameExecutionAuthority(executionAuthorityOf(ctx), authority)) {
+          throw new Error('The execution authority changed before applying the goal command.')
+        }
+        return executeGoalCommand(ctx, invocation)
+      }
+      return authority === undefined ? execute()
         : authority.runRequest(invocation.agent, { command: 'goal', input: invocation.rawInput, attachments: invocation.attachments },
-          () => executeGoalCommand(ctx, invocation))
+          execute)
     },
   })
 }

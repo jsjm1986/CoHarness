@@ -1,0 +1,14 @@
+{
+  "name": "pressure-bounds-gateway-types",
+  "cwd": "gateway",
+  "command": "npm run typecheck",
+  "startedAt": "2026-10-23T23:30:33.112676+00:00",
+  "seconds": 6.97,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a17b744fce0a67eea49049df5d1fc65e760349beb4915530596d0e173b527aea",
+  "inputsAfter": "a34b1ca90caedfcbe5b6b48df3aba655b6d88bd2a1a116a8daebc83cda11818d",
+  "postgresToolDirectory": null,
+  "outputSha256": "8fa1cf5506304e8abac55868e7f1a136c9b1dde57a3981a382da4c21ea129a6f",
+  "outputTail": "\n> typecheck\n> tsc --noEmit\n\n"
+}

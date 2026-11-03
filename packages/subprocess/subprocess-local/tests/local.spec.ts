@@ -442,7 +442,7 @@ describe('LocalSubprocessRuntime', () => {
     const inspector = {
       foregroundPgid: () => undefined,
       isStdinWaiting: () => false,
-      snapshot: () => ({ tree: () => [], session: () => [], alive: () => false }),
+      snapshot: () => ({ complete: true, tree: () => [], session: () => [], alive: () => false }),
       isAlive: () => false,
       signalGroup: () => {},
       signalProcess: () => {},
@@ -508,7 +508,7 @@ describe('LocalSubprocessRuntime', () => {
     const inspector = {
       foregroundPgid: () => undefined,
       isStdinWaiting: () => false,
-      snapshot: () => ({ tree: () => [], session: () => [], alive: () => false }),
+      snapshot: () => ({ complete: true, tree: () => [], session: () => [], alive: () => false }),
       isAlive: () => false,
       signalGroup: () => {},
       signalProcess: () => {},
@@ -598,6 +598,7 @@ describe('LocalSubprocessRuntime', () => {
       foregroundPgid: () => undefined,
       isStdinWaiting: () => false,
       snapshot: () => ({
+        complete: true,
         tree: () => [{ pid: 123, started: 'shell' }],
         session: () => [],
         alive: () => false,
@@ -735,7 +736,7 @@ describe('LocalSubprocessRuntime', () => {
       runtime.terminalInspector = {
         foregroundPgid: () => undefined,
         isStdinWaiting: () => false,
-        snapshot: () => ({ tree: () => [], session: () => [], alive: () => false }),
+        snapshot: () => ({ complete: true, tree: () => [], session: () => [], alive: () => false }),
         isAlive: () => false,
         signalGroup: () => {},
         signalProcess: () => {},
@@ -779,6 +780,7 @@ describe('LocalSubprocessRuntime', () => {
       foregroundPgid: () => undefined,
       isStdinWaiting: () => false,
       snapshot: () => ({
+        complete: true,
         tree: () => [{ pid: 123, started: 'shell' }],
         session: () => [],
         alive: () => false,
@@ -852,6 +854,7 @@ describe('LocalSubprocessRuntime', () => {
         foregroundPgid: () => 123,
         isStdinWaiting: () => false,
         snapshot: () => ({
+          complete: true,
           tree: () => [{ pid: 123, started: 'shell' }, { pid: 124, started: 'child' }],
           session: () => [],
           alive: identity => alive.has(identity.pid),
@@ -871,6 +874,8 @@ describe('LocalSubprocessRuntime', () => {
       expect((ctx.subprocess as unknown as { terminals: Set<SubprocessTerminalHandle> }).terminals.size).toBe(1)
       await fiber.dispose()
       expect(disposalErrors).toHaveLength(1)
+      alive.clear()
+      await handle.terminate()
     } finally {
       unmockLazyRequireForIsolatedRuntime()
       unmockWin32ForIsolatedRuntime()
@@ -881,7 +886,7 @@ describe('LocalSubprocessRuntime', () => {
   it('registers as ctx.subprocess and spawns managed handles', async () => {
     const ctx = new Context()
     const fiber = await ctx.plugin(LocalSubprocessRuntime)
-    const handle = ctx.subprocess.spawn(spec('echo managed'))
+    const handle = await ctx.subprocess.spawn(spec('echo managed'))
     expect(handle).not.toHaveProperty('pid')
     const result = await handle.done
     expect(result.exitCode).toBe(0)
@@ -898,7 +903,7 @@ describe('LocalSubprocessRuntime', () => {
     const runtime = ctx.subprocess as LocalSubprocessRuntime
     runtime.internals = { spillDir: removedDir }
     try {
-      const handle = runtime.spawn(spec('', {
+      const handle = await runtime.spawn(spec('', {
         argv: [process.execPath, '-e', 'process.stdout.write("x".repeat(4096))'],
         stdio: { stdin: 'ignore', stdout: { maxBytes: 16, spill: { maxBytes: 1_000_000 } }, stderr: 'pipe' },
       }))
@@ -925,8 +930,8 @@ describe('LocalSubprocessRuntime', () => {
     const runtime = ctx.subprocess as LocalSubprocessRuntime
     runtime.internals = { platform: 'darwin' }
     try {
-      const first = runtime.spawn(spec('true'))
-      const second = runtime.spawn(spec('true'))
+      const first = await runtime.spawn(spec('true'))
+      const second = await runtime.spawn(spec('true'))
       await Promise.all([first.done, second.done])
       expect(warning).toHaveBeenCalledOnce()
       expect(warning).toHaveBeenCalledWith(
@@ -1035,17 +1040,17 @@ describe('LocalSubprocessRuntime', () => {
       linuxRuntime.internals = { platform: 'linux' }
       const preparationFailure = new Error('spill directory unavailable')
       prepareManagedProcessBinding.mockImplementationOnce(() => { throw preparationFailure })
-      expect(() => linuxRuntime.spawn(spec('true'))).toThrow(preparationFailure)
+      await expect(linuxRuntime.spawn(spec('true'))).rejects.toThrow(preparationFailure)
       expect(launchLinuxScope).not.toHaveBeenCalled()
-      await linuxRuntime.spawn(spec('true')).done
+      await (await linuxRuntime.spawn(spec('true'))).done
       await new Promise(resolve => setImmediate(resolve))
-      await linuxRuntime.spawn(spec('true')).done
+      await (await linuxRuntime.spawn(spec('true'))).done
       await new Promise(resolve => setImmediate(resolve))
       expect(probeLinuxNative).toHaveBeenCalledOnce()
       expect(confirmLinuxManager).toHaveBeenCalledTimes(2)
       expect(launchLinuxScope).toHaveBeenCalledTimes(2)
       expect(launchLinuxScope).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), [])
-      await linuxRuntime.spawn(spec('true')).done
+      await (await linuxRuntime.spawn(spec('true'))).done
       expect(confirmLinuxManager).toHaveBeenCalledTimes(3)
       expect(spawnSubprocess).toHaveBeenCalledOnce()
       expect(warn).toHaveBeenCalledOnce()
@@ -1055,9 +1060,9 @@ describe('LocalSubprocessRuntime', () => {
       fibers.push(windowsFiber)
       const windowsRuntime = windowsContext.subprocess as InstanceType<typeof IsolatedLocalSubprocessRuntime>
       windowsRuntime.internals = { platform: 'win32' }
-      await windowsRuntime.spawn(spec('true')).done
+      await (await windowsRuntime.spawn(spec('true'))).done
       await new Promise(resolve => setImmediate(resolve))
-      await windowsRuntime.spawn(spec('true')).done
+      await (await windowsRuntime.spawn(spec('true'))).done
       await new Promise(resolve => setImmediate(resolve))
       expect(probeWindowsJob).toHaveBeenCalledTimes(2)
       expect(launchWindowsJob).toHaveBeenCalledTimes(2)
@@ -1132,18 +1137,18 @@ describe('LocalSubprocessRuntime', () => {
       runtime.internals = { platform: 'linux' }
       const settle = () => new Promise(resolve => setImmediate(resolve))
 
-      runtime.spawn(spec('true'))
-      runtime.spawn(spec('true'))
+      await runtime.spawn(spec('true'))
+      await runtime.spawn(spec('true'))
       scopeOutcomes[0]?.reject(new Error('scope target failed after starting'))
       await settle()
-      runtime.spawn(spec('true'))
+      await runtime.spawn(spec('true'))
       scopeOutcomes[1]?.reject(new LinuxScopeNotStartedError('scope never started'))
       await settle()
-      runtime.spawn(spec('true'))
+      await runtime.spawn(spec('true'))
       // A launch from the superseded probe keeps the newer verdict.
       scopeOutcomes[2]?.reject(new LinuxScopeNotStartedError('superseded launch'))
       await settle()
-      runtime.spawn(spec('true'))
+      await runtime.spawn(spec('true'))
 
       expect(probeLinuxNative).toHaveBeenCalledTimes(2)
       expect(launchLinuxScope.mock.calls.map(([, , literalArgv]) => literalArgv)).toEqual([[], [], []])
@@ -1234,7 +1239,7 @@ describe('LocalSubprocessRuntime', () => {
   it('disposal kills still-running processes and awaits their exit', async () => {
     const ctx = new Context()
     const fiber = await ctx.plugin(LocalSubprocessRuntime)
-    const handle = ctx.subprocess.spawn(spec('sleep 60'))
+    const handle = await ctx.subprocess.spawn(spec('sleep 60'))
     await fiber.dispose()
     const outcome = await handle.done
     // Windows teardown terminates through taskkill, which reports no signal.
@@ -1244,7 +1249,7 @@ describe('LocalSubprocessRuntime', () => {
   it('a settled process leaves the live set (disposal does not re-kill it)', async () => {
     const ctx = new Context()
     const fiber = await ctx.plugin(LocalSubprocessRuntime)
-    const handle = ctx.subprocess.spawn(spec('true'))
+    const handle = await ctx.subprocess.spawn(spec('true'))
     const outcome = await handle.done
     expect(outcome.exitCode).toBe(0)
     await fiber.dispose()
@@ -1282,7 +1287,7 @@ describe('LocalSubprocessRuntime', () => {
       fiber = await ctx.plugin(IsolatedLocalSubprocessRuntime)
       const runtime = ctx.subprocess as InstanceType<typeof IsolatedLocalSubprocessRuntime>
       runtime.internals = { platform: 'darwin' }
-      const spawned = runtime.spawn(spec('true', {
+      const spawned = await runtime.spawn(spec('true', {
         stdio: { stdin: 'ignore', stdout: 'inherit', stderr: 'inherit', control: 'pipe' },
       }))
       await spawned.done
@@ -1313,7 +1318,7 @@ describe('LocalSubprocessRuntime', () => {
   it('disposal tolerates a handle whose spawn already failed', async () => {
     const ctx = new Context()
     const fiber = await ctx.plugin(LocalSubprocessRuntime)
-    const handle = ctx.subprocess.spawn(spec('true', { cwd: '/nonexistent-dir-dsh-subprocess-test' }))
+    const handle = await ctx.subprocess.spawn(spec('true', { cwd: '/nonexistent-dir-dsh-subprocess-test' }))
     await expect(handle.done).rejects.toThrow()
     await fiber.dispose()
   })
@@ -1328,7 +1333,7 @@ describe('LocalSubprocessRuntime', () => {
     // that stops the bootstrap first settles as the requested termination —
     // the recorded failure only outranks the stop when it was published before
     // the stop landed.
-    const handle = ctx.subprocess.spawn(spec('true', { cwd: '/nonexistent-dir-dsh-subprocess-test' }))
+    const handle = await ctx.subprocess.spawn(spec('true', { cwd: '/nonexistent-dir-dsh-subprocess-test' }))
     await fiber.dispose()
     const settlement = await handle.done.then(
       outcome => ({ kind: 'stopped' as const, outcome }),
@@ -1346,8 +1351,10 @@ describe('LocalSubprocessRuntime', () => {
 
   it('loading a second implementation throws (one processes service per context — cordis standard)', async () => {
     const ctx = new Context()
-    await ctx.plugin(LocalSubprocessRuntime)
-    class SecondManager extends LocalSubprocessRuntime {}
-    await expect(ctx.plugin(SecondManager)).rejects.toThrow(/service "subprocess" has been registered/)
+    try {
+      await ctx.plugin(LocalSubprocessRuntime)
+      class SecondManager extends LocalSubprocessRuntime {}
+      await expect(ctx.plugin(SecondManager)).rejects.toThrow(/service "subprocess" has been registered/)
+    } finally { await ctx.fiber.dispose() }
   })
 })

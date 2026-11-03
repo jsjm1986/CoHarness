@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-cloudflare-protocol-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/cloudflare-api.spec.ts tests/tunnel-access.spec.ts tests/tunnel-supervisor.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T21:41:51.320951+00:00",
+  "seconds": 8.551,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "85a3be88b4ef44346cc37521ced85dd6030666608211c1f350f6bda0262e627f",
+  "inputsAfter": "85a3be88b4ef44346cc37521ced85dd6030666608211c1f350f6bda0262e627f",
+  "postgresToolDirectory": null,
+  "outputSha256": "9cd35320bd514a1e3637ed4d9ac96cb155f8c98c21cc18c73e6ec8e11a5ec869",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  29 passed (29)\n   Start at  05:41:53\n   Duration  6.29s (transform 85ms, setup 0ms, import 237ms, tests 6.10s, environment 0ms)\n\n"
+}

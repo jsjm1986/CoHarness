@@ -1,0 +1,7 @@
+{"type":"assistant","text":"Done."}
+{"type":"review","keys":["obsolete","original"]}
+{"type":"review","keys":["workspace-only"]}
+{"type":"tool-results","results":["No saved memory matches \"workspace-only\".","The requested memory scope is unavailable in this request.","The requested memory scope is unavailable in this request.","The requested memory scope is unavailable in this request.","The requested memory scope is unavailable in this request."]}
+{"type":"tool-results","results":["Deleted memory \"workspace-only\" in the workspace scope."]}
+{"type":"memory","keys":["obsolete","original"],"changedSince":0}
+{"type":"workspace-memory","keys":[],"changedSince":0}

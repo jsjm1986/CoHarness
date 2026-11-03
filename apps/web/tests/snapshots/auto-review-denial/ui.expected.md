@@ -6,8 +6,6 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - button "Feedback":
-    - img
   - button "Open right sidebar":
     - img
 - button "System prompt":
@@ -62,8 +60,6 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - button "Feedback":
-    - img
   - button "Open right sidebar":
     - img
 - button "System prompt":
@@ -128,8 +124,6 @@
   - tablist:
     - tab "Chat"
     - tab "Trajectory" [selected]
-  - button "Feedback":
-    - img
   - button "Open right sidebar":
     - img
 - toolbar "Trajectory toolbar":

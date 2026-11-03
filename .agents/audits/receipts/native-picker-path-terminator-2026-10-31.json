@@ -1,0 +1,278 @@
+{
+  "finding": "B364",
+  "status": "fixed_named_posix_native_path_scope",
+  "updatedAt": "2026-10-30T18:56:08.781758+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T182500Z",
+  "sourcePaths": [
+    "packages/host/directory-picker-native/src/native-picker.ts",
+    "packages/host/directory-picker-native/tests/native-picker.spec.ts",
+    "packages/host/directory-picker-native/tests/path-results.spec.ts",
+    "packages/host/directory-picker-native/tests/fixtures/path-results.mjs",
+    "packages/host/directory-picker-native/tests/expected/path-results.jsonl",
+    "packages/host/directory-picker-native/README.md",
+    "packages/host/directory-picker-native/README.zh.md",
+    "packages/host/directory-picker-native/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-path-terminator.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-path-terminator.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-path-terminator.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/host/directory-picker-native/src/native-picker.ts": "a9b6a374a59a1bae98cb8d5d9f08d9410b6283872b1368ce713c2096ea6c5e43",
+    "packages/host/directory-picker-native/tests/native-picker.spec.ts": "3f57414606d0df03f488515b109b453a20c1be06b85929197b3c5e462034bfd2",
+    "packages/host/directory-picker-native/tests/path-results.spec.ts": "7bac48b16972e7b9cce45709dd80f91c404e10eb40302f470a431fe8cdc4afb6",
+    "packages/host/directory-picker-native/tests/fixtures/path-results.mjs": "2af50ada75eaa47d8c9ce7111337bb93de69207aa1d2aaa21240b670ed0372a5",
+    "packages/host/directory-picker-native/tests/expected/path-results.jsonl": "e231aa2a92e4ddf1e54437c3c8b755d6137022ff5bfb0030ffe01735700d71f1",
+    "packages/host/directory-picker-native/README.md": "6b051cf6d1c29e4685fd6aaa709ce2d16261886bc908e2d08278159be07d8fde",
+    "packages/host/directory-picker-native/README.zh.md": "b2abeb8dcb84ef1659c8e616a3662d2d5f93a2c31101ff31a13ee441b984be47",
+    "packages/host/directory-picker-native/README.i18n.yaml": "cd8b106792245cc413bcb246f21a81e8bafb0354fb174ba8fbbbe463aec27b9c",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-path-terminator.md": "2603d5fbee704a4fe3c1af39fe5456979084fc1533bd2448b3f6fafd70a393b4",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-path-terminator.zh.md": "d0f35a0520330e9e4069ecda718c203dac4fa5ac16f91cea665dd3114e43395f",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-path-terminator.i18n.yaml": "2f485a9beb07c19a36d2567280e133d27367e82e7f39d5e681d9034a55667624"
+  },
+  "builtArtifact": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/host/directory-picker-native/lib/index.js",
+  "builtHash": "ff79c21da867616b41d31e9a32acab7cbaecce824026461dd38bd3fa8a87ddf8",
+  "repair": "Remove exactly one LF protocol terminator from POSIX chooser output. Preserve preceding carriage returns and newlines as filename characters; empty selection remains null. No Windows parser or GUI component changed.",
+  "causalEvidence": {
+    "native-picker-path-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T18:45:16.573581+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/host/directory-picker-native/tests/native-picker.spec.ts",
+        "-t",
+        "directory name ending",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T18:45:17.661422+00:00"
+    },
+    "native-picker-loader-path-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T18:46:36.503107+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/host/directory-picker-native/tests/path-results.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T18:46:38.496969+00:00"
+    }
+  },
+  "negativeWitness": "12 macOS/Zenity/KDialog adapter cases fail. A real Loader and production provider returns different nonexistent directories for LF, CR, CRLF and repeated-LF names; normal and cancellation controls pass.",
+  "verification": {
+    "uniqueSourceCases": 30,
+    "sourceFiles": 3,
+    "keylessRunnablePrograms": 1,
+    "goldenStages": 6,
+    "cases": [
+      "normal",
+      "LF",
+      "CR",
+      "CRLF",
+      "two-LF",
+      "cancel"
+    ],
+    "coverage": {
+      "file": "packages/host/directory-picker-native/src/native-picker.ts",
+      "statements": [
+        38,
+        38
+      ],
+      "branches": [
+        36,
+        36
+      ],
+      "functions": [
+        5,
+        5
+      ],
+      "lines": [
+        33,
+        33
+      ],
+      "allFourMetrics": 100,
+      "newExemptions": 0
+    },
+    "compiledMacNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "linuxReplay": {
+      "node": "22.22.1",
+      "platform": "linux/arm64",
+      "uid": 1000,
+      "imageId": "sha256:8094c002d08262dba12645a3b4a15cd6cd627d30bc782f53229a2ec13ee22a00",
+      "repositoryMount": "read-only",
+      "network": "none",
+      "ownedContainerRemoved": true
+    },
+    "repeatedReplaysAreNotNewCases": true,
+    "docQuickGates": 20,
+    "checks": {
+      "native-picker-path-source-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:48:24.471623+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/directory-picker-native/tests/native-picker.spec.ts",
+          "packages/host/directory-picker-native/tests/service.spec.ts",
+          "packages/host/directory-picker-native/tests/path-results.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/host/directory-picker-native/src/native-picker.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T182500Z/native-picker-path-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:48:35.268800+00:00"
+      },
+      "native-picker-path-pairing": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:52:30.779235+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "--write",
+          "packages/host/directory-picker-native/README.md",
+          ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-path-terminator.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:52:32.896758+00:00"
+      },
+      "native-picker-path-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:52:30.779246+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/host/directory-picker-native/src/native-picker.ts",
+          "packages/host/directory-picker-native/tests/native-picker.spec.ts",
+          "packages/host/directory-picker-native/tests/path-results.spec.ts",
+          "packages/host/directory-picker-native/tests/fixtures/path-results.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:52:33.141995+00:00"
+      },
+      "native-picker-path-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:53:36.829206+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/directory-picker-native/tests/path-results.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:53:40.037012+00:00"
+      },
+      "native-picker-path-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:53:36.831337+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/directory-picker-native/tests/path-results.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:53:39.682259+00:00"
+      },
+      "native-picker-path-built-linux22-executable-fixture": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:54:58.923205+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T182500Z/native-picker-linux-replay.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:54:59.307276+00:00"
+      },
+      "native-picker-path-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:53:13.318431+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:53:45.348146+00:00"
+      },
+      "native-picker-path-fixture-syntax": {
+        "status": "passed",
+        "startedAt": "2026-10-30T18:56:08.637881+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--check",
+          "packages/host/directory-picker-native/tests/fixtures/path-results.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T18:56:08.665409+00:00"
+      }
+    }
+  },
+  "fullBuild": {
+    "status": "seven_gates_passed_client_test_types_pending_peer",
+    "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T182500Z/native-picker-path-build.json",
+    "owner": "Architecture/client peer",
+    "failures": [
+      "personal-directory.client.spec.ts:142 mock callback tuple type",
+      "prepare-runtime.client.spec.ts:42 readonly forTarget assignment"
+    ],
+    "handoff": "One concrete handoff sent; root preserves peer client/runtime files."
+  },
+  "harnessCorrections": [
+    "Initial Linux replay failed because the test tmpfs disallowed its external chooser executable. The corrected private fixture mount permits execution; product confinement settings are unchanged.",
+    "Fixture reports actual Loader errors on failed startup.",
+    "A standalone mjs-only oxlint invocation found no eligible files. The owning TypeScript lint passed; final mjs syntax is checked separately."
+  ],
+  "documentation": {
+    "pairedStems": 2,
+    "nativeBackendReadmeCompositionCorrected": true,
+    "activeNotesRetained": [
+      "2026-07-27-native-workspace-directory-picker",
+      "2026-09-16-native-picker-stale-settlement-fence",
+      "2026-07-28-directory-picker-capability-seam"
+    ],
+    "fullySupersededActiveNotes": [],
+    "frozenArchivesEdited": false,
+    "upgradeGuide": "No configuration, export, wire or durable format break; valid POSIX path identity is restored."
+  },
+  "limits": [
+    "macOS uses the actual headless JXA string serializer; Linux replaces the interactive Zenity choice with an owned external Node executable. No physical GUI or Windows dialog acceptance is claimed.",
+    "The named parser reaches100percent; this is not whole-package or whole-project coverage. Native chooser lifecycle/resource ownership remains under review.",
+    "Full build is not yet green because peer-owned client test types fail; native/Host compiler/aggregate/bundles/Client compiler/Web gates pass.",
+    "Real paid model success and public push remain human-deferred. All12 original domains and B04/B25 stay in progress."
+  ],
+  "followupAcceptance": {
+    "at": "2026-10-30T19:05:14.419426+00:00",
+    "receipt": "receipts/native-picker-service-lifetime-2026-10-31.json",
+    "fullBuild": "all8gates_pass_after_peer_client_test_type_repairs",
+    "builtPathReplay": "Passes again with the lifetime repair underNode22/24.",
+    "priorFailureRecordPreserved": true
+  }
+}

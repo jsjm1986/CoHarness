@@ -1,0 +1,14 @@
+{
+  "name": "native-search-usage-postgres-current",
+  "cwd": "gateway",
+  "command": "node_modules/.bin/vitest run tests/postgres.spec.ts -t 'native search usage' --retry=0",
+  "startedAt": "2026-10-24T07:22:42.406700+00:00",
+  "seconds": 4.009,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a1cf540c5ac6e609e2ed0cdd098bc163bd0085028f11924608c9a15310e625df",
+  "inputsAfter": "a1cf540c5ac6e609e2ed0cdd098bc163bd0085028f11924608c9a15310e625df",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "a8d55214da46a15829fd4e8664b78acb802a5633462a01a138969bbb36f59412",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/postgres.spec.ts (41 tests | 2 failed | 39 skipped) 1255ms\n     × prices and deduplicates proved native search usage for the user subject 130ms\n     × prices and deduplicates proved native search usage for the project subject 102ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/postgres.spec.ts > PostgreSQL baseline > prices and deduplicates proved native search usage for the user subject\n FAIL  tests/postgres.spec.ts > PostgreSQL baseline > prices and deduplicates proved native search usage for the project subject\nerror: column \"estimated_cost_micros\" does not exist\n ❯ node_modules/.pnpm/pg-pool@3.14.0_pg@8.16.3/node_modules/pg-pool/index.js:45:11\n ❯ tests/postgres.spec.ts:351:22\n    349|         expect(await f.post(usage)).toEqual({ status: 200, body: { ins…\n    350|       }\n    351|       const result = await pool.query<{ purpose: string; credential_so…\n       |                      ^\n    352|         actor_user_id: string; user_id: string | null; estimated_cost_…\n    353|         SELECT purpose,credential_source,credential_class,actor_user_i…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 39 skipped (41)\n   Start at  15:22:43\n   Duration  3.23s (transform 1.54s, setup 0ms, import 1.88s, tests 1.25s, environment 0ms)\n\n"
+}

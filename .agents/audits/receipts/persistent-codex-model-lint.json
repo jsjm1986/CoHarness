@@ -1,0 +1,14 @@
+{
+  "name": "persistent-codex-model-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/eslint packages/llm/llm/src/index.ts packages/llm/llm/tests/orchestration.spec.ts packages/subagent/subagent/src/external.ts packages/subagent/subagent/tests/external-member-identity.spec.ts packages/subagent/subagent-codex/src/index.ts packages/subagent/subagent-codex/src/member.ts packages/subagent/subagent-codex/tests/member.spec.ts packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts packages/subagent/subagent-codex/tests/real-product.spec.ts",
+  "startedAt": "2026-10-25T06:28:30.203095+00:00",
+  "seconds": 1.265,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c10022da813a02168f93ced271a7e97a117ad6527773d9ad9432b80482effec2",
+  "inputsAfter": "c10022da813a02168f93ced271a7e97a117ad6527773d9ad9432b80482effec2",
+  "postgresToolDirectory": null,
+  "outputSha256": "07433ec4f264fcbea011cb736ce73cb5ee9afe467c58738003d111174fc1adeb",
+  "outputTail": "\nOops! Something went wrong! :(\n\nESLint: 10.5.0\n\nESLint couldn't find an eslint.config.(js|mjs|cjs) file.\n\nFrom ESLint v9.0.0, the default configuration file is now eslint.config.js.\nIf you are using a .eslintrc.* file, please follow the migration guide\nto update your configuration file to the new format:\n\nhttps://eslint.org/docs/latest/use/configure/migration-guide\n\nIf you still have problems after following the migration guide, please stop by\nhttps://eslint.org/chat/help to chat with the team.\n\n"
+}

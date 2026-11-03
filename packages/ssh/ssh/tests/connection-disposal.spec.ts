@@ -7,6 +7,7 @@ import { SshRpcPeer } from '../src/protocol.ts'
 import { SshConnection } from '../src/index.ts'
 
 const transport = vi.hoisted(() => ({ spawn: vi.fn(), execFile: vi.fn(), connect: vi.fn(), tlsConnect: vi.fn() }))
+vi.mock('@deepseek-ai/dsh-subprocess-local', async () => import('./fixtures/local-transport.ts'))
 vi.mock('node:child_process', async importOriginal => ({
   ...await importOriginal<typeof import('node:child_process')>(),
   spawn: transport.spawn,
@@ -44,9 +45,11 @@ class HelperChild extends EventEmitter {
   readonly stderr = new PassThrough()
   private stopped = false
   readonly signals: (string | undefined)[] = []
+  ignoreTerm = false
 
   kill(signal?: string): boolean {
     this.signals.push(signal)
+    if (this.ignoreTerm && signal !== 'SIGKILL') return true
     if (!this.stopped) {
       this.stopped = true
       queueMicrotask(() => { this.emit('close', 0, null) })
@@ -85,8 +88,9 @@ async function setup(phase: 'connect' | 'authenticate', pauseControl?: 'forward'
   ) => {
     const command = new HelperChild()
     if (pauseControl !== undefined && args.includes(pauseControl)) {
+      command.ignoreTerm = true
       controlChild = command
-      finishControl = () => { command.kill() }
+      finishControl = () => { command.kill('SIGKILL') }
       options.signal.addEventListener('abort', () => {
         callback(new Error('control command cancelled'), '', '')
         controlAborted.resolve(undefined)

@@ -1,0 +1,14 @@
+{
+  "name": "sonar-model-pipeline-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/web/web/src/index.ts packages/web/web/src/model-search.ts packages/web/web/tests/model-search.spec.ts packages/web/web-search-deepseek/src/admission.ts packages/web/web-search-deepseek/src/provider.ts packages/web/web-search-deepseek/src/usage.ts packages/web/web-search-perplexity/src/index.ts packages/web/web-search-perplexity/src/provider.ts packages/web/web-search-perplexity/src/types.ts packages/web/web-search-perplexity/tests/admission.spec.ts packages/web/web-search-perplexity/tests/prepared.spec.ts packages/llm/llm-pi-ai/src/adapter.ts packages/llm/llm-pi-ai/src/perplexity-operation.ts packages/llm/llm-pi-ai/tests/search-operation.spec.ts plugins/dsh-model-governance/tests/execution-billing.spec.ts examples/headless-agent/tests/governed-native-model.snapshot.ts examples/headless-agent/tests/fixtures/governed-native-model/plugin.mjs examples/headless-agent/tests/fixtures/governed-sonar-model/prepare.mjs scripts/gen-cordis-catalog.ts",
+  "startedAt": "2026-10-24T09:23:47.277114+00:00",
+  "seconds": 4.467,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cc99d8dd5ab56c67b813fe805d963e6f59ea8c91934d23db74f5edeb68225070",
+  "inputsAfter": "cc99d8dd5ab56c67b813fe805d963e6f59ea8c91934d23db74f5edeb68225070",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

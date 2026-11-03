@@ -21,9 +21,12 @@ import type {
   UserDocTarget,
   UserDocUploadChunk,
   UserDocUploadId,
+  UserDocUploadOwnerId,
   UserDocUploadSession,
   UserDocTrashPage,
   UserDocTrashRef,
+  UserDocSelection,
+  UserDocTrashSelection,
 } from '@deepseek-ai/dsh-userdoc'
 import { expandHomePath } from '@deepseek-ai/dsh-home-paths'
 import { LocalUserDocFs, SharedRead } from './local-fs.ts'
@@ -46,6 +49,10 @@ export {
   DEFAULT_UPLOAD_SESSION_TTL_MS,
   MAX_UPLOAD_TIMER_DELAY_MS,
 } from './upload.ts'
+
+export type { UserDocBackgroundWrite } from './upload.ts'
+export { verifyDocumentIdentityBackup, restoreDocumentIdentityBackup, recoverDocumentIdentityMount } from './backup.ts'
+export type { DocumentBackupEntry, DocumentMountRecoveryReference } from './backup.ts'
 
 export { DEFAULT_MEDIA_TYPE, mediaTypeFor } from './media-type.ts'
 export {
@@ -79,6 +86,7 @@ export {
 export { listTrash, purgeDocument, purgeDueDocuments, restoreDocument, trashDocument } from './trash.ts'
 export { LocalUserDocFs } from './local-fs.ts'
 export type { LocalUserDocFsOptions } from './local-fs.ts'
+export type { DocumentProjectionBatch, DocumentProjectionChange, DocumentProjectionCursor, DocumentProjectionReadOptions } from './projection.ts'
 
 /** Default document directory name below the runtime operating-system home. */
 export const DEFAULT_DOCUMENT_DIR_NAME = 'documents'
@@ -236,30 +244,33 @@ export class LocalUserDocStore extends UserDocStore {
     return saved
   }
 
-  async beginUpload(input: BeginUserDocUpload): Promise<UserDocUploadSession> {
-    return this.engine.beginUpload(input)
+  async beginUpload(input: BeginUserDocUpload, ownerId?: UserDocUploadOwnerId): Promise<UserDocUploadSession> {
+    return this.engine.beginUpload(input, ownerId)
   }
 
-  async inspectUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<UserDocUploadSession> {
-    return this.engine.inspectUpload(uploadId, signal)
+  async inspectUpload(uploadId: UserDocUploadId, signal?: AbortSignal, ownerId?: UserDocUploadOwnerId): Promise<UserDocUploadSession> {
+    return this.engine.inspectUpload(uploadId, signal, ownerId)
   }
 
   async writeUploadChunk(
     uploadId: UserDocUploadId,
     chunk: UserDocUploadChunk,
     signal?: AbortSignal,
+    ownerId?: UserDocUploadOwnerId,
   ): Promise<UserDocUploadSession> {
-    return this.engine.writeUploadChunk(uploadId, chunk, signal)
+    return this.engine.writeUploadChunk(uploadId, chunk, signal, ownerId)
   }
 
-  async completeUpload(uploadId: UserDocUploadId, sha256: string, signal?: AbortSignal): Promise<UserDocUploadSession> {
-    const completed = await this.engine.completeUpload(uploadId, sha256, signal)
+  async completeUpload(
+    uploadId: UserDocUploadId, sha256: string, signal?: AbortSignal, ownerId?: UserDocUploadOwnerId,
+  ): Promise<UserDocUploadSession> {
+    const completed = await this.engine.completeUpload(uploadId, sha256, signal, ownerId)
     if (completed.state === 'complete') this.invalidateReads()
     return completed
   }
 
-  async cancelUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<void> {
-    return this.engine.cancelUpload(uploadId, signal)
+  async cancelUpload(uploadId: UserDocUploadId, signal?: AbortSignal, ownerId?: UserDocUploadOwnerId): Promise<void> {
+    return this.engine.cancelUpload(uploadId, signal, ownerId)
   }
 
   async list(signal?: AbortSignal): Promise<UserDocRef[]> {
@@ -318,20 +329,22 @@ export class LocalUserDocStore extends UserDocStore {
     return operation.wait(signal)
   }
 
-  async trash(docId: UserDocId, signal?: AbortSignal): Promise<UserDocTrashRef> {
-    const trashed = await this.engine.trash(docId, signal)
+  async trash(docId: UserDocId, signal?: AbortSignal, expected?: UserDocSelection): Promise<UserDocTrashRef> {
+    const trashed = await this.engine.trash(docId, signal, expected)
     this.invalidateReads()
     return trashed
   }
 
-  async restore(docId: UserDocId, directoryId?: UserDocDirectoryId, name?: string, signal?: AbortSignal): Promise<UserDocRef> {
-    const restored = await this.engine.restore(docId, directoryId, name, signal)
+  async restore(
+    docId: UserDocId, directoryId?: UserDocDirectoryId, name?: string, signal?: AbortSignal, expected?: UserDocTrashSelection,
+  ): Promise<UserDocRef> {
+    const restored = await this.engine.restore(docId, directoryId, name, signal, expected)
     this.invalidateReads()
     return restored
   }
 
-  async purge(docId: UserDocId, signal?: AbortSignal): Promise<void> {
-    await this.engine.purge(docId, signal)
+  async purge(docId: UserDocId, signal?: AbortSignal, expected?: UserDocTrashSelection): Promise<void> {
+    await this.engine.purge(docId, signal, expected)
     this.invalidateReads()
   }
 
@@ -341,8 +354,10 @@ export class LocalUserDocStore extends UserDocStore {
     return created
   }
 
-  async renameDirectory(directoryId: UserDocDirectoryId, name: string): Promise<UserDocDirectoryRef> {
-    const renamed = await this.engine.renameDirectory(directoryId, name)
+  async renameDirectory(
+    directoryId: UserDocDirectoryId, name: string, expected?: readonly UserDocSelection[],
+  ): Promise<UserDocDirectoryRef> {
+    const renamed = await this.engine.renameDirectory(directoryId, name, expected)
     this.invalidateReads()
     return renamed
   }
@@ -352,8 +367,8 @@ export class LocalUserDocStore extends UserDocStore {
     this.invalidateReads()
   }
 
-  async move(docId: UserDocId, directoryId: UserDocDirectoryId): Promise<UserDocRef> {
-    const moved = await this.engine.move(docId, directoryId)
+  async move(docId: UserDocId, directoryId: UserDocDirectoryId, expected?: UserDocSelection): Promise<UserDocRef> {
+    const moved = await this.engine.move(docId, directoryId, expected)
     this.invalidateReads()
     return moved
   }
@@ -370,8 +385,8 @@ export class LocalUserDocStore extends UserDocStore {
     return this.engine.openRead(docId)
   }
 
-  async remove(docId: UserDocId, signal?: AbortSignal): Promise<void> {
-    await this.engine.remove(docId, signal)
+  async remove(docId: UserDocId, signal?: AbortSignal, expected?: UserDocSelection): Promise<void> {
+    await this.engine.remove(docId, signal, expected)
     this.invalidateReads()
   }
 }

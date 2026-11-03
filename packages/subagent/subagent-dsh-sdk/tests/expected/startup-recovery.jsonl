@@ -1,0 +1,2 @@
+{"phase":"rejected-start","rejected":true,"processExited":true,"publishedStarts":0,"occupied":1,"allocations":1}
+{"phase":"recovered-start","completedBeforeReplacement":true,"allocations":3,"occupied":0,"acknowledgements":3,"publishedStarts":1,"publishedEnds":1,"outcome":"completed"}

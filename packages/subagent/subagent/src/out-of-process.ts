@@ -22,6 +22,8 @@ import type {} from '@deepseek-ai/dsh-working-directory'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SubagentCapabilities, SubagentResult, SubagentRun, SubagentStopReason } from './types.ts'
 
+export { assertExternalModelExecution, requiresParentModelControl } from './external-model.ts'
+
 /** Maximum UTF-8 size of {@link SubagentResult.diagnostic}. */
 const MAX_SUBAGENT_DIAGNOSTIC_BYTES = 4_096
 
@@ -247,15 +249,15 @@ export interface SubprocessRunHandleParts {
   onAbort: () => void
   /** Settle local cancellation so {@link result} resolves without the child. */
   requestCancel: () => void
-  /** Tear the child process down to quiescence (backend-owned ladder). */
+  /** Tear the child down to quiescence; a rejected attempt can be called again by the same owner. */
   teardown: () => Promise<void>
 }
 
 /**
  * Publish the seam run handle for an out-of-process child. `dispose()` is
- * idempotent (one memoized teardown): it removes the abort listener, settles
+ * idempotent after success and shares pending teardown: it removes the abort listener, settles
  * local cancellation — there is no assumption the child cooperates — and then
- * awaits the backend's teardown to actual exit.
+ * awaits the backend's teardown to actual exit. A rejected teardown retains caller ownership and can retry.
  * @param parts - the run identity, result, cancellation wiring, and teardown.
  * @returns the seam run handle (`localAgent` is `undefined` for remote runs).
  */
@@ -269,7 +271,7 @@ export function subprocessRunHandle(parts: SubprocessRunHandleParts): SubagentRu
       if (disposal !== undefined) return disposal
       parts.signal.removeEventListener('abort', parts.onAbort)
       parts.requestCancel()
-      disposal = parts.teardown()
+      disposal = Promise.resolve().then(() => parts.teardown()).catch((error: unknown) => { disposal = undefined; throw error })
       return disposal
     },
   }

@@ -1,6 +1,6 @@
 /** Helper leases, stream ownership and request validation over the administrative wire. */
 import { createHash, randomUUID } from 'node:crypto'
-import { readFile, stat, writeFile } from 'node:fs/promises'
+import { readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { PassThrough } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { LocalFileSystem } from '@deepseek-ai/dsh-fs-local'
@@ -216,8 +216,12 @@ describe.skipIf(process.platform === 'win32')('SSH helper wire and lifecycle bou
       const rejected = expect(test.serving).rejects.toBe(failure)
       test.controller.abort()
       await rejected
-      await expect(stat(test.facts!.root)).rejects.toMatchObject({ code: 'ENOENT' })
-    } finally { close.mockRestore(); await expect(test.close()).rejects.toBe(failure) }
+      expect((await stat(test.facts!.root)).isDirectory()).toBe(true)
+    } finally {
+      close.mockRestore()
+      await expect(test.close()).rejects.toBe(failure)
+      await rm(test.facts!.root, { recursive: true, force: true })
+    }
   })
 
   it('routes process and terminal lifecycle operations while rejecting unknown ids', async () => {

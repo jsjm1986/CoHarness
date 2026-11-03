@@ -1,0 +1,316 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-28T15:53:33.461277+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "findings": [
+    "B249",
+    "B250"
+  ],
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "preExistingEditsPreserved": true,
+    "exactRevisions": "Retained only in external audit evidence."
+  },
+  "behavior": {
+    "personalPolicy": "Current eligible account/process identity and role after resident/maintenance admission; current facts also supplied to warm refresh. Account, membership, organization and local assignment withdrawal refuse eligibility.",
+    "allocation": "After node-pressure wait, recheck current username/home/role/status before LocalLauncher process allocation or systemd start. Changed policy rejects and publishes stopped; eligible fresh request rematerializes restricted policy.",
+    "errors": "Admin typed admission failures preserve readable error, add stable code and retain409/503/service status in both response and failed audit; no success event.",
+    "limits": "This names final-check admission semantics. Subsequent revocation uses existing invalidation/stop convergence; general administrator lifecycle authority and new device grants remain separate review. No schema/Session change."
+  },
+  "negativeEvidence": [
+    "runtime-personal-role-before:two actual SQLite/LocalLauncher regressions fail on old capacity/preparation behavior",
+    "runtime-personal-warm-before:old warm callback receives cached administrator role",
+    "runtime-personal-admission-http-typed-before:four actual authenticated API cases wrongly400",
+    "runtime-personal-policy-sqlite-http-source:actual preparation demotion rejected but Admin wrongly400 before error-mapper repair"
+  ],
+  "verification": {
+    "source": {
+      "cases": 294,
+      "files": 14,
+      "skips": 0
+    },
+    "realHttp": {
+      "sqliteScenarios": 3,
+      "postgresScenarios": 6,
+      "eligibleRestrictedRetries": 3,
+      "realLocalSupervisor": true,
+      "resourceRegistrationAndReadiness": "PostgreSQL child registers through authenticated production Runtime API and responds with credential-bound readiness proof.",
+      "observations": "Generated admin overlay and filesystem-root grant are observed from the actual child. Refused starts publish no child listener."
+    },
+    "compiled": {
+      "node22": "22.22.1; six PostgreSQL scenarios plus two restricted retries",
+      "node24": "24.19.0; six PostgreSQL scenarios plus two restricted retries",
+      "hostSqlite": "25.8.1; three scenarios plus one restricted retry",
+      "buildInputs": "Gateway source fingerprints unchanged during build; exact inputs/artifact hashes retained externally.",
+      "peerOverlay": "Node channel/service development remains unaccepted and is not part of these feature claims."
+    },
+    "docs": "20 passed,0failed,0skipped",
+    "commands": [
+      {
+        "name": "runtime-personal-policy-source-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-28T15:46:18.382472+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/instances.spec.ts",
+          "tests/admin-api.spec.ts",
+          "tests/runtime-personal-policy-postgres.spec.ts",
+          "tests/runtime-personal-policy-transcript.spec.ts",
+          "tests/instance-capacity-postgres.spec.ts",
+          "tests/node-resource-budget-postgres.spec.ts",
+          "tests/runtime-stop-lease-postgres.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "tests/proxy.spec.ts",
+          "tests/launcher.spec.ts",
+          "tests/systemd.spec.ts",
+          "tests/user-service-postgres.spec.ts",
+          "tests/user-administration-transcript.spec.ts",
+          "tests/project-removal-transcript.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=src/instances.ts",
+          "--coverage.include=src/postgres/instance-repository.ts",
+          "--coverage.include=src/admin-api.ts",
+          "--coverage.reportsDirectory=coverage/personal-runtime-authority-current-20261028",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T15:46:54.768102+00:00"
+      },
+      {
+        "name": "runtime-personal-policy-build-current",
+        "status": "passed",
+        "startedAt": "2026-10-28T15:44:50.028948+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.build.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T15:44:54.462736+00:00"
+      },
+      {
+        "name": "runtime-personal-policy-postgres-built-node22",
+        "status": "passed",
+        "startedAt": "2026-10-28T15:45:19.460634+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-runtime-personal-policy.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "lib",
+          "postgres"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T15:45:24.295118+00:00"
+      },
+      {
+        "name": "runtime-personal-policy-postgres-built-node24",
+        "status": "passed",
+        "startedAt": "2026-10-28T15:45:24.331801+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-runtime-personal-policy.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "lib",
+          "postgres"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T15:45:28.909293+00:00"
+      },
+      {
+        "name": "runtime-personal-policy-sqlite-built-host",
+        "status": "passed",
+        "startedAt": "2026-10-28T15:45:28.943972+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-runtime-personal-policy.py",
+          "node",
+          "lib",
+          "sqlite"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T15:45:31.385647+00:00"
+      },
+      {
+        "name": "runtime-personal-policy-types-final",
+        "status": "passed",
+        "startedAt": "2026-10-28T15:48:32.306210+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T15:48:37.405714+00:00"
+      },
+      {
+        "name": "runtime-personal-policy-lint-current",
+        "status": "passed",
+        "startedAt": "2026-10-28T15:48:32.306152+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "gateway/src/instances.ts",
+          "gateway/src/postgres/instance-repository.ts",
+          "gateway/src/admin-api.ts",
+          "gateway/tests/instances.spec.ts",
+          "gateway/tests/admin-api.spec.ts",
+          "gateway/tests/runtime-personal-policy-postgres.spec.ts",
+          "gateway/tests/runtime-personal-policy-transcript.spec.ts",
+          "gateway/tests/fixtures/runtime-personal-policy.mjs",
+          "gateway/tests/fixtures/personal-runtime-carrier.mjs",
+          "gateway/tests/postgres-suite.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T15:48:34.453238+00:00"
+      },
+      {
+        "name": "runtime-personal-policy-docs-current",
+        "status": "passed",
+        "startedAt": "2026-10-28T15:49:35.904149+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T15:51:05.380735+00:00"
+      }
+    ]
+  },
+  "coverage": {
+    "total": {
+      "lines": {
+        "total": 1889,
+        "covered": 1214,
+        "skipped": 0,
+        "pct": 64.26
+      },
+      "statements": {
+        "total": 2410,
+        "covered": 1386,
+        "skipped": 0,
+        "pct": 57.51
+      },
+      "functions": {
+        "total": 174,
+        "covered": 146,
+        "skipped": 0,
+        "pct": 83.9
+      },
+      "branches": {
+        "total": 2143,
+        "covered": 1102,
+        "skipped": 0,
+        "pct": 51.42
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "gateway/src/admin-api.ts": {
+      "lines": {
+        "total": 1183,
+        "covered": 573,
+        "skipped": 0,
+        "pct": 48.43
+      },
+      "functions": {
+        "total": 45,
+        "covered": 29,
+        "skipped": 0,
+        "pct": 64.44
+      },
+      "statements": {
+        "total": 1589,
+        "covered": 669,
+        "skipped": 0,
+        "pct": 42.1
+      },
+      "branches": {
+        "total": 1581,
+        "covered": 667,
+        "skipped": 0,
+        "pct": 42.18
+      }
+    },
+    "gateway/src/instances.ts": {
+      "lines": {
+        "total": 590,
+        "covered": 547,
+        "skipped": 0,
+        "pct": 92.71
+      },
+      "functions": {
+        "total": 94,
+        "covered": 90,
+        "skipped": 0,
+        "pct": 95.74
+      },
+      "statements": {
+        "total": 686,
+        "covered": 618,
+        "skipped": 0,
+        "pct": 90.08
+      },
+      "branches": {
+        "total": 455,
+        "covered": 368,
+        "skipped": 0,
+        "pct": 80.87
+      }
+    },
+    "gateway/src/postgres/instance-repository.ts": {
+      "lines": {
+        "total": 116,
+        "covered": 94,
+        "skipped": 0,
+        "pct": 81.03
+      },
+      "functions": {
+        "total": 35,
+        "covered": 27,
+        "skipped": 0,
+        "pct": 77.14
+      },
+      "statements": {
+        "total": 135,
+        "covered": 99,
+        "skipped": 0,
+        "pct": 73.33
+      },
+      "branches": {
+        "total": 107,
+        "covered": 67,
+        "skipped": 0,
+        "pct": 62.61
+      }
+    }
+  },
+  "remaining": [
+    "All twelve domains remain in_progress; inventory is not evidence of review.",
+    "Affected instance, PostgreSQL repository and Admin modules still have per-file coverage debt; no threshold was lowered.",
+    "Live model API verification remains human-deferred.",
+    "Existing-node supervision checks do not validate remote transport or native Windows."
+  ]
+}

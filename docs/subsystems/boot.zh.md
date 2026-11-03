@@ -20,6 +20,10 @@
 
 `PluginManagementCapability` 将操作分为 `read`（对任何能到达服务的调用者开放）与 `manage`（由部署的授权策略判定）。`PluginManagementAccess` 报告调用者的 `manage` 授权，界面可据此门控控件而无需试探写入。
 
+`ParsedInstallSpec` 保留提交的 `spec`，并区分 registry、path、tarball 和 git 来源。registry 来源包含 `name` 和可选的 `range`；path 来源包含 `path`；tarball 包含可选的 `path` 或 `host`；git 来源包含 `host`。安装授权可以在包操作开始前限制实际的获取来源。
+
+`PluginConfigValue` 是递归 JSON 值。`PluginConfigDescription.config` 包含条目配置，未声明时为 `null`；可选的 `schema` 包含插件的 Schemastery `toJSON` 序列化结果，供配置表单使用。
+
 `PluginDesiredState` 是部署对一个 profile 的期望组成：键集限于 `id`、`name`、`disabled` 的逐字 patch `entries`，加上有序的 `bundles` 选择。`PluginDesiredStateSnapshot` 将已存状态与存储的乐观并发 `revision` 配对（未保存时为 `'0'`），`PluginDesiredStatePublish` 以新 revision 应答 `applied`，或以存储当前快照应答 `conflict`。
 
 ## Profile 重新组合
@@ -119,6 +123,17 @@ Deployment-owned authority for current-profile management.
 authorize(capability?: PluginManagementCapability): Promise<void>
 
 /**
+ * Gate one installable spec by its form before pnpm runs. Present only in
+ * deployments that restrict install sources; absent means any spec form is
+ * acceptable. The parsed spec, not the raw string, reaches the policy so a
+ * URL spelled several ways cannot slip past a host rule.
+ * @param spec - the parsed install spec.
+ * @returns After the deployment permits the source; rejects with
+ * 'plugin-management/install-source' otherwise.
+ */
+authorizeInstall?(spec: ParsedInstallSpec): Promise<void>
+
+/**
  * Read the profile's saved desired state. Present only in deployments with
  * a durable state store; standalone profiles manage files directly.
  * @returns the store's current snapshot.
@@ -202,6 +217,24 @@ async authorize(capability: PluginManagementCapability = 'manage'): Promise<void
  * @returns Saved and runtime outcomes, including higher-priority overrides.
  */
 @Remote async setPluginEnabled(id: PluginEntryId, enabled: boolean): Promise<ChangeResult>
+
+/** Read one plugin row's current config and its schema, when the module declares one.
+ * The schema serializes through schemastery `toJSON` for form rendering;
+ * modules without a `Config` schema report `schema: undefined`.
+ * @param id Loader entry identity returned by listPlugins.
+ * @returns The entry's declared config and its JSON-serialized schema.
+ */
+@Remote async describePluginConfig(id: PluginEntryId): Promise<PluginConfigDescription>
+
+/** Replace one plugin row's config in the profile patch, validated against its schema.
+ * `config: null` clears all matching profile config overrides so composition defaults apply. The loader
+ * rejects a failing schema at reload as well; validating here first reports a
+ * readable error instead of a broken reload.
+ * @param id Loader entry identity returned by listPlugins.
+ * @param config JSON-serializable config object, or `null` to clear the override.
+ * @returns Saved and runtime outcomes.
+ */
+@Remote async setPluginConfig(id: PluginEntryId, config: PluginConfigValue | null): Promise<ChangeResult>
 
 /** Select or remove a bundle layer while retaining installed dependencies.
  * @param name Bundle package name.

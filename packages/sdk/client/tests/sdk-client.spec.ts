@@ -5,13 +5,16 @@
  * and session-tree scoping, error surfaces, timeouts, and the dispose ladder.
  */
 
-import { mkdir, mkdtemp, readFile, realpath, rm, stat } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ChildProcess, execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import {
   DeepSeekHarness,
+  HarnessClient,
   HarnessSession,
   JsonRpcResponseError,
   RequestTimeoutError,
@@ -56,7 +59,61 @@ async function tempDir(prefix: string): Promise<string> {
   return dir
 }
 
+/** Wire responses order every scripted notification before the caller's next assertion. */
+async function notificationClient(batches: HarnessNotification[][], options: LaunchOverrides = {}) {
+  const root = await tempDir('dsh-sdk-notification-script-'), script = join(root, 'notifications.json')
+  await writeFile(script, JSON.stringify(batches))
+  const client = createProcessHarnessClient(fakeLaunch({ FAKE_NOTIFICATION_BATCHES_FILE: script }, options))
+  cleanups.push(() => client.close())
+  await client.initialize({ cwd: process.cwd(), provider: 'p', model: 'm' })
+  return { client, nextBatch: () => client.getWorkingDirectory('notification-owner') }
+}
+
 describe('DeepSeekHarness', () => {
+  it('reports a failed spawn from an independent Node process with no unrelated live handles', async () => {
+    const root = await tempDir('dsh-sdk-independent-failed-spawn-'), script = join(root, 'probe.mjs')
+    const module = new URL('../src/index.ts', import.meta.url).href
+    await writeFile(script, `import assert from 'node:assert/strict';import {DeepSeekHarness,TransportClosedError} from ${JSON.stringify(module)};
+const harness=new DeepSeekHarness(${JSON.stringify({ dshBin: fakeRuntime, processCwd: join(root, 'missing') })});
+try{await harness.start();throw new Error('SDK launch unexpectedly succeeded')}catch(error){assert(error instanceof TransportClosedError);assert.match(error.message,/ENOENT/u);console.log('OBSERVED_SPAWN_FAILURE')}finally{await harness.close()}
+`)
+    const result = await promisify(execFile)(process.execPath, ['--import', import.meta.resolve('tsx/esm'), script], {
+      env: { ...process.env, TSX_TSCONFIG_PATH: fileURLToPath(new URL('../../../../tsconfig.host.json', import.meta.url)) },
+      timeout: 15_000,
+    })
+    expect(result.stdout.trim()).toBe('OBSERVED_SPAWN_FAILURE')
+    expect(result.stderr).not.toContain('unsettled top-level await')
+  })
+
+  it('reports a failed spawn without a cleanup failure and retries after its directory is created', async () => {
+    const root = await tempDir('dsh-sdk-missing-cwd-'), cwd = join(root, 'created-later')
+    const harness = harnessWith({}, { cwd })
+    await expect(harness.start()).rejects.toBeInstanceOf(TransportClosedError)
+    await mkdir(cwd)
+    expect((await harness.run('retry the owned launch')).finalResponse).toBe('hello from fake runtime')
+  })
+
+  it('joins a failed spawn when close begins before its error event', async () => {
+    const root = await tempDir('dsh-sdk-close-failed-spawn-')
+    const client = createProcessHarnessClient(fakeLaunch({}, { cwd: join(root, 'missing') }))
+    cleanups.push(() => client.close())
+    client.start()
+    await client.close()
+    await expect(client.initialize({ cwd: root, provider: 'p', model: 'm' })).rejects.toBeInstanceOf(TransportClosedError)
+  })
+
+  it('still confirms live-process exit after a process-control error', async () => {
+    const client = createProcessHarnessClient(fakeLaunch())
+    cleanups.push(() => client.close())
+    await client.initialize({ cwd: process.cwd(), provider: 'p', model: 'm' })
+    const child: unknown = Reflect.get(client, 'child')
+    if (!(child instanceof ChildProcess) || child.pid === undefined) throw new Error('The SDK has no owned live process.')
+    const pid = child.pid
+    child.emit('error', new Error('Owned process-control failure.'))
+    await client.close()
+    expect(() => process.kill(pid, 0)).toThrow(expect.objectContaining({ code: 'ESRCH' }))
+  })
+
   it('returns a restored handle that can run followups on the same identity', async () => {
     const harness = harnessWith()
     const session = await harness.resumeSession('saved-session')
@@ -484,6 +541,40 @@ describe('HarnessClient', () => {
     await untouched.close()
   })
 
+  it('retries refused termination without admitting work or replacing its owned runtime', async () => {
+    const client = createProcessHarnessClient(fakeLaunch(
+      { FAKE_IGNORE_EOF: '1' },
+      { shutdownTimeoutMs: 100, disposeEofGraceMs: 30, disposeGraceMs: 1_000 },
+    ))
+    await client.initialize({ cwd: process.cwd(), provider: 'p', model: 'm' })
+    const child: unknown = Reflect.get(client, 'child')
+    if (!(child instanceof ChildProcess) || child.pid === undefined) throw new Error('The SDK has no owned live process.')
+    const kill = vi.spyOn(child, 'kill').mockReturnValue(false)
+    try {
+      const first = client.close()
+      expect(client.close()).toBe(first)
+      await expect(first).rejects.toThrow(/SIGKILL was refused/u)
+      expect(child.exitCode).toBeNull()
+      expect(child.signalCode).toBeNull()
+      expect(() => { client.start() }).toThrow(TransportClosedError)
+      await expect(client.request('new-work')).rejects.toBeInstanceOf(TransportClosedError)
+      await expect(client.subscribe().next()).rejects.toBeInstanceOf(TransportClosedError)
+      kill.mockRestore()
+      const recovered = client.close()
+      expect(client.close()).toBe(recovered)
+      await recovered
+      expect(child.exitCode !== null || child.signalCode !== null).toBe(true)
+      expect(() => { client.start() }).toThrow(TransportClosedError)
+    } finally {
+      kill.mockRestore()
+      if (child.exitCode === null && child.signalCode === null) {
+        const exited = new Promise<void>((resolve) => { child.once('exit', () => { resolve() }) })
+        child.kill('SIGKILL')
+        await exited
+      }
+    }
+  })
+
   it('escalates through SIGTERM when the runtime ignores EOF', async () => {
     const dir = await tempDir('sdk-client-ladder-')
     const sigtermFile = join(dir, 'sigterm.txt')
@@ -623,6 +714,8 @@ describe('HarnessClient', () => {
     inject('subagent.started', { parentSessionId: 'loop', childSessionId: 'loop' })
     inject('subagent.started', { parentSessionId: '', childSessionId: 'x' })
     inject('subagent.finished', { childSessionId: 'root' })
+    inject('subagent.finished', { childSessionId: '' })
+    inject('subagent.finished', { childSessionId: 42 })
 
     expect((await tree.next()).method).toBe('subagent.started')
     expect((await tree.next()).method).toBe('subagent.started')
@@ -647,6 +740,112 @@ describe('HarnessClient', () => {
     expect((client as unknown as { sessionParents: Map<string, string> }).sessionParents.size).toBe(0)
     await client.close()
   })
+})
+
+it('does not deliver a frame after its filter closes the subscription', async () => {
+  const { client, nextBatch } = await notificationClient([[{ method: 'owned-frame', params: {} }]])
+  const subscription = client.subscribe(() => { subscription.close(); return true })
+  await nextBatch()
+  await expect(subscription.next()).rejects.toThrow('notification subscription closed')
+})
+
+it('retains active ancestry independently of a one-frame notification queue', async () => {
+  const { client, nextBatch } = await notificationClient([
+    [{ method: 'subagent.started', params: { parentSessionId: 'root', childSessionId: 'child' } }],
+    [{ method: 'subagent.started', params: { parentSessionId: 'child', childSessionId: 'grandchild' } }],
+    [{ method: 'session.event', params: { sessionId: 'grandchild', event: { type: 'owned-frame' } } }],
+  ], { maxNotificationQueue: 1 })
+  const tree = client.subscribeSessionTree('root')
+  await nextBatch()
+  expect(tree.tryNext()?.params.childSessionId).toBe('child')
+  await nextBatch()
+  expect(tree.tryNext()?.params.childSessionId).toBe('grandchild')
+  await nextBatch()
+  expect(tree.tryNext()?.params.sessionId).toBe('grandchild')
+  tree.close()
+})
+
+it.each([0, 1.5, Number.NaN])('rejects invalid SDK notification and ancestry capacities: %s', (value) => {
+  expect(() => createProcessHarnessClient(fakeLaunch({}, { maxNotificationQueue: value }))).toThrow('maxNotificationQueue')
+  expect(() => createProcessHarnessClient(fakeLaunch({}, { maxSessionRelationships: value }))).toThrow('maxSessionRelationships')
+})
+
+it('rejects invalid subscription capacity changed after construction', () => {
+  const client = createProcessHarnessClient(fakeLaunch())
+  client.options.maxNotificationQueue = 0
+  expect(() => client.subscribe()).toThrow('maxNotificationQueue')
+})
+
+it('fails a slow subscriber at its queue bound while other subscriptions remain usable', async () => {
+  const { client, nextBatch } = await notificationClient([
+    Array.from({ length: 3 }, (_, index) => ({ method: 'slow', params: { index } })),
+    [{ method: 'late', params: {} }, { method: 'healthy', params: { index: 3 } }],
+  ], { maxNotificationQueue: 2 })
+  const slow = client.subscribe(), healthy = client.subscribe(n => n.method === 'healthy')
+  await nextBatch()
+  expect(slow.tryNext()?.params.index).toBe(0)
+  expect(slow.tryNext()?.params.index).toBe(1)
+  await expect(slow.next()).rejects.toThrow('notification subscription queue limit exceeded')
+  await nextBatch()
+  expect(slow.tryNext()).toBeUndefined()
+  expect((await healthy.next()).params.index).toBe(3)
+  healthy.close()
+})
+
+it('drains a notification burst in wire order while reclaiming consumed queue storage', async () => {
+  const { client, nextBatch } = await notificationClient([0, 160].map(start =>
+    Array.from({ length: 160 }, (_, offset) => ({ method: 'frame', params: { index: start + offset } }))), { maxNotificationQueue: 200 })
+  const subscription = client.subscribe()
+  for (const start of [0, 160]) {
+    await nextBatch()
+    for (let index = start; index < start + 160; index += 1) expect(subscription.tryNext()?.params.index).toBe(index)
+    expect(subscription.tryNext()).toBeUndefined()
+  }
+  subscription.close()
+})
+
+it('fails ancestry-capacity overflow explicitly through the running transport', async () => {
+  const { client, nextBatch } = await notificationClient([
+    [{ method: 'subagent.started', params: { parentSessionId: 'root', childSessionId: 'child-one' } }],
+    [{ method: 'subagent.started', params: { parentSessionId: 'root', childSessionId: 'child-two' } }],
+  ], { maxSessionRelationships: 1 })
+  const tree = client.subscribeSessionTree('root')
+  await nextBatch()
+  expect(tree.tryNext()?.params.childSessionId).toBe('child-one')
+  await expect(nextBatch()).rejects.toThrow()
+  await expect(tree.next()).rejects.toThrow('Session relationship limit exceeded')
+  await expect(client.subscribe().next()).rejects.toThrow('Session relationship limit exceeded')
+  expect(() => { client.start() }).toThrow('Session relationship limit exceeded')
+})
+
+it('enforces configured pending-request capacity while retaining bounded process cleanup', async () => {
+  const client = createProcessHarnessClient(fakeLaunch({ FAKE_HANG_PROMPT: '1' }, {
+    maxLineBytes: 1024 * 1024, maxPendingRequests: 1, maxConcurrentIncoming: 2, maxOutputBytes: 1024 * 1024,
+  }))
+  cleanups.push(() => client.close())
+  await client.initialize({ cwd: process.cwd(), provider: 'p', model: 'm' })
+  const pending = client.prompt('owned', normalizeInput('wait')).catch((error: unknown) => error)
+  await expect(client.getWorkingDirectory('another')).rejects.toThrow('pending request limit exceeded')
+  await client.close()
+  expect(await pending).toBeInstanceOf(TransportClosedError)
+})
+
+it.each(['1', 'null'])('rejects malformed working-directory responses over the real SDK wire: %s', async (value) => {
+  const harness = harnessWith({ FAKE_MALFORMED_DIRECTORY: value })
+  await expect(harness.session('owned').getWorkingDirectory()).rejects.toBeInstanceOf(SdkProtocolError)
+})
+
+it('reads the effective working directory through the SDK session API', async () => {
+  const harness = harnessWith()
+  expect(await harness.session('owned').getWorkingDirectory()).toBe(resolvePath(process.cwd()))
+  expect(await harness.client.setWorkingDirectory('owned', 'entered')).toBe(resolvePath(process.cwd(), 'entered'))
+  expect(await harness.session('owned').getWorkingDirectory()).toBe(resolvePath(process.cwd(), 'entered'))
+})
+
+it('closes a default public client without starting its lazy runtime', async () => {
+  const client = new HarnessClient()
+  await client.close()
+  expect(() => { client.start() }).toThrow(TransportClosedError)
 })
 
 describe('wire payload validation', () => {

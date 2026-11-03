@@ -1,0 +1,14 @@
+{
+  "name": "subprocess-spill-loader-source",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subprocess/subprocess-local/tests/loader-spill.spec.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T10:49:29.925727+00:00",
+  "seconds": 4.384,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b304bbd28d26f0bd4e12d133b561f676c6d10be201f43e6ce60a3a7d798a8347",
+  "inputsAfter": "b304bbd28d26f0bd4e12d133b561f676c6d10be201f43e6ce60a3a7d798a8347",
+  "postgresToolDirectory": null,
+  "outputSha256": "b3b50b9fec8ae8502c531903514f89cef5b0cf2e6cc0584b259833a8de07d164",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  18:49:33\n   Duration  712ms (transform 264ms, setup 39ms, import 313ms, tests 193ms, environment 0ms)\n\n"
+}

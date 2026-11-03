@@ -1,0 +1,14 @@
+{
+  "name": "upload-actor-focused-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc/tests packages/attachment/userdoc-local/tests packages/host/userdoc-http/tests --retry=0 --maxWorkers=2 --coverage --coverage.include=packages/attachment/userdoc/src/brand.ts --coverage.include=packages/attachment/userdoc-local/src/upload.ts --coverage.include=packages/attachment/userdoc-local/src/local-fs.ts --coverage.include=packages/attachment/userdoc-local/src/store.ts --coverage.include=packages/host/userdoc-http/src/index.ts --coverage.reportsDirectory=.agents/audits/.local/upload-actor-coverage",
+  "startedAt": "2026-10-25T10:15:10.876525+00:00",
+  "seconds": 19.941,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6d3dca1d15dda691fc9eb40f17c2f1d9be7df132f72aa353b5ba4c3f40565f2f",
+  "inputsAfter": "6d3dca1d15dda691fc9eb40f17c2f1d9be7df132f72aa353b5ba4c3f40565f2f",
+  "postgresToolDirectory": null,
+  "outputSha256": "38b9059853249c9d7b78c5fc9ca11173856ead509e17fbe6e616ff5264065107",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  18 passed (18)\n      Tests  270 passed (270)\n   Start at  18:15:21\n   Duration  9.08s (transform 1.33s, setup 195ms, import 1.99s, tests 7.16s, environment 1ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 200/200 )\nBranches     : 100% ( 56/56 )\nFunctions    : 100% ( 66/66 )\nLines        : 100% ( 175/175 )\n================================================================================\n"
+}

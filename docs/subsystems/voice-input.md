@@ -127,7 +127,8 @@ snapshot(): SpeechSnapshot
  * Persist changed selection fields into the `speech-to-text` settings section; the resulting
  * language must be accepted by the selected provider.
  * @param patch - explicit provider or language changes.
- * @returns after the settings write commits.
+ * @returns after the settings write commits under the current binding.
+ * @throws when the Settings binding changes during the write; committed file data is retained.
  */
 async configure(patch: SpeechSelectionPatch): Promise<void>
 

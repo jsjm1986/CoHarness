@@ -1,0 +1,14 @@
+{
+  "name": "progress-session-evidence-before",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-progress-postgres.spec.ts -t 'durable current-format Session' --no-file-parallelism",
+  "startedAt": "2026-10-23T22:51:27.529475+00:00",
+  "seconds": 5.095,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c6ee742996398454c19ec9cdb79ba979b1d5683afa1276d656af1033d06404f2",
+  "inputsAfter": "c6ee742996398454c19ec9cdb79ba979b1d5683afa1276d656af1033d06404f2",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "d4f3419b39a5004bc8b52cd33f047cbd4636d45624ee7be60d92efe76bde06d1",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/project-progress-postgres.spec.ts (20 tests | 1 failed | 19 skipped) 552ms\n     × reconstructs the exact utility request from its durable current-format Session 515ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/project-progress-postgres.spec.ts > project digest governed model path > reconstructs the exact utility request from its durable current-format Session\nAssertionError: expected null to match object { header: { …(2) }, …(1) }\n\n- Expected:\n{\n  \"header\": {\n    \"id\": \"33477377-b78c-475d-9d75-e2eb362f6386\",\n    \"isSeeded\": false,\n  },\n  \"inheritedEventCount\": 0,\n}\n\n+ Received:\nnull\n\n ❯ tests/project-progress-postgres.spec.ts:165:25\n    163|       [f.context.organizationId],\n    164|     )).rows[0]!\n    165|     expect(row.session).toMatchObject({ header: { id: row.request_id, …\n       |                         ^\n    166|     const artifact = sessionLogicalFormatCatalog.migrate(row.session!.…\n    167|     const header = artifact.events.find(event => event.type === 'reque…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 19 skipped (20)\n   Start at  06:51:30\n   Duration  2.40s (transform 1.40s, setup 0ms, import 1.74s, tests 552ms, environment 0ms)\n\n"
+}

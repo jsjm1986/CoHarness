@@ -1,4 +1,5 @@
 /** Maintenance-space admission management: admin-layered grants, space state, and member table. */
+import { usePendingEdits } from '../pending-edits.tsx'
 import { RefreshCw, ShieldCheck } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -47,6 +48,7 @@ export function StewardPage() {
   const [notice, setNotice] = useState('')
   const [pending, setPending] = useState<PendingGrant | null>(null)
   const [saving, setSaving] = useState(false)
+  usePendingEdits(saving || pending !== null)
   const generation = useRef(0)
 
   const reload = useCallback(async (showLoading = false) => {

@@ -1,0 +1,324 @@
+{
+  "finding": "B454",
+  "status": "fixed_verified_captured_collaboration_lifetime_controls_global_review_open",
+  "updatedAt": "2026-11-01T21:25:29.372836+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "verifiedAt": "2026-11-01T21:22:07.266972+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-latest-origin-fetch.json",
+    "workingTreePreserved": true
+  },
+  "problem": "A browser catalog or child prompt retained a successful authorization result across asynchronous reads or prompt admission without retaining its issuing collaboration provider lifetime. Provider withdrawal or replacement could still publish catalog data and accept a child user message. The interrupt path also lacked a post-authorization lifetime check.",
+  "fix": "Bind catalog reads and pre-acceptance delivery to the original authority signal, recheck the captured provider after asynchronous read/admission, and check lifetime before interrupt admission. Map withdrawal to collaboration-forbidden/gateway-unavailable while retaining caller cancellation. A replacement authorizes only fresh requests. Accepted messages remain independently manager-owned.",
+  "compatibility": {
+    "newWireOrEventFields": false,
+    "schemaOrSessionFormatChange": false,
+    "publicServiceSignatureChange": false,
+    "assertionExpiryPolicyChanged": false,
+    "postAcceptanceCancellationAdded": false,
+    "rootProductionMutation": false
+  },
+  "verification": {
+    "distinctPassingNamedCases": 723,
+    "unitCases": 707,
+    "unitFiles": 37,
+    "typescriptRunnableCases": 8,
+    "pythonRunnableCases": 8,
+    "versionRepeatsAddedToCount": false,
+    "sourceNode22AndNormalBuiltNode24": true,
+    "completeControlCoverage": {
+      "lines": {
+        "total": 32,
+        "covered": 32,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 9,
+        "covered": 9,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 35,
+        "covered": 35,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 41,
+        "covered": 41,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "completeCoreEntryCoverage": {
+      "lines": {
+        "total": 253,
+        "covered": 248,
+        "skipped": 0,
+        "pct": 98.02
+      },
+      "functions": {
+        "total": 65,
+        "covered": 63,
+        "skipped": 0,
+        "pct": 96.92
+      },
+      "statements": {
+        "total": 286,
+        "covered": 279,
+        "skipped": 0,
+        "pct": 97.55
+      },
+      "branches": {
+        "total": 128,
+        "covered": 120,
+        "skipped": 0,
+        "pct": 93.75
+      }
+    },
+    "addedOrReplacedStatementCoverage": {
+      "packages/subagent/subagent/src/index.ts": {
+        "addedOrReplacedStatementStarts": 19,
+        "covered": 19,
+        "uncoveredStatementStarts": [
+          252,
+          509,
+          638,
+          874,
+          875,
+          894,
+          971
+        ]
+      },
+      "packages/subagent/subagent/src/control.ts": {
+        "addedOrReplacedStatementStarts": 9,
+        "covered": 9,
+        "uncoveredStatementStarts": []
+      }
+    },
+    "repositoryThresholdOrBaselineChanged": false,
+    "completeCore100PercentGatePassed": false,
+    "originalEvidence": "Four original source cases return catalog data or a prompt receipt after authority withdrawal. The original normal Core bundle byte-matches B450, which remained unchanged through B453. Both actual SDK cases start successfully, replace the real GatewayCollaboration provider, then wrongly persist WITHDRAWN_INPUT with no refusal; failure is the behavior assertion.",
+    "currentNativeEvidence": "The runnable shipped SDK composition creates a real continuable child, authorizes through real GatewayCollaboration and owned loopback HTTP, replaces the provider during prompt admission, and reads the persisted child log. The old input is refused and absent; one fresh input succeeds. Project input retains Alice attribution; personal input adds no project participant. Both SDKs replay personal/project scopes.",
+    "businessCases": [
+      "Personal/project prompt admission withdrawal",
+      "Catalog result withheld after a noncooperative read completes following withdrawal",
+      "Replacement provider cannot adopt an old request; a fresh request succeeds",
+      "Pending delivery observes authority and carrier cancellation with carrier failure precedence",
+      "Interrupt refuses authority withdrawal as child authorization completes",
+      "Required provider absence refuses catalog/prompt/interrupt without touching child primitives",
+      "Current child permission denial remains distinct from provider unavailability",
+      "Original foreground withdrawal and failed background cleanup retain their behavior"
+    ],
+    "checks": [
+      {
+        "name": "control-authority-expanded",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/control-authority-expanded.json"
+      },
+      {
+        "name": "sdk-authority-source-connected",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/sdk-authority-source-connected.json"
+      },
+      {
+        "name": "authority-final-built-acceptance",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-final-built-acceptance.json"
+      },
+      {
+        "name": "authority-related-built-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-related-built-sdk.json"
+      },
+      {
+        "name": "authority-final-python-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-final-python-sdk.json"
+      },
+      {
+        "name": "authority-final-build-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-final-build-types.json"
+      },
+      {
+        "name": "authority-final-normal-bundles",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-final-normal-bundles.json"
+      },
+      {
+        "name": "authority-final-host-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-final-host-types.json"
+      },
+      {
+        "name": "authority-final-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-final-lint.json"
+      },
+      {
+        "name": "authority-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-python-lint.json"
+      },
+      {
+        "name": "authority-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-doc-quick.json"
+      },
+      {
+        "name": "authority-export-jsdoc",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-export-jsdoc.json"
+      },
+      {
+        "name": "authority-latest-origin-fetch",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-latest-origin-fetch.json"
+      },
+      {
+        "name": "control-authority-before",
+        "status": "expected_original_authority_withdrawal_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/control-authority-before.json"
+      },
+      {
+        "name": "sdk-authority-original-built",
+        "status": "expected_original_authority_withdrawal_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/sdk-authority-original-built.json"
+      },
+      {
+        "name": "authority-final-entry-measurement",
+        "status": "707_behavior_cases_pass_complete_control_100_percent_core_existing_threshold_debt_remains",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-final-entry-measurement.json"
+      },
+      {
+        "name": "authority-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/authority-repository-references.json"
+      }
+    ],
+    "intermediateSetup": [
+      "The first native fixture did not guard parent adapter reentry after child notifications; the owned fixture run was terminated and its exact temporary workspace removed after confirming no active process. The final adapter performs the exercise once.",
+      "A fixture accessed collaboration through an undeclared injection; switching the host shim to the explicit ctx.get lookup restores the actual provider replacement. These setup failures are retained separately from original-source and original-built bug proofs.",
+      "Scoped lint fixed formatting, bound test authorizers, preserved unknown caught errors and narrowed the internal error helper before throwing. Final normal builds and both SDK acceptance run after the change."
+    ]
+  },
+  "coordination": {
+    "status": "new_peer_scope_acknowledged_once_no_source_overlap",
+    "peerProductionBaseline": "R36",
+    "peerNextRelease": "R37 entry and connection work; B451 control integration deferred",
+    "rootScope": "Core child control, resource/model consumers, generated API and corresponding tests/docs",
+    "peerScope": "Computer-side UI entry, no-workspace conversations, cross-computer request/connection reuse, Gateway node-service transport and necessary PostgreSQL authorization round trips",
+    "rootProductionMutation": false,
+    "repeatedPeerPolling": false
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/control-authority-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-10-23-retained-collaboration-requirement.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-23-retained-collaboration-requirement.md",
+    ".agents/notes/implemented/bug-fix/2026-10-23-retained-collaboration-requirement.zh.md",
+    "apps/cli/tests/profiles/sdk/subagent-control-authority.expected.e2e.ts",
+    "docs/subsystems/subagent.i18n.yaml",
+    "docs/subsystems/subagent.md",
+    "docs/subsystems/subagent.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/conversation-writer-authorization/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/conversation-writer-authorization/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/conversation-writer-authorization/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/subagent-control-authority/expected.json",
+    "examples/headless-agent/tests/fixtures/subagent-control-authority/model.mjs",
+    "examples/headless-agent/tests/fixtures/subagent-control-authority/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/subagent-control-authority/runtime.cordis.yml",
+    "examples/headless-agent/tests/fixtures/subagent-control-authority/runtime.mjs",
+    "packages/extensions/tool-cordis/src/api-catalog.ts",
+    "packages/subagent/subagent/README.i18n.yaml",
+    "packages/subagent/subagent/README.md",
+    "packages/subagent/subagent/README.zh.md",
+    "packages/subagent/subagent/src/control.ts",
+    "packages/subagent/subagent/src/index.ts",
+    "packages/subagent/subagent/tests/control-authority.spec.ts",
+    "python/sdk/tests/test_subagent_control_authority_expected.py"
+  ],
+  "readOnlyPrerequisiteCount": 313,
+  "artifactReferences": {
+    "apps/cli/lib/bin.js": "a3f373cfa7a3a84aa5fb6e25c3db5b2cb9b338afe986169c00fcc38ea0044455",
+    "packages/boot/app-boot/lib/index.js": "e7527dacdd9bc28e1a95536f3930f042ebbac186b16393059469ac7f3a537b80",
+    "packages/bundle/sdk-minimal/lib/index.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "packages/context/collaboration-gateway/lib/index.js": "0f9959205ed5dcc40ee9558d04c575fbf5fe3aa643e42430ec471ca3cc975b65",
+    "packages/core/agent-loop/lib/index.js": "4d9e306e15bd8a750ff97bd48c6253a45f2faa49edf5b41ac88b37c2b0f0e882",
+    "packages/core/agent/lib/index.js": "4ffa8768f1ed50640eaba1ef6cddd9183c824a5a183208e3012a4f86ed27fa18",
+    "packages/extensions/tool-cordis/lib/index.js": "a8db112aaa38e65f1c4a25ff4215d876df687c4f079ad38faaa8c83a9bd01cb8",
+    "packages/extensions/tool-cordis/lib/types/api-catalog.d.ts": "751ebac54d1c2d0a694d18973b2d1a95f901b8dda3ed49eb6303795a30c8dc4e",
+    "packages/extensions/tool-cordis/lib/types/api-catalog.js": "1601d1a9a14d2788d68534f88c96ea7d66fc5eceea45427abb5e14e7c2e6167a",
+    "packages/extensions/tool-cordis/lib/types/index.d.ts": "af71d264ee9c5c04b991eeb6c75c7b02137bc0281cd576b6db3f8e7f8d49ae57",
+    "packages/extensions/tool-cordis/lib/types/index.js": "a96b33268cd03e577cdfc62f32c55ebc380e98d7ba3006789feb65cd2480dfc6",
+    "packages/jobs/jobs-local/lib/index.js": "376e13f6ad2eb71dd76dee6f3098d4d596ea34a28c8c95603014dd00eeb92c81",
+    "packages/jobs/jobs/lib/index.js": "0e7659e20c3ab0cdef78aeadc08d14baa23cc05412f28daf21e5ecc7b71b3821",
+    "packages/jobs/tool-jobs/lib/index.js": "d09749a36d2b6247ac32a476fb2947c1fe32fe95ea4444bbd768901c6b838c0b",
+    "packages/ptc-runtime/ptc-runtime-node/lib/index.js": "9b01e82609461ca27c7353386722a523bed4ebbed0f326d6ccc803c620032fa6",
+    "packages/sdk/client/lib/index.js": "7099941321aa5a129caed823ac18c4749ac269dba7705c5ce6274b0276f51aad",
+    "packages/sdk/server/lib/index.js": "c94739bc12898d337ca362ef657464e2aa06d117cec7c90395fc37a03abd4196",
+    "packages/subagent/subagent/lib/index.js": "d1d5a046de6fb2a67dc15d682bdb7c0b8ef6966a3b918a1ca48b62f66180b007",
+    "packages/subagent/subagent/lib/types/index.d.ts": "0fda33152b96a3ab06f65d8d2f3009554e7e51c330c1b2f193ad7c6254285dea",
+    "packages/subagent/subagent/lib/types/index.js": "367eeafbfccd4d538ce6d26b6733e7f8208b0fb056215b25ac0c9d1cfb992e6b",
+    "packages/subagent/subagent/lib/types/internal.d.ts": "910db97a43b6dd599126d6c7cf9057b2c007120bcf9dd761bcf1439aa2e45291",
+    "packages/subagent/subagent/lib/types/internal.js": "9e629487ae14104c2d46269197692279bf5c1a5209af0b2a56ee0865ac477afb",
+    "packages/subagent/subagent/lib/types/retained-cleanup.d.ts": "612a42281e3890f569f17ff5a8a34cbd14b62efde68bf7b4578bfce7bf0bebf3",
+    "packages/subagent/subagent/lib/types/retained-cleanup.js": "f3faf639884fea1af4ddcf84386170e8e41926d229b7fd131425b7bba71924a1",
+    "packages/subagent/subagent/lib/types/run-lease.d.ts": "b4a73727a97ba0369cf20f99633cef031ba8a9b3671b7ef427021ffc91fa2037",
+    "packages/subagent/subagent/lib/types/run-lease.js": "68a420195cd7358362a8edd97d9a4cfd4c766e836d1f32e25e467d2b9ec7fa63",
+    "packages/subagent/subagent/lib/types/types.d.ts": "fe23d6fbb40919d51ec2b1a65934249b074f6d3b9794847d58dfe453f6887501",
+    "packages/subagent/subagent/lib/types/types.js": "74c4a6ef14ae2c83292457c179e22fc44885e5d92976595089107527c160f9cd",
+    "packages/subagent/tool-subagent/lib/index.js": "d9de7ae8a530685125fa1cca13d988bde53ab75c30e9846188c2efe264e0cf46",
+    "packages/subagent/tool-subagent/lib/types/index.d.ts": "8b09f71db58a223e7e965f4f5775d97941851d5d6dd8d92b3e6a83d54b6eea5c",
+    "packages/subagent/tool-subagent/lib/types/index.js": "4d8643492ed30c70d067d7d0e5f91115371318e890e35da11380847c7b9041c5",
+    "packages/workflow/tool-ralph/lib/index.js": "657f8d26e9bba0ed6a953351c3133c0042e3e5d33e145a265988e58308b50c47",
+    "packages/workflow/tool-ralph/lib/types/index.d.ts": "aca7d199ca84ddfa327b1f198767482d647cadab731176dbfc66466eb2064d1a",
+    "packages/workflow/tool-ralph/lib/types/index.js": "5eb5bd99e37fbefec07703d7b6d28e0e98e90f0bdf07ca2e5d8f09e1fbad4736",
+    "packages/workflow/tool-workflow/lib/index.js": "b67d1ca2c2f20b0ae0162ab79977cacac34358ec0dbdbf72329da00d5dcba466",
+    "packages/workflow/tool-workflow/lib/types/index.d.ts": "580add4796ea967c51f79558608ef6472780a393c046e20673751437d41df549",
+    "packages/workflow/tool-workflow/lib/types/index.js": "63ba6b1738032618f6894e342b488ff9a6ddd24a27f58c7f12a3ba303095411b",
+    "packages/workflow/tool-workflow/lib/types/record.d.ts": "b76ec5244084c6bc7a23bf099fab530280c818b7c4b87866d0d675960fa521a6",
+    "packages/workflow/tool-workflow/lib/types/record.js": "a796561d1ce5a65fcaeb4c62f20694dfade02a92102534306ed0c6c7ccbfa8f6",
+    "packages/workflow/workflow-ptc/lib/index.js": "c3d9578dcdaa08430018fc72848d587d98f457d695b2200dd5a385d758a4b373",
+    "packages/workflow/workflow-ptc/lib/types/index.d.ts": "7fb2a61124763eed3629d93eb1d0e95de4de7a2e68697961b740f959eda81c54",
+    "packages/workflow/workflow-ptc/lib/types/index.js": "4faffdf81ad5a92ec4b99070ec2775362af9ce7711da3f0e2ff3f0e63e0a70e5",
+    "packages/workflow/workflow/lib/index.js": "fa7c0ac38c714b7230c41fa38d22524923c1237940fbfa416f63d3e1b37fde8b",
+    "packages/workflow/workflow/lib/types/index.d.ts": "91b595cdbb6d70e398d68b7529e4980f74f4651cea24a65f286201926dee1b15",
+    "packages/workflow/workflow/lib/types/index.js": "889279d97ad94551d2dcc2e945f0d4363e6056d3d175ae3dabd6cc889d1cd54d"
+  },
+  "noteReview": {
+    "action": "extended the existing retained-collaboration note, owning README and existing conversation-writer upgrade guide; regenerated three control descriptions and their bilingual subsystem reference",
+    "newNotes": 0,
+    "archivedNotesChanged": false,
+    "generatedBeforeimageProvenance": "subsystem reference and metadata imported from frozen B453; generated differences checked to contain only the three control descriptions"
+  },
+  "remaining": [
+    "All12 business domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue B455 with remaining Core lifecycle and resource-admission paths, queued continuation, exact-parent teardown, model/Inspector consumers and permission withdrawal. Full domain review is not implied by named tests.",
+    "B454 complete Core index measurement:97.55%statements279/286,93.75%branches120/128,96.92%functions63/65,98.02%lines248/253. Seven existing statements remain uncovered; unchanged100%threshold fails. Control helper is100%all4metrics and all28 added/replaced statement starts execute. Keep the last B453 Tool entry100%measurement as scoped historical evidence.",
+    "Peer now owns computer-side entry, no-workspace conversation creation, cross-computer request/connection reuse and necessary Gateway node-service/PG round trips. R36 is serving; its next R37 entry/connection work is independently authorized. B451 exact Admin Runtime control integration is deferred, not included. Avoid those source areas and routine pings.",
+    "Keep the reported search capability/configuration gap open: the current account refuses the configured official route, and its enabled organization provider has no supported native search factory. Inspect provider/configuration behavior without broadening authorization.",
+    "Continue cross-account/computer/document permissions and other business modules outside peer-reserved areas. Full native user/Admin operational acceptance and an assembled Root/peer release remain incomplete.",
+    "Official paid Responses remains deferred. No Root production deployment, restart, dependency synchronization, reset, stash, commit or push."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": {
+    "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T205242Z/B416-B454-integration-index.json",
+    "findings": 39,
+    "capsules": 32,
+    "frozenDeltaVersions": 702,
+    "presentPaths": 405,
+    "currentSourceDriftPaths": [
+      "gateway/README.i18n.yaml",
+      "gateway/README.md",
+      "gateway/README.zh.md",
+      "packages/context/gateway-runtime/src/index.ts"
+    ]
+  }
+}

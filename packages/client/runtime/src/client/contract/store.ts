@@ -84,12 +84,12 @@ function rafBatch(notify: () => void): () => void {
  * @returns the store.
  */
 export function createSnapshotStore<T>(
-  init: T, opts?: { flush?: 'raf' | 'sync'; persist?: { name: string } }): SnapshotStore<T> {
+  init: T, opts?: { flush?: 'raf' | 'sync'; persist?: { name: string; storage?: 'local' | 'session' } }): SnapshotStore<T> {
   // Immer enters through produce() in update() below (identical semantics to
   // the immer middleware without its setState-signature mutator generics).
   const withSelector = subscribeWithSelector(() => init)
   const api: StoreApi<T> = createStore<T>()(withSelector)
-  if (opts?.persist) attachPersistence(api, opts.persist.name)
+  if (opts?.persist) attachPersistence(api, opts.persist.name, opts.persist.storage)
 
   let subscribe = (fn: () => void) => api.subscribe(fn)
   if (opts?.flush === 'raf') {
@@ -124,13 +124,16 @@ export function createSnapshotStore<T>(
  * because the corruption happens before serialization. Storage failures
  * (quota, private mode) only disable persistence, never break the store.
  */
-function attachPersistence<T>(api: StoreApi<T>, name: string): void {
+function attachPersistence<T>(api: StoreApi<T>, name: string, kind: 'local' | 'session' = 'local'): void {
   // Non-browser runs (node e2e booting the client tree) have no localStorage:
   // persistence silently disables — same contract as a storage failure, minus
   // the per-store console noise a ReferenceError would produce.
-  if (typeof localStorage === 'undefined') return
+  let storage: Storage | undefined
+  try { storage = kind === 'session' ? globalThis.sessionStorage : globalThis.localStorage }
+  catch (error) { console.error(`snapshot store '${name}' storage unavailable:`, error); return }
+  if (storage === undefined) return
   try {
-    const raw = localStorage.getItem(name)
+    const raw = storage.getItem(name)
     if (raw !== null) {
       api.setState(devFreeze(JSON.parse(raw) as T), true)
     }
@@ -139,7 +142,7 @@ function attachPersistence<T>(api: StoreApi<T>, name: string): void {
   }
   api.subscribe((state) => {
     try {
-      localStorage.setItem(name, JSON.stringify(state))
+      storage.setItem(name, JSON.stringify(state))
     } catch (error) {
       console.error(`snapshot store '${name}' persistence failed:`, error)
     }

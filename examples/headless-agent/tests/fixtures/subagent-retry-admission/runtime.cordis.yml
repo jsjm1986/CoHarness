@@ -1,0 +1,9 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, subagentRetryAdmissionReady]
+- insert:
+    - id: retry-subagents
+      name: '@deepseek-ai/dsh-subagent'
+    - id: retry-subagent-model
+      name: './model.mjs'

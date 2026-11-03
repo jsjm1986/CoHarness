@@ -56,7 +56,7 @@ HMR 的 profile 监听和 Plugin Manager 执行的 profile 重新组合，还会
 <details>
 <summary>实现细节——点击展开</summary>
 
-`watchConfig()` 注册会被等待的配置处理器。`runExclusive()` 将配置变更、Loader 更新与自动重载串行化，并拒绝嵌套事务。包安装和删除在该队列之外执行。HMR 不获取包操作写锁；manifest 通知仅在有序的 `dsh.profile.bundles` 列表变化时触发重载。profile 与 home patch 变化也会触发重新组合。配置事务期间收到的文件事件在事务结束后处理。 Include 刷新和 profile 重载都通过普通的 Loader 条目更新到达插件；仅 volatile 变化由 Loader 就地提交。
+`watchConfig()` 注册会被等待的配置处理器。每个 HMR 实例保留自己的规范化配置路径；监听辅助模块不持有全局登记表。`runExclusive()` 将配置变更、Loader 更新与自动重载串行化，并拒绝嵌套事务。包安装和删除在该队列之外执行。HMR 不获取包操作写锁；manifest 通知仅在有序的 `dsh.profile.bundles` 列表变化时触发重载。profile 与 home patch 变化也会触发重新组合。配置事务期间收到的文件事件在事务结束后处理。 Include 刷新和 profile 重载都通过普通的 Loader 条目更新到达插件；仅 volatile 变化由 Loader 就地提交。
 
 App-boot 负责 profile 解析和 patch 优先级规则。HMR 读取启动器提供的纯数据 `profileContext`，在初始化时注册 profile manifest 和两份用户 patch 的监听，并等待应用就绪后处理更改。销毁 HMR 时会关闭监听器并取消等待启动的重载。配置监听器在当前事务上下文之外启动，使后续通知可以进入队列。
 
@@ -76,7 +76,7 @@ Loader entry 保留原始导入结果。HMR 为每个 entry 名称与配置树 b
 
 共享同一运行时的 entry 一起替换，每个 entry 使用其自身模块对应的实现。同一模块的重复 entry 仍保有各自的插件实例。替换失败时，HMR 清理已部分激活的替换实例，并恢复原来的模块和插件实现。重载成功后更新所有匹配的 entry 记录，包括已停用的 entry；替换失败时这些记录保持不变。从未加载过的 entry 仍保持未初始化状态。
 
-[package-manifest.ts](src/package-manifest.ts) 封装 package 读取、scope、type 和最近 manifest 查询所需的 Node internal 接口。每个 HMR 实例拥有自己的配置缓存，销毁时恢复它安装的 hook。manifest 失效会清空 ESM `ResolveCache` 和 CommonJS `_pathCache`：它们都不记录查询过的全部 manifest，入口也可能指向包目录之外。CommonJS 加载先用 Node 默认 resolver 解析请求，再进入原生 loader，绕过旧请求别名并保留已求值模块。同步 resolve hook 收到的是解析后的文件名。普通模块替换仍由 HMR 独立处理。
+[package-manifest.ts](src/package-manifest.ts) 封装 package 读取、scope、type 和最近 manifest 查询所需的 Node internal 接口。每个 HMR 实例拥有自己的配置缓存，销毁时退役它安装的 hook 层。重叠实例可按任意顺序退出：退役层直接委托，不读取已释放的状态；最后一层退出时恢复原始 Node 方法。manifest 失效会清空 ESM `ResolveCache` 和 CommonJS `_pathCache`：它们都不记录查询过的全部 manifest，入口也可能指向包目录之外。CommonJS 加载先用 Node 默认 resolver 解析请求，再进入原生 loader，绕过旧请求别名并保留已求值模块。同步 resolve hook 收到的是解析后的文件名。普通模块替换仍由 HMR 独立处理。
 
 被监听模块的路径沿用 Node ESM 解析所用的 `realpathSync()` 表示，包括 Windows 短目录名，使文件事件与模块缓存匹配。
 
@@ -106,7 +106,7 @@ Loader entry 保留原始导入结果。HMR 为每个 entry 名称与配置树 b
 <a id="known-limitations-and-deferred-work"></a>
 
 - 模块替换需要 Node loader 内部接口。框架依赖变化调用宿主提供的 `loader.exit()` 钩子；HMR 本身不重启进程。
-- 仅限于 `package.json` 的变化不会被检测到。`node_modules` 之下 manifest 的监听通知仍被忽略。浏览器 Client 模块图保留独立的浏览器侧加载机制。
+- `node_modules` 之下 manifest 的监听通知仍被忽略。浏览器 Client 模块图保留独立的浏览器侧加载机制。
 - 替换沿静态导入传播。对陈旧模块的动态 `import()` 在下次调用时求值新文件，而其导入方继续运行；已存在的 Worker 和 TSX loader 线程保留各自的模块缓存。
 - profile 的 `node_modules` 之下的每个符号链接都会扩大比较范围。链接进程入口（通过 bin 链接的真实路径定位）静态导入的包（例如来自 dsh checkout 的 `dsh-app-boot`、Cordis 或 Loader）会把宿主模块纳入范围；这些模块的变化保持待处理，Plugin Manager 对后续操作报告 `restart-required`，直到进程重启。Loader entry 导入的已链接 dsh 包与其他插件一样被替换。
 - 比较记录属于单个 HMR 实例。重启 `hmr` 条目本身的重新组合会重新记录当前文件，因此此时待处理的变化不再被报告或重试。
@@ -125,4 +125,9 @@ Loader entry 保留原始导入结果。HMR 为每个 entry 名称与配置树 b
 
 <a id="dev-note"></a>
 
-无。
+配置监听器在就绪前就已归属提供者。[归属决策](../../../.agents/notes/implemented/bug-fix/2026-10-24-hmr-pending-watch-ownership.zh.md)说明取消与清理失败行为。在仓库根目录验证构建产物：
+
+```sh
+pnpm run build
+node --expose-internals packages/boot/hmr/tests/fixtures/pending-watch-owner.mjs
+```

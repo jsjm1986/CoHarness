@@ -8,8 +8,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { expect, it, vi } from 'vitest'
+import { expect, it, onTestFailed, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { LocalSubprocessRuntime } from '@deepseek-ai/dsh-subprocess-local'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
 import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
 import BrowserUseRegistry from '@deepseek-ai/dsh-browser-use'
@@ -18,7 +19,14 @@ import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepse
 import { SessionId } from '@deepseek-ai/dsh-session'
 import * as Provider from '../src/index.ts'
 import { stagehandModelSchema } from '../src/native.ts'
+import { launchChromium } from '../src/launch.ts'
 import { nativeModel } from './fixtures/stagehand.ts'
+
+async function mountAttachments(ctx: Context): Promise<void> {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-stagehand-model-'))
+  onTestFinished(async () => { await rm(root, { recursive: true, force: true }) })
+  await ctx.plugin(LocalAttachmentStore, { dshHome: root })
+}
 
 class ImageCapabilities extends LlmAdapter {
   override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
@@ -27,88 +35,148 @@ class ImageCapabilities extends LlmAdapter {
   async * stream(_options: GenerateOptions): AsyncIterable<StreamChunk> { throw new Error('Unexpected model call in browser smoke') }
 }
 
-it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1')('launches and attaches to installed Chromium while preserving the external browser', { timeout: 120_000, retry: 0 }, async ({ signal }) => {
+for (const reuseExtension of [false, true]) {
+  const scenario = `preserves external Chromium across source/built connections (reuse extension: ${reuseExtension})`
+  it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1')(scenario, { timeout: 120_000, retry: 0 }, async ({ signal }) => {
+    const started = performance.now()
+    const stages: Array<{ stage: string; elapsedMs: number }> = []
+    const stage = (name: string): void => { stages.push({ stage: name, elapsedMs: Math.round(performance.now() - started) }) }
+    onTestFailed(() => { console.error('Stagehand source/built milestones:', JSON.stringify(stages)) })
+    const executable = process.env.DSH_BROWSER_EXECUTABLE
+    if (executable === undefined) throw new Error('DSH_STAGEHAND_E2E requires DSH_BROWSER_EXECUTABLE')
+    const server = createServer((_request, response) => {
+      response.setHeader('content-type', 'text/html')
+      response.end('<!doctype html><title>Stagehand fixture</title><h1>Stagehand local smoke</h1><button onclick="this.textContent=\'Clicked\'">Click fixture</button>')
+    })
+    const root = await mkdtemp(join(tmpdir(), 'dsh-stagehand-live-'))
+    const ctx = new Context()
+    let external: ReturnType<typeof spawn> | undefined
+    let exited: Promise<unknown> | undefined
+    try {
+      await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
+      const address = server.address()
+      if (address === null || typeof address === 'string') throw new Error('Missing fixture server address')
+      const url = `http://127.0.0.1:${address.port}/`
+      await mountAgentLoopTestDependencies(ctx)
+      await ctx.plugin(BrowserUseRegistry)
+      await ctx.plugin(LocalAttachmentStore, { dshHome: root })
+      ctx.llm.registerAdapter(['visual-fixture'], new ImageCapabilities())
+      const harness = await mountAgentLoopTestHarness(ctx)
+      const agent = await harness.create(SessionId('stagehand-live'), { provider: 'visual-fixture', model: 'vision' })
+      const execute = (suffix: string, args: unknown) => ctx.tools.execute({
+        agent, name: `stagehand_${suffix}`, arguments: args, callId: ToolCallId(`live-${suffix}`), signal,
+      })
+      const launched = ctx.plugin(Provider, { model: nativeModel, mode: 'launch', executablePath: executable })
+      await launched
+      stage('owned-navigation')
+      const navigation = await execute('navigate', { url })
+      expect(navigation.isError, JSON.stringify(navigation.content)).toBe(false)
+      expect(JSON.stringify(navigation.content)).toContain('Stagehand fixture')
+      const screenshot = await execute('screenshot', {})
+      expect(screenshot.isError, JSON.stringify(screenshot.content)).toBe(false)
+      expect(screenshot.content.some(block => block.type === 'image')).toBe(true)
+      stage('owned-disposal')
+      await launched.dispose()
+
+      stage('external-launch')
+      external = spawn(executable, [
+        '--headless=new', '--remote-debugging-port=0', '--enable-unsafe-extension-debugging', '--remote-allow-origins=*',
+        `--user-data-dir=${join(root, 'external-profile')}`, '--no-first-run', '--no-default-browser-check', 'about:blank',
+      ], { stdio: ['ignore', 'ignore', 'pipe'] })
+      exited = once(external, 'exit')
+      const endpoint = await new Promise<string>((resolve, reject) => {
+        let stderr = ''
+        external!.stderr!.on('data', (chunk: Buffer) => {
+          stderr += chunk.toString()
+          const match = /DevTools listening on (ws:\/\/[^\s]+)/u.exec(stderr)
+          if (match?.[1] !== undefined) resolve(match[1])
+        })
+        external!.once('error', reject)
+        external!.once('exit', (code) => { reject(new Error(`External Chrome exited before readiness (${code}): ${stderr}`)) })
+      })
+      const attached = ctx.plugin(Provider, { model: nativeModel, mode: 'attach', cdpEndpoint: endpoint })
+      await attached
+      stage('source-attachment')
+      const attachedNavigation = await execute('navigate', { url })
+      expect(attachedNavigation.isError, JSON.stringify(attachedNavigation.content)).toBe(false)
+      const createdUrl = `${url}created-by-tool`
+      const created = await execute('tabs', { action: 'new', url: createdUrl })
+      expect(created.isError, JSON.stringify(created.content)).toBe(false)
+      stage('source-disposal')
+      await attached.dispose()
+      expect(external.exitCode).toBeNull()
+      const versionUrl = new URL(endpoint)
+      versionUrl.protocol = 'http:'
+      versionUrl.pathname = '/json/list'
+      const targets = await (await fetch(versionUrl, { signal })).json() as Array<{ url: string }>
+      expect(targets.some(target => target.url === url)).toBe(true)
+      expect(targets.some(target => target.url === createdUrl)).toBe(true)
+      const workers = targets.filter(target => target.url.startsWith('chrome-extension://') && target.url.endsWith('/service-worker.js'))
+      expect(workers).toHaveLength(1)
+      const extensionId = new URL(workers[0]!.url).hostname
+      stage('built-reattachment')
+      const { stdout } = await promisify(execFile)(process.execPath, [
+        fileURLToPath(new URL('./fixtures/built-attachment.mjs', import.meta.url)), endpoint, `${url}built-worker`,
+        ...reuseExtension ? [extensionId] : [],
+      ], { signal, env: {} })
+      expect(stdout).toContain('Stagehand fixture')
+      expect(JSON.parse(stdout)).toMatchObject({ admissions: 1, completions: 1, waited: true })
+      expect(external.exitCode).toBeNull()
+      const afterBuilt = await (await fetch(versionUrl, { signal })).json() as Array<{ url: string }>
+      expect(afterBuilt.some(target => target.url === `${url}built-worker`)).toBe(true)
+      stage('built-completed')
+    } finally {
+      stage('cleanup')
+      await ctx.fiber.dispose()
+      if (external !== undefined && external.exitCode === null) external.kill('SIGTERM')
+      await exited
+      await new Promise<void>((resolve, reject) => { server.close((error) => { if (error) reject(error); else resolve() }) })
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+}
+
+it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1')('admits the built attachment Worker under plain Node without closing its external Chromium', { timeout: 120_000, retry: 0 }, async ({ signal }) => {
   const executable = process.env.DSH_BROWSER_EXECUTABLE
   if (executable === undefined) throw new Error('DSH_STAGEHAND_E2E requires DSH_BROWSER_EXECUTABLE')
   const server = createServer((_request, response) => {
     response.setHeader('content-type', 'text/html')
-    response.end('<!doctype html><title>Stagehand fixture</title><h1>Stagehand local smoke</h1><button onclick="this.textContent=\'Clicked\'">Click fixture</button>')
+    response.end('<!doctype html><title>Stagehand fixture</title><h1>Built Worker admission</h1>')
   })
-  const root = await mkdtemp(join(tmpdir(), 'dsh-stagehand-live-'))
-  const ctx = new Context()
-  let external: ReturnType<typeof spawn> | undefined
-  let exited: Promise<unknown> | undefined
+  let browser: Awaited<ReturnType<typeof launchChromium>> | undefined
+  const launchContext = new Context()
   try {
+    await launchContext.plugin(LocalSubprocessRuntime)
     await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
     const address = server.address()
-    if (address === null || typeof address === 'string') throw new Error('Missing fixture server address')
-    const url = `http://127.0.0.1:${address.port}/`
-    await mountAgentLoopTestDependencies(ctx)
-    await ctx.plugin(BrowserUseRegistry)
-    await ctx.plugin(LocalAttachmentStore, { dshHome: root })
-    ctx.llm.registerAdapter(['visual-fixture'], new ImageCapabilities())
-    const harness = await mountAgentLoopTestHarness(ctx)
-    const agent = await harness.create(SessionId('stagehand-live'), { provider: 'visual-fixture', model: 'vision' })
-    const execute = (suffix: string, args: unknown) => ctx.tools.execute({
-      agent, name: `stagehand_${suffix}`, arguments: args, callId: ToolCallId(`live-${suffix}`), signal,
-    })
-    const launched = ctx.plugin(Provider, { model: nativeModel, mode: 'launch', executablePath: executable })
-    await launched
-    const navigation = await execute('navigate', { url })
-    expect(navigation.isError, JSON.stringify(navigation.content)).toBe(false)
-    expect(JSON.stringify(navigation.content)).toContain('Stagehand fixture')
-    const screenshot = await execute('screenshot', {})
-    expect(screenshot.isError, JSON.stringify(screenshot.content)).toBe(false)
-    expect(screenshot.content.some(block => block.type === 'image')).toBe(true)
-    await launched.dispose()
-
-    external = spawn(executable, [
-      '--headless=new', '--remote-debugging-port=0', '--enable-unsafe-extension-debugging', '--remote-allow-origins=*',
-      `--user-data-dir=${join(root, 'external-profile')}`, '--no-first-run', '--no-default-browser-check', 'about:blank',
-    ], { stdio: ['ignore', 'ignore', 'pipe'] })
-    exited = once(external, 'exit')
-    const endpoint = await new Promise<string>((resolve, reject) => {
-      let stderr = ''
-      external!.stderr!.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString()
-        const match = /DevTools listening on (ws:\/\/[^\s]+)/u.exec(stderr)
-        if (match?.[1] !== undefined) resolve(match[1])
-      })
-      external!.once('error', reject)
-      external!.once('exit', (code) => { reject(new Error(`External Chrome exited before readiness (${code}): ${stderr}`)) })
-    })
-    const attached = ctx.plugin(Provider, { model: nativeModel, mode: 'attach', cdpEndpoint: endpoint })
-    await attached
-    const attachedNavigation = await execute('navigate', { url })
-    expect(attachedNavigation.isError, JSON.stringify(attachedNavigation.content)).toBe(false)
-    const createdUrl = `${url}created-by-tool`
-    const created = await execute('tabs', { action: 'new', url: createdUrl })
-    expect(created.isError, JSON.stringify(created.content)).toBe(false)
-    await attached.dispose()
-    expect(external.exitCode).toBeNull()
-    const versionUrl = new URL(endpoint)
-    versionUrl.protocol = 'http:'
-    versionUrl.pathname = '/json/list'
-    const targets = await (await fetch(versionUrl, { signal })).json() as Array<{ url: string }>
-    expect(targets.some(target => target.url === url)).toBe(true)
-    expect(targets.some(target => target.url === createdUrl)).toBe(true)
+    if (address === null || typeof address === 'string') throw new Error('Missing built fixture server address')
+    const url = `http://127.0.0.1:${address.port}/built-worker`
+    const owned = await promisify(execFile)(process.execPath, [
+      fileURLToPath(new URL('./fixtures/built-attachment.mjs', import.meta.url)), '--launch', executable, url,
+    ], { signal, env: {} })
+    expect(owned.stdout).toContain('Stagehand fixture')
+    expect(JSON.parse(owned.stdout)).toMatchObject({ admissions: 2, completions: 2, waited: true })
+    browser = await launchChromium({ executablePath: executable,
+      headless: true, operationTimeoutMs: 30_000, processGraceMs: 2000, processCloseTimeoutMs: 5000 },
+    signal, launchContext.subprocess, SessionId('external-browser-fixture'))
     const { stdout } = await promisify(execFile)(process.execPath, [
-      fileURLToPath(new URL('./fixtures/built-attachment.mjs', import.meta.url)), endpoint, `${url}built-worker`,
+      fileURLToPath(new URL('./fixtures/built-attachment.mjs', import.meta.url)), browser.endpoint, url,
     ], { signal, env: {} })
     expect(stdout).toContain('Stagehand fixture')
-    expect(external.exitCode).toBeNull()
-    const afterBuilt = await (await fetch(versionUrl, { signal })).json() as Array<{ url: string }>
-    expect(afterBuilt.some(target => target.url === `${url}built-worker`)).toBe(true)
+    expect(JSON.parse(stdout)).toMatchObject({ admissions: 1, completions: 1, waited: true })
+    const targets = new URL(browser.endpoint)
+    targets.protocol = 'http:'
+    targets.pathname = '/json/list'
+    const pages = await (await fetch(targets, { signal })).json() as Array<{ url: string }>
+    expect(pages.some(page => page.url === url)).toBe(true)
   } finally {
-    await ctx.fiber.dispose()
-    if (external !== undefined && external.exitCode === null) external.kill('SIGTERM')
-    await exited
-    await new Promise<void>((resolve, reject) => { server.close((error) => { if (error) reject(error); else resolve() }) })
-    await rm(root, { recursive: true, force: true })
+    try { await browser?.close(); await launchContext.fiber.dispose() } finally {
+      await new Promise<void>((resolve, reject) => { server.close((error) => { if (error) reject(error); else resolve() }) })
+    }
   }
 })
 
-it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1' || !process.env.DSH_STAGEHAND_MODEL || !process.env.DSH_STAGEHAND_MODEL_API_KEY)('extracts a controlled heading using an independently configured native Stagehand model', { timeout: 120_000, retry: 0 }, async ({ signal }) => {
+it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1' || !process.env.DSH_STAGEHAND_PROVIDER || !process.env.DSH_STAGEHAND_MODEL || !process.env.DSH_STAGEHAND_MODEL_API_KEY)('extracts a controlled heading using an independently configured host model', { timeout: 120_000, retry: 0 }, async ({ signal }) => {
   const server = createServer((_request, response) => {
     response.setHeader('content-type', 'text/html')
     response.end('<!doctype html><h1>Stagehand structured result</h1>')
@@ -119,8 +187,12 @@ it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1' || !process.env.DSH_STAGEHAND_MO
     const address = server.address()
     if (address === null || typeof address === 'string') throw new Error('Missing fixture address')
     await mountAgentLoopTestDependencies(ctx)
+    await mountAttachments(ctx)
     await ctx.plugin(BrowserUseRegistry)
-    await ctx.plugin(Provider, { model: stagehandModelSchema.parse({ modelName: process.env.DSH_STAGEHAND_MODEL, apiKey: process.env.DSH_STAGEHAND_MODEL_API_KEY }), mode: 'launch', ...process.env.DSH_BROWSER_EXECUTABLE === undefined ? {} : { executablePath: process.env.DSH_BROWSER_EXECUTABLE } })
+    const model = stagehandModelSchema.parse({ provider: process.env.DSH_STAGEHAND_PROVIDER, model: process.env.DSH_STAGEHAND_MODEL })
+    const provider = await import('@deepseek-ai/dsh-llm-pi-ai')
+    await ctx.plugin(provider, { providers: { [model.provider]: { apiKeyEnv: 'DSH_STAGEHAND_MODEL_API_KEY' } } })
+    await ctx.plugin(Provider, { model, mode: 'launch', ...process.env.DSH_BROWSER_EXECUTABLE === undefined ? {} : { executablePath: process.env.DSH_BROWSER_EXECUTABLE } })
     const harness = await mountAgentLoopTestHarness(ctx)
     const agent = await harness.create(SessionId('stagehand-real-model'), {})
     const execute = (suffix: string, args: unknown) => ctx.tools.execute({ agent, name: `stagehand_${suffix}`, arguments: args, callId: ToolCallId(`api-${suffix}`), signal })
@@ -132,7 +204,7 @@ it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1' || !process.env.DSH_STAGEHAND_MO
     })
     expect(result.isError, JSON.stringify(result.content)).toBe(false)
     expect(JSON.stringify(result.content)).toContain('Stagehand structured result')
-    expect(agent.session.snapshotEvents().some(event => event.type.startsWith('browser-use/'))).toBe(false)
+    expect(agent.session.snapshotEvents().some(event => event.type === 'browser-use/stagehand-llm-request')).toBe(true)
   } finally {
     await ctx.fiber.dispose()
     await new Promise<void>((resolve, reject) => { server.close((error) => { if (error) reject(error); else resolve() }) })
@@ -179,6 +251,7 @@ it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1' || process.platform === 'win32')
     ].join('\n'))
     await chmod(wrapper, 0o700)
     await mountAgentLoopTestDependencies(ctx)
+    await mountAttachments(ctx)
     await ctx.plugin(BrowserUseRegistry)
     await mountAgentLoopTestHarness(ctx)
     await ctx.plugin(Provider, { model: nativeModel, mode: 'launch', executablePath: wrapper })
@@ -228,6 +301,7 @@ it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1')('drains canceled navigation bef
     if (address === null || typeof address === 'string') throw new Error('No cancellation fixture listener')
     const url = `http://127.0.0.1:${address.port}/pending`
     await mountAgentLoopTestDependencies(ctx)
+    await mountAttachments(ctx)
     await ctx.plugin(BrowserUseRegistry)
     await mountAgentLoopTestHarness(ctx)
     await ctx.plugin(Provider, { model: nativeModel, mode: 'launch', executablePath: executable })

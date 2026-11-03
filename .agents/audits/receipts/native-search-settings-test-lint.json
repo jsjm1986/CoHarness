@@ -1,0 +1,14 @@
+{
+  "name": "native-search-settings-test-lint",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/web/web-search-deepseek/tests/settings.spec.ts",
+  "startedAt": "2026-10-24T04:05:36.553386+00:00",
+  "seconds": 5.099,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "21d2a07d66ae3c7cdcc9bbbe3df12065deb15e639866d0cefd8606479956f361",
+  "inputsAfter": "21d2a07d66ae3c7cdcc9bbbe3df12065deb15e639866d0cefd8606479956f361",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

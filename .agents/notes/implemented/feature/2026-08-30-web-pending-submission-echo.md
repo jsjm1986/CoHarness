@@ -14,7 +14,7 @@ The existing [Web multimodal image input and durable attachments](2026-07-22-web
 
 `Session.beginSubmission()` registers a local echo synchronously before image serialization and returns a fresh `rpcId`. The caller passes that identity to `session.prompt()` or `subagent.prompt()`. Host/API projection carries the same identity on the durable user-message source and on each `session/queue` occurrence; the queue schema preserves the occurrence field instead of stripping it.
 
-`Session` keeps pending echoes outside the Session log. A durable `user/message` or queue occurrence schedules retirement on the next frame, and a settlement latch makes duplicate observations idempotent. Admission failures, serialization failures, cancellation, and session disposal retire the echo as failed. The caller receives the retirement callback exactly once and can restore failed drafts without confusing an uncommitted echo with durable history.
+`Session` keeps pending echoes outside the Session log. A durable `user/message` or queue occurrence schedules retirement on the next frame, and a settlement latch makes duplicate observations idempotent. Admission failures, serialization failures, cancellation, and session disposal retire the echo as failed. The caller receives the retirement callback exactly once and can restore failed drafts without confusing an uncommitted echo with durable history. Buffered, replayed, and newly prepended durable user messages retain their admission meaning outside the installed history window. Their matching receipt settles the input without appending older content or replaying queue mutations; a successful admission RPC alone remains insufficient to prove that a pre-step pipeline accepted the message.
 
 `ConversationController` gives the Chat view the browser-owned preview URL immediately. On observed image admission it transfers each preview to the session-scoped durable image cache, where the preview remains synchronously readable until the authenticated bytes resolve. The canonical URL then replaces it and the preview is revoked. Failed or invalidated loads remove the cache entry; releasing a rendered session revokes any current preview immediately and also releases a later canonical URL. Document-only and image-only prompts omit empty text blocks, and concurrent submissions settle only their own images.
 
@@ -23,6 +23,8 @@ Pending echoes are not reused as durable message nodes: durable renderers carry 
 ## Verification
 
 Focused runtime, queue-schema, ConversationController, ChatView, and MessageImage tests cover slow encoding, request-id forwarding, queue/durable duplicate observations, business/transport/abort failures, serialization abandonment, image-only and document-only content, concurrent submissions, durable URL replacement, failed-load retry, and preview cleanup on session release and disposal.
+
+The keyless Web regression runs the shipped Host, drops its live downlink during a tool round, and reconnects through production history pagination. It verifies that an older matching receipt unlocks the composer without a duplicate user message; the preceding browser artifact fails this scenario.
 
 ## Alternatives considered
 

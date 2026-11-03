@@ -1,0 +1,14 @@
+{
+  "name": "document-projection-no-unknown-casts",
+  "cwd": ".",
+  "command": "pnpm run verify-no-unknown-casts",
+  "startedAt": "2026-10-25T22:26:27.418984+00:00",
+  "seconds": 72.85,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e4d097033832f21b5e567a2bfb85d08fac0f3e8d4b1b5d19d14529f6830a99c9",
+  "inputsAfter": "e4d097033832f21b5e567a2bfb85d08fac0f3e8d4b1b5d19d14529f6830a99c9",
+  "postgresToolDirectory": null,
+  "outputSha256": "9bd3ef672b335c55ff9a3b3a164efea88e941edc4f149f9081ff20ca2d32f9ea",
+  "outputTail": "$ tsx scripts/verify-no-unknown-casts.ts\nverify-no-unknown-casts: no new assertions; 1865 existing assertions remain.\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "managed-copy-lint",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/oxlint -c ../.oxlintrc.json --type-aware src/managed-files.ts tests/managed-files-short-write.spec.ts tests/deployment-backups.spec.ts",
+  "startedAt": "2026-10-25T11:10:49.038906+00:00",
+  "seconds": 3.359,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a624ab3fb39c6b12f284e49096327ab3960ca73af3ebf0dd9fe49d9c666ddca8",
+  "inputsAfter": "a624ab3fb39c6b12f284e49096327ab3960ca73af3ebf0dd9fe49d9c666ddca8",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

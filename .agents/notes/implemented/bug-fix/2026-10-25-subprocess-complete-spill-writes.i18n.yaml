@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-25-subprocess-complete-spill-writes.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-25-subprocess-complete-spill-writes.md
+document:
+  en: 12d693bd8cd343e68d5b705e994ea39210c02f80
+  zh: 2f13ee51cc00f3408fa5cdf8f0c7b6636c7d4a92
+/agent-note-complete-subprocess-recovery-file-writes:
+  en: e0652365d9f47ec7
+  zh: fdbbe87121466501
+/agent-note-complete-subprocess-recovery-file-writes/problem:
+  en: 5b7a44268d2c2c74
+  zh: 8c08360cda9a6f43
+/agent-note-complete-subprocess-recovery-file-writes/decision:
+  en: 4ab72313b2ac7c79
+  zh: 6fe33fc30787f4e6
+/agent-note-complete-subprocess-recovery-file-writes/alternatives-considered:
+  en: 2321729390925293
+  zh: 084568ba844a1acb
+/agent-note-complete-subprocess-recovery-file-writes/consequences:
+  en: f107d7b2fa43cb1d
+  zh: 136942f387bd40b8
+/agent-note-complete-subprocess-recovery-file-writes/verification:
+  en: 1d04caaba3f2265b
+  zh: d4454fcb6458bb7c

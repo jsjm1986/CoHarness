@@ -33,6 +33,14 @@ const childProcessMocks = vi.hoisted(() => ({
   spawn: vi.fn(),
   spawnSync: vi.fn(),
 }))
+const filesystemMocks = vi.hoisted(() => ({ readFileSync: vi.fn(), mkdtempSync: vi.fn() }))
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  filesystemMocks.readFileSync.mockImplementation(actual.readFileSync)
+  filesystemMocks.mkdtempSync.mockImplementation(actual.mkdtempSync)
+  return { ...actual, readFileSync: filesystemMocks.readFileSync, mkdtempSync: filesystemMocks.mkdtempSync }
+})
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>()
@@ -148,6 +156,7 @@ function launch(
     ...overrides.runnerAvailable === undefined ? {} : { runnerAvailable: overrides.runnerAvailable },
     ...overrides.loadLinuxExecve === undefined ? {} : { loadLinuxExecve: overrides.loadLinuxExecve },
     ...overrides.sleep === undefined ? {} : { sleep: overrides.sleep },
+    ...overrides.processCgroup === undefined ? {} : { processCgroup: overrides.processCgroup },
   })
   const requestPath = options?.env?.[SUBPROCESS_RUNNER_ENV]
   if (requestPath === undefined) throw new Error('launch did not publish a request locator')
@@ -156,6 +165,55 @@ function launch(
 }
 
 describe('Linux native capability selection', () => {
+  it('refuses unreadable kernel ownership before allocating launch files or starting pipe and PTY targets', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'dsh-runtime-unreadable-')); directories.push(directory)
+    const processCgroup = join(directory, 'missing-cgroup'), spawn = vi.fn()
+    filesystemMocks.mkdtempSync.mockClear()
+    const internals = { processCgroup, spawn, runnerInvocation: ['/usr/bin/node', '/runner.js'] as [string, ...string[]] }
+    expect(() => launchLinuxScope(spec(), {}, [], internals)).toThrow(expect.objectContaining({ code: 'ENOENT' }))
+    expect(() => prepareLinuxTerminalScope({ argv: ['tool'], cwd: '/target', rows: 24, cols: 80, terminalType: 'dumb', graceMs: 100 }, {}, [], internals))
+      .toThrow(expect.objectContaining({ code: 'ENOENT' }))
+    expect(spawn).not.toHaveBeenCalled()
+    expect(filesystemMocks.mkdtempSync).not.toHaveBeenCalled()
+  })
+
+  it('reads the current Linux process membership when no alternate kernel file is supplied', () => {
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
+    const slice = 'dshruntime0123456789abcdef0123456789abcdef.slice'
+    const spawnSync = vi.fn((_command: string, _args: readonly string[]) => ({ status: 0, stdout: '', stderr: '' }))
+    Object.defineProperty(process, 'platform', { ...platform, value: 'linux' })
+    filesystemMocks.readFileSync.mockReturnValueOnce(`0::/user.slice/user@1000.service/${slice}/runtime.scope\n`)
+    try {
+      probeLinuxScope({ spawnSync: spawnSync as never })
+      expect(filesystemMocks.readFileSync).toHaveBeenLastCalledWith('/proc/self/cgroup', 'utf8')
+      expect(spawnSync.mock.calls[0]?.[1]).toContain(`--slice=${slice}`)
+    } finally { Object.defineProperty(process, 'platform', platform) }
+  })
+
+  it.each(['0::', '2:name=systemd:'])('keeps probes, pipe and PTY scopes inside their inherited Runtime slice through %s', (membership) => {
+    const directory = mkdtempSync(join(tmpdir(), 'dsh-runtime-cgroup-')); directories.push(directory)
+    const processCgroup = join(directory, 'cgroup')
+    const slice = 'dshruntime0123456789abcdef0123456789abcdef.slice'
+    writeFileSync(processCgroup, `${membership}/user.slice/user-1000.slice/user@1000.service/${slice}/dsh-subprocess-parent.scope\n`)
+    const spawnSync = vi.fn((_command: string, _args: readonly string[]) => ({ status: 0, stdout: '', stderr: '' }))
+    probeLinuxScope({ processCgroup, spawnSync: spawnSync as never })
+    expect(spawnSync.mock.calls[0]?.[1]).toContain(`--slice=${slice}`)
+    const ordinary = launch(undefined, { processCgroup })
+    expect(ordinary.spawn.mock.calls[0]?.[1]).toContain(`--slice=${slice}`)
+    const terminal = prepareLinuxTerminalScope({ argv: ['tool'], cwd: '/target', graceMs: 100, cols: 80, rows: 24, terminalType: 'dumb' }, {}, [], { processCgroup, runnerInvocation: ['/usr/bin/node', '/runner.js'] })
+    try { expect(terminal.args).toContain(`--slice=${slice}`) } finally { terminal.cleanup() }
+  })
+
+  it('ignores non-Runtime slices and names outside the exact kernel membership syntax', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'dsh-runtime-cgroup-')); directories.push(directory)
+    const processCgroup = join(directory, 'cgroup')
+    for (const entry of ['0::/user.slice/app.slice/tool.scope', '0::/dshruntimewrong.slice/tool.scope',
+      '1:memory:/dshruntime0123456789abcdef0123456789abcdef.slice/tool.scope']) {
+      writeFileSync(processCgroup, entry + '\n')
+      expect(launch(undefined, { processCgroup }).spawn.mock.calls[0]?.[1]?.some(arg => arg.startsWith('--slice='))).toBe(false)
+    }
+  })
+
   it.each([
     { delivered: true, error: undefined, accepted: true },
     { delivered: false, error: undefined, accepted: false },
@@ -278,6 +336,20 @@ describe('Linux native capability selection', () => {
         expect(confirmLinuxManager({ spawnSync: query as never, unixSocketTable: table })).toBe(true)
         expect(query).toHaveBeenCalledOnce()
       }
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('does not discover a user manager for a fresh runtime directory through the default kernel table', () => {
+    const runtime = mkdtempSync(join(tmpdir(), 'dsh-runtime-absent-'))
+    directories.push(runtime)
+    try {
+      vi.stubEnv('XDG_RUNTIME_DIR', runtime)
+      expect(linuxManagerListener()).toBeUndefined()
+      const query = vi.fn(() => ({ status: 1, error: undefined }))
+      expect(confirmLinuxManager({ spawnSync: query as never })).toBe(false)
+      expect(query).toHaveBeenCalledOnce()
     } finally {
       vi.unstubAllEnvs()
     }

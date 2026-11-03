@@ -2,7 +2,11 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash } from 'node:crypto'
 import { ExecutionIdentityError, GatewayExecutionIdentity, watchExecutionAccess } from './execution-identity.ts'
 import type { GatewayAccessMonitor } from './access-invalidation.ts'
-import { DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS } from './config.ts'
+import { createRuntimeDocumentStoreStream, type RuntimeDocumentStoreHandler } from './runtime-document-store.ts'
+import type { GatewayRuntimeHandler } from './server.ts'
+import { DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS, DEFAULT_UPSTREAM_TIMEOUT_MS } from './config.ts'
+import { handleRuntimeResourceApi } from './runtime-resource-api.ts'
+import type { NodeResourceBudget } from './node-resource-budget.ts'
 import { sessionLogicalFormatCatalog as sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import {
   SESSION_SURFACE_EVENT_TYPES,
@@ -31,6 +35,7 @@ import {
   decodePageCursor,
   encodePageCursor,
   type ConversationRepository,
+  type ConversationRuntimeScope,
   type StoredConversation,
 } from './postgres/conversation-repository.ts'
 import type { PostgresInstanceRepository } from './postgres/instance-repository.ts'
@@ -60,6 +65,12 @@ import {
   type RuntimeDocumentCatalogPurgeHandler,
 } from './document-catalog.ts'
 
+/** Required storage operations and optional bounded reads exposed by a Runtime repository. */
+export type RuntimeConversationRepository = Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
+  & Partial<Pick<ConversationRepository,
+      'readHeader' | 'readFrom' | 'readPage' | 'readHistoryIndex' | 'revision' | 'migrate'
+      | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner' | 'hasProjectDraftReservation'>>
+
 export interface RuntimeCredentialSubject {
   organizationId: string
   target: RuntimeTarget
@@ -87,21 +98,26 @@ const EVENT_ENVELOPE_KEYS = new Set([
 ])
 
 interface RuntimeApiDependencies {
-  /** Initialized organization invalidations; streamed as hints to managed runtimes. */
+  /** Initialized organization invalidations; required for documentStore and streamed as hints to managed runtimes. */
   accessMonitor?: GatewayAccessMonitor
   /** Configured liveness interval for execution-watch connections. */
   executionWatchHeartbeatMs?: number
+  /** Authority-read deadline; omitted standalone compositions use the default upstream request timeout. */
+  executionWatchAuthorizationTimeoutMs?: number
   context: Pick<PostgresRuntimeContext, 'pool' | 'organizationSlug' | 'nodeId'>
   instances: Pick<PostgresInstanceRepository, 'authenticateRuntimeToken'>
-  conversations: Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
-    & Partial<Pick<ConversationRepository,
-      'readHeader' | 'readFrom' | 'readPage' | 'readHistoryIndex' | 'revision' | 'migrate'
-      | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner' | 'hasProjectDraftReservation'>>
+    & Partial<Pick<PostgresInstanceRepository, 'authenticateRuntimeCleanupToken'>>
+  /** Node-wide model/process coordinator; managed launches require this service. */
+  resourceBudget?: NodeResourceBudget
+  /** Bind every Session operation to the authenticated organization and Runtime. */
+  conversations: { forRuntime(scope: ConversationRuntimeScope): RuntimeConversationRepository }
   collaboration: Pick<
     PostgresCollaborationService,
     'access' | 'claimInteraction' | 'projectForUser' | 'readableSessionIds'
   >
   archives?: Pick<ConversationArchiveService, 'syncRuntimeSnapshot' | 'acknowledgeCommand' | 'hasPendingCommands'>
+  /** Runtime-owned metadata publication; absent in standalone fixtures. */
+  workspaceCatalog?: Pick<import('./workspace-catalog.ts').PostgresWorkspaceCatalog, 'publish'>
   principals: GatewayPrincipalSigner
   governance: Pick<GatewayModelGovernanceService, 'resolveOrganizationCredential'>
     & Partial<Pick<GatewayModelGovernanceService, 'resolveManagedCredential'>>
@@ -125,6 +141,8 @@ interface RuntimeApiDependencies {
   documentCatalogAuthorize?: RuntimeDocumentCatalogAuthorizeHandler
   documentCatalogOverview?: RuntimeDocumentCatalogOverviewHandler
   documentCatalogHistory?: RuntimeDocumentCatalogHistoryHandler
+  /** Gateway-owned authenticated streaming document backend. */
+  documentStore?: RuntimeDocumentStoreHandler
   /** Optional interactive-desktop coordinator; absent where desktop driving is disabled. */
   desktops?: DesktopCoordinator
   /** Optional registered SSH targets; absent in standalone compositions without managed SSH. */
@@ -404,12 +422,15 @@ function assertionFor(
     return undefined
   }
   const claims = authority.verify(assertion)
-  // webhook-dispatch assertions authorize only the managed intake route and the
-  // execution input/selection admission it drives; every other runtime-facing
-  // API keeps rejecting the restricted purpose.
-  if (claims.purpose === 'webhook-dispatch' && options.allowWebhookDispatch !== true) throw new CollaborationDeniedError('forbidden')
+  if (claims.purpose !== undefined
+    && !((claims.purpose === 'document-admin' && options.allowDocumentAdmin === true)
+      || (claims.purpose === 'terminal-admin' && options.allowTerminalAdmin === true)
+      || (claims.purpose === 'plugin-admin' && options.allowPluginAdmin === true)
+      || (claims.purpose === 'webhook-dispatch' && options.allowWebhookDispatch === true))) {
+    throw new CollaborationDeniedError('forbidden')
+  }
   if (claims.runtime.kind !== subject.target.kind || claims.runtime.id !== subject.target.id
-    || claims.runtime.generation !== subject.generation) {
+    || claims.runtime.generation !== subject.generation || claims.runtime.runtimeId !== subject.target.runtimeId) {
     throw new CollaborationDeniedError('forbidden')
   }
   if (subject.target.kind === 'user') {
@@ -434,7 +455,8 @@ function belongsToRuntime(header: ConversationHeader, subject: RuntimeCredential
 }
 
 function revisionFor(subject: RuntimeCredentialSubject, revision: string): string {
-  return `postgres:${subject.organizationId}:${subject.target.kind}:${String(subject.target.id)}:${revision}`
+  const runtime = subject.target.runtimeId === undefined ? '' : `${subject.target.runtimeId}:`
+  return `postgres:${subject.organizationId}:${subject.target.kind}:${String(subject.target.id)}:${runtime}${revision}`
 }
 
 function draftScopeKey(
@@ -448,21 +470,41 @@ function draftScopeKey(
   const owner = subject.target.kind === 'user'
     ? { kind: 'personal', runtime: subject.target.id, user: claims.user.id }
     : { kind: 'project', runtime: subject.target.id, project: claims.scope.kind === 'project' ? claims.scope.projectId : 0, user: claims.user.id }
-  return createHash('sha256').update(JSON.stringify({ owner, cwd, visibility, agentPreset: agentPreset ?? '', sshTarget: sshTarget ?? 0 })).digest('hex')
+  return createHash('sha256').update(JSON.stringify({ owner, runtimeId: subject.target.runtimeId ?? null,
+    cwd, visibility, agentPreset: agentPreset ?? '', sshTarget: sshTarget ?? 0 })).digest('hex')
 }
 
 /** Authenticated loopback API used by Gateway-backed runtime plugins. */
 export function createRuntimeApiHandler(
   deps: RuntimeApiDependencies,
-): (req: IncomingMessage, res: ServerResponse, pathname: string, body: string) => Promise<boolean> {
-  const execution = new GatewayExecutionIdentity(deps.context.pool)
-  const authenticate = async (req: IncomingMessage): Promise<RuntimeCredentialSubject | null> => {
+): GatewayRuntimeHandler {
+  const execution = new GatewayExecutionIdentity(deps.context.pool, deps.context.nodeId)
+  const authenticate = async (req: IncomingMessage, cleanup: boolean): Promise<RuntimeCredentialSubject | null> => {
     const token = authorizationToken(req)
-    return token === undefined ? null : deps.instances.authenticateRuntimeToken(token)
+    if (token === undefined) return null
+    return cleanup && deps.instances.authenticateRuntimeCleanupToken !== undefined
+      ? deps.instances.authenticateRuntimeCleanupToken(token) : deps.instances.authenticateRuntimeToken(token)
   }
 
+  const currentAssertion = async (req: IncomingMessage, subject: RuntimeCredentialSubject, required: boolean,
+    options: Parameters<typeof assertionFor>[4] = {}): Promise<GatewayPrincipalClaims | undefined> => {
+    const claims = assertionFor(req, deps.principals, subject, required, options)
+    if (claims === undefined || claims.purpose === 'document-admin' || claims.purpose === 'terminal-admin' || claims.purpose === 'plugin-admin') return claims
+    const current = await deps.context.pool.query(`SELECT 1 FROM harness.users u WHERE u.organization_id=$1 AND u.public_id=$2
+      AND harness.computer_use_allowed(u.organization_id,u.id,$3)`, [subject.organizationId, claims.user.id, deps.context.nodeId])
+    if (current.rowCount !== 1) throw new CollaborationDeniedError('forbidden')
+    return claims
+  }
+
+  const sessionScope = (subject: RuntimeCredentialSubject): ConversationRuntimeScope => {
+    const runtimeId = subject.target.runtimeId
+    if (runtimeId === undefined) throw new ConversationReadError('dependency', 'conversation Runtime identity is unavailable')
+    return { organizationId: subject.organizationId, runtimeId }
+  }
+  const conversations = (subject: RuntimeCredentialSubject): RuntimeConversationRepository => deps.conversations.forRuntime(sessionScope(subject))
+
   const stored = async (sessionId: string, subject: RuntimeCredentialSubject): Promise<StoredConversation | undefined> => {
-    const value = await deps.conversations.load(sessionId)
+    const value = await conversations(subject).load(sessionId)
     return value !== undefined && belongsToRuntime(value.header, subject) ? value : undefined
   }
 
@@ -472,9 +514,10 @@ export function createRuntimeApiHandler(
     subject: RuntimeCredentialSubject,
     signal?: AbortSignal,
   ): Promise<ConversationHeader | undefined> => {
-    const value = deps.conversations.readHeader !== undefined
-      ? await deps.conversations.readHeader(sessionId, signal)
-      : (await deps.conversations.load(sessionId))?.header
+    const repository = conversations(subject)
+    const value = repository.readHeader !== undefined
+      ? await repository.readHeader(sessionId, signal)
+      : (await repository.load(sessionId))?.header
     return value !== undefined && belongsToRuntime(value, subject) ? value : undefined
   }
 
@@ -495,7 +538,8 @@ export function createRuntimeApiHandler(
     if (direction !== 'older' && direction !== 'newer') {
       throw new ConversationReadError('protocol', 'conversation page direction is invalid')
     }
-    if (cursor !== undefined && (cursor.sessionId !== sessionId || cursor.direction !== direction)) {
+    if (cursor !== undefined && (cursor.organizationId !== subject.organizationId || cursor.runtimeId !== sessionScope(subject).runtimeId
+      || cursor.sessionId !== sessionId || cursor.direction !== direction)) {
       throw new ConversationReadError('protocol', 'conversation page cursor belongs to another request')
     }
     // A moved log is the same transient condition as a revision change inside
@@ -559,7 +603,7 @@ export function createRuntimeApiHandler(
       startSeq: first?.seq ?? null,
       endSeq: last?.seq ?? null,
       hasMore,
-      ...(hasMore ? { nextCursor: encodePageCursor({ version: 1, sessionId, revision: value.revision, direction, anchor: nextAnchor }) } : {}),
+      ...(hasMore ? { nextCursor: encodePageCursor({ version: 2, ...sessionScope(subject), sessionId, revision: value.revision, direction, anchor: nextAnchor }) } : {}),
       uncompressedBytes: bytes,
     }
   }
@@ -576,14 +620,15 @@ export function createRuntimeApiHandler(
     let creatorUserId = subject.userInternalId
     if (subject.target.kind === 'project') {
       if (header.parentSession === undefined) throw new CollaborationDeniedError('forbidden')
-      assertionFor(req, deps.principals, subject, false)
+      await currentAssertion(req, subject, false)
       creatorUserId = undefined
     } else {
-      assertionFor(req, deps.principals, subject, false)
+      await currentAssertion(req, subject, false)
     }
     return {
       id: header.id,
       organizationId: subject.organizationId,
+      runtimeId: subject.target.runtimeId,
       ...(creatorUserId === undefined ? {} : { creatorUserId }),
       ...(subject.projectInternalId === undefined ? {} : { projectId: subject.projectInternalId }),
       ...(header.parentSession === undefined ? {} : { parentSessionId: header.parentSession }),
@@ -611,7 +656,7 @@ export function createRuntimeApiHandler(
     if (subject.target.kind !== 'project' || subject.projectInternalId === undefined
       || claims.organization !== deps.context.organizationSlug
       || claims.runtime.kind !== subject.target.kind || claims.runtime.id !== subject.target.id
-      || claims.runtime.generation !== subject.generation) {
+      || claims.runtime.generation !== subject.generation || claims.runtime.runtimeId !== subject.target.runtimeId) {
       throw new Error('invalid session creation authorization')
     }
     if (claims.header.id !== sessionId || claims.header.parentSession !== undefined) {
@@ -637,6 +682,7 @@ export function createRuntimeApiHandler(
     return {
       id: claims.header.id,
       organizationId: subject.organizationId,
+      runtimeId: subject.target.runtimeId,
       creatorUserId,
       projectId: subject.projectInternalId,
       visibility: claims.visibility,
@@ -684,18 +730,34 @@ export function createRuntimeApiHandler(
     }
   }
 
-  return async (req, res, pathname, body) => {
+  const handler: GatewayRuntimeHandler = async (req, res, pathname, body) => {
     if (!pathname.startsWith('/internal/runtime/')) return false
-    const subject = await authenticate(req)
+    const subject = await authenticate(req, pathname === '/internal/runtime/resources/finish' && req.method === 'POST')
     if (subject === null) {
       send(res, 401, { error: 'invalid-runtime-token' })
       return true
     }
     try {
+      if (pathname === '/internal/runtime/workspace/catalog' && req.method === 'POST') {
+        if (deps.workspaceCatalog === undefined) { send(res, 503, { error: 'workspace-catalog-unavailable' }); return true }
+        await deps.workspaceCatalog.publish(subject, JSON.parse(body))
+        send(res, 200, { synchronized: true }); return true
+      }
+      if (pathname.startsWith('/internal/runtime/resources/')) {
+        if (deps.resourceBudget === undefined) { send(res, 503, { error: 'resource-unavailable' }); return true }
+        return await handleRuntimeResourceApi({ pool: deps.context.pool, principals: deps.principals,
+          execution, budget: deps.resourceBudget }, subject, req, res, pathname, body)
+      }
       const url = new URL(req.url ?? '/', 'http://runtime')
       if (pathname === '/internal/runtime/execution/watch' && req.method === 'GET') {
         if (deps.accessMonitor === undefined) { send(res, 503, { error: 'execution-watch-unavailable' }); return true }
-        watchExecutionAccess(deps.accessMonitor, res, deps.executionWatchHeartbeatMs ?? DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS)
+        watchExecutionAccess(deps.accessMonitor, res, deps.executionWatchHeartbeatMs ?? DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS,
+          deps.context.nodeId, async () => {
+            const current = await authenticate(req, false)
+            return current !== null && current.organizationId === subject.organizationId
+              && current.target.kind === subject.target.kind && current.target.id === subject.target.id
+              && current.generation === subject.generation
+          }, deps.executionWatchAuthorizationTimeoutMs ?? DEFAULT_UPSTREAM_TIMEOUT_MS)
         return true
       }
       if (pathname.startsWith('/internal/runtime/execution/') && req.method === 'POST') {
@@ -712,7 +774,7 @@ export function createRuntimeApiHandler(
           let header: Pick<ConversationHeader, 'id' | 'parentSessionId' | 'seedLength'> | undefined = subject.target.kind === 'project'
             ? await storedHeader(payload.sessionId, subject, requestSignal(req, res)) : undefined
           if (header === undefined && subject.projectInternalId !== undefined
-            && await deps.conversations.hasProjectDraftReservation?.(subject.organizationId, payload.sessionId, subject.projectInternalId) === true) {
+            && await conversations(subject).hasProjectDraftReservation?.(subject.organizationId, payload.sessionId, subject.projectInternalId) === true) {
             // A live draft reservation binds this Session id to the project before
             // the first append materializes its header; it admits a root unseeded Session only.
             header = { id: payload.sessionId }
@@ -724,12 +786,12 @@ export function createRuntimeApiHandler(
         } else if (action === 'combine') {
           send(res, 200, await execution.combine(subject, value))
         } else if (action === 'selection') {
-          await execution.selection(subject, assertionFor(req, deps.principals, subject, true, { allowWebhookDispatch: true })!, value)
+          await execution.selection(subject, (await currentAssertion(req, subject, true, { allowWebhookDispatch: true }))!, value)
           res.writeHead(204)
           res.end()
         } else if (action === 'input' || action === 'question') {
-          const principal = assertionFor(req, deps.principals, subject, true,
-            action === 'input' ? { allowWebhookDispatch: true } : {})!
+          const principal = (await currentAssertion(req, subject, true,
+            action === 'input' ? { allowWebhookDispatch: true } : {}))!
           send(res, 200, action === 'input'
             ? await execution.input(subject, principal, value)
             : await execution.question(subject, principal, value))
@@ -750,13 +812,13 @@ export function createRuntimeApiHandler(
           }
           send(res, 200, action === 'inherit' ? await execution.inherit(subject, value) : await execution.relay(subject, value))
         } else if (action === 'terminal-authorize') {
-          send(res, 200, await execution.authorizeTerminal(subject, assertionFor(req, deps.principals, subject, true)!, deps.context.nodeId, value))
+          send(res, 200, await execution.authorizeTerminal(subject, (await currentAssertion(req, subject, true))!, deps.context.nodeId, value))
         } else if (action === 'terminal-check') {
           send(res, 200, await execution.checkTerminal(subject, deps.context.nodeId, value))
         } else if (action === 'desktop-confirmation') {
-          send(res, 200, await execution.desktopConfirmation(subject, assertionFor(req, deps.principals, subject, true)!, deps.context.nodeId, value))
+          send(res, 200, await execution.desktopConfirmation(subject, (await currentAssertion(req, subject, true))!, deps.context.nodeId, value))
         } else if (action === 'desktop-confirm') {
-          await execution.confirmDesktop(subject, assertionFor(req, deps.principals, subject, true)!, deps.context.nodeId, value)
+          await execution.confirmDesktop(subject, (await currentAssertion(req, subject, true))!, deps.context.nodeId, value)
           send(res, 200, { saved: true })
         } else if (action === 'desktop-authorize') {
           send(res, 200, await execution.authorizeDesktop(subject, deps.context.nodeId, value))
@@ -767,7 +829,7 @@ export function createRuntimeApiHandler(
       }
       if ((pathname === '/internal/runtime/plugin-management/authorize' || pathname === '/internal/runtime/terminal-management/authorize') && req.method === 'POST') {
         const terminal = pathname === '/internal/runtime/terminal-management/authorize'
-        const claims = assertionFor(req, deps.principals, subject, true, { allowTerminalAdmin: terminal, allowPluginAdmin: !terminal })!
+        const claims = (await currentAssertion(req, subject, true, { allowTerminalAdmin: terminal, allowPluginAdmin: !terminal }))!
         if (terminal || claims.user.role === 'admin') {
           // Administrators keep unconditional management authority; the
           // elevated purpose stays restricted to them.
@@ -786,14 +848,14 @@ export function createRuntimeApiHandler(
           const granted = await deps.context.pool.query<{ enabled: boolean | null }>(`SELECT p.enabled FROM harness.users u
             JOIN harness.memberships m ON m.user_id=u.id AND m.organization_id=u.organization_id
             JOIN harness.organizations o ON o.id=u.organization_id AND o.status='active'
-            LEFT JOIN harness.plugin_access_policies p ON p.organization_id=u.organization_id AND p.user_id=u.id
+            LEFT JOIN harness.plugin_access_policies p ON p.organization_id=u.organization_id AND p.user_id=u.id AND p.node_id=$3
             WHERE u.organization_id=$1 AND u.public_id=$2 AND u.deleted_at IS NULL
               AND u.status='active' AND m.status='active'`,
-          [subject.organizationId, claims.user.id])
+          [subject.organizationId, claims.user.id, deps.context.nodeId])
           if (granted.rows[0]?.enabled !== true) throw new CollaborationDeniedError('forbidden')
           if (subject.target.kind === 'project') {
             const project = await deps.context.pool.query(`SELECT 1 FROM harness.plugin_access_policies
-              WHERE organization_id=$1 AND project_id=$2 AND enabled`, [subject.organizationId, subject.projectInternalId])
+              WHERE organization_id=$1 AND project_id=$2 AND node_id=$3 AND enabled`, [subject.organizationId, subject.projectInternalId, deps.context.nodeId])
             if (project.rowCount !== 1) throw new CollaborationDeniedError('forbidden')
           }
         }
@@ -815,7 +877,7 @@ export function createRuntimeApiHandler(
         const approvalId = typeof payload.approvalId === 'string' && payload.approvalId !== '' ? payload.approvalId : undefined
         const rowLimit = safeInteger(payload.rowLimit, 1) ? Math.min(payload.rowLimit as number, 5_000) : 500
         send(res, 200, await deps.stewardQuery.query(
-          { organizationId: subject.organizationId, projectInternalId: subject.projectInternalId!, generation: subject.generation },
+          { organizationId: subject.organizationId, projectInternalId: subject.projectInternalId!, runtimeId: sessionScope(subject).runtimeId, generation: subject.generation },
           { sql: payload.sql, dryRun: payload.dryRun === true, approvalId, rowLimit },
         ))
         return true
@@ -838,7 +900,7 @@ export function createRuntimeApiHandler(
         return true
       }
       if (pathname === '/internal/runtime/ssh/resolve' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         if (deps.sshTargets === undefined) { send(res, 503, { error: 'ssh-unavailable' }); return true }
         if (claims.purpose !== undefined) throw new CollaborationDeniedError('forbidden')
         const payload = record(JSON.parse(body))
@@ -866,7 +928,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/documents/transfer' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         if (deps.documentTransfer === undefined) {
           send(res, 503, { error: 'document-transfer-unavailable' })
           return true
@@ -884,7 +946,7 @@ export function createRuntimeApiHandler(
 
       if ((pathname === '/internal/runtime/documents/transfer/commit' || pathname === '/internal/runtime/documents/transfer/retry')
         && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         const handler = pathname.endsWith('/retry') ? deps.documentTransferRetry : deps.documentTransferCommit
         if (handler === undefined) {
           send(res, 503, { error: 'document-transfer-unavailable' })
@@ -897,7 +959,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/documents/transfer/plan' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         if (deps.documentTransferPlan === undefined) {
           send(res, 503, { error: 'document-transfer-unavailable' })
           return true
@@ -909,7 +971,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/documents/transfer/capabilities' && req.method === 'GET') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         if (deps.documentTransferCapabilities === undefined) {
           send(res, 503, { error: 'document-transfer-unavailable' })
           return true
@@ -921,7 +983,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/documents/transfer/list' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         if (deps.documentTransferList === undefined) {
           send(res, 503, { error: 'document-transfer-unavailable' })
           return true
@@ -936,7 +998,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/documents/transfer/directories' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         if (deps.documentTransferDirectories === undefined) {
           send(res, 503, { error: 'document-transfer-unavailable' })
           return true
@@ -948,7 +1010,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/documents/transfer/directories/create' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         if (deps.documentTransferDirectoryCreate === undefined) {
           send(res, 503, { error: 'document-transfer-unavailable' })
           return true
@@ -960,7 +1022,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/documents/catalog/sync' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true, { allowDocumentAdmin: true })!
+        const claims = (await currentAssertion(req, subject, true, { allowDocumentAdmin: true }))!
         if (deps.documentCatalogSync === undefined) {
           send(res, 503, { error: 'document-catalog-unavailable' })
           return true
@@ -970,7 +1032,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/documents/catalog/authorize' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true, { allowDocumentAdmin: true })!
+        const claims = (await currentAssertion(req, subject, true, { allowDocumentAdmin: true }))!
         if (deps.documentCatalogAuthorize === undefined) {
           send(res, 503, { error: 'document-catalog-unavailable' })
           return true
@@ -980,7 +1042,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/documents/catalog/purge' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true, { allowDocumentAdmin: true })!
+        const claims = (await currentAssertion(req, subject, true, { allowDocumentAdmin: true }))!
         if (deps.documentCatalogPurge === undefined) {
           send(res, 503, { error: 'document-catalog-unavailable' })
           return true
@@ -990,7 +1052,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/documents/catalog/overview' && req.method === 'GET') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         if (deps.documentCatalogOverview === undefined) {
           send(res, 503, { error: 'document-catalog-unavailable' })
           return true
@@ -1008,7 +1070,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/documents/catalog/history' && req.method === 'GET') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         if (deps.documentCatalogHistory === undefined) {
           send(res, 503, { error: 'document-catalog-unavailable' })
           return true
@@ -1025,7 +1087,7 @@ export function createRuntimeApiHandler(
             && payload.visibility !== 'project' && payload.visibility !== 'private')) {
           throw new Error('invalid session creation request')
         }
-        const claims = assertionFor(req, deps.principals, subject, true, { allowWebhookDispatch: true })!
+        const claims = (await currentAssertion(req, subject, true, { allowWebhookDispatch: true }))!
         if (claims.purpose !== undefined && claims.purpose !== 'webhook-dispatch') {
           throw new CollaborationDeniedError('forbidden')
         }
@@ -1037,7 +1099,7 @@ export function createRuntimeApiHandler(
         send(res, 200, {
           authorization: deps.principals.issueSessionCreation({
             creatorUserId: claims.user.id,
-            runtime: { kind: 'project', id: subject.target.id, generation: subject.generation },
+            runtime: { ...subject.target, kind: 'project', generation: subject.generation },
             header,
             visibility: (payload?.visibility ?? 'project') as 'project' | 'private',
           }),
@@ -1046,7 +1108,8 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/session/draft/reserve' && req.method === 'POST') {
-        if (deps.conversations.reserveDraft === undefined) {
+        const repository = conversations(subject)
+        if (repository.reserveDraft === undefined) {
           send(res, 503, { error: 'draft-reservation-unavailable' })
           return true
         }
@@ -1059,7 +1122,7 @@ export function createRuntimeApiHandler(
           || (payload.sshTarget !== undefined && !safeInteger(payload.sshTarget, 1))) {
           throw new Error('invalid draft reservation request')
         }
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         const visibility = payload.visibility as 'personal' | 'project' | 'private'
         let userId: string | undefined
         let projectId: string | undefined
@@ -1079,8 +1142,10 @@ export function createRuntimeApiHandler(
           projectId = subject.projectInternalId
         }
         const sshTarget = payload.sshTarget as number | undefined
-        const reservation: ConversationDraftReservation = await deps.conversations.reserveDraft({
+        if (subject.target.runtimeId === undefined) throw new CollaborationDeniedError('forbidden')
+        const reservation: ConversationDraftReservation = await repository.reserveDraft({
           organizationId: subject.organizationId,
+          runtimeId: subject.target.runtimeId,
           scopeKey: draftScopeKey(subject, claims, payload.cwd, visibility, payload.agentPreset as string | undefined, sshTarget),
           draftId: payload.draftId,
           sessionId: payload.sessionId,
@@ -1101,8 +1166,9 @@ export function createRuntimeApiHandler(
 
       if ((pathname === '/internal/runtime/session/draft/heartbeat'
         || pathname === '/internal/runtime/session/draft/release') && req.method === 'POST') {
-        if (deps.conversations.heartbeatDraftForOwner === undefined
-          || deps.conversations.releaseDraftForOwner === undefined) {
+        const repository = conversations(subject)
+        if (repository.heartbeatDraftForOwner === undefined
+          || repository.releaseDraftForOwner === undefined) {
           send(res, 503, { error: 'draft-reservation-unavailable' })
           return true
         }
@@ -1111,7 +1177,7 @@ export function createRuntimeApiHandler(
           || typeof payload.sessionId !== 'string' || payload.sessionId.length === 0) {
           throw new Error('invalid draft reservation lifecycle request')
         }
-        const claims = assertionFor(req, deps.principals, subject, pathname.endsWith('/heartbeat'))
+        const claims = (await currentAssertion(req, subject, pathname.endsWith('/heartbeat')))
         let userId: string | undefined
         let projectId: string | undefined
         if (subject.target.kind === 'user') {
@@ -1139,10 +1205,10 @@ export function createRuntimeApiHandler(
           ...(projectId === undefined ? {} : { projectId }),
         }
         if (pathname.endsWith('/heartbeat')) {
-          const renewed = await deps.conversations.heartbeatDraftForOwner(input)
+          const renewed = await repository.heartbeatDraftForOwner(input)
           send(res, 200, { renewed })
         } else {
-          await deps.conversations.releaseDraftForOwner(input)
+          await repository.releaseDraftForOwner(input)
           send(res, 200, { released: true })
         }
         return true
@@ -1175,7 +1241,7 @@ export function createRuntimeApiHandler(
         const sessionIds = new Set<string>()
         let searchBytes = 0
         const snapshot = {
-          runtime: { kind: subject.target.kind, id: subject.target.id },
+          runtime: subject.target,
           revision,
           archivedSessionIds: ids as string[],
           sessions: sessions.map(value => {
@@ -1243,10 +1309,7 @@ export function createRuntimeApiHandler(
             }),
           }),
         } satisfies ConversationArchiveRuntimeSnapshot
-        const commands = await deps.archives.syncRuntimeSnapshot(snapshot, {
-          kind: subject.target.kind,
-          id: subject.target.id,
-        })
+        const commands = await deps.archives.syncRuntimeSnapshot(snapshot, subject.target)
         send(res, 200, { commands })
         return true
       }
@@ -1261,16 +1324,14 @@ export function createRuntimeApiHandler(
           || (payload.error !== undefined && typeof payload.error !== 'string')) {
           throw new Error('invalid archive acknowledgement')
         }
-        const acknowledged = await deps.archives.acknowledgeCommand(payload.commandId, payload.revision, payload.error as string | undefined, {
-          kind: subject.target.kind,
-          id: subject.target.id,
-        })
+        const acknowledged = await deps.archives.acknowledgeCommand(payload.commandId, payload.revision, payload.error as string | undefined, subject.target)
         if (!acknowledged) { send(res, 409, { error: 'archive-command-not-acknowledged' }); return true }
         send(res, 200, { acknowledged: true })
         return true
       }
 
       if (pathname === '/internal/runtime/session/append' && req.method === 'POST') {
+        const repository = conversations(subject)
         const payload = record(JSON.parse(body))
         if (typeof payload?.sessionId !== 'string' || typeof payload.batchId !== 'string') {
           throw new Error('invalid append request')
@@ -1290,7 +1351,7 @@ export function createRuntimeApiHandler(
           ? (header === undefined ? undefined : await createHeader(req, subject, header, payload.visibility))
           : await creationHeader(creationAuthorization, subject, payload.sessionId)
         const events = conversationEvents(payload.events)
-        const result = await deps.conversations.append(
+        const result = await repository.append(
           payload.sessionId,
           payload.batchId,
           events,
@@ -1299,7 +1360,7 @@ export function createRuntimeApiHandler(
         if (result === 'inserted' && deps.push !== undefined) {
           const completed = completedTurnEndSeqs(events)
           for (const eventSeq of completed) {
-            void deps.push.notifyCompleted(payload.sessionId, eventSeq).catch((error: unknown) => {
+            void deps.push.notifyCompleted(sessionScope(subject).runtimeId, payload.sessionId, eventSeq).catch((error: unknown) => {
               console.error(`[gateway] completed-turn push failed for ${payload.sessionId}:`, error)
             })
           }
@@ -1309,9 +1370,10 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/session/migrate' && req.method === 'POST') {
+        const repository = conversations(subject)
         // Repositories without body migration keep the compatibility no-op:
         // the Host treats a missing route as "metadata cannot be republished".
-        if (deps.conversations.migrate === undefined) return false
+        if (repository.migrate === undefined) return false
         const payload = record(JSON.parse(body))
         if (typeof payload?.sessionId !== 'string' || payload.sessionId === ''
           || typeof payload.sourceRevision !== 'string' || payload.sourceRevision === ''
@@ -1330,7 +1392,7 @@ export function createRuntimeApiHandler(
         if (!payload.sourceRevision.startsWith(revisionPrefix)) {
           throw new ConversationReadError('protocol', 'conversation migration source revision is not scoped to this runtime')
         }
-        const migrated = await deps.conversations.migrate(
+        const migrated = await repository.migrate(
           payload.sessionId,
           payload.migrationId,
           payload.sourceRevision.slice(revisionPrefix.length),
@@ -1359,14 +1421,15 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/session/read-from' && req.method === 'GET') {
+        const repository = conversations(subject)
         const sessionId = url.searchParams.get('sessionId') ?? ''
         const fromSeq = Number(url.searchParams.get('fromSeq'))
         if (!safeInteger(fromSeq)) throw new Error('invalid fromSeq')
         const signal = requestSignal(req, res)
         const header = await storedHeader(sessionId, subject, signal)
         if (header === undefined) throw new CollaborationDeniedError('conversation-not-found')
-        const events = deps.conversations.readFrom !== undefined
-          ? await deps.conversations.readFrom(sessionId, fromSeq, signal)
+        const events = repository.readFrom !== undefined
+          ? await repository.readFrom(sessionId, fromSeq, signal)
           : (await stored(sessionId, subject))?.events.filter(event => event.seq >= fromSeq) ?? []
         validateConversationRange(events, fromSeq)
         send(res, 200, {
@@ -1377,12 +1440,13 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/session/meta' && req.method === 'GET') {
+        const repository = conversations(subject)
         const sessionId = url.searchParams.get('sessionId') ?? ''
         const signal = requestSignal(req, res)
         const header = await storedHeader(sessionId, subject, signal)
         if (header === undefined) throw new CollaborationDeniedError('conversation-not-found')
-        const revision = deps.conversations.revision !== undefined
-          ? await deps.conversations.revision(sessionId, signal)
+        const revision = repository.revision !== undefined
+          ? await repository.revision(sessionId, signal)
           : (await stored(sessionId, subject))?.revision
         if (revision === undefined) throw new CollaborationDeniedError('conversation-not-found')
         send(res, 200, {
@@ -1393,6 +1457,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/session/index' && req.method === 'GET') {
+        const repository = conversations(subject)
         const sessionId = url.searchParams.get('sessionId') ?? ''
         const rawMaxItems = url.searchParams.get('maxItems')
         const maxItems = rawMaxItems === null ? 2_000 : Number(rawMaxItems)
@@ -1402,9 +1467,9 @@ export function createRuntimeApiHandler(
         const signal = requestSignal(req, res)
         const header = await storedHeader(sessionId, subject, signal)
         if (header === undefined) throw new CollaborationDeniedError('conversation-not-found')
-        const indexed = deps.conversations.readHistoryIndex === undefined
+        const indexed = repository.readHistoryIndex === undefined
           ? undefined
-          : await deps.conversations.readHistoryIndex(sessionId, maxItems, signal)
+          : await repository.readHistoryIndex(sessionId, maxItems, signal)
         if (indexed === undefined) {
           // Compatibility repositories without a bounded index retain their
           // existing complete-read fallback; first-party PostgreSQL never
@@ -1438,6 +1503,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/session/page' && req.method === 'GET') {
+        const repository = conversations(subject)
         const sessionId = url.searchParams.get('sessionId') ?? ''
         const cursor = url.searchParams.get('cursor') ?? undefined
         const directionParam = url.searchParams.get('direction')
@@ -1467,8 +1533,8 @@ export function createRuntimeApiHandler(
         // change without exposing a foreign page in the response.
         const header = await storedHeader(sessionId, subject, signal)
         if (header === undefined) throw new CollaborationDeniedError('conversation-not-found')
-        const page = deps.conversations.readPage !== undefined
-          ? await deps.conversations.readPage(sessionId, pageRequest, signal)
+        const page = repository.readPage !== undefined
+          ? await repository.readPage(sessionId, pageRequest, signal)
           : await fallbackPage(sessionId, subject, pageRequest, signal)
         if (page === undefined || !belongsToRuntime(page.header, subject) || page.header.id !== header.id) {
           throw new CollaborationDeniedError('conversation-not-found')
@@ -1488,13 +1554,14 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/session/revision' && req.method === 'GET') {
+        const repository = conversations(subject)
         const sessionId = url.searchParams.get('sessionId') ?? ''
         const signal = requestSignal(req, res)
         const value = await storedHeader(sessionId, subject, signal)
         const revision = value === undefined
           ? undefined
-          : deps.conversations.revision !== undefined
-            ? await deps.conversations.revision(sessionId, signal)
+          : repository.revision !== undefined
+            ? await repository.revision(sessionId, signal)
             : (await stored(sessionId, subject))?.revision
         send(res, 200, {
           revision: revision === undefined ? null : revisionFor(subject, revision),
@@ -1503,6 +1570,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/session/remove' && req.method === 'POST') {
+        const repository = conversations(subject)
         const payload = record(JSON.parse(body))
         const sessionId = payload?.sessionId
         if (typeof sessionId !== 'string' || sessionId === '') throw new Error('invalid session id')
@@ -1513,14 +1581,16 @@ export function createRuntimeApiHandler(
         if (await storedHeader(sessionId, subject, requestSignal(req, res)) === undefined) {
           throw new CollaborationDeniedError('conversation-not-found')
         }
-        await deps.conversations.removeTree(subject.organizationId, sessionId)
+        await repository.removeTree(subject.organizationId, sessionId)
         send(res, 200, { removed: true })
         return true
       }
 
       if (pathname === '/internal/runtime/session/list' && req.method === 'GET') {
-        const items = await deps.conversations.listScoped({
+        const repository = conversations(subject)
+        const items = await repository.listScoped({
           organizationId: subject.organizationId,
+          runtimeId: subject.target.runtimeId,
           ...(subject.projectInternalId === undefined ? {} : { projectId: subject.projectInternalId }),
           ...(subject.userInternalId === undefined ? {} : { creatorUserId: subject.userInternalId }),
         })
@@ -1533,6 +1603,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/session/repair' && req.method === 'POST') {
+        const repository = conversations(subject)
         const payload = record(JSON.parse(body))
         if (typeof payload?.sessionId !== 'string' || typeof payload.batchId !== 'string') {
           throw new Error('invalid repair request')
@@ -1542,10 +1613,10 @@ export function createRuntimeApiHandler(
         }
         const closers = conversationEvents(payload.closers)
         if (closers.length > 0) {
-          const result = await deps.conversations.append(payload.sessionId, payload.batchId, closers)
+          const result = await repository.append(payload.sessionId, payload.batchId, closers)
           if (result === 'inserted' && deps.push !== undefined) {
             for (const eventSeq of completedTurnEndSeqs(closers)) {
-              void deps.push.notifyCompleted(payload.sessionId, eventSeq).catch((error: unknown) => {
+              void deps.push.notifyCompleted(sessionScope(subject).runtimeId, payload.sessionId, eventSeq).catch((error: unknown) => {
                 console.error(`[gateway] repaired-turn push failed for ${payload.sessionId}:`, error)
               })
             }
@@ -1556,7 +1627,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/collaboration/authorize' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         const payload = record(JSON.parse(body))
         if (typeof payload?.sessionId !== 'string'
           || (payload.action !== 'read' && payload.action !== 'write'
@@ -1584,7 +1655,7 @@ export function createRuntimeApiHandler(
           return true
         }
         try {
-          send(res, 200, { access: await deps.collaboration.access(claims.user.id, payload.sessionId, payload.action) })
+          send(res, 200, { access: await deps.collaboration.access(claims.user.id, sessionScope(subject).runtimeId, payload.sessionId, payload.action) })
         } catch (error: unknown) {
           if (!(error instanceof CollaborationDeniedError && error.code === 'conversation-not-found')
             || creationAuthorization === undefined) throw error
@@ -1602,7 +1673,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/collaboration/claim-interaction' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         const payload = record(JSON.parse(body))
         if (subject.target.kind !== 'project' || typeof payload?.sessionId !== 'string'
           || (payload.kind !== 'approval' && payload.kind !== 'question')
@@ -1612,6 +1683,7 @@ export function createRuntimeApiHandler(
         send(res, 200, {
           claimed: await deps.collaboration.claimInteraction(
             claims.user.id,
+            sessionScope(subject).runtimeId,
             payload.sessionId,
             payload.kind,
             payload.interactionId,
@@ -1623,7 +1695,7 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/collaboration/readable' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = (await currentAssertion(req, subject, true))!
         const payload = record(JSON.parse(body))
         if (subject.target.kind !== 'project' || !Array.isArray(payload?.sessionIds)
           || payload.sessionIds.length > MAX_READABLE_SESSION_IDS
@@ -1648,7 +1720,7 @@ export function createRuntimeApiHandler(
         const readable = new Set<string>()
         for (let offset = 0; offset < payload.sessionIds.length; offset += READABLE_SESSION_BATCH_SIZE) {
           const batch = payload.sessionIds.slice(offset, offset + READABLE_SESSION_BATCH_SIZE)
-          for (const id of await deps.collaboration.readableSessionIds(claims.user.id, subject.target.id, batch)) {
+          for (const id of await deps.collaboration.readableSessionIds(claims.user.id, sessionScope(subject).runtimeId, subject.target.id, batch)) {
             readable.add(id)
           }
         }
@@ -1778,4 +1850,10 @@ export function createRuntimeApiHandler(
       disposeRequestSignals(res)
     }
   }
+  if (deps.documentStore === undefined) return handler
+  if (deps.accessMonitor === undefined) throw new Error('Runtime document backend requires a document access monitor.')
+  return Object.assign(handler, { stream: createRuntimeDocumentStoreStream({
+    authenticate: request => authenticate(request, false), execution, serve: deps.documentStore, accessMonitor: deps.accessMonitor,
+    principal: async (request, subject, allowDocumentAdmin) => (await currentAssertion(request, subject, true, { allowDocumentAdmin }))!,
+  }) })
 }

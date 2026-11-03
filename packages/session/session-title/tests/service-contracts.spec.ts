@@ -1,6 +1,6 @@
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Context, type Fiber } from '@deepseek-ai/cordis'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import SessionStore, { Session, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import SessionTitleService, {
   SessionTitleProviderId,
@@ -342,6 +342,28 @@ describe('SessionTitleService configuration and refresh boundaries', () => {
 
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('fallback title update failed'))
     expect(ctx.sessionTitle.get(session)).toBeUndefined()
+  })
+
+  it.each(['detached', 'service-unloading'] as const)('contains restored title repair failure when %s', async (kind) => {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(SessionTitleService, CONFIG)
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
+    const session = Session.create(SessionId(`restore-repair-${kind}`))
+    session.append('turn/start', { turn: 1 })
+    appendPrompt(session, 'Restored prompt without a title')
+    const detach = ctx.sessions.enter(session)
+    ctx.sessions.announce(session)
+    if (kind === 'detached') detach()
+    else {
+      await Promise.resolve()
+      await fiber.dispose()
+    }
+    await settle()
+    expect(session.snapshotEvents().some(event => event.type === 'session/title')).toBe(false)
+    if (kind === 'detached') expect(warn).toHaveBeenCalledWith(expect.stringContaining('title repair failed'))
+    else expect(warn).not.toHaveBeenCalled()
   })
 
   it('leaves a title absent when the byte cap cannot hold the first code point', async () => {

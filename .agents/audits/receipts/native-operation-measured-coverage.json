@@ -1,0 +1,14 @@
+{
+  "name": "native-operation-measured-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/llm/llm/tests/model-policy.spec.ts packages/llm/llm/tests/operations.spec.ts packages/llm/llm-deepseek/tests/search-operation.spec.ts packages/llm/llm-pi-ai/tests/search-operation.spec.ts packages/web/web-search-deepseek/tests --retry=0 --coverage --coverage.include=packages/llm/llm/src/model-policy.ts --coverage.include=packages/llm/llm/src/operation-call.ts --coverage.include=packages/llm/llm-deepseek/src/search-operation.ts --coverage.include=packages/llm/llm-pi-ai/src/search-operation.ts --coverage.include=packages/web/web-search-deepseek/src/usage.ts --coverage.reportsDirectory=.agents/audits/.local/native-operation-measured-coverage",
+  "startedAt": "2026-10-24T06:57:04.561044+00:00",
+  "seconds": 18.893,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2c156df7a59b5efacd5aeee2fc8e5fe427039bee6763f37586c746663544ab44",
+  "inputsAfter": "2c156df7a59b5efacd5aeee2fc8e5fe427039bee6763f37586c746663544ab44",
+  "postgresToolDirectory": null,
+  "outputSha256": "cf5e24ff4a8757a405a401a59906d5f07adecffac2fa5e7bf7e913d1533d47c7",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  11 passed (11)\n      Tests  128 passed (128)\n   Start at  14:57:20\n   Duration  3.33s (transform 5.15s, setup 693ms, import 7.00s, tests 748ms, environment 1ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 85/85 )\nBranches     : 100% ( 65/65 )\nFunctions    : 100% ( 22/22 )\nLines        : 100% ( 71/71 )\n================================================================================\n"
+}

@@ -11,6 +11,8 @@ kind: "package-reference"
 
 框架发布 `data-viewport` 与 `--dsw-viewport-height`，以支持窄窗格和屏幕键盘。medium 模式保留导航控制栏，右侧栏覆盖中间内容；compact 模式使用左侧抽屉和全屏辅助栏。遮罩和 Escape 将关闭请求交给标签状态所有者，不直接改写另一份开合状态。侧边抽屉关闭后恢复顶栏开关焦点。框架尺寸不写入 localStorage，Session 标签的恢复规则由右侧栏负责。
 
+`shell.mobile.header.context` 在紧凑顶栏标题旁显示当前标签页的身份信息；侧边栏收起为控制栏时显示于中间内容上方，尚未选择 Session 时也可使用。会话操作仍由 `shell.mobile.header.actions` 提供，并要求已选中 Session。
+
 `/client` 导出表层包含插件主体（`apply`／`inject`）、`LayoutController` 和 owner-share 接口（包括 `MobileHeaderActionOwnerProps`）。AppFrame、面板 store 与让步求解器仍属于包内部。
 
 `layout.openDetails(sessionId, target)` 把工具调用交给唯一的辅助栏所有者；`target.callId` 明确指定调用，标签不依赖聊天中当前选中的调用。`layout.focusRightbar(sessionId)` 只切换辅助栏目标，不改变中间窗格选择。辅助栏向框架报告是否显示、是否占轨道以及是否全屏；折叠不会结束 Host Session。
@@ -52,3 +54,5 @@ kind: "package-reference"
 无。
 
 </details>
+
+`shell.mobile.header.context` 的所属界面提供 `compact`：手机顶部栏为 true，桌面侧栏收起后的区域为 false。贡献方据此避免重复显示对话标题中已有的身份。

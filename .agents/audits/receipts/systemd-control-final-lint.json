@@ -1,0 +1,14 @@
+{
+  "name": "systemd-control-final-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts gateway/src/launcher.ts gateway/src/child-command.ts gateway/src/child-environment.ts gateway/src/tunnel-supervisor.ts gateway/src/config.ts gateway/src/index.ts gateway/tests/launcher.spec.ts gateway/tests/systemd-command.spec.ts gateway/tests/config.spec.ts gateway/tests/run-built-systemd-control.mjs gateway/tests/fixtures/systemctl-client.mjs",
+  "startedAt": "2026-10-25T00:49:39.008502+00:00",
+  "seconds": 5.985,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d2d4f9f1c9681583f12fb4f216494b4e575b68f61e622651ef4e92558155b32d",
+  "inputsAfter": "d2d4f9f1c9681583f12fb4f216494b4e575b68f61e622651ef4e92558155b32d",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -1,0 +1,49 @@
+- main:
+  - heading "模型治理" [level=1]
+  - text: 0 个组织模型
+  - paragraph: 统一管理组织 Provider、模型权限与计价；个人 BYOK 仅在个人运行时可用。
+  - group "模型治理视图":
+    - button "组织模型" [pressed]
+    - button "权限与计价"
+    - button "个人登记"
+  - heading "组织 Provider 与模型" [level=2]
+  - paragraph: 配置组织统一持有的 Provider、API 密钥和完整模型目录；保存后按角色、用户和项目的默认规则生效，也可设置单模型例外。
+  - list
+  - text: 自定义 组织 Provider Provider ID
+  - textbox "Provider ID":
+    - /placeholder: acme-gateway
+    - text: org-draft-fixture
+  - paragraph: 组织 Provider ID 必须以 org- 开头，后续只能使用小写字母、数字和短横线。
+  - text: 显示名称
+  - textbox "显示名称":
+    - /placeholder: org-draft-fixture
+    - text: 待保存组织连接
+  - text: API 地址
+  - textbox "API 地址":
+    - /placeholder: https://gateway.example/v1
+    - text: https://draft.example.invalid/v1
+  - text: API 协议
+  - combobox "API 协议":
+    - option "OpenAI Chat Completions" [selected]
+    - option "OpenAI Responses"
+    - option "Anthropic Messages"
+  - text: API 密钥
+  - textbox "API 密钥":
+    - /placeholder: 输入 API 密钥
+    - text: fixture-only-key
+  - region "模型目录":
+    - text: 模型目录
+    - button "获取可用模型"
+    - paragraph: 添加至少一个模型后才能保存组织 Provider
+    - button "添加模型"
+  - paragraph: 组织 Provider 至少需要一个模型
+  - button "取消"
+  - button "创建组织 Provider" [disabled]
+
+- dialog "保留当前编辑":
+  - banner:
+    - heading "保留当前编辑" [level=2]
+    - paragraph: 当前页面有未结束的编辑或提交操作。请先保存或取消编辑；也可以在新标签页打开目标，当前页面和编辑内容会保留。
+    - button "关闭"
+  - contentinfo:
+    - button "留在当前页面"

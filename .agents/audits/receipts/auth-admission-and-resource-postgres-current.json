@@ -1,0 +1,14 @@
+{
+  "name": "auth-admission-and-resource-postgres-current",
+  "cwd": "gateway",
+  "command": "npx vitest run tests/auth-postgres.spec.ts tests/runtime-resource-provider.spec.ts tests/runtime-resource-api.spec.ts --no-file-parallelism --retry=0",
+  "startedAt": "2026-10-24T01:56:27.108355+00:00",
+  "seconds": 11.667,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "930b748d29b9eabf377278f6909fd2c101fa3de0e0edba0850e8388c104bc85c",
+  "inputsAfter": "930b748d29b9eabf377278f6909fd2c101fa3de0e0edba0850e8388c104bc85c",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "349a6de9474230ab4d991f13f19c4c0a33a35f555931656d7eee99ecec388c82",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  36 passed (36)\n   Start at  09:56:28\n   Duration  10.29s (transform 1.74s, setup 0ms, import 2.46s, tests 7.56s, environment 0ms)\n\n"
+}

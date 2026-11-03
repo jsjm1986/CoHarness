@@ -1,0 +1,11 @@
+Admin remote project governance
+explicit primary route: one named current-computer option
+native project creation: computer-b, runtime never started
+/admin/api/project-model-access: 200 computer-b
+/admin/api/usage: 200 computer-b
+/admin/api/usage/contributors: 200 computer-b
+native model assignment and restoration: 204 computer-b
+native project quota independent: 204 computer-b
+native project quota inherit: 204 computer-b
+organization usage overview: 200 primary
+project runtime and creation generation preserved

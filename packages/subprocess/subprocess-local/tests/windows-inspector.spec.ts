@@ -43,7 +43,7 @@ describe('WindowsProcessInspector table enumeration', () => {
     const fake = fakeInternals()
     fake.add({ pid: 10, parentPid: 0 }, 't10')
     fake.add({ pid: 11, parentPid: 10 }, 't11')
-    const inspector = new WindowsProcessInspector(fake.internals)
+    const inspector = new WindowsProcessInspector(1000, fake.internals)
 
     // Liveness is a per-handle question on Windows, so a snapshot asked only
     // for liveness must not pay a Toolhelp32 walk. The terminal's Windows
@@ -95,26 +95,28 @@ describe('WindowsProcessInspector (injected internals)', () => {
   it('hides the default taskkill helper window for both termination tiers', () => {
     const taskkill = vi.mocked(nodeSpawnSync)
     taskkill.mockReturnValueOnce({} as never).mockReturnValueOnce({} as never)
-    const inspector = createWindowsProcessInspector()
+    const inspector = createWindowsProcessInspector(1000)
     inspector.signalGroup(77, 'SIGKILL')
     inspector.signalGroup(78, 'SIGTERM')
+    inspector.signalGroup(0, 'SIGKILL')
+    expect(taskkill).toHaveBeenCalledTimes(2)
     expect(taskkill).toHaveBeenNthCalledWith(
       1,
       'taskkill',
       ['/PID', '77', '/T', '/F'],
-      { stdio: 'ignore', windowsHide: true },
+      { stdio: 'ignore', windowsHide: true, timeout: 1000, killSignal: 'SIGKILL' },
     )
     expect(taskkill).toHaveBeenNthCalledWith(
       2,
       'taskkill',
       ['/PID', '78', '/T'],
-      { stdio: 'ignore', windowsHide: true },
+      { stdio: 'ignore', windowsHide: true, timeout: 1000, killSignal: 'SIGKILL' },
     )
   })
 
   it('exposes the shell pid as the pseudo foreground group and never proves stdin waits', () => {
     const fake = fakeInternals()
-    const inspector = new WindowsProcessInspector(fake.internals)
+    const inspector = new WindowsProcessInspector(1000, fake.internals)
     expect(inspector.foregroundPgid(77)).toBe(77)
     expect(inspector.isStdinWaiting(77, 10)).toBe(false)
     expect(inspector.snapshot().session(77)).toEqual([])
@@ -124,7 +126,7 @@ describe('WindowsProcessInspector (injected internals)', () => {
     const fake = fakeInternals()
     fake.add({ pid: 10, parentPid: 0 }, 't10')
     fake.add({ pid: 11, parentPid: 10 }, 't11')
-    const inspector = new WindowsProcessInspector(fake.internals)
+    const inspector = new WindowsProcessInspector(1000, fake.internals)
     expect(inspector.snapshot().tree(10)).toEqual([
       { pid: 11, started: 't11' },
       { pid: 10, started: 't10' },
@@ -139,7 +141,7 @@ describe('WindowsProcessInspector (injected internals)', () => {
 
   it('maps SIGKILL to a forced taskkill and other signals to the grace form', () => {
     const fake = fakeInternals()
-    const inspector = new WindowsProcessInspector(fake.internals)
+    const inspector = new WindowsProcessInspector(1000, fake.internals)
     inspector.signalGroup(77, 'SIGKILL')
     inspector.signalGroup(77, 'SIGTERM')
     inspector.signalGroup(0, 'SIGKILL')
@@ -150,7 +152,7 @@ describe('WindowsProcessInspector (injected internals)', () => {
     const fake = fakeInternals()
     fake.add({ pid: 10, parentPid: 0 }, 't10')
     fake.add({ pid: 11, parentPid: 10 }, 't11', false)
-    const inspector = new WindowsProcessInspector(fake.internals)
+    const inspector = new WindowsProcessInspector(1000, fake.internals)
     inspector.signalProcess({ pid: 10, started: 't10' }, 'SIGKILL')
     inspector.signalProcess({ pid: 11, started: 't11' }, 'SIGKILL')
     inspector.signalProcess({ pid: 10, started: 'stale' }, 'SIGTERM')
@@ -159,8 +161,8 @@ describe('WindowsProcessInspector (injected internals)', () => {
 
   it('accepts an injected internals factory through the creator', () => {
     const fake = fakeInternals()
-    expect(createWindowsProcessInspector(fake.internals)).toBeInstanceOf(WindowsProcessInspector)
-    expect(createWindowsProcessInspector()).toBeInstanceOf(WindowsProcessInspector)
+    expect(createWindowsProcessInspector(1000, fake.internals)).toBeInstanceOf(WindowsProcessInspector)
+    expect(createWindowsProcessInspector(1000)).toBeInstanceOf(WindowsProcessInspector)
   })
 })
 
@@ -180,7 +182,7 @@ const win32 = process.platform === 'win32' ? describe : describe.skip
 
 win32('WindowsProcessInspector over the real koffi bindings', () => {
   it('walks the live process table from the test runner itself', () => {
-    const inspector = createWindowsProcessInspector()
+    const inspector = createWindowsProcessInspector(1000)
     const tree = inspector.snapshot().tree(process.pid)
     const self = tree.find(member => member.pid === process.pid)
     expect(self).toBeDefined()
@@ -188,8 +190,8 @@ win32('WindowsProcessInspector over the real koffi bindings', () => {
     expect(inspector.foregroundPgid(process.pid)).toBe(process.pid)
   })
 
-  it('reports unreadable identities for absent processes and no-ops tree signalling', () => {
-    const inspector = createWindowsProcessInspector()
+  it('reports absent process identities and no-ops tree signalling', () => {
+    const inspector = createWindowsProcessInspector(1000)
     expect(inspector.isAlive({ pid: 0x7FFFFFFF, started: 'absent' })).toBe(false)
     expect(() => { inspector.signalGroup(0x7FFFFFFF, 'SIGKILL') }).not.toThrow()
     expect(() => { inspector.signalGroup(0x7FFFFFFF, 'SIGTERM') }).not.toThrow()

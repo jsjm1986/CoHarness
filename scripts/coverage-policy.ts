@@ -106,9 +106,6 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
   const windowsCoveredDebtExclusions = platform !== 'win32'
     ? [
       'packages/shell/tool-bash/src/render.ts',
-      'packages/ssh/ssh/src/helper-processes.ts',
-      'packages/subprocess/subprocess-local/src/index.ts',
-      'packages/subprocess/subprocess-local/src/output.ts',
     ]
     : []
 
@@ -149,14 +146,14 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       'packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx',
       'packages/client/ui-workspace/src/client/WorkspacePicker.tsx',
       'packages/client/ui-renderer/src/client/*',
-      // This isolated settings-scope lifecycle has complete unit coverage;
-      // keep it out of the broader client-runtime GUI debt exemption.
-      'packages/client/runtime/src/**/!(settings-scope).ts',
-      // Keep the browser conversation tree under its existing GUI debt
-      // exemption while gating the newly stateful Host half and vocabulary.
-      'packages/client/ui-conversation/src/client/*',
+      // Gate settings and private presentation ownership independently of GUI composition.
+      'packages/client/runtime/src/**/!(settings-scope|session-persistence).ts',
+      'packages/client/ui-conversation/src/client/!(stores).ts',
+      'packages/client/ui-conversation/src/client/*.tsx',
       'packages/client/ui-primitives/src/DisclosureRow.tsx',
-      'packages/client/ui-project-activity/src/*',
+      // Activity requests and ownership are unit-gated; view components and store bindings retain GUI coverage debt.
+      'packages/client/ui-project-activity/src/client/*.tsx',
+      'packages/client/ui-project-activity/src/client/store.ts',
       // Memory tab's right-sidebar timeline view is browser GUI debt; the
       // tested client source stays under `src/client/` with the view files.
       // TODO(gui): cover and remove with the client test lane above.
@@ -232,10 +229,8 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       'packages/typert/generator/src/*.ts',
       'packages/host/apiproxy/src/index.ts',
       'packages/host/apiproxy/src/api-proxy.ts',
-      // Projection/command round: executor lifecycle branches and the
-      // registry's drive tails need the same maturing lanes. TODO(gui):
-      // cover and remove with the client test lane above.
-      'packages/interaction/commands/src/index.ts',
+      // Projection registry drive tails need the client test lane.
+      // TODO(gui): cover and remove this entry with that lane.
       'packages/session/session-projection/src/index.ts',
       // Debt the first hosted-runner coverage run reported, carried as an
       // explicit shrink-only roster (scripts/coverage-baseline.ts).

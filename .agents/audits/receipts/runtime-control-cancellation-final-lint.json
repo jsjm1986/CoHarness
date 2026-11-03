@@ -1,0 +1,14 @@
+{
+  "name": "runtime-control-cancellation-final-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts gateway",
+  "startedAt": "2026-10-24T19:45:57.319924+00:00",
+  "seconds": 3.575,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "687a166a24dc81467c177dc53ab84365e31066a3e0124a44a0a4672e3fc75e7a",
+  "inputsAfter": "687a166a24dc81467c177dc53ab84365e31066a3e0124a44a0a4672e3fc75e7a",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

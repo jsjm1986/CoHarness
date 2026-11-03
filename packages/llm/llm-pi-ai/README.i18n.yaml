@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/llm/llm-pi-ai/README.md
 document:
-  en: d7e9a5c7e5295241b82265434938d4316d5bd5a7
-  zh: a9301811e90feb35802eceee0bc604de178e6862
+  en: dc5c4d880be14c9d1ed29156ec0cb1dfd5163981
+  zh: d9cf998cb4ab52f862b7fb27b8f43b612cc35ef1
 /:
   en: 5b95296b78f8bc9c
   zh: 61495d48365178df
@@ -36,8 +36,8 @@ document:
   en: 911336d01350f28b
   zh: ffc2e89bd8c9ab13
 /deepseek-ai-dsh-llm-pi-ai/provider-model-routing-and-replay:
-  en: bb983efab750987c
-  zh: 5ad0165714618b78
+  en: 5aa31c796f391091
+  zh: 3e8387a31cb94e3f
 /deepseek-ai-dsh-llm-pi-ai/provider-model-routing-and-replay/tagged-reasoning-in-openai-compatible-text:
   en: 4806236e0d3fd2c7
   zh: bc53d604768b28b1
@@ -78,8 +78,8 @@ document:
   en: b6bd570c0159ba08
   zh: 1c706ee993b1e0bf
 /deepseek-ai-dsh-llm-pi-ai/known-limitations-and-deferred-work:
-  en: a71c8c065a6f846c
-  zh: 3ca2b10926088a7f
+  en: 98e9de0e03c38d7c
+  zh: a3b508062fda8196
 /deepseek-ai-dsh-llm-pi-ai/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  en: ef199c04b68e1898
+  zh: d926f372c8a5803c

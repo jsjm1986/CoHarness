@@ -1,0 +1,13 @@
+{
+  "name": "progress-extension-admission-current",
+  "cwd": "gateway",
+  "command": "npm exec vitest run tests/progress-service.spec.ts",
+  "startedAt": "2026-10-23T20:57:24.544092+00:00",
+  "seconds": 3.007,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "65a2194ff0e98f7c990695b0e6298087fbfcce67b08b48ef44d435bdf10e55d0",
+  "inputsAfter": "65a2194ff0e98f7c990695b0e6298087fbfcce67b08b48ef44d435bdf10e55d0",
+  "outputSha256": "cfe1b404b348731965e6657b742849a148a5503813fe1864fc42b750ed2268f4",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  20 passed (20)\n   Start at  04:57:27\n   Duration  347ms (transform 66ms, setup 0ms, import 105ms, tests 146ms, environment 0ms)\n\n"
+}

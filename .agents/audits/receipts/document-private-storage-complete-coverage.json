@@ -1,0 +1,14 @@
+{
+  "name": "document-private-storage-complete-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/document-private-storage-coverage.config.mts --coverage packages/attachment/userdoc-local/tests/identity-storage.spec.ts packages/attachment/userdoc-local/tests/identity-storage-platform.spec.ts packages/attachment/userdoc-local/tests/identity-fs.spec.ts",
+  "startedAt": "2026-10-26T00:33:29.908599+00:00",
+  "seconds": 15.486,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "942ac9f3e207161a6e005b201e121765e56dcb77e2b295bfbf21b6b414bc2bcf",
+  "inputsAfter": "942ac9f3e207161a6e005b201e121765e56dcb77e2b295bfbf21b6b414bc2bcf",
+  "postgresToolDirectory": null,
+  "outputSha256": "e2e61b5ae5811e3ec2075158d916511904b3d14b63b11ad3b375a44682026122",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  3 passed (3)\n      Tests  65 passed (65)\n   Start at  08:33:43\n   Duration  1.60s (transform 361ms, setup 117ms, import 359ms, tests 1.26s, environment 0ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 103/103 )\nBranches     : 100% ( 99/99 )\nFunctions    : 100% ( 21/21 )\nLines        : 100% ( 82/82 )\n================================================================================\n"
+}

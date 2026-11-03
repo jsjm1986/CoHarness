@@ -1,0 +1,433 @@
+{
+  "recordedAt": "2026-10-29T09:17:28.991954+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "findings": [
+    "B308",
+    "B309",
+    "B310"
+  ],
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z",
+  "baseline": {
+    "recordedAt": "2026-10-29T09:17:28.991954+00:00",
+    "headAheadOriginBehind": [
+      139,
+      0
+    ],
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "fetchReceipt": "python-sdk-pipe-latest-baseline-fetch",
+    "sharedWorktreeRebasedOrReset": false,
+    "headRef": "HEAD",
+    "upstreamRef": "origin/master",
+    "identityEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-current-baseline.json"
+  },
+  "negativeEvidence": [
+    {
+      "name": "python-sdk-blocked-write-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T08:42:38.671589+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/python/sdk",
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "tests/test_write_deadlines.py"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T08:42:48.931395+00:00",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-blocked-write-causal-before.log"
+    },
+    {
+      "name": "python-sdk-timeout-and-self-join-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T08:54:39.312882+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/python/sdk",
+      "command": [
+        "env",
+        "PYTHONPATH=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-before-write-artifact",
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "tests/test_write_deadlines.py",
+        "-k",
+        "invalid_request_timeout or notification_filter"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T08:54:39.665790+00:00",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-timeout-and-self-join-causal-before.log"
+    }
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "python-sdk-pipe-wheel-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T09:02:57.466901+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/Users/a1234/.local/bin/uv",
+          "build",
+          "--wheel",
+          "--out-dir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-wheel",
+          "python/sdk"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T09:02:59.268491+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-wheel-build.log"
+      },
+      {
+        "name": "python-sdk-pipe-public-wheel-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T09:05:31.113572+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/python/sdk",
+        "command": [
+          "env",
+          "PATH=/Users/a1234/.nvm/versions/node/v22.22.1/bin:/usr/local/bin:/usr/bin:/bin",
+          "PYTHONPATH=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-wheel-artifact",
+          "/Users/a1234/.local/bin/uv",
+          "run",
+          "--no-sync",
+          "--with",
+          "coverage",
+          "python",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/run-python-pipe-wheel-check.py",
+          "python-sdk-pipe-public-wheel-node22"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T09:05:44.485209+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-public-wheel-node22.log"
+      },
+      {
+        "name": "python-sdk-pipe-public-wheel-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T09:07:14.878016+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/python/sdk",
+        "command": [
+          "env",
+          "PATH=/Users/a1234/.nvm/versions/node/v24.19.0/bin:/usr/local/bin:/usr/bin:/bin",
+          "PYTHONPATH=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-wheel-artifact",
+          "/Users/a1234/.local/bin/uv",
+          "run",
+          "--no-sync",
+          "--with",
+          "coverage",
+          "python",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/run-python-pipe-wheel-check.py",
+          "python-sdk-pipe-public-wheel-node24"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T09:07:27.848250+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-public-wheel-node24.log"
+      },
+      {
+        "name": "python-sdk-pipe-output-boundaries",
+        "status": "passed",
+        "startedAt": "2026-10-29T09:10:27.430685+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/python/sdk",
+        "command": [
+          "env",
+          "PYTHONPATH=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-wheel-artifact",
+          "/Users/a1234/.local/bin/uv",
+          "run",
+          "--no-sync",
+          "--with",
+          "coverage",
+          "python",
+          "-m",
+          "coverage",
+          "run",
+          "--branch",
+          "--data-file=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-output-boundaries.coverage",
+          "--include=*/deepseek_harness/client.py,*/deepseek_harness/api.py",
+          "-m",
+          "pytest",
+          "tests/test_write_deadlines.py",
+          "-k",
+          "refuses_frames or oversized_output or finishes_after_teardown"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T09:10:28.320526+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-output-boundaries.log"
+      },
+      {
+        "name": "python-sdk-pipe-combined-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T09:13:57.999150+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/python/sdk",
+        "command": [
+          "/Users/a1234/.local/bin/uv",
+          "run",
+          "--no-sync",
+          "--with",
+          "coverage",
+          "python",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/combine-python-pipe-coverage.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T09:13:58.298486+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-combined-coverage.log"
+      },
+      {
+        "name": "python-sdk-pipe-final-ruff",
+        "status": "passed",
+        "startedAt": "2026-10-29T09:13:59.518966+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python/sdk/.venv/bin/python",
+          "-m",
+          "ruff",
+          "check",
+          "--config",
+          "python/sdk/pyproject.toml",
+          "python/sdk/src/deepseek_harness/client.py",
+          "python/sdk/src/deepseek_harness/api.py",
+          "python/sdk/tests/test_write_deadlines.py",
+          "python/sdk/tests/test_write_deadlines_snapshot.py",
+          "python/sdk/tests/test_close_recovery.py",
+          "python/sdk/tests/test_close_recovery_snapshot.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T09:13:59.594473+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-final-ruff.log"
+      },
+      {
+        "name": "python-sdk-pipe-fixture-syntax",
+        "status": "passed",
+        "startedAt": "2026-10-29T09:10:27.350436+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--check",
+          "python/sdk/tests/fixtures/backpressure-runtime.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T09:10:27.367528+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-fixture-syntax.log"
+      },
+      {
+        "name": "python-sdk-pipe-final-doc-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-29T09:13:58.358969+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "--write",
+          "python/sdk/README.md",
+          ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-close-recovery/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T09:15:21.337167+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-final-doc-pairs.log"
+      }
+    ],
+    "publicWheel": {
+      "recordedAt": "2026-10-29T09:05:31.087990+00:00",
+      "wheel": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-wheel/deepseek_harness_sdk-0.0.0.dev0-py3-none-any.whl",
+      "wheelSha256": "98db4c2922144cc52c67e2cb70505583759cc214749905e31e6ef07e2b886104",
+      "artifactRoot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-wheel-artifact",
+      "sourceFiles": {
+        "deepseek_harness/models.py": "c8cba1cdf77017506ab5a01e53c3c8e5b36bfe941cc3e51d40580cd9407a35be",
+        "deepseek_harness/client.py": "fe5eeed263f1543a24e41db7f7540f0a3cd4c72959024d72a927c46e8ab4b6d3",
+        "deepseek_harness/__init__.py": "0511648a19b7f0e639f2dd4fe2cb972039c8e794be57546422ac519004992e4b",
+        "deepseek_harness/api.py": "e6176f8f5dfd584c81da5cceb327abb27f0f1dabdac62debdd7bccab24427e32",
+        "deepseek_harness/errors.py": "0d380a8947c7cc64dc1811660816b89fe676fac46b3cfcf18a51ecafc6bf28da"
+      },
+      "sourceAndWheelEqual": true
+    },
+    "publicWheelSourceInputsUnchanged": true,
+    "node22Cases": 62,
+    "node24Cases": 62,
+    "additionalBoundaryCases": 3,
+    "distinctNamedPythonCases": 65,
+    "coverage": {
+      "publicWheelModules": {
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-wheel-artifact/deepseek_harness/api.py": {
+          "covered_lines": 176,
+          "num_statements": 187,
+          "percent_covered": 90.29535864978902,
+          "percent_covered_display": "90",
+          "missing_lines": 11,
+          "excluded_lines": 0,
+          "percent_statements_covered": 94.11764705882354,
+          "percent_statements_covered_display": "94",
+          "num_branches": 50,
+          "num_partial_branches": 12,
+          "covered_branches": 38,
+          "missing_branches": 12,
+          "percent_branches_covered": 76.0,
+          "percent_branches_covered_display": "76"
+        },
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-pipe-wheel-artifact/deepseek_harness/client.py": {
+          "covered_lines": 595,
+          "num_statements": 658,
+          "percent_covered": 87.90322580645162,
+          "percent_covered_display": "88",
+          "missing_lines": 63,
+          "excluded_lines": 0,
+          "percent_statements_covered": 90.42553191489361,
+          "percent_statements_covered_display": "90",
+          "num_branches": 210,
+          "num_partial_branches": 36,
+          "covered_branches": 168,
+          "missing_branches": 42,
+          "percent_branches_covered": 80.0,
+          "percent_branches_covered_display": "80"
+        }
+      },
+      "functions": {
+        "HarnessClient._close_owned_runtime": {
+          "summary": {
+            "covered_lines": 39,
+            "num_statements": 40,
+            "percent_covered": 96.15384615384616,
+            "percent_covered_display": "96",
+            "missing_lines": 1,
+            "excluded_lines": 0,
+            "percent_statements_covered": 97.5,
+            "percent_statements_covered_display": "98",
+            "num_branches": 12,
+            "num_partial_branches": 1,
+            "covered_branches": 11,
+            "missing_branches": 1,
+            "percent_branches_covered": 91.66666666666667,
+            "percent_branches_covered_display": "92"
+          },
+          "missingLines": [
+            238
+          ],
+          "missingBranches": [
+            [
+              237,
+              238
+            ]
+          ]
+        },
+        "HarnessClient._write_message": {
+          "summary": {
+            "covered_lines": 15,
+            "num_statements": 17,
+            "percent_covered": 92.0,
+            "percent_covered_display": "92",
+            "missing_lines": 2,
+            "excluded_lines": 0,
+            "percent_statements_covered": 88.23529411764706,
+            "percent_statements_covered_display": "88",
+            "num_branches": 8,
+            "num_partial_branches": 0,
+            "covered_branches": 8,
+            "missing_branches": 0,
+            "percent_branches_covered": 100.0,
+            "percent_branches_covered_display": "100"
+          },
+          "missingLines": [
+            475,
+            476
+          ],
+          "missingBranches": []
+        },
+        "HarnessClient._finish_output": {
+          "summary": {
+            "covered_lines": 5,
+            "num_statements": 5,
+            "percent_covered": 100.0,
+            "percent_covered_display": "100",
+            "missing_lines": 0,
+            "excluded_lines": 0,
+            "percent_statements_covered": 100.0,
+            "percent_statements_covered_display": "100",
+            "num_branches": 2,
+            "num_partial_branches": 0,
+            "covered_branches": 2,
+            "missing_branches": 0,
+            "percent_branches_covered": 100.0,
+            "percent_branches_covered_display": "100"
+          },
+          "missingLines": [],
+          "missingBranches": []
+        },
+        "HarnessClient._writer_loop": {
+          "summary": {
+            "covered_lines": 28,
+            "num_statements": 29,
+            "percent_covered": 94.28571428571429,
+            "percent_covered_display": "94",
+            "missing_lines": 1,
+            "excluded_lines": 0,
+            "percent_statements_covered": 96.55172413793103,
+            "percent_statements_covered_display": "97",
+            "num_branches": 6,
+            "num_partial_branches": 1,
+            "covered_branches": 5,
+            "missing_branches": 1,
+            "percent_branches_covered": 83.33333333333333,
+            "percent_branches_covered_display": "83"
+          },
+          "missingLines": [
+            503
+          ],
+          "missingBranches": [
+            [
+              502,
+              503
+            ]
+          ]
+        }
+      },
+      "wholeModuleCoverageComplete": false,
+      "thresholdsChanged": false,
+      "ignoredLinesAdded": false
+    },
+    "rootBuild": {
+      "name": "sdk-cleanup-full-build-final",
+      "status": "passed",
+      "startedAt": "2026-10-29T08:37:24.302466+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "node",
+        "--import",
+        "tsx/esm",
+        "scripts/build.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T08:37:57.634126+00:00",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-cleanup-full-build-final.log"
+    },
+    "rootBuildScope": "Passing eight-gate TypeScript/Host/Client/Web build; subsequent production edits are Python SDK source, verified from its own wheel.",
+    "documentation": "All 20 shared doc-quick gates pass after the final paired documentation and audit receipt updates.",
+    "documentationFinal": {
+      "name": "python-sdk-pipe-final-doc-quick",
+      "status": "passed",
+      "startedAt": "2026-10-29T09:17:29.282253+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "pnpm",
+        "run",
+        "test:docs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T09:18:49.054570+00:00"
+    }
+  },
+  "guarantees": [
+    "A blocked native stdin write cannot prevent request timeout or the process termination ladder.",
+    "One owned writer preserves frame order; queued and active bytes share max_output_bytes. Admission failure does not enqueue a partial frame.",
+    "Process exit alone does not discard a still-running writer; the original handle remains available for cleanup retry.",
+    "Invalid request timeout validation precedes response registration and wire mutation.",
+    "A notification filter may close its client without joining its own thread; late filters cannot republish after close."
+  ],
+  "limits": [
+    "Whole Python client/API coverage remains partial; serializer fallback, unreachable owned-pipe guards and some ancillary reader paths were not forced through private producers. No new coverage ignore or lower threshold was added.",
+    "B04 complete allocation inventory, B25 Linux namespace/systemd containment and remaining feature reviews stay open.",
+    "Actual remote provider inference and public-cloud push validation remain human-deferred."
+  ],
+  "fixtureLintDisposition": "Root Oxlint intentionally ignores all .mjs fixtures. Its no-matches attempts are retained as diagnostics, not passes. This fixture was parsed by Node 22 and executed in both Node 22/24 real-profile wheel replays.",
+  "phaseClosedAt": "2026-10-29T09:22:14.119456+00:00"
+}

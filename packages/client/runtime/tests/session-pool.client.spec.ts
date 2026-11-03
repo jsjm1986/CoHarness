@@ -14,6 +14,7 @@ import { FakeApiClient, fakeRemote, ok } from './fake-api.client.ts'
 
 function connection(api: FakeApiClient, onStart?: (sinks: Parameters<ConnectionHandle['start']>[0]) => void): ConnectionHandle {
   return {
+    metadataTiming: { requestTimeoutMs: 15000, retryAfterMs: 10000 },
     api,
     isLoopback: true,
     interactions: 'none',
@@ -210,6 +211,39 @@ describe('SessionRuntimePool', () => {
     }
   })
 
+  it('keeps a management transport without creating or selecting a Session and releases only that view ownership', async () => {
+    const ctx = new Context()
+    await ctx.plugin(() => {}).await()
+    const baseApi = new FakeApiClient(), targetApi = new FakeApiClient()
+    const stop = vi.fn()
+    const start = vi.fn((sinks: Parameters<ConnectionHandle['start']>[0]) => {
+      queueMicrotask(() => sinks.onConnected?.({ version: 'management', cwd: '/target', home: '/target', attachedSessions: 0, canOpenPath: false }))
+      return { stop }
+    })
+    const target: ConnectionHandle = { ...connection(targetApi), start }
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, { ...connection(baseApi), forTarget: () => target }, fakeRemote())
+    const prepared = Promise.withResolvers<undefined>()
+    const viewClosed = Promise.withResolvers<undefined>()
+    const operation = pool.usingRuntime({ kind: 'project', projectId: 7 }, new AbortController().signal, async (signal) => {
+      await pool.prepareRuntime({ kind: 'project', projectId: 7 }, signal)
+      prepared.resolve(undefined)
+      await viewClosed.promise
+    })
+    try {
+      await Promise.race([prepared.promise, operation])
+      expect(start).toHaveBeenCalledOnce()
+      expect(pool.list.getSnapshot().current).toBeUndefined()
+      expect(targetApi.callsOf('session.create')).toHaveLength(0)
+      pool.setAdditionalStaged([])
+      expect(stop).not.toHaveBeenCalled()
+      viewClosed.resolve(undefined)
+      await operation
+      expect(stop).toHaveBeenCalledOnce()
+      expect(targetApi.callsOf('session.cancel')).toHaveLength(0)
+    } finally { viewClosed.resolve(undefined); await Promise.allSettled([operation]); await ctx.fiber.dispose() }
+  })
+
   it('retains an acquiring runtime through handshake and directory lookup while the base pane stage changes', async () => {
     const ctx = new Context()
     await ctx.plugin(() => {}).await()
@@ -237,6 +271,7 @@ describe('SessionRuntimePool', () => {
     try {
       pool.setAdditionalStaged([])
       expect(stop).not.toHaveBeenCalled()
+      await vi.waitFor(() => { expect(sinks).toBeDefined() })
       sinks?.onConnected?.({ version: 'fixture', cwd: '/project', attachedSessions: 0, home: '/fixture', canOpenPath: true })
       await vi.waitFor(() => { expect(projectApi.callsOf('workspace.list').length).toBeGreaterThan(0) })
       pool.setAdditionalStaged([])
@@ -261,12 +296,14 @@ describe('SessionRuntimePool', () => {
     const baseApi = new FakeApiClient(), projectApi = new FakeApiClient()
     const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
     const stop = vi.fn()
-    const target: ConnectionHandle = { ...connection(projectApi), start: () => ({ stop }) }
+    const started = vi.fn(() => ({ stop }))
+    const target: ConnectionHandle = { ...connection(projectApi), start: started }
     const pool = new SessionRuntimePool(ctx, base, { ...connection(baseApi), forTarget: () => target }, fakeRemote())
     const cancel = new AbortController()
     const pending = pool.usingRuntime({ kind: 'project', projectId: 7 }, cancel.signal,
       signal => pool.ensureSession({ kind: 'project', projectId: 7 }, 'pending' as SessionId, signal))
     const rejection = expect(pending).rejects.toThrow(kind === 'cancel' ? 'cancelled intent' : 'identity was invalidated')
+    await vi.waitFor(() => { expect(started).toHaveBeenCalledOnce() })
     if (kind === 'cancel') cancel.abort(new Error('cancelled intent'))
     else pool.invalidateAccount()
     await rejection
@@ -297,6 +334,28 @@ describe('SessionRuntimePool', () => {
     expect(projectApi.callsOf('session.list')).toHaveLength(1)
   })
 
+  it('retains a slow target handshake within its configured ready window', async () => {
+    const ctx = new Context()
+    await ctx.plugin(() => {}).await()
+    const baseApi = new FakeApiClient(), projectApi = new FakeApiClient()
+    const id = 'slow-target' as SessionId
+    projectApi.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: true }] })
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    let sinks: Parameters<ConnectionHandle['start']>[0] | undefined
+    const target: ConnectionHandle = { ...connection(projectApi), metadataTiming: { requestTimeoutMs: 100_000, retryAfterMs: 1000 },
+      start: (next) => { sinks = next; return { stop: () => {} } } }
+    const pool = new SessionRuntimePool(ctx, base, { ...connection(baseApi), forTarget: () => target }, fakeRemote())
+    vi.useFakeTimers()
+    try {
+      const attempt = pool.ensureSession({ kind: 'project', projectId: 7 }, id)
+      const settled = attempt.then(value => ({ value }), (error: unknown) => ({ error }))
+      await vi.advanceTimersByTimeAsync(30_001)
+      expect(sinks).toBeDefined()
+      sinks?.onConnected?.({ version: 'slow', cwd: '/project', attachedSessions: 0, home: '/home/test', canOpenPath: true })
+      expect(await settled).toEqual({ value: true })
+    } finally { vi.useRealTimers(); await ctx.fiber.dispose() }
+  })
+
   it('releases a target runtime that stays unready past the ready window', async () => {
     const ctx = new Context()
     const baseApi = new FakeApiClient()
@@ -316,6 +375,7 @@ describe('SessionRuntimePool', () => {
       expect(pool.runtimeTargetFor('project-session' as SessionId)).toBeUndefined()
     } finally {
       vi.useRealTimers()
+      await ctx.fiber.dispose()
     }
   })
 
@@ -578,7 +638,8 @@ it('retains four colliding Host IDs with independent scopes, payloads, holds, an
     return api
   })
   const dispatch = vi.fn()
-  ctx.provide('remote', { $dispatch: dispatch } as never)
+  const forTarget = vi.fn(() => ({ $dispatch: dispatch }))
+  ctx.provide('remote', { $dispatch: dispatch, $forTarget: forTarget } as never)
   const handles = apis.map(api => connection(api, (sinks) =>{  queueMicrotask(() => sinks.onConnected?.({
     version: 'test', cwd: '/workspace', home: '/home/test', attachedSessions: 0, canOpenPath: true,
   })) }))
@@ -607,6 +668,7 @@ it('retains four colliding Host IDs with independent scopes, payloads, holds, an
       expect(apis[index]!.callsOf('session.rename').at(-1)).toMatchObject({ sessionId: id, title: `renamed ${index}` })
     }
     pool.dispatchRemoteEvent('agent-preset/selected', [id, 'plain'], targets[2])
+    expect(forTarget).toHaveBeenLastCalledWith(targets[2])
     expect(dispatch).toHaveBeenLastCalledWith('agent-preset/selected', [keys[2], 'plain'])
     const activation = { sessionId: id, goal: { id: 'g-1', revision: 1, activation: 'disarmed' } }
     for (const [index, target] of targets.entries()) {

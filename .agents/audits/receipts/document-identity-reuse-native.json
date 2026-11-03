@@ -1,0 +1,14 @@
+{
+  "name": "document-identity-reuse-native",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/reproduce-document-identities.mjs",
+  "startedAt": "2026-10-24T04:33:16.277024+00:00",
+  "seconds": 2.173,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "21d2a07d66ae3c7cdcc9bbbe3df12065deb15e639866d0cefd8606479956f361",
+  "inputsAfter": "21d2a07d66ae3c7cdcc9bbbe3df12065deb15e639866d0cefd8606479956f361",
+  "postgresToolDirectory": null,
+  "outputSha256": "0da4668821160c092a6c62c36b6edc28e2cca2b0078ad0937033b86eb0c93368",
+  "outputTail": "{\"case\":\"trash-reuse\",\"firstId\":\"same.txt\",\"secondId\":\"same.txt\",\"sameName\":true,\"secondTrash\":\"DOCUMENT_TRASHED\",\"activeContents\":\"second\",\"recoverableDocuments\":1}\n{\"case\":\"purged-reuse\",\"firstId\":\"same.txt\",\"secondId\":\"same.txt\",\"sameName\":true}\n{\"case\":\"restore-collision\",\"firstId\":\"same.txt\",\"secondId\":\"same.txt\",\"sameName\":true,\"restoredId\":\"same (2).txt\",\"restoredContents\":\"first\"}\n"
+}

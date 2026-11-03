@@ -34,6 +34,7 @@ export const rpcIdSchema = z.string() as unknown as z.ZodType<RpcId>
 const rpcDomainErrorSchema = z.discriminatedUnion('code', [
   z.object({ code: z.literal('bad-request'), message: z.string(), details: z.object({ issues: z.array(z.custom<ZodIssue>()) }) }),
   z.object({ code: z.literal('cancelled'), message: z.string(), details: z.object({}) }),
+  z.object({ code: z.literal('desktop-unavailable'), message: z.string(), details: z.object({ reason: z.enum(['headless', 'disabled']) }) }),
   z.object({
     code: z.literal('collaboration-forbidden'),
     message: z.string(),

@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-ui-browser-runtime-cli",
+  "cwd": ".",
+  "command": "node node_modules/playwright/cli.js install chromium",
+  "startedAt": "2026-10-24T23:10:38.918603+00:00",
+  "seconds": 0.374,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f527824fac7778a6424e81cd4524ff4e5a002a2414194ca18e0356cd1d89968d",
+  "inputsAfter": "f527824fac7778a6424e81cd4524ff4e5a002a2414194ca18e0356cd1d89968d",
+  "postgresToolDirectory": null,
+  "outputSha256": "969ffb883d5bf3b90bf0f806c167abcf987e10cabfb3bd75fe2dfed30a45281b",
+  "outputTail": "node:internal/modules/cjs/loader:1478\n  throw err;\n  ^\n\nError: Cannot find module '/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/playwright/cli.js'\n    at Module._resolveFilename (node:internal/modules/cjs/loader:1475:15)\n    at wrapResolveFilename (node:internal/modules/cjs/loader:1048:27)\n    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1072:10)\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1093:12)\n    at Module._load (node:internal/modules/cjs/loader:1261:25)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\n    at node:internal/main/run_main_module:33:47 {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: []\n}\n\nNode.js v25.8.1\n"
+}

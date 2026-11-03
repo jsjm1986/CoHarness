@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-descriptor-handoff-before",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/local-runtime-launcher.spec.ts -t 'lost descriptor-close' --retry=0",
+  "startedAt": "2026-10-24T19:53:02.267151+00:00",
+  "seconds": 3.046,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b22878cf0021a8ebf662ada19ca8703a5bfb02fe9ec6a1f58c335ae214990b43",
+  "inputsAfter": "b22878cf0021a8ebf662ada19ca8703a5bfb02fe9ec6a1f58c335ae214990b43",
+  "postgresToolDirectory": null,
+  "outputSha256": "ae388d167c8ef4a8c26ba58e1fe52d66c29e5c290f3a53fdd49bfaafccea5ff8",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/local-runtime-launcher.spec.ts (14 tests | 1 failed | 13 skipped) 236ms\n     × confirms owned cleanup before rejecting a lost descriptor-close acknowledgement 235ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/local-runtime-launcher.spec.ts > recoverable LocalLauncher > confirms owned cleanup before rejecting a lost descriptor-close acknowledgement\nAssertionError: expected 'running' to be 'stopped' // Object.is equality\n\nExpected: \"stopped\"\nReceived: \"running\"\n\n ❯ tests/local-runtime-launcher.spec.ts:202:45\n    200|       const started = f.launcher.start({ ...f.runtime, gatewayCredenti…\n    201|       await expect(started).rejects.toBe(lostAck)\n    202|       expect((await f.store.read())?.phase).toBe('stopped')\n       |                                             ^\n    203|     } finally {\n    204|       close.mockRestore()\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 13 skipped (14)\n   Start at  03:53:04\n   Duration  780ms (transform 354ms, setup 0ms, import 460ms, tests 236ms, environment 0ms)\n\n"
+}

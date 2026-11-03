@@ -1,0 +1,142 @@
+{
+  "finding": "B405",
+  "title": "Failed SSH process startup releases admission before sibling stream allocation and socket closure finish",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "at": "2026-10-31T13:14:40.906011+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T125204Z",
+  "paths": [
+    "packages/ssh/subprocess-ssh/src/index.ts",
+    "packages/ssh/subprocess-ssh/tests/partial-stream-allocation.spec.ts",
+    "packages/ssh/subprocess-ssh/tests/fixtures/partial-stream-allocation.mjs",
+    "packages/ssh/subprocess-ssh/tests/partial-stream-allocation.expected.e2e.ts",
+    "packages/ssh/subprocess-ssh/tests/fixtures/partial-stream-allocation.expected.jsonl",
+    "vitest.expected.config.ts",
+    "packages/ssh/subprocess-ssh/README.md",
+    "packages/ssh/subprocess-ssh/README.zh.md",
+    "packages/ssh/subprocess-ssh/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-ssh-partial-stream-allocation.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-ssh-partial-stream-allocation.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-ssh-partial-stream-allocation.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-partial-stream-allocation/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-partial-stream-allocation/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-partial-stream-allocation/guide.i18n.yaml"
+  ],
+  "matchingPrerequisites": [
+    "packages/ssh/subprocess-ssh/package.json",
+    "packages/ssh/subprocess-ssh/tsconfig.json",
+    "packages/ssh/ssh/tests/fixtures/local-ssh-carrier.mjs",
+    "tsdown.config.ts",
+    "vitest.shared.ts",
+    "scripts/test-proxy-environment.ts",
+    "packages/ssh/ssh/src/helper-entry.ts",
+    "packages/ssh/ssh/src/helper-processes.ts",
+    "packages/ssh/ssh/src/helper.ts",
+    "packages/ssh/ssh/src/index.ts",
+    "packages/ssh/ssh/src/protocol.ts",
+    "packages/ssh/ssh/src/schemas.ts",
+    "packages/ssh/ssh/src/stream-security.ts",
+    "packages/ssh/ssh/package.json",
+    "packages/ssh/ssh/tsconfig.json",
+    "packages/ssh/ssh/tsdown.config.ts"
+  ],
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchedAt": "2026-10-31T13:10:02.653320+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T125204Z/ssh-pipes-origin-fetch.json",
+    "sharedChangesPreserved": true
+  },
+  "cause": "Promise.all rejects before sibling connectStream calls settle, and sockets were retained only from its successful aggregate. Remote termination sets quiescent while startup remains active. Failed-start streamsClosed falsely resolves and provider disposal does not join physical stream closure.",
+  "implementation": "Retain each authenticated socket immediately; cancel and join all sibling attempts, then destroy and observe every allocated socket before rejecting startup. Successful observation requires settled startup as well as a confirmed remote range. Provider disposal joins physical stream closure for successful and failed handles. Bounded observations and retained independent termination failures preserve their existing reporting paths.",
+  "verification": {
+    "uniqueRelatedCases": 294,
+    "unitCases": 293,
+    "unitFiles": 30,
+    "assembledExpectedOutputCases": 1,
+    "coverage": {
+      "packages/ssh/subprocess-ssh/src/index.ts": {
+        "statements": [
+          294,
+          294
+        ],
+        "branches": [
+          104,
+          104
+        ],
+        "functions": [
+          70,
+          70
+        ],
+        "lines": [
+          230,
+          230
+        ]
+      }
+    },
+    "beforeFix": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T125204Z/ssh-pipes-before-fix.json",
+    "oldRows": [
+      {
+        "nativeControlAlive": true,
+        "resultHeld": false,
+        "observationHeld": false,
+        "providerHeld": false,
+        "ordinaryPermitRetained": false,
+        "originalFailureRetained": true,
+        "rangeConfirmed": true,
+        "masterReusable": true,
+        "launchRefused": true,
+        "nativeControlStopped": true,
+        "ordinaryAdmissions": 1,
+        "ordinaryReleases": 1,
+        "allInfrastructurePermitsCompleted": true,
+        "uncertainties": 0
+      }
+    ],
+    "positiveRows": [
+      {
+        "nativeControlAlive": true,
+        "resultHeld": true,
+        "observationHeld": true,
+        "providerHeld": true,
+        "ordinaryPermitRetained": true,
+        "originalFailureRetained": true,
+        "rangeConfirmed": true,
+        "masterReusable": true,
+        "launchRefused": true,
+        "nativeControlStopped": true,
+        "ordinaryAdmissions": 1,
+        "ordinaryReleases": 1,
+        "allInfrastructurePermitsCompleted": true,
+        "uncertainties": 0
+      }
+    ],
+    "oldCompiledNegative": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T125204Z/ssh-pipes-old-negative-final.json",
+    "oldResolverCorrection": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T125204Z/old-provider-resolver-correction.json",
+    "finalFixtureUnits": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T125204Z/ssh-pipes-final-fixture-units.json",
+    "nodeMajors": [
+      22,
+      24
+    ],
+    "builtReplays": "The held native control flow and the unchanged ten-row stale-owner/normal process-and-PTY admission flow pass on Node22 and Node24; runtime repetitions are not extra unique cases.",
+    "types": "Zero diagnostics for the edited test faces with explicit package references; fake budget uses an actual ResourceBudget Service subclass. Published declarations remain byte-identical.",
+    "build": "Normal scoped single-entry provider build and package type compile pass; its emitted entry and type-plane JS are captured.",
+    "documentation": "All twenty doc-quick gates, export JSDoc and complete generated catalog freshness checks pass. Catalog regeneration computes127 artifacts and writes none.",
+    "lint": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T125204Z/ssh-pipes-lint.json"
+  },
+  "noteReview": "The new fan-out cleanup decision complements active admission ownership, Host forwarding rollback and helper cleanup retry notes; their separate owner authority and protocol decisions remain active, with no complete supersession.",
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T125204Z/r6-followup-root-source-union.json",
+  "mergeRequirement": "Apply only fifteen B405 source deltas and preserve newer peer Local/Gateway/UI changes. Sixteen unchanged files are matching verification inputs. Rebuild the Host SSH subprocess provider with the combined distribution; two reference artifacts are its normal runtime entry and type-plane JS. The public declarations and current helper entry digest are byte-identical to B404. The reference capsule is not an independent deployment or permission to replace newer peer artifacts. B398 onward remain for a later combined backend freeze, separate from the last reported client-only R15 candidate.",
+  "limitations": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Continue resource-only remote execution and remaining allocation consumers, native containment and cross-computer permissions outside peer-reserved paths.",
+    "Inspect the remaining allocation classification and application permission paths; named SSH lifecycle verification does not finish those domains.",
+    "Preserve peer Gateway topology/auth/resource, reserved Local/UI and REAL033 input settlement changes. No routine peer status request. Last reported R14/R15 candidate state is not fresh deployment acceptance.",
+    "Real paid model API verification remains deferred by the user.",
+    "Actual native control processes and the real helper run through a private OpenSSH carrier stand-in; no physical SSH server, remote encryption or separate Linux/Windows computer acceptance is claimed.",
+    "Built replays use the live shared workspace dependencies. Older Local reference artifacts remain excluded from deployment; rebuild combined sources before acceptance."
+  ],
+  "rootDeployed": false
+}

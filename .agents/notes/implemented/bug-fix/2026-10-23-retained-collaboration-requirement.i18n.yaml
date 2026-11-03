@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-retained-collaboration-requirement.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-retained-collaboration-requirement.md
+document:
+  en: 19edce63d23ab63c0c2743801683f3f65d91f62f
+  zh: 599b3260416948ccc24023689be46b48041a711c
+/agent-note-retained-collaboration-requirements:
+  en: 01714505b654d37c
+  zh: 78e22393db861d93
+/agent-note-retained-collaboration-requirements/problem:
+  en: d515d942e57371b2
+  zh: d4ce5768b79bb641
+/agent-note-retained-collaboration-requirements/decision:
+  en: 5fa17e098af25d91
+  zh: 1d99231d765d78d2
+/agent-note-retained-collaboration-requirements/alternatives-considered:
+  en: c020e5aedc8cd64c
+  zh: f7bc6ec5b1a0fbbd
+/agent-note-retained-collaboration-requirements/consequences:
+  en: af313d0449edc5a7
+  zh: b41730a06b3f0c7b
+/agent-note-retained-collaboration-requirements/verification:
+  en: 037bbc9b5aff66a8
+  zh: ef9b2f68b9588850

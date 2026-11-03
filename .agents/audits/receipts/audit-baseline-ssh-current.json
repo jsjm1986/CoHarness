@@ -1,0 +1,14 @@
+{
+  "name": "audit-baseline-ssh-current",
+  "cwd": ".",
+  "command": "git fetch origin",
+  "startedAt": "2026-10-25T12:11:46.108938+00:00",
+  "seconds": 8.195,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c3b78ab538c5fb4d0817f91edaa4e5e5a98f483d9823dbd053d93e6961fcc0a0",
+  "inputsAfter": "c3b78ab538c5fb4d0817f91edaa4e5e5a98f483d9823dbd053d93e6961fcc0a0",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

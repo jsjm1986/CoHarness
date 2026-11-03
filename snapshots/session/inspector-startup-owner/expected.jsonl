@@ -1,0 +1,6 @@
+{"change":"replaced","ready":false,"unavailable":true,"published":false,"announcements":0,"workers":0,"exited":true,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"change":"withdrawn","ready":false,"unavailable":true,"published":false,"announcements":0,"workers":0,"exited":true,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"change":"unchanged","ready":true,"published":true,"announcements":1,"workers":1,"exited":true,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"change":"independent","ready":true,"published":true,"announcements":1,"workers":1,"exited":true,"admissions":0,"releases":0,"uncertainties":0,"replacementAdmissions":0}
+{"phase":"bootstrap","client":"live","headersBefore":false,"status":200,"workers":1,"exited":true,"releases":1}
+{"phase":"bootstrap","client":"abandoned","headersBefore":false,"fetchRejected":true,"replyUntouched":true,"workers":1,"exited":true,"releases":1}

@@ -1,0 +1,14 @@
+{
+  "name": "native-search-policy-native-peers-before",
+  "cwd": ".",
+  "command": "node --import .agents/audits/.local/native-policy-built-peers.mjs .agents/audits/.local/reproduce-native-search-policy.mjs",
+  "startedAt": "2026-10-24T04:57:19.702458+00:00",
+  "seconds": 0.553,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8043e602d71a4c5aa95c3bd908531c9b38489f4194b610d95b414669d00fcbf7",
+  "inputsAfter": "8043e602d71a4c5aa95c3bd908531c9b38489f4194b610d95b414669d00fcbf7",
+  "postgresToolDirectory": null,
+  "outputSha256": "080a5f5943911df86d1de6ace029b9848fc67b5d4568c92883d299c6af776a68",
+  "outputTail": "node:internal/modules/package_json_reader:257\n    throw new ERR_INVALID_MODULE_SPECIFIER(\n          ^\n\nTypeError [ERR_INVALID_MODULE_SPECIFIER]: Invalid module \".agents/audits/.local/native-policy-built-peers.mjs\" is not a valid package name imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/\n    at parsePackageName (node:internal/modules/package_json_reader:257:11)\n    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:268:53)\n    at packageResolve (node:internal/modules/esm/resolve:764:81)\n    at moduleResolve (node:internal/modules/esm/resolve:855:18)\n    at defaultResolve (node:internal/modules/esm/resolve:988:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:697:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:714:38)\n    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:746:52)\n    at #resolve (node:internal/modules/esm/loader:679:17)\n    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:599:35) {\n  code: 'ERR_INVALID_MODULE_SPECIFIER'\n}\n\nNode.js v25.8.1\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "runtime-tunnel-source-complete-current",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/tsx --tsconfig tsconfig.run.json tests/run-local-web-assembly.mjs src",
+  "startedAt": "2026-10-24T21:59:18.530409+00:00",
+  "seconds": 13.445,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "inputsAfter": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "bf73f7c20590290b4f4ac0f7d734d2d109fd06c6217e366592ba465160368db8",
+  "outputTail": "tunnel: authenticated quick startup failure leaves Gateway available.\ntunnel: quick and named children drain output and exclude deployment credentials.\ntunnel: token retrieval retries reuse the durable tunnel and stop confirms child closure.\npersonal: signed-in Gateway serves the real Web profile after registered readiness.\npersonal: replacement Gateway reuses the exact generation without another cold-start credit.\npersonal: unavailable supervision returns 503, retains occupation, and resumes the same generation.\npersonal: graceful replacement shutdown confirms process exit and durable stop.\nproject: signed-in Gateway serves the real Web profile after registered readiness.\nproject: replacement Gateway reuses the exact generation without another cold-start credit.\nproject: a second member shares the recovered project Runtime.\nproject: unavailable supervision returns 503, retains occupation, and resumes the same generation.\nproject: graceful replacement shutdown confirms process exit and durable stop.\n"
+}

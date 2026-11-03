@@ -83,7 +83,7 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.authorization` — `AuthorizationService`
 
-`ctx.authorization`: a registry of credential-obtaining flows, one attempt at a time per key.
+`ctx.authorization`: a registry of credential-obtaining flows, one attempt at a time per key. Disposal closes admission and joins original flows and credential writes.
 
 ```ts cordis-catalog
 /**
@@ -94,6 +94,7 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
  * @param flow - the key it writes, its label, its methods, and its runner.
  * @returns Disposer that withdraws this flow.
  * @throws {AuthorizationError} code `DUPLICATE_FLOW` when the key is already claimed.
+ * @throws {AuthorizationError} code `WITHDRAWN` after service disposal.
  */
 registerFlow(flow: AuthorizationFlow): () => void
 
@@ -136,7 +137,7 @@ cancel(key: CredentialKey): void
  *   `UNKNOWN_METHOD` when the named method is not one the flow offers,
  *   `ALREADY_IN_FLIGHT` when an attempt is already running for the key, or
  *   `NOT_COMMITTED` when the flow resolved without committing a record
- *   during the attempt.
+ *   during the attempt, or `WITHDRAWN` after service disposal.
  */
 async begin(request: AuthorizationRequest): Promise<AuthorizationOutcome>
 ```

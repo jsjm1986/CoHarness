@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-13-input-echo-admission-ownership.md
 document:
-  en: 4b9a4d0513b6ecd328d85f0ca9764d10fb911e13
-  zh: ea3967319442e817f8ecebbd4c685e37470d0a04
+  en: 076eeb2cc5c818c62d152ede44ea3b1d2d068183
+  zh: 16491691171ad989200336127e19e8f49b5f262f
 /agent-note-input-echo-admission-ownership-queue-durable-dedup-deferred-failure-assistant-retention:
   en: db6167dd0f232022
   zh: 8e0dbf5a591dd9fe
@@ -12,14 +12,14 @@ document:
   en: 83b0a8ffd7265c3a
   zh: 514155818648a007
 /agent-note-input-echo-admission-ownership-queue-durable-dedup-deferred-failure-assistant-retention/decision:
-  en: 5d6577b4301fdfa9
-  zh: f946f668e09d4dbf
+  en: 8be1faaab70797a8
+  zh: 566a4990f4cc15a7
 /agent-note-input-echo-admission-ownership-queue-durable-dedup-deferred-failure-assistant-retention/alternatives-considered:
   en: 38bb30f0def72d70
   zh: 0b1f43cba888af4e
 /agent-note-input-echo-admission-ownership-queue-durable-dedup-deferred-failure-assistant-retention/consequences:
-  en: f383702f2708b3ab
-  zh: cd34aa080c2e6837
+  en: 951169f11966e0de
+  zh: 82958f1b9e3cea00
 /agent-note-input-echo-admission-ownership-queue-durable-dedup-deferred-failure-assistant-retention/verification:
   en: c5aeed530f617769
   zh: 83352cac34df50a2

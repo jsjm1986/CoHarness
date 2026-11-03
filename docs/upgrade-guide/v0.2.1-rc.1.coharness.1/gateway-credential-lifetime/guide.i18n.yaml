@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/gateway-credential-lifetime/guide.md
+document:
+  en: 9e1559ee218fee95caa5a4cd515d9fc61b491ea2
+  zh: e08d277bec635402df4753bd1812e6663ff3c450
+/:
+  en: 31c21c299a6d16ed
+  zh: 554ee56eedab1191
+/upgrade-gateway-credential-lifetime:
+  en: 3598aded37da1172
+  zh: e71b776ed7f45cea
+/upgrade-gateway-credential-lifetime/change:
+  en: 73b55f1d054172c0
+  zh: 622f77425a3c6049
+/upgrade-gateway-credential-lifetime/action:
+  en: f3b3939b80864b75
+  zh: 86c6afdbd61b68e8

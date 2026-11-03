@@ -1,0 +1,14 @@
+{
+  "name": "managed-copy-built-node24",
+  "cwd": ".",
+  "command": "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node .agents/audits/.local/managed-copy-built.mjs",
+  "startedAt": "2026-10-25T11:14:01.273519+00:00",
+  "seconds": 0.533,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f228954b1842b443f207e7162d90835ebf91682da826eafc97713819e126d7c2",
+  "inputsAfter": "f228954b1842b443f207e7162d90835ebf91682da826eafc97713819e126d7c2",
+  "postgresToolDirectory": null,
+  "outputSha256": "b4602f337833d41dd66758970ca1f1d1796b1c0d0d1fff9e866a33f8a907e853",
+  "outputTail": "Emitted managed-copy short,zero,abort,flush passed on Node24.19.0; original bytes preserved.\n"
+}

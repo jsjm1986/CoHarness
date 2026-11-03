@@ -5,8 +5,10 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import { sessionPersistenceKey } from '@deepseek-ai/dsh-client-runtime/client'
 import { SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
 import { createChatStore } from '../src/client/stores.ts'
+import { readPersistedDraft } from '../src/client/input/persisted-draft.ts'
 
 const sid = (s: string): SessionId => s as SessionId
 
@@ -14,7 +16,13 @@ type ChatInstance = ReturnType<ReturnType<typeof createChatStore>['create']>
 
 async function bench() {
   const runtime = await SlotTestRuntime.create()
-  const chat = createChatStore()
+  const chat = createChatStore({
+    key: (id, intent) => sessionPersistenceKey({ list: runtime.ctx.sessions.list }, id, false, undefined, intent) === undefined
+      ? undefined : `dsh.conversation.chat.${id}`,
+    subscribe: listener => runtime.ctx.sessions.list.subscribe(listener),
+    onDispose: (dispose) => { runtime.ctx.effect(() => dispose) },
+    readDraft: readPersistedDraft,
+  })
   // The apply.ts shape: one shared handle across the strict Session header,
   // body, and details registrations; the session-maybe 'conversation' shell
   // carries no store by design. The slots must first exist in the ledger.
@@ -69,6 +77,7 @@ describe('selection survives on the store seat', () => {
   it('a list-projection update keeps instance identity and the selection value', async () => {
     const b = await bench()
     const id = sid('s1')
+    await b.runtime.sessions.add({ id })
 
     const store = storeFor(b, 'conversation.session', id)
     store.actions.select({ turnSeq: 3, callId: 'c1' })
@@ -76,7 +85,7 @@ describe('selection survives on the store seat', () => {
 
     // A projection churn elsewhere (list rows re-projected) must not touch
     // store identity: drive the runtime's own list observable.
-    await b.runtime.sessions.add({ id, summary: { displayTitle: 'proj-a' } })
+    await b.runtime.sessions.updateSummary(id, { displayTitle: 'proj-a' })
     expect(b.runtime.sessions.list.getSnapshot().byId[id]?.displayTitle).toBe('proj-a')
 
     const after = storeFor(b, 'conversation.session', id)

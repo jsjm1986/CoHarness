@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/browser-use-runtime/README.md
 document:
-  en: 61c29a77e37bd63228ec0e6ece2ba1237d4cada0
-  zh: d6518db762d1c3b3fe0c4e7affe1c73f402536e3
+  en: cddaaf26860a49d9ccd08da4862ecc89955e0b0f
+  zh: 8a3e464cc820fbc0a8206c061eeaced5a4409043
 /:
   en: 32bd01db6a5146ed
   zh: 31e56827b98bc1b3
@@ -18,11 +18,11 @@ document:
   en: d152484eb41ac6b4
   zh: f14f34fce35a8d90
 /deepseek-ai-dsh-experimental-browser-use-runtime/use-this-package:
-  en: a97df9f537665c2c
-  zh: ff5f20d2aa6af26a
+  en: 37aa86853caeb0b5
+  zh: 438435061f8466dc
 /deepseek-ai-dsh-experimental-browser-use-runtime/understand-the-implementation:
-  en: 9e41c7b39b640a1d
-  zh: ac970330dddc80fa
+  en: 139765b23e30cfbd
+  zh: a465473fa312314b
 /deepseek-ai-dsh-experimental-browser-use-runtime/further-exploration:
   en: 2a8d2c9b217b9e95
   zh: 084c9ad664e55498
@@ -33,8 +33,8 @@ document:
   en: 066ff4d955210cfe
   zh: a26b6c72f527d701
 /deepseek-ai-dsh-experimental-browser-use-runtime/known-limitations-and-deferred-work:
-  en: 5a3a9c35a8097d30
-  zh: 9e67f2c4279becf7
+  en: 544c8d2cb79007ec
+  zh: 3d4c67c2e78e320e
 /deepseek-ai-dsh-experimental-browser-use-runtime/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 8ec3e73528ddb1a6

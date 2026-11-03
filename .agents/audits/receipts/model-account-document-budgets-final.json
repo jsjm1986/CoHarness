@@ -1,0 +1,14 @@
+{
+  "name": "model-account-document-budgets-final",
+  "cwd": ".",
+  "command": "pnpm run verify-doc-budgets",
+  "startedAt": "2026-10-24T00:25:36.261259+00:00",
+  "seconds": 2.696,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "624fad0c381495b5fa1798f728e38f296835106be05ea7b8c51e55557fbf1e62",
+  "inputsAfter": "624fad0c381495b5fa1798f728e38f296835106be05ea7b8c51e55557fbf1e62",
+  "postgresToolDirectory": null,
+  "outputSha256": "9ada1148db3727a6cec3cd7554d7b64568079137376bd0d09ebb712531b1f852",
+  "outputTail": "$ tsx scripts/verify-doc-budgets.ts\nverify-doc-budgets: 8 budgeted docs within ceiling.\n"
+}

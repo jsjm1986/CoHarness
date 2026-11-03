@@ -1,7 +1,7 @@
 /**
- * Register a DeepSeek-backed provider in `ctx.web`. It calls the Anthropic-compatible Messages API
- * with native `web_search_20250305`. The provider reuses `DEEPSEEK_API_KEY` but not
- * `DEEPSEEK_BASE_URL`, because search and chat-completions use different bases.
+ * Register native Messages search in `ctx.web`. Governed compositions use the selected LLM
+ * route's prepared operation, endpoint and credentials. Independent web compositions resolve
+ * their own API-key endpoint for the `web_search_20250305` server tool.
  * @module @deepseek-ai/dsh-web-search-deepseek
  */
 
@@ -11,10 +11,9 @@ import type {} from '@deepseek-ai/dsh-agent'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
-import type {} from '@deepseek-ai/dsh-session'
+import type { Session } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-web'
 import {
-  DeepSeekSearchProvider,
   DEEPSEEK_DEFAULT_API_VERSION,
   DEEPSEEK_DEFAULT_BASE_URL,
   DEEPSEEK_DEFAULT_MAX_TOKENS,
@@ -22,6 +21,7 @@ import {
   DEEPSEEK_DEFAULT_MODEL,
 } from './provider.ts'
 import type { DeepSeekSearchProviderOptions } from './provider.ts'
+import { registerAdmittedSearch } from './admission.ts'
 
 export {
   DeepSeekSearchProvider,
@@ -32,7 +32,7 @@ export {
   DEEPSEEK_DEFAULT_MODEL,
   DEEPSEEK_PROVIDER_ID,
 } from './provider.ts'
-export type { DeepSeekSearchLlmRequest, DeepSeekSearchProviderOptions } from './provider.ts'
+export type { DeepSeekSearchLlmRequest, DeepSeekSearchProviderOptions, PreparedDeepSeekSearch } from './provider.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'web-search-deepseek'
@@ -44,11 +44,13 @@ const DEFAULT_API_KEY_ENV = 'DEEPSEEK_API_KEY'
 
 /** Plugin config (all optional — `apply` fills env-var and constant defaults). */
 export interface Config {
-  /** Literal DeepSeek API key; prefer {@link apiKeyEnv} so no secret enters configuration files. */
+  /** Governed LLM provider route; defaults to `deepseek-official` when model authorization is installed or required. */
+  provider?: string
+  /** Standalone API key; prefer {@link apiKeyEnv}. Governed calls use the model route's credentials. */
   apiKey?: string
-  /** Credential reference resolved for each search; defaults to `DEEPSEEK_API_KEY`. */
+  /** Standalone credential reference; defaults to `DEEPSEEK_API_KEY` and does not override a governed model route. */
   apiKeyEnv?: string
-  /** Anthropic-compatible endpoint base; `/messages` is appended. */
+  /** Standalone Messages base; `/messages` is appended. Governed calls use the model route's endpoint. */
   baseURL?: string
   /** Anthropic-format model name. Defaults to `deepseek-v4-flash`. */
   model?: string
@@ -61,6 +63,7 @@ export interface Config {
 }
 
 export const Config: z<Config> = z.object({
+  provider: z.string().min(1),
   apiKey: z.string().role('secret'),
   apiKeyEnv: z.string().role('credential-ref').default(DEFAULT_API_KEY_ENV),
   // Declared here rather than only at the use site: a configuration surface
@@ -75,9 +78,8 @@ export const Config: z<Config> = z.object({
 
 /**
  * Environment variable naming this provider's endpoint. Deliberately distinct
- * from `$DEEPSEEK_BASE_URL`, which belongs to the chat-completions adapter:
- * search speaks the Anthropic-compatible Messages API, so one variable cannot
- * serve both.
+ * from `$DEEPSEEK_BASE_URL`; this variable controls only independent search
+ * transport, while governed operations retain the selected model route.
  */
 const SEARCH_BASE_URL_ENV = 'DEEPSEEK_SEARCH_BASE_URL'
 
@@ -90,14 +92,16 @@ export const WEB_SEARCH_DEEPSEEK_SETTINGS_NAMESPACE = settingsNamespace('web-sea
  * every value it reads is already fully defaulted.
  * @param ctx - plugin context supplying the credential and environment planes.
  * @param config - the currently authoritative section.
+ * @param session - captured caller Session, or absence for independent searches.
  * @returns options for one search.
  */
-function resolveOptions(ctx: Context, config: Config): DeepSeekSearchProviderOptions {
+function resolveOptions(ctx: Context, config: Config, session: Session | undefined): DeepSeekSearchProviderOptions & Pick<Config, 'provider'> {
   const apiKeyEnv = credentialRef(config.apiKeyEnv ?? DEFAULT_API_KEY_ENV)
   const literalApiKey = config.apiKey !== undefined && config.apiKey.length > 0
     ? config.apiKey
     : undefined
   return {
+    ...config.provider === undefined ? {} : { provider: config.provider },
     ...literalApiKey === undefined ? {} : { apiKey: literalApiKey },
     resolveApiKey: async () => {
       const credentials = ctx.get('credentials')
@@ -115,7 +119,7 @@ function resolveOptions(ctx: Context, config: Config): DeepSeekSearchProviderOpt
     maxTokens: config.maxTokens ?? DEEPSEEK_DEFAULT_MAX_TOKENS,
     maxUses: config.maxUses ?? DEEPSEEK_DEFAULT_MAX_USES,
     recordRequest: (request) => {
-      ctx.get('agents')?.currentInitiator()?.session.append(
+      session?.append(
         'web/deepseek-search-llm-request',
         request,
       )
@@ -130,7 +134,7 @@ export function apply(ctx: Context, config: Config): void {
     label: { en: 'Web search', zh: '网页搜索' },
     owner: 'project',
     projectWrite: 'manager',
-    projectWritePaths: [['baseURL'], ['model'], ['apiVersion'], ['maxTokens'], ['maxUses']],
+    projectWritePaths: [['provider'], ['baseURL'], ['model'], ['apiVersion'], ['maxTokens'], ['maxUses']],
     setSource: (source) => {
       current = source
     },
@@ -138,5 +142,5 @@ export function apply(ctx: Context, config: Config): void {
     // section per search, so a committed change needs no re-registration.
     onChange: () => {},
   })
-  ctx.web.registerSearchProvider(new DeepSeekSearchProvider(() => resolveOptions(ctx, current())))
+  registerAdmittedSearch(ctx, session => resolveOptions(ctx, current(), session))
 }

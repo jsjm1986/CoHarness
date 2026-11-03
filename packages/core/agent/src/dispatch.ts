@@ -7,6 +7,7 @@
  */
 
 import type { Context, Events } from '@deepseek-ai/cordis'
+import { formatThrownValue } from '@deepseek-ai/dsh-util-values'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type { AssembleContext } from '@deepseek-ai/dsh-system-prompt'
@@ -128,10 +129,10 @@ export function agentEvents(ctx: Context, agent: Agent, carrier: Scoped<Agent> =
         try {
           const returned: unknown = callback(...args)
           void Promise.resolve(returned).catch((error: unknown) => {
-            ctx.logger.warn(`agent event "${name}" listener rejected: ${String(error)}`)
+            ctx.logger.warn(`agent event "${name}" listener rejected: ${formatThrownValue(error)}`)
           })
         } catch (error: unknown) {
-          ctx.logger.warn(`agent event "${name}" listener threw: ${String(error)}`)
+          ctx.logger.warn(`agent event "${name}" listener threw: ${formatThrownValue(error)}`)
         }
       }
     },

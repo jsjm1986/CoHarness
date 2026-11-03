@@ -1,11 +1,12 @@
 import { readFile } from 'node:fs/promises'
+import { setImmediate as nextTurn } from 'node:timers/promises'
 import { Context } from '@deepseek-ai/cordis'
 import type { ToolExecution, ToolExecutionToken } from '@deepseek-ai/dsh-tools'
 import { GoalId, type GoalView } from '@deepseek-ai/dsh-goal'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { GatewayRequestPrincipal, GatewayRuntimeRequestInit } from '@deepseek-ai/dsh-gateway-runtime'
 import type { ExecutionInputId, ExecutionQuestionId, ExecutionScopeId, ExecutionState } from '@deepseek-ai/dsh-execution-authority'
-import { createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { WebhookDeliveryId, WebhookRuleId, WebhookSourceId } from '@deepseek-ai/dsh-webhook'
 import { TeamId, TeamMessageId } from '@deepseek-ai/dsh-experimental-agent-team'
 import SessionStore, { Session, SessionId, SessionLogOffset, SessionSeq, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
@@ -14,7 +15,10 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { SessionObservation, SessionQueryEngine } from '@deepseek-ai/dsh-session-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import GatewayExecution, { type Config } from '../src/index.ts'
+import GatewayResourceBudget from '@deepseek-ai/dsh-gateway-runtime/resource-budget'
+import type { ResourceLease } from '@deepseek-ai/dsh-resource-budget'
 import { executionScope, inputDigest } from '../src/input.ts'
+import { mountMemory } from '../../../memory/memory/tests/harness.ts'
 
 const A = '00000000-0000-4000-8000-000000000001' as ExecutionInputId
 const B = '00000000-0000-4000-8000-000000000002' as ExecutionInputId
@@ -25,7 +29,9 @@ const state = (revision = '1', both = false): ExecutionState => ({
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup() })
 
-async function fixture(options: { kind?: 'user' | 'project'; config?: Config } = {}) {
+type JobNotice = { type: 'settled'; job: { owner: SessionId } } | { type: 'output'; owner?: SessionId }
+
+async function fixture(options: { kind?: 'user' | 'project'; config?: Config; watchCancel?: () => Promise<undefined> } = {}) {
   const ctx = new Context()
   const sessions = ctx.plugin(SessionStore)
   const projections = ctx.plugin(SessionProjectionRegistry)
@@ -48,6 +54,7 @@ async function fixture(options: { kind?: 'user' | 'project'; config?: Config } =
   let authorize: (() => Promise<ExecutionState>) | undefined
   const requests: { path: string; body: Record<string, unknown> }[] = []
   const responses = new Map<string, (body: Record<string, unknown>, init?: GatewayRuntimeRequestInit) => Promise<Response>>()
+  const watchCancel = options.watchCancel
   const request = vi.fn(async (path: string, options?: GatewayRuntimeRequestInit) => {
     if (path.endsWith('/watch')) {
       const respond = responses.get('/watch')
@@ -56,7 +63,7 @@ async function fixture(options: { kind?: 'user' | 'project'; config?: Config } =
         stream = controller
         controller.enqueue(new TextEncoder().encode('{"type":"ready"}\n'))
         options?.signal?.addEventListener('abort', () => { controller.error(options.signal?.reason) }, { once: true })
-      } })
+      }, ...watchCancel === undefined ? {} : { cancel: watchCancel } })
       return new Response(body)
     }
     const body = typeof options?.body === 'string' ? JSON.parse(options.body) as Record<string, unknown> : {}
@@ -104,6 +111,16 @@ function dispatch(): GatewayRequestPrincipal {
     assertion: 'verified-dispatch',
     claims: { ...caller.claims, purpose: 'webhook-dispatch', nonce: 'dispatch-test' },
   }
+}
+
+/** A running qualified scope proves that one watch update has finished its recheck. */
+async function revocationWitness(f: Awaited<ReturnType<typeof fixture>>) {
+  const session = f.ctx.sessions.create(SessionId('revocation-witness'))
+  const cancel = vi.fn<Agent['cancel']>()
+  const agent: Agent = { ...f.agent, id: session.id, session, cancel, status: 'running' }
+  f.agents.set(agent.id, agent)
+  await f.ctx.executionAuthority.authorize('memory', agent)
+  return { cancel }
 }
 
 function webhookSource() {
@@ -166,9 +183,9 @@ describe('managed execution identity', () => {
 
   it('keeps desktop ownership while an idle root has a running job and reports cleanup failure', async () => {
     const f = await fixture({ config: { desktop: 'display-0', desktopPollMs: 60_000 } })
-    const callbacks: Array<(event: { type: string; job: { owner: SessionId } }) => void> = []
+    const callbacks: Array<(event: JobNotice) => void> = []
     const job = { owner: f.agent.id, status: 'running' }
-    f.ctx.provide('jobs', { list: () => [job], events: { subscribe: (_filter: unknown, callback: (event: { type: string; job: { owner: SessionId } }) => void) => {
+    f.ctx.provide('jobs', { list: () => [job], events: { subscribe: (_filter: unknown, callback: (event: JobNotice) => void) => {
       callbacks.push(callback); return () => {}
     } } } as never)
     await vi.waitFor(() => { expect(callbacks).toHaveLength(2) })
@@ -178,6 +195,7 @@ describe('managed execution identity', () => {
     await f.ctx.computerUseAuthorization.run({ agent: f.agent, signal: new AbortController().signal } as ToolExecution, async () => 'result')
     Object.assign(f.agent, { status: 'idle' })
     await f.ctx.serial('agent/status', { agent: f.agent, status: 'idle' } as never)
+    for (const callback of callbacks) callback({ type: 'output', owner: f.agent.id })
     expect(f.requests.some(row => row.path.endsWith('/release'))).toBe(false)
     for (const callback of callbacks) callback({ type: 'settled', job: { owner: f.agent.id } })
     await f.ctx.serial('agent/status', { agent: f.agent, status: 'idle' } as never)
@@ -201,6 +219,223 @@ describe('managed execution identity', () => {
     f.responses.set('/authorize', async () => new Response(null, { status: 403 }))
     f.stream.enqueue(new TextEncoder().encode('{"type":"invalidate","userId":1}\n'))
     await vi.waitFor(() => { expect(f.cancel).toHaveBeenCalledOnce() })
+  })
+
+  it.each(['authorize', 'relay'] as const)('cancels %s while shared registration remains available to another caller', async (operation) => {
+    const f = await fixture()
+    const session = f.ctx.sessions.create(SessionId('pending-registration'))
+    const agent: Agent = { ...f.agent, id: session.id, session }
+    f.agents.set(agent.id, agent)
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    let registrationSignal: GatewayRuntimeRequestInit['signal']
+    f.responses.set('/register-session', async (_body, init) => {
+      registrationSignal = init?.signal
+      entered.resolve(undefined)
+      await release.promise
+      return new Response(null, { status: 204 })
+    })
+    const scope = f.ctx.executionAuthority.capture(f.agent)
+    const lifetime = new AbortController()
+    const cancellation = new Error('cancelled while registration waits')
+    const invoke = (signal?: AbortSignal) => operation === 'authorize'
+      ? f.ctx.executionAuthority.authorize('memory', agent, signal)
+      : f.ctx.executionAuthority.relay(session, scope, MessageId('pending-relay'), signal)
+    const cancelled = vi.fn()
+    const first = invoke(lifetime.signal).then(value => ({ value }), (error: unknown) => { cancelled(error); return { error } })
+    await entered.promise
+    const second = invoke()
+    try {
+      lifetime.abort(cancellation)
+      await vi.waitFor(() => { expect(cancelled).toHaveBeenCalledWith(cancellation) })
+      expect(registrationSignal?.aborted).toBe(false)
+      expect(f.requests.filter(row => row.path.endsWith('/register-session') && row.body.sessionId === session.id)).toHaveLength(1)
+      release.resolve(undefined)
+      await expect(second).resolves.toMatchObject({ inputs: [A] })
+      expect(f.requests.filter(row => row.path.endsWith(operation === 'authorize' ? '/authorize' : '/relay')
+        && row.body.sessionId === session.id)).toHaveLength(1)
+    } finally {
+      release.resolve(undefined)
+      await Promise.allSettled([first, second])
+    }
+  })
+
+  it.each(['authorization', 'message-entry'] as const)('cancels %s while inherited execution restoration waits', async (operation) => {
+    const f = await fixture()
+    const session = f.ctx.sessions.create(SessionId('pending-inheritance'))
+    const agent: Agent = { ...f.agent, id: session.id, session }
+    f.agents.set(agent.id, agent)
+    f.ctx.executionAuthority.inherit(session, f.ctx.executionAuthority.capture(f.agent))
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const lifetime = new AbortController()
+    const cancellation = new Error('cancelled while inheritance waits')
+    let abortReason: unknown
+    f.responses.set('/inherit', async (_body, init) => {
+      entered.resolve(undefined)
+      let onAbort!: () => void
+      const aborted = new Promise<never>((_resolve, reject) => {
+        onAbort = () => { abortReason = init?.signal?.reason; reject(cancellation) }
+        init?.signal?.addEventListener('abort', onAbort, { once: true })
+      })
+      try {
+        await Promise.race([release.promise, aborted])
+        return Response.json(state())
+      } finally { init?.signal?.removeEventListener('abort', onAbort) }
+    })
+    const cancelled = vi.fn()
+    const event = session.append('user/message', createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'cancel this turn' }] }), { surfaceOp: 'append' })
+    const pending = operation === 'authorization'
+      ? f.ctx.executionAuthority.authorize('memory', agent, lifetime.signal)
+      : f.ctx.serial('agent/message-entered', { agent, event, turn: 1, step: 1, signal: lifetime.signal } as never)
+    const outcome = pending
+      .then(value => ({ value }), (error: unknown) => { cancelled(error); return { error } })
+    try {
+      await entered.promise
+      lifetime.abort(cancellation)
+      await vi.waitFor(() => { expect(cancelled).toHaveBeenCalledWith(cancellation) })
+      expect(abortReason).toBe(cancellation)
+      expect(f.requests.filter(row => row.path.endsWith('/authorize') && row.body.sessionId === session.id)).toHaveLength(0)
+    } finally {
+      release.resolve(undefined)
+      await outcome
+    }
+  })
+
+  it.each(['authorize', 'relay'] as const)('refuses an already cancelled %s without starting Session registration', async (operation) => {
+    const f = await fixture()
+    const session = f.ctx.sessions.create(SessionId('already-cancelled-registration'))
+    const agent: Agent = { ...f.agent, id: session.id, session }
+    f.agents.set(agent.id, agent)
+    const lifetime = new AbortController()
+    const cancellation = new Error('cancelled before registration')
+    lifetime.abort(cancellation)
+    const pending = operation === 'authorize'
+      ? f.ctx.executionAuthority.authorize('memory', agent, lifetime.signal)
+      : f.ctx.executionAuthority.relay(session, f.ctx.executionAuthority.capture(f.agent), MessageId('cancelled-relay'), lifetime.signal)
+    await expect(pending).rejects.toBe(cancellation)
+    expect(f.requests.filter(row => row.body.sessionId === session.id)).toHaveLength(0)
+  })
+
+  it.each(['user', 'project', 'disconnect', 'unrelated-user'] as const)(
+    'checks an idle authorization response against a concurrent %s invalidation', async (reason) => {
+      const f = await fixture({ kind: 'project' })
+      Object.assign(f.agent, { status: 'idle' })
+      await f.ctx.serial('agent/status', { agent: f.agent, status: 'idle' } as never)
+      const entered = Promise.withResolvers<undefined>()
+      const release = Promise.withResolvers<undefined>()
+      let revoked = false
+      f.responses.set('/authorize', async (body) => {
+        if (body.sessionId === f.agent.id) {
+          const checked = state()
+          entered.resolve(undefined)
+          await release.promise
+          return Response.json(checked)
+        }
+        if (revoked && body.capability === 'memory') return new Response(null, { status: 403 })
+        return Response.json({ ...state(), inputs: [B], actors: [{ userId: reason === 'unrelated-user' ? 99 : 1 }],
+          primaryActorUserId: reason === 'unrelated-user' ? 99 : 1 })
+      })
+      const witness = await revocationWitness(f)
+      const checking = f.ctx.executionAuthority.authorize('memory', f.agent)
+      const outcome = checking.then(value => ({ value }), (error: unknown) => ({ error }))
+      try {
+        await entered.promise
+        revoked = true
+        if (reason === 'disconnect') {
+          f.responses.set('/watch', async () => new Response(null, { status: 503 }))
+          f.stream.error(new Error('fixture update stream disconnected'))
+        } else {
+          const subject = reason === 'project' ? { projectId: 1 } : { userId: reason === 'unrelated-user' ? 99 : 1 }
+          f.stream.enqueue(new TextEncoder().encode(JSON.stringify({ type: 'invalidate', ...subject }) + '\n'))
+        }
+        await vi.waitFor(() => { expect(witness.cancel).toHaveBeenCalledOnce() })
+        release.resolve(undefined)
+        if (reason === 'unrelated-user') expect(await outcome).toEqual({ value: state() })
+        else expect(await outcome).toMatchObject({ error: { code: 'execution/forbidden' } })
+        expect(f.cancel).not.toHaveBeenCalled()
+      } finally {
+        release.resolve(undefined)
+        await outcome
+      }
+    },
+  )
+
+  it.each([
+    ['save', 'user'], ['delete', 'user'], ['save', 'project'], ['delete', 'project'],
+    ['save', 'disconnect'], ['delete', 'disconnect'], ['save', 'unrelated-user'], ['delete', 'unrelated-user'],
+  ] as const)('rechecks an idle memory %s after %s revocation while its marker waits', async (operation, reason) => {
+    const f = await fixture({ kind: 'project' })
+    Object.assign(f.agent, { status: 'idle' })
+    await f.ctx.serial('agent/status', { agent: f.agent, status: 'idle' } as never)
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    let block = false
+    let revoked = false
+    f.responses.set('/authorize', async (body) => {
+      const witness = body.sessionId === 'revocation-witness'
+      if (revoked && body.capability === 'memory' && (witness || reason !== 'unrelated-user')) {
+        return new Response(null, { status: 403 })
+      }
+      return Response.json(witness
+        ? { ...state(), inputs: [B], actors: [{ userId: reason === 'unrelated-user' ? 99 : 1 }],
+          primaryActorUserId: reason === 'unrelated-user' ? 99 : 1 }
+        : state())
+    })
+    const witness = await revocationWitness(f)
+    const memory = await mountMemory(f.ctx, {
+      config: { space: 'project' },
+      beforeOpen: (backend) => {
+        const open = backend.kv.open.bind(backend.kv)
+        backend.kv.open = async (descriptor) => {
+          const unit = await open(descriptor)
+          const put = unit.putRecord.bind(unit)
+          unit.putRecord = async (table, key, value) => {
+            if (block && table === 'cursors') { entered.resolve(undefined); await release.promise }
+            await put(table, key, value)
+          }
+          return unit
+        }
+      },
+    })
+    const scope = { kind: 'project' as const }
+    const input = { scope, key: 'retained', kind: 'guidance' as const, summary: 'shared fact', content: 'original body' }
+    if (operation === 'delete') await memory.service.memberSave(input)
+    const changed = vi.fn()
+    f.ctx.on('memory/changed', changed)
+    block = true
+    const controller = new AbortController()
+    const writer = { kind: 'agent' as const, agent: f.agent, signal: controller.signal }
+    const mutation = operation === 'save' ? memory.service.save(input, writer) : memory.service.delete({ scope, key: input.key }, writer)
+    const outcome = mutation.then(value => ({ value }), (error: unknown) => ({ error }))
+    try {
+      await entered.promise
+      revoked = true
+      if (reason === 'disconnect') {
+        f.responses.set('/watch', async () => new Response(null, { status: 503 }))
+        f.stream.error(new Error('fixture update stream disconnected'))
+      } else {
+        const subject = reason === 'project' ? { projectId: 1 } : { userId: reason === 'unrelated-user' ? 99 : 1 }
+        f.stream.enqueue(new TextEncoder().encode(JSON.stringify({ type: 'invalidate', ...subject }) + '\n'))
+      }
+      await vi.waitFor(() => { expect(witness.cancel).toHaveBeenCalledOnce() })
+      expect(controller.signal.aborted).toBe(false)
+      release.resolve(undefined)
+      if (reason === 'unrelated-user') {
+        expect(await outcome).toMatchObject({ value: { ok: true } })
+        expect((await memory.service.read(scope, input.key))?.content).toBe(operation === 'save' ? input.content : undefined)
+      } else {
+        expect(await outcome).toMatchObject({ error: { code: 'execution/forbidden' } })
+        expect((await memory.service.read(scope, input.key))?.content).toBe(operation === 'save' ? undefined : input.content)
+        expect(changed).not.toHaveBeenCalled()
+      }
+      expect(f.cancel).not.toHaveBeenCalled()
+    } finally {
+      release.resolve(undefined)
+      await outcome
+      await f.fiber.dispose()
+      await f.ctx.fiber.dispose()
+    }
   })
 
   it('rechecks desktop confirmation on access invalidation even while qualification remains valid', async () => {
@@ -385,8 +620,9 @@ describe('managed execution identity', () => {
     const f = await fixture()
     const message = createUserMessage({ content: [{ type: 'text', text: 'edited' }], source: { kind: 'user', gatewayExecutionInput: A } })
     await expect(f.ctx.executionAuthority.stamp(f.agent.session, message)).rejects.toThrow(/interactive caller/)
-    const principal = { claims: { user: { id: 2 } } } as GatewayRequestPrincipal
-    f.setPrincipal(principal)
+    const base = principal()
+    const caller = { ...base, claims: { ...base.claims, user: { ...base.claims.user, id: 2 } } }
+    f.setPrincipal(caller)
     f.request.mockImplementationOnce(async () => Response.json({ inputId: B }))
     const edited = await f.ctx.executionAuthority.stamp(f.agent.session, message)
     expect(edited.source).toMatchObject({ gatewayExecutionInput: B })
@@ -396,8 +632,27 @@ describe('managed execution identity', () => {
     expect(JSON.parse(postedBody)).toMatchObject({
       previousInputId: A, contentHash: inputDigest(message.content), messageId: message.id,
     })
-    expect(call[1]).toMatchObject({ principal })
+    expect(call[1]).toMatchObject({ principal: caller })
     expect(Object.isFrozen(edited)).toBe(true)
+  })
+
+  it.each(['user', 'user-question-reply', 'fixture'] as const)('records current project attribution only for a human %s source', async (kind) => {
+    const f = await fixture()
+    const base = principal()
+    const scope = { kind: 'project' as const, projectId: 9, projectName: 'Shared project', mode: 'rw' as const }
+    const caller = { ...base, claims: { ...base.claims, scope } }
+    f.setPrincipal(caller)
+    f.request.mockImplementationOnce(async () => Response.json({ inputId: A }))
+    const message = createUserMessage({ content: [{ type: 'text', text: 'A human contribution' }],
+      source: { kind, ...(kind === 'user-question-reply' ? { callId: ToolCallId('continued'), outcome: 'answered' } : {}),
+        ...(kind === 'fixture' ? {} : { participant: { userId: 99 } }) } as never })
+    const stamped = await f.ctx.executionAuthority.stamp(f.agent.session, message)
+    if (kind === 'fixture') expect(stamped.source).not.toHaveProperty('participant')
+    else expect(stamped.source).toMatchObject({ participant: {
+      userId: 1, username: 'admin', displayName: 'Admin', role: 'admin', scope,
+    } })
+    expect(stamped.source).toMatchObject({ gatewayExecutionInput: A })
+    expect(stamped.content).toEqual(message.content)
   })
 
   it('stamps a managed webhook dispatch admission through its purpose-bound assertion', async () => {
@@ -493,17 +748,18 @@ describe('managed execution identity', () => {
     await f.ctx.executionAuthority.authorize('plugin-management', f.agent)
     const policy = f.ctx.get('permissionPresetAuthorization')!
     expect(policy.canSelect('danger-full-access')).toBe(true)
-    let notify: ((event: { type: string; job: { owner: SessionId } }) => void) | undefined
+    let notify: ((event: JobNotice) => void) | undefined
     f.ctx.provide('jobs', {
       list: () => [{ owner: SessionId('other'), status: 'running' },
         { owner: f.agent.id, status: 'completed' }],
-      events: { subscribe: (_filter: unknown, listener: (event: { type: string; job: { owner: SessionId } }) => void) => {
+      events: { subscribe: (_filter: unknown, listener: (event: JobNotice) => void) => {
         notify = listener
         return () => {}
       } },
     } as never)
     await vi.waitFor(() => { expect(notify).toBeDefined() })
     Object.assign(f.agent, { status: 'idle' })
+    notify?.({ type: 'output' })
     notify?.({ type: 'settled', job: { owner: SessionId('other') } })
     expect(policy.canSelect('danger-full-access')).toBe(true)
     notify?.({ type: 'settled', job: { owner: f.agent.id } })
@@ -557,6 +813,22 @@ describe('managed execution identity', () => {
     f.stream.close()
     await vi.waitFor(() => { expect(refused).toHaveBeenCalledOnce(); expect(cancelled).toHaveBeenCalledOnce() })
     expect(f.cancel).toHaveBeenCalled()
+  })
+
+  it('fails closed on malformed updates while reader cancellation remains unacknowledged', async () => {
+    const cancellation = Promise.withResolvers<undefined>()
+    const acknowledgement = Promise.withResolvers<undefined>()
+    const f = await fixture({ config: { reconnectDelayMs: 60_000 }, watchCancel: () => {
+      cancellation.resolve(undefined)
+      return acknowledgement.promise
+    } })
+    try {
+      f.stream.enqueue(new TextEncoder().encode('{bad}\n'))
+      await cancellation.promise
+      await nextTurn()
+      expect(f.cancel).toHaveBeenCalledOnce()
+      await expect(f.ctx.executionAuthority.authorize('execute', f.agent)).rejects.toThrow(/unavailable/)
+    } finally { acknowledgement.resolve(undefined) }
   })
 
   it('reports a background job that does not release after revocation', async () => {
@@ -1343,15 +1615,43 @@ describe('immutable current execution', () => {
     expect(f.ctx.executionAuthority.capture(f.agent).scopeId).toBe(secondId)
   })
 
+  it('refuses captured resource work after its Agent was replaced under the same Session id', async () => {
+    const f = await fixture()
+    record(f, first())
+    f.responses.set('/register', async () => Response.json({ nextSequence: 1, policy: {
+      sampleMs: 20, staleMs: 500, cpuTarget: 0.85, eventLoopTargetMs: 100, linuxMemoryReserveRatio: 0.1,
+      maxQueued: 16, maxQueuedPerUser: 8, maxQueuedPerProject: 8, maxQueuedBytes: 64 * 1024, maxWaitMs: 10_000,
+    } }))
+    f.responses.set('/request', async () => Response.json({ state: 'active' }))
+    f.responses.set('/statuses', async () => Response.json([{ state: 'active' }]))
+    f.responses.set('/finish', async () => Response.json({}))
+    const budget = await f.ctx.plugin(GatewayResourceBudget, { requestTimeoutMs: 1000, cleanupTimeoutMs: 3000 })
+    cleanups.push(async () => { await budget.dispose() })
+    const authority = f.ctx.executionAuthority, scope = authority.capture(f.agent)
+    await authority.runCaptured(f.agent, scope, async () => {
+      f.agents.set(f.agent.id, { ...f.agent })
+      let lease: ResourceLease | undefined
+      try {
+        await expect(f.ctx.resourceBudget.acquire({ kind: 'model', sessionId: f.agent.id }).then((value) => {
+          lease = value
+          return value
+        })).rejects.toThrow('execution owner is no longer active')
+      } finally { await lease?.release() }
+    })
+    expect(f.requests.filter(request => request.path.endsWith('/resources/request'))).toHaveLength(0)
+  })
+
   it('retains a captured callback and nested PTC identity while a newer request becomes current', async () => {
     const f = await fixture()
     record(f, first())
     const authority = f.ctx.executionAuthority
     const earlier = authority.capture(f.agent)
+    expect(authority.current()).toBeUndefined()
     const entered = Promise.withResolvers<undefined>(), resume = Promise.withResolvers<undefined>()
     const oldWork = authority.runCaptured(f.agent, earlier, async () => {
       entered.resolve(undefined)
       await resume.promise
+      expect(authority.current()).toEqual(earlier)
       return authority.capture(f.agent)
     })
     await entered.promise

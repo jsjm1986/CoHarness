@@ -14,7 +14,7 @@ it('validates remote shell facts and distinguishes a lookup miss from transport 
     if (failure !== undefined) throw failure
     return schema.parse(method === 'terminal.environment' ? facts : '/remote/bin/bash')
   })
-  ctx.provide('ssh', { request } as never)
+  ctx.provide('ssh', { request, retainConsumer: (cleanup: () => Promise<void>) => cleanup } as never)
   const runtime = new SshSubprocessRuntime(ctx)
   const signal = new AbortController().signal
   try {

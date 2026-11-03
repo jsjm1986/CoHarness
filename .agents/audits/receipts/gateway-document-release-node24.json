@@ -1,0 +1,14 @@
+{
+  "name": "gateway-document-release-node24",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 /Users/a1234/.nvm/versions/node/v24.19.0/bin/node gateway/tests/fixtures/document-stream-built.mjs",
+  "startedAt": "2026-10-26T20:17:38.925387+00:00",
+  "seconds": 3.413,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "270473bbb8c0e3a13fa83e15be2f5c4597e4a1c33de3222928fa785398c5e8ee",
+  "inputsAfter": "270473bbb8c0e3a13fa83e15be2f5c4597e4a1c33de3222928fa785398c5e8ee",
+  "postgresToolDirectory": null,
+  "outputSha256": "b1b987790b09291c3577607053af9dfbf91803da16455fbac269d7e0014c8b06",
+  "outputTail": "{\"operation\":\"compiled-document-authority\",\"actor\":7,\"unrelatedRoute\":\"untouched\"}\n"
+}

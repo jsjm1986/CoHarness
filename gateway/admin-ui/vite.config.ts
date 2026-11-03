@@ -18,7 +18,7 @@ export default defineConfig({
       '@deepseek-ai/dsh-client-ui-primitives': resolve(__dirname, 'src/model-settings-primitives.ts'),
       '@deepseek-ai/dsh-typert-protocol/remote-info': resolve(__dirname, '../../packages/typert/protocol/src/remote-info.ts'),
     },
-    dedupe: ['react', 'react-dom', 'lucide-react'],
+    dedupe: ['react', 'react-dom', 'lucide-react', 'zod'],
   },
   build: {
     outDir: '../public/admin',

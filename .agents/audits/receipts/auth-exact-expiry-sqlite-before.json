@@ -1,0 +1,14 @@
+{
+  "name": "auth-exact-expiry-sqlite-before",
+  "cwd": "gateway",
+  "command": "npx vitest run tests/auth.spec.ts -t 'exactly at its' --retry=0",
+  "startedAt": "2026-10-24T01:47:39.548424+00:00",
+  "seconds": 3.789,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c4fbe7284eb4638456d0ed5837b7ab0be34c102188298913b6d2eaf4fbb80c30",
+  "inputsAfter": "c4fbe7284eb4638456d0ed5837b7ab0be34c102188298913b6d2eaf4fbb80c30",
+  "postgresToolDirectory": null,
+  "outputSha256": "8d19bbf9674d746a0525ec44caedc7e683e1df16d7304b8d61e8ebc92995aec7",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/auth.spec.ts (5 tests | 2 failed | 3 skipped) 162ms\n     × refuses a token exactly at its idle deadline without renewing it 99ms\n     × refuses a token exactly at its absolute deadline without renewing it 63ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/auth.spec.ts > AuthService > refuses a token exactly at its idle deadline without renewing it\n FAIL  tests/auth.spec.ts > AuthService > refuses a token exactly at its absolute deadline without renewing it\nAssertionError: expected { id: 1, username: 'alice', …(6) } to be null\n\n- Expected:\nnull\n\n+ Received:\n{\n  \"autoReviewEligible\": false,\n  \"displayName\": \"\",\n  \"homePath\": \"/tmp/alice\",\n  \"id\": 1,\n  \"mustChangePassword\": false,\n  \"role\": \"user\",\n  \"status\": \"active\",\n  \"username\": \"alice\",\n}\n\n ❯ tests/auth.spec.ts:32:42\n     30|         .run(kind === 'idle' ? now : now + 10_000, kind === 'absolute'…\n     31|       const before = db.prepare('SELECT expires_at,absolute_expires_at…\n     32|       expect(auth.validate(login.token)).toBeNull()\n       |                                          ^\n     33|       expect(db.prepare('SELECT expires_at,absolute_expires_at,last_se…\n     34|     } finally { time.mockRestore() }\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 3 skipped (5)\n   Start at  09:47:42\n   Duration  894ms (transform 505ms, setup 0ms, import 621ms, tests 162ms, environment 0ms)\n\n"
+}

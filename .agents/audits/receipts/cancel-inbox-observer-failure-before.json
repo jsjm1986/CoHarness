@@ -1,0 +1,14 @@
+{
+  "name": "cancel-inbox-observer-failure-before",
+  "cwd": ".",
+  "command": "node --import tsx/esm .agents/audits/.local/cancel-observer-probe.mjs",
+  "startedAt": "2026-10-26T09:54:17.330973+00:00",
+  "seconds": 2.638,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "56f778c2ab5cc631539c3ab7bda0b16c5555506832e35f9983b4cbce55b09e73",
+  "inputsAfter": "56f778c2ab5cc631539c3ab7bda0b16c5555506832e35f9983b4cbce55b09e73",
+  "postgresToolDirectory": null,
+  "outputSha256": "855040db48da19ffcd5aabf45551bcb06c992a189f67a82f8146d4830b74d6ab",
+  "outputTail": "{\"originalFailurePropagated\":false,\"activeRequestAborted\":true,\"pendingInput\":0}\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ undefined\n- Error: cancel inbox observer failed\n-     at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/cancel-observer-probe.mjs:28:18)\n\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/cancel-observer-probe.mjs:35:9) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: Error: cancel inbox observer failed\n      at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/cancel-observer-probe.mjs:28:18),\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v25.8.1\n"
+}

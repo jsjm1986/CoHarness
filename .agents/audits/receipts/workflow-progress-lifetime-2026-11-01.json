@@ -1,0 +1,231 @@
+{
+  "finding": "B446",
+  "status": "fixed_verified_named_original_job_progress_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T14:59:19.641119+00:00",
+  "baseline": {
+    "status": "passed",
+    "startedAt": "2026-11-01T14:49:17.981363+00:00",
+    "finishedAt": "2026-11-01T14:49:22.513654+00:00",
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-origin.json"
+  },
+  "problem": "ToolWorkflow progress subscriptions belonged to the tool definition. Unloading or replacing it removed phase/log/member narration for a background Job that still owned a live Workflow; replacement Jobs continued while the original stopped reporting.",
+  "fix": "One scoped mirror filters its accepted run and writes its original JobHandle. The original parent scope owns its subscriptions independently of tool registration and waits for the producer to stop them. Stop rejects late events immediately and releases subscriptions without cancelling the Job. Cleanup failure stops progress so its recovery notice remains authoritative.",
+  "verification": {
+    "distinctBusinessCases": 51,
+    "owningPackageCases": 47,
+    "newUnitCases": 2,
+    "typescriptSdkCases": 2,
+    "pythonSdkCases": 2,
+    "versionRepeatsAndSubsetsNotAdded": true,
+    "checks": [
+      {
+        "name": "workflow-progress-after",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-after.json"
+      },
+      {
+        "name": "workflow-progress-sdk-after",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-sdk-after.json"
+      },
+      {
+        "name": "workflow-progress-built-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-built-node22.json"
+      },
+      {
+        "name": "workflow-progress-built-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-built-node24.json"
+      },
+      {
+        "name": "workflow-progress-python-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-python-sdk.json"
+      },
+      {
+        "name": "workflow-progress-build-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-build-types.json"
+      },
+      {
+        "name": "workflow-progress-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-lint.json"
+      },
+      {
+        "name": "workflow-progress-test-preservation",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-test-preservation.json"
+      },
+      {
+        "name": "workflow-progress-pairing",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-pairing.json"
+      },
+      {
+        "name": "workflow-progress-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-doc-quick.json"
+      },
+      {
+        "name": "workflow-progress-export-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-export-docs.json"
+      },
+      {
+        "name": "workflow-progress-origin",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-origin.json"
+      },
+      {
+        "name": "workflow-progress-sdk-before-corrected",
+        "status": "expected_original_business_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-sdk-before-corrected.json"
+      },
+      {
+        "name": "workflow-progress-original-built-node22",
+        "status": "expected_original_business_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-original-built-node22.json"
+      },
+      {
+        "name": "workflow-progress-final-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-final-repository-references.json"
+      },
+      {
+        "name": "workflow-progress-peer-report-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-peer-report-references.json"
+      }
+    ],
+    "measuredCoverage": {
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/workflow/tool-workflow/src/index.ts": {
+        "lines": {
+          "total": 127,
+          "covered": 127,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 29,
+          "covered": 29,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 141,
+          "covered": 141,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 80,
+          "covered": 80,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/workflow/tool-workflow/src/record.ts": {
+        "lines": {
+          "total": 21,
+          "covered": 21,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 8,
+          "covered": 8,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 26,
+          "covered": 26,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 16,
+          "covered": 16,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "coverageScope": "Entire ToolWorkflow index.ts and record.ts100% all4metrics, aggregate167statements/96branches/37functions/148lines. Existing repository thresholds and exclusions unchanged.",
+    "preservedTests": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/test-preservation.json",
+    "otherUnchangedTestFiles": 25,
+    "originalCarrier": "33-file frozen ToolWorkflow carrier. All original package sources match the B445 capsule and the executed original bundle matches its B445 reference. Unexecuted ancillary compiler files are not claimed as release artifacts.",
+    "originalOutcome": "Corrected pre-fix source and frozen original Node22 bundle each fail the one background business assertion while foreground still passes. All four durable member events remain present, but observed Job progress is empty and its ring contains only the member start line. Native response closure succeeds; no startup/module/timeout failure counts as proof.",
+    "assembledFixture": "Strengthened existing keyless real model-issued Workflow fixture through actual Node PTC, original Job registry and native HTTP child stream. The script emits a labelled member ending, phase and log after tool withdrawal; observers receive the phase and the original ring retains all four lines. Two SDKs and normal Node22/24 bundles pass. Session event observation does not claim disk fsync/replay or hard production shutdown acceptance.",
+    "invalidAcceptance": "Replacing the tool cannot redirect original progress into the replacement Job. Stopped mirrors reject stale events; pending parent cleanup keeps routing until the producer stops. Existing cleanup-failure cases retain the notice and reject later phase overwrites.",
+    "retainedIntermediateFailures": [
+      "workflow-progress-before",
+      "workflow-progress-sdk-before"
+    ],
+    "limitations": "Full Workflow/PTC/Ralph runtime lifetime, hard parent/session writer shutdown, persistent cleanup failure recovery, Core/other entry coverage and cross-computer production acceptance remain open."
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/workflow-progress-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-workflow-cleanup-ownership.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-workflow-cleanup-ownership.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-workflow-cleanup-ownership.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/workflow-record-lifetime/expected.json",
+    "examples/headless-agent/tests/fixtures/workflow-record-lifetime/model.mjs",
+    "packages/workflow/tool-workflow/README.i18n.yaml",
+    "packages/workflow/tool-workflow/README.md",
+    "packages/workflow/tool-workflow/README.zh.md",
+    "packages/workflow/tool-workflow/src/index.ts",
+    "packages/workflow/tool-workflow/src/record.ts",
+    "packages/workflow/tool-workflow/tests/tool-workflow.spec.ts"
+  ],
+  "removedPaths": [],
+  "readOnlyPrerequisiteCount": 219,
+  "artifactReferences": {
+    "packages/subagent/subagent/lib/index.js": "d6ddb08f62734b4c88f7508bf8c9052bca29fd07ee4cb8e50393611727001d14",
+    "packages/subagent/subagent/lib/types/index.js": "2ea5d6edd2af7c0f65209e7277d80e7ccdc3e9ebd9ff88e31c67776285dac39f",
+    "packages/subagent/subagent/lib/types/index.d.ts": "1e98c7dd4944d32ca9a241c681a4b588b2dec9d9cffa6420369c2612be9f06ab",
+    "packages/subagent/subagent/lib/types/run-lease.js": "68a420195cd7358362a8edd97d9a4cfd4c766e836d1f32e25e467d2b9ec7fa63",
+    "packages/subagent/subagent/lib/types/run-lease.d.ts": "b4a73727a97ba0369cf20f99633cef031ba8a9b3671b7ef427021ffc91fa2037",
+    "apps/cli/lib/bin.js": "a3f373cfa7a3a84aa5fb6e25c3db5b2cb9b338afe986169c00fcc38ea0044455",
+    "packages/bundle/sdk-minimal/lib/index.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "packages/subagent/subagent/lib/types/types.js": "74c4a6ef14ae2c83292457c179e22fc44885e5d92976595089107527c160f9cd",
+    "packages/subagent/subagent/lib/types/types.d.ts": "fe23d6fbb40919d51ec2b1a65934249b074f6d3b9794847d58dfe453f6887501",
+    "packages/subagent/subagent/lib/types/internal.js": "9e629487ae14104c2d46269197692279bf5c1a5209af0b2a56ee0865ac477afb",
+    "packages/subagent/subagent/lib/types/internal.d.ts": "910db97a43b6dd599126d6c7cf9057b2c007120bcf9dd761bcf1439aa2e45291",
+    "packages/subagent/tool-subagent/lib/index.js": "1dc73f2d5ed54577b5243fdc5ea6bca03a032c999982ed1dadfa76d2905a7bcf",
+    "packages/subagent/tool-subagent/lib/types/index.js": "f14f7d6c2b92d72524008f154c40ee55031fe4c08b113c250b05b07b8c6021cf",
+    "packages/subagent/tool-subagent/lib/types/index.d.ts": "8b09f71db58a223e7e965f4f5775d97941851d5d6dd8d92b3e6a83d54b6eea5c",
+    "packages/jobs/jobs-local/lib/index.js": "376e13f6ad2eb71dd76dee6f3098d4d596ea34a28c8c95603014dd00eeb92c81",
+    "packages/jobs/tool-jobs/lib/index.js": "d09749a36d2b6247ac32a476fb2947c1fe32fe95ea4444bbd768901c6b838c0b",
+    "packages/workflow/workflow-ptc/lib/index.js": "cdd665826c4e031404345a7c62d69532fefcb5aef101a2429bd6e90ce29d6f37",
+    "packages/ptc-runtime/ptc-runtime-node/lib/index.js": "9b01e82609461ca27c7353386722a523bed4ebbed0f326d6ccc803c620032fa6",
+    "packages/workflow/tool-workflow/lib/index.js": "20cba82a193aa147bffcb8e5bc5993f1c0b9aa3c4e2c812189a4f88cc718e86a",
+    "packages/workflow/tool-workflow/lib/types/index.js": "0ffe01430069d55ee8b01d7813ba23257826e00157b0ab2d2534e546f6692667",
+    "packages/workflow/tool-workflow/lib/types/index.d.ts": "580add4796ea967c51f79558608ef6472780a393c046e20673751437d41df549",
+    "packages/workflow/tool-workflow/lib/types/record.js": "a796561d1ce5a65fcaeb4c62f20694dfade02a92102534306ed0c6c7ccbfa8f6",
+    "packages/workflow/tool-workflow/lib/types/record.d.ts": "b76ec5244084c6bc7a23bf099fab530280c818b7c4b87866d0d675960fa521a6"
+  },
+  "noteReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/note-review.json",
+  "remaining": [
+    "All12domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue full Workflow/PTC/Ralph foreground resource lifetimes under Core/engine withdrawal and late failed hand-back. B445/B446 repair durable recording and transient Job progress for the named cases, not full runtime admission or hard parent/session writer shutdown.",
+    "Persistent failed cleanup after enclosing service drain remains unproven. Do not release uncertain resource occupancy merely because a scope reported an error.",
+    "Complete Core/other Consumer entry coverage remains open. B443 private Core index measurement was92.14/85.96/96.61/92.52 for statements/branches/functions/lines. The entire ToolWorkflow index.ts and record.ts are100% all4metrics in B446; this does not clear other entry debt.",
+    "Continue resource/model/tool/Inspector authorization, queued continuation/permission transitions, cross-account/computer isolation, document/runtime business rules and remaining file/platform coverage outside peer-reserved surfaces.",
+    "B416-B446 is a per-batch verified delta index, not an assembled release or production acceptance. Preserve B417 matching required-on-read writer/readers/SDKs, header7 and immutable Session generations; no old-reader downgrade.",
+    "Latest trusted peer production report remains R28/schema103/write epoch1, maintenance104 exited normally on local and Ubuntu nodes. R28 excludes Root B416+. Root did not independently verify production. B project history loading and15-35second metadata latency remain peer investigation. Keep Gateway html/server/browser fixtures/docs/Admin/UI and other reserved surfaces peer-owned; no routine polling or production mutation.",
+    "Official Responses real-interface verification remains explicitly deferred by the user."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T144658Z/B416-B446-integration-index.json"
+}

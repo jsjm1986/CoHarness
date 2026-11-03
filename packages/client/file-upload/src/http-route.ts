@@ -31,11 +31,7 @@ export async function handleFileUploadHttp(
     response.end()
     return
   }
-  const rawType: unknown = request.headers['content-type']
-  const headerValue: unknown = Array.isArray(rawType) ? rawType[0] : rawType
-  const mediaType = typeof headerValue === 'string'
-    ? headerValue.split(';', 1)[0]?.trim().toLowerCase()
-    : undefined
+  const mediaType = request.headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase()
   if (mediaType !== 'application/octet-stream') {
     response.writeHead(415, { 'content-type': 'text/plain; charset=utf-8' })
     response.end('content type must be application/octet-stream')
@@ -78,6 +74,7 @@ export async function handleFileUploadHttp(
   } finally {
     request.off('aborted', onAborted)
   }
+  if (response.destroyed || response.writableEnded) return
   response.writeHead(200, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',

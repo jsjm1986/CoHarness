@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.md
 document:
-  en: 277d6c767df9d0030bc496a6ce5e42027460e6a8
-  zh: 27333233841b568e4c31d2eee065f4d6dbe3f7ef
+  en: 9a4837afbec7968016e391889f540165483087e1
+  zh: 3a3b830de695b16ec7ad92c99d7c91f1e3e772eb
 /agent-note-document-index-pagination-and-recoverable-trash:
   en: 1db4b68735aaf621
   zh: b813714a5cc49fd7
@@ -12,14 +12,14 @@ document:
   en: 7403c36610537e71
   zh: f77cebba8c384016
 /agent-note-document-index-pagination-and-recoverable-trash/decision:
-  en: 3b04cc42ccb80a60
-  zh: d12d6f59c80578ca
+  en: a824a977154cb6b8
+  zh: 1fa155e7c73d6364
 /agent-note-document-index-pagination-and-recoverable-trash/alternatives-considered:
-  en: 82c1423d4010d028
-  zh: 980f69f550d3918c
+  en: 30dbbb6e22373232
+  zh: b0c0f0778cd318d2
 /agent-note-document-index-pagination-and-recoverable-trash/consequences:
   en: f326ce90df9dbd64
   zh: ce50518b52841457
 /agent-note-document-index-pagination-and-recoverable-trash/verification:
-  en: 3b41949598d111d2
-  zh: 514ea236376d7b6e
+  en: 1aa6ad76e9d0703b
+  zh: 130fca6393373755

@@ -112,6 +112,7 @@ export class ScheduleService extends TypertRemoteService {
   private chain: Promise<unknown> = Promise.resolve()
   private runtime: ScheduleRuntime | undefined
   private stopping = false
+  private pendingOperations = 0
 
   /**
    * @param ctx - Host services owning storage, dispatch, and Session restoration.
@@ -123,6 +124,7 @@ export class ScheduleService extends TypertRemoteService {
       days: config.deliveryHistoryDays ?? DEFAULT_DELIVERY_HISTORY_DAYS,
       records: config.deliveryHistoryRecords ?? DEFAULT_DELIVERY_HISTORY_RECORDS,
     }
+    let hasActiveTasks: (() => boolean) | undefined
     this.ready = ctx.storageDomain.open(scheduleDomain).then(async (domain) => {
       for (const [key, task] of domain.table('tasks').entries()) {
         if (key !== task.record.id) {
@@ -135,21 +137,30 @@ export class ScheduleService extends TypertRemoteService {
           throw new Error(`schedule: stored task key "${key}" differs from record id "${task.record.id}"`)
         }
       }
+      hasActiveTasks = () => [...domain.table('tasks').entries()].some(([, task]) => task.status === 'active')
       return domain
     })
     this.initialized = ctx.effect(async () => {
-      const domain = await this.ready
+      const releaseIdle = ctx.root.on('runtime/idle-release-check', () =>
+        this.stopping || this.pendingOperations > 0 || hasActiveTasks === undefined || hasActiveTasks()
+          ? 'busy' : undefined, { global: true })
+      let domain: Domain<typeof scheduleDomain>
+      try { domain = await this.ready }
+      catch (error) { releaseIdle(); throw error }
       let cleanup: () => Promise<void>
       try {
         cleanup = ctx.effect(() => async () => {
-          this.stopping = true
-          await this.runtime?.dispose()
-          await this.chain // The chain contains failures after returning them to their callers.
-          await domain.close()
+          try {
+            this.stopping = true
+            await this.runtime?.dispose()
+            await this.chain // The chain contains failures after returning them to their callers.
+            await domain.close()
+          } finally { releaseIdle() }
         })
       } catch (error) {
         this.stopping = true
-        await domain.close()
+        try { await domain.close() }
+        finally { releaseIdle() }
         throw error
       }
       const tasks = domain.table('tasks')
@@ -463,8 +474,12 @@ export class ScheduleService extends TypertRemoteService {
 
   private serialize<T>(work: () => Promise<T>): Promise<T> {
     if (this.stopping) return Promise.reject(new Error('Schedule service is stopping'))
+    this.pendingOperations += 1
     const pending = this.chain.then(work)
-    this.chain = pending.catch(() => undefined) // Preserve FIFO progress after the caller receives the failure.
+    this.chain = pending.then(
+      () => { this.pendingOperations -= 1 },
+      () => { this.pendingOperations -= 1 },
+    )
     return pending
   }
 }

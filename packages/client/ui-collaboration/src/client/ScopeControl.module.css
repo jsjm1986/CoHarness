@@ -19,6 +19,19 @@
   overflow: hidden;
 }
 
+.configurationComputer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dsw-space-1);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.openConfigurationEnvironment {
+  flex: none;
+  color: var(--dsw-alias-label-secondary);
+}
+
 .trigger:hover:not(:disabled),
 .trigger[aria-expanded='true'] {
   background: var(--dsw-alias-interactive-bg-hover);
@@ -189,7 +202,7 @@
 }
 
 .menuSearchInput::placeholder {
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .menuSearchInput::-webkit-search-cancel-button {
@@ -286,6 +299,21 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.destinationText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  gap: var(--dsw-space-1);
+}
+
+.destinationText .scopeName {
+  max-width: 100%;
+}
+
+
 
 /* Roster mode flag: restricted scopes carry a muted dot (read-only) or a
    warn dot (steward); the default read-write state stays plain text. */
@@ -654,4 +682,55 @@
 
 .pageSearch {
   padding: var(--dsw-space-1) var(--dsw-space-3);
+}
+
+
+
+
+.scopeIdentity {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.trigger[data-has-computer='true']:not(.rail) {
+  height: auto;
+  min-height: 44px;
+  padding-block: 5px;
+}
+
+.currentComputer {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-1);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.currentComputer > svg {
+  flex: 0 0 auto;
+}
+
+.destinationComputer {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.currentComputer > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

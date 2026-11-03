@@ -1,0 +1,14 @@
+{
+  "name": "personal-document-owner-peer-assertions",
+  "cwd": "gateway",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 ../node_modules/.bin/vitest run tests/document-transfer-loader.spec.ts",
+  "startedAt": "2026-10-26T14:30:43.429396+00:00",
+  "seconds": 5.188,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5ccf9353c4281fc75599c5dec67606cb7c86f75e60b9532f494789b4705ce3b1",
+  "inputsAfter": "5ccf9353c4281fc75599c5dec67606cb7c86f75e60b9532f494789b4705ce3b1",
+  "postgresToolDirectory": null,
+  "outputSha256": "408072e0ce8cad2378a5377e163af9ff0cc6b5565c9f7b8c263cc97333e42fdc",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/document-transfer-loader.spec.ts (2 tests | 1 failed) 2598ms\n   × preserves copy authority and drains document HTTP work through the Loader 1250ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/document-transfer-loader.spec.ts > preserves copy authority and drains document HTTP work through the Loader\nError: Snapshot `preserves copy authority and drains document HTTP work through the Loader 1` mismatched\n\n- Expected\n+ Received\n\n@@ -2,9 +2,10 @@\n  {\"operation\":\"copy-revocation\",\"status\":\"denied\",\"furtherChunks\":false,\"newPublication\":false}\n  {\"operation\":\"disabled-actor\",\"status\":\"denied\",\"published\":[\"report.txt\"]}\n  {\"operation\":\"personal-upload-owner\",\"formatVersion\":2,\"ownerId\":\"user:7\",\"collaborationService\":false}\n  {\"operation\":\"personal-ownerless-resume\",\"status\":404,\"newSession\":true,\"legacyUnchanged\":true}\n  {\"operation\":\"project-to-personal-copy\",\"status\":\"copied\",\"bytes\":\"shared copy bytes\",\"formatVersion\":2,\"ownerId\":\"user:7\"}\n+ {\"operation\":\"readonly-member-personal-copy\",\"status\":\"copied\",\"bytes\":\"shared copy bytes\",\"personalOwner\":\"user:9\",\"projectOwner\":\"user:7\",\"ownPersonalRead\":200,\"foreignPersonalRead\":401}\n  {\"operation\":\"document-catalog-unload\",\"listed\":200,\"routeRemoved\":404,\"committedWhenStopped\":true,\"actor\":7}\n  {\"operation\":\"document-read-unload\",\"listed\":200,\"routeRemoved\":404,\"documents\":[\"report.txt\"]}\n  {\"operation\":\"project-upload-no-authority\",\"status\":503,\"error\":\"COLLABORATION_UNAVAILABLE\",\"message\":\"Document authorization is temporarily unavailable.\",\"createdSessions\":0}\n\n\n ❯ tests/document-transfer-loader.spec.ts:37:3\n     35| it('preserves copy authority and drains document HTTP work through the…\n     36|   const result = await run()\n     37|   await expect(result.stdout).toMatchFileSnapshot(fileURLToPath(new UR…\n       |   ^\n     38| }, 45_000)\n     39|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n  Snapshots  1 failed\n Test Files  1 failed (1)\n      Tests  1 failed | 1 passed (2)\n   Start at  22:30:45\n   Duration  2.72s (transform 15ms, setup 0ms, import 25ms, tests 2.60s, environment 0ms)\n\n"
+}

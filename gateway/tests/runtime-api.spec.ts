@@ -1,5 +1,8 @@
+import type { RuntimeId } from '../src/runtime-catalog.ts'
 import Database from 'better-sqlite3'
 import { sessionLogicalFormatCatalog as sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
+import { documentRequestSchema, GATEWAY_DOCUMENT_STORE_PATH, type DocumentStoreRequest } from '@deepseek-ai/dsh-userdoc-gateway/protocol'
+import { UserDocError, userDocErrorStatus } from '@deepseek-ai/dsh-userdoc'
 import { generateKeyPairSync } from 'node:crypto'
 import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:http'
 import type { Pool } from 'pg'
@@ -19,7 +22,11 @@ import type { DocumentTransferResponse } from '../src/document-transfer.ts'
 import type { RuntimeTarget } from '../src/instances.ts'
 import type { PluginStateSnapshot } from '../src/plugin-state.ts'
 import { createRuntimeApiHandler } from '../src/runtime-api.ts'
+import { ExecutionIdentityError, GatewayExecutionIdentity, type ExecutionIdentityState } from '../src/execution-identity.ts'
+import type { RuntimeDocumentStoreHandler } from '../src/runtime-document-store.ts'
+import type { AccessInvalidationSubject, GatewayAccessMonitor } from '../src/access-invalidation.ts'
 
+const RUNTIME_ID = '00000000-0000-4000-8000-000000000003' as RuntimeId
 const ORGANIZATION_ID = '11d4a86c-4624-44fa-b69f-7e3f48cc5a04'
 const ORGANIZATION_SLUG = 'acme'
 const PROJECT_ID = 23
@@ -66,7 +73,7 @@ function user(id: number, role: UserRow['role'] = 'user'): UserRow {
 async function request(
   handler: RuntimeHandler,
   pathname: string,
-  input: { body: unknown; principal?: string; token?: string; method?: string },
+  input: { body: unknown; principal?: string; token?: string; method?: string; stream?: boolean },
 ): Promise<RuntimeResponse> {
   const headers: IncomingHttpHeaders = {
     authorization: `Bearer ${input.token ?? RUNTIME_TOKEN}`,
@@ -77,7 +84,8 @@ async function request(
     method: input.method ?? 'POST',
     url: pathname,
     headers,
-  } as unknown as IncomingMessage
+    resume() { return this },
+  } as IncomingMessage
   let status = 0
   let responseBody = ''
   const res = {
@@ -91,7 +99,11 @@ async function request(
     },
   } as unknown as ServerResponse
   const routePath = pathname.split('?', 1)[0] ?? pathname
-  const handled = await handler(req, res, routePath, JSON.stringify(input.body))
+  let handled: boolean
+  if (input.stream === true) {
+    if (handler.stream === undefined) throw new Error('The fixture requires a streaming runtime handler.')
+    handled = await handler.stream(req, res, routePath, () => Promise.resolve('open'))
+  } else handled = await handler(req, res, routePath, JSON.stringify(input.body))
   return {
     handled,
     status,
@@ -111,6 +123,10 @@ function fixture() {
       : values?.[1] === ADMIN_ID ? [{ id: ADMIN_INTERNAL_ID }] : []
     return { rows, rowCount: rows.length }
   })
+  const computerQuery = vi.fn(async (_text: string, values?: unknown[]) => {
+    const rowCount = [CREATOR_ID, MEMBER_ID, ADMIN_ID].includes(Number(values?.[1])) ? 1 : 0
+    return { rows: rowCount === 0 ? [] : [{ '?column?': 1 }], rowCount }
+  })
   const append = vi.fn(async (
     _sessionId: string,
     _batchId: string,
@@ -121,7 +137,7 @@ function fixture() {
   const resolveOrganizationCredential = vi.fn(async (_subject, ref: string) =>
     ref === 'DSH_ORG_PRIMARY_API_KEY' ? 'sk-organization' : null)
   const push = {
-    notifyCompleted: vi.fn(async (_sessionId: string, _eventSeq: number): Promise<void> => {}),
+    notifyCompleted: vi.fn(async (_runtimeId: RuntimeId, _sessionId: string, _eventSeq: number): Promise<void> => {}),
   }
   const archiveSnapshot = vi.fn(async () => [{ id: 'command-1', rootSessionId: 'session-archive', action: 'restore' as const }])
   const archiveAck = vi.fn(async () => true)
@@ -131,11 +147,18 @@ function fixture() {
       Promise<{ status: 'applied'; revision: string } | { status: 'conflict'; current: PluginStateSnapshot }> =>
       ({ status: 'applied' as const, revision: '1' })),
   }
+  const conversations = {
+      append,
+      listScoped: vi.fn(async () => []),
+      load,
+      removeTree: vi.fn(async () => []),
+    }
   const deps = {
     context: {
       organizationSlug: ORGANIZATION_SLUG,
       nodeId: '00000000-0000-4000-8000-000000000099',
-      pool: { query } as unknown as Pool,
+      pool: { query: (text: string, values?: unknown[]) => text.includes('harness.computer_use_allowed')
+        ? computerQuery(text, values) : query(text, values) } as unknown as Pool,
     },
     instances: {
       authenticateRuntimeToken: vi.fn(async (token: string): Promise<{
@@ -146,17 +169,12 @@ function fixture() {
         projectInternalId?: string
       } | null> => token === RUNTIME_TOKEN ? {
         organizationId: ORGANIZATION_ID,
-        target: { kind: 'project' as const, id: PROJECT_ID },
+        target: { runtimeId: RUNTIME_ID, kind: 'project' as const, id: PROJECT_ID },
         generation: GENERATION,
         projectInternalId: PROJECT_INTERNAL_ID,
       } : null),
     },
-    conversations: {
-      append,
-      listScoped: vi.fn(async () => []),
-      load,
-      removeTree: vi.fn(async () => []),
-    },
+    conversations: { forRuntime: () => conversations },
     collaboration: {
       access: vi.fn(async () => { throw new CollaborationDeniedError('conversation-not-found') }),
       claimInteraction: vi.fn(async () => false),
@@ -164,7 +182,7 @@ function fixture() {
         const administrator = userId === ADMIN_ID
         const mode = administrator ? 'rw' : modes.get(userId)
         return projectId === PROJECT_ID && mode !== undefined
-          ? { projectId, name: 'Shared', path: '/tmp/shared', mode, administrator }
+          ? { projectId, name: 'Shared', path: '/tmp/shared', mode, administrator, canManage: administrator, uiThemePolicy: 'follow-user' as const }
           : null
       }),
       readableSessionIds: vi.fn(async () => []),
@@ -183,11 +201,13 @@ function fixture() {
       projectName: 'Shared',
       mode,
     },
-    runtime: { kind: 'project', id: PROJECT_ID, generation: GENERATION },
+    runtime: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID, generation: GENERATION },
   })
   return {
+    conversations,
     append,
     query,
+    computerQuery,
     deps,
     handler: createRuntimeApiHandler(deps),
     issuePrincipal,
@@ -200,6 +220,309 @@ function fixture() {
     pluginState,
   }
 }
+
+function documentAuthorityResponse(envelope: DocumentStoreRequest, signal = new AbortController().signal): RuntimeDocumentStoreHandler {
+  return async ({ authorize, response }) => {
+    try {
+      const authority = await authorize(envelope, signal)
+      const result = authority.kind === 'execution'
+        ? { kind: authority.kind, primary: authority.state.primaryActorUserId, actors: authority.state.actors }
+        : authority.kind === 'request' ? { kind: authority.kind, primary: authority.principal.user.id } : { kind: authority.kind }
+      response.writeHead(200); response.end(JSON.stringify(result))
+    } catch (error) {
+      if (!(error instanceof UserDocError)) throw error
+      response.writeHead(userDocErrorStatus(error.code)); response.end(JSON.stringify({ code: error.code }))
+    }
+  }
+}
+
+function documentAccessMonitor() {
+  const listeners = new Set<Parameters<GatewayAccessMonitor['subscribe']>[0]>()
+  let available = true, acknowledged = 0
+  const monitor: GatewayAccessMonitor = {
+    get available() { return available },
+    synchronize: async () => {},
+    subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener) } },
+  }
+  return { monitor, listeners, get acknowledged() { return acknowledged },
+    setAvailable(value: boolean) { available = value },
+    async publish(subject: AccessInvalidationSubject) {
+      await Promise.all([...listeners].map(listener => listener(subject)))
+      acknowledged += 1
+    },
+  }
+}
+
+function documentBarrier() {
+  let resolve!: () => void
+  const promise = new Promise<void>((done) => { resolve = done })
+  return { promise, resolve }
+}
+
+describe('streamed document authority', () => {
+  it('refuses a document backend without its access monitor at construction', () => {
+    const runtime = fixture()
+    expect(() => createRuntimeApiHandler({ ...runtime.deps, documentStore: async () => {} }))
+      .toThrow('document access monitor')
+  })
+
+  it.each((['openRead', 'save', 'writeUploadChunk'] as const).flatMap(kind =>
+    (['account', 'monitor-loss', 'secondary-execution-actor'] as const).map(reason => ({ kind, reason }))))(
+    'cancels an admitted $kind on $reason and retains invalidation through cleanup', async ({ kind, reason }) => {
+    const runtime = fixture(), access = documentAccessMonitor()
+    const entered = documentBarrier(), release = documentBarrier()
+    const captured = reason === 'secondary-execution-actor'
+    if (captured) {
+      const authorize = vi.spyOn(GatewayExecutionIdentity.prototype, 'authorize').mockResolvedValue({ revision: '1',
+        actors: [{ userId: CREATOR_ID }, { userId: MEMBER_ID }], inputs: ['input-7', 'input-8'],
+        primaryActorUserId: CREATOR_ID, unverifiedHistory: false })
+      onTestFinished(() => { authorize.mockRestore() })
+    }
+    const envelope = documentRequestSchema.parse({ version: 1,
+      authority: captured ? { kind: 'execution', sessionId: 'captured-parent', scopeId: '087a91f2-6e40-497d-8fd0-18fc4918ff34' }
+        : { kind: 'request' }, operation: kind === 'openRead' ? { kind, docId: 'file.txt' }
+          : kind === 'save' ? { kind, target: { path: '/virtual/file.txt', name: 'file.txt', docId: 'file.txt' } }
+            : { kind, uploadId: 'upload-fixture', chunk: { index: 0, start: 0, end: 0, total: 1, sha256: 'a'.repeat(64) } } })
+    let activeSignal: AbortSignal | undefined, cleaned = false
+    const handler = createRuntimeApiHandler({ ...runtime.deps, accessMonitor: access.monitor,
+      documentStore: async (invocation) => {
+        activeSignal = invocation.signal
+        try {
+          await invocation.authorize(envelope, activeSignal)
+          entered.resolve(); await release.promise
+          activeSignal.throwIfAborted()
+          invocation.response.writeHead(200); invocation.response.end('{}')
+        } catch (error) {
+          if (!(error instanceof UserDocError)) throw error
+          invocation.response.writeHead(userDocErrorStatus(error.code)); invocation.response.end(JSON.stringify({ code: error.code }))
+        } finally { cleaned = true }
+      },
+    })
+    const pending = request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true, principal: runtime.issuePrincipal(CREATOR_ID) })
+    let changing: Promise<void> | undefined
+    try {
+      await entered.promise
+      await access.publish({ userId: ADMIN_ID })
+      await access.publish({ projectId: PROJECT_ID + 1 })
+      expect(activeSignal?.aborted).toBe(false)
+      const before = access.acknowledged
+      if (reason === 'monitor-loss') access.setAvailable(false)
+      changing = access.publish(reason === 'monitor-loss' ? {} : { userId: captured ? MEMBER_ID : CREATOR_ID })
+      expect(activeSignal?.aborted).toBe(true)
+      expect(access.acknowledged).toBe(before)
+      expect(cleaned).toBe(false)
+      release.resolve()
+      await changing
+      expect(cleaned).toBe(true)
+      expect(await pending).toMatchObject({ status: reason === 'monitor-loss' ? 503 : 403,
+        body: { code: reason === 'monitor-loss' ? 'DOCUMENT_STORE_UNAVAILABLE' : 'DOCUMENT_PERMISSION_DENIED' } })
+      expect(access.listeners.size).toBe(0)
+    } finally { release.resolve(); await pending; await changing }
+    },
+  )
+
+  it('refuses unavailable monitoring and catches a revocation delivered by admission synchronization', async () => {
+    const runtime = fixture(), access = documentAccessMonitor()
+    const envelope = documentRequestSchema.parse({ version: 1, authority: { kind: 'request' }, operation: { kind: 'list' } })
+    const handler = createRuntimeApiHandler({ ...runtime.deps, accessMonitor: access.monitor, documentStore: documentAuthorityResponse(envelope) })
+    access.setAvailable(false)
+    expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true, principal: runtime.issuePrincipal(CREATOR_ID) }))
+      .toMatchObject({ status: 503, body: { code: 'DOCUMENT_STORE_UNAVAILABLE' } })
+    access.setAvailable(true)
+    access.monitor.synchronize = () => access.publish({ projectId: PROJECT_ID })
+    const verify = vi.spyOn(runtime.principals, 'verify').mockImplementationOnce(() => { throw new Error('Owned revoked assertion') })
+    onTestFinished(() => { verify.mockRestore() })
+    expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true, principal: runtime.issuePrincipal(CREATOR_ID) }))
+      .toMatchObject({ status: 403, body: { code: 'DOCUMENT_PERMISSION_DENIED' } })
+    expect(access.listeners.size).toBe(0)
+  })
+
+  it('rejects a content authorization invalidated while its execution registry read is pending', async () => {
+    const runtime = fixture(), access = documentAccessMonitor(), entered = documentBarrier()
+    let release!: (state: ExecutionIdentityState) => void
+    const result = new Promise<ExecutionIdentityState>((resolve) => { release = resolve })
+    const authorize = vi.spyOn(GatewayExecutionIdentity.prototype, 'authorize').mockImplementation(async () => {
+      entered.resolve(); return result
+    })
+    const state: ExecutionIdentityState = { revision: '1', actors: [{ userId: CREATOR_ID }], inputs: ['input-7'],
+      primaryActorUserId: CREATOR_ID, unverifiedHistory: false }
+    const envelope = documentRequestSchema.parse({ version: 1,
+      authority: { kind: 'execution', sessionId: 'captured-parent', scopeId: '087a91f2-6e40-497d-8fd0-18fc4918ff34' },
+      operation: { kind: 'openRead', docId: 'file.txt' } })
+    const handler = createRuntimeApiHandler({ ...runtime.deps, accessMonitor: access.monitor, documentStore: documentAuthorityResponse(envelope) })
+    const pending = request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true })
+    try {
+      await entered.promise
+      await access.publish({ userId: CREATOR_ID })
+      release(state)
+      expect(await pending).toMatchObject({ status: 403, body: { code: 'DOCUMENT_PERMISSION_DENIED' } })
+      expect(access.listeners.size).toBe(0)
+    } finally { release(state); await pending; authorize.mockRestore() }
+  })
+
+  it('does not acknowledge a revocation whose admitted content cleanup fails', async () => {
+    const runtime = fixture(), access = documentAccessMonitor(), entered = documentBarrier(), release = documentBarrier()
+    const failure = new Error('Owned document cleanup failure')
+    const envelope = documentRequestSchema.parse({ version: 1, authority: { kind: 'request' },
+      operation: { kind: 'openRead', docId: 'file.txt' } })
+    const handler = createRuntimeApiHandler({ ...runtime.deps, accessMonitor: access.monitor,
+      documentStore: async (invocation) => {
+        await invocation.authorize(envelope, invocation.signal)
+        entered.resolve(); await release.promise
+        throw failure
+      },
+    })
+    const pending = request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true,
+      principal: runtime.issuePrincipal(CREATOR_ID) })
+    const rejected = expect(pending).rejects.toBe(failure)
+    let changed: Promise<void> | undefined
+    try {
+      await entered.promise
+      changed = access.publish({ userId: CREATOR_ID })
+      const refused = expect(changed).rejects.toBe(failure)
+      release.resolve()
+      await Promise.all([refused, rejected])
+      expect(access.acknowledged).toBe(0)
+      expect(access.listeners.size).toBe(0)
+    } finally { release.resolve(); await pending.catch(() => {}); await changed?.catch(() => {}) }
+  })
+
+  it('refuses a runtime generation changed during monitor catch-up and normalizes monitor outages', async () => {
+    const runtime = fixture(), access = documentAccessMonitor()
+    const envelope = documentRequestSchema.parse({ version: 1, authority: { kind: 'request' },
+      operation: { kind: 'openRead', docId: 'file.txt' } })
+    const handler = createRuntimeApiHandler({ ...runtime.deps, accessMonitor: access.monitor, documentStore: documentAuthorityResponse(envelope) })
+    runtime.deps.instances.authenticateRuntimeToken.mockResolvedValueOnce({ organizationId: ORGANIZATION_ID,
+      target: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID }, generation: GENERATION }).mockResolvedValueOnce(null)
+    expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true,
+      principal: runtime.issuePrincipal(CREATOR_ID) })).toMatchObject({ status: 403, body: { code: 'DOCUMENT_PERMISSION_DENIED' } })
+    access.monitor.synchronize = async () => { throw new Error('Owned document monitor outage') }
+    expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true,
+      principal: runtime.issuePrincipal(CREATOR_ID) })).toMatchObject({ status: 503, body: { code: 'DOCUMENT_STORE_UNAVAILABLE' } })
+    expect(access.listeners.size).toBe(0)
+  })
+
+  it('resolves captured execution and all its actors without borrowing a later signed administrator', async () => {
+    const runtime = fixture(), principal = runtime.issuePrincipal(ADMIN_ID)
+    const scopeId = '087a91f2-6e40-497d-8fd0-18fc4918ff34'
+    const state: ExecutionIdentityState = { revision: '1', scopeId, inputs: ['input-7', 'input-8'],
+      actors: [{ userId: CREATOR_ID }, { userId: MEMBER_ID }], primaryActorUserId: CREATOR_ID, unverifiedHistory: false }
+    const execute = vi.spyOn(GatewayExecutionIdentity.prototype, 'authorize').mockResolvedValue(state)
+    const verify = vi.spyOn(runtime.principals, 'verify')
+    onTestFinished(() => { execute.mockRestore(); verify.mockRestore() })
+    const envelope = documentRequestSchema.parse({ version: 1, authority: { kind: 'execution', sessionId: 'captured-parent', scopeId },
+      operation: { kind: 'list' } })
+    const handler = createRuntimeApiHandler({ ...runtime.deps, accessMonitor: documentAccessMonitor().monitor, documentStore: documentAuthorityResponse(envelope) })
+    expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, principal, stream: true })).toMatchObject({
+      status: 200, body: { kind: 'execution', primary: CREATOR_ID, actors: state.actors },
+    })
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ organizationId: ORGANIZATION_ID,
+      target: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID }, generation: GENERATION }),
+    { sessionId: 'captured-parent', scopeId, capability: 'execute' })
+    execute.mockRejectedValueOnce(new ExecutionIdentityError(403, 'a captured actor was revoked'))
+    expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, principal, stream: true })).toMatchObject({
+      status: 403, body: { code: 'DOCUMENT_PERMISSION_DENIED' },
+    })
+    expect(verify).not.toHaveBeenCalled()
+  })
+
+  it('permits descriptor authority only for the descriptor and rechecks the runtime token', async () => {
+    const runtime = fixture()
+    const descriptor = documentRequestSchema.parse({ version: 1, authority: { kind: 'runtime' }, operation: { kind: 'describe' } })
+    const handler = createRuntimeApiHandler({ ...runtime.deps, accessMonitor: documentAccessMonitor().monitor, documentStore: documentAuthorityResponse(descriptor) })
+    expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true })).toMatchObject({
+      status: 200, body: { kind: 'runtime' },
+    })
+    expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, token: 'wrong-runtime', stream: true })).toMatchObject({
+      status: 401, body: { error: 'invalid-runtime-token' },
+    })
+    const listing = documentRequestSchema.parse({ version: 1, authority: { kind: 'runtime' }, operation: { kind: 'list' } })
+    const denied = createRuntimeApiHandler({ ...runtime.deps, accessMonitor: documentAccessMonitor().monitor, documentStore: documentAuthorityResponse(listing) })
+    expect(await request(denied, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true })).toMatchObject({
+      status: 403, body: { code: 'DOCUMENT_PERMISSION_DENIED' },
+    })
+  })
+
+  it('verifies interactive signatures and exact runtime generation without using execution receipts', async () => {
+    const runtime = fixture()
+    const envelope = documentRequestSchema.parse({ version: 1, authority: { kind: 'request' }, operation: { kind: 'list' } })
+    const handler = createRuntimeApiHandler({ ...runtime.deps, accessMonitor: documentAccessMonitor().monitor, documentStore: documentAuthorityResponse(envelope) })
+    expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true,
+      principal: runtime.issuePrincipal(CREATOR_ID) })).toMatchObject({ status: 200, body: { kind: 'request', primary: CREATOR_ID } })
+    for (const principal of [undefined, 'forged-principal', runtime.principals.issue({ user: user(CREATOR_ID),
+      scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'rw' },
+      runtime: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID, generation: GENERATION + 1 },
+    })]) {
+      expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true,
+        ...(principal === undefined ? {} : { principal }) })).toMatchObject({ status: 403, body: { code: 'DOCUMENT_PERMISSION_DENIED' } })
+    }
+  })
+
+  it('admits document administrator lifecycle methods and refuses every unrelated purpose', async () => {
+    const runtime = fixture()
+    const issue = (purpose: 'document-admin' | 'archive-read' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch') => runtime.principals.issue({
+      user: user(ADMIN_ID, 'admin'), purpose,
+      scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'ro' },
+      runtime: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID, generation: GENERATION },
+    })
+    for (const kind of ['trash', 'restore', 'purge'] as const) {
+      const envelope = documentRequestSchema.parse({ version: 1, authority: { kind: 'request' }, operation: { kind, docId: 'file.txt' } })
+      const handler = createRuntimeApiHandler({ ...runtime.deps, accessMonitor: documentAccessMonitor().monitor, documentStore: documentAuthorityResponse(envelope) })
+      expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true, principal: issue('document-admin') }))
+        .toMatchObject({ status: 200, body: { primary: ADMIN_ID } })
+      for (const purpose of ['archive-read', 'terminal-admin', 'plugin-admin', 'webhook-dispatch'] as const) {
+        expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true, principal: issue(purpose) }))
+          .toMatchObject({ status: 403, body: { code: 'DOCUMENT_PERMISSION_DENIED' } })
+      }
+    }
+    const listing = documentRequestSchema.parse({ version: 1, authority: { kind: 'request' }, operation: { kind: 'list' } })
+    const handler = createRuntimeApiHandler({ ...runtime.deps, accessMonitor: documentAccessMonitor().monitor, documentStore: documentAuthorityResponse(listing) })
+    expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true, principal: issue('document-admin') }))
+      .toMatchObject({ status: 403, body: { code: 'DOCUMENT_PERMISSION_DENIED' } })
+  })
+
+  it('keeps a queued authorization cancellation independent of the registry result', async () => {
+    const runtime = fixture()
+    let signalEntered!: () => void, resolveRelease!: (value: ExecutionIdentityState) => void
+    const entered = new Promise<void>((resolve) => { signalEntered = resolve })
+    const release = new Promise<ExecutionIdentityState>((resolve) => { resolveRelease = resolve })
+    const execute = vi.spyOn(GatewayExecutionIdentity.prototype, 'authorize').mockImplementation(async () => {
+      signalEntered(); return release
+    })
+    onTestFinished(() => { execute.mockRestore() })
+    const abort = new AbortController(), reason = new Error('Owned document authorization cancellation')
+    const envelope = documentRequestSchema.parse({ version: 1, authority: { kind: 'execution', sessionId: 'captured-parent', scopeId: 'captured-scope' },
+      operation: { kind: 'list' } })
+    const handler = createRuntimeApiHandler({ ...runtime.deps, accessMonitor: documentAccessMonitor().monitor, documentStore: documentAuthorityResponse(envelope, abort.signal) })
+    const pending = request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true })
+    const rejected = expect(pending).rejects.toBe(reason)
+    try {
+      await entered; abort.abort(reason)
+      resolveRelease({ revision: '1', inputs: ['input-7'], actors: [{ userId: CREATOR_ID }],
+        primaryActorUserId: CREATOR_ID, unverifiedHistory: false })
+      await rejected
+    } finally {
+      resolveRelease({ revision: '1', inputs: [], actors: [], unverifiedHistory: false })
+      await rejected
+    }
+  })
+
+  it('rejects malformed execution references without disguising a registry outage as a permission refusal', async () => {
+    const runtime = fixture()
+    const execute = vi.spyOn(GatewayExecutionIdentity.prototype, 'authorize')
+      .mockRejectedValueOnce(new ExecutionIdentityError(400, 'invalid execution scope'))
+    onTestFinished(() => { execute.mockRestore() })
+    const envelope = documentRequestSchema.parse({ version: 1, authority: { kind: 'execution', sessionId: 'captured-parent', scopeId: 'malformed' },
+      operation: { kind: 'list' } })
+    const handler = createRuntimeApiHandler({ ...runtime.deps, accessMonitor: documentAccessMonitor().monitor, documentStore: documentAuthorityResponse(envelope) })
+    expect(await request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true })).toMatchObject({
+      status: 400, body: { code: 'DOCUMENT_TRANSPORT_PROTOCOL' },
+    })
+    const unavailable = new Error('Owned registry outage')
+    execute.mockRejectedValueOnce(unavailable)
+    await expect(request(handler, GATEWAY_DOCUMENT_STORE_PATH, { body: null, stream: true })).rejects.toBe(unavailable)
+  })
+})
 
 describe('profile management authorization', () => {
   it('admits an active administrator and rechecks a later revocation', async () => {
@@ -217,7 +540,7 @@ describe('profile management authorization', () => {
     const issue = (purpose: 'plugin-admin' | 'terminal-admin') => runtime.principals.issue({
       user: user(ADMIN_ID, 'admin'), purpose,
       scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'ro' },
-      runtime: { kind: 'project', id: PROJECT_ID, generation: GENERATION },
+      runtime: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID, generation: GENERATION },
     })
     const path = '/internal/runtime/plugin-management/authorize'
     expect(await request(runtime.handler, path, { body: {}, principal: issue('plugin-admin') })).toMatchObject({ status: 204 })
@@ -232,8 +555,23 @@ describe('profile management authorization', () => {
     const path = '/internal/runtime/plugin-management/authorize'
     expect(await request(runtime.handler, path, { body: {}, principal: runtime.issuePrincipal(CREATOR_ID) }))
       .toMatchObject({ status: 403 })
-    expect(runtime.query).toHaveBeenLastCalledWith(expect.stringContaining('plugin_access_policies'), [ORGANIZATION_ID, CREATOR_ID])
+    expect(runtime.query).toHaveBeenLastCalledWith(expect.stringContaining('plugin_access_policies'), [ORGANIZATION_ID, CREATOR_ID, runtime.deps.context.nodeId])
     expect(await request(runtime.handler, path, { body: {} })).toMatchObject({ status: 403 })
+  })
+
+  it('rejects a normal principal after computer revocation while retaining purpose-limited Admin management', async () => {
+    const runtime = fixture(), path = '/internal/runtime/plugin-management/authorize'
+    runtime.computerQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 })
+    expect(await request(runtime.handler, path, { body: {}, principal: runtime.issuePrincipal(CREATOR_ID) })).toMatchObject({ status: 403 })
+    expect(runtime.query).not.toHaveBeenCalled()
+    expect(runtime.computerQuery).toHaveBeenCalledWith(expect.stringContaining('harness.computer_use_allowed'),
+      [ORGANIZATION_ID, CREATOR_ID, runtime.deps.context.nodeId])
+    runtime.computerQuery.mockClear()
+    const principal = runtime.principals.issue({ user: user(ADMIN_ID, 'admin'), purpose: 'plugin-admin',
+      scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'rw' },
+      runtime: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID, generation: GENERATION } })
+    expect(await request(runtime.handler, path, { body: {}, principal })).toMatchObject({ status: 204 })
+    expect(runtime.computerQuery).not.toHaveBeenCalled()
   })
 
   it('admits a member only while the user and project policies stay enabled', async () => {
@@ -245,7 +583,7 @@ describe('profile management authorization', () => {
     runtime.query.mockResolvedValueOnce({ rows: [{ enabled: true }], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 })
     expect(await request(runtime.handler, path, { body: {}, principal })).toMatchObject({ status: 403 })
-    expect(runtime.query).toHaveBeenLastCalledWith(expect.stringContaining('project_id=$2'), [ORGANIZATION_ID, PROJECT_INTERNAL_ID])
+    expect(runtime.query).toHaveBeenLastCalledWith(expect.stringContaining('project_id=$2'), [ORGANIZATION_ID, PROJECT_INTERNAL_ID, runtime.deps.context.nodeId])
     runtime.query.mockResolvedValueOnce({ rows: [{ enabled: true }], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [{ '?column?': 1 }], rowCount: 1 })
     expect(await request(runtime.handler, path, { body: {}, principal })).toMatchObject({ status: 204 })
@@ -255,19 +593,19 @@ describe('profile management authorization', () => {
     const runtime = fixture()
     runtime.deps.instances.authenticateRuntimeToken.mockResolvedValue({
       organizationId: ORGANIZATION_ID,
-      target: { kind: 'user', id: CREATOR_ID },
+      target: { runtimeId: RUNTIME_ID, kind: 'user', id: CREATOR_ID },
       generation: GENERATION,
       userInternalId: CREATOR_INTERNAL_ID,
     })
     const principal = runtime.principals.issue({
       user: user(CREATOR_ID),
       scope: { kind: 'personal' },
-      runtime: { kind: 'user', id: CREATOR_ID, generation: GENERATION },
+      runtime: { runtimeId: RUNTIME_ID, kind: 'user', id: CREATOR_ID, generation: GENERATION },
     })
     runtime.query.mockResolvedValueOnce({ rows: [{ enabled: true }], rowCount: 1 })
     expect(await request(runtime.handler, '/internal/runtime/plugin-management/authorize', { body: {}, principal }))
       .toMatchObject({ status: 204 })
-    expect(runtime.query).toHaveBeenLastCalledWith(expect.stringContaining('plugin_access_policies'), [ORGANIZATION_ID, CREATOR_ID])
+    expect(runtime.query).toHaveBeenLastCalledWith(expect.stringContaining('plugin_access_policies'), [ORGANIZATION_ID, CREATOR_ID, runtime.deps.context.nodeId])
     expect(runtime.query).not.toHaveBeenCalledWith(expect.stringContaining('project_id=$2'), expect.anything())
   })
 
@@ -276,7 +614,7 @@ describe('profile management authorization', () => {
     const purpose = runtime.principals.issue({
       user: user(CREATOR_ID), purpose: 'plugin-admin',
       scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'rw' },
-      runtime: { kind: 'project', id: PROJECT_ID, generation: GENERATION },
+      runtime: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID, generation: GENERATION },
     })
     // The signer still emits it, but claim validation refuses a purpose on a
     // non-administrator before the authorization branch runs.
@@ -372,7 +710,7 @@ describe('runtime session creation authorization', () => {
     const principal = runtime.principals.issueWebhookDispatch({
       user: user(CREATOR_ID),
       scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'rw' },
-      runtime: { kind: 'project', id: PROJECT_ID, generation: GENERATION },
+      runtime: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID, generation: GENERATION },
     }, 60_000)
     const response = await request(runtime.handler, '/internal/runtime/session/create', {
       principal,
@@ -392,7 +730,7 @@ describe('runtime session creation authorization', () => {
     const principal = runtime.principals.issueWebhookDispatch({
       user: user(CREATOR_ID),
       scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'rw' },
-      runtime: { kind: 'project', id: PROJECT_ID, generation: GENERATION },
+      runtime: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID, generation: GENERATION },
     }, 60_000)
     runtime.modes.set(CREATOR_ID, 'ro')
     const response = await request(runtime.handler, '/internal/runtime/session/create', {
@@ -408,7 +746,7 @@ describe('runtime session creation authorization', () => {
     const principal = runtime.principals.issue({
       user: user(ADMIN_ID, 'admin'), purpose,
       scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'rw' },
-      runtime: { kind: 'project', id: PROJECT_ID, generation: GENERATION },
+      runtime: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID, generation: GENERATION },
     })
     expect(await request(runtime.handler, '/internal/runtime/session/create', {
       principal,
@@ -423,7 +761,7 @@ describe('runtime session creation authorization', () => {
     expect(runtime.principals.verifySessionCreation(authorization)).toMatchObject({
       organization: ORGANIZATION_SLUG,
       creatorUserId: CREATOR_ID,
-      runtime: { kind: 'project', id: PROJECT_ID, generation: GENERATION },
+      runtime: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID, generation: GENERATION },
       header: { id: 'session-root', version: 0, createdAt: CREATED_AT, cwd: '/tmp/shared' },
       visibility: 'private',
     })
@@ -440,6 +778,7 @@ describe('runtime session creation authorization', () => {
       {
         id: 'session-root',
         organizationId: ORGANIZATION_ID,
+        runtimeId: RUNTIME_ID,
         creatorUserId: CREATOR_INTERNAL_ID,
         projectId: PROJECT_INTERNAL_ID,
         visibility: 'private',
@@ -469,9 +808,9 @@ describe('runtime session creation authorization', () => {
   })
 
   it.each([
-    ['runtime id', { runtime: { kind: 'project' as const, id: PROJECT_ID + 1, generation: GENERATION }, sessionId: 'bound-root' }],
-    ['runtime generation', { runtime: { kind: 'project' as const, id: PROJECT_ID, generation: GENERATION + 1 }, sessionId: 'bound-root' }],
-    ['session id', { runtime: { kind: 'project' as const, id: PROJECT_ID, generation: GENERATION }, sessionId: 'other-root' }],
+    ['runtime id', { runtime: { runtimeId: RUNTIME_ID, kind: 'project' as const, id: PROJECT_ID + 1, generation: GENERATION }, sessionId: 'bound-root' }],
+    ['runtime generation', { runtime: { runtimeId: RUNTIME_ID, kind: 'project' as const, id: PROJECT_ID, generation: GENERATION + 1 }, sessionId: 'bound-root' }],
+    ['session id', { runtime: { runtimeId: RUNTIME_ID, kind: 'project' as const, id: PROJECT_ID, generation: GENERATION }, sessionId: 'other-root' }],
   ])('rejects an authorization bound to another %s', async (_label, binding) => {
     const runtime = fixture()
     const authorization = runtime.principals.issueSessionCreation({
@@ -597,6 +936,47 @@ describe('runtime session creation authorization', () => {
 })
 
 describe('runtime document transfer authorization', () => {
+  it.each(['archive-read', 'document-admin', 'terminal-admin', 'plugin-admin', 'webhook-dispatch'] as const)(
+    'admits %s to catalog synchronization only when it is the document purpose', async (purpose) => {
+      const runtime = fixture()
+      const synchronize = vi.fn(async () => ({ version: 1 as const, accepted: 0 }))
+      const dependencies = runtime.deps as RuntimeDependencies
+      dependencies.documentCatalogSync = synchronize
+      const principal = runtime.principals.issue({
+        user: user(ADMIN_ID, 'admin'), purpose,
+        scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'rw' },
+        runtime: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID, generation: GENERATION },
+      })
+      const response = await request(runtime.handler, '/internal/runtime/documents/catalog/sync', {
+        principal, body: { version: 1, documents: [] },
+      })
+      expect(response.status).toBe(purpose === 'document-admin' ? 200 : 403)
+      expect(synchronize).toHaveBeenCalledTimes(purpose === 'document-admin' ? 1 : 0)
+    },
+  )
+
+  it.each(['archive-read', 'document-admin', 'terminal-admin', 'plugin-admin', 'webhook-dispatch'] as const)(
+    'refuses a %s assertion before invoking cross-scope transfer', async (purpose) => {
+      const runtime = fixture()
+      const transfer = vi.fn(async (): Promise<DocumentTransferResponse> => ({
+        version: 1, transferId: 'restricted-transfer', items: [],
+        source: { kind: 'personal', label: 'Personal documents' },
+        target: { kind: 'project', label: 'Shared' },
+      }))
+      const dependencies = runtime.deps as RuntimeDependencies
+      dependencies.documentTransfer = transfer
+      const principal = runtime.principals.issue({
+        user: user(ADMIN_ID, 'admin'), purpose,
+        scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'rw' },
+        runtime: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID, generation: GENERATION },
+      })
+      expect(await request(runtime.handler, '/internal/runtime/documents/transfer', {
+        principal, body: { version: 1 },
+      })).toMatchObject({ status: 403, body: { error: 'forbidden' } })
+      expect(transfer).not.toHaveBeenCalled()
+    },
+  )
+
   it('requires the current principal and delegates only validated runtime metadata', async () => {
     const runtime = fixture()
     const transfer = vi.fn(async (input: { payload: unknown }): Promise<DocumentTransferResponse> => {
@@ -668,7 +1048,7 @@ describe('runtime completed-turn push notifications', () => {
 
     expect(response).toMatchObject({ handled: true, status: 200, body: { result: 'inserted' } })
     expect(runtime.push.notifyCompleted).toHaveBeenCalledOnce()
-    expect(runtime.push.notifyCompleted).toHaveBeenCalledWith(sessionId, 9)
+    expect(runtime.push.notifyCompleted).toHaveBeenCalledWith(RUNTIME_ID, sessionId, 9)
   })
 
   it('does not notify duplicate appends or non-completed turn endings', async () => {
@@ -731,7 +1111,7 @@ describe('runtime bounded session history', () => {
       hasMore: false,
       uncompressedBytes: 128,
     }))
-    const conversations = runtime.deps.conversations as typeof runtime.deps.conversations & {
+    const conversations = runtime.conversations as typeof runtime.conversations & {
       readHeader: typeof readHeader
       revision: typeof revision
       readPage: typeof readPage
@@ -748,10 +1128,10 @@ describe('runtime bounded session history', () => {
       status: 200,
       body: { header: { id: 'paged-session' }, events: [event], hasMore: false, uncompressedBytes: 128 },
     })
-    expect(response.body).toMatchObject({ revision: `postgres:${ORGANIZATION_ID}:project:${String(PROJECT_ID)}:7:2` })
+    expect(response.body).toMatchObject({ revision: `postgres:${ORGANIZATION_ID}:project:${String(PROJECT_ID)}:${RUNTIME_ID}:7:2` })
     expect(readHeader).toHaveBeenCalledOnce()
     expect(readPage).toHaveBeenCalledOnce()
-    expect(runtime.deps.conversations.load).not.toHaveBeenCalled()
+    expect(runtime.conversations.load).not.toHaveBeenCalled()
   })
 
   it('maps malformed page query values to a protocol response', async () => {
@@ -779,16 +1159,16 @@ describe('runtime bounded session history', () => {
       createdAt: CREATED_AT,
       cwd: '/tmp/shared',
     }
-    runtime.deps.conversations.load.mockResolvedValue({ header, events: [event], revision: '7:2' })
+    runtime.conversations.load.mockResolvedValue({ header, events: [event], revision: '7:2' })
     const page = (cursor: string) => request(
       runtime.handler,
       `/internal/runtime/session/page?sessionId=fallback-session&cursor=${encodeURIComponent(cursor)}`,
       { method: 'GET', body: {} },
     )
 
-    const moved = await page(encodePageCursor({ version: 1, sessionId: 'fallback-session', revision: '7:1', direction: 'older', anchor: 1 }))
+    const moved = await page(encodePageCursor({ organizationId: ORGANIZATION_ID, runtimeId: RUNTIME_ID, version: 2, sessionId: 'fallback-session', revision: '7:1', direction: 'older', anchor: 1 }))
     expect(moved).toMatchObject({ status: 503, body: { error: 'conversation-dependency', code: 'dependency' } })
-    const foreign = await page(encodePageCursor({ version: 1, sessionId: 'other-session', revision: '7:2', direction: 'older', anchor: 1 }))
+    const foreign = await page(encodePageCursor({ organizationId: ORGANIZATION_ID, runtimeId: RUNTIME_ID, version: 2, sessionId: 'other-session', revision: '7:2', direction: 'older', anchor: 1 }))
     expect(foreign).toMatchObject({ status: 400, body: { error: 'conversation-protocol', code: 'protocol' } })
   })
 
@@ -816,7 +1196,7 @@ describe('runtime bounded session history', () => {
       ],
       truncated: false,
     }))
-    const conversations = runtime.deps.conversations as typeof runtime.deps.conversations & {
+    const conversations = runtime.conversations as typeof runtime.conversations & {
       readHeader: typeof readHeader
       readHistoryIndex: typeof readHistoryIndex
     }
@@ -838,7 +1218,7 @@ describe('runtime bounded session history', () => {
     })
     expect(readHeader).toHaveBeenCalledOnce()
     expect(readHistoryIndex).toHaveBeenCalledOnce()
-    expect(runtime.deps.conversations.load).not.toHaveBeenCalled()
+    expect(runtime.conversations.load).not.toHaveBeenCalled()
   })
 
   it('rejects an invalid history index item before sending it to the runtime', async () => {
@@ -854,7 +1234,7 @@ describe('runtime bounded session history', () => {
       createdAt: CREATED_AT,
       cwd: '/tmp/shared',
     }
-    const conversations = runtime.deps.conversations as typeof runtime.deps.conversations & {
+    const conversations = runtime.conversations as typeof runtime.conversations & {
       readHeader: () => Promise<ConversationHeader>
       readHistoryIndex: () => Promise<{
         revision: string
@@ -889,7 +1269,7 @@ describe('runtime organization credentials', () => {
       body: { configured: true, value: 'sk-organization' },
     })
     expect(runtime.resolveOrganizationCredential).toHaveBeenCalledWith(
-      { kind: 'project', id: PROJECT_ID },
+      { kind: 'project', id: PROJECT_ID, runtimeId: RUNTIME_ID },
       'DSH_ORG_PRIMARY_API_KEY',
     )
   })
@@ -936,7 +1316,7 @@ describe('runtime archive synchronization', () => {
     runtime.deps.archives.hasPendingCommands.mockResolvedValueOnce(true)
     expect(await request(runtime.handler, path, { method: 'GET', body: {} }))
       .toMatchObject({ status: 200, body: { pending: true } })
-    expect(runtime.deps.archives.hasPendingCommands).toHaveBeenCalledWith({ kind: 'project', id: PROJECT_ID })
+    expect(runtime.deps.archives.hasPendingCommands).toHaveBeenCalledWith({ kind: 'project', id: PROJECT_ID, runtimeId: RUNTIME_ID })
     expect(await request(runtime.handler, path, { method: 'GET', body: {}, token: 'not-authorized' }))
       .toMatchObject({ status: 401 })
     expect(runtime.deps.archives.hasPendingCommands).toHaveBeenCalledOnce()
@@ -960,15 +1340,15 @@ describe('runtime archive synchronization', () => {
     })
     expect(response).toMatchObject({ handled: true, status: 200, body: { commands: [{ id: 'command-1', rootSessionId: 'session-archive', action: 'restore' }] } })
     expect(runtime.archiveSnapshot).toHaveBeenCalledWith(expect.objectContaining({
-      runtime: { kind: 'project', id: PROJECT_ID }, revision: 4, archivedSessionIds: ['session-archive'],
+      runtime: { runtimeId: RUNTIME_ID, kind: 'project', id: PROJECT_ID }, revision: 4, archivedSessionIds: ['session-archive'],
       sessions: [expect.objectContaining({ messageCount: 1, rootMessageCount: 3 })],
-    }), { kind: 'project', id: PROJECT_ID })
+    }), { kind: 'project', id: PROJECT_ID, runtimeId: RUNTIME_ID })
 
     const ack = await request(runtime.handler, '/internal/runtime/archive/ack', {
       body: { commandId: 'command-1', revision: 5 },
     })
     expect(ack).toMatchObject({ handled: true, status: 200, body: { acknowledged: true } })
-    expect(runtime.archiveAck).toHaveBeenCalledWith('command-1', 5, undefined, { kind: 'project', id: PROJECT_ID })
+    expect(runtime.archiveAck).toHaveBeenCalledWith('command-1', 5, undefined, { kind: 'project', id: PROJECT_ID, runtimeId: RUNTIME_ID })
     runtime.archiveAck.mockResolvedValueOnce(false)
     expect(await request(runtime.handler, '/internal/runtime/archive/ack', { body: { commandId: 'wrong-command', revision: 5 } }))
       .toMatchObject({ status: 409, body: { error: 'archive-command-not-acknowledged' } })
@@ -1123,7 +1503,7 @@ describe('runtime session body migration', () => {
     createdAt: CREATED_AT,
     cwd: '/tmp/shared',
   }
-  const wireRevision = `postgres:${ORGANIZATION_ID}:project:${PROJECT_ID}:7:40`
+  const wireRevision = `postgres:${ORGANIZATION_ID}:project:${PROJECT_ID}:${RUNTIME_ID}:7:40`
 
   type MigrateCall = {
     readHeader?: (sessionId: string) => Promise<ConversationHeader | undefined>
@@ -1141,7 +1521,7 @@ describe('runtime session body migration', () => {
   }
 
   function migrateBody(runtime: ReturnType<typeof fixture>, migrate?: MigrateCall['migrate']) {
-    const conversations = runtime.deps.conversations as typeof runtime.deps.conversations & MigrateCall
+    const conversations = runtime.conversations as typeof runtime.conversations & MigrateCall
     conversations.readHeader = vi.fn(async () => legacyHeader)
     conversations.migrate = migrate ?? vi.fn(async () => ({
       status: 'committed' as const,
@@ -1179,7 +1559,7 @@ describe('runtime session body migration', () => {
       status: 200,
       body: {
         result: 'committed',
-        revision: `postgres:${ORGANIZATION_ID}:project:${PROJECT_ID}:8:42`,
+        revision: `postgres:${ORGANIZATION_ID}:project:${PROJECT_ID}:${RUNTIME_ID}:8:42`,
         nextSeq: 42,
         seedLength: null,
       },

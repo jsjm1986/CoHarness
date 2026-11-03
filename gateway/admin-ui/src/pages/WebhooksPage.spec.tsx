@@ -2,10 +2,14 @@
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
-import { createWebhookEndpoint, listUsers, listProjects } from '../api.ts'
+import { runtimePageFixture } from '../components/runtime-fixture.ts'
+import { createWebhookEndpoint, listUsers, listProjects, listWebhookEndpoints } from '../api.ts'
 import { WebhooksPage } from './WebhooksPage.tsx'
 
 vi.mock('../api.ts', () => ({
+  getAdminComputerContext: vi.fn(async () => ({ nodeId: 'node-a', name: 'Computer A', forwardingEnabled: true })),
+  listUserRuntimes: vi.fn(async id => runtimePageFixture('user', id)),
+  listRuntimeEnvironments: vi.fn(async () => runtimePageFixture('project', 8)),
   listWebhookEndpoints: vi.fn(async () => ({ endpoints: [] })),
   listUsers: vi.fn(async () => []),
   listProjects: vi.fn(async () => []),
@@ -16,6 +20,19 @@ vi.mock('../api.ts', () => ({
   redispatchWebhookDelivery: vi.fn(),
 }))
 afterEach(() => { cleanup(); vi.clearAllMocks() })
+
+it('ends initial loading with readable unavailable feedback and retries only on refresh', async () => {
+  vi.mocked(listWebhookEndpoints).mockRejectedValueOnce(new Error('webhook-endpoints-unavailable'))
+  const user = userEvent.setup()
+  render(<WebhooksPage />)
+  expect((await screen.findByRole('alert')).textContent).toContain('服务暂不可用，请稍后重试。')
+  expect(screen.queryByText('正在加载 Webhook 端点')).toBeNull()
+  expect(screen.queryByText('尚无 Webhook 端点')).toBeNull()
+  expect(listWebhookEndpoints).toHaveBeenCalledOnce()
+  await user.click(screen.getByRole('button', { name: '刷新' }))
+  expect(await screen.findByText('尚无 Webhook 端点')).toBeTruthy()
+  expect(listWebhookEndpoints).toHaveBeenCalledTimes(2)
+})
 
 it('shows missing execution-account feedback without closing or clearing the registration draft', async () => {
   const user = userEvent.setup()

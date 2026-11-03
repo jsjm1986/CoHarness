@@ -590,6 +590,124 @@ describe('no execution gating beyond the exit tool', () => {
 })
 
 describe('/plan', () => {
+  it('attests a new command message with verified Gateway identity before changing the plan selection', async () => {
+    const ctx = await setup()
+    try {
+      const inputId = '00000000-0000-4000-8000-000000000001'
+      const stamp = vi.fn((_session: Session, message: UserMessage) => Promise.resolve({
+        ...message, source: { ...message.source, gatewayExecutionInput: inputId },
+      }))
+      ctx.provide('executionAuthorityRequired', true)
+      ctx.provide('executionAuthority', { stamp })
+      await ctx.plugin(CommandRuntime)
+      await new Promise(resolve => setImmediate(resolve))
+      const agent = await agentWithSession(ctx, 'verified-plan-command')
+      openTurn(agent.session)
+      const steer = vi.fn<Agent['steer']>()
+      ;(agent as { steer: Agent['steer'] }).steer = steer
+      await expect(ctx.commands.execute(agent, '/plan prepare the migration', [], new AbortController().signal))
+        .resolves.toMatchObject({ result: { kind: 'success' } })
+      expect(stamp).toHaveBeenCalledExactlyOnceWith(agent.session, expect.objectContaining({
+        content: [{ type: 'text', text: 'prepare the migration' }], source: { kind: 'user' },
+      }))
+      expect(steer).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+        source: { kind: 'user', gatewayExecutionInput: inputId },
+      }))
+      expect(ctx.planMode.get(agent)).toEqual({ active: false, pending: true })
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('refuses missing managed authority before changing the plan selection or sending input', async () => {
+    const ctx = await setup()
+    try {
+      ctx.provide('executionAuthorityRequired', true)
+      await ctx.plugin(CommandRuntime)
+      await new Promise(resolve => setImmediate(resolve))
+      const agent = await agentWithSession(ctx, 'missing-plan-authority')
+      openTurn(agent.session)
+      const steer = vi.fn<Agent['steer']>()
+      ;(agent as { steer: Agent['steer'] }).steer = steer
+      await expect(ctx.commands.execute(agent, '/plan prepare the migration', [], new AbortController().signal))
+        .rejects.toMatchObject({ code: 'execution/forbidden' })
+      expect(steer).not.toHaveBeenCalled()
+      expect(ctx.planMode.get(agent)).toEqual({ active: false })
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('keeps the plan selection unchanged when input attestation is refused', async () => {
+    const ctx = await setup()
+    try {
+      const refusal = new Error('interactive caller was revoked')
+      ctx.provide('executionAuthorityRequired', true)
+      ctx.provide('executionAuthority', { stamp: () => Promise.reject(refusal) })
+      await ctx.plugin(CommandRuntime)
+      await new Promise(resolve => setImmediate(resolve))
+      const agent = await agentWithSession(ctx, 'refused-plan-command')
+      openTurn(agent.session)
+      const steer = vi.fn<Agent['steer']>()
+      ;(agent as { steer: Agent['steer'] }).steer = steer
+      await expect(ctx.commands.execute(agent, '/plan prepare the migration', [], new AbortController().signal)).rejects.toBe(refusal)
+      expect(steer).not.toHaveBeenCalled()
+      expect(ctx.planMode.get(agent)).toEqual({ active: false })
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it.each([
+    { change: 'cancellation', message: 'plan input cancelled' },
+    { change: 'provider', message: 'plan input authorization changed' },
+    { change: 'caller', message: 'the calling agent changed' },
+    { change: 'plan-provider', message: 'the plan-mode service was reloaded' },
+    { change: 'service', message: 'commands service was withdrawn' },
+  ] as const)('refuses late plan input after $change changes during attestation', async ({ change, message }) => {
+    const ctx = await setup()
+    const release = Promise.withResolvers<undefined>()
+    const entered = Promise.withResolvers<undefined>()
+    const controller = new AbortController()
+    const stamp = vi.fn(async (_session: Session, input: UserMessage) => {
+      entered.resolve(undefined)
+      await release.promise
+      return { ...input, source: { ...input.source, gatewayExecutionInput: '00000000-0000-4000-8000-000000000001' } }
+    })
+    ctx.provide('executionAuthorityRequired', true)
+    const removeAuthority = ctx.provide('executionAuthority', { stamp })
+    await ctx.plugin(CommandRuntime)
+    await new Promise(resolve => setImmediate(resolve))
+    const agent = await agentWithSession(ctx, 'waiting-plan-command')
+    openTurn(agent.session)
+    let live = true
+    ctx.provide('agents', { get: (id: SessionId) => live && id === agent.id ? agent : undefined })
+    const steer = vi.fn<Agent['steer']>()
+    ;(agent as { steer: Agent['steer'] }).steer = steer
+    const replacementStamp = vi.fn()
+    const pending = ctx.commands.execute(agent, '/plan prepare the migration', [], controller.signal)
+    const refused = expect(pending).rejects.toThrow(message)
+    let unloading: Promise<void> | undefined
+    try {
+      await entered.promise
+      if (change === 'cancellation') controller.abort(new Error(message))
+      else if (change === 'provider') {
+        removeAuthority()
+        ctx.provide('executionAuthority', { stamp: replacementStamp })
+      } else if (change === 'caller') live = false
+      else if (change === 'plan-provider') await [...ctx.registry.get(PlanModeController)!.fibers][0]!.dispose()
+      else {
+        unloading = ctx.fiber.dispose()
+        await refused
+      }
+      release.resolve(undefined)
+      await refused
+      await unloading
+      await new Promise(resolve => setImmediate(resolve))
+      expect(steer).not.toHaveBeenCalled()
+      expect(replacementStamp).not.toHaveBeenCalled()
+      if (change !== 'service' && change !== 'plan-provider') expect(ctx.planMode.get(agent)).toEqual({ active: false })
+    } finally {
+      release.resolve(undefined)
+      await Promise.allSettled([pending, unloading])
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('registers only when a commands service is composed and optionally submits the next-step message', async () => {
     const bare = await setup()
     expect(bare.get('commands')).toBeUndefined()
@@ -1085,7 +1203,7 @@ describe('exit_plan_mode', () => {
     expect(foldPlanMode(agent.session.snapshotEvents())).toBe(true)
   })
 
-  it('forwards the execution abort signal to the review question', async () => {
+  it('links execution cancellation to the service-owned review signal', async () => {
     const { ctx, agent, asked } = await setupWithReview({ selected: ['Approve'] })
     const controller = new AbortController()
     const result = await ctx.tools.execute({
@@ -1096,7 +1214,10 @@ describe('exit_plan_mode', () => {
       signal: controller.signal,
     })
     expect(result.isError).toBe(false)
-    expect(asked[0]?.signal).toBe(controller.signal)
+    expect(asked[0]?.signal).toBeInstanceOf(AbortSignal)
+    expect(asked[0]?.signal?.aborted).toBe(false)
+    controller.abort()
+    expect(asked[0]?.signal?.aborted).toBe(true)
   })
 
   it('fails the call when the plugin is disposed while the review awaits (no phantom exit)', async () => {

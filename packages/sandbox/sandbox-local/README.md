@@ -56,6 +56,8 @@ With the provider mounted, a command runs under the mode you resolve per call. E
 
 An unsupported platform or an unusable runner fails closed: `confine()` rejects with `SANDBOX_UNAVAILABLE` and names the runner options for the platform, and the consumer surfaces that error rather than running the command unconfined. A runner that starts but refuses its profile is identified by its fatal stderr signature and exit code, so a broken sandbox is not mistaken for a denied command. The `runnerCommand` override is an operator assertion: it skips functional probes and assumes the configured runner implements the bwrap-compatible profile honestly.
 
+Functional probes force-kill a stalled native client at `probeTimeoutMs` and return only after that client closes. A timeout makes the candidate unusable; it cannot authorize unconfined execution. The provider caches the completed selection verdict. The [probe ownership decision](../../../.agents/notes/implemented/bug-fix/2026-10-29-native-capability-probe-closure.md) records the failure and lifetime rules.
+
 -----
 
 <a id="understand-the-implementation"></a>

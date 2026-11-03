@@ -1,0 +1,267 @@
+{
+  "recordedAt": "2026-10-30T04:32:06.253940+00:00",
+  "status": "fixed_and_verified_for_named_scope",
+  "finding": "B331",
+  "wholeProjectComplete": false,
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T181457Z",
+  "reproduction": "runtime-session-global-key-confirmed.json",
+  "scope": "Runtime-qualified PostgreSQL Session storage, authenticated API consumers, collaboration, scoped derived records and responsive maintenance selection. Equal original Host IDs coexist independently; this closes the demonstrated materialization collision without asserting that the old source disclosed a foreign body.",
+  "next": "Continue remaining business and permission review; this receipt closes the named Session identity defect only.",
+  "updatedAt": "2026-10-30T04:32:06.253940+00:00",
+  "workingDirectory": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+  "published": true,
+  "chosenImplementation": "Preserve original Host IDs with organization/Runtime namespace keys on Session and every SQL reference. A generated legacy namespace preserves NULL-runtime history without assigning a new Runtime. No Session body or JSONL generation is rewritten.",
+  "pending": [
+    "Continue all12original review domains, remaining resource admission and physical multi-host/platform acceptance; B04/B25 remain open.",
+    "Validate the recorded text-index NUL candidate against the current baseline before assigning or repairing it.",
+    "Historical pre-namespace Git-source performance comparison baselines are not accepted against the new SQL schema; no new performance result is claimed."
+  ],
+  "firstMigrationEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session-098-migration-first.json",
+  "migrationValidation": "Packaged source and Node22/24 compiled regression preserves15legacy tables, raw event bytes, workspace catalog and recorded ownership; Runtime references are immutable.",
+  "productSourceMigrationPublished": true,
+  "schemaValidationV2": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session-098-migration-v2-launched.json",
+  "schemaAcceptance": [
+    "All legacy columns and exact event bytes preserved across15tables.",
+    "Unknown history and unwitnessed reservations remain legacy; later Runtime allocations cannot adopt them.",
+    "Equal original Host roots, descendants, batch ids, interaction ids, push claims and project receipts coexist in independent namespaces.",
+    "New foreign-parent, migration, body and progress references are refused; deleting one Runtime tree preserves the sibling."
+  ],
+  "migrationDraftVersion": 99,
+  "migrationNumberReconciliation": {
+    "status": "resolved_without_placeholder",
+    "peerMigration": "gateway/deploy/postgres/migrations/098_personal_workspace_catalog.sql",
+    "sessionMigration": "099_conversation_runtime_namespace.sql",
+    "schemaPrototype98": "Historical prototype receipts and the administrative scratch database retain the original98number; that Session prototype was never published. The shared source publishes Session migration099 after the peer workspace-catalog098 and uses fresh child databases for current validation."
+  },
+  "schemaValidationV3": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session-099-migration-v3.json",
+  "schemaTablesWithLegacyWitness": 15,
+  "applicationNamedScenarios": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session-upper-storage-second.json",
+  "applicationSourceTypecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session-stage-source-types-v2.json",
+  "additionalCandidate": {
+    "textIndexNul": "An unchanged text-index projection rejected a valid JSON text block containing NUL in the staging test. Baseline-specific reproduction and repair are still pending; the failure is preserved at text-index-nul-candidate.json."
+  },
+  "sourcePublicationEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-source-publication.json",
+  "rootBehaviorEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-root-behavior.json",
+  "rootStrictTypes": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-root-types.json",
+  "migrationVersion": 99,
+  "sourcePaths": [
+    "gateway/package.json",
+    "gateway/tests/project-activity-postgres.spec.ts",
+    "gateway/tests/project-activity.perf.ts",
+    "gateway/tests/admin-business-postgres.spec.ts",
+    "gateway/tests/archive-runtime-namespace-postgres.spec.ts",
+    "gateway/tests/conversation-repository.spec.ts",
+    "gateway/tests/project-progress-postgres.spec.ts",
+    "gateway/tests/archive-administration-postgres.spec.ts",
+    "gateway/tests/archive-file-cleanup-postgres.spec.ts",
+    "gateway/tests/project-service-postgres.spec.ts",
+    "gateway/tests/run-built-archive-ui.mjs",
+    "gateway/tests/push-notifications-postgres.spec.ts",
+    "gateway/tests/conversation-writer.perf.ts",
+    "gateway/tests/postgres.spec.ts",
+    "gateway/tests/document-upload-postgres.spec.ts",
+    "gateway/tests/runtime-api.spec.ts",
+    "gateway/tests/archive-read-administration-postgres.spec.ts",
+    "gateway/tests/steward.spec.ts",
+    "gateway/tests/push-notifications.spec.ts",
+    "gateway/tests/execution-fixture.ts",
+    "gateway/tests/webhook.spec.ts",
+    "gateway/tests/progress-material.perf.ts",
+    "gateway/src/admin-api.ts",
+    "gateway/src/push-notifications.ts",
+    "gateway/src/runtime-api.ts",
+    "gateway/src/index.ts",
+    "gateway/src/services.ts",
+    "gateway/src/server.ts",
+    "gateway/src/execution-identity.ts",
+    "gateway/tests/expected/archive-runtime-namespace-browser.jsonl",
+    "gateway/tests/expected/archive-runtime-namespace.jsonl",
+    "gateway/tests/fixtures/project-activity-perf.mjs",
+    "gateway/tests/fixtures/archive-runtime-namespace.mjs",
+    "gateway/tests/fixtures/resource-scope-isolation.mjs",
+    "gateway/tests/fixtures/push-delivery.mjs",
+    "gateway/tests/fixtures/runtime-personal-policy.mjs",
+    "gateway/tests/fixtures/progress-node-affinity.mjs",
+    "gateway/tests/fixtures/archive-read-administration.mjs",
+    "gateway/tests/fixtures/project-progress-built.mjs",
+    "gateway/tests/fixtures/archive-administration.mjs",
+    "gateway/tests/fixtures/workbench-computer-permissions.mjs",
+    "gateway/tests/fixtures/conversation-writer-perf.mjs",
+    "gateway/tests/fixtures/local-runtime-web-gateway.mjs",
+    "gateway/tests/fixtures/node-service-gateway.mjs",
+    "gateway/admin-ui/src/api.ts",
+    "gateway/admin-ui/src/api.spec.ts",
+    "gateway/admin-ui/src/pages/ArchivesPage.spec.tsx",
+    "gateway/admin-ui/src/pages/ArchivesPage.tsx",
+    "gateway/src/postgres/collaboration-service.ts",
+    "gateway/src/postgres/progress-service.ts",
+    "gateway/src/postgres/steward-query.ts",
+    "gateway/src/postgres/conversation-archive-service.ts",
+    "gateway/src/postgres/conversation-repository.ts",
+    "gateway/src/session-identity.ts",
+    "gateway/deploy/postgres/migrations/099_conversation_runtime_namespace.sql",
+    "gateway/tests/conversation-runtime-namespace-postgres.spec.ts",
+    "gateway/tests/conversation-runtime-migration-transcript.spec.ts",
+    "gateway/tests/fixtures/conversation-runtime-migration.mjs",
+    "gateway/tests/expected/conversation-runtime-migration.jsonl",
+    "gateway/tests/blank-draft-archive-lifecycle-postgres.spec.ts",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/README.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-session-runtime-namespace/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-session-runtime-namespace/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/postgres-session-runtime-namespace/guide.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-30-postgres-session-runtime-namespace.md",
+    ".agents/notes/implemented/architecture/2026-10-30-postgres-session-runtime-namespace.zh.md",
+    ".agents/notes/implemented/architecture/2026-10-30-postgres-session-runtime-namespace.i18n.yaml",
+    ".agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md",
+    ".agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.zh.md",
+    ".agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-08-26-session-draft-lifecycle-and-content-watermarks.md",
+    ".agents/notes/implemented/architecture/2026-08-26-session-draft-lifecycle-and-content-watermarks.zh.md",
+    ".agents/notes/implemented/architecture/2026-08-26-session-draft-lifecycle-and-content-watermarks.i18n.yaml"
+  ],
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-final-source-artifact-hashes.json",
+  "checks": [
+    {
+      "name": "session099-root-types",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-root-types.json"
+    },
+    {
+      "name": "session099-root-behavior",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-root-behavior.json"
+    },
+    {
+      "name": "session099-root-docs",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-root-docs.json"
+    },
+    {
+      "name": "session099-root-lint",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-root-lint.json"
+    },
+    {
+      "name": "session099-root-private-build",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-root-private-build.json"
+    },
+    {
+      "name": "session099-root-admin-types",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-root-admin-types.json"
+    },
+    {
+      "name": "session099-root-admin-tests",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-root-admin-tests.json"
+    },
+    {
+      "name": "session099-root-compiled-node22",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-root-compiled-node22.json"
+    },
+    {
+      "name": "session099-root-compiled-node24",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-root-compiled-node24.json"
+    },
+    {
+      "name": "session-maintenance-built-browser-final",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session-maintenance-built-browser-final.json"
+    },
+    {
+      "name": "session-native-push-consumer",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session-native-push-consumer.json"
+    },
+    {
+      "name": "session-latest-js-lint-final",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session-latest-js-lint-final.json"
+    },
+    {
+      "name": "session-migration-packaged-regression",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session-migration-packaged-regression.json"
+    },
+    {
+      "name": "session-push-workbench-http",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session-push-workbench-http.json"
+    },
+    {
+      "name": "session-resource-scope-transcript",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session-resource-scope-transcript.json"
+    },
+    {
+      "name": "session099-latest-baseline",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session099-latest-baseline.json"
+    }
+  ],
+  "validation": {
+    "currentRootBusinessCases": 214,
+    "currentRootAdminCases": 38,
+    "nativePushConsumerCases": 2,
+    "compiledNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "compiledTranscriptCasesPerNode": 2,
+    "legacyTablesWithPreservedWitness": 15,
+    "httpTranscriptFacts": 10,
+    "browserWidths": [
+      1280,
+      390,
+      320
+    ],
+    "browserFacts": "Independent same-name archive and blank-draft selection, exact posted Runtime/Host pair, only selected draft trashed, sibling retained, no page error or horizontal overflow. Published Admin bytes equal tested staging bytes.",
+    "documentationChecks": "20passed0failed0skipped",
+    "additionalScopedEvidence": "191selected service/API unit cases,126project transactions,15namespace/lifecycle cases,45push cases and assembled push/workbench/resource transcripts are retained as separate receipts; overlaps are not summed into a project total.",
+    "coverageLimit": "Selected branch and application regressions; no100% or whole-project coverage claim.",
+    "realProviderAndPublicPush": "Human-deferred. Loopback provider doubles establish local protocol and ownership behavior only.",
+    "physicalMultiHost": "Not established by the logical computer fixtures."
+  },
+  "implementation": {
+    "identity": "Organization + generated Runtime namespace + original Host id; no Host or committed generation rewriting.",
+    "storage": "Authenticated immutable forRuntime repository factory; reads, locks, mutations, cursors and descendants retain that namespace.",
+    "derivedRecords": [
+      "search",
+      "participants",
+      "interaction responses",
+      "file references",
+      "migration predecessors",
+      "push delivery claims",
+      "project progress receipts",
+      "steward approval consumption"
+    ],
+    "legacy": "Recorded assignments retained. Unknown bodies and unwitnessed reservations remain legacy and cannot be adopted by a later allocation.",
+    "maintenance": "Strict Runtime/Host pairs survive preview, responsive selection and confirmation. Foreign-computer selection changes nothing."
+  },
+  "noteReview": {
+    "newActive": "implemented/architecture/2026-10-30-postgres-session-runtime-namespace.md",
+    "retainedActive": [
+      "implemented/bug-fix/2026-10-24-conversation-writer-locks.md",
+      "implemented/feature/2026-08-15-project-collaborative-conversations.md",
+      "implemented/architecture/2026-08-26-session-draft-lifecycle-and-content-watermarks.md",
+      "implemented/architecture/2026-10-30-archive-runtime-namespace.md"
+    ],
+    "archivedOrDeleted": 0,
+    "reason": "Independent writer freshness, collaboration ACL, draft durability and archive-record identity rationales remain useful. Current facts and partial supersession links are updated."
+  },
+  "originalReproductionScope": "Two separate organizations/accounts and Runtime identities, sequential current-source PostgreSQL create/load calls on one disposable local database. Equal original Host Session IDs cannot coexist; an independent-ID control succeeds. A scoped second-Runtime read returns absence. This establishes a materialization collision, not an accepted cross-account read.",
+  "historicalMigrationDraft": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/staging/gateway/deploy/postgres/migrations/099_conversation_runtime_namespace.sql",
+  "migrationPath": "gateway/deploy/postgres/migrations/099_conversation_runtime_namespace.sql",
+  "sourceSuccessor": {
+    "receipt": "nul-conversation-query-projection-2026-10-30.json",
+    "scope": "Migration100 and current fixture corrections retain the accepted099 Runtime namespace and draft lifecycle."
+  }
+}

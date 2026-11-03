@@ -105,6 +105,7 @@
     "@deepseek-ai/dsh-working-directory": "workspace:*"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/client.js",
     "lib/types/**/*.js",
@@ -112,7 +113,6 @@
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts",
-    "locale/*.json"
+    "lib/typert.remote-client.d.ts"
   ]
 }

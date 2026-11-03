@@ -18,6 +18,25 @@ const MAX_NAME_BYTES = 255
 const INTERNAL_UPLOAD_DIRECTORY = '.upload-sessions'
 const INTERNAL_TRASH_DIRECTORY = '.dsh-trash'
 
+/**
+ * Recognize provider-owned staging leaves without hiding ordinary `.part` documents.
+ * @param name - one file leaf.
+ * @returns whether the name belongs to the fixed staging namespace, including filesystem case aliases.
+ */
+export function isDocumentPartial(name: string): boolean {
+  return /^\.userdoc-[0-9a-f]{24}\.part$/iu.test(name.replace(/[. ]+$/u, ''))
+}
+
+/**
+ * Reserve root maintenance names across case-insensitive and Win32 suffix aliases.
+ * @param name - first root-relative component or prospective root leaf.
+ * @returns whether the component names a maintenance directory.
+ */
+export function isPrivateRootName(name: string): boolean {
+  const folded = name.replace(/[. ]+$/u, '').toUpperCase().toLowerCase()
+  return folded === INTERNAL_UPLOAD_DIRECTORY || folded === INTERNAL_TRASH_DIRECTORY
+}
+
 /** Names a POSIX filesystem accepts as entries but which never denote a file. */
 const RESERVED_NAMES = new Set(['', '.', '..'])
 
@@ -44,12 +63,12 @@ export function sanitizeName(value: string): string {
   // NUL would truncate the path at the syscall boundary; the other control
   // characters are legal POSIX filename bytes but make a path unquotable in
   // any terminal or log the operator later reads.
-  const stripped = leaf.replace(/[\u0000-\u001f\u007f]/g, '').trim()
+  const stripped = leaf.replace(/[\u0000-\u001f\u007f]/g, '').trim().replace(/[. ]+$/u, '')
   let clean = stripped
   // Truncate by bytes, not code units: the limit filesystems enforce is bytes,
   // and a multi-byte name (a Chinese document title) hits it at a quarter the
   // character count. Trailing partial sequences are dropped by the decoder.
-  clean = truncateUtf8(clean, MAX_NAME_BYTES)
+  clean = truncateUtf8(clean, MAX_NAME_BYTES).replace(/[. ]+$/u, '')
   // A name of only dots would resolve to this directory or its parent.
   if (RESERVED_NAMES.has(clean) || /^\.+$/.test(clean)) {
     throw new UserDocError('Upload name is not a usable file name.', INVALID_DOCUMENT_NAME_CODE)
@@ -65,7 +84,8 @@ export function sanitizeName(value: string): string {
  */
 export function sanitizeDirectoryName(value: string): string {
   const leaf = value.slice(Math.max(value.lastIndexOf('/'), value.lastIndexOf('\\')) + 1)
-  const clean = truncateUtf8(leaf.replace(/[\u0000-\u001f\u007f]/g, '').trim(), MAX_NAME_BYTES)
+  const stripped = leaf.replace(/[\u0000-\u001f\u007f]/g, '').trim().replace(/[. ]+$/u, '')
+  const clean = truncateUtf8(stripped, MAX_NAME_BYTES).replace(/[. ]+$/u, '')
   if (RESERVED_NAMES.has(clean) || /^\.+$/.test(clean)) {
     throw new UserDocError('Document directory name is invalid.', INVALID_DOCUMENT_DIRECTORY_CODE)
   }
@@ -154,6 +174,37 @@ export async function assertNestedDirectories(root: string, parent: string, code
 }
 
 /**
+ * Refuse public traversal into the actual private directory object, including filesystem-specific aliases.
+ * @param root - absolute document root.
+ * @param directory - existing directory reached through a public reference.
+ * @param code - caller's stable invalid-reference or invalid-directory code.
+ * @returns after lexical containment, component links and private directory identities are checked.
+ */
+export async function assertPublicDirectory(root: string, directory: string, code: UserDocErrorCode): Promise<void> {
+  assertInside(root, directory)
+  const rootEntry = await lstat(root)
+  if (rootEntry.isSymbolicLink() || !rootEntry.isDirectory()) {
+    throw new UserDocError('The document root must be a real directory.', code)
+  }
+  await assertNestedDirectories(root, directory, code)
+  const first = relative(resolve(root), resolve(directory)).split(sep)[0]
+  if (first === undefined || first === '') return
+  if (isPrivateRootName(first)) throw new UserDocError('Private document storage cannot be selected as a document directory.', code)
+  const paths = [join(root, first), join(root, INTERNAL_UPLOAD_DIRECTORY), join(root, INTERNAL_TRASH_DIRECTORY)]
+  const [actual, ...privateDirectories] = await Promise.all(paths.map(async (path) => {
+    try { return await lstat(path, { bigint: true }) } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+      throw error
+    }
+  }))
+  for (const hidden of privateDirectories) {
+    if (actual !== undefined && hidden !== undefined && hidden.dev === actual.dev && hidden.ino === actual.ino) {
+      throw new UserDocError('Private document storage cannot be selected through a filesystem alias.', code)
+    }
+  }
+}
+
+/**
  * Compose the store-scoped identifier for one stored path. The identifier is
  * the path relative to the document root with forward slashes, which keeps it
  * stable across platforms and readable in a session log, while carrying no
@@ -184,7 +235,7 @@ function validRelativeSegments(value: string, allowRoot: boolean): string[] | un
   // documents. Keep them unreachable through an opaque id even when a caller
   // guesses the hidden name; nested user directories with the same leaf remain
   // ordinary entries.
-  if (segments[0] === INTERNAL_UPLOAD_DIRECTORY || segments[0] === INTERNAL_TRASH_DIRECTORY) return undefined
+  if (segments[0] !== undefined && isPrivateRootName(segments[0])) return undefined
   if (segments.every(segment => segment !== '' && segment !== '.' && segment !== '..'
     && !segment.includes('\\') && !/[\u0000-\u001f\u007f]/u.test(segment) && basename(segment) === segment)) return segments
   return undefined
@@ -204,7 +255,9 @@ function validRelativeSegments(value: string, allowRoot: boolean): string[] | un
  */
 export function pathForDocId(root: string, docId: string): string {
   const segments = validRelativeSegments(docId, false)
-  if (segments === undefined) throw new UserDocError('Document identifier is invalid.', INVALID_DOCUMENT_REF_CODE)
+  if (segments === undefined || isDocumentPartial(segments.at(-1) ?? '')) {
+    throw new UserDocError('Document identifier is invalid.', INVALID_DOCUMENT_REF_CODE)
+  }
   const path = resolve(join(resolve(root), ...segments))
   assertInside(root, path)
   return path
@@ -258,8 +311,7 @@ export async function resolveTargetIn(
 ): Promise<UserDocTarget> {
   assertInside(root, directory)
   const clean = sanitizeName(name)
-  if (resolve(directory) === resolve(root)
-    && (clean === INTERNAL_UPLOAD_DIRECTORY || clean === INTERNAL_TRASH_DIRECTORY)) {
+  if (resolve(directory) === resolve(root) && isPrivateRootName(clean)) {
     throw new UserDocError('Document name is reserved by the document store.', INVALID_DOCUMENT_NAME_CODE)
   }
   // Bounded rather than unbounded: a caller repeatedly uploading one name is
@@ -271,7 +323,7 @@ export async function resolveTargetIn(
     // The sanitized leaf cannot contain a separator, so this re-proof is a
     // second fence rather than the only one.
     assertInside(root, path)
-    if (!await taken(path)) return { path, name: leaf, docId: docIdFor(root, path) }
+    if (!isDocumentPartial(leaf) && !await taken(path)) return { path, name: leaf, docId: docIdFor(root, path) }
   }
   throw new UserDocError('Too many documents share this name.', DOCUMENT_NAME_EXHAUSTED_CODE)
 }

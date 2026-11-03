@@ -68,8 +68,8 @@ describe('experimental Inspector Host bootstrap route', () => {
     const messages: Message[] = []
     context.logger.exporter({ levels: { default: 3 }, export: (message) => { messages.push(message) } })
     const fiber = context.plugin({ name, inject: [...inject], Config, apply }, { port: 0, captureFetch: false })
-    const bootstrap = (signal?: AbortSignal) => httpFetch(connection,
-      new Request(`http://localhost${INSPECTOR_BOOTSTRAP_PATH}`, signal === undefined ? {} : { signal }))
+    const bootstrap = (signal?: AbortSignal, path = INSPECTOR_BOOTSTRAP_PATH, method = 'GET') => httpFetch(connection,
+      new Request(`http://localhost${path}`, { method, ...signal === undefined ? {} : { signal } }))
     const injected = () => {
       const rows: IndexInjection[] = []
       context!.emit('webserver/index-inject', rows)
@@ -77,6 +77,19 @@ describe('experimental Inspector Host bootstrap route', () => {
     }
     return { fiber, bootstrap, injected, register, registerUpgrade, messages, log }
   }
+
+  it.each([
+    { method: 'POST', path: INSPECTOR_BOOTSTRAP_PATH, status: 405, allow: 'GET' },
+    { method: 'GET', path: `${INSPECTOR_BOOTSTRAP_PATH}/nested`, status: 404, allow: null },
+  ])('refuses bootstrap $method $path with $status before Worker readiness', async ({ method, path, status, allow }) => {
+    const gate = gateStartup('unavailable'), { fiber, bootstrap } = mount()
+    try {
+      await vi.waitFor(() => { expect(startInspector).toHaveBeenCalledOnce() })
+      const response = await bootstrap(undefined, path, method)
+      expect(response.status).toBe(status)
+      expect(response.headers.get('allow')).toBe(allow)
+    } finally { gate.resolve(undefined); await fiber.await() }
+  })
 
   it('accepts bootstrap requests before the Worker is ready and answers once it is', async () => {
     const gate = gateStartup('start')
@@ -161,8 +174,8 @@ describe('experimental Inspector Host bootstrap route', () => {
     const abandoned = bootstrap(abort.signal)
     expect(await settledWithin(abandoned, 50)).toBe(false)
     abort.abort()
-    expect((await abandoned).status).toBe(503)
-    expect((await bootstrap(AbortSignal.abort())).status).toBe(503)
+    await expect(abandoned).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(bootstrap(AbortSignal.abort())).rejects.toMatchObject({ name: 'AbortError' })
 
     gate.resolve(undefined)
     await fiber.await()

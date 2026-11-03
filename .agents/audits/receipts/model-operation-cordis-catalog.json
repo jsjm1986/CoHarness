@@ -1,0 +1,14 @@
+{
+  "name": "model-operation-cordis-catalog",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-cordis-api.ts",
+  "startedAt": "2026-10-24T06:04:41.934249+00:00",
+  "seconds": 7.144,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6497141ad81261e1bb4fa80119e860a33d64c87fa2f65b1fd54201997be1308b",
+  "inputsAfter": "6497141ad81261e1bb4fa80119e860a33d64c87fa2f65b1fd54201997be1308b",
+  "postgresToolDirectory": null,
+  "outputSha256": "0977d582878c02d645910ad454103c76e2a9088a211489c2b402a2be0e819988",
+  "outputTail": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/typert/generator/src/cordis-catalog.ts:51\n  throw new Error(\n        ^\n\nError: gen-cordis-catalog: 3 signature type-link coverage violation(s):\n  service method ctx.llm.prepareOperation (packages/llm/llm/src/index.ts:933) references unclassified type 'LlmOperationMap'. Add it to linkedTypePages with its documentation page, to foundationTypeNames if TypeScript or the framework owns it, or to typeLinkExemptions with the non-catalog documentation owner.\n  service method ctx.llm.prepareOperation (packages/llm/llm/src/index.ts:933) references unclassified type 'LlmOperationParameters'. Add it to linkedTypePages with its documentation page, to foundationTypeNames if TypeScript or the framework owns it, or to typeLinkExemptions with the non-catalog documentation owner.\n  service method ctx.llm.prepareOperation (packages/llm/llm/src/index.ts:933) references unclassified type 'PreparedLlmOperation'. Add it to linkedTypePages with its documentation page, to foundationTypeNames if TypeScript or the framework owns it, or to typeLinkExemptions with the non-catalog documentation owner.\n    at reportTypeLinkViolations (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/typert/generator/src/cordis-catalog.ts:51:9)\n    at CordisCatalogProjector.collectServices (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/typert/generator/src/cordis-catalog.ts:328:5)\n    at CordisCatalogProjector.project (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/typert/generator/src/cordis-catalog.ts:161:22)\n    at projectCordisCatalog (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/typert/generator/src/cordis-catalog.ts:398:40)\n    at computeOutputs (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/gen-cordis-catalog.ts:1241:32)\n    at main (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/gen-cordis-catalog.ts:1311:8)\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/gen-cordis-api.ts:9:1)\n    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)\n    at async node:internal/modules/esm/loader:639:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v25.8.1\n"
+}

@@ -1,0 +1,38 @@
+- main:
+  - heading "模型治理" [level=1]
+  - group "模型治理视图":
+    - button "组织模型"
+    - button "权限与计价"
+    - button "个人登记" [pressed]
+  - alert: fixture-query-unavailable
+  - heading "个人 Provider 与模型登记" [level=2]
+  - button "刷新"
+  - paragraph: 个人可以自由添加和管理 Provider 与模型；此页仅记录登记变化，不参与审批或权限限制。
+  - form "个人登记筛选":
+    - text: 用户
+    - combobox "筛选用户":
+      - option "全部用户" [selected]
+      - option "admin"
+    - text: Provider
+    - textbox "筛选 Provider":
+      - /placeholder: 按 Provider 筛选
+    - text: 模型
+    - textbox "筛选模型":
+      - /placeholder: 按模型筛选
+    - text: 开始日期
+    - textbox "开始日期":
+      - /placeholder: YYYY-MM-DD
+    - text: 结束日期
+    - textbox "结束日期":
+      - /placeholder: YYYY-MM-DD
+    - text: 动作
+    - combobox "筛选动作":
+      - option "全部动作" [selected]
+      - option "新增 Provider"
+      - option "修改 Provider"
+      - option "删除 Provider"
+      - option "新增模型"
+      - option "修改模型"
+      - option "删除模型"
+    - button "重置"
+    - button "应用筛选"

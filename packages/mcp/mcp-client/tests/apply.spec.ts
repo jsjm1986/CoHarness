@@ -42,13 +42,11 @@ vi.mock('@modelcontextprotocol/client', () => ({
   StreamableHTTPClientTransport: vi.fn(),
 }))
 
-vi.mock('@modelcontextprotocol/client/stdio', () => ({
-  StdioClientTransport: vi.fn(),
-}))
+vi.mock('../src/transport.ts', () => ({ createTransport: vi.fn(() => ({})) }))
 
 // vi.mock is hoisted above static imports, so the module under test sees the
 // mocked SDK even through a static import.
-import { apply, name, inject, Config as ConfigSchema } from '@deepseek-ai/dsh-mcp-client/src/index.ts'
+import { apply, name, inject, mountMcpClient, Config as ConfigSchema } from '@deepseek-ai/dsh-mcp-client/src/index.ts'
 
 // ---- Helpers ----
 
@@ -163,6 +161,17 @@ describe('apply (plugin lifecycle)', () => {
     })
     mockCallTool.mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] })
     ctx = await mountRegistry()
+  })
+
+  it('rejects invalid stdio limits before reserving the server namespace', async () => {
+    try {
+      expect(() => mountMcpClient(ctx, { ...stdioConfig, processGraceMs: 0 })).toThrow('positive timer integer')
+      expect(mockConnect).not.toHaveBeenCalled()
+      const client = mountMcpClient(ctx, stdioConfig)
+      await client.ready
+      expect(mockConnect).toHaveBeenCalledOnce()
+      await client.dispose()
+    } finally { await ctx.fiber.dispose() }
   })
 
   it.each([undefined, '', ' \n\t'])(

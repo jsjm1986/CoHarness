@@ -90,7 +90,7 @@ function settingsFailure(
   error: unknown,
   expectedRevision: number | undefined,
 ): Promise<RpcEnvelope<never>> | RpcEnvelope<never> {
-  if (error instanceof AdminRequestError && error.status === 409 && error.message === 'settings-conflict') {
+  if (error instanceof AdminRequestError && error.status === 409 && error.code === 'settings-conflict') {
     return describeOrganizationModelSettings().then((current) => rejected<never>(
       'settings-conflict',
       error.message,

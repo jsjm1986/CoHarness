@@ -1,7 +1,7 @@
 /**
  * Derives the workspace browser tree from Host Workspace order and membership.
- * Unassigned Sessions trail under Ungrouped; only the selected blank Session
- * remains visible. Pinned Sessions lead every section in the section's own
+ * Unassigned Sessions trail under Ungrouped; selected and composer-owned blank
+ * Sessions remain visible. Pinned Sessions lead every section in the section's own
  * order, reorderable only among themselves.
  */
 import {
@@ -225,6 +225,8 @@ export type ArchivedFilter = 'default' | 'show' | 'only'
 
 /** Registry-global row state consumed by every tree derivation. */
 export interface SessionRowState {
+  /** Authorized blanks still holding this document's composer input. */
+  inputDraftSessionIds?: readonly SessionId[]
   /** Registry-global pin ids in Host pin order; pinned rows lead their section in the local order. */
   pinnedSessionIds: readonly SessionId[]
   /** Archive set; members keep their account slots and show grayed while visible. */
@@ -306,8 +308,8 @@ export function pinCurrentBlank(
 }
 
 /**
- * Ordinary sessions are visible; among blank sessions, only the current one
- * is visible. Subagent children use their parent header catalog; archived
+ * Ordinary sessions, the current blank and document-owned input blanks are
+ * visible. Subagent children use their parent header catalog; archived
  * sessions follow the archived filter, while their accounting slots remain
  * either way so unarchiving restores position.
  */
@@ -316,9 +318,10 @@ function sessionVisible(
   current: SessionId | undefined,
   archived: ReadonlySet<SessionId>,
   archivedFilter: ArchivedFilter,
+  inputDraftSessionIds?: readonly SessionId[],
 ): boolean {
   if (session.origin === 'subagent') return false
-  if (session.blank && session.id !== current) return false
+  if (session.blank && session.id !== current && inputDraftSessionIds?.includes(session.id) !== true) return false
   switch (archivedFilter) {
     case 'default':
       return !archived.has(session.id)
@@ -413,16 +416,17 @@ function groupByWorkspace(
   archived: ReadonlySet<SessionId>,
   archivedFilter: ArchivedFilter,
   ungroupedOrder: readonly string[] | undefined,
+  inputDraftSessionIds?: readonly SessionId[],
 ): Group[] {
   const groups: Group[] = []
   const accounted = new Set<SessionId>()
-  // Only the current blank row can be visible; avoid rescanning a large list
-  // of hidden blank reservations on every live event.
-  const currentSummary = list.current === undefined ? undefined : list.byId[list.current]
-  const currentHint = currentSummary?.blank === true && currentSummary.workspaceId !== undefined
-    ? currentSummary
-    : undefined
-  const workspaceMembers = currentHint === undefined
+  // Inspect only the selected blank and existing input owners for hints.
+  const hintedIds = new Set([...(list.current === undefined ? [] : [list.current]), ...inputDraftSessionIds ?? []])
+  const hints = [...hintedIds].flatMap((id) => {
+    const summary = list.byId[id]
+    return summary?.blank === true && summary.workspaceId !== undefined ? [summary] : []
+  })
+  const workspaceMembers = hints.length === 0
     ? undefined
     : new Set(workspaces.flatMap(workspace => workspace.sessionIds))
   const summaries = sessionSummaries(list)
@@ -432,19 +436,17 @@ function groupByWorkspace(
       const summary = summaries[id]
       if (summary === undefined) continue // account may lead the list pull; the row appears when the summary lands
       accounted.add(id)
-      if (!sessionVisible(summary, list.current, archived, archivedFilter)) continue
+      if (!sessionVisible(summary, list.current, archived, archivedFilter, inputDraftSessionIds)) continue
       members.push(summary)
     }
     // A newly reserved draft is not attached by the Host until its first
     // visible message. Its client-local Workspace hint keeps the current
     // placeholder in the intended group during that short interval.
-    if (currentHint !== undefined && currentHint.workspaceId === workspace.workspaceId
-      && workspaceMembers?.has(currentHint.id) !== true && !accounted.has(currentHint.id)
-      && sessionVisible(currentHint, list.current, archived, archivedFilter)) {
-      accounted.add(currentHint.id)
-      // Keep the current provisional row at the top even before Workspace
-      // membership arrives, matching the render-time pin for attached drafts.
-      members.unshift(currentHint)
+    for (const hint of [...hints].reverse()) {
+      if (hint.workspaceId !== workspace.workspaceId || workspaceMembers?.has(hint.id) === true || accounted.has(hint.id)
+        || !sessionVisible(hint, list.current, archived, archivedFilter, inputDraftSessionIds)) continue
+      accounted.add(hint.id)
+      members.unshift(hint)
     }
     // The archived-only view lists archives, not the Workspace inventory, so
     // a Workspace without archived Sessions contributes no group.
@@ -457,7 +459,7 @@ function groupByWorkspace(
   const stray = sessionKnownIds(list)
     .map(id => summaries[id])
     .filter((s): s is SessionSummary =>
-      s !== undefined && !accounted.has(s.id) && sessionVisible(s, list.current, archived, archivedFilter))
+      s !== undefined && !accounted.has(s.id) && sessionVisible(s, list.current, archived, archivedFilter, inputDraftSessionIds))
   if (stray.length > 0) {
     groups.push(buildGroup(
       UNGROUPED_KEY,
@@ -529,7 +531,9 @@ export function deriveGroups(
         ?? currentSummary?.workspaceId
         ?? UNGROUPED_KEY
   const groups: GroupNode[] = []
-  for (const g of groupByWorkspace(list, workspaces, archived, rowState.archivedFilter, view.ungroupedOrder)) {
+  const groupsByWorkspace = groupByWorkspace(list, workspaces, archived, rowState.archivedFilter,
+    view.ungroupedOrder, rowState.inputDraftSessionIds)
+  for (const g of groupsByWorkspace) {
     const expanded = expandedGroups.has(g.key)
     groups.push({
       key: g.key,
@@ -554,15 +558,16 @@ export function deriveGroups(
  * every known ordinary Session keeps its account slot so an unarchive
  * restores its position.
  * @param list - sessions list snapshot.
- * @returns known ordinary Session ids, including archives and only the current blank.
+ * @param inputDraftSessionIds - authorized blanks still holding this document's composer input.
+ * @returns known ordinary Session ids, including archives, the current blank and owned input blanks.
  */
-export function sessionMemberIds(list: SessionListState): SessionId[] {
+export function sessionMemberIds(list: SessionListState, inputDraftSessionIds?: readonly SessionId[]): SessionId[] {
   const summaries = sessionSummaries(list)
   return sessionKnownIds(list).filter((id) => {
     const s = summaries[id]
     return s !== undefined
       && s.origin !== 'subagent'
-      && (!s.blank || s.id === list.current)
+      && (!s.blank || s.id === list.current || inputDraftSessionIds?.includes(s.id) === true)
   })
 }
 
@@ -586,7 +591,7 @@ export function deriveFlat(
   const descendants = indexSubagentDescendants(summaries)
   const members = sessionIds.flatMap((id) => {
     const s = summaries[id]
-    return s !== undefined && sessionVisible(s, list.current, archived, rowState.archivedFilter) ? [s] : []
+    return s !== undefined && sessionVisible(s, list.current, archived, rowState.archivedFilter, rowState.inputDraftSessionIds) ? [s] : []
   })
   return sectionMembers(members, pinned, archived)
     .map(session => sessionNode(session, descendants, pinned, archived))

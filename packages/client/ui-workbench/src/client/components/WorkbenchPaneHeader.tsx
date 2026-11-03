@@ -1,17 +1,18 @@
 /** Per-pane header actions contributed to the conversation viewport. */
 import { useState } from 'react'
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { HostObservable, PropsHooks, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   IconCloseOutline16, IconEllipsisOutline16, IconFolderOpenOutline16, IconMaximizeOutline16,
-  IconMinimizeOutline16, IconRestoreOutline16, Menu, StateDot,
+  IconMinimizeOutline16, IconRestoreOutline16, Menu, StateDot, Tooltip, ComputerBadge,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { ProjectUiPolicySnapshot, SessionId, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
+import type { DeploymentContextSnapshot, ProjectUiPolicySnapshot, SessionId, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { NS } from '../locales.ts'
 import { paneIdentity, ScopeTile } from './ScopeTile.tsx'
 import css from './Workbench.module.css'
 
-interface Props extends PropsRuntime<'conversation.workbench.pane.header'>, PropsLocale<typeof NS> {
+interface Props extends PropsRuntime<'conversation.workbench.pane.header'>, PropsLocale<typeof NS>,
+  PropsHooks<{ deployment: HostObservable<DeploymentContextSnapshot> }> {
   replacePane: () => void
   movePane: (direction: 'previous' | 'next') => void
   /** Provider availability for this pane's runtime, evaluated at render time. */
@@ -29,16 +30,17 @@ export function stateOf(summary: SessionListState['byId'][SessionId] | undefined
   return 'done'
 }
 
-/** Render one pane header: space identity, status capsule, hover actions — or the collapsed strip. */
+/** Render one pane header with identity, status, compact actions, or the collapsed strip. */
 export function WorkbenchPaneHeader({
-  sessionId, active, onFocus, onClose, maximized, onMaximize, collapsed = false, collapsible = false,
+  sessionId, active, onFocus, onClose, maximized, onMaximize, condensed = false, collapsed = false, collapsible = false,
   onToggleCollapse, solo = false, onSolo, replacePane, movePane,
-  filesAvailable, openFiles, useSessions, useWorkspaces, useProjectPolicy, t,
+  filesAvailable, openFiles, useSessions, useWorkspaces, useProjectPolicy, useDeployment, t,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const summary = useSessions(s => s.byId[sessionId])
   const workspaces = useWorkspaces(s => s)
   const policy = useProjectPolicy(value => value)
+  const showComputer = useDeployment(value => value.showComputer)
   const identity = paneIdentity(sessionId, summary, workspaces, policy, t('personal'), t('untitled'))
   const subtitle = identity.workspaceName === '' || identity.workspaceName === identity.scopeName
     ? identity.scopeName
@@ -77,26 +79,30 @@ export function WorkbenchPaneHeader({
   }
 
   return (
-    <header className={css.paneHeader} data-workbench-pane-header="" data-active={active || undefined} onClick={onFocus}>
+    <header className={css.paneHeader} data-workbench-pane-header="" data-active={active || undefined} data-condensed={condensed || undefined} onClick={onFocus}>
       <div
         className={css.paneIdentity}
         data-pane-drag=""
         draggable
-        title={t('dragReorder')}
+        title={condensed ? `${identity.title}\n${subtitle}\n${t('dragReorder')}` : t('dragReorder')}
       >
         <ScopeTile name={identity.scopeName} tone={identity.tone} />
         <div className={css.paneLead}>
           <strong title={summary?.displayTitle}>{identity.title}</strong>
-          <span title={subtitle}>{subtitle}</span>
+          <div className={css.paneMeta}>
+            <span className={css.paneState} data-tone={status}>
+              {status === 'newReply'
+                ? <span className={css.receiptDot} aria-hidden />
+                : <StateDot state={state} size={8} />}
+              <span>{t(status)}</span>
+            </span>
+            {showComputer && identity.computerName !== undefined && <ComputerBadge name={identity.computerName} label={t('computer')} />}
+            <span className={css.paneSubtitle} title={subtitle}>{subtitle}</span>
+          </div>
         </div>
       </div>
-      <span className={css.paneState} data-tone={status}>
-        {status === 'newReply'
-          ? <span className={css.receiptDot} aria-hidden />
-          : <StateDot state={state} size={8} />}
-        <span>{t(status)}</span>
-      </span>
       <span className={css.paneActions}>
+
         {collapsible && (
           <button
             type="button"
@@ -108,15 +114,17 @@ export function WorkbenchPaneHeader({
             <IconMinimizeOutline16 />
           </button>
         )}
-        <button
-          type="button"
-          className={css.iconAction}
-          aria-label={t(maximized ? 'restore' : 'maximize')}
-          title={t(maximized ? 'restore' : 'maximize')}
-          onClick={(event) => { event.stopPropagation(); onMaximize() }}
-        >
-          {maximized ? <IconRestoreOutline16 /> : <IconMaximizeOutline16 />}
-        </button>
+        <Tooltip label={t(maximized ? 'restore' : 'maximize')} side="bottom" delayMs={500}>
+          <button
+            type="button"
+            className={css.iconAction}
+            aria-label={t(maximized ? 'restore' : 'maximize')}
+            title={t(maximized ? 'restore' : 'maximize')}
+            onClick={(event) => { event.stopPropagation(); onMaximize() }}
+          >
+            {maximized ? <IconRestoreOutline16 /> : <IconMaximizeOutline16 />}
+          </button>
+        </Tooltip>
         <Menu open={menuOpen} onClose={() => { setMenuOpen(false) }} align="end" portal dense
           items={[
             ...(showFiles ? [
@@ -141,15 +149,17 @@ export function WorkbenchPaneHeader({
           }}
           anchor={<button type="button" className={css.iconAction} aria-label={t('more')} title={t('more')} onClick={(event) => { event.stopPropagation(); setMenuOpen(open => !open) }}><IconEllipsisOutline16 /></button>}
         />
-        <button
-          type="button"
-          className={css.iconAction}
-          aria-label={t('close')}
-          title={t('close')}
-          onClick={(event) => { event.stopPropagation(); onClose() }}
-        >
-          <IconCloseOutline16 />
-        </button>
+        <Tooltip label={t('close')} side="bottom" delayMs={500}>
+          <button
+            type="button"
+            className={css.iconAction}
+            aria-label={t('close')}
+            title={t('close')}
+            onClick={(event) => { event.stopPropagation(); onClose() }}
+          >
+            <IconCloseOutline16 />
+          </button>
+        </Tooltip>
       </span>
     </header>
   )

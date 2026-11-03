@@ -1,6 +1,6 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import LlmRuntime, { createUserMessage, isAgentLoopRequest, LlmAdapter, ReasoningEffortId, ToolCallId } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { createUserMessage, LlmAdapter, ReasoningEffortId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type {
   FinishReason,
   GenerateOptions,
@@ -211,7 +211,7 @@ describe('executeSessionTitleLlm', () => {
     const options = adapter.requests[0]!
     expect(Object.isFrozen(options)).toBe(true)
     expect(Object.isFrozen(options.messages)).toBe(true)
-    expect(isAgentLoopRequest(options)).toBe(false)
+    expect(ctx.llm.isAgentLoopRequest(options)).toBe(false)
     expect(options).toMatchObject({
       provider: 'current-route',
       model: 'current-model',

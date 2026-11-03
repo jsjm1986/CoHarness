@@ -1,0 +1,14 @@
+{
+  "name": "model-account-deletion-release-units",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/macos-release-control.spec.ts tests/usage-intake.spec.ts tests/apply-model-governance.spec.ts",
+  "startedAt": "2026-10-24T00:20:57.349888+00:00",
+  "seconds": 14.254,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b54d3282874638483afc775a3982f7bb3cd46024e2cd86f4c74aecfef21ba23b",
+  "inputsAfter": "b54d3282874638483afc775a3982f7bb3cd46024e2cd86f4c74aecfef21ba23b",
+  "postgresToolDirectory": null,
+  "outputSha256": "c718fe1d40a86f25a058e22065191c3339c16e7b9ac87a8f2ae9917db4a7010c",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  39 passed (39)\n   Start at  08:20:58\n   Duration  12.82s (transform 26ms, setup 0ms, import 43ms, tests 12.66s, environment 0ms)\n\n"
+}

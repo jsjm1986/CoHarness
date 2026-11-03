@@ -1,0 +1,13 @@
+{
+  "name": "browser-lifecycle-types",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T14:24:36.355008+00:00",
+  "seconds": 10.788,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "67cb465a8a3c29f425c7a0bc085ed5d3b91f542ba81109976db5d0bb123fbde4",
+  "inputsAfter": "67cb465a8a3c29f425c7a0bc085ed5d3b91f542ba81109976db5d0bb123fbde4",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-published-persistence-gates",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 node_modules/.bin/tsx .agents/audits/.local/native-model-static-checks.mts",
+  "startedAt": "2026-10-25T03:38:13.479377+00:00",
+  "seconds": 0.546,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3915166ecd7a16e79402e71568e5c0b510ae0a366e8c6a3d58daf74ef27b2450",
+  "inputsAfter": "3915166ecd7a16e79402e71568e5c0b510ae0a366e8c6a3d58daf74ef27b2450",
+  "postgresToolDirectory": null,
+  "outputSha256": "56bcb6c4c9ad100b8a278d3710cf9fd6fadec4538a9e792f907749ce35775fc7",
+  "outputTail": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/pnpm-invocation.ts:15\n    throw new Error('pnpm invocation: npm_execpath is unavailable; invoke the script through pnpm run.')\n          ^\n\nError: pnpm invocation: npm_execpath is unavailable; invoke the script through pnpm run.\n    at pnpmInvocation (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/pnpm-invocation.ts:15:11)\n    at pnpmScript (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/run-gates.ts:282:8)\n    at docSyncLeafGates (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/run-gates.ts:958:10)\n    at gatesForMode (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/run-gates.ts:402:14)\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/native-model-static-checks.ts:3:19)\n\nNode.js v25.8.1\n"
+}

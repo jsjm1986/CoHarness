@@ -1,0 +1,10 @@
+{
+  "allow": {
+    "reply": "翻译结果",
+    "proof": { "requests": 1, "nativeAdmissions": 1, "nativeReleased": 1, "requestRecords": 1, "resultRecords": 1, "historyUnchanged": true, "independentInput": true, "transportErrors": 0, "purposes": ["translation"] }
+  },
+  "refused": {
+    "reply": "TRANSLATION_UNAVAILABLE",
+    "proof": { "requests": 0, "nativeAdmissions": 1, "nativeReleased": 1, "requestRecords": 1, "resultRecords": 0, "historyUnchanged": true, "independentInput": true, "transportErrors": 0, "purposes": ["translation"] }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "ssh-private-transport-oxlint-current",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/ssh/ssh/src/index.ts packages/ssh/ssh/tests/fixtures/local-transport.ts packages/ssh/ssh/tests/startup-behavior.spec.ts packages/ssh/ssh/tests/password-channel.spec.ts packages/ssh/ssh/tests/connection-disposal.spec.ts packages/ssh/ssh/tests/resource-admission.e2e.ts packages/host/apiproxy/src/ssh-execution.ts",
+  "startedAt": "2026-10-23T15:05:46.734661+00:00",
+  "seconds": 2.556,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9383a6a5aa9aba6dd64611f39945198feea8cf29edca5bab2a15b170275e0c67",
+  "inputsAfter": "9383a6a5aa9aba6dd64611f39945198feea8cf29edca5bab2a15b170275e0c67",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

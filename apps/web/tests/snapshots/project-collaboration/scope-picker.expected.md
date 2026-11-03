@@ -1,10 +1,18 @@
 - group "Switch personal or project scope":
   - button "Close":
     - img
-  - text: Switch space Payments migration Can edit
+  - text: Workspaces Payments migration Can edit
   - button "Manage":
     - text: Manage
     - img
+  - text: All spaces · 3
+  - searchbox "Search spaces"
+  - text: Personal
+  - button "Personal"
+  - text: Projects
+  - button "Payments migration"
+  - button "Audit platform Read only"
+  - button "Refresh spaces"
   - text: Space settings
   - button "New conversation visibility Shared with project":
     - text: New conversation visibility Shared with project
@@ -15,8 +23,4 @@
   - button "Project settings":
     - text: Project settings
     - img
-  - text: All spaces · 3
-  - button "Personal Personal"
-  - button "Payments migration"
-  - button "Audit platform Read only"
   - button "New project space"

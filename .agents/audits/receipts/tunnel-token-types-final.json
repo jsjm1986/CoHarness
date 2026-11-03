@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-token-types-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T21:56:18.084212+00:00",
+  "seconds": 5.159,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ec131136ddb14514cdd56da5ce603320136fe15d814b83b5c19b778b722c9e8f",
+  "inputsAfter": "ec131136ddb14514cdd56da5ce603320136fe15d814b83b5c19b778b722c9e8f",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

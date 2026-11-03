@@ -1,0 +1,14 @@
+{
+  "name": "document-authority-organization-and-transfer-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/admin-business-postgres.spec.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T00:19:09.616037+00:00",
+  "seconds": 5.689,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "29f6aa4a89ec52877e7e3d865fd607257f28e5477e611967d20940ddc3ad7b4e",
+  "inputsAfter": "29f6aa4a89ec52877e7e3d865fd607257f28e5477e611967d20940ddc3ad7b4e",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "f6376ad624ed1759849db45cd3205bd46350ba7dc925871e701a2f9c06531559",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  67 passed (67)\n   Start at  08:19:11\n   Duration  3.76s (transform 600ms, setup 0ms, import 769ms, tests 2.93s, environment 0ms)\n\n"
+}

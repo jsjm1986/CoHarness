@@ -41,7 +41,7 @@ kind: "package-reference"
 <details>
 <summary>实现细节 — 点击展开</summary>
 
-辅助程序复用 [`fs-local`](../../fs/fs-local/README.zh.md) 与 [`fs-sandbox`](../../fs/fs-sandbox/README.zh.md)，保留符号链接身份、陈旧版本拒绝、差异基线及发布语义。UTF-8 流使用有界拉取请求，在消费方提前停止时关闭远端迭代器。
+辅助程序复用 [`fs-local`](../../fs/fs-local/README.zh.md) 与 [`fs-sandbox`](../../fs/fs-sandbox/README.zh.md)，保留符号链接身份、陈旧版本拒绝、差异基线及发布语义。UTF-8 流在第一次拉取时预留远端迭代器，使用有界拉取请求，并在消费方提前停止时关闭迭代器。关闭或取消尚未读取的可迭代对象不会占用远端文本流名额。流准入和文件错误在迭代期间报告。
 
 </details>
 

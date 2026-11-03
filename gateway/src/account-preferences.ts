@@ -6,7 +6,7 @@ export type AccountPreferenceNamespace = 'locale' | 'ui-theme' | 'ui-conversatio
 /** Fields accepted for each account preference namespace. */
 export type AccountPreferenceField =
   | { namespace: 'locale'; field: 'preference' }
-  | { namespace: 'ui-theme'; field: 'preference' }
+  | { namespace: 'ui-theme'; field: keyof AccountThemePreferences }
   | {
     namespace: 'ui-conversation'
     field:
@@ -53,10 +53,31 @@ export const DEFAULT_ACCOUNT_PERFORMANCE_USAGE: AccountPerformanceUsageMode = 'd
 /** Default Chat link destination when an account has no explicit override. */
 export const DEFAULT_ACCOUNT_LINK_OPENING: AccountLinkOpening = 'sidebar'
 
+/** Account font-size limits and defaults, matching the theme controls. */
+export const ACCOUNT_THEME_FONT_SIZES = {
+  fontSize: { min: 10, max: 22, default: 14 },
+  codeFontSize: { min: 10, max: 16, default: 11 },
+  terminalFontSize: { min: 10, max: 20, default: 13 },
+} as const
+
+/** Account-owned font-family lists; empty strings explicitly select built-in fonts. */
+export const ACCOUNT_THEME_FONT_FAMILIES = ['textFontFamily', 'codeFontFamily', 'terminalFontFamily'] as const
+
+/** Effective appearance and font values owned by one authenticated account. */
+export interface AccountThemePreferences {
+  preference: 'light' | 'dark' | 'system'
+  fontSize: number
+  codeFontSize: number
+  terminalFontSize: number
+  textFontFamily: string
+  codeFontFamily: string
+  terminalFontFamily: string
+}
+
 /** Effective account preferences returned to browser clients. */
 export interface AccountPreferenceValues {
   locale: { preference?: 'zh' | 'en' }
-  'ui-theme': { preference: 'light' | 'dark' | 'system' }
+  'ui-theme': AccountThemePreferences
   'ui-conversation': {
     busyEnter: 'queue' | 'steer'
     chatContentWidth: number
@@ -77,7 +98,7 @@ export interface AccountPreferencesView {
   /** Explicit account layer; omitted fields inherit product defaults. */
   overrides: {
     locale: { preference?: 'zh' | 'en' }
-    'ui-theme': { preference?: 'light' | 'dark' | 'system' }
+    'ui-theme': Partial<AccountThemePreferences>
     'ui-conversation': {
       busyEnter?: 'queue' | 'steer'
       chatContentWidth?: number
@@ -101,8 +122,29 @@ export type AccountPreferenceMutation = AccountPreferenceField & {
 
 /** Account preference persistence consumed by the Gateway HTTP server. */
 export interface GatewayAccountPreferencesService {
+  /**
+   * Read this account's preferences while retaining current account and organization eligibility.
+   * @param user - authenticated account; cached status and role do not confer authority.
+   * @returns effective values; first read migrates valid legacy fields or initializes defaults for absent/malformed YAML.
+   */
   describe(user: UserRow): Promise<AccountPreferencesView>
+  /**
+   * Update an account-owned field in the same transaction as its current authority check.
+   * @param user - authenticated account; no computer execution grant is required.
+   * @param mutation - validated field operation and optional revision fence.
+   * @returns accepted values; rejection and legacy read failures publish no initialization or mutation.
+   */
   mutate(user: UserRow, mutation: AccountPreferenceMutation): Promise<AccountPreferencesView>
+}
+
+/** Legacy account storage could not be read; initialization remains uncommitted and can retry. */
+export class AccountPreferencesUnavailableError extends Error {
+  readonly code = 'account-preferences-unavailable'
+
+  constructor(cause: unknown) {
+    super('Account preferences could not be loaded. Try again later.', { cause })
+    this.name = 'AccountPreferencesUnavailableError'
+  }
 }
 
 /** A stale account preference write. */
@@ -128,7 +170,10 @@ export class AccountPreferencesInputError extends Error {
 /** Default values used when an account has not selected an explicit value. */
 export const ACCOUNT_PREFERENCE_DEFAULTS: AccountPreferenceValues = {
   locale: {},
-  'ui-theme': { preference: 'system' },
+  'ui-theme': {
+    preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+    textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+  },
   'ui-conversation': {
     busyEnter: 'queue',
     chatContentWidth: DEFAULT_ACCOUNT_CHAT_CONTENT_WIDTH,
@@ -164,7 +209,9 @@ export function normalizeAccountPreferenceMutation(
   const validField = namespace === 'ui-conversation'
     ? field === 'busyEnter' || field === 'chatContentWidth' || field === 'chatFullWidth' || field === 'chatFontSize'
       || field === 'transcriptView' || field === 'performanceUsage' || field === 'linkOpening'
-    : field === 'preference'
+    : field === 'preference' || namespace === 'ui-theme'
+      && (field === 'fontSize' || field === 'codeFontSize' || field === 'terminalFontSize'
+        || field === 'textFontFamily' || field === 'codeFontFamily' || field === 'terminalFontFamily')
   if (!validField) throw new AccountPreferencesInputError('unsupported account preference field')
   if (operation !== 'set' && operation !== 'unset') {
     throw new AccountPreferencesInputError('account preference operation must be set or unset')
@@ -173,15 +220,19 @@ export function normalizeAccountPreferenceMutation(
   const raw = row.value
   const numericConversationField = namespace === 'ui-conversation'
     && (field === 'chatContentWidth' || field === 'chatFontSize')
+  const themeFontRange = namespace === 'ui-theme'
+    && (field === 'fontSize' || field === 'codeFontSize' || field === 'terminalFontSize')
+    ? ACCOUNT_THEME_FONT_SIZES[field] : undefined
+  const numericPreferenceField = numericConversationField || themeFontRange !== undefined
   const booleanConversationField = namespace === 'ui-conversation' && field === 'chatFullWidth'
-  if (operation === 'set' && numericConversationField
+  if (operation === 'set' && numericPreferenceField
     && typeof raw !== 'number' && typeof raw !== 'string') {
-    throw new AccountPreferencesInputError('conversation display preference requires a number')
+    throw new AccountPreferencesInputError('numeric display preference requires a number')
   }
   if (operation === 'set' && booleanConversationField && typeof raw !== 'boolean') {
     throw new AccountPreferencesInputError('chatFullWidth preference must be a boolean')
   }
-  if (operation === 'set' && !numericConversationField && !booleanConversationField && typeof raw !== 'string') {
+  if (operation === 'set' && !numericPreferenceField && !booleanConversationField && typeof raw !== 'string') {
     throw new AccountPreferencesInputError('account preference set requires a string value')
   }
   if (namespace === 'locale' && field === 'preference' && operation === 'set'
@@ -208,11 +259,11 @@ export function normalizeAccountPreferenceMutation(
     && !ACCOUNT_LINK_OPENINGS.includes(raw as AccountLinkOpening)) {
     throw new AccountPreferencesInputError('linkOpening preference must be sidebar or new-tab')
   }
-  if (numericConversationField && operation === 'set') {
+  if (numericPreferenceField && operation === 'set') {
     const numberValue = typeof raw === 'number' ? raw : Number(raw)
-    const range = field === 'chatContentWidth'
+    const range = themeFontRange ?? (field === 'chatContentWidth'
       ? ACCOUNT_CHAT_CONTENT_WIDTH_RANGE
-      : ACCOUNT_CHAT_FONT_SIZE_RANGE
+      : ACCOUNT_CHAT_FONT_SIZE_RANGE)
     if (!Number.isSafeInteger(numberValue) || numberValue < range.min || numberValue > range.max) {
       throw new AccountPreferencesInputError(
         `${field} must be an integer between ${String(range.min)} and ${String(range.max)}`,

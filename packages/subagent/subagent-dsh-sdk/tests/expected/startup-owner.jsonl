@@ -1,0 +1,8 @@
+{"phase":"queued","change":"replaced","rejected":true,"resourceUnavailable":true,"spawns":0,"marker":false,"closed":true,"originalAcquires":1,"originalReleases":1,"uncertainties":0,"replacementAcquires":0,"starts":0,"ends":0,"outcome":null}
+{"phase":"queued","change":"downgraded","rejected":true,"resourceUnavailable":true,"spawns":0,"marker":false,"closed":true,"originalAcquires":1,"originalReleases":1,"uncertainties":0,"replacementAcquires":0,"starts":0,"ends":0,"outcome":null}
+{"phase":"control","change":"replaced","rejected":true,"resourceUnavailable":true,"spawns":0,"marker":false,"closed":true,"originalAcquires":1,"originalReleases":1,"uncertainties":0,"replacementAcquires":0,"starts":0,"ends":0,"outcome":null}
+{"phase":"control","change":"downgraded","rejected":true,"resourceUnavailable":true,"spawns":0,"marker":false,"closed":true,"originalAcquires":1,"originalReleases":1,"uncertainties":0,"replacementAcquires":0,"starts":0,"ends":0,"outcome":null}
+{"phase":"unchanged","change":"managed","rejected":false,"resourceUnavailable":false,"spawns":1,"marker":true,"closed":true,"originalAcquires":1,"originalReleases":1,"uncertainties":0,"replacementAcquires":0,"starts":1,"ends":1,"outcome":"completed"}
+{"phase":"unchanged","change":"independent","rejected":false,"resourceUnavailable":false,"spawns":1,"marker":true,"closed":true,"originalAcquires":0,"originalReleases":0,"uncertainties":0,"replacementAcquires":0,"starts":1,"ends":1,"outcome":"completed"}
+{"phase":"authority-only","allowed":true,"parentChecks":1,"childDispatches":1,"outcome":"completed","spawns":1,"closed":true}
+{"phase":"authority-only","allowed":false,"parentChecks":1,"childDispatches":0,"outcome":"error","spawns":1,"closed":true}

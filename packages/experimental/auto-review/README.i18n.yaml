@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/auto-review/README.md
 document:
-  en: 753bd715b4500ed2d92d8d13e6328a0681abeaa4
-  zh: 146833868d93c09040cd591635cf2bfd56c4d4ef
+  en: 0ed4dff0e8a82ce8a6c5964f05dd4de0f9045c1e
+  zh: fb03c2b36089adcd9841bcaad692405d95e3fa91
 /:
   en: 4f245200f5345e3c
   zh: 221e9996e8ce2963
@@ -21,14 +21,14 @@ document:
   en: bbff250eba0f1b89
   zh: 0a618f05cc88ee2b
 /deepseek-ai-dsh-experimental-auto-review/use-this-package/install-into-a-profile:
-  en: ad2e1b7b40731bb9
-  zh: a481fe7de1bce296
+  en: e30eed45b37c506b
+  zh: 4b746d96361da252
 /deepseek-ai-dsh-experimental-auto-review/use-this-package/what-you-get:
   en: 1f6d8cd15c9cc038
   zh: da2b571a325dcf90
 /deepseek-ai-dsh-experimental-auto-review/understand-the-implementation:
-  en: a93134b4ad92e740
-  zh: 917117d612cdc3b6
+  en: bb1e4de0c64300c1
+  zh: 0273c8374bf0c252
 /deepseek-ai-dsh-experimental-auto-review/further-exploration:
   en: 8b81d32ea370ecd3
   zh: dc53ff4da78232ac
@@ -51,8 +51,8 @@ document:
   en: f9b4d7b686f14fc5
   zh: a2fac9a8eaf5e2a3
 /deepseek-ai-dsh-experimental-auto-review/model-experience/tool-denial/what-the-model-sees:
-  en: 7944bb8aa9ef4624
-  zh: c3650e7267aaa8e7
+  en: 15c43b2e666f89d5
+  zh: 6e1ab4f6060f5a08
 /deepseek-ai-dsh-experimental-auto-review/model-experience/tool-denial/token-effect:
   en: 7cd4a7e8c4fd7c67
   zh: 00fed0c8fdb8ba13

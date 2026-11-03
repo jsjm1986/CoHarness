@@ -1,0 +1,124 @@
+{
+  "at": "2026-10-31T05:44:48.236287+00:00",
+  "finding": "B391",
+  "title": "Local target environment validation leaves unused ordinary and terminal process permits occupied",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "paths": [
+    "packages/subprocess/subprocess-local/src/index.ts",
+    "packages/subprocess/subprocess-local/tests/preflight-admission.spec.ts",
+    "packages/subprocess/subprocess/tests/fixtures/resource-owner.mjs",
+    "packages/subprocess/subprocess/tests/expected/resource-owner.jsonl",
+    "packages/subprocess/subprocess-local/README.md",
+    "packages/subprocess/subprocess-local/README.zh.md",
+    "packages/subprocess/subprocess-local/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.i18n.yaml"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-source-coverage.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-build.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-doc-quick.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-built-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-isolated-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-sdk-projection.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-python-projection.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-lint-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-guide.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-origin-fetch.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-host-typecheck.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-catalog-freshness.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-isolated-compiler-complete.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T052742Z/environment-preflight-isolated-bundle.json"
+  ],
+  "causalEvidence": "Both allocation methods, across program, argument, cwd, environment-key and environment-value null bytes, fail ten pre-fix cases. The complete prior compiled Local graph retains all ten unused reservations and refuses a subsequent valid process in the same slot. Updated source and built Loader transcripts preserve ERR_INVALID_ARG_VALUE and physically create each subsequent marker after capacity returns.",
+  "behavior": "Extend confirmed no-process rejection to the existing targetEnvironment validation in both Local allocation methods. No new parser, relaxed input rule, public signature, HTTP field, configuration or stored data change. Unknown physical cleanup remains uncertain.",
+  "verification": {
+    "uniqueRelatedCases": 511,
+    "sourceCases": 503,
+    "platformSkipped": 16,
+    "typescriptSdkSnapshots": 4,
+    "pythonSdkSnapshots": 4,
+    "standardCoverage": {
+      "packages/subprocess/subprocess-local/src/index.ts": {
+        "statements": [
+          187,
+          187
+        ],
+        "branches": [
+          118,
+          118
+        ],
+        "functions": [
+          41,
+          41
+        ],
+        "lines": [
+          153,
+          153
+        ]
+      },
+      "packages/subprocess/subprocess/src/index.ts": {
+        "statements": [
+          125,
+          125
+        ],
+        "branches": [
+          39,
+          39
+        ],
+        "functions": [
+          35,
+          35
+        ],
+        "lines": [
+          91,
+          91
+        ]
+      }
+    },
+    "applicationReplay": "Twenty-two stable Loader rows pass in source, Node22 shared artifacts and Node24 independently compiled frozen artifacts.",
+    "buildGates": 8,
+    "quickDocumentationGates": 20,
+    "guideEnglishWords": 280,
+    "limits": "Build and source results apply to the frozen B391 inputs. Later peer terminal source changes require their own tests and a combined candidate rebuild. No full-project coverage or current peer edit acceptance.",
+    "privateCompilerSetup": "Private setup was corrected to retain Host project references, an explicit local root and source-map accounting. No production strictness, vendor code or coverage policy changed.",
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "noteReview": {
+    "owner": ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.md",
+    "decision": "Extended the existing preflight accounting owner and current unreleased guide; no duplicate note or archived edit."
+  },
+  "baseline": {
+    "at": "2026-10-31T05:40:19.663343+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "at": "2026-10-31T05:44:48.236287+00:00",
+    "source": "Peer direct report; root does not claim production acceptance.",
+    "serving": "Peer R9 remains the reported serving build through B388; B389-B391 are for a later candidate.",
+    "linuxTerminal": "Peer reproduced a real Ubuntu UID988 terminal close returning incomplete process observation, with one retained process/principal slot. No quota clearing or weakened unknown-state rule. Peer owns terminal.ts and process-inspector.ts.",
+    "artifactIsolation": "Root froze all 18 Local inputs, compiled them with Host project references and the package configuration, and proved four emitted files byte-identical to the shared 8-gate build. Later peer terminal source edits are excluded from this validated artifact.",
+    "currentPeerSourceDivergence": [
+      "src/terminal.ts"
+    ],
+    "merge": "Apply the 13 B391 source overrides, retain peer terminal changes, and rebuild the combined Local package for the next candidate. The frozen Local artifact is a validated reference, not an override for a newer peer terminal build.",
+    "otherOpenPeerWork": "REAL001 cold asset delivery remains open. No routine status coordination or root deployment."
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Audit direct admission consumers: SDK private process startup, migration verifier, plugin-market parser Worker, browser Worker, independent model search and Inspector.",
+    "Review remaining remote pipe consumers and resource-only remote execution; continue nonconflicting business permissions.",
+    "Peer owns Linux terminal process observation and REAL001 cold asset delivery. A joint candidate must preserve both owners and rebuild.",
+    "No root paid API, production database operation or deployment. Physical Linux/Windows and fresh owned PostgreSQL acceptance remain unclaimed."
+  ]
+}

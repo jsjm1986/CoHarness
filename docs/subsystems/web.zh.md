@@ -10,6 +10,10 @@ Web 访问 seam 是一个[能力 seam](../../.agents/notes/implemented/architect
 
 搜索与抓取既不共享请求 schema，也不共享业务逻辑，但它们被有意设计为同一个 `ctx.web` 中间层：一个提供方选择策略的所有者、一套中止与错误词汇，以及一个面向产品的「此 harness 如何访问 Web」配置界面。代价是服务上并行的 `searchX`／`fetchX` 方法对；这种并行是有意为之，而不是遗漏了可抽取的共性。提供方注册的是**能力**（`WebSearchProvider` 或 `WebFetchProvider`），而非工具；面向模型的名称、schema、提示词引导与展示全部集中在唯一的消费方 `dsh-tool-web` 中。
 
+## 模型搜索
+
+`ModelSearchRoute` 选择提供方／模型及输出上限。`PreparedModelSearch<Request>` 保留模型配置、可记录的精确输入与延迟执行。`ModelSearchImplementation<Options, Request>` 向 `registerModelSearch()` 提供协议准备、记录和独立传输。共享注册器负责受管模式选择、单个模型许可及插件取消等待。`ModelSearchUsageFields` 为 `modelSearchUsage()` 映射实际协议计数；`resolveModelSearchCredential()` 提供支持取消的凭据结算。提供方设置与支持的协议参见 [web 包参考](../../packages/web/web/README.zh.md)。
+
 ## 搜索请求与结果
 
 每个 seam 请求只携带一个 `query`。消费方 `dsh-tool-web` 接受必填的 `queries` 数组，并把它扇出为多个独立 seam 请求；单元素数组执行一次搜索。`maxResults` 是消费方自有的上限（`dsh-tool-web` 的 `searchMaxResults` 配置，默认 `8`），通过 seam 传递并在返回时强制执行——如果提供方返回超量，seam 截断 `sources[]` 并设置 `truncated`。

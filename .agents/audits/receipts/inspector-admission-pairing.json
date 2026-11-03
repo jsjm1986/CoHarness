@@ -1,0 +1,13 @@
+{
+  "name": "inspector-admission-pairing",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write packages/experimental/inspector/README.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+  "startedAt": "2026-10-23T14:44:55.338254+00:00",
+  "seconds": 3.02,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9448426940718df91371860ec38b661c7e755525a461b657a083559eea6787ec",
+  "inputsAfter": "5e2b6bde82c8e0619f6c8d9783601d4f27441f3b8910e62578d8244280debb95",
+  "outputSha256": "5d2006e541bf401608fd709528b19a1b8ec0bfa9b5ed263e6aaeed0cc6ccc4f3",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write packages/experimental/inspector/README.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md\nverify-translation-pairing: recorded .agents/notes/proposed/feature/2026-10-23-node-resource-admission.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml\nverify-translation-pairing: recorded packages/experimental/inspector/README.i18n.yaml\nverify-translation-pairing: 3 record(s) written; run the check to validate the pairs.\n"
+}

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-permission-presets/README.md
 document:
-  en: 2c3b30d4f6ec05791f55bc6754dabdc39bda44f3
-  zh: 3fac2a9e2dea276d6b60f29b1a657a0d00cee1eb
+  en: 027cbe6257cb5b5cf519f4927f40d144c44751bd
+  zh: e01fa0d3953ccaa35ea5590c71483137904efd9a
 /:
   en: 8702a2f18b13e5e2
   zh: 61495d48365178df
@@ -21,8 +21,8 @@ document:
   en: 7bda231e023c163f
   zh: 06a8e993cc427d65
 /deepseek-ai-dsh-client-ui-permission-presets/desktop-confirmation:
-  en: 31a21ef4ed0b5e68
-  zh: 2f0c008c926409e7
+  en: 19b16f1733b1e5a6
+  zh: 18ddb14ca179b2c0
 /deepseek-ai-dsh-client-ui-permission-presets/model-experience:
   en: 114f37b90a58cffa
   zh: dc99a48a72c975e6

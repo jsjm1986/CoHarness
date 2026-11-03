@@ -1,0 +1,14 @@
+{
+  "name": "document-operation-hygiene",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm run hygiene",
+  "startedAt": "2026-10-25T20:47:47.924751+00:00",
+  "seconds": 336.433,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c88e0b053f4ae1d72b89de0df2b2279f6ec5fc41bb9456ba26a3dce22d285eee",
+  "inputsAfter": "c88e0b053f4ae1d72b89de0df2b2279f6ec5fc41bb9456ba26a3dce22d285eee",
+  "postgresToolDirectory": null,
+  "outputSha256": "4e457eaa52121c521bf0a0c0969c7ae3d4f00e428a6fd03a318168d6b9bb3fe5",
+  "outputTail": "$ tsx scripts/run-gates.ts hygiene\nrun-gates: hygiene running 21 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start vendored links\nrun-gates: PASS vendored links (1.20s)\nrun-gates: start vendor rescope\nrun-gates: PASS vendor rescope (13.00s)\nrun-gates: start knip\nrun-gates: PASS knip (50.75s)\nrun-gates: start publint\nrun-gates: PASS publint (5.94s)\nrun-gates: start constraints\nrun-gates: PASS constraints (1.39s)\nrun-gates: start default product isolation\nrun-gates: PASS default product isolation (6.00s)\nrun-gates: start package dependencies\nrun-gates: PASS package dependencies (196.14s)\nrun-gates: start application entrypoints\nrun-gates: PASS application entrypoints (1.64s)\nrun-gates: start DSH package licenses\nrun-gates: PASS DSH package licenses (0.48s)\nrun-gates: start node-next types\nrun-gates: PASS node-next types (5.18s)\nrun-gates: start optional dependency imports\nrun-gates: PASS optional dependency imports (16.62s)\nrun-gates: start client packages\nrun-gates: PASS client packages (8.48s)\nrun-gates: start client UI i18n\nrun-gates: PASS client UI i18n (1.62s)\nrun-gates: start menu surface backdrop\nrun-gates: PASS menu surface backdrop (0.68s)\nrun-gates: start client route resolution\nrun-gates: PASS client route resolution (3.14s)\nrun-gates: start plugin surfaces\nrun-gates: PASS plugin surfaces (0.59s)\nrun-gates: start proxy-aware dispatchers\nrun-gates: PASS proxy-aware dispatchers (1.15s)\nrun-gates: start plugin record callers\nrun-gates: PASS plugin record callers (8.95s)\nrun-gates: start no new unknown casts\n\n== FAILED no new unknown casts (5.90s) ==\ncommand: pnpm run verify-no-unknown-casts\noutcome: exit 1\n$ tsx scripts/verify-no-unknown-casts.ts\nverify-no-unknown-casts: new assertions to unknown are forbidden. Use a typed value or narrow the input.\n  packages/attachment/userdoc-local/src/upload.ts:333 (3cadc3597855979fe20dfb9e4c231bf41a3497a5620a207247cad0eeda126682)\n[ELIFECYCLE] Command failed with exit code 1.\nrun-gates: start Cordis config\nrun-gates: PASS Cordis config (2.46s)\nrun-gates: start runtime closure\nrun-gates: PASS runtime closure (0.59s)\n\nrun-gates: 20 passed, 1 failed, 0 skipped in 331.91s.\nrun-gates: unsuccessful gates:\n  - FAILED no new unknown casts (5.90s, exit 1)\n    pnpm run verify-no-unknown-casts\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

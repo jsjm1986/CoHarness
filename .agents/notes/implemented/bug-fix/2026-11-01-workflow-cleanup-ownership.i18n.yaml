@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-workflow-cleanup-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-workflow-cleanup-ownership.md
+document:
+  en: 95872b8d8dfe711ad5129970bc6d9f454ee366db
+  zh: 40cb554014ab97f372efad21e3418377991bca5c
+/agent-note-failed-workflow-cleanup-retains-its-owner:
+  en: 4a8dc6ede94497c5
+  zh: f0e36dc94eb39482
+/agent-note-failed-workflow-cleanup-retains-its-owner/problem:
+  en: 45b2353418e5e57a
+  zh: fd296002d4ef4262
+/agent-note-failed-workflow-cleanup-retains-its-owner/decision:
+  en: b5af633568efdb3a
+  zh: 55b6e639e4cb9593
+/agent-note-failed-workflow-cleanup-retains-its-owner/alternatives-considered:
+  en: b41940bd67fa9642
+  zh: e025f92f6fbb2df0
+/agent-note-failed-workflow-cleanup-retains-its-owner/consequences:
+  en: 9d49b9ca4e4db716
+  zh: 89d9e83044a61783
+/agent-note-failed-workflow-cleanup-retains-its-owner/verification:
+  en: 1c8e062a06a7107d
+  zh: 6d132ec390e16530

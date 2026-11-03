@@ -8,10 +8,11 @@
  * @module @deepseek-ai/dsh-experimental-auto-review
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { executionAuthorityOf, type ExecutionState } from '@deepseek-ai/dsh-execution-authority'
+import { executionAuthorityOf, sameExecutionAuthority, type ExecutionAuthority, type ExecutionInheritance, type ExecutionState } from '@deepseek-ai/dsh-execution-authority'
 import type {} from '@deepseek-ai/dsh-agent-instructions'
 import {
   BlockAssembler,
@@ -70,6 +71,61 @@ type AutoReviewDecision =
 
 /** A reviewable managed execution has one verified billing primary. */
 type ReviewExecution = ExecutionState & { readonly primaryActorUserId: number }
+
+/** One review retains its issuer and exact pending tool execution through model dispatch. */
+interface ReviewOwner {
+  readonly agent: Agent
+  readonly exec: ToolExecution
+  readonly deployment: { readonly managed: boolean }
+  readonly issuer: { readonly authority: ExecutionAuthority; readonly execution: ReviewExecution } | undefined
+  refused: boolean
+}
+
+/** A replacement service cannot lend its matching state to an existing review. */
+function assertReviewIssuer(ctx: Context, owner: ReviewOwner): void {
+  try {
+    if (owner.deployment.managed && owner.issuer === undefined) throw new Error('Auto review now requires managed execution authority.')
+    if (!sameExecutionAuthority(executionAuthorityOf(ctx), owner.issuer?.authority)) {
+      throw new Error('Auto review execution authority was replaced.')
+    }
+  } catch (error: unknown) { owner.refused = true; throw error }
+}
+
+/** Recheck eligibility for the same captured pending action without reserving model usage. */
+async function authorizeReview(ctx: Context, owner: ReviewOwner, signal: AbortSignal | undefined): Promise<void> {
+  try {
+    signal?.throwIfAborted()
+    assertReviewIssuer(ctx, owner)
+    const issuer = owner.issuer
+    if (issuer !== undefined) {
+      const current = await issuer.authority.authorize('auto-review', owner.agent, signal, owner.exec)
+      assertReviewIssuer(ctx, owner)
+      signal?.throwIfAborted()
+      if (!unchangedExecution(issuer.execution, current)) throw new Error('Auto review execution changed before admission.')
+    }
+  } catch (error: unknown) { owner.refused = true; throw error }
+}
+
+/** Preserve the attested tool participants rather than recapturing a later Agent state. */
+function reviewScope(agent: Agent, execution: ReviewExecution): ExecutionInheritance {
+  return { parentSessionId: agent.id, inputs: execution.inputs, unverifiedHistory: execution.unverifiedHistory,
+    primaryActorUserId: execution.primaryActorUserId, ...(execution.scopeId === undefined ? {} : { scopeId: execution.scopeId }) }
+}
+
+/** Exact provider-neutral reviewer input retained before model admission. */
+export interface AutoReviewRequestEventData {
+  /** Pending native or PTC inner tool call reviewed by this request. */
+  readonly callId: ToolCallId
+  /** Resolved input, excluding runtime-only cancellation and authorization. */
+  readonly request: Omit<GenerateOptions, 'sessionId' | 'signal' | 'purpose' | 'resourceOrigin' | 'executionIdentity'>
+}
+
+declare module '@deepseek-ai/dsh-session/types' {
+  interface SessionEventMap {
+    /** Log-only input for one independently admitted tool authorization review. */
+    'auto-review/request': AutoReviewRequestEventData
+  }
+}
 
 type ReviewSourceRole =
   | 'human-instruction'
@@ -623,22 +679,35 @@ async function classifyRisk(
   agent: Agent,
   exec: ToolExecution,
   signal: AbortSignal,
-  execution: ReviewExecution | undefined,
+  owner: ReviewOwner,
 ): Promise<AutoReviewDecision> {
+  signal.throwIfAborted()
+  assertReviewIssuer(ctx, owner)
   const cwd = await ctx.workingDirectory.ensure(agent, signal)
+  assertReviewIssuer(ctx, owner)
+  const execution = owner.issuer?.execution
   const snapshot = snapshotAutoReview(agent, exec, cwd)
-  // This review prompt is sent only through ctx.llm.stream and never enters a Session log.
-  const options: GenerateOptions = deepFreeze({
+  const call = await ctx.llm.prepareCall({
     provider: snapshot.provider,
     model: snapshot.model,
+    temperature: 0,
+  }, signal)
+  const request: AutoReviewRequestEventData['request'] = deepFreeze({
+    ...call.config,
     system: REVIEW_POLICY,
     messages: [{
       role: 'user',
       content: [{ type: 'text', text: reviewUserText(snapshot) }],
     }],
-    temperature: 0,
+  })
+  await authorizeReview(ctx, owner, signal)
+  signal.throwIfAborted()
+  agent.session.append('auto-review/request', { callId: exec.callId, request })
+  return readDecision(call.stream(deepFreeze({
+    ...request,
     sessionId: agent.session.id,
     purpose: 'auto-review',
+    resourceOrigin: 'execution',
     ...execution === undefined ? {} : {
       executionIdentity: {
         inputs: execution.inputs,
@@ -646,8 +715,7 @@ async function classifyRisk(
       },
     },
     signal,
-  })
-  return readDecision(ctx.llm.stream(options))
+  })))
 }
 
 /** Materialize the fixed model-facing final Auto denial plus optional UI detail. */
@@ -710,9 +778,16 @@ export function apply(ctx: Context): void {
   let accepting = true
   const active = new Set<Promise<void>>()
   const lifecycle = new AbortController()
-  let managed = ctx.get('executionAuthorityRequired') === true
+  const reviews = new AsyncLocalStorage<ReviewOwner>()
+  const deployment = { managed: ctx.get('executionAuthorityRequired') === true || ctx.get('executionAuthority') !== undefined }
+  ctx.inject(['executionAuthority'], () => { deployment.managed = true })
 
   ctx.effect(function* () {
+    yield ctx.on('llm/pre-dispatch', async (options, next) => {
+      const owner = reviews.getStore()
+      if (owner !== undefined) await authorizeReview(ctx, owner, options.signal)
+      await next()
+    }, { global: true })
     const stopListener = ctx.on('tools/pre-execute', async (exec, next): Promise<PreToolDecision> => {
       const agent = exec.agent
       if (agent === undefined || (exec.parent === undefined && exec.name === RUN_CODE_NAME)) {
@@ -729,29 +804,39 @@ export function apply(ctx: Context): void {
       active.add(completed.promise)
       try {
         const signal = AbortSignal.any([exec.signal, lifecycle.signal])
-        managed ||= ctx.get('executionAuthorityRequired') === true
-        let execution: ReviewExecution | undefined
+        if (isAborted(signal)) return { kind: 'cancel' }
+        deployment.managed ||= ctx.get('executionAuthorityRequired') === true
+        let issuer: ReviewOwner['issuer']
         try {
           const authority = executionAuthorityOf(ctx)
-          if (managed && authority === undefined) return eligibilityDenied(exec)
-          managed ||= authority !== undefined
-          const current = await authority?.authorize('auto-review', agent, signal, exec)
-          if (current !== undefined) {
+          if (deployment.managed && authority === undefined) return eligibilityDenied(exec)
+          deployment.managed ||= authority !== undefined
+          if (authority !== undefined) {
+            const current = await authority.authorize('auto-review', agent, signal, exec)
+            if (isAborted(signal)) return { kind: 'cancel' }
+            if (!sameExecutionAuthority(executionAuthorityOf(ctx), authority)) return eligibilityDenied(exec)
             if (current.unverifiedHistory || current.primaryActorUserId === undefined) return eligibilityDenied(exec)
-            execution = { ...current, primaryActorUserId: current.primaryActorUserId }
+            issuer = { authority, execution: { ...current, primaryActorUserId: current.primaryActorUserId } }
           }
         } catch {
           // Missing providers, revoked grants, and failed fresh checks cannot authorize Auto.
-          return isAborted(lifecycle.signal) ? { kind: 'cancel' } : eligibilityDenied(exec)
+          return isAborted(signal) ? { kind: 'cancel' } : eligibilityDenied(exec)
         }
-        if (isAborted(signal)) return { kind: 'cancel' }
-        const review = await classifyRisk(ctx, agent, exec, signal, execution).then(
+        const owner: ReviewOwner = { agent, exec, deployment, issuer, refused: false }
+        const classify = () => reviews.run(owner, () => classifyRisk(ctx, agent, exec, signal, owner))
+        const work = Promise.resolve().then(() => {
+          if (issuer === undefined) return classify()
+          try { return issuer.authority.runCaptured(agent, reviewScope(agent, issuer.execution), classify) }
+          catch (error: unknown) { owner.refused = true; throw error }
+        })
+        const review = await work.then(
           decision => ({ ok: true as const, decision }),
           (error: unknown) => ({ ok: false as const, error }),
         )
         // A settled review still loses to caller cancellation: the abandoned
         // call reports cancel rather than the reviewer's late outcome.
         if (isAborted(signal)) return { kind: 'cancel' }
+        if (owner.refused) return eligibilityDenied(exec)
         if (!review.ok) return failed(exec, review.error)
         const { decision } = review
         // The permission owner pins an approval policy into every published Session.
@@ -759,18 +844,13 @@ export function apply(ctx: Context): void {
           return denied(exec, decision.reason)
         }
         const downstream = await next()
-        if (isAborted(lifecycle.signal)) return { kind: 'cancel' }
-        if (execution !== undefined || ctx.get('executionAuthorityRequired') === true) {
-          try {
-            if (execution === undefined) return eligibilityDenied(exec)
-            const authority = executionAuthorityOf(ctx)
-            if (authority === undefined) return eligibilityDenied(exec)
-            const current = await authority.authorize('auto-review', agent, signal, exec)
-            if (!unchangedExecution(execution, current)) return eligibilityDenied(exec)
-          } catch {
-            // Revoke or provider failure during review prevents the pending tool body.
-            return isAborted(lifecycle.signal) ? { kind: 'cancel' } : eligibilityDenied(exec)
-          }
+        try {
+          await authorizeReview(ctx, owner, signal)
+          assertReviewIssuer(ctx, owner)
+        }
+        catch {
+          // Eligibility refusal cannot execute a pending tool body.
+          return isAborted(signal) ? { kind: 'cancel' } : eligibilityDenied(exec)
         }
         if (isAborted(signal)) return { kind: 'cancel' }
         if (decision.decision === 'allow' || downstream.kind !== 'allow') return downstream
@@ -790,12 +870,14 @@ export function apply(ctx: Context): void {
       try {
         for (const session of ctx.sessions.list()) {
           if (permissionPresets.current(session) !== AUTO_PRESET) continue
-          const fallback = managed || ctx.get('executionAuthorityRequired') === true ? 'workspace-write' : 'danger-full-access'
+          const requiresAuthority = deployment.managed || ctx.get('executionAuthorityRequired') === true || ctx.get('executionAuthority') !== undefined
+          const fallback = requiresAuthority ? 'workspace-write' : 'danger-full-access'
           permissionPresets.set(session, fallback)
         }
       } finally {
         lifecycle.abort(new Error('auto-review integration disposed'))
         await Promise.allSettled([...active])
+        reviews.disable()
       }
     }
   }, 'auto-review lifecycle')

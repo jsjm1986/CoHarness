@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-22-verified-execution-participants.md
 document:
-  en: babd6a255a711c19f7a21b0926027bfceedefb75
-  zh: 2f2648a346ae58264a3e6683ccdc6b2e8f8da628
+  en: 8b89bad9c38601e9996b255e776d707fb1879698
+  zh: 34b5e4b3ca948098dcd27f9f48d604501a058489
 /agent-note-verified-participants-for-managed-execution:
   en: 1336bc185455c184
   zh: fd68fb33e9e2a148
@@ -12,11 +12,11 @@ document:
   en: a79a61848c57e0a5
   zh: b7b0e3d150e74986
 /agent-note-verified-participants-for-managed-execution/decision:
-  en: d3d78c2ea84e3fba
-  zh: 9dbb06a56a6163e8
+  en: b9ca654fbe145195
+  zh: a608755647a5d02f
 /agent-note-verified-participants-for-managed-execution/alternatives-considered:
-  en: 0c469861387c99de
-  zh: c516fbab43da858d
+  en: 229d7539ea2158e8
+  zh: caab9ac4112e47b9
 /agent-note-verified-participants-for-managed-execution/consequences:
   en: 4a3bfe4ae90353f7
   zh: e7cdada367baaaed

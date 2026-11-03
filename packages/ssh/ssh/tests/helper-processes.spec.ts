@@ -274,7 +274,7 @@ describe.skipIf(process.platform === 'win32')('SSH helper process settlement', (
       await test.owner.start(run.id)
       await expect(test.owner.close()).rejects.toThrow('SSH remote process cleanup failed')
       expect(child.terminate).toHaveBeenCalled()
-    } finally { await test.close() }
+    } finally { child.waitForExit.mockResolvedValue(true); await test.close() }
   })
 
   it('expires an unused reservation and prevents launch during helper shutdown', async () => {
@@ -341,7 +341,8 @@ describe.skipIf(process.platform === 'win32')('SSH helper process settlement', (
       await expect(test.owner.wait(run.id)).rejects.toThrow('terminal cleanup is unknown')
       await expect(test.owner.prepare(ordinaryRequest)).rejects.toThrow('capacity unavailable')
       await expect(test.owner.close()).rejects.toThrow('SSH remote process cleanup failed')
-    } finally { await test.close() }
+      await expect(test.owner.close()).rejects.toThrow('SSH remote process cleanup failed')
+    } finally { child.terminate.mockResolvedValue(undefined); await test.close() }
   })
 
   it('preserves an ordinary driver failure through direct-result and cleanup observations', async () => {
@@ -356,7 +357,7 @@ describe.skipIf(process.platform === 'win32')('SSH helper process settlement', (
       child.stdout.end(); child.stderr.end()
       await failed
       await expect(test.owner.close()).rejects.toThrow('SSH remote process cleanup failed')
-    } finally { await test.close() }
+    } finally { child.waitForExit.mockResolvedValue(true); await test.close() }
   })
 
   it('observes an expired reservation cleanup error without an unhandled rejection', async () => {
@@ -367,6 +368,9 @@ describe.skipIf(process.platform === 'win32')('SSH helper process settlement', (
       vi.mocked(rm).mockClear().mockRejectedValueOnce(new Error('temporary directory became unavailable'))
       await vi.advanceTimersByTimeAsync(5000)
       await vi.waitFor(() => { expect(rm).toHaveBeenCalledOnce() })
+      await expect(test.owner.start(run.id)).rejects.toThrow('reservation closed')
+      expect(test.spawn).not.toHaveBeenCalled()
+      await test.owner.terminate(run.id)
       await expect(test.owner.start(run.id)).rejects.toThrow('Unknown or expired')
     } finally { await test.close(); vi.useRealTimers() }
   })

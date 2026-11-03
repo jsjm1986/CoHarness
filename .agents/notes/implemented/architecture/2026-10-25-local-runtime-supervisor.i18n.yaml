@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-25-local-runtime-supervisor.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-25-local-runtime-supervisor.md
+document:
+  en: a30a7c6f507a2f63f47c352062593c9023f142e4
+  zh: fd7c2d9b8a867cbba03b5c3ca26d7b1e88782628
+/agent-note-recoverable-local-runtime-supervision:
+  en: 29ab2d73c4347adc
+  zh: 67b035963b6974c2
+/agent-note-recoverable-local-runtime-supervision/problem:
+  en: 662c4f89e67c6a7f
+  zh: 51ab41ad51c816da
+/agent-note-recoverable-local-runtime-supervision/decision:
+  en: 8dae82477283d884
+  zh: ac50acdf7f689b05
+/agent-note-recoverable-local-runtime-supervision/alternatives-considered:
+  en: 6973afdc246d8683
+  zh: 5dde4c3726312b3b
+/agent-note-recoverable-local-runtime-supervision/consequences:
+  en: 48fb20eae2148975
+  zh: fa271af04b08af7c
+/agent-note-recoverable-local-runtime-supervision/verification:
+  en: 4fe9b2888e5379f1
+  zh: 565a8498d54b6bac

@@ -3,17 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/directory-picker-native/README.md
 document:
-  en: 3334d086e71b7d01a506fa72090ec9db581e7956
-  zh: baf1c339bd99e2c4d6982c5e00315d3240ae118f
+  en: 92428448b41d461053abc34e9a645927679f1172
+  zh: e49e759b089379205b30a677d6a453d12b1f18e8
 /:
   en: da76a4b2d2d7b566
   zh: 61495d48365178df
 /deepseek-ai-dsh-host-directory-picker-native:
-  en: c10734413a09d791
-  zh: 7745a859aff648ab
+  en: ea8793f8ea77d271
+  zh: 21ae38607d0101da
 /deepseek-ai-dsh-host-directory-picker-native/summary:
-  en: d02a09798cbe9a37
-  zh: c0231f9dacf8f6d0
+  en: f9531cd8614cb588
+  zh: daa1772bc36d365e
 /deepseek-ai-dsh-host-directory-picker-native/table-of-contents:
   en: b4683d2a53256fda
   zh: 705ecbe0b6cabec6

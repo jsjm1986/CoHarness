@@ -1,0 +1,157 @@
+{
+  "at": "2026-10-31T12:00:42.178505+00:00",
+  "finding": "B403",
+  "title": "SSH helper acknowledges unfinished cleanup and loses retryable ownership after failure",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "paths": [
+    "packages/ssh/ssh/src/helper.ts",
+    "packages/ssh/ssh/src/helper-processes.ts",
+    "packages/ssh/ssh/tests/helper-cleanup-join.spec.ts",
+    "packages/ssh/ssh/tests/helper-processes.spec.ts",
+    "packages/ssh/ssh/tests/helper-boundaries.spec.ts",
+    "packages/ssh/ssh/tests/fixtures/cleanup-fault.mjs",
+    "packages/ssh/ssh/tests/fixtures/cleanup-recovery.mjs",
+    "scripts/coverage-policy.ts",
+    "scripts/coverage-selection.spec.ts",
+    "snapshots/session/ssh-helper-cleanup-recovery.snapshot.ts",
+    "snapshots/session/ssh-helper-cleanup-recovery/expected.jsonl",
+    "packages/ssh/ssh/README.md",
+    "packages/ssh/ssh/README.zh.md",
+    "packages/ssh/ssh/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-ssh-helper-cleanup-ownership.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-ssh-helper-cleanup-ownership.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-ssh-helper-cleanup-ownership.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-helper-cleanup-ownership/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-helper-cleanup-ownership/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-helper-cleanup-ownership/guide.i18n.yaml"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-full-module-coverage-first.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-source-application-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-package-compile.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-package-bundle.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-old-observation.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-built-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-built-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-existing-admission-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-existing-admission-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-policy-selection.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-lint-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-typed-tests.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-test-format-verified.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-own-doc-pairing.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-global-pairing-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-export-jsdoc.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-catalog.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/ssh-cleanup-origin-fetch-final.json"
+  ],
+  "causalEvidence": "Three pre-change regressions show overlapping close returns before held native-success/native-failure finalization, and repeated close leaves a failed reservation directory. The same final runnable application against the complete old compiled SSH graph cannot acknowledge retry, loses reservation evidence or leaves the private root, and exits127. Updated native wire cases retain evidence, refuse new effects, acknowledge retry/repeat, exit0 and complete one original host permit only after native range exit.",
+  "behavior": "Stable coalesced cleanup callbacks remain owned until success. Closing denies new work permanently while failures allow a later cleanup attempt. Helper providers/private root remain available while process cleanup is unconfirmed; a later close can retry without replaying effects. Direct results keep their independent bounded retention.",
+  "verification": {
+    "uniqueRelatedCases": 308,
+    "sshPackageCases": 278,
+    "sshPackageFiles": 29,
+    "newNativeSnapshotCases": 1,
+    "coverageSelectionCases": 8,
+    "readOnlySessionInspectorCases": 21,
+    "standardCoverage": {
+      "packages/ssh/ssh/src/helper-processes.ts": {
+        "statements": [
+          321,
+          321
+        ],
+        "branches": [
+          114,
+          114
+        ],
+        "functions": [
+          77,
+          77
+        ],
+        "lines": [
+          251,
+          251
+        ]
+      },
+      "packages/ssh/ssh/src/helper.ts": {
+        "statements": [
+          201,
+          201
+        ],
+        "branches": [
+          137,
+          137
+        ],
+        "functions": [
+          17,
+          17
+        ],
+        "lines": [
+          160,
+          160
+        ]
+      }
+    },
+    "coverageLimits": "Both edited helper modules meet all four per-file100% metrics on the POSIX host. The prior helper-processes whole-file POSIX debt exemption is removed, with platform-selection regression coverage. No thresholds are lowered and unsupported Windows carriers remain excluded.",
+    "build": "Only the SSH package is compiled and its normal workspace/Typert build emits the four declared entries and reachable shared chunk. No full repository build, native executable packaging or target deployment is claimed.",
+    "native": "Source and plain Node22/24 replay two actual helper wire shutdown scenarios; Node22/24 also replay the existing ten process/terminal admission-owner rows. Hosts use a private local carrier, not physical multi-computer/SSHD acceptance.",
+    "documentation": "Nineteen quick gates passed; the only failing leaf saw peer client-runtime/note English edits in progress. All three owned pairs pass, and the later corpus-wide leaf passes2022 pairs. These are separate actual checks; a fresh all20 single-command pass is not claimed.",
+    "typedTests": "Three edited helper test modules compile with the SSH package face and declared project references, with zero local or transitive diagnostics. Final lint and six cleanup recovery cases pass.",
+    "guideEnglishWords": 177,
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "evidenceSetupCorrections": [
+    "The first wire fixture tried overlapping close requests beyond the reserved management credit; the final test retries sequentially and the owner-level tests cover overlap.",
+    "The first runnable fixture supplied origin instead of the declared resourceOrigin field, and its permit counter initially counted calls rather than idempotent completion. Both fixture issues are corrected; final source/Node22/24 rows complete one permit.",
+    "Obsolete tests unconditionally deleted private evidence or silently accepted failed teardown. They now retain failure, recover the external observation before fixture cleanup and verify retry. Test formatting and unsafe matcher assignments are corrected before final lint/types."
+  ],
+  "readOnlyReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/session-inspector-data-flow-review.json",
+  "peerReports": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/peer-r14-report.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/peer-r14-followup-report.json"
+  ],
+  "noteReview": {
+    "owner": ".agents/notes/implemented/bug-fix/2026-10-31-ssh-helper-cleanup-ownership.md",
+    "decision": "Keep the new retryable ownership and dependency-release rule active. Existing POSIX SSH architecture records distinct composition decisions; no archive changes."
+  },
+  "baseline": {
+    "at": "2026-10-31T11:54:32.430435+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "scope": "SSH helper, its tests, selected coverage policy and documentation only; no peer reserved product source edited.",
+    "merge": "Merge twenty B403 delta paths and nine matching unchanged SSH source/manifest/build prerequisites onto the B402 final typed snapshot. Rebuild all four SSH package entries and retain their reachable stream-security chunk; seven reference artifacts include that runtime closure and the two changed type-plane JS files. Update the installed helper digest after rebuilding its complete distribution. Only the helper-processes POSIX coverage exemption is removed; thresholds and unsupported Windows scope stay unchanged. Preserve peer client-runtime and Local/Gateway/UI edits and newer outputs; B398 onward belong to the next matching backend freeze, not the serving R14 Admin overlay."
+  },
+  "matchingSourcePrerequisites": [
+    "packages/ssh/ssh/src/stream-security.ts",
+    "packages/ssh/ssh/src/schemas.ts",
+    "packages/ssh/ssh/src/protocol.ts",
+    "packages/ssh/ssh/src/index.ts",
+    "packages/ssh/ssh/src/helper-entry.ts",
+    "packages/ssh/ssh/package.json",
+    "packages/ssh/ssh/tsconfig.json",
+    "packages/ssh/ssh/tsdown.config.ts",
+    "tsdown.config.ts"
+  ],
+  "externalSourceChangesExcluded": {
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "7a54b9e99352908283ee973e2dcd7707c9d7a7ba312ad9761311219172a47569",
+    "packages/subprocess/subprocess-local/README.md": "223b3dfcdc9732041ea508d9d131b9505e98abca53ea60dbb098851bd2c74629",
+    "packages/subprocess/subprocess-local/README.zh.md": "f13592bad150012aaa31e62226119ed4f22772b4bca5174936f988e1ae0cd407"
+  },
+  "externalArtifactChangesExcluded": {
+    "packages/subprocess/subprocess-local/lib/index.js": "5fbdc054c9a1ef7799f7da80b030e5db88ffdb3639b5e5b0f2a908d5e183e950"
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Continue SSH asynchronous pipe/stream allocation, resource-only remote execution and remaining allocation consumers.",
+    "Continue native containment and other business permissions; named Session Inspector binding consumers do not complete upstream identity or GUI acceptance.",
+    "Peer owns R14 client-runtime submission admission, large-directory historical-review performance, Gateway topology/auth/resource and reserved Local/UI paths. Preserve per-user model authorization.",
+    "Real paid API validation stays deferred; no root deployment, production database or physical Linux/Windows acceptance is claimed."
+  ]
+}

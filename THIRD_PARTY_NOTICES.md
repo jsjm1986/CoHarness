@@ -47,7 +47,7 @@ External packages installed for runtime use or distributed inside the prebuilt b
 | [`@joplin/turndown-plugin-gfm`](https://github.com/laurent22/joplin-turndown-plugin-gfm) | MIT |
 | [`@jridgewell/gen-mapping`](https://github.com/jridgewell/sourcemaps) | MIT |
 | [`@js-temporal/polyfill`](https://github.com/js-temporal/temporal-polyfill) | ISC |
-| [`@modelcontextprotocol/client`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
+| [`@modelcontextprotocol/client`](https://github.com/modelcontextprotocol/typescript-sdk) | Apache-2.0 |
 | [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
 | [`@noble/hashes`](https://github.com/paulmillr/noble-hashes) | MIT |
 | [`@novnc/novnc`](https://github.com/novnc/noVNC) | MPL-2.0 |
@@ -116,6 +116,7 @@ External packages installed for runtime use or distributed inside the prebuilt b
 | [`papaparse`](https://github.com/mholt/PapaParse) | MIT |
 | [`pdfjs-dist`](https://github.com/mozilla/pdf.js) | Apache-2.0 |
 | [`picomatch`](https://github.com/micromatch/picomatch) | MIT |
+| [`playwright-core`](https://github.com/microsoft/playwright) | Apache-2.0 |
 | [`react`](https://github.com/react/react) | MIT |
 | [`react-dom`](https://github.com/react/react) | MIT |
 | [`resolve.exports`](https://github.com/lukeed/resolve.exports) | MIT |
@@ -192,7 +193,7 @@ External packages **directly declared** for development, tests, types, or toolin
 | [`@braintree/sanitize-url`](https://github.com/braintree/sanitize-url) | MIT |
 | [`@capacitor/cli`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@modelcontextprotocol/node`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
-| [`@modelcontextprotocol/server`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
+| [`@modelcontextprotocol/server`](https://github.com/modelcontextprotocol/typescript-sdk) | Apache-2.0 |
 | [`@modelcontextprotocol/server-everything`](https://github.com/modelcontextprotocol/servers) | MIT / Apache-2.0 |
 | [`@modelcontextprotocol/server-filesystem`](https://github.com/modelcontextprotocol/servers) | MIT / Apache-2.0 |
 | [`@panzoom/panzoom`](https://github.com/timmywil/panzoom) | MIT |
@@ -235,12 +236,14 @@ External packages **directly declared** for development, tests, types, or toolin
 | [`knip`](https://github.com/webpro-nl/knip) | ISC |
 | [`lefthook`](https://github.com/evilmartians/lefthook) | MIT |
 | [`lightningcss`](https://github.com/parcel-bundler/lightningcss) | MPL-2.0 |
+| [`material-icon-theme`](https://github.com/material-extensions/vscode-material-icon-theme) | MIT |
 | [`mermaid`](https://github.com/mermaid-js/mermaid) | MIT |
 | [`oxlint`](https://github.com/oxc-project/oxc) | MIT |
 | [`oxlint-tsgolint`](https://github.com/oxc-project/tsgolint) | MIT |
 | [`playwright`](https://github.com/microsoft/playwright) | Apache-2.0 |
 | [`pnpm`](https://github.com/pnpm/pnpm) | MIT |
 | [`publint`](https://github.com/publint/publint) | MIT |
+| [`punycode`](https://github.com/mathiasbynens/punycode.js) | MIT |
 | [`selfsigned`](https://github.com/jfromaniello/selfsigned) | MIT |
 | [`smol-toml`](https://github.com/squirrelchat/smol-toml) | BSD-3-Clause |
 | [`spdx-expression-parse`](https://github.com/jslicense/spdx-expression-parse.js) | MIT |

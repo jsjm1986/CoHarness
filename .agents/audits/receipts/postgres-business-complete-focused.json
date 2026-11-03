@@ -1,0 +1,14 @@
+{
+  "name": "postgres-business-complete-focused",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/admin-business-postgres.spec.ts tests/auth-postgres.spec.ts tests/postgres.spec.ts tests/project-service-postgres.spec.ts tests/project-activity-postgres.spec.ts --no-file-parallelism --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-24T23:51:50.593242+00:00",
+  "seconds": 11.069,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4be3441aedec2b2f56e77f10facd6eaf32ba701667eb5e80378b87af44e46d54",
+  "inputsAfter": "4be3441aedec2b2f56e77f10facd6eaf32ba701667eb5e80378b87af44e46d54",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "b6e2ddeb1a18ad2c95f9f1a8456773f2d918093e7159e6f8aae42b7f020e72e3",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  5 passed (5)\n      Tests  135 passed (135)\n   Start at  07:51:51\n   Duration  10.36s (transform 1.21s, setup 0ms, import 1.98s, tests 8.06s, environment 0ms)\n\n"
+}

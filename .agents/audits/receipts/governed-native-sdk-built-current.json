@@ -1,0 +1,14 @@
+{
+  "name": "governed-native-sdk-built-current",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=lib node_modules/.bin/vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/governed-native-model.snapshot.ts snapshots/sdk/auto-review-model.snapshot.ts snapshots/sdk/memory-auxiliary.snapshot.ts --retry=0",
+  "startedAt": "2026-10-24T07:14:08.932669+00:00",
+  "seconds": 4.333,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ab9ae91b7fa70aee5237f3dc4fbf02cec1533dc84a292115283781d18161c378",
+  "inputsAfter": "ab9ae91b7fa70aee5237f3dc4fbf02cec1533dc84a292115283781d18161c378",
+  "postgresToolDirectory": null,
+  "outputSha256": "96e7a501510ec95540f7e4a020f848c875cdd175e9ae6461b659afdd420a049f",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  3 passed (3)\n      Tests  3 passed (3)\n   Start at  15:14:09\n   Duration  3.37s (transform 3.93s, setup 532ms, import 5.23s, tests 3.80s, environment 0ms)\n\n"
+}

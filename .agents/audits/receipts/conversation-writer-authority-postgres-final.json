@@ -1,0 +1,14 @@
+{
+  "name": "conversation-writer-authority-postgres-final",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-service-postgres.spec.ts tests/steward.spec.ts tests/postgres.spec.ts tests/admin-business-postgres.spec.ts tests/access-invalidation.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-24T00:51:18.657174+00:00",
+  "seconds": 37.21,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "14b469ff4d5420098bc3c6404c998e63287360abdd028108b42bec4a9b3c2305",
+  "inputsAfter": "14b469ff4d5420098bc3c6404c998e63287360abdd028108b42bec4a9b3c2305",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "216c54122f6b75984816c43dde27cd246c282a235d8f199f73e22c2ea45ae496",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/project-service-postgres.spec.ts (33 tests | 1 failed) 14172ms\n     × rechecks 'visibility' revocation after waiting to 'append' a project conversation 10122ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/project-service-postgres.spec.ts > PostgreSQL project creation and mutations > rechecks 'visibility' revocation after waiting to 'append' a project conversation\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ tests/project-service-postgres.spec.ts:204:87\n    202|         visibility: () => collaboration.setVisibility(f.creator, sessi…\n    203|       revoked = revoke[kind]().catch((error: unknown) => error)\n    204|       await expect.poll(() => waiting(mutation.applicationName), { tim…\n       |                                                                                       ^\n    205|       created = fetch(`${base}/internal/runtime/session/append`, { met…\n    206|         headers: { authorization: `Bearer ${token}`, 'content-type': '…\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ tests/project-service-postgres.spec.ts:204:7\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 4 passed (5)\n      Tests  1 failed | 148 passed (149)\n   Start at  08:51:19\n   Duration  36.04s (transform 1.82s, setup 0ms, import 3.05s, tests 32.50s, environment 0ms)\n\n"
+}

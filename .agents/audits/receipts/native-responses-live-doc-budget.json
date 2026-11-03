@@ -1,0 +1,14 @@
+{
+  "name": "native-responses-live-doc-budget",
+  "cwd": ".",
+  "command": "pnpm run verify-doc-budgets",
+  "startedAt": "2026-10-25T04:19:17.786044+00:00",
+  "seconds": 2.084,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "69d0aac1e58ab946e167776d6db6500bca8a99bfed632c9030f3703314d00b3a",
+  "inputsAfter": "69d0aac1e58ab946e167776d6db6500bca8a99bfed632c9030f3703314d00b3a",
+  "postgresToolDirectory": null,
+  "outputSha256": "9ada1148db3727a6cec3cd7554d7b64568079137376bd0d09ebb712531b1f852",
+  "outputTail": "$ tsx scripts/verify-doc-budgets.ts\nverify-doc-budgets: 8 budgeted docs within ceiling.\n"
+}

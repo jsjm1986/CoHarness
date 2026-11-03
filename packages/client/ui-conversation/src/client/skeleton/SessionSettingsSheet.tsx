@@ -1,5 +1,6 @@
-import { useEffect, useId, type ReactNode } from 'react'
-import { IconCloseOutline16, MobileSheetBackdrop } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useId, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { IconCloseOutline16, MobileSheetBackdrop, useModalLayer } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './SessionSettingsSheet.module.css'
 
 /** Session-level control section shown by the compact settings sheet. */
@@ -36,27 +37,18 @@ export function SessionSettingsSheet({
   onSectionChange: (section: SessionSettingsSectionId) => void
 }) {
   const id = useId()
-
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onClose()
-      }
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => { document.removeEventListener('keydown', onKeyDown) }
-  }, [onClose, open])
-
-  if (!open) return null
+  const sheet = useRef<HTMLElement>(null)
   const active = sections.find(section => section.id === activeSection) ?? sections[0]
-  if (active === undefined) return null
+  const visible = open && active !== undefined
+  useModalLayer(sheet, visible, onClose)
+  if (!visible) return null
 
-  return (
+  return createPortal((
     <>
       <MobileSheetBackdrop onClose={onClose} />
       <section
+        ref={sheet}
+        tabIndex={-1}
         className={css.sheet}
         role="dialog"
         aria-modal="true"
@@ -66,7 +58,7 @@ export function SessionSettingsSheet({
         <div className={css.handle} aria-hidden="true" />
         <header className={css.header}>
           <h2 id={`${id}-title`} className={css.title}>{title}</h2>
-          <button type="button" className={css.close} aria-label={closeLabel} autoFocus onClick={onClose}>
+          <button type="button" className={css.close} aria-label={closeLabel} data-modal-autofocus="" onClick={onClose}>
             <IconCloseOutline16 size={20} />
           </button>
         </header>
@@ -92,5 +84,5 @@ export function SessionSettingsSheet({
         </div>
       </section>
     </>
-  )
+  ), document.body)
 }

@@ -1,0 +1,14 @@
+{
+  "name": "sonar-doc-pairs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write packages/web/web/README.md packages/web/web-search-perplexity/README.md packages/llm/llm-pi-ai/README.md docs/subsystems/web.md .agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.md docs/persistence-changes/2026-10-24-prepared-model-operations.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/governed-native-search/guide.md",
+  "startedAt": "2026-10-24T09:27:23.060169+00:00",
+  "seconds": 1.762,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cc99d8dd5ab56c67b813fe805d963e6f59ea8c91934d23db74f5edeb68225070",
+  "inputsAfter": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "postgresToolDirectory": null,
+  "outputSha256": "71648d0bb850fae83f8308b6c1b9f34e57431eb4bf857f450a4ac4b899e8afd0",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.i18n.yaml\nverify-translation-pairing: recorded docs/subsystems/web.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/governed-native-search/guide.i18n.yaml\nverify-translation-pairing: recorded packages/llm/llm-pi-ai/README.i18n.yaml\nverify-translation-pairing: recorded packages/web/web-search-perplexity/README.i18n.yaml\nverify-translation-pairing: recorded packages/web/web/README.i18n.yaml\nverify-translation-pairing: 6 record(s) written; run the check to validate the pairs.\n"
+}

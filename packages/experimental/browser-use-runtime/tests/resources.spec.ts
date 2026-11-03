@@ -4,7 +4,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SessionResources } from '../src/index.ts'
+import { ResourceAcquisitionCleanupError, SessionResources } from '../src/index.ts'
 
 const contexts: Context[] = []
 
@@ -112,6 +112,49 @@ describe('Session browser resource ownership', () => {
     await a.dispose()
     await resources.dispose()
     expect(close).toHaveBeenCalledTimes(1)
+  })
+
+  it('retains failed acquisition ownership until its transferred cleanup completes', async () => {
+    const { ctx, owner } = await fixture()
+    const a = await owner('failed-acquisition'), b = await owner('next-owner')
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const cleanup = vi.fn(async () => { entered.resolve(undefined); await release.promise })
+    const failure = new ResourceAcquisitionCleanupError(cleanup, new Error('Worker remains alive'))
+    const open = vi.fn().mockRejectedValueOnce(failure).mockResolvedValue({ value: 1, close: async () => {} })
+    const resources = new SessionResources<number>(ctx, { label: 'test', exclusive: true, open })
+    await expect(resources.get(a.agent)).rejects.toBe(failure)
+    await expect(resources.get(a.agent)).rejects.toBe(failure)
+    await expect(resources.get(b.agent)).rejects.toThrow('already reserved')
+    const closing = a.dispose()
+    try {
+      await entered.promise
+      expect(resources.available(b.agent)).toBe(false)
+      expect(open).toHaveBeenCalledOnce()
+    } finally { release.resolve(undefined); await closing }
+    expect(cleanup).toHaveBeenCalledOnce()
+    expect(await resources.get(b.agent)).toBe(1)
+    await resources.dispose()
+  })
+
+  it('rejects provider disposal and preserves exclusivity after failed acquisition cleanup fails', async () => {
+    const { ctx, owner } = await fixture()
+    const a = await owner('failed-acquisition'), b = await owner('next-owner')
+    const cleanup = vi.fn(async (): Promise<void> => { throw new Error('Worker still alive') })
+    const resources = new SessionResources(ctx, {
+      label: 'test', exclusive: true,
+      async open() { throw new ResourceAcquisitionCleanupError(cleanup, new Error('initialization failed')) },
+    })
+    await expect(resources.get(a.agent)).rejects.toBeInstanceOf(ResourceAcquisitionCleanupError)
+    await a.dispose()
+    expect(resources.available(b.agent)).toBe(false)
+    await expect(resources.get(b.agent)).rejects.toThrow('already reserved')
+    await expect(resources.dispose()).rejects.toThrow('browser cleanup failed')
+    expect(cleanup).toHaveBeenCalledTimes(2)
+    cleanup.mockResolvedValue(undefined)
+    await resources.dispose()
+    expect(cleanup).toHaveBeenCalledTimes(3)
+    expect(resources.available(b.agent)).toBe(false)
+    await expect(resources.get(b.agent)).rejects.toThrow('not a live browser owner')
   })
 
   it('quiesces disposal when an in-flight acquisition fails during rollback', async () => {
@@ -330,6 +373,23 @@ describe('Session browser resource ownership', () => {
     await expect(resources.get(b.agent)).rejects.toThrow('already reserved')
     await expect(resources.dispose()).rejects.toThrow('browser cleanup failed')
     await expect(resources.get(b.agent)).rejects.toThrow('not a live browser owner')
+  })
+
+  it('retries failed provider cleanup while keeping acquisition permanently stopped', async () => {
+    const { ctx, owner } = await fixture(), a = await owner('provider-retry'), b = await owner('later-owner')
+    const close = vi.fn<() => Promise<void>>().mockRejectedValueOnce(new Error('completion report unavailable')).mockResolvedValue(undefined)
+    const resources = new SessionResources(ctx, {
+      label: 'retry', exclusive: true, open: async () => ({ value: 1, close }),
+    })
+    await resources.get(a.agent)
+    await expect(resources.dispose()).rejects.toThrow('browser cleanup failed')
+    expect(resources.available(a.agent)).toBe(false)
+    expect(resources.available(b.agent)).toBe(false)
+    await expect(resources.get(b.agent)).rejects.toThrow('not a live browser owner')
+    await resources.dispose()
+    expect(close).toHaveBeenCalledTimes(2)
+    await a.dispose()
+    expect(close).toHaveBeenCalledTimes(2)
   })
 })
 

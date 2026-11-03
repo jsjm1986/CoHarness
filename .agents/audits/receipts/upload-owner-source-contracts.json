@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-source-contracts",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-no-unknown-casts.ts",
+  "startedAt": "2026-10-25T10:27:06.182393+00:00",
+  "seconds": 7.755,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "796b292af8022f51d6932e70b74c52ece82bbe22e2ab4fff4061a8309bd9b75d",
+  "inputsAfter": "796b292af8022f51d6932e70b74c52ece82bbe22e2ab4fff4061a8309bd9b75d",
+  "postgresToolDirectory": null,
+  "outputSha256": "78bcf14320b68ce5ff8ac0b90ea8f46b8c16c654b570dacc83e8c7394c47a8ed",
+  "outputTail": "verify-no-unknown-casts: no new assertions; 1866 existing assertions remain.\n"
+}

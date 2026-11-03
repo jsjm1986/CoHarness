@@ -1,0 +1,20 @@
+- id: llm-deepseek
+  disabled: true
+- id: tools
+  config:
+    mode: native
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, autoAuthorityReady]
+- insert:
+    - id: review-shell
+      name: '@deepseek-ai/dsh-bash-sandbox'
+    - id: review-approval
+      name: '@deepseek-ai/dsh-user-approval'
+      config:
+        policy: never
+    - id: review-permission
+      name: '@deepseek-ai/dsh-permission-presets'
+    - id: review-integration
+      name: '@deepseek-ai/dsh-experimental-auto-review'
+    - id: review-model
+      name: './model.mjs'

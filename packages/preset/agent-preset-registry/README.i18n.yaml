@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/preset/agent-preset-registry/README.md
 document:
-  en: 9a33ba1e1f0a3d868509585dd08d933e2c8c06d3
-  zh: 33affeafd8fc6d29c4365d98fea4ddf7b441edb3
+  en: 338a357737845e49993b43e2b8fc7ee884dceaaa
+  zh: 3f2c2f70bf0e0fed0e5b04a5f81cefffd1d7525e
 /:
   en: d5ac01c9c587f150
   zh: 61495d48365178df
@@ -18,11 +18,11 @@ document:
   en: 2d61db45444313f1
   zh: 5feefd8b1f07dd5a
 /dsh-agent-preset-registry/service-agentpresets-ctx-key-agentpresets:
-  en: 7f4404257ca850e6
-  zh: d24056ec7adf0f8f
+  en: 7a8f5a0eb2c48470
+  zh: ea46f444c986010c
 /dsh-agent-preset-registry/service-agentpresets-ctx-key-agentpresets/where-to-call-mount:
-  en: 5aee6aca527a4c9a
-  zh: ed02ffb5115d8fae
+  en: 6bcc049dd02a5d84
+  zh: c6bb13188626f5d2
 /dsh-agent-preset-registry/service-agentpresets-ctx-key-agentpresets/composing-a-child-agent:
   en: c7195bbd639635a5
   zh: 8a9182f195cd9135
@@ -51,14 +51,14 @@ document:
   en: 515d7ac2de3c4de5
   zh: a79b58a0c8da623e
 /dsh-agent-preset-registry/what-a-mount-rejects:
-  en: cae8fffde99212e2
-  zh: a1fc2a0a5fa0af01
+  en: d59e9ca44967722d
+  zh: 492d593931855ffe
 /dsh-agent-preset-registry/a-preset-file-is-an-input-never-a-persistence-target:
   en: 45fb7f549ed28713
   zh: 3304c389f7c59d60
 /dsh-agent-preset-registry/trust:
-  en: 52c4013bde89d654
-  zh: 96ec65f542a34f50
+  en: 3ca303ccdce01bf1
+  zh: 3081dd2a2d73ab85
 /dsh-agent-preset-registry/model-experience:
   en: 07ca03c481bc35f3
   zh: e64e2305ac5f8d54

@@ -1,0 +1,14 @@
+{
+  "name": "sonar-actual-built-governance",
+  "cwd": ".",
+  "command": "node --import ./.agents/audits/.local/native-policy-built-peers.mjs .agents/audits/.local/verify-built-governed-sonar.mjs",
+  "startedAt": "2026-10-24T09:23:26.304233+00:00",
+  "seconds": 2.484,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cc99d8dd5ab56c67b813fe805d963e6f59ea8c91934d23db74f5edeb68225070",
+  "inputsAfter": "cc99d8dd5ab56c67b813fe805d963e6f59ea8c91934d23db74f5edeb68225070",
+  "postgresToolDirectory": null,
+  "outputSha256": "89f4db2e6f1f54fa4234387df1969b1f894c4f265f40b0f336e0150e8bfef399",
+  "outputTail": "{\"requests\":1,\"admissions\":1,\"releases\":1,\"uncertain\":0,\"successSource\":\"file\",\"successClass\":\"personal\",\"usage\":{\"inputTokens\":3,\"outputTokens\":2,\"totalTokens\":5},\"denial\":\"denied\",\"records\":2}\n"
+}

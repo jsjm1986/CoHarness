@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-node-resource-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md
+document:
+  en: 002d5cedafb7f795308bb5b0cc961c154a383ee4
+  zh: 3421487a19fe308348591bb643aa61d30df4bb1c
+/agent-note-node-wide-model-and-process-admission:
+  en: 4af1d4c5b042db32
+  zh: 7b4b42d734a9c6f3
+/agent-note-node-wide-model-and-process-admission/problem:
+  en: 40600914fa9e5349
+  zh: 13be8c065e12ad8d
+/agent-note-node-wide-model-and-process-admission/proposal:
+  en: 31f3b6468b82644f
+  zh: f2e545e076c8e121
+/agent-note-node-wide-model-and-process-admission/alternatives-considered:
+  en: 35ff9e53343a047c
+  zh: ea6f840f2e9f0436
+/agent-note-node-wide-model-and-process-admission/acceptance-criteria:
+  en: 220e26ba06ec67a3
+  zh: 732b7c3bd468f2c6
+/agent-note-node-wide-model-and-process-admission/risks:
+  en: 3c7ab949477055d1
+  zh: f0a6a67693219c8f

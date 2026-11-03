@@ -1,0 +1,14 @@
+{
+  "name": "model-operation-core-lint",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/llm/llm/src/index.ts packages/llm/llm/src/operations.ts packages/llm/llm/src/types.ts packages/llm/llm/tests/operations.spec.ts packages/web/web-search-deepseek/src/types.ts",
+  "startedAt": "2026-10-24T05:40:51.130476+00:00",
+  "seconds": 4.565,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d523048529307b69ec49bdbcc23c7dfdb9ab40f2cb641ff8a9cae498b21bc19b",
+  "inputsAfter": "d523048529307b69ec49bdbcc23c7dfdb9ab40f2cb641ff8a9cae498b21bc19b",
+  "postgresToolDirectory": null,
+  "outputSha256": "b6927eb894d3c4883de3b85b46ac3e15dc596f9cfb0b60a387bb0b23f955dba8",
+  "outputTail": "packages/llm/llm/src/operations.ts:20:1: error @stylistic(max-len): This line has a length of 156. Maximum allowed is 140.\npackages/llm/llm/src/operations.ts:23:1: error @stylistic(max-len): This line has a length of 144. Maximum allowed is 140.\npackages/llm/llm/tests/operations.spec.ts:34:1: error @stylistic(max-len): This line has a length of 145. Maximum allowed is 140.\npackages/llm/llm/src/index.ts:962:13: error typescript(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`. help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.\npackages/llm/llm/src/index.ts:1033:13: error typescript(no-unnecessary-condition): Unnecessary comparison between literal values.\npackages/llm/llm/src/index.ts:1042:14: error typescript(no-unnecessary-condition): Unnecessary comparison between literal values.\npackages/llm/llm/src/index.ts:1106:11: error typescript(no-unnecessary-condition): Unnecessary comparison between literal values.\npackages/llm/llm/src/index.ts:1106:45: error typescript(no-unnecessary-condition): This condition will always return the same value since the types have no overlap.\n"
+}

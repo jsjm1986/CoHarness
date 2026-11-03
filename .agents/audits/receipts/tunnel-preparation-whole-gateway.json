@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-preparation-whole-gateway",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T23:33:09.963062+00:00",
+  "seconds": 47.858,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a0d86acc16e7427c0c08b6f641c0e08be8a16c49e7580a85af667fbf17ab1395",
+  "inputsAfter": "a0d86acc16e7427c0c08b6f641c0e08be8a16c49e7580a85af667fbf17ab1395",
+  "postgresToolDirectory": null,
+  "outputSha256": "434712e52802866a88129360faeac1facdb8a855641efe27aa5f0f01bd7c31a8",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  71 passed | 20 skipped (91)\n      Tests  845 passed | 390 skipped (1235)\n   Start at  07:33:12\n   Duration  45.58s (transform 2.91s, setup 0ms, import 9.14s, tests 75.28s, environment 4ms)\n\n"
+}

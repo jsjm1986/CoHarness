@@ -135,7 +135,7 @@ describe('WorkspacePicker', () => {
     expect(b.onClose).toHaveBeenCalled()
     expect(screen.getByTestId('directory-flow')).toBeTruthy()
     await act(async () => { b.probe.owner!.onPicked('/tmp/project') })
-    expect(createWorkspace).toHaveBeenCalledWith({ path: '/tmp/project' })
+    expect(createWorkspace).toHaveBeenCalledWith({ path: '/tmp/project', runtimeTarget: null })
     await waitFor(() => { expect(b.onPick).toHaveBeenCalledWith(created.workspaceId) })
     // Successful adoption withdraws the flow request.
     expect(screen.queryByTestId('directory-flow')).toBeNull()
@@ -327,7 +327,7 @@ describe('WorkspacePicker', () => {
     })
     expect(screen.getByRole('alert').textContent).toBe('此工作区已不在授权范围内，无法打开。')
     expect(b.onPick).not.toHaveBeenCalled()
-    expect(listDirectory).toHaveBeenCalledWith()
+    expect(listDirectory).toHaveBeenCalledWith(undefined, undefined, undefined)
   })
 
   it('opens an existing workspace that sits on an authorized root', async () => {

@@ -1,0 +1,14 @@
+{
+  "name": "core-observers-all-runtime-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/core-observer-exact.config.mts packages/core/agent/ packages/core/session/ packages/core/agent-loop/ packages/util/values/ packages/workflow/tool-workflow/ packages/jobs/tool-jobs/ packages/session/working-directory/tests/working-directory.spec.ts --coverage",
+  "startedAt": "2026-10-26T10:23:19.868737+00:00",
+  "seconds": 30.483,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f3d669c1adc303aa5a2a24228b789170f1c08adb36c04718d2c69feea5cdb308",
+  "inputsAfter": "f3d669c1adc303aa5a2a24228b789170f1c08adb36c04718d2c69feea5cdb308",
+  "postgresToolDirectory": null,
+  "outputSha256": "c47233a60fc1618f1269a2a28292daa666d582676a87c742dc7153c47a3ff0b2",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  57 passed (57)\n      Tests  1284 passed (1284)\n   Start at  18:23:35\n   Duration  14.68s (transform 20.73s, setup 2.84s, import 48.63s, tests 27.29s, environment 7ms)\n\n % Coverage report from v8\n------------------|---------|----------|---------|---------|-------------------\nFile              | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n------------------|---------|----------|---------|---------|-------------------\n------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 825/825 )\nBranches     : 100% ( 648/648 )\nFunctions    : 100% ( 150/150 )\nLines        : 100% ( 726/726 )\n================================================================================\n"
+}

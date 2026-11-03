@@ -10,7 +10,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
-import { resolveChildExecution, externalMemberAgent, type ChildExecution } from '@deepseek-ai/dsh-subagent'
+import { assertExternalModelExecution, resolveChildExecution, externalMemberAgent, type ChildExecution } from '@deepseek-ai/dsh-subagent'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {
@@ -162,6 +162,8 @@ class AcpProvider implements SubagentProvider {
   ) => Promise<ContinuableCreateSpec>
 
   async start(request: ResolvedSubagentStartRequest) {
+    assertExternalModelExecution(this.ctx)
+    assertExternalModelExecution(request.parent.ctx)
     if (request.signal.aborted) {
       throw new Error('subagent request was aborted before the ACP child started')
     }
@@ -182,7 +184,7 @@ class AcpProvider implements SubagentProvider {
       env: this.config.env,
       disposeEofGraceMs: this.config.disposeEofGraceMs,
       disposeGraceMs: this.config.disposeGraceMs,
-      spawn: spec => execution.subprocess.spawn(spec),
+      spawn: spec => execution.subprocess.spawn({ ...spec, sessionId: request.parent.id, resourceOrigin: 'execution' }),
       onError: (error, stopReason) => {
         // The seam forbids `result` rejecting, so a child-level failure is
         // flattened to a stop reason — preserve it here rather than losing it.
@@ -222,14 +224,20 @@ export function apply(ctx: Context, config: Config): void {
         args: validated.args, cwd: execution.cwd, permission: validated.permission, env: validated.env,
         disposeEofGraceMs: validated.disposeEofGraceMs, disposeGraceMs: validated.disposeGraceMs,
       }
-      return { execution, transport: new AcpMemberTransport(memberConfig, spec => execution.subprocess.spawn(spec)) }
+      return { execution, transport: new AcpMemberTransport(memberConfig,
+        spec => execution.subprocess.spawn({ ...spec, sessionId: agent.id, resourceOrigin: 'execution' })) }
     }
     prepareMember = async (request) => {
+      assertExternalModelExecution(ctx)
+      assertExternalModelExecution(request.parent.ctx)
       const { transport } = await resolveMember(request.parent, request.cwd, request.signal)
       await transport.probe(request.signal)
     }
     const transport = async (child: SessionId, signal: AbortSignal) => {
-      const member = await resolveMember(externalMemberAgent(ctx, child), undefined, signal)
+      assertExternalModelExecution(ctx)
+      const agent = externalMemberAgent(ctx, child)
+      assertExternalModelExecution(agent.ctx)
+      const member = await resolveMember(agent, undefined, signal)
       store.assertExecution(child, member.execution)
       return member.transport
     }

@@ -1,0 +1,2457 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-11-02T08:46:54.035013+00:00",
+  "status": "in_progress",
+  "objectiveUnchanged": true,
+  "scope": "Review all implemented and newly exposed multi-computer features plus explicit design gates across the original12 business domains. Planned and intentionally unavailable capabilities are not mislabeled as verified or as completed implementations.",
+  "coordination": {
+    "humanAuthorization": "User explicitly requested direct conversation with the parallel multi-computer Codex and asked that architectural/permission changes enter the ongoing audit.",
+    "peerThreadId": "01a1821f-1577-7472-93db-3bd83ee42345",
+    "peerTitle": "多电脑连接架构",
+    "auditThreadId": "01a16450-5b0a-7661-a0d9-79e9d8d2cae0",
+    "workspaceShared": true,
+    "peerOwns": [
+      "RuntimeId/environment routing",
+      "node enrollment and control",
+      "Admin node UI",
+      "server request-context block",
+      "index runtime-router composition"
+    ],
+    "auditOwns": [
+      "project removal authority",
+      "runtime destructive ownership and quiescence",
+      "resource cleanup and queue wakeup",
+      "078 durable operation fence"
+    ],
+    "sharedFileRule": "Apply minimal coordinated patches; never replace shared files from old backups. Compile to private output and record source/migration hashes. Contact the peer only for actual overlapping edits, API handoff or concrete build/test blockers.",
+    "migrationReservation": {
+      "peer": [
+        "076_runtime_environment_directory.sql",
+        "077_node_agent_access.sql"
+      ],
+      "audit": "078_runtime_destructive_operations.sql implemented; SHA-256 b019b42d6e0ae1cb5980bf3a77428efb3ef9bce5033aa6dd570a0198da56e2da"
+    },
+    "ownerInjection": "Peer approved the sixth InstanceManager argument at its existing index.ts construction; peer is not editing that line.",
+    "databaseIsolation": "Audit owns50809 only; peer uses separate temporary database/container.",
+    "userScopeRefinement": "2026-10-28: independently audit non-overlapping functions; coordinate only shared implementation, architecture or authority decisions.",
+    "compiledGatewayWindow": "Peer can compile current stable production API; audit editing tests/docs, final own artifact receipt pending.",
+    "peerCurrentMode": "Peer owns Admin/UI selected-computer attribution and interaction; production execution-identity changes excluded by agreement.",
+    "humanScopeRefinement": "Continue independent nonconflicting review. User asks to stop routine messages to peer; coordinate only actual conflicting modifications.",
+    "currentAuditDatabase": "Owned parent PostgreSQL55933is intentionally retained; acceptance runs own disposable child databases. Production5432and peer58773are excluded.",
+    "currentHandoff": {
+      "source": "Trusted peer reply in this thread after one concrete build-blocker message",
+      "routinePolling": false,
+      "peerOwned": [
+        "client-session and host.describe",
+        "client connection/runtime/ui-collaboration/ui-documents/ui-workbench",
+        "Gateway documents-local/document-catalog/server/node-service-proxy",
+        "Admin UI"
+      ],
+      "lastBuild": "resource-sdk-final-full-build-current-ui",
+      "clientIntegrationAccepted": false
+    },
+    "currentAuditImplementationOwner": "096 migration, execution-identity and resource-ancestor Runtime namespace; concrete ownership confirmed once with peer.",
+    "currentHandoff20261030": {
+      "at": "2026-10-30T09:08:53.666554+00:00",
+      "source": "Peer message received in this chat under existing human coordination authorization",
+      "peerOwns": [
+        "101_deployment_topology.sql",
+        "deployment-protocol/topology/node-connection",
+        "node-access/service/proxy/server/admin-api/runtime-management",
+        "entryNodeId catalog composition and client/Admin topology UI",
+        "current restore topology preservation"
+      ],
+      "auditScope": "Read-only integration review plus independently owned resource/permission fixes; coordinate concrete overlapping defects only.",
+      "currentReproducedOverlap": "B341: preserved node enrollment issuer absent from older restored users; sent one concrete evidence/ownership message.",
+      "routineMessages": false,
+      "restoreFixOwner": {
+        "finding": "B341",
+        "owner": "architecture peer",
+        "migration": "102_node_enrollment_issuer_history.sql",
+        "rule": "created_by retains its original historical UUID independently of restored live users; issuing and administrative operations still require current organization administrator authority.",
+        "status": "independently_verified_for_named_restore_scope",
+        "receipt": "receipts/restore-node-enrollment-issuer-2026-10-30.json",
+        "verifiedAt": "2026-10-30T09:46:01.454672+00:00"
+      }
+    },
+    "real048SourceAndVerification": {
+      "recordedAt": "2026-11-01T17:15:54.081140+00:00",
+      "source": "Trusted direct peer division message during B448; no repeated clarification needed.",
+      "rootOwnsSource": [
+        "gateway/src/node-resource-budget.ts",
+        "gateway/src/postgres/instance-repository.ts",
+        "gateway/src/postgres/database.ts",
+        "gateway/src/instances.ts"
+      ],
+      "peerOwns": "Frozen R28 reproduction in an independent test database, repeatable blocking-chain evidence, matching builds and production functional verification. Peer avoids concurrent edits to the four Root source files.",
+      "preserve": "Generation, ownership, membership/revocation and all existing operation fences. Network delay is accepted; do not change architecture solely for speed.",
+      "uiAcceptance": "Peer owns one bounded tooling recovery check; API and native UI acceptance remain separate.",
+      "status": "agreed_nonconflicting_source_review_and_frozen_runtime_verification"
+    }
+  },
+  "designSources": [
+    ".agents/notes/proposed/architecture/2026-10-28-multi-computer-personal-runtimes.md",
+    "gateway/docs/node-agent/README.md",
+    "gateway/docs/deployment-topology/README.md",
+    ".agents/notes/implemented/architecture/2026-10-30-entry-topology-and-independent-node-authority.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/deployment-modes/guide.md"
+  ],
+  "policyProvenance": "Latest human-authorized product handoff from the multi-computer architecture chat, received in this audit chat on2026-10-30. Requirements are the review target; peer-reported checks and in-flight implementation are not independent audit acceptance.",
+  "areas": [
+    {
+      "id": "environment-identity",
+      "domains": [
+        "runtime-and-execution",
+        "sdk-cli-and-protocols"
+      ],
+      "implementationStage": "local_router_integrated_multi_personal_environment_consumers_gated",
+      "auditStatus": "in_progress",
+      "requirements": [
+        "Stable RuntimeId survives generation changes and retained retirement; organization/owner identity immutable.",
+        "Node placement requires stopped state plus destructive ownership exclusion.",
+        "User-approved target allows multiple personal RuntimeIds for the same user on one node. Current076 personal-node and instance-owner unique indexes are temporary implementation restrictions; retain until all identity/authorization/resource/lifecycle consumers migrate."
+      ],
+      "sources": [
+        "gateway/src/runtime-catalog.ts",
+        "gateway/src/postgres/runtime-catalog.ts",
+        "gateway/deploy/postgres/migrations/076_runtime_environment_directory.sql"
+      ],
+      "runtimeExecutionNamespaceEvidence": {
+        "finding": "B311",
+        "receipt": "receipts/runtime-execution-namespace-2026-10-29.json",
+        "status": "named_scenarios_verified_remaining_area_review_open"
+      },
+      "continuationEvidence": [
+        "receipts/node-configuration-native-control-2026-10-29.json",
+        "receipts/node-configuration-health-budgets-2026-10-29.json",
+        "receipts/node-configuration-health-identity-2026-10-29.json",
+        "receipts/node-pressure-native-command-2026-10-29.json",
+        "receipts/local-runtime-boot-identity-2026-10-29.json",
+        "receipts/native-capability-probes-2026-10-29.json",
+        "receipts/runtime-readiness-completion-2026-10-29.json"
+      ],
+      "currentProductRequirementIds": [
+        "single-mode-preservation",
+        "personal-groups-and-fixed-projects"
+      ]
+    },
+    {
+      "id": "authority-and-discovery",
+      "domains": [
+        "identity-and-authorization",
+        "projects-and-collaboration"
+      ],
+      "implementationStage": "implemented_current_stage_review_open",
+      "auditStatus": "in_progress",
+      "requirements": [
+        "Account directory/resolve admits only own personal environment and currently authorized projects; admin metadata access does not grant another account execution.",
+        "Current organization/account/membership and project authority; Steward requires current admin qualification.",
+        "Node credentials are organization control capabilities, not browser identities or Runtime bearers."
+      ],
+      "sources": [
+        "gateway/src/postgres/runtime-catalog.ts",
+        "gateway/src/postgres/node-access-service.ts"
+      ],
+      "continuationEvidence": [
+        "receipts/inspector-resource-completion-2026-10-29.json",
+        "receipts/push-computer-notification-permissions-2026-10-29.json",
+        "receipts/sdk-resource-completion-2026-10-29.json"
+      ],
+      "currentProductRequirementIds": [
+        "entry-scoped-authorization",
+        "personal-groups-and-fixed-projects"
+      ]
+    },
+    {
+      "id": "node-enrollment-and-revocation",
+      "domains": [
+        "identity-and-authorization",
+        "gateway-operations-backup-and-deployment"
+      ],
+      "implementationStage": "implemented_control_plane_review_open",
+      "auditStatus": "in_progress",
+      "requirements": [
+        "Only organization administrators issue/reissue/revoke/list nodes; no separate node-admin role exists.",
+        "Enrollment replay binds the original candidate credential; lost issuance secret requires explicit reissue.",
+        "Issuer demotion alone does not revoke an already-issued organization capability; explicit node revocation does.",
+        "Every control request rechecks credential/organization and exact connection UUID plus epoch; late heartbeat cannot revive expiry and old disconnect cannot release a successor."
+      ],
+      "sources": [
+        "gateway/src/node-access.ts",
+        "gateway/src/postgres/node-access-service.ts",
+        "gateway/src/node-agent.ts"
+      ],
+      "futureDesignConstraint": "Full per-device/per-runtime user authority, configuration and plugin composition require an explicit design. Existing organization-admin control capability and executionReady=false do not establish that completed product model.",
+      "currentProductRequirementIds": [
+        "attachment-and-mode-transitions",
+        "configuration-and-recovery"
+      ]
+    },
+    {
+      "id": "execution-and-placement",
+      "domains": [
+        "runtime-and-execution",
+        "projects-and-collaboration"
+      ],
+      "implementationStage": "remote_execution_intentionally_disabled",
+      "auditStatus": "in_progress",
+      "requirements": [
+        "Connected control lease is distinct from executionReady, currently fixed false.",
+        "Current first stage supports macOS/Linux control; remote execution and Windows remain gated.",
+        "resolveForAccount returns authorized placement metadata, including remote entries; the Router owns remote execution refusal and compares the actual local node UUID for HTTP/WS dispatch.",
+        "Each project has one owning computer; different projects may reside on different nodes. Current local-only dispatch and remote503 remain implementation limits until routing, mounts, ownership, access and storage are integrated."
+      ],
+      "sources": [
+        "gateway/docs/node-agent/README.md",
+        "gateway/src/postgres/instance-repository.ts",
+        "gateway/src/proxy.ts",
+        "gateway/src/runtime-router.ts"
+      ],
+      "futureDesignConstraint": "Full per-device/per-runtime user authority, configuration and plugin composition require an explicit design. Existing organization-admin control capability and executionReady=false do not establish that completed product model.",
+      "runtimeExecutionNamespaceEvidence": {
+        "finding": "B311",
+        "receipt": "receipts/runtime-execution-namespace-2026-10-29.json",
+        "status": "named_scenarios_verified_remaining_area_review_open"
+      },
+      "currentProductRequirementIds": [
+        "entry-scoped-authorization"
+      ]
+    },
+    {
+      "id": "destructive-lifecycle",
+      "domains": [
+        "runtime-and-execution",
+        "projects-and-collaboration"
+      ],
+      "implementationStage": "durable_fence_source_verified_artifact_restore_coverage_acceptance_pending",
+      "auditStatus": "in_progress",
+      "requirements": [
+        "Bind destructive ownership to organization + RuntimeId, assigned node, generation, operation and proved live owner.",
+        "Independent ordinary stop must not reopen start or placement during an existing destructive operation.",
+        "Crash recovery requires verified owner death and process quiescence; timeouts, missing heartbeats and disconnection alone are insufficient.",
+        "Account removal must eventually cover every live personal RuntimeId or refuse partial coverage before multi-instance uniqueness is relaxed.",
+        "Before removing owner uniqueness, account deletion/disable must enumerate and fence every owned RuntimeId across all nodes or fail closed before partial data retirement. A single user-target stop is insufficient for the approved multiple-environment model.",
+        "Revisit078 owner-wide replacement-assignment refusal when separate per-environment deletion and whole-account retirement are introduced; do not remove protection without explicit operation scope and recovery proof."
+      ],
+      "sources": [
+        "gateway/src/instances.ts",
+        "gateway/src/postgres/instance-repository.ts",
+        "gateway/tests/fixtures/project-removal.mjs",
+        "gateway/deploy/postgres/migrations/078_runtime_destructive_operations.sql",
+        "gateway/src/gateway-model-budget.ts",
+        "gateway/tests/runtime-stop-lease-postgres.spec.ts"
+      ],
+      "currentProductRequirementIds": [
+        "attachment-and-mode-transitions"
+      ]
+    },
+    {
+      "id": "sessions-and-state",
+      "domains": [
+        "conversations-and-session-persistence",
+        "web-client-and-desktop",
+        "sdk-cli-and-protocols"
+      ],
+      "implementationStage": "new_consumers_require_review_before_remote_enablement",
+      "auditStatus": "in_progress",
+      "requirements": [
+        "Session routing, browser drafts, workbench layouts and environment settings include RuntimeId.",
+        "Retain original Session ids and immutable committed JSONL generations.",
+        "Account preferences remain account-scoped and project grants remain project-scoped.",
+        "Any new model-visible input is logged and both SDK projections follow actual loop/log changes."
+      ],
+      "sources": [
+        ".agents/notes/proposed/architecture/2026-10-28-multi-computer-personal-runtimes.md"
+      ],
+      "runtimeExecutionNamespaceEvidence": {
+        "finding": "B311",
+        "receipt": "receipts/runtime-execution-namespace-2026-10-29.json",
+        "status": "named_scenarios_verified_remaining_area_review_open"
+      },
+      "currentProductRequirementIds": [
+        "paging-targets-and-browser-state"
+      ]
+    },
+    {
+      "id": "files-documents-and-terminals",
+      "domains": [
+        "files-documents-and-workspace",
+        "tools-subagents-and-workflows"
+      ],
+      "implementationStage": "remote_paths_not_enabled_review_existing_assumptions",
+      "auditStatus": "in_progress",
+      "requirements": [
+        "Personal bytes remain on the owning computer; shared project bytes remain central.",
+        "Path equality across computers is not document or storage ownership.",
+        "Upload ids, private document provenance, preview caches, terminals and tool sessions retain exact environment and actor identity.",
+        "Revocation must fence active streams and queued writes without resurrecting retired ownership."
+      ],
+      "sources": [
+        "gateway/src/document-transfer.ts",
+        "gateway/src/runtime-document-store.ts",
+        "gateway/src/runtime-router.ts"
+      ],
+      "currentProductRequirementIds": [
+        "personal-groups-and-fixed-projects",
+        "paging-targets-and-browser-state"
+      ]
+    },
+    {
+      "id": "models-resources-and-usage",
+      "domains": [
+        "models-policy-credentials-and-billing",
+        "runtime-and-execution"
+      ],
+      "implementationStage": "new_environment_attribution_and_failure_paths_require_review",
+      "auditStatus": "in_progress",
+      "requirements": [
+        "User/org quota admission stays authoritative across computers; local node pressure is separately bounded.",
+        "Model requests, child processes and nested runtimes carry exact environment/generation/operation provenance.",
+        "Do not release occupation or permit replacement while stop outcome remains uncertain.",
+        "Preserve historical usage attribution and prevent duplicate per-node quota allowances."
+      ],
+      "sources": [
+        "gateway/src/node-resource-budget.ts",
+        "gateway/src/gateway-model-budget.ts",
+        "gateway/src/postgres/model-governance-service.ts"
+      ],
+      "continuationEvidence": [
+        "receipts/inspector-resource-completion-2026-10-29.json",
+        "receipts/push-computer-notification-permissions-2026-10-29.json",
+        "receipts/sdk-resource-completion-2026-10-29.json",
+        "receipts/sdk-unpublished-startup-2026-10-29.json",
+        "receipts/sdk-client-close-recovery-2026-10-29.json",
+        "receipts/python-sdk-pipe-backpressure-2026-10-29.json",
+        "receipts/node-configuration-native-control-2026-10-29.json",
+        "receipts/node-configuration-health-budgets-2026-10-29.json",
+        "receipts/node-configuration-health-identity-2026-10-29.json",
+        "receipts/node-pressure-native-command-2026-10-29.json",
+        "receipts/linux-provider-native-control-2026-10-29.json",
+        "receipts/local-runtime-boot-identity-2026-10-29.json",
+        "receipts/native-capability-probes-2026-10-29.json",
+        "receipts/runtime-readiness-completion-2026-10-29.json",
+        "receipts/terminal-monotonic-cleanup-2026-10-30.json",
+        "receipts/subprocess-disposed-exit-protection-2026-10-30.json"
+      ],
+      "runtimeExecutionNamespaceEvidence": {
+        "finding": "B311",
+        "receipt": "receipts/runtime-execution-namespace-2026-10-29.json",
+        "status": "named_scenarios_verified_remaining_area_review_open"
+      },
+      "currentProductRequirementIds": [
+        "attachment-and-mode-transitions"
+      ]
+    },
+    {
+      "id": "connections-cancellation-and-receipts",
+      "domains": [
+        "gateway-operations-backup-and-deployment",
+        "runtime-and-execution"
+      ],
+      "implementationStage": "control_implemented_execution_receipts_future_gate",
+      "auditStatus": "in_progress",
+      "requirements": [
+        "Connectivity never acknowledges maintenance writers or proves stopped processes.",
+        "Control changes respect maintenance/restore epochs and writer spans.",
+        "Unknown mutation responses do not imply rollback or safe automatic retry; receipts bind node, RuntimeId, generation and operation.",
+        "Reconnect resumes bounded revisioned metadata without replaying task effects or full file trees."
+      ],
+      "sources": [
+        "gateway/src/node-access.ts",
+        "gateway/src/node-agent.ts",
+        "gateway/src/server.ts"
+      ],
+      "continuationEvidence": [
+        "receipts/inspector-resource-completion-2026-10-29.json",
+        "receipts/push-computer-notification-permissions-2026-10-29.json",
+        "receipts/sdk-resource-completion-2026-10-29.json",
+        "receipts/sdk-unpublished-startup-2026-10-29.json",
+        "receipts/sdk-client-close-recovery-2026-10-29.json",
+        "receipts/python-sdk-pipe-backpressure-2026-10-29.json",
+        "receipts/node-configuration-native-control-2026-10-29.json",
+        "receipts/node-configuration-health-budgets-2026-10-29.json",
+        "receipts/node-configuration-health-identity-2026-10-29.json",
+        "receipts/node-pressure-native-command-2026-10-29.json",
+        "receipts/linux-provider-native-control-2026-10-29.json",
+        "receipts/local-runtime-boot-identity-2026-10-29.json",
+        "receipts/native-capability-probes-2026-10-29.json",
+        "receipts/runtime-readiness-completion-2026-10-29.json",
+        "receipts/terminal-monotonic-cleanup-2026-10-30.json",
+        "receipts/subprocess-disposed-exit-protection-2026-10-30.json"
+      ],
+      "currentProductRequirementIds": [
+        "entry-scoped-authorization",
+        "attachment-and-mode-transitions"
+      ]
+    },
+    {
+      "id": "backup-and-restore",
+      "domains": [
+        "gateway-operations-backup-and-deployment",
+        "conversations-and-session-persistence"
+      ],
+      "implementationStage": "multi_node_full_coverage_intentionally_refused",
+      "auditStatus": "in_progress",
+      "requirements": [
+        "Require actual covered files and stopped writers from every included node before claiming complete multi-node backup/restore.",
+        "Keep each backup owning-node and data coverage explicit; a center-only snapshot cannot represent arbitrary project nodes.",
+        "Review restore effects on retired RuntimeIds, node credentials/revisions, old leases and write epochs; do not assume existing restore sanitizers cover new tables.",
+        "Current deployment-data counts all compute_nodes: issuing even an offline, never-enrolled node blocks full backup/restore; revoke does not remove that row. This is an acknowledged conservative design limit, surfaced before Admin submission, not silently loosened coverage."
+      ],
+      "sources": [
+        "gateway/src/postgres/deployment-backups.ts",
+        "gateway/src/postgres/deployment-data.ts",
+        "gateway/deploy/postgres/migrations/077_node_agent_access.sql"
+      ],
+      "runtimeExecutionNamespaceEvidence": {
+        "finding": "B311",
+        "receipt": "receipts/runtime-execution-namespace-2026-10-29.json",
+        "status": "named_scenarios_verified_remaining_area_review_open"
+      },
+      "currentProductRequirementIds": [
+        "configuration-and-recovery"
+      ]
+    },
+    {
+      "id": "slow-node-and-browser-isolation",
+      "domains": [
+        "web-client-and-desktop",
+        "remaining-packages-and-platforms"
+      ],
+      "implementationStage": "architecture_requirement_measurement_pending",
+      "auditStatus": "in_progress",
+      "requirements": [
+        "Slow/disconnected nodes do not block healthy environments, input, stop or control.",
+        "Metadata, file enumeration, body windows, queues, memory and DOM work are bounded; pagination limits actual work, not only response rows.",
+        "Per-node and global limits keep interactive/control capacity separate from bulk transfers.",
+        "Caches include authenticated actor, environment and version; incomplete refresh is not deletion evidence."
+      ],
+      "sources": [
+        "packages/client/runtime/src/client/sessions/pool.ts",
+        "gateway/src/project-directories.ts",
+        ".agents/notes/proposed/architecture/2026-10-28-multi-computer-personal-runtimes.md"
+      ],
+      "currentProductRequirementIds": [
+        "single-mode-preservation",
+        "paging-targets-and-browser-state"
+      ]
+    },
+    {
+      "id": "release-and-platform-compatibility",
+      "domains": [
+        "remaining-packages-and-platforms",
+        "sdk-cli-and-protocols"
+      ],
+      "implementationStage": "remote_enablement_gate_pending",
+      "auditStatus": "in_progress",
+      "requirements": [
+        "Do not inject arbitrary node plugin graphs into one frontend without release/capability compatibility checks.",
+        "Source/built local routing, enrollment and reconnect require independent process evidence; real public-network and cross-computer execution remain separate acceptance.",
+        "Native Windows behavior is not inferred from macOS/Linux or adapter tests."
+      ],
+      "sources": [
+        "gateway/docs/node-agent/README.md",
+        "gateway/tests/runtime-catalog-postgres.spec.ts",
+        "gateway/tests/node-access-postgres.spec.ts"
+      ],
+      "continuationEvidence": [
+        "receipts/sdk-unpublished-startup-2026-10-29.json",
+        "receipts/sdk-client-close-recovery-2026-10-29.json",
+        "receipts/python-sdk-pipe-backpressure-2026-10-29.json",
+        "receipts/node-configuration-native-control-2026-10-29.json",
+        "receipts/node-configuration-health-budgets-2026-10-29.json",
+        "receipts/node-configuration-health-identity-2026-10-29.json",
+        "receipts/node-pressure-native-command-2026-10-29.json",
+        "receipts/linux-provider-native-control-2026-10-29.json",
+        "receipts/local-runtime-boot-identity-2026-10-29.json",
+        "receipts/native-capability-probes-2026-10-29.json",
+        "receipts/runtime-readiness-completion-2026-10-29.json",
+        "receipts/terminal-monotonic-cleanup-2026-10-30.json",
+        "receipts/subprocess-disposed-exit-protection-2026-10-30.json"
+      ],
+      "currentProductRequirementIds": [
+        "configuration-and-recovery"
+      ]
+    }
+  ],
+  "currentEvidence": {
+    "namedPreFenceSource": "project-removal-pre-final-source:262 passed in5 files, before the additional cross-coordinator stop counterexample was added. This is not complete lifecycle acceptance.",
+    "additionalCounterexample": "project-removal-cross-coordinator-stop-negative: actual source Gateway/PostgreSQL and a separate InstanceManager.stop reopen beginStart; restartRefused=false.",
+    "remaining": [
+      "Complete new multi-computer requirements and original12-domain/file inventory.",
+      "General Runtime control actor authority and model policy queue/role freshness remain under review.",
+      "Live model API success verification remains human-deferred."
+    ],
+    "destructiveFence": "B243-B247 completed named source,PostgreSQL,Node22/24 artifact and deployment/lifecycle acceptance; see receipts/project-deletion-lifecycle-2026-10-28.json. Whole module/domain coverage remains open.",
+    "nodeChannelDraft": "Peer now develops node-service/tunnel and outbound channel routing by reusing existing node Gateway services. Channel/service/server integration remains unaccepted and excluded from audit feature claims.",
+    "peerSeventyChecks": "Peer reports70 targeted existing desktop/plugin authorization checks plus bilingual proposed design pairing; these are existing rules, not acceptance of new cross-node controls or WIP transport.",
+    "personalRuntimePolicy": "B249/B250 named current account role,eligibility and pre-allocation recheck verified; no new device grant implementation or remote execution acceptance.",
+    "accountModelPolicy": "B251-B254 named current account/model policy,cache,failure and combined disable scenarios verified in source,private Node22/24 artifacts and real Loader consumers. Cross-Runtime quota/identity and node/device execution are not inferred."
+  },
+  "currentProductIntent": "Preserve the mature single-computer multiuser system by default; an explicit organization mode adds managed computers through a primary while every directly visited computer retains local-only browser scope. Existing Runtime, project and capability permission identities remain authoritative.",
+  "confirmedProductRules": {
+    "provenance": "Actual human messages and clarification replies read from 多电脑连接架构 on2026-10-28, not inferred from a draft.",
+    "projectPlacement": "Each project owns one computer initially; different projects can belong to different computers, including non-center computers.",
+    "personalMultiplicity": "A user may own multiple independent personal RuntimeIds on the same computer, controlled by permissions and quotas.",
+    "deviceAccess": "A user may have access to one or several managed computers; the Web UI identifies the selected computer/runtime and its actual permissions.",
+    "plugins": "Existing per-plugin authorization, consent, resource admission and exclusion remain authoritative; extend physical resource identities and runtime holders without inventing a universal replacement."
+  },
+  "peerReportedDesktopRule": {
+    "source": "Architecture peer inspection of existing DesktopCoordinator/VNC/Computer Use code;70 existing-rule checks reported, not independently accepted by this matrix.",
+    "rule": "Physical exclusion key stays node+desktop, while holder includes RuntimeId/generation/workflow. VNC view/control/consent and Computer Use qualification/confirmation need explicit mapping and cross-control competition acceptance.",
+    "newMappingAndCrossCompetitionAcceptance": "pending"
+  },
+  "peerReportedClarifications": {
+    "source": "Authorized architecture peer reports latest human clarifications; not an independent implementation acceptance.",
+    "deployment": "Same existing project on every computer,central Gateway/Admin/Web unifies managed node services and can also execute local Runtimes. Reuse existing InstanceManager/Launcher/Supervisor/plugin execution stack.",
+    "administration": "Existing personal/project space allocation,Admin authority and files remain; device authorization adds no automatic self-service right to create personal Runtimes.",
+    "projectDeviceAccess": "Project membership requires usage authority for its selected computer.",
+    "deviceAdmission": "Requires actual startup/execution checks; catalog filtering alone is insufficient.",
+    "implementation": "No079 reservation claimed by audit; exact RuntimeId/device grant API and multiple-runtime uniqueness migration remain coordinated integration work."
+  },
+  "auditContinuation20261029": {
+    "coordination": "Only actual overlap/build issues were messaged; no routine coordination loop.",
+    "peerOwnedSchema": [
+      "079_computer_use_permissions.sql",
+      "080_node_resource_qualifications.sql"
+    ],
+    "auditAdaptation": "Existing raw SQL fixtures grant declared computer rights, and the reserved-control fixture supplies the selected node qualification. Joint initiating-admin/owner admission is preserved.",
+    "partialEvidence": "Personal policy and lifecycle source scenarios pass under the current migration files; this does not accept the full node/remote execution feature.",
+    "stillPending": [
+      "Full per-user device-grant revocation and target-node execution admission",
+      "Independent desktop/VNC/terminal/plugin/memory/Steward qualification consumers and changes after waits",
+      "Multiple RuntimeIds per account/node and current uniqueness migration",
+      "Project owning-node placement and cross-node Session/document identity",
+      "In-progress feature documentation pairing"
+    ],
+    "peerFilesRewrittenForDocumentation": false,
+    "webhookBatch": {
+      "findings": [
+        "B272",
+        "B273",
+        "B274"
+      ],
+      "status": "named_administrator_endpoint_revision_and_payload_scenarios_verified_full_new_feature_review_open",
+      "sourceEvidence": "Webhook33focused cases plus5signed-JSON supplement cases; library/adapter85cases.",
+      "compiledHttpObservations": 64,
+      "compiledNodes": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "peerHandoff": "Peer owns the next exact RuntimeId/node endpoint binding. Current actor locks, captured revision checks and payload validation must be preserved. Reviewer no longer edits endpoint/runtime routing sections.",
+      "peerReportedFrozenMigrations": "088–090 reported frozen. Later migrations require fresh independent review; private snapshots are not peer acceptance.",
+      "privateSnapshotUpperVersion": 93,
+      "pendingReviewCandidates": [
+        {
+          "area": "sessions-and-state",
+          "state": "named_revoked_computer_catalog_path_fixed_and_verified_remaining_runtime_ui_review_open",
+          "question": "Verify a personal root is filtered by its own RuntimeId/node after the account retains permission on another computer. Current global root listing includes an any-personal-instance permission query; check the complete caller filtering path with two nodes before classifying.",
+          "resolvedFinding": "B296",
+          "resolutionReceipt": "receipts/workbench-computer-permissions-2026-10-29.json"
+        },
+        {
+          "area": "connections-cancellation-and-receipts",
+          "state": "policy_and_runtime_binding_followup_open",
+          "question": "Verify personal completion notifications after the source computer grant is revoked; account preference access remains independent of computer execution grants."
+        }
+      ],
+      "peerRegressionHandoff": "Four legacy admin runtime tests were handed to peer after its RuntimeTarget changes; peer reports grants projection failures restored and numeric delete compatibility still pending. No pass is claimed for those branches."
+    },
+    "frozenBackendHandoff": {
+      "receivedAt": "2026-10-28T23:20:02.979599+00:00",
+      "sourceThreadTitle": "多电脑连接架构",
+      "migrationUpperVersion": 95,
+      "status": "peer_reported_named_backend_verification_independent_review_open",
+      "reportedEvidence": {
+        "sourceBuildAndTypes": "passed",
+        "node22And24": "Two actual Gateway/node-agent/WebRuntime setups per engine,15 scenarios each.",
+        "postgres": "9specs142cases: runtime-management,stop-lease,node-resource-budget,computer-access,execution-scopes,plugin-state,document-computer-scope,runtime-catalog,personal-policy."
+      },
+      "newMechanism": "EachRuntime has an independent model reporting credential; account/project ledgers remain shared by owner, and deletion removes corresponding Runtime tokens.",
+      "phaseConstraints": "Forwarding stays off by default; UI, actual cross-computer/public deployment, Windows and complete multi-node backups remain pending.",
+      "independentReviewPending": [
+        "TwoRuntime tokens coexist without cross-Runtime attribution or generation/node confusion.",
+        "Token cleanup and revocation preserve correct retained account/project billing.",
+        "Personal conversation root listing and push permission after one source-computer grant is withdrawn."
+      ],
+      "peerDatabase": "Peer owns cleanup; this review does not touch it.",
+      "newReplySent": false
+    },
+    "runtimeUsageIndependentReview": {
+      "recordedAt": "2026-10-29T01:27:05.094727+00:00",
+      "finding": "B295",
+      "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+      "receipt": "receipts/runtime-usage-execution-ownership-2026-10-29.json",
+      "verified": "ThreeindependentRuntimecredentials/2computers,ownbillingshared,fiveforeignproofrefusals,delayedownbilling,tokenreuseandaccount-widedeletion.",
+      "remaining": "Project-tokenretirement,completeper-computerSessioncatalogcallerchecks,UI/actualnetwork/Windows/multi-nodebackupacceptance.",
+      "peerMessageSent": false
+    },
+    "workbenchComputerPermissionReview": {
+      "recordedAt": "2026-10-29T01:41:53.816450+00:00",
+      "finding": "B296",
+      "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+      "receipt": "receipts/workbench-computer-permissions-2026-10-29.json",
+      "verified": "ExactRuntimeowningcomputerpermissionon4actualauthenticatedHTTPscenarios,includingunavailablepersonalRuntimefallback;2revokedcomputerrootsarehiddenandotheraccountunchanged.",
+      "remaining": "ExactRuntimefrontendaddressing,source-computerpushandothercapabilitycallerreviews.",
+      "peerMessageSent": false
+    },
+    "resourceCompletionAndPersonalPush": {
+      "findings": [
+        "B297",
+        "B299",
+        "B300",
+        "B302",
+        "B298",
+        "B301"
+      ],
+      "receipts": [
+        "receipts/inspector-resource-completion-2026-10-29.json",
+        "receipts/push-computer-notification-permissions-2026-10-29.json",
+        "receipts/sdk-resource-completion-2026-10-29.json"
+      ],
+      "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+      "liveRemoteHardwareValidated": false,
+      "migration095Rewritten": false,
+      "newPeerUiAccepted": false
+    }
+  },
+  "auditContinuation20261029SdkStartupAndClose": {
+    "recordedAt": "2026-10-29T08:36:51.587370+00:00",
+    "status": "in_progress",
+    "findings": [
+      "B303",
+      "B304",
+      "B305",
+      "B306",
+      "B307"
+    ],
+    "receipts": [
+      "receipts/sdk-unpublished-startup-2026-10-29.json",
+      "receipts/sdk-client-close-recovery-2026-10-29.json"
+    ],
+    "scope": "SDK startup rollback and child process teardown only. No new multi-node authority or UI path is declared accepted.",
+    "coordination": {
+      "peerThread": "01a1821f-1577-7472-93db-3bd83ee42345",
+      "peerTitle": "多电脑连接架构",
+      "outgoingMessagesThisContinuation": 1,
+      "passiveSnapshotsThisContinuation": 2,
+      "scope": "SDK process/permit cleanup, Python/TypeScript SDK admission, resource inventory and audit evidence; no peer UI or routing files edited."
+    }
+  },
+  "auditContinuation20261029PythonPipes": {
+    "recordedAt": "2026-10-29T09:17:28.991954+00:00",
+    "status": "in_progress",
+    "findings": [
+      "B308",
+      "B309",
+      "B310"
+    ],
+    "receipt": "receipts/python-sdk-pipe-backpressure-2026-10-29.json",
+    "scope": "Local standalone SDK process/pipe lifetime only; no new multi-node authority is inferred."
+  },
+  "auditContinuation20261029RuntimeExecutionNamespace": {
+    "recordedAt": "2026-10-29T11:03:27.617943+00:00",
+    "status": "in_progress",
+    "finding": "B311",
+    "receipt": "receipts/runtime-execution-namespace-2026-10-29.json",
+    "scope": "Named Runtime namespace cases fixed; remaining feature and platform acceptance stays open."
+  },
+  "auditContinuation20261029NativeCommand": {
+    "recordedAt": "2026-10-29T11:25:22.513205+00:00",
+    "status": "in_progress",
+    "findings": [
+      "B312"
+    ],
+    "receipt": "receipts/native-command-cancellation-2026-10-29.json",
+    "scope": "Native direct-helper termination only; remaining computer/Runtime authority and platform acceptance remain open."
+  },
+  "auditContinuation20261029LinuxOwnership": {
+    "recordedAt": "2026-10-29T13:28:47.335734+00:00",
+    "status": "in_progress",
+    "findings": [
+      "B313",
+      "B314",
+      "B315"
+    ],
+    "receipts": [
+      "receipts/local-runtime-native-descendants-2026-10-29.json",
+      "receipts/gateway-native-control-cancellation-2026-10-29.json",
+      "receipts/incomplete-process-group-observation-2026-10-29.json"
+    ],
+    "scope": "Local native descendant and fallback cleanup only; no new remote-computer/UI authority or public-network acceptance is inferred.",
+    "coordination": "One concrete B313 ownership notification. Peer-owned apiproxy test fixture inspected and24cases independently passed; peer UI/routes not edited."
+  },
+  "auditContinuation20261029NodeNativeControl": {
+    "recordedAt": "2026-10-29T14:13:25.413767+00:00",
+    "findings": [
+      "B316",
+      "B317",
+      "B318",
+      "B319"
+    ],
+    "receipts": [
+      "receipts/node-configuration-native-control-2026-10-29.json",
+      "receipts/node-configuration-health-budgets-2026-10-29.json",
+      "receipts/node-configuration-health-identity-2026-10-29.json",
+      "receipts/node-pressure-native-command-2026-10-29.json"
+    ],
+    "wholeProjectComplete": false,
+    "domainsStillOpen": 12,
+    "ownedPostgres": "removed_after_zero_clients",
+    "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/node-control-final-baseline-and-hashes.json",
+    "verified": "Real PostgreSQL configuration apply switches a running Gateway listener and refuses occupied candidates; nine direct PostgreSQL preflight cases.51focused cases,26authority/adjacent cases,61CI contracts, source replay, Node22/24 private artifact replays, Gateway types/build/lint and20documentation gates passed.",
+    "coverageScope": "Coverage is scoped to three changed modules. node-config-host.ts:97.46% lines/78.94% branches; node-resource-pressure.ts:87.23% lines/64.7% branches. The shared command helper has100% across all four metrics. Linux memory acquisition is outside this macOS coverage selection.",
+    "coordination": "No messages sent to peer this continuation. Existing node-target protocol consumed; peer-owned server/UI/routes left unchanged."
+  },
+  "auditContinuation20261029LinuxProviderNativeClients": {
+    "recordedAt": "2026-10-29T14:26:37.611973+00:00",
+    "findings": [
+      "B320"
+    ],
+    "receipt": "receipts/linux-provider-native-control-2026-10-29.json",
+    "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+    "wholeProjectComplete": false,
+    "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T133205Z/linux-provider-control-final-hashes.json",
+    "validation": "Source and Node22/24 emitted-owner real-client replays passed.395package cases passed,16platform skips; linux-scope.ts remains100% statements/branches/functions/lines. Public package rebuilt; host aggregate types, scoped lint and20documentation gates passed.",
+    "limitations": [
+      "The native-client scenarios use real private CLI processes and the production scope owner. They run on the current macOS host and emitted internal owner module under Node22/24; no new actual Linux cgroup or whole Loader acceptance is claimed.",
+      "Killing a control client cannot prove a managed range empty; unknown state must still retain ownership."
+    ]
+  },
+  "auditContinuation20261029NativeProbeClosure": {
+    "recordedAt": "2026-10-29T15:05:40.314940+00:00",
+    "findings": [
+      "B321",
+      "B322"
+    ],
+    "receipts": [
+      "receipts/local-runtime-boot-identity-2026-10-29.json",
+      "receipts/native-capability-probes-2026-10-29.json"
+    ],
+    "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+    "wholeProjectComplete": false,
+    "validation": "92Gateway cases,54sandbox/native-source cases,61CI contracts; source and final Node22/24 compiled replays; public native entry Node22/24; host and Gateway types, scoped lint and20documentation gates passed. Four selected modules have100% statements/branches/functions/lines.",
+    "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/native-probe-final-source-artifact-hashes.json",
+    "coordination": "No peer messages or UI/routing/interface changes this continuation. Native probe, local bootstrap and fixture ownership remain in the audit lane."
+  },
+  "auditContinuation20261029ReadinessCompletion": {
+    "recordedAt": "2026-10-29T15:50:40.238900+00:00",
+    "findings": [
+      "B323",
+      "B324"
+    ],
+    "receipt": "receipts/runtime-readiness-completion-2026-10-29.json",
+    "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+    "wholeProjectComplete": false,
+    "validation": "Nine complete source scenarios and nine per Node22/24 private compiled artifact;95focused manager/proxy cases plus70independent PostgreSQL cases,46CI contracts,20docs gates,Gateway types,lint and full build passed. File coverage remains partial.",
+    "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T150659Z/readiness-final-source-artifact-hashes.json",
+    "coordination": "No peer messages or edits to peer-owned UI/routing/request-context interfaces. InstanceManager private readiness, existing completion documentation and test ownership remain in the audit lane."
+  },
+  "auditContinuation20261030TerminalCleanup": {
+    "recordedAt": "2026-10-29T16:05:39.211699+00:00",
+    "findings": [
+      "B325"
+    ],
+    "receipt": "receipts/terminal-monotonic-cleanup-2026-10-30.json",
+    "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+    "wholeProjectComplete": false,
+    "validation": "422adjacent cases passed,16platformcases skipped;terminal.ts100%allfourmetrics;actual source and Node22/24 public Loader/native PTY cases;full build,scoped lint and20docs gates passed.",
+    "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-final-source-artifact-hashes.json",
+    "coordination": "No peer messages or peer-owned UI/routing/interface edits. Terminal cleanup and source/native tests remain in the audit lane."
+  },
+  "auditContinuation20261030DisposedExitProtection": {
+    "recordedAt": "2026-10-29T16:21:58.627566+00:00",
+    "findings": [
+      "B326"
+    ],
+    "receipt": "receipts/subprocess-disposed-exit-protection-2026-10-30.json",
+    "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+    "wholeProjectComplete": false,
+    "validation": "422adjacent cases pass/16platformskips. Provider entry POSIX exclusion removed;entry and terminal source both100%allfourmetrics. Exact callback identity captured in real two-session recovery; source and public Node22/24 native scenarios,full build,TS lint,explicit JS correctness,syntax and20docs gates pass.",
+    "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-final-source-artifact-hashes-v2.json",
+    "coordination": "No peer messages or UI/routing/interface edits. Native process cleanup, fixture ownership and coverage restoration remain in the audit lane."
+  },
+  "auditContinuation20261030ArchiveAdministrationAuthority": {
+    "recordedAt": "2026-10-29T16:59:45.762777+00:00",
+    "findings": [
+      "B327"
+    ],
+    "receipt": "receipts/archive-administration-authority-2026-10-30.json",
+    "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+    "wholeProjectComplete": false,
+    "validation": "173basecases pass;39additional selected cases include4new unique cases and40name-filtered unselected.35realHTTP scenarios pass on each Node22/24 private compiled Gateway. Gateway types/build,full8-gate rootbuild,TS lint,explicit JS correctness and20docs gates pass. Archive file coverage remains partial.",
+    "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T162243Z/archive-final-source-artifact-hashes.json",
+    "coordination": "No peer messages or UI/routing/request-context/interface changes. Existing archive service authority remains in the audit lane."
+  },
+  "auditContinuation20261030ResourceScopeRuntimeIsolation": {
+    "recordedAt": "2026-10-29T17:13:50.445418+00:00",
+    "findings": [
+      "B328"
+    ],
+    "receipt": "receipts/resource-scope-runtime-isolation-2026-10-30.json",
+    "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+    "wholeProjectComplete": false,
+    "validation": "121selected source cases and17real provider/model-adapter/process/terminal cases pass. Source and Node22/24 compiled two-computer-identity HTTP transcripts pass; final compiled archive35-case matrix also passes on each. Gateway compiler/types,TS lint,explicit JS correctness,20docs gates,named final pairing,file format and owned PG cleanup pass. Source file coverage remains partial.",
+    "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/resource-final-source-artifact-hashes.json",
+    "coordination": "No peer messages or peer-owned UI/routing/request-context interface edits. Execution identity and resource authority remain in the audit lane."
+  },
+  "auditContinuation20261030ArchiveReadAuthority": {
+    "recordedAt": "2026-10-29T18:12:14.668923+00:00",
+    "findings": [
+      "B329"
+    ],
+    "receipt": "receipts/archive-read-administration-authority-2026-10-30.json",
+    "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+    "wholeProjectComplete": false,
+    "validation": "248complete selected cases plus2new unique PostgreSQL qualification cases;final read PG37cases and90-entry source transcript. Three compiled transcripts pass on each Node22/24. Reader and authority helper100%allfourmetrics; archive service partial. Gateway strict types/private build,TS lint,explicit JS correctness,20docs and exact owned PG cleanup pass.",
+    "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-final-source-artifact-hashes.json",
+    "coordination": {
+      "peerThreadId": "01a1821f-1577-7472-93db-3bd83ee42345",
+      "messagesThisContinuation": 1,
+      "scope": "One concrete message reserved only archive service/Admin sections and the existing index archive-reader callback. No repeated polling/messages, node/routing/UI interface edits or shared output rebuild window."
+    }
+  },
+  "archiveIdentityNamespaceCandidate": {
+    "finding": "B330",
+    "status": "fixed_named_scope",
+    "receipt": "receipts/archive-runtime-namespace-2026-10-30.json",
+    "remaining": "B331 full PostgreSQL Session namespace; physical multi-host transport/native coldstart and remaining review stay open."
+  },
+  "auditContinuation20261030ArchiveRuntimeNamespace": {
+    "status": "named_paths_verified_remaining_review_open",
+    "receipt": "receipts/archive-runtime-namespace-2026-10-30.json",
+    "baseline": {
+      "ahead": 139,
+      "behind": 0,
+      "lastFetch": "2026-10-29T19:49:39.220376+00:00",
+      "dirtyWorkspacePreserved": true,
+      "headReference": "codex/business-logic-audit-2026-10-23",
+      "originReference": "origin/master",
+      "localIdentityEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/current-baseline-identity.json"
+    },
+    "coverage": {
+      "archive-identity.ts": {
+        "lines": 100,
+        "functions": 100,
+        "statements": 100,
+        "branches": 100
+      },
+      "archive-runtime-reader.ts": {
+        "lines": 100,
+        "functions": 100,
+        "statements": 100,
+        "branches": 100
+      },
+      "administrator-authority.ts": {
+        "lines": 100,
+        "functions": 100,
+        "statements": 100,
+        "branches": 100
+      },
+      "conversation-archive-service.ts": {
+        "lines": 92.49,
+        "functions": 93.75,
+        "statements": 86.74,
+        "branches": 77.58
+      }
+    },
+    "nextFinding": "B331",
+    "peerWork": "Archive DTO/API/ArchivesPage and reserved migration097 were coordinated once. Unrelated Scope navigation/routing UI was preserved; concurrent README edits were merged at the paragraph only."
+  },
+  "auditContinuation20261030ArchiveCleanupAcknowledgement": {
+    "status": "fixed_named_scope_remaining_review_open",
+    "finding": "B332",
+    "receipt": "receipts/archive-file-cleanup-acknowledgement-2026-10-30.json",
+    "wholeProjectComplete": false
+  },
+  "postgresSessionNamespace": {
+    "finding": "B331",
+    "status": "fixed_named_scope_remaining_review_open",
+    "receipt": "receipts/postgres-session-runtime-namespace-2026-10-30.json",
+    "published": true,
+    "migrationDraftVersion": 99,
+    "migrationVersion": 99,
+    "wholeProjectComplete": false
+  },
+  "auditContinuation20261030ProjectProgressNodeAffinity": {
+    "status": "fixed_named_scope_remaining_review_open",
+    "finding": "B333",
+    "receipt": "receipts/project-progress-node-affinity-2026-10-30.json",
+    "wholeProjectComplete": false
+  },
+  "auditContinuation20261030BlankDraftLifecycle": {
+    "finding": "B334",
+    "status": "fixed_named_scope_remaining_review_open",
+    "receipt": "receipts/blank-draft-archive-lifecycle-2026-10-30.json",
+    "wholeProjectComplete": false
+  },
+  "deploymentTopology101Observation": {
+    "at": "2026-10-30T06:38:09.564841+00:00",
+    "path": "gateway/deploy/postgres/migrations/101_deployment_topology.sql",
+    "sha256": "c4ffd37d4040ac5e5630be197fe4325043cfbd00d913f525ccb1cd449a84368e",
+    "status": "read_only_business_integration_review_in_progress",
+    "reviewAreas": [
+      "entry-node visibility",
+      "managed/pending/detached attachment transitions",
+      "Runtime node-connection fencing",
+      "organization isolation and existing node data"
+    ],
+    "scope": "Read-only observation; peer-owned schema left unchanged. This is not a defect finding or acceptance claim.",
+    "latestObservedAt": "2026-10-30T09:08:53.666554+00:00",
+    "latestSha256": "7fccd68c06ab59bca74663b4704270580afa64e7fb27061a3b952ad296edd097"
+  },
+  "confirmedProductHandoff20261030": {
+    "at": "2026-10-30T09:08:53.666554+00:00",
+    "status": "requirements_mapped_implementation_under_review",
+    "requirements": [
+      {
+        "id": "single-mode-preservation",
+        "rules": [
+          "New deployment defaults to organization single mode, preserving multiple users, personal Runtime identities, documents, fixed-computer projects and collaboration.",
+          "Single mode suppresses computer labels, groups, selectors and cross-computer Admin entry without rebuilding identity or permissions."
+        ],
+        "areas": [
+          "environment-identity",
+          "slow-node-and-browser-isolation"
+        ]
+      },
+      {
+        "id": "entry-scoped-authorization",
+        "rules": [
+          "The browser-reached primary aggregates only authorized managed computers; its own Runtime remains usable.",
+          "A directly visited non-primary Gateway serves local resources only and returns its own entry policy before any Runtime forwarding.",
+          "Unavailable foreign selections are refused without substituting local targets."
+        ],
+        "areas": [
+          "authority-and-discovery",
+          "execution-and-placement",
+          "connections-cancellation-and-receipts"
+        ]
+      },
+      {
+        "id": "personal-groups-and-fixed-projects",
+        "rules": [
+          "Personal metadata groups by computer without starting Runtimes.",
+          "Projects remain on one fixed computer; invitations require that computer use grant as well as project membership and capability policy.",
+          "Single-mode project creation selects the local computer implicitly."
+        ],
+        "areas": [
+          "environment-identity",
+          "authority-and-discovery",
+          "files-documents-and-terminals"
+        ]
+      },
+      {
+        "id": "attachment-and-mode-transitions",
+        "rules": [
+          "Pending enrollment does not revoke local execution authority; managed activation requires confirmed stopped prior Runtimes.",
+          "Detachment requires confirmed stop and drained HTTP/WebSocket/transfer work; offline or unknown state cannot prove stop.",
+          "Detachment withdraws old credentials and connection leases while retaining identities, files, project membership and grants; fresh independent local generations remain possible.",
+          "All retained registrations must detach before mode disable; topology locking, revision CAS and database triggers serialize relevant transitions and starts.",
+          "Primary-local work survives mode changes; re-enabling does not reconnect older computers automatically."
+        ],
+        "areas": [
+          "node-enrollment-and-revocation",
+          "destructive-lifecycle",
+          "models-resources-and-usage",
+          "connections-cancellation-and-receipts"
+        ]
+      },
+      {
+        "id": "paging-targets-and-browser-state",
+        "rules": [
+          "Entry visibility filters precede pagination and counts for Runtimes, computer permissions, invitations, sessions, document locations and overviews.",
+          "Backend checks cover explicit and resolved HTTP, WebSocket, Webhook and document-copy destinations.",
+          "Drafts, unsaved forms and captured targets are retained; tabs share only configuration revision, with visible policy refresh default30000milliseconds."
+        ],
+        "areas": [
+          "sessions-and-state",
+          "files-documents-and-terminals",
+          "slow-node-and-browser-isolation"
+        ]
+      },
+      {
+        "id": "configuration-and-recovery",
+        "rules": [
+          "Reuse deployment, NodeConfiguration, Node Agent, public origins and installed systemd/launchd services.",
+          "Private node-connection setup is atomically written with0600mode; enrollment codes never enter URLs, process arguments or persisted browser storage.",
+          "Restore preserves destination topology and agent/enrollment authority, advances connection epochs, and keeps node-local connection files outside application snapshots.",
+          "Same organization database plus local files is in scope; separate-deployment import, installers and additional Windows execution support remain excluded.",
+          "Complete backup still requires every computer’s files; a local bundle does not imply multi-computer coverage."
+        ],
+        "areas": [
+          "backup-and-restore",
+          "release-and-platform-compatibility",
+          "node-enrollment-and-revocation"
+        ]
+      }
+    ],
+    "peerReportedChecksNotCountedAsAuditAcceptance": true,
+    "peerImplementationComplete": false
+  },
+  "auditContinuation20261030RestoreEnrollmentHistory": {
+    "finding": "B341",
+    "status": "fixed_named_scope",
+    "receipt": "receipts/restore-node-enrollment-issuer-2026-10-30.json",
+    "independentIntegrationTests": 60,
+    "physicalMultiHostAcceptance": false,
+    "remaining": "All12review areas and original business domains stay in_progress; GUI failure investigation belongs to peer."
+  },
+  "auditContinuation20261030WindowsObservation": {
+    "finding": "B342",
+    "receipt": "receipts/windows-terminal-observation-2026-10-30.json",
+    "scope": "Native terminal observation failure preserves process ownership; no new Windows Gateway execution support and no full resource-admission claim."
+  },
+  "auditContinuation20261030ManagedDirectoryPolicy": {
+    "receipt": "receipts/managed-directory-access-2026-10-30.json",
+    "scope": "Managed picker selection, exact grant mode and strict grant inputs; automatic default guard override qualified; production CLI already protects launch-only keys."
+  },
+  "auditContinuation20261030Favicon": {
+    "receipt": "receipts/favicon-runtime-allocation-2026-10-30.json",
+    "scope": "Gateway fallback icon never allocates a Runtime; archive form consumer uses stable IDs."
+  },
+  "auditContinuation20261030BrowserNavigationFixtures": {
+    "receipt": "receipts/web-navigation-fixture-races-2026-10-30.json",
+    "scope": "Both peer-reported Web failures resolved as obsolete asynchronous-navigation test assumptions; product scopes preserved."
+  },
+  "auditContinuation20261030ProjectActivityOwnership": {
+    "receipt": "receipts/project-activity-runtime-ownership-2026-10-30.json",
+    "scope": "Complete Session Runtime addressing, bounded polling, stable grouping and superseded-response isolation; no full backend or physical computer acceptance claim."
+  },
+  "pendingComputerPreparationReview": {
+    "status": "peer_reported_candidate_under_source_review",
+    "observation": "A newly issued computer is offline; Gateway startup requiresactive, while the primary preparation-status HTTP path refusespendingvisibility. Peer explicitly used the audited administrator maintenance operation after preparation. Verify the supported preparation/activation workflow before classifying a product defect.",
+    "deploymentSeparation": "Peer prepares a separate Ubuntu computer with Mac primary from a frozen release excludingB350throughB353. No audit operation mutates its live database or hosts."
+  },
+  "peerReportedLinuxContinuation20261030": {
+    "status": "peer_reported_under_validation",
+    "reports": [
+      "SystemdLauncher credential files were removed before Type=simple exec preparation; peer changes Type=exec and retains generation-owned 0600 files until confirmed stop.",
+      "Pressure sampling now follows explicit enabled lifecycle, peer reports eight focused tests and zero maintenance writer count after stop.",
+      "Peer reports 24 keyless dual-Gateway and actual Web scenarios."
+    ],
+    "acceptanceLimit": "Root has not independently accepted or deployed these changes. Peer owns deployment and these source paths."
+  },
+  "directoryReplacementContinuation20261030": {
+    "finding": "B354",
+    "status": "fixed_named_directory_scope",
+    "nativeMinimumVersion": "0.1.3",
+    "peerHandoff": "Acceptance complete; concrete integration handoff follows. Frozen deployments have not been changed by this audit.",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z",
+    "receipt": "receipts/directory-replacement-ownership-2026-10-30.json"
+  },
+  "managedDocumentActivationReview20261030": {
+    "status": "fixed_named_selection_scope_peer_live_activation_separate",
+    "observation": "Both live managed Runtime inventories report userdoc-gateway failed. Browser document broker upload and cross-computer copy succeed but do not prove Runtime provider activation. Source Loader default-config controls pass. Obtain the actual Fiber exception in an isolated compiled Web composition.",
+    "ownedScope": "Root handles provider/activation investigation; peer retains Gateway topology, connection deadlines and deployment. No permission weakening, credentials disclosure, or live mutation.",
+    "receipt": "receipts/managed-document-provider-selection-2026-10-31.json",
+    "causalScope": "Real Loader source cases; full compiled Web verification is normal startup, not delayed Gateway absence.",
+    "peerDeployment": "Peer received YAML-only production payload and paired docs; peer independently activates frozen Mac/Ubuntu release excluding B354Native and B356.",
+    "peerReportedLiveAcceptance": {
+      "at": "2026-10-30T16:16:03.661867+00:00",
+      "source": "Parallel computer architecture chat report; root did not mutate or independently inspect live hosts.",
+      "macPersonalGeneration": 12605,
+      "ubuntuPersonalGeneration": 12,
+      "providers": "local disabled with null fiber; gateway/context/http active; no userdoc startup failure.",
+      "scopeLimits": "Peer verified managed provider activation on both hosts. Wide-area browser/event connection latency and disconnect recovery remain under peer investigation; this is not complete cross-computer business acceptance."
+    }
+  },
+  "credentialRemountReview20261031": {
+    "finding": "B356",
+    "status": "fixed_named_application_authority_scope",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z",
+    "negative": "gateway-credential-plugin-remount-negative.json",
+    "scope": "Retain one validated launch authority per application root across provider remount, without sharing across roots.",
+    "receipt": "receipts/gateway-credential-lifetime-2026-10-31.json",
+    "peerRelease": "Excluded from the current peer frozen release; final integration handoff follows separately."
+  },
+  "peerReportedWanChannelAuthorization20261031": {
+    "status": "peer_reports_source_and_frozen_matrix_passed",
+    "observation": "Peer measured shared-DBSELECT1latency281to1210ms. Read-only channel authorization takes node_agents FOR UPDATE and serializes same-node readers. Peer owns changing only that read path to FOR SHARE OF a while heartbeat/connect/enroll/revoke retain exclusive locks, with realPGlock/revocation regressions.",
+    "rootScope": "No root edits to peer NodeAccess or live hosts. This report is not independent acceptance.",
+    "peerEvidence": "Old exclusive reader times out after1second under realPGlock; shared-reader implementation15cases pass including concurrent readers and revocation/expiry401/409. Peer reports27line compiled two-Gateway replay and20browser screenshots. Root did not independently rerun those checks.",
+    "lockSemantics": "Only read-only channel authentication requests SHARE OF a/o; mutating authentication retains UPDATE. SHARE still conflicts with non-key credential UPDATE."
+  },
+  "peerReportedSystemdUserProjectOrigin20261031": {
+    "status": "peer_fix_in_progress",
+    "observation": "Stored user-origin projects are created under HGW_USER_PROJECTS_ROOT but the unconditional administrator-import runtime path validator refuses that root. Peer carries persisted DBproject.origin into validation and three documents-local call sites, preserving realpath/symlink/outside/system-root checks.",
+    "coordination": "Peer owns this minimal origin change and frozen patch; root does not edit its instance repository or documents-local work."
+  },
+  "managedStartupRequirements20261031": {
+    "finding": "B357",
+    "status": "fixed_named_cli_startup_scope",
+    "receipt": "receipts/managed-startup-admission-2026-10-31.json",
+    "peerRelease": "Not deployed by root; shared CLI source is separate from peer NodeAccess/project-origin changes."
+  },
+  "privateRuntimeCredentialParsing20261031": {
+    "findings": [
+      "B358",
+      "B359"
+    ],
+    "status": "fixed_named_parser_scope",
+    "receipt": "receipts/private-gateway-credential-input-2026-10-31.json",
+    "peerRelease": "Not deployed by root; no request to restart current peer freeze."
+  },
+  "desktopHostHttpAuthorization20261031": {
+    "finding": "B360",
+    "status": "fixed_optional_desktop_scope",
+    "receipt": "receipts/desktop-request-authorization-2026-10-31.json",
+    "cloudBundle": "Remains unmounted; no deployment change.",
+    "peerOwnership": "Project runtime account/home provisioning handed to architecture peer; root does not edit user-data/instances/launcher or live hosts."
+  },
+  "runtimeStartAdmissionIdentity20261031": {
+    "finding": "B361",
+    "status": "fixed_named_explicit_selector_scope",
+    "receipt": "receipts/runtime-start-admission-identity-2026-10-31.json",
+    "deployment": "Private compiled Gateway only; peer-owned production deployments untouched."
+  },
+  "peerReportedProjectRuntimePrivatePreparation20261031": {
+    "status": "peer_implemented_not_released",
+    "owner": "Architecture/deployment peer",
+    "paths": [
+      "gateway/src/project-runtime-data.ts",
+      "gateway/src/instances.ts"
+    ],
+    "peerEvidence": "Ubuntu5tests including directory replacement and external hardlink refusal. Root has not independently accepted this scope.",
+    "mechanism": "Actual non-root Unix UID/GID, retained no-follow directory chain with inode checks,0700directories and0600single-link inventory before mount/seed; no recursive chown.",
+    "followup": "Peer explicitly owns client/runtime lazy startup before directory/conversation operations; metadata reads stay lazy. Root preserves those files.",
+    "latestPeerFollowup": "Peer will additionally prepare existing managed inventory/.env/grants/governance/home patch files with fd+NOFOLLOW+nlink1/0600 and make managed-default atomic patch temp inherit DSH_HOME uid/gid. Project helper and apply-model-governance paths remain peer-owned; not independently accepted by root.",
+    "peerBrowserEvidence": "Peer reports isolated WorkspaceCatalog assembled29line transcript and24screenshots pass; public unified-space scope503 investigation remains in progress."
+  },
+  "postgresMaintenanceChildEnvironment20261031": {
+    "finding": "B362",
+    "status": "fixed_named_environment_scope",
+    "receipt": "receipts/postgres-command-environment-2026-10-31.json",
+    "deployment": "Private compiled Gateway only; peer-owned live hosts and project preparation untouched."
+  },
+  "maintenanceDiagnosticByteCeiling20261031": {
+    "finding": "B363",
+    "status": "fixed_named_diagnostic_scope",
+    "receipt": "receipts/maintenance-diagnostic-byte-ceiling-2026-10-31.json"
+  },
+  "peerReportedFinalAtomicRelease20261031": {
+    "owner": "Architecture/deployment peer",
+    "status": "peer_reports_activated_public_browser_acceptance_ongoing",
+    "release": "coharness-dualhost-20261031-atomic",
+    "peerEvidence": "Ubuntu project generation5ready;9Linux file/hardlink cases plus two-Unix-identity compiled read;36model-policy source cases;94client cases including old30-second ready negative;29dualGateway transcript entries and24browser/mode captures.",
+    "scope": "Peer policy writers use existing writeFileAtomic owner/mode; SessionRuntimePool uses target metadata requestTimeoutMs. Root has not independently accepted this scope.",
+    "remaining": "Public two-tab unified-personal-space acceptance and observed WAN control-WebSocket interruptions remain under peer review."
+  },
+  "nativeDirectoryPathIdentity": {
+    "finding": "B364",
+    "receipt": "receipts/native-picker-path-terminator-2026-10-31.json",
+    "status": "fixed_named_path_scope",
+    "managedComposition": "Gateway automatic default continues browser interaction; native local compositions preserve exact POSIX filename characters. No peer runtime/UI edits."
+  },
+  "nativeChooserLifetime": {
+    "finding": "B365",
+    "status": "fixed_named_posix_scope",
+    "receipt": "receipts/native-picker-service-lifetime-2026-10-31.json",
+    "ownership": "Root native package only; peer runtime and deployment files preserved."
+  },
+  "peerPublicDualHostAcceptance20261031": {
+    "status": "peer_reported_functional_acceptance_performance_limit_open",
+    "release": "coharness-dualhost-20261031-atomic",
+    "reported": "A/Btab drafts/computer labels/send readiness correct; no page/HTTPerrors. Ausableabout13seconds,Bprewarmedusableabout137seconds. Cross-network database/RPC performance is not accepted.",
+    "typeCheckHandoff": "Peer corrected two test mock types; peer reports14cases/typecheck/lint pass. Root independently passes subsequent8-gatebuild.",
+    "limits": "Root has not independently reaccepted the public deployment; no root deployment or live database mutation."
+  },
+  "nativeDialogWorkerClosure": {
+    "finding": "B366",
+    "receipt": "receipts/native-dialog-worker-closure-2026-10-31.json",
+    "status": "driver_protocol_verified_physical_windows_open"
+  },
+  "peerExpandedRealTaskGoal": {
+    "owner": "Architecture/deployment peer",
+    "status": "peer_reported_started",
+    "record": ".agents/audits/full-real-task-2026-10-31/ledger.json",
+    "scope": "Peer inventories active routes/plugins/configuration and runs actual role/computer/Runtime tasks under its separately reported user authorization. HeadlessUbuntu remote-desktop/ComputerUse capability presentation belongs to peer.",
+    "coordination": "Root keeps native/CLI/archive scope and does not overwrite GUI/runtime files. No repeated coordination request is sent. Root paid-interface validation remains deferred; no independent acceptance of the new peer goal is claimed."
+  },
+  "posixIdentityObservation": {
+    "finding": "B367",
+    "receipt": "receipts/posix-identity-observation-2026-10-31.json",
+    "status": "named_observer_scope_verified_global_build_gui_types_pending"
+  },
+  "resourceAdmissionCoordination": {
+    "at": "2026-10-30T20:33:06.075878+00:00",
+    "scope": "Root read-only review of resource request/status requalification; peer owns real first-inference failure and NoGUI capability presentation.",
+    "peerReportedRepair": "workspace-changes index/git/execution maintenance spawns explicitly choose infrastructure before user input enters execution. Peer reports41source cases; REAL-003in peer ledger reports fixed_and_real_retested with r1-real-model-completion.json.",
+    "independentRootLimits": "Root did not independently execute a real model call or accept provider-specific Responses. The three resource-budget/API files remain untouched by root this turn.",
+    "currentBuild": "Desktop schema occupancy consumer has changed; remaining ClientDesktopStatus export and NoGUItest typing failures are recorded, not accepted as a green full build."
+  },
+  "nativeProcessControlDeadlines": {
+    "finding": "B368",
+    "receipt": "receipts/native-process-control-deadlines-2026-10-31.json",
+    "status": "named_helper_and_workload_lifetime_verified"
+  },
+  "currentResourceQualifications": {
+    "receipt": "receipts/native-process-control-deadlines-2026-10-31.json",
+    "cases": 61,
+    "scope": "Named per-computer six-lane qualification and execution/watch controls; complete cross-computer review remains open."
+  },
+  "currentBuildAndDocumentation": {
+    "receipt": "receipts/native-translation-admission-2026-11-01.json",
+    "build": "Normal LLM/translator declaration emit and filtered runtime builds, built NodeNext consumer and both SDKs verified.",
+    "documentation": "Final20 quick documentation checks, export JSDoc and config-catalog pass; full doc-sync not rerun.",
+    "coordination": "Apply only sourceDeltaPaths; prerequisite files are read-only context and must never overwrite newer peer source. Rebuild LLM and translator together from the matching complete source tree. Older LLM JavaScript silently ignores the extra guard argument. Runtime references are comparison artifacts, not production overlays. Shared lockfile, type-equivalence manifest and generated catalogs require hunk-level integration over current peer changes. The lockfile own patch contains exactly two dev dependency entries. No Session event or format changes, no committed Session generation writes and no database migration are introduced by this packet. B416/B417/B418 matching-reader integration remains independently pending with the peer."
+  },
+  "memoryConsolidationCoalescing": {
+    "finding": "B369",
+    "receipt": "receipts/memory-consolidation-coalescing-2026-10-31.json",
+    "status": "named_shared_scope_model_admission_verified_domain_open"
+  },
+  "latestDocumentationConvergence": {
+    "receipt": "receipts/uncertain-resource-cancellation-2026-11-01.json",
+    "quickPassed": 20,
+    "quickFailed": 0,
+    "fullQuickAggregateExecuted": true,
+    "rootDidNotModifyPeerLedger": true
+  },
+  "peerFullRealTaskCurrent": {
+    "source": ".agents/audits/full-real-task-2026-10-31/ledger.json",
+    "status": "inventory_in_progress",
+    "targetRelease": "coharness-full-real-20261031-r3",
+    "coverage": {
+      "inventoried": 172,
+      "executed": 24,
+      "passed": 20,
+      "failed": 1,
+      "partial": 3,
+      "blocked": 0,
+      "unsupported": 0,
+      "pending": 148,
+      "note": "Atomic supporting observations are recorded separately; incomplete scenarios do not count as passed."
+    },
+    "scope": "Peer scenario inventory and partial results are separate from root keyless test counts; no complete real acceptance claim."
+  },
+  "memoryRecallAddresses": {
+    "findings": [
+      "B370",
+      "B371",
+      "B372",
+      "B373"
+    ],
+    "receipt": "receipts/memory-recall-addresses-2026-10-31.json",
+    "status": "named_recall_fitting_scope_order_and_resource_controls_verified_domain_open"
+  },
+  "memoryToolScopes": {
+    "finding": "B374",
+    "receipt": "receipts/memory-tool-offered-scopes-2026-10-31.json",
+    "status": "named_model_tool_scope_controls_verified_domain_open"
+  },
+  "peerFrozenR3": {
+    "peerRelease": "coharness-full-real-20261031-r3",
+    "peerSourceSnapshot": "/Users/a1234/harness-gateway-releases/coharness-full-real-20261031-r3",
+    "sourceFreezeAcknowledgement": "Peer reported18756source files copied and hash-stable; root applied B374only after that acknowledgement.",
+    "snapshotModuleHash": "11f336e017943a2cd7e2e0d37efa13ee621499d4226b191f98eeb11f2944a218",
+    "scope": "The frozen r3contains B368throughB373but not B374. This source correction belongs to a subsequent peer release. Root did not modify the frozen tree, deploy, use Docker or touch production databases.",
+    "peerEnvironment": "Peer reports Docker stopped after disk exhaustion and is restoring services without deleting data volumes. Root continues disjoint keyless code work and performs no host service recovery."
+  },
+  "sdkRegistrationRecovery": {
+    "findings": [
+      "B375",
+      "B376"
+    ],
+    "receipt": "receipts/sdk-resource-registration-recovery-2026-10-31.json",
+    "status": "named_sdk_resource_recovery_verified_domain_open"
+  },
+  "peerFrozenR4": {
+    "peerFrozenRelease": "coharness-full-real-20261031-r4",
+    "frozenDirectory": "/Users/a1234/harness-gateway-releases/coharness-full-real-20261031-r4",
+    "frozenManagedSourceMatchesBeforeFix": true,
+    "rootDidNotModifyFrozenRelease": true,
+    "scope": "B377follows the frozen R4. Root did not deploy or operate Docker/production services. No current deployment claim is made.",
+    "peerReservedFiles": [
+      "gateway/src/runtime-resource-api.ts",
+      "gateway/src/node-resource-budget.ts",
+      "packages/context/gateway-runtime/src/resource-budget.ts"
+    ],
+    "peerAdditionalOwnership": "ui-collaboration conversation URLs, corresponding tests and identity documents remain with the peer."
+  },
+  "sdkPausedModelShutdown": {
+    "findings": [
+      "B377"
+    ],
+    "receipt": "receipts/sdk-paused-model-shutdown-2026-10-31.json",
+    "status": "named_sdk_paused_model_shutdown_verified_domain_open"
+  },
+  "peerLatestOperationalReport": {
+    "at": "2026-10-31T08:40:17.419075+00:00",
+    "source": "Peer direct operational messages; not root production acceptance.",
+    "serving": "Peer reports R12 serving epoch89/schema102 on A/B with B393/B394 included and B395/B396 awaiting its next candidate. Existing UID993/project29 files and retained A drafts remain intact.",
+    "qaTransport": "Peer attributed A browser latency to its private HTTP/1.1 QA proxy queue, replaced that proxy with transparent HTTP/2, and reports improved actual browser timing. Product service/config did not change. PrincipalSignal expiry is intended authorization expiry, not an established proxyTimeout bug.",
+    "realAcceptance": "Peer reports real invitation acceptance and read-only task access, plus separate usage-grant and membership-revocation refusals. The full state-transition matrix and B remote PostgreSQL/start/PTY delays remain open.",
+    "authorization": "The user confirmed ordinary-user models remain authorized per user; do not broaden configured default models.",
+    "merge": "Apply only the twenty-six current source paths, preserving current peer Local/Gateway/UI and pending B395/B396 changes. Rebuild matching web, web-search-deepseek and web-search-perplexity main artifacts. Merge only the two new test dependency records in llm-pi-ai package.json and lockfile; preserve any newer shared metadata. Older cumulative reference artifacts must not replace newer merged outputs."
+  },
+  "sdkCleanupDeadline": {
+    "findings": [
+      "B378"
+    ],
+    "receipt": "receipts/sdk-total-cleanup-deadline-2026-10-31.json",
+    "status": "named_sdk_aggregate_cleanup_verified_domain_open"
+  },
+  "peerR5SdkCapture": {
+    "at": "2026-10-31T00:31:49.101700+00:00",
+    "status": "peer_acknowledged_capture_and_reports_matched_deployment",
+    "sdkUnionUnchanged": true,
+    "receipt": "receipts/codex-model-body-deadline-2026-10-31.json"
+  },
+  "codexModelBodyDeadline": {
+    "findings": [
+      "B379"
+    ],
+    "receipt": "receipts/codex-model-body-deadline-2026-10-31.json",
+    "status": "named_native_upload_deadline_verified_domain_open"
+  },
+  "sdkModelAndCancellationCompletion": {
+    "findings": [
+      "B380",
+      "B381"
+    ],
+    "receipt": "receipts/sdk-model-and-cancellation-completion-2026-10-31.json",
+    "status": "named_source_and_built_sdk_completion_recovery_verified_domain_open"
+  },
+  "sdkControlRequestBody": {
+    "finding": "B382",
+    "receipt": "receipts/sdk-control-request-body-deadline-2026-10-31.json",
+    "status": "named_source_and_built_control_upload_deadline_verified_domain_open"
+  },
+  "sdkControlTransportConcurrency": {
+    "finding": "B383",
+    "receipt": "receipts/sdk-control-transport-concurrency-2026-10-31.json",
+    "status": "named_source_and_built_control_concurrency_verified_domain_open"
+  },
+  "opaqueMemberResourceAdmission": {
+    "finding": "B384",
+    "receipt": "receipts/opaque-member-resource-admission-2026-10-31.json",
+    "status": "named_opaque_member_resource_only_admission_verified_domain_open"
+  },
+  "peerNavigationInputRace": {
+    "id": "REAL-013",
+    "owner": "architecture peer",
+    "status": "peer_implementation_and_verification_in_progress",
+    "scope": [
+      "packages/client/runtime",
+      "ui-conversation",
+      "test-support/client-runtime",
+      "apps/web/tests/workspace-history-entry.e2e.ts"
+    ]
+  },
+  "modelResourceProviderOwnership": {
+    "finding": "B385",
+    "receipt": "receipts/model-resource-provider-ownership-2026-10-31.json",
+    "status": "named_provider_identity_cases_verified_domain_open"
+  },
+  "processAdmissionAndSpillLifetime": {
+    "findings": [
+      "B386",
+      "B387"
+    ],
+    "receipt": "receipts/process-admission-and-spill-lifetime-2026-10-31.json",
+    "status": "named_owner_and_spill_cases_verified_domain_open"
+  },
+  "asynchronousSshAdmission": {
+    "finding": "B388",
+    "receipt": "receipts/ssh-asynchronous-admission-2026-10-31.json",
+    "status": "named_ssh_owner_wait_cases_verified_domain_open"
+  },
+  "modelAdmissionFailureCategories": {
+    "finding": "B389",
+    "receipt": "receipts/model-admission-failure-categories-2026-10-31.json",
+    "status": "named_model_admission_categories_verified_domain_open"
+  },
+  "localResourceOnlyCodex": {
+    "receipt": "receipts/resource-only-native-codex-2026-10-31.json",
+    "status": "named_local_resource_only_compositions_verified_other_review_open",
+    "productionSourceChanges": 0,
+    "coordination": "Peer R9 remains frozen through B388; no routine message or deployment change."
+  },
+  "localPreflightResourceAccounting": {
+    "finding": "B390",
+    "receipt": "receipts/local-preflight-resource-accounting-2026-10-31.json",
+    "status": "named_local_preflight_verified_domain_open"
+  },
+  "localTargetValidationAccounting": {
+    "finding": "B391",
+    "receipt": "receipts/local-target-validation-accounting-2026-10-31.json",
+    "status": "named_target_validation_verified_domain_open"
+  },
+  "sdkStartupAdmissionOwner": {
+    "finding": "B392",
+    "receipt": "receipts/sdk-startup-admission-owner-2026-10-31.json",
+    "status": "named_sdk_start_owner_verified_domain_open"
+  },
+  "migrationVerificationOwner": {
+    "finding": "B393",
+    "receipt": "receipts/migration-verification-resource-owner-2026-10-31.json",
+    "status": "named_migration_owner_verified_domain_open"
+  },
+  "marketParserOwner": {
+    "finding": "B394",
+    "receipt": "receipts/market-parser-resource-owner-2026-10-31.json",
+    "status": "named_market_parser_owner_verified_domain_open"
+  },
+  "inspectorStartupAndBootstrap": {
+    "findings": [
+      "B395",
+      "B396"
+    ],
+    "receipt": "receipts/inspector-startup-and-bootstrap-2026-10-31.json",
+    "status": "named_startup_and_bootstrap_verified_permission_review_open"
+  },
+  "peerR11AndR12": {
+    "at": "2026-10-31T08:00:42.700239+00:00",
+    "source": "Peer direct operational message; not root production acceptance.",
+    "serving": "Peer reports R11 serving on both nodes, including B392; B393/B394 await its next candidate. Project29 generation3 policy-package readability and Web plugin interface are restored.",
+    "reservedR12": [
+      "gateway/src/managed-files.ts and related manifest tests",
+      "ui-collaboration/ProjectManagerModal.tsx and related invitation tests",
+      "gateway-runtime required-policy-plugin readiness and related tests"
+    ],
+    "remaining": "The peer real-task matrix remains incomplete. Root retains its archive/search work and does not modify reserved files.",
+    "merge": "Apply only the twenty-eight current source paths and rebuild matching Inspector index.js/worker.js on the current candidate. Preserve prior B393/B394 deltas and all peer Local/Gateway/UI work; do not overwrite current merged artifacts with cumulative older references."
+  },
+  "modelSearchDispatchOwner": {
+    "finding": "B397",
+    "receipt": "receipts/model-search-dispatch-owner-2026-10-31.json",
+    "status": "named_independent_dispatch_verified_domain_open"
+  },
+  "peerR12OperationalTimingAndAuthority": {
+    "at": "2026-10-31T08:40:17.419075+00:00",
+    "source": "Peer direct operational messages; not root production acceptance.",
+    "serving": "Peer reports R12 serving epoch89/schema102 on A/B with B393/B394 included and B395/B396 awaiting its next candidate. Existing UID993/project29 files and retained A drafts remain intact.",
+    "qaTransport": "Peer attributed A browser latency to its private HTTP/1.1 QA proxy queue, replaced that proxy with transparent HTTP/2, and reports improved actual browser timing. Product service/config did not change. PrincipalSignal expiry is intended authorization expiry, not an established proxyTimeout bug.",
+    "realAcceptance": "Peer reports real invitation acceptance and read-only task access, plus separate usage-grant and membership-revocation refusals. The full state-transition matrix and B remote PostgreSQL/start/PTY delays remain open.",
+    "authorization": "The user confirmed ordinary-user models remain authorized per user; do not broaden configured default models.",
+    "merge": "Apply only the twenty-six current source paths, preserving current peer Local/Gateway/UI and pending B395/B396 changes. Rebuild matching web, web-search-deepseek and web-search-perplexity main artifacts. Merge only the two new test dependency records in llm-pi-ai package.json and lockfile; preserve any newer shared metadata. Older cumulative reference artifacts must not replace newer merged outputs."
+  },
+  "browserStartupOwner": {
+    "finding": "B398",
+    "receipt": "receipts/browser-startup-resource-owner-2026-10-31.json",
+    "status": "named_browser_admission_verified_domain_open"
+  },
+  "browserReconnectCleanup": {
+    "finding": "B399",
+    "receipt": "receipts/browser-reconnect-cleanup-2026-10-31.json",
+    "status": "named_browser_reconnect_cleanup_verified_domain_open"
+  },
+  "sdkAuthorityOnlyControl": {
+    "finding": "B400",
+    "receipt": "receipts/sdk-execution-authority-control-2026-10-31.json",
+    "status": "named_sdk_authority_composition_verified_domain_open"
+  },
+  "peerR13CandidateAndDiskReport": {
+    "source": "Peer direct report; not root production acceptance.",
+    "candidate": "Peer reports R13 includes B395/B396/B397, full build, Admin537 and native PostgreSQL/double-Gateway/Web/Admin replay passed; production switch not yet confirmed.",
+    "disk": "Peer traced private QA Buffer retention and swap pressure, recreated that private driver after saving tab storage, and reports recovery near 7GiB. Root observed 6.9GiB; all new Node checks disable compile cache. Root performed only the planned single-package incremental compile and 80KB bundle after the earlier full-build pause.",
+    "merge": "Merge fourteen B400 delta paths onto the B399 immutable capsule and rebuild matching SDK index/managed entries. A planned package-only compile and 80KB paired bundle passed with source and built Node22/24 native SDK applications; no new full repository build is claimed. B398/B399/B400 remain follow-up candidates, not additions to the peer current R13 freeze. Preserve newer peer artifacts; cumulative references are not deployment replacements."
+  },
+  "sharedSubagentParentControl": {
+    "finding": "B401",
+    "receipt": "receipts/subagent-parent-model-control-2026-10-31.json",
+    "status": "named_parent_control_classification_verified_domain_open"
+  },
+  "inspectorDebugAuthority": {
+    "finding": "B402",
+    "receipt": "receipts/inspector-managed-debugging-2026-10-31.json",
+    "status": "named_debug_authority_verified_domain_open"
+  },
+  "sshHelperCleanup": {
+    "finding": "B403",
+    "receipt": "receipts/ssh-helper-cleanup-ownership-2026-10-31.json",
+    "status": "named_helper_cleanup_verified_domain_open"
+  },
+  "peerR14LatestReports": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/peer-r14-report.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T111213Z/peer-r14-followup-report.json"
+  ],
+  "sshStreamForwarding": {
+    "finding": "B404",
+    "receipt": "receipts/ssh-stream-forwarding-cancellation-2026-10-31.json",
+    "status": "named_stream_cleanup_verified_domain_open"
+  },
+  "peerR15LatestReport": {
+    "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T120849Z/peer-r15-report.json",
+    "serving": "R14",
+    "candidate": "R15 input settlement fix, not activated at last report; excludes B398 onward",
+    "resourceCorrection": "Reported large-directory admission delay was actual macOS memory pressure. Closing seven saved idle pages restored credits; file-count causality is not established. Thresholds remain unchanged; ordinary model authorization remains per user.",
+    "coordination": "No routine peer reply or status request; send one completed batch handoff."
+  },
+  "sshPartialStreamAllocation": {
+    "finding": "B405",
+    "receipt": "receipts/ssh-partial-stream-allocation-2026-10-31.json",
+    "status": "named_partial_allocation_verified_domain_open"
+  },
+  "webBrowserHelper": {
+    "finding": "B406",
+    "receipt": "receipts/web-browser-helper-ownership-2026-10-31.json",
+    "status": "named_administrative_helper_verified_domain_open"
+  },
+  "peerR16LatestReports": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T132512Z/peer-r16-report.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T132512Z/peer-r16-model-and-freeze-report.json"
+  ],
+  "memoryLiveAvailability": {
+    "finding": "B407",
+    "receipt": "receipts/memory-live-availability-2026-10-31.json",
+    "status": "named_feature_availability_verified_full_domain_open"
+  },
+  "peerR16DeploymentAndReal038": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T142435Z/peer-r16-deployed-and-real038.json"
+  ],
+  "memoryCurationLiveAvailability": {
+    "finding": "B408",
+    "receipt": "receipts/memory-curation-live-availability-2026-10-31.json",
+    "status": "named_setting_commit_cancellation_verified_full_domain_open"
+  },
+  "peerR17LatestReport": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T151555Z/peer-r17-deployed-and-real001.json"
+  ],
+  "memoryProviderAvailability": {
+    "finding": "B409",
+    "receipt": "receipts/memory-provider-availability-2026-11-01.json",
+    "status": "named_provider_lifetimes_verified_project_authority_open"
+  },
+  "peerProjectContextReadLatestReport": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T160400Z/peer-project-context-read-and-r17.json"
+  ],
+  "memoryCurationAuthority": {
+    "finding": "B410",
+    "receipt": "receipts/memory-curation-authority-2026-11-01.json",
+    "status": "named_curation_dispatch_and_cursor_authority_verified_broader_review_open"
+  },
+  "peerR18LatestReport": {
+    "source": "User-authorized direct peer messages in this turn; reported, not root production verification",
+    "peerThread": "01a1821f-1577-7472-93db-3bd83ee42345",
+    "serving": "R18/schema102/epoch95, both computers. Matching B406/B407/B408 and ProjectAuthorityView optimization deployed; B409/B410 not deployed.",
+    "references": [
+      ".artifacts/full-real-task-20261031/r18-source-overlay.json",
+      ".artifacts/full-real-task-20261031/r18-serving-confirmation.json",
+      ".artifacts/full-real-task-20261031/r18-workspace-review-recovery-durable-proof.json"
+    ],
+    "acceptance": "175 total,88 exercised,67 passed,21 partial,87 pending. REAL-001 remains open; B sessions still read-only.",
+    "newReservedWork": "Peer investigates workspace-changes retained rejected git/xcode-select runner Promise (REAL-039) and Gateway operationRef serialization/SQL. Root does not touch these paths."
+  },
+  "memoryRecallAuthority": {
+    "finding": "B411",
+    "receipt": "receipts/memory-recall-authority-2026-11-01.json",
+    "status": "named_recall_identity_route_and_publication_verified_broader_review_open"
+  },
+  "peerR19LatestReport": {
+    "source": "User-authorized peer messages in this goal turn; reports, not root production verification",
+    "serving": "R19/epoch97/schema102 on both computers. R18+B406/B407/B408 plus REAL-039 workspace-changes recovery; B409/B410/B411 not deployed.",
+    "recovery": "Peer reports the same generation19 Session recovers after a real30-second admission timeout: explicit retry completes turn5 in3690ms, official Flash/Bash pwd/Darwin/UID and unique QA file. Original18 events and drafts preserved.",
+    "nextReservedWork": "Peer owns Gateway operationRef roundtrip measurement; no permission cache or generation/node weakening.",
+    "coordination": "Peer approved only3 lock importer lines for memory-context execution-authority; current lock hash proves all other bytes unchanged. Peer retained icon license and sorted ui-documents files without changing their set; root owns the narrow existing per-package whitelist entry and acceptance/rejection checks.",
+    "manifestR19": "The mechanical icon notice file ordering is not retroactively written into frozenR19 and must be a matching input to a future freeze."
+  },
+  "autoReviewAuthority": {
+    "finding": "B412",
+    "receipt": "receipts/auto-review-authority-2026-11-01.json",
+    "status": "named_auto_authority_and_fallback_verified_broader_review_open"
+  },
+  "peerR20LastReport": {
+    "source": "Trusted peer message already received; no routine polling",
+    "live": "R19 per last report",
+    "candidate": "R20 pending final combined checks and deployment; contains B409/B410/B411",
+    "reservedWork": "InstanceRepository.admitLease, PostgreSQL/SQLite implementation, InstanceManager shared leases, operationRef, corresponding tests/docs"
+  },
+  "modelRequestExecution": {
+    "finding": "B413",
+    "receipt": "receipts/model-request-execution-2026-11-01.json",
+    "status": "fixed_named_scenarios_verified_remaining_full_review_open"
+  },
+  "peerR22LastReport": {
+    "source": "Unsolicited peer reports received during B413; no routine polling.",
+    "live": "R20/schema102/epoch98, contains B409/B410/B411",
+    "pending": "R21 hot-endpoint and R22 stale node-epoch recovery, not deployed; B412 awaits combined integration.",
+    "preserve": "instances.ts, postgres/instance-repository.ts, services.ts, proxy.ts, node-access tests, real node-service fixtures and matching docs; all previous reservations remain.",
+    "reportedOpen": [
+      "REAL-001 warm request and database latency",
+      "REAL-002 configured desktop without GUI feedback",
+      "REAL-040 project AccountOrHost font persistence omits six account fields",
+      "REAL-041 old runtime bound to node epoch43 while current same connection is epoch44"
+    ],
+    "desktop": "B has no desktopId; desktop.status200 with ok null is not configured-provider GUI acceptance.",
+    "network": "Linux public address currently supports SSH/database; no public-direct business endpoint is implemented. Node Agent still connects outward through main."
+  },
+  "accountFontPreferences": {
+    "finding": "B414",
+    "receipt": "receipts/account-font-preferences-2026-11-01.json",
+    "status": "local_named_verification_complete_live_REAL040_acceptance_pending",
+    "migration": 103,
+    "latestPeerNativeAcceptance": {
+      "status": "peer_reported_accepted_R23",
+      "source": "receipts/speech-settings-provider-lifetime-2026-11-01.json",
+      "revisionRestored": 30
+    }
+  },
+  "peerR22LatestDeploymentReport": {
+    "source": "Existing ownership agreement and unsolicited multi-computer peer reports.",
+    "live": "Peer reports R22/epoch99/schema102 on Mac and Ubuntu with B412/B413; root has not deployed B414/B415.",
+    "real041": "Peer reports actual Ubuntu lease45-to46 recovery with old Runtime14 refused, Web reentry stopping it and Runtime15 ready; original Session history and file bytes retained. Root does not claim independent physical-computer verification.",
+    "real042": "Peer owns remote retry UI running/stop-button mismatch; durable backend events are complete. This packet changes no production events.",
+    "real002": "Peer owns no-GUI metadata via new gateway-execution desktop-availability subentry, native/system-prompt manifests and Host/Gateway desktop assembly. This packet does not change those files.",
+    "fontPacket": "B414 independent font packet and migration103 remain pending peer matching integration and REAL040 operational acceptance.",
+    "matrix": "Peer reports175 scenarios,88 executed,67 passed. The complete matrix remains open."
+  },
+  "infrastructureModelActivity": {
+    "finding": "B415",
+    "receipt": "receipts/infrastructure-model-activity-2026-11-01.json",
+    "status": "local_named_verification_complete_matching_integration_pending",
+    "productionEventChanges": false
+  },
+  "handoffCompletion": {
+    "finding": "B416",
+    "receipt": "receipts/session-handoff-completion-2026-11-01.json",
+    "status": "local_named_verification_complete_matching_integration_pending",
+    "productionEventChanges": false
+  },
+  "peerR23PendingBuildReport": {
+    "live": "Peer reports R22/epoch99/schema102 remains serving; R23 is not yet accepted or deployed.",
+    "r23": "Peer received B414/103 and B415 and is preparing a matching frozen R23 with REAL002 desktop-availability. Only their owned deltas are applied.",
+    "buildFinding": "Peer full build found B414 remote-mock ACCOUNT_BASE ui-theme missing6 required font fields (TS2740). Peer owns the transports.ts default-value repair, its README and tests; root does not modify it or claim the combined build passed.",
+    "real042": "Remote retry UI running/stop-button mismatch remains peer-owned. This batch changes no production model events.",
+    "readmeGate": "The shared quick-doc command passes19/20 gates. The sole failure is peer-owned gateway-execution README model-experience structure during REAL002 implementation; root did not modify it. The earlier desktop fixture manifest error was fixed by the peer and430 Cordis configs now pass.",
+    "coordination": "Only actual shared gate failures and completed independent packets are reported; no repeated progress polling."
+  },
+  "handoffInput": {
+    "findings": [
+      "B417",
+      "B418"
+    ],
+    "receipt": "receipts/session-handoff-input-2026-11-01.json",
+    "status": "local_named_verification_complete_matching_reader_integration_pending",
+    "requiredReaderEvent": "session/handoff-llm-request"
+  },
+  "peerR23LatestReport": {
+    "source": "Existing ownership agreement and unsolicited R23 peer reports.",
+    "reportedCandidate": "Peer reports frozen R23 full8-item build, Host/Client typecheck, publint, constraints and real dual-Gateway/browser acceptance; font production acceptance is not claimed. Root does not infer serving state from candidate acceptance.",
+    "scope": "R23 includes B414/103, B415 and peer REAL002. Peer explicitly left B416 and later B417/B418 for a subsequent matched build. REAL042 remains peer-owned.",
+    "hostTypes": "The3 initial Host errors came from stale referenced declarations, not missing source exports. After the normal doc-sync declaration emit, root Host aggregate passes. Source/test imports were preserved.",
+    "artifacts": "Peer retains formal lib/types-based client outputs; earlier B414 src-based browser bundles remain references only. Root does not overlay them."
+  },
+  "nativeTranslationAdmission": {
+    "findings": [
+      "B419",
+      "B420"
+    ],
+    "receipt": "receipts/native-translation-admission-2026-11-01.json",
+    "status": "local_named_verification_complete_matching_build_integration_pending",
+    "sharedFiles": "Manifest, lockfile and generated documentation changes require current-tree hunk integration; prerequisites remain read-only."
+  },
+  "peerR23ResourcePressureReport": {
+    "status": "peer_reported_not_root_reverified",
+    "release": "R23",
+    "deployed": true,
+    "schemaVersion": 103,
+    "maintenanceEpoch": 100,
+    "dataEpochChanged": false,
+    "pendingRootPackets": [
+      "B416",
+      "B417",
+      "B418",
+      "B419",
+      "B420"
+    ],
+    "operationalAcceptanceOpen": [
+      "REAL040 native font persistence",
+      "REAL042 node-service shared connection capacity",
+      "historical-review storage error wrapping a real resource admission expiry"
+    ],
+    "hostInterference": "Peer identified and suspended18 owned old QA browser processes without ending them; root provided more than five minutes without heavy checks. No permission or resource budget was bypassed.",
+    "sourceOwnership": "Root did not modify peer node-service, Gateway runtime resource provider, native-command or GUI acceptance code."
+  },
+  "speechSettingsLifetime": {
+    "finding": "B421",
+    "receipt": "receipts/speech-settings-provider-lifetime-2026-11-01.json",
+    "status": "local_named_verification_complete_matching_build_pending"
+  },
+  "peerR23NativeAcceptanceReport": {
+    "status": "peer_reported_not_root_reverified",
+    "release": "R23",
+    "schemaVersion": 103,
+    "maintenanceEpoch": 100,
+    "REAL040": "Native five-field font save/reload/cross-Runtime read accepted; UI values restored through revision30.",
+    "nativeBusinessAcceptance": "Peer reports account27 creation, forced password change, old-password401, A-only grants, individual Flash exception, workspace creation and real Flash+Bash file creation succeeded after host resource pressure recovered.",
+    "latestNodeState": {
+      "agentEpoch": 48,
+      "projectBRuntimeGeneration": 17
+    },
+    "stateCaution": "Agent invalid-response exit and automatic restart make the earlier epoch47/generation16 unsuitable for current diagnosis.",
+    "remaining": "REAL042 node-service503 capacity/release still under peer investigation. R24 review-error copy has10 owned workspace-changes/ui-deliverables source edits with85 tests, not built/deployed.",
+    "rootIntegrationPending": [
+      "B416",
+      "B417",
+      "B418",
+      "B419",
+      "B420",
+      "B421"
+    ],
+    "protectedState": "Peer reports both43-character drafts and Admin unsaved address retained; old QA Chrome remains only suspended."
+  },
+  "speechRemovalQuiescence": {
+    "finding": "B422",
+    "receipt": "receipts/speech-removal-quiescence-2026-11-01.json",
+    "status": "local_named_verification_complete_matching_build_pending",
+    "dependsOn": "B421"
+  },
+  "peerGatewayAgentRecoveryReport": {
+    "status": "peer_reported_not_root_reverified",
+    "servingRelease": "R23",
+    "pendingReleaseWork": "R24 source only, not deployed",
+    "reserved": [
+      "gateway/src/node-agent.ts",
+      "gateway/tests/node-agent.spec.ts",
+      "gateway/tests/node-access-postgres.spec.ts",
+      "gateway/tests/run-built-node-agent.mjs",
+      "test-only native fetch IPC observer",
+      "Gateway node-agent docs and Note",
+      "REAL043 workspace-changes/ui-deliverables error copy"
+    ],
+    "agentRecoveryVerification": "24 real HTTP tests reported passed; actual Gateway+PostgreSQL+separate CLI Agent three-phase body interruption validation in progress.",
+    "nodeService": "No capacity change or deployment;503 investigation remains open.",
+    "networkRule": "Linux public host uses its public endpoint/direct SSH; do not add an extra public tunnel.",
+    "latestReportedNode": {
+      "epoch": 48,
+      "generation": 17
+    },
+    "requiredReaderEvent": "Peer keeps B417 required-on-read event and format acceptance separate from older serving R23."
+  },
+  "speechSettingsPersistence": {
+    "finding": "B423",
+    "receipt": "receipts/speech-settings-persist-owner-2026-11-01.json",
+    "status": "local_named_verification_complete_matching_build_pending",
+    "dependsOn": "B422"
+  },
+  "peerGatewayAgentRecoveryCompletedReport": {
+    "status": "peer_reported_not_root_reverified_except_documentation",
+    "servingRelease": "R23",
+    "recoverySourceOnly": "14 owned Gateway Agent/code/test/doc paths; R24 not deployed",
+    "verificationReported": {
+      "unitHttp": 24,
+      "sourcePostgres": 19,
+      "builtNode22And24ScenariosEach": 4,
+      "oldR23ThreePhaseBodyInterruptionFailures": 3
+    },
+    "publicHost": "Peer reports public SSH good, Linux cloudflared0, Agent epoch48/PID62949/restarts2 stable; two Gateway200.",
+    "protectedUi": "Peer reports both43-character drafts and Admin unsaved URL retained.",
+    "rootDocumentation": "Peer pair updates complete and root full20 quick docs passed.",
+    "nodeService": "No capacity/source change;503 review remains with peer.",
+    "requiredEvent": "B417 Session vocabulary publication/reader acceptance remains explicitly pending, not silently merged into older R23."
+  },
+  "nativeTranslationPurpose": {
+    "finding": "B424",
+    "receipt": "receipts/native-translation-purpose-2026-11-01.json",
+    "status": "local_named_verification_complete_matching_integration_pending",
+    "dependsOn": "B420",
+    "interactiveAttributionReview": "open"
+  },
+  "peerNodeChannelRetirementCompletedReport": {
+    "ownedSource": "gateway/src/node-channel-client.ts",
+    "ownedTest": "gateway/tests/node-service.spec.ts",
+    "reportedTests": 31,
+    "reportedNormalBuildAndTestTypes": true,
+    "reportedPlainBuiltDualGatewayPostgresWebNode22And24": true,
+    "rule": "At most one successor per cancelled physical slot joins old bridge retirement; active capacity and probe isolation remain unchanged.",
+    "productionRestart": false
+  },
+  "interactivePrincipalResourceReview": {
+    "receipt": "receipts/interactive-resource-review-2026-11-01.json",
+    "status": "named_resource_caller_and_revocation_cases_verified",
+    "noNewRuntimeBugClaim": true,
+    "integrationCases": 34,
+    "newCases": 4,
+    "dependencyRecovery": "peer-restored; root Node22/25 suites and actual terminal cases verified",
+    "rootDependencyMutation": false,
+    "productionRelease": "R23",
+    "peerContinuesIsolatedR24Build": true
+  },
+  "resourceRegistrationRetirement": {
+    "findings": [
+      "B425",
+      "B426"
+    ],
+    "receipt": "receipts/runtime-resource-registration-retirement-2026-11-01.json",
+    "status": "local_named_verification_complete_matching_runtime_integration_pending",
+    "rootProductionDeploy": false
+  },
+  "uncertainResourceCancellation": {
+    "findings": [
+      "B427"
+    ],
+    "receipt": "receipts/uncertain-resource-cancellation-2026-11-01.json",
+    "status": "local_named_verification_complete_matching_runtime_integration_pending",
+    "rootProductionDeploy": false
+  },
+  "boundedResponseCancellation": {
+    "findings": [
+      "B428"
+    ],
+    "receipt": "receipts/gateway-response-cancellation-2026-11-01.json",
+    "status": "named_local_verification_and_lint_complete_matching_integration_pending",
+    "rootProductionDeploy": false,
+    "sharedIndexPatchOnly": true,
+    "lint": {
+      "wholeChangedFiles": "passed",
+      "convergenceEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/b428-readiness-convergence.json"
+    }
+  },
+  "workflowCleanupOwnership": {
+    "findings": [
+      "B429",
+      "B430"
+    ],
+    "receipt": "receipts/workflow-cleanup-ownership-2026-11-01.json",
+    "status": "local_named_verification_complete_matching_integration_pending",
+    "rootProductionDeploy": false
+  },
+  "latestPeerReportedAcceptance": {
+    "recordedAt": "2026-11-01T14:44:23.315207+00:00",
+    "source": "Trusted direct peer operational report received during B445; not Root independent production acceptance.",
+    "reportedRelease": "R28/schema103",
+    "writeEpoch": 1,
+    "maintenanceSequence": 104,
+    "maintenanceExitedNormallyReported": true,
+    "hostsReported": [
+      "local",
+      "Ubuntu access node"
+    ],
+    "compositionReported": "Immutable R26 plus15 peer-owned Gateway HTTP HTML refusal, fixtures and docs inputs. Root B416+ Core/SDK/Session writer-reader changes excluded.",
+    "rootIndependentVerification": false,
+    "rootPacketsIntegrated": false,
+    "passedReported": [
+      "Chinese manual-retry HTML card after controlled local resource refusal; original Runtime retained, no automatic refresh",
+      "Two browser drafts of36/45characters and unsaved Admin Provider input preserved"
+    ],
+    "openReported": [
+      "Host memory warning still blocks startup",
+      "B project history loading failure",
+      "15-35second metadata latency",
+      "B Gateway readiness probe timeout; peer is comparing transport directions and proxy behavior. R30 Client candidate remains undeployed."
+    ],
+    "productionAcceptanceClaimedByRoot": false
+  },
+  "subagentJobCleanup": {
+    "finding": "B431",
+    "receipt": "receipts/subagent-job-cleanup-2026-11-01.json",
+    "status": "named_local_sdk_cases_verified_cross_computer_review_open",
+    "productionAcceptanceClaimed": false,
+    "peerEditExclusion": "Host ApiProxy fetch/client.ts failed-response cancellation and related actual Web failure snapshots",
+    "officialResponsesDeferred": true
+  },
+  "gatewayRevocationResponse": {
+    "finding": "B432",
+    "receipt": "receipts/gateway-revocation-response-2026-11-01.json",
+    "status": "named_local_sdk_permission_revocation_verified_cross_computer_review_open",
+    "productionAcceptanceClaimed": false,
+    "latestTrustedPeerReport": "R24 remains deployed. R25 is isolated and excludes B416+ root capsules; peer owns Host ApiProxy fetch/client.ts cancel-ACK fix and real Web refusal test, reported93 cases. Root has not independently verified that peer packet.",
+    "officialResponsesDeferred": true
+  },
+  "workspacePublicationRevision": {
+    "finding": "B433",
+    "receipt": "receipts/workspace-publication-revision-2026-11-01.json",
+    "status": "named_local_sdk_and_database_generation_cases_verified_cross_computer_review_open",
+    "productionAcceptanceClaimed": false,
+    "latestTrustedPeerReport": {
+      "source": "Trusted unsolicited peer status message",
+      "reportedAt": "2026-11-01T07:19Z",
+      "release": "R25",
+      "deployedAt": "2026-11-01T07:11Z",
+      "schemaVersion": 103,
+      "nodeEpoch": 50,
+      "qa": {
+        "project": 27,
+        "runtime": 4
+      },
+      "bProject": {
+        "project": 29,
+        "runtime": 19
+      },
+      "mainSteward": 209,
+      "rootB416AndLaterIncluded": false,
+      "B432Included": false,
+      "peerOwnedReleaseInputCount": 12,
+      "real042": "open; B start/Host/plugin reads slow with503",
+      "rootIndependentlyVerified": false
+    },
+    "officialResponsesDeferred": true
+  },
+  "archiveRefusalResponse": {
+    "finding": "B434",
+    "receipt": "receipts/archive-response-cleanup-2026-11-01.json",
+    "productionAcceptanceClaimed": false,
+    "status": "named_native_sdk_response_cleanup_verified_cross_computer_review_open",
+    "latestTrustedPeerReport": {
+      "source": "Trusted unsolicited peer update during B434",
+      "reportedAt": "2026-11-01T08:16Z",
+      "release": "R25",
+      "schemaVersion": 103,
+      "nodeEpoch": 50,
+      "rootB416AndLaterIncluded": false,
+      "newReservedScope": [
+        "gateway/admin-ui/src/pages/ModelsPage.tsx",
+        "ModelsPage unit test",
+        "apps/web/tests/admin-model-view-drafts.e2e.ts",
+        "two compilation registrations"
+      ],
+      "peerFinding": "Internal model view switch discards unsaved Provider/key drafts; existing computer-switch protection works. Peer is fixing its own Admin surface without touching archive or provider authorization/resource files.",
+      "real042": "B Runtime19 manual fixed reply completed in1m57; high latency and model admission expiry under memory pressure remain open.",
+      "rootIndependentlyVerified": false
+    },
+    "officialResponsesDeferred": true
+  },
+  "subagentAdmissionCleanup": {
+    "findings": [
+      "B436",
+      "B437",
+      "B438"
+    ],
+    "receipt": "receipts/subagent-admission-cleanup-2026-11-01.json",
+    "productionAcceptanceClaimed": false,
+    "status": "named_source_built_sdk_admission_cases_verified_cross_computer_review_open",
+    "latestTrustedPeerReport": {
+      "source": "Trusted unsolicited peer update during B436 implementation",
+      "reportedAt": "2026-11-01T09:10Z",
+      "release": "R26",
+      "deployed": true,
+      "schemaVersion": 103,
+      "nodeEpoch": 51,
+      "rootB416AndLaterIncluded": false,
+      "peerOwns": "ModelsPage protected navigation, OrganizationModelsEditor minimum model hint, related tests, Gateway README and existing settings-save-acknowledgments Note; browser compile registration outside Root host face.",
+      "peerAcceptance": "Own Provider UI create/edit/blank-key retention/replacement/removal; ordinary public browser403 to Admin credentials; no plain credential output or browser storage; old drafts retained. These are peer reports, not root verification.",
+      "remaining": "OS memory pressure2 and B latency/admission/review remain open. Peer matrix101 executed/78 passed/23 partial/74 pending. Root must not restart or remove unrelated processes on a guess.",
+      "rootIndependentlyVerified": false,
+      "r27Followup": {
+        "source": "Trusted unsolicited peer update during finalization",
+        "reportedAt": "2026-11-01T09:59Z",
+        "productionRelease": "R26 unchanged; R27 is a test batch only",
+        "reportedChecks": "Published CLI/TS SDK/Python SDK and sdk-minimal/sdk/ACP/Headless source+built file tasks pass; Python resumes the actual TS Session. Linux Node24 standalone SDK task passes with no residual child. These differ from managed route/credentials/orchestration and do not locate the B latency cause.",
+        "remaining": "Standalone Web launch must use the logged one-time link; bare origin401 is expected. Browser launch acceptance remains open.",
+        "integrationRequest": "A frozen B416-to-current minimal consistent collection, including B417 required-on-read writers, all readers/SDKs and rollback obligations. Do not copy the dirty Root tree or an isolated new event writer."
+      }
+    },
+    "officialResponsesDeferred": true
+  },
+  "workflowProviderIdentity": {
+    "finding": "B439",
+    "receipt": "receipts/workflow-provider-identity-2026-11-01.json",
+    "productionAcceptanceClaimed": false,
+    "status": "named_source_built_sdk_parent_context_cases_verified_cross_computer_review_open",
+    "officialResponsesDeferred": true
+  },
+  "foregroundWorkflowCleanup": {
+    "finding": "B440",
+    "receipt": "receipts/workflow-foreground-recovery-2026-11-01.json",
+    "status": "named_native_sdk_cleanup_cases_verified_cross_computer_review_open",
+    "productionAcceptanceClaimed": false,
+    "latestTrustedPeerReport": {
+      "source": "Trusted unsolicited peer report during B440",
+      "release": "R26/schema103 still live; R27 tests only",
+      "reserved": [
+        "gateway/src/html.ts",
+        "gateway/src/server.ts",
+        "gateway/tests/html.spec.ts",
+        "gateway/tests/server.spec.ts",
+        "related forthcoming browser snapshot and existing docs"
+      ],
+      "scope": "Localize the native account/runtime/start resource-refusal HTML response while retaining API JSON, target, authorization, quota and retry. Peer has4 local HTML cases, no build/deploy yet.",
+      "requiredReaderPolicy": "Peer preserves full B416-B439 integration and B417 matching reader/SDK obligations; never publishes writer independently.",
+      "rootIndependentlyVerified": false,
+      "r28Followup": {
+        "status": "Frozen14-input R26-based candidate, not deployed",
+        "reportedChecks": "81 Gateway HTML/API cases,4 desktop/mobile personal/project browser cases, both Gateway compiler faces pass.",
+        "rootDocGate": "Peer reported19/20 because new WorkflowRun retained-cleanup method/JSDoc was not yet copied. Root has now updated both copies and re-recorded9 bilingual pairs; own doc aggregate is running.",
+        "peerLog": ".artifacts/full-real-task-20261031/r28-root-doc-quick-corrected.log",
+        "rootEditsToPeerOwnedPaths": false
+      }
+    },
+    "officialResponsesDeferred": true
+  },
+  "queuedSubagentCleanup": {
+    "finding": "B441",
+    "receipt": "receipts/queued-subagent-cleanup-2026-11-01.json",
+    "productionAcceptanceClaimed": false,
+    "status": "named_source_built_sdk_admission_cases_verified_cross_computer_review_open",
+    "officialResponsesDeferred": true
+  },
+  "drainingSubagentCleanup": {
+    "finding": "B442",
+    "receipt": "receipts/draining-subagent-cleanup-2026-11-01.json",
+    "productionAcceptanceClaimed": false,
+    "status": "named_source_built_sdk_scope_drain_cases_verified_cross_computer_review_open",
+    "officialResponsesDeferred": true
+  },
+  "withdrawnSubagentAdmission": {
+    "finding": "B443",
+    "receipt": "receipts/withdrawn-subagent-admission-2026-11-01.json",
+    "productionAcceptanceClaimed": false,
+    "status": "named_source_built_sdk_withdrawal_cases_verified_cross_computer_review_open",
+    "officialResponsesDeferred": true
+  },
+  "foregroundSubagentWithdrawal": {
+    "finding": "B444",
+    "receipt": "receipts/foreground-subagent-withdrawal-2026-11-01.json",
+    "productionAcceptanceClaimed": false,
+    "status": "named_source_built_sdk_tool_foreground_cases_verified_cross_computer_review_open",
+    "officialResponsesDeferred": true
+  },
+  "workflowRecordLifetime": {
+    "finding": "B445",
+    "receipt": "receipts/workflow-record-lifetime-2026-11-01.json",
+    "productionAcceptanceClaimed": false,
+    "status": "named_source_built_sdk_workflow_record_cases_verified_cross_computer_review_open",
+    "officialResponsesDeferred": true
+  },
+  "peerR24HistoricalAcceptance": {
+    "reportedRelease": "R24/schema103",
+    "rootIndependentVerification": false,
+    "unintegratedRootPackets": "B416 and later remain independently frozen pending matching integration.",
+    "passedReported": [
+      "A3 local task",
+      "A3 model file-read task through real public domain/current network proxy",
+      "B18/node49 task file59 bytes matched; older files and per-tab drafts retained"
+    ],
+    "openReported": {
+      "id": "REAL-042",
+      "description": "B task took11 minutes55 seconds; frontend completed after canonical turn/end, connection/model state repeated.",
+      "canonicalEvidence": ".artifacts/full-real-task-20261031/r24-b-real-task-canonical-postgres-timeline.json",
+      "linuxPgLatencyMsReported": [
+        252,
+        1732
+      ],
+      "mainPgLatencyMsReported": [
+        0.4,
+        0.85
+      ],
+      "directBDescribeSecondsReported": 11,
+      "mainForwardedDescribeSecondsReported": 20,
+      "readyRpcTimeoutSecondsReported": 120,
+      "rootDidNotChangeTimeouts": true
+    }
+  },
+  "workflowProgressLifetime": {
+    "finding": "B446",
+    "receipt": "receipts/workflow-progress-lifetime-2026-11-01.json",
+    "productionAcceptanceClaimed": false,
+    "status": "named_source_built_dual_sdk_original_job_progress_cases_verified_cross_computer_review_open",
+    "officialResponsesDeferred": true
+  },
+  "peerR28ReadinessNetworkReport": {
+    "recordedAt": "2026-11-01T15:01:39.243696+00:00",
+    "source": "Trusted peer direct message after B446 final checks; reported measurements only. No reply requested.",
+    "reportedServing": "Both hosts R28/schema103, serving/write epoch1.",
+    "rootIndependentProductionVerification": false,
+    "reportedIssue": "B Gateway readiness probe timeout; network direction and proxy comparisons underway.",
+    "reportedBWindow": {
+      "cpuPercent": [
+        4,
+        15
+      ],
+      "memoryAvailableGiB": [
+        1.25,
+        1.4
+      ],
+      "memoryTotalGiB": 3.9,
+      "diskUtilizationPercentMax": 0.5,
+      "oomObserved": false,
+      "select1MedianMs": 540.76,
+      "mainSelect1MedianMs": 0.52,
+      "contextBytes": 784,
+      "contextLocalSeconds": 5.316,
+      "contextForwardedSeconds": 10.923,
+      "sshTransferBytes": 2097152,
+      "sshTransferSeconds": 126.285
+    },
+    "reportedProxyComparison": {
+      "mainDirectHttpsConnectTimeoutSeconds": 20,
+      "configuredProxyHealthStatus": 200,
+      "configuredProxyHealthSeconds": 3.55,
+      "onlineDatabaseSshChannelChanged": false
+    },
+    "reportedMaintenance": "Peer removed only five unused own old releases and rebuildable caches under existing user cleanup authorization. User data, Root capsules and retained fallback/R26/R28/R30 remain.",
+    "reportedR30Candidate": {
+      "status": "source_candidate_not_deployed",
+      "scope": "Client reference initial-readiness",
+      "peerUnitCases": 163,
+      "peerTypesPassed": true,
+      "browserReconnectFixtureStillInvestigating": true,
+      "rootCoreSdkSessionChangesIncluded": false
+    },
+    "rootAction": "Record the report, preserve peer-reserved surfaces, no production mutation and no routine reply."
+  },
+  "workflowForegroundWithdrawal": {
+    "finding": "B447",
+    "receipt": "receipts/workflow-foreground-withdrawal-2026-11-01.json",
+    "productionAcceptanceClaimed": false,
+    "status": "named_source_built_dual_sdk_full_foreground_withdrawal_cases_verified_cross_computer_review_open",
+    "officialResponsesDeferred": true
+  },
+  "retiredSubagentCleanup": {
+    "finding": "B448",
+    "receipt": "receipts/retired-subagent-cleanup-2026-11-02.json",
+    "productionAcceptanceClaimed": false,
+    "status": "named_source_built_dual_sdk_live_parent_recovery_verified_other_review_open",
+    "officialResponsesDeferred": true
+  },
+  "peerR33FunctionalAndLockReport": {
+    "recordedAt": "2026-11-01T17:13:52.757310+00:00",
+    "source": "Trusted direct peer reports during B448; no Root independent production acceptance.",
+    "servingReported": "Both hosts remain R28/schema103/serving and write epoch1. Root B416+ excluded. R30 remains an undeployable diagnostic copy.",
+    "rootIndependentVerification": false,
+    "reportedFunctionalResult": "One B task completed with one human prompt and explicit user-only skill injection; read-only bash existence check, write/read/edit/read. Final67byte file verified through two product APIs and direct server hash/UID988/mode0600. Exact gen16 stop200; file retained, no residual resource requests; original A file unchanged.",
+    "openDefect": {
+      "id": "REAL-048",
+      "observed": "session.history HTTP500 at16:53:36UTC matched B admitLease/instances row lock timeout SQLSTATE55P03; node_resource_state observe55P03 also reported.",
+      "laterHistoryRead200": true,
+      "taskSucceededWithoutReprompt": true,
+      "laterSamplingSeconds": 80,
+      "blockingHolderIdentified": false,
+      "uniqueRootCauseProven": false,
+      "status": "open_source_transaction_order_and_error_classification_review_required"
+    },
+    "reportedReadiness": {
+      "linuxHealthReadyMs": 3221,
+      "contextBytes": 784,
+      "contextMs": 4080,
+      "cpuPeakPercent": 9.18,
+      "ioWaitPercent": 0,
+      "minimumAvailableMemoryMiB": 1415,
+      "pgLockWaitSeenDuringEarlierWindow": false
+    },
+    "attributionRule": "Gateway pools share application_name and Docker maps client ports; do not attribute a query from Main SSH port alone.",
+    "acceptanceToolLimitations": "Browser DOM/dialog read tooling timed out; API stop negatives are not native UI acceptance. Mixed early-history/late-list asOf observations and earlier wrong protocol probes were corrected as tool issues, not product failures or passes.",
+    "userPriorityAsReported": "Functional correctness, permissions and recovery take priority; network delay is accepted and does not justify architecture changes alone.",
+    "reportedEvidence": [
+      ".artifacts/full-real-task-20261031/r33-b-readiness-attribution.json",
+      ".artifacts/full-real-task-20261031/r33-b-real-file-and-skill-task.json",
+      ".artifacts/full-real-task-20261031/r33-b-functional-task-and-cleanup-proof.json",
+      ".artifacts/full-real-task-20261031/private/r33-linux-log-after-history-500.log"
+    ],
+    "rootNext": "Inspect resource observation and instance activity lease transaction holding/order and55P03 classification on the matching R28/current source, coordinating shared changes once and preserving all existing authority/fencing checks."
+  },
+  "resourceDatabaseContention": {
+    "finding": "B449",
+    "receipt": "receipts/resource-contention-authority-2026-11-02.json",
+    "status": "root_local_source_and_built_verified_peer_matching_production_pending",
+    "r28BeforeImagesMatch": true,
+    "sourceAndBuiltWithdrawalRepro": "Old computer/membership lease admission accepts after withdrawal; patched admission refuses after the instance lock wait.",
+    "rootProductionMutation": false,
+    "handoffCompleted": true
+  },
+  "peerR34LockReproductionReport": {
+    "recordedAt": "2026-11-01T17:49:15.783390+00:00",
+    "source": "Trusted direct peer report, independently supported by Root source/built comparisons.",
+    "mechanism": "R28 actual resource request holds one blocker for both instances and node_resource_state55P03; unrelated Runtime lease succeeds; isolated DB dropped. Historical production holder remains unidentified.",
+    "evidence": ".artifacts/full-real-task-20261031/r34-lease-resource-lock-repro.json",
+    "productionChanged": false
+  },
+  "peerReal049Reported": {
+    "recordedAt": "2026-11-01T17:49:15.783390+00:00",
+    "source": "Trusted peer report; Root did not edit or claim verification of this area.",
+    "status": "peer_implementation_and_verification_in_progress",
+    "problem": "Raw host.describe headless-reason field is stripped by the client Zod schema.",
+    "division": "Peer owns optional schema field, client handler regression, built-node-service snapshot and matching docs/note. Root stays on the four agreed Gateway files.",
+    "latestTrustedReport": "Peer reports79 focused cases passed and a13-input schema/docs candidate in preparation; Root has not independently verified or accepted its deployment."
+  },
+  "parentSubagentCleanup": {
+    "finding": "B450",
+    "receipt": "receipts/parent-subagent-cleanup-2026-11-02.json",
+    "status": "root_named_source_built_native_cases_verified_complete_union_and_production_open",
+    "b449GatewayFrozenFilesPreserved": true,
+    "handoffCompleted": true
+  },
+  "peerR34MatchingLocalReport": {
+    "recordedAt": "2026-11-01T18:51:12.899314+00:00",
+    "source": "Trusted direct peer report; Root independently verified its own B449/B450 named scopes only.",
+    "status": "matched_local_and_trusted_peer_targeted_production_acceptance_recorded",
+    "scope": "R34 applies16 exact B449 deltas to R28 without B416-B448. Peer reports isolated real same-holder double waiting5629ms, fresh computer/membership withdrawal refusal,217 Gateway and79 codec cases,20 docs leaves, real two-Gateway/NodeAgent/Web composition. Candidate-only SQLite ABI repair leaves Root and R28 dependencies unchanged.",
+    "productionReported": "Peer R34 actual read task completed with10/10 successful history reads and no lock/statement/sample failures; native UI matrix and global goal remain open."
+  },
+  "peerExactCentralRuntimeStopReport": {
+    "recordedAt": "2026-11-01T18:51:12.899314+00:00",
+    "status": "B451 independently_fixed_verified_source_and_built_production_validation_pending",
+    "nextFinding": "B451",
+    "scope": "Authorized exact Admin Runtime stop returns409 protected-project refusal while the same generation through the existing project instance stop route returns204 under maintenance. Preserve delete/retire/archive protections.",
+    "evidence": [
+      ".artifacts/full-real-task-20261031/private/r34-maintenance-preparation.json",
+      ".artifacts/full-real-task-20261031/private/r34-maintenance-convergence.json"
+    ],
+    "ownership": "Peer explicitly requests an independent targeted patch, outside B449 frozen deltas. Root will read and reproduce before changing code.",
+    "finding": "B451",
+    "receipt": "receipts/central-runtime-control-2026-11-02.json"
+  },
+  "peerR34TargetedProductionAcceptance": {
+    "status": "trusted_peer_report_and_local_evidence_named_production_acceptance",
+    "rootIndependentlyRanProductionModel": false,
+    "release": "R34",
+    "schema": 103,
+    "findingsIncluded": [
+      "B449"
+    ],
+    "b450Excluded": true,
+    "actualTask": {
+      "humanMessages": 1,
+      "readCalls": 1,
+      "turnEndReason": "completed",
+      "historyReadsDuringTask": 10,
+      "http200": 10,
+      "historyReadFailures": 0,
+      "runtimeStopped": true,
+      "originalPromptNotReplayed": true
+    },
+    "headlessTypedRefusal": "peer reports actual typed Host headless and direct desktop-unavailable refusal verified; native user/Admin qualification UI matrix remains incomplete",
+    "logWindow": {
+      "since": "2026-11-01T18:13:37.476Z",
+      "through": "2026-11-01T18:52:14.945838+00:00",
+      "lockTimeouts": 0,
+      "statementTimeouts": 0,
+      "sampleFailures": 0
+    },
+    "evidence": {
+      ".artifacts/full-real-task-20261031/r34-real-task-and-history-proof.json": "bd81359ddb16850241c58ec4995e70fa7678e09b8e2ce7f640424142e6425b37",
+      ".artifacts/full-real-task-20261031/r34-linux-serving-log-summary-final.json": "0322e8c4a44e615b6712716d45ca7344099a5711613785df2b69f6ed4ac869a4",
+      ".artifacts/full-real-task-20261031/r34-deployment-and-real-acceptance.json": "f0905ccbb0c42fbf0e1109b53f421a440a547154551b1c3f41b9aa400c123357"
+    },
+    "remaining": "B451 exact central controls, peer-owned default-login and other unintegrated patches, native UI matrix and global coverage remain open; initial central admission timeout is unattributed, later exact authorized start reportedly recovered without policy changes."
+  },
+  "exactCentralRuntimeControl": {
+    "finding": "B451",
+    "receipt": "receipts/central-runtime-control-2026-11-02.json",
+    "status": "named_process_control_and_data_protection_verified_complete_review_open",
+    "peerReservedFilesUnchanged": [
+      "gateway/src/server.ts",
+      "gateway/src/runtime-catalog.ts",
+      "gateway/src/postgres/runtime-catalog.ts"
+    ]
+  },
+  "peerDefaultLoginEntryReport": {
+    "status": "trusted_peer_R36_targeted_production_entry_render_verified_full_native_matrix_open",
+    "reportedProblem": "Default login returned a flattened project/Runtime selection page when multiple personal runtimes made legacy owner resolution ambiguous.",
+    "ownership": "Peer owns server.ts, runtime-catalog interface/PG provider and corresponding tests/docs. Root does not modify these sources.",
+    "constraints": "Preserve explicit remote target refusal, current computer permission and no implicit launch on another computer.",
+    "receipt": ".artifacts/full-real-task-20261031/r36-deployment-and-real-acceptance.json"
+  },
+  "pendingBackgroundCleanup": {
+    "finding": "B452",
+    "receipt": "receipts/pending-background-cleanup-2026-11-02.json",
+    "status": "named_source_built_and_sdk_cases_verified_full_coverage_and_global_open",
+    "peerGatewaySourcesUnchanged": true
+  },
+  "peerR36DefaultLoginCandidateReport": {
+    "status": "trusted_peer_report_candidate_checks_passed_activation_pending",
+    "productionSourceFiles": [
+      "gateway/src/server.ts",
+      "gateway/src/runtime-router.ts",
+      "gateway/src/postgres/runtime-catalog.ts"
+    ],
+    "focusedCases": 165,
+    "docLeaves": 20,
+    "schema": 103,
+    "maintenanceEpoch": 106,
+    "scope": "Default no-target browser login landing only; explicit Runtime/owner addressing remains strict. B451 intentionally deferred. Root did not edit these source files."
+  },
+  "subagentModelPreflight": {
+    "finding": "B453",
+    "receipt": "receipts/subagent-model-preflight-2026-11-02.json",
+    "status": "named_cases_verified_complete_tool_entry_100_percent_global_open",
+    "peerGatewaySourcesUnchanged": true
+  },
+  "peerR36TargetedDefaultEntryAcceptance": {
+    "status": "trusted_peer_report_and_local_receipt_inspected_targeted_R36_default_entry_acceptance",
+    "receipt": ".artifacts/full-real-task-20261031/r36-deployment-and-real-acceptance.json",
+    "receiptSha256": "cba94295dd86a648f9b077fa8d7af4777a8f0f280c06484416fb7dfcf62d4bf3",
+    "schema": 103,
+    "servingEpoch": 106,
+    "nativeDefaultWorkbenchRendered": true,
+    "nativeInteractionMatrixComplete": false,
+    "freshProductionLoginFormSubmittedThisTurn": false,
+    "freshLoginInBuiltRealGatewayTranscript": true,
+    "modelPromptsForEntryFix": 0,
+    "distinctGatewayCases": 165,
+    "docLeaves": 20,
+    "rootIndependentlyRanProductionOrModel": false,
+    "scope": "Peer reports three account entry redirects, exact authorized metadata, preserved file hashes and restored local Runtime state. Specific default-entry render only; full native account/Admin interaction coverage remains incomplete.",
+    "pendingRelease": "Peer is independently assembling B451 over R36 as R37; no B450/B452/B453 Runtime changes are included.",
+    "webSearchReportedGap": "The selected account refuses the configured built-in official search route. Its currently enabled organization provider uses openai-completions, while the available native search factory requires anthropic-messages. Treat as an unresolved capability/configuration gap; do not broaden account authorization."
+  },
+  "subagentControlAuthority": {
+    "finding": "B454",
+    "receipt": "receipts/subagent-control-authority-2026-11-02.json",
+    "status": "named_cases_verified_control_helper_100_percent_global_open",
+    "peerGatewaySourcesUnchanged": true
+  },
+  "latestPeerWorkAgreement": {
+    "status": "root_command_and_plan_core_peer_client_directory_and_transport",
+    "rootScope": "interaction/commands cancellation; plan-mode verified input; Gateway execution Loader tests and their RuntimeId fixture; declared dependencies and documentation",
+    "peerScope": "R40 pool queueing and R41 client/ui-commands; prior R39 UI/Admin and cross-boot recovery",
+    "communications": "One concrete test-fixture ownership handoff; no routine progress pings.",
+    "rootPeerUiEdits": 0,
+    "rootRuntimeOwnerEdits": 0,
+    "rootPoolQueueEdits": 0,
+    "rootProductionMutation": false,
+    "rootChangesIncludedInPeerRelease": false
+  },
+  "jobCaptureCapacity": {
+    "finding": "B455",
+    "receipt": "receipts/job-capture-admission-2026-11-02.json",
+    "status": "named_cases_verified_full_local_job_entry_100_percent_global_open",
+    "peerGatewaySourcesUnchanged": true
+  },
+  "httpLeaseRetirement": {
+    "finding": "B456",
+    "receipt": "receipts/http-lease-retirement-2026-11-02.json",
+    "status": "native_old_source_failure_normal_built_success_783_named_cases_global_open",
+    "ownerRule": "A released request borrower retains no authority to destroy the connection assigned to a successor.",
+    "rootProductionAllocationsAdded": 0,
+    "ownedTestPostgresDatabase": "dropped",
+    "rootProductionMutation": false
+  },
+  "draftRecoveryAndRouteReview": {
+    "findings": [
+      "B457",
+      "B458"
+    ],
+    "status": "peer_ui_work_pending_independent_acceptance",
+    "rootUiEdits": 0,
+    "productionIdentifiersOmitted": true
+  },
+  "commandRegistrationAdmission": {
+    "finding": "B459",
+    "receipt": "receipts/command-registration-admission-2026-11-02.json",
+    "status": "fixed_verified_command_registration_cutoff_normal_entry_100_percent_global_review_open",
+    "newProductionProcessAllocations": 0,
+    "ownedTestResources": "SDK application subprocesses and private fixture workspaces are closed by the maintained harness on both passing and expected failing runs.",
+    "rootProductionMutation": false
+  },
+  "crossBootRuntimeOwnerRecovery": {
+    "finding": "B460",
+    "status": "peer_fix_reported_64_cases_and_formal_recovery_passed_r39_deployment_and_independent_acceptance_pending",
+    "observation": "Two prior owner records have a new boot, stable lock inode and changed device; device rejection precedes recovery. Current peer report supersedes its pre-reboot readiness report.",
+    "rootRuntimeOwnerEdits": 0,
+    "rootProductionMutation": false,
+    "latestPeerReport": {
+      "at": "2026-11-01T23:55:29.757456+00:00",
+      "sourceCases": 64,
+      "newKernelLockCases": 5,
+      "oldSourceNegativeControl": "two_failed_two_passed",
+      "formalCompiledRecoveryReported": true,
+      "deployment": "R39_preparing_not_completed",
+      "independentRootAcceptance": false,
+      "rootOwnerSourceEdits": 0
+    }
+  },
+  "commandCancellationAndPlanIdentity": {
+    "findings": [
+      "B461",
+      "B462"
+    ],
+    "receipt": "receipts/command-cancellation-plan-identity-2026-11-02.json",
+    "status": "fixed_verified_203_cases_command_and_plan_entries_100_percent_npm_layout_and_global_review_open",
+    "newProductionAllocations": 0,
+    "ownedTestPostgresDatabasesDropped": 5,
+    "rootProductionMutation": false
+  },
+  "latestPeerDirectoryAndTransportReport": {
+    "findings": [
+      "B463",
+      "B464"
+    ],
+    "r40": "reported_deployed",
+    "r41": "peer_reports_deployed_operational_safari_checks_passed",
+    "peerReportedClientCases": 144,
+    "reportedWaitersAfterEntry": 0,
+    "reportedRestoredDrafts": 2,
+    "reportedSuccessfulRoundUserSubmissions": 1,
+    "reportedSuccessfulRoundReplies": 1,
+    "rootIndependentAcceptance": false,
+    "remaining": "B Gateway list/history8-10seconds; three simple shared DB round trips456/457/461ms. Root/peer assembled acceptance and B451 remain open.",
+    "rootChangesIncludedInPeerRelease": false
+  },
+  "npmInstallLayoutGap": {
+    "finding": "B465",
+    "status": "fixed_verified_offline_metadata_and_dual_release_layout_global_review_open",
+    "receipt": "receipts/npm-registry-metadata-2026-11-02.json",
+    "liveRegistryQueriedForRecordingOnly": true,
+    "runtimeResolutionOffline": true,
+    "packagesInstalled": false
+  },
+  "commandCompactionAndGoalAdmission": {
+    "findings": [
+      "B466",
+      "B467"
+    ],
+    "receipt": "receipts/manual-compaction-goal-admission-2026-11-02.json",
+    "status": "fixed_verified_scoped_global_review_open",
+    "cases": 220,
+    "wholeProjectComplete": false
+  },
+  "pendingCommandOwnerReview": {
+    "finding": "B470",
+    "status": "fixed_verified_command_service_withdrawal_and_cleanup_344_cases_global_review_open",
+    "receipt": "receipts/command-service-withdrawal-2026-11-02.json",
+    "previousExactAgentAdmissionReceipt": "receipts/command-caller-lifetime-2026-11-02.json",
+    "differentNamedCases": 344,
+    "normalCoverageStatements": 667,
+    "normalCoverageBranches": 491,
+    "wholeProjectComplete": false
+  },
+  "continuedQuestionOwnerReview": {
+    "finding": "B469",
+    "status": "fixed_verified_continued_reply_identity_and_cancellation_210_cases_global_review_open",
+    "receipt": "receipts/continued-question-execution-identity-2026-11-02.json",
+    "differentNamedCases": 210,
+    "normalCoverageStatements": 209,
+    "normalCoverageBranches": 198,
+    "wholeProjectComplete": false
+  },
+  "retainedSubagentCleanupCoverage": {
+    "finding": "B436",
+    "kind": "verification_followup",
+    "receipt": "receipts/subagent-complete-entry-coverage-2026-11-02.json",
+    "differentNamedCases": 754,
+    "normalCoverageStatements": 379,
+    "normalCoverageBranches": 198,
+    "normalEntryCoverageExemptionRemoved": true,
+    "wholeProjectComplete": false
+  },
+  "publishedMigrationUpgradeAcceptance": {
+    "finding": "B348",
+    "receipt": "receipts/published-migration61-upgrade-2026-11-02.json",
+    "schemaBefore": 61,
+    "schemaAfter": 103,
+    "sourceProductFilesChanged": false,
+    "status": "fixed_verified_released_migration_identities_and_schema61_to103_owned_postgres_upgrade_production_acceptance_open",
+    "wholeProjectComplete": false
+  },
+  "continuedQuestionParticipantReview": {
+    "finding": "B471",
+    "status": "fixed_verified_project_question_participant_and_model_attribution_439_cases_global_review_open",
+    "receipt": "receipts/project-question-participant-attribution-2026-11-02.json",
+    "differentNamedCases": 439,
+    "normalCoveredStatements": 240,
+    "normalCoveredBranches": 239,
+    "wholeProjectComplete": false
+  },
+  "accountLookupResourceReview": {
+    "finding": "B472",
+    "status": "fixed_verified_async_bounded_account_lookup_and_native_closure_85_cases_global_review_open",
+    "receipt": "receipts/gateway-account-lookup-ownership-2026-11-02.json",
+    "differentUnitAndSourceCases": 85,
+    "sourceNode22": true,
+    "builtNode24": true,
+    "realLinuxAccounts": true,
+    "wholeProjectComplete": false
+  },
+  "failedSpawnCancellationReview": {
+    "finding": "B473",
+    "receipt": "receipts/failed-native-spawn-cancellation-2026-11-02.json",
+    "status": "fixed_verified_failed_spawn_cancellation_process_group_isolation_390_cases_global_review_open",
+    "differentNamedCases": 390,
+    "wholeCoveredStatements": 107,
+    "wholeCoveredBranches": 58,
+    "globalReviewComplete": false
+  }
+}

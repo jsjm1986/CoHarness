@@ -27,9 +27,11 @@ kind: "package-reference"
 <a id="write-authority"></a>
 ## 写入权限
 
-项目空间的镜像会暴露当前有效值以及每个 namespace 的所有权元数据。标记为 `projectWrite: manager` 的 namespace 可由项目 owner 或组织管理员写入；其他项目 namespace 会以 `writable: false` 和对应所有者的 `writableReason` 标记只读，设置提供方只读时使用 `provider`。语言、主题、忙碌 Enter、对话宽度和字号等账户级 scope 即使处于项目空间，也会使用账户偏好 transport；只有账户路由明确不支持时才回退到 Host。scope 在首次视图仍处于 loading 或当前权限只读时拒绝 mutation，因此这些状态不会产生任何 mutation RPC。每次接受的写入会发布 `saving`，成功应答折入共享镜像；最新写入被拒绝或失败后先恢复再记录 `error`。功能行渲染这些状态，不会持久化被阻止的选择。
+项目空间的镜像会暴露当前有效值以及每个 namespace 的所有权元数据。标记为 `projectWrite: manager` 的 namespace 可由项目 owner 或组织管理员写入；其他项目 namespace 会以 `writable: false` 和对应所有者的 `writableReason` 标记只读，设置提供方只读时使用 `provider`。语言、主题、忙碌 Enter、对话宽度和字号等账户级 scope 即使处于项目空间，也会使用账户偏好 transport；只有账户路由明确不支持时才回退到 Host。scope 在首次视图仍处于 loading 或当前权限只读时拒绝 mutation，因此这些状态不会产生任何 mutation RPC。控件通过[运行时设置类型](../runtime/README.zh.md)解析字段可用性，因此可写账户偏好不会使只读项目中的 Host 字段变为可写。每次接受的写入会发布 `saving`，成功应答折入共享镜像；最新写入被拒绝或失败后先恢复再记录 `error`。功能行渲染这些状态，不会持久化被阻止的选择。
 
 账户读取共用当前请求。强制刷新或接受相同或更高 revision 的 mutation 应答都会使当前请求失效；接受应答后，`ensure()` 从 ready 视图完成，而不等待已失效的 GET。mutation 应答与当前 GET 都不能降低已持有的 revision。释放镜像会阻止传输准入与发布；每次释放调用都会等待所有仍保留的 GET 实际结束，包括已中止或被取代但忽略取消的请求。
+
+account-or-host 字段路由包含 `ui-theme` 的全部六项字体字段。每个字段从相同账号层读写，共享项目 Host 保持只读；独立 Host 保留404/501回退。参见[字体归属决策](../../../.agents/notes/implemented/bug-fix/2026-11-01-account-font-preferences.zh.md)。
 
 <a id="model-experience"></a>
 ## 模型体验

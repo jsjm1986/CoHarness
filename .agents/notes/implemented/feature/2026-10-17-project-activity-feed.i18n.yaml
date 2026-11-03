@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-17-project-activity-feed.md
 document:
-  en: b58b1cc31c32dab3a611e26ffbfa0ee01650f5d5
-  zh: 9d9d83a6e3a36f2e053fb2d88be8030098979cca
+  en: 399d01423a5057e19b3f24893b0fe73f7bbd306f
+  zh: 5b4d93bce051efe9ae89a571ac28a94ce82fca7c
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input:
   en: 032f3b6dc17cbb4f
   zh: a67b58c5bcc837c9
@@ -15,26 +15,26 @@ document:
   en: e9c9d8d83951e419
   zh: 3c82803db6e0a4c6
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/recorded-content:
-  en: 350dde048fd162d5
-  zh: c5ad4bb815f31bc3
+  en: 7fcbadc963f4bb84
+  zh: 0e14415761743834
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/derivation-query-time-not-a-derived-table:
   en: 7674f9c22b2bb65b
   zh: 745b08da9d549e66
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/server-surface:
-  en: f1ec67e96848b737
-  zh: bdd18b9a96d228c0
+  en: eca6f107fdde122d
+  zh: cd14d03ac62bf0b4
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/client-surface:
-  en: 178eb4724e762d8b
-  zh: a29f65f7884543c5
+  en: 0389dba712426b07
+  zh: 8a88fc0b4d071d18
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/presentation-reviewed-html-mock:
-  en: 8f6f605844813b2e
-  zh: d57acd74b9de4b25
+  en: 12b1f3dbee3eb215
+  zh: e4207996ee9c3211
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/alternatives-considered:
-  en: 05f3800fe73d3390
-  zh: fb1143a8e5caff60
+  en: ff486c5615315a70
+  zh: 69231140f2617e45
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/consequences:
   en: d4b121dc92ed6d80
   zh: 49fdbb8375218c4f
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/testing:
-  en: 7319548903d3c5ea
-  zh: c00a00252ed4b757
+  en: 309dcc0103c565d6
+  zh: c4957d27a467624a

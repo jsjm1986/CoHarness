@@ -1,0 +1,160 @@
+{
+  "finding": "B407",
+  "title": "Memory feature withdrawal during asynchronous reads and recall still discloses completed data to the model",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "at": "2026-10-31T15:11:14.377754+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T142435Z",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.md",
+    ".agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-live-availability.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-live-availability.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-live-availability.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-tool-scopes.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-tool-scopes.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-tool-scopes.zh.md",
+    "apps/cli/tests/profiles/headless/tests/memory-live-settings.expected.e2e.ts",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-member-authority/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-member-authority/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-member-authority/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/memory-live-settings/cordis.patch.yml",
+    "examples/headless-agent/tests/fixtures/memory-live-settings/model.mjs",
+    "examples/headless-agent/tests/fixtures/memory-live-settings/register.mjs",
+    "packages/memory/memory-context/README.i18n.yaml",
+    "packages/memory/memory-context/README.md",
+    "packages/memory/memory-context/README.zh.md",
+    "packages/memory/memory-context/src/index.ts",
+    "packages/memory/memory-context/tests/memory-context.spec.ts",
+    "packages/memory/tool-memory/README.i18n.yaml",
+    "packages/memory/tool-memory/README.md",
+    "packages/memory/tool-memory/README.zh.md",
+    "packages/memory/tool-memory/src/index.ts",
+    "packages/memory/tool-memory/tests/tool-memory.spec.ts"
+  ],
+  "matchingPrerequisites": [
+    "examples/package.json",
+    "packages/memory/memory-context/package.json",
+    "packages/memory/memory-context/tests/loader-composition.spec.ts",
+    "packages/memory/memory-context/tsconfig.json",
+    "packages/memory/memory/README.i18n.yaml",
+    "packages/memory/memory/README.md",
+    "packages/memory/memory/README.zh.md",
+    "packages/memory/memory/package.json",
+    "packages/memory/memory/src/client.ts",
+    "packages/memory/memory/src/index.ts",
+    "packages/memory/memory/src/search.ts",
+    "packages/memory/memory/src/storage.ts",
+    "packages/memory/memory/src/types.ts",
+    "packages/memory/memory/tests/harness.ts",
+    "packages/memory/memory/tsconfig.json",
+    "packages/memory/tool-memory/package.json",
+    "packages/memory/tool-memory/tsconfig.json",
+    "vitest.expected.config.ts",
+    "vitest.snapshot.config.ts"
+  ],
+  "cause": "Consumers captured offered scopes before asynchronous storage or model work. Completed data reused that captured set, and disabling recall did not cancel its pending model admission.",
+  "implementation": "Catalog rows are filtered against current exact scopes; recall rechecks current switches and scopes after metadata/preparation and before reads/injection. Live memory setting commits abort active recall controllers. Main memory read/search tools recheck every requested scope after storage completion while owner-facing reads remain available.",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchedAt": "2026-10-31T15:07:05.210061+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T142435Z/memory-live-origin-fetch.json",
+    "sharedChangesPreserved": true
+  },
+  "verification": {
+    "uniqueRelatedCases": 296,
+    "unitCases": 282,
+    "unitFiles": 11,
+    "unitCalculation": "281 cases in complete memory suite plus one later implicit multi-scope search case. The other28 cases repeated with that file and runtime-version repetitions are not additional unique cases.",
+    "assembledCliCases": 9,
+    "existingSnapshotCases": 5,
+    "coverage": {
+      "packages/memory/memory-context/src/index.ts": {
+        "statements": [
+          323,
+          323
+        ],
+        "branches": [
+          227,
+          227
+        ],
+        "functions": [
+          47,
+          47
+        ],
+        "lines": [
+          264,
+          264
+        ]
+      },
+      "packages/memory/tool-memory/src/index.ts": {
+        "statements": [
+          94,
+          94
+        ],
+        "branches": [
+          88,
+          88
+        ],
+        "functions": [
+          30,
+          30
+        ],
+        "lines": [
+          86,
+          86
+        ]
+      }
+    },
+    "coverageEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T142435Z/coverage-evidence.json",
+    "nodeMajors": [
+      22,
+      24
+    ],
+    "beforeFix": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T142435Z/memory-scope-before-fix-complete.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T142435Z/memory-tools-pending-before-fix-complete.json"
+    ],
+    "oldCompiledNegative": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T142435Z/memory-live-old-cli-negative.json",
+    "oldPackageHashes": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T142435Z/old-package-hashes.json",
+    "native": "Actual shipped dsh headless profile in source and built modes uses file settings, JSON storage, a local model adapter, the real Agent loop and memory tools. Nine unchanged cases fail with complete private old consumer packages: pending catalog rows, personal/workspace/project read/search bodies and both recall completion paths cross withdrawal. Current packages pass. Turning recall alone off still permits ordinary memory tools; disabling memory refuses them. Member reads retain the original body.",
+    "admission": "Real LlmRuntime with a held late budget grant observes selector cancellation before disposal, invokes no model adapter and releases the late lease once. Metadata, prepared-call and full-entry completion checks also have focused cases.",
+    "normalCases": "Five pre-existing recorded/Loader memory scenarios, including canonical catalog transcript, disabled/enabled owner access and recall addresses, pass unchanged. New non-recorded CLI observations use the owner-local test:expected lane.",
+    "types": "Edited consumer specs and actual CLI expected test have zero own or transitive diagnostics with explicit referenced package faces and the existing resource-budget Context declaration. No new manifest or lock change is required.",
+    "build": "Normal scoped TypeScript compile and tsdown builds pass for memory-context and tool-memory; both runtime entries and matching type-plane JS/declarations are captured.",
+    "documentation": "All20 doc-quick checks, export JSDoc, six bilingual pairs and127-file catalog freshness pass. Full doc-sync and whole-repository checks are not claimed.",
+    "lint": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T142435Z/memory-live-lint-complete.json"
+  },
+  "semantics": "Only newly completed publication and dispatch use current availability. Entries and revisions, owner read authority, already logged history, Session formats, model policy, resource attribution and quotas are unchanged. Standalone project-scope tests do not substitute for Gateway membership acceptance.",
+  "noteReview": {
+    "keptActive": [
+      "2026-10-31-memory-tool-scopes: entry admission and model/owner separation remain current; delayed results are cross-linked to the new rule.",
+      "2026-10-24-memory-auxiliary-ownership: durable request records and completion ownership remain current; settings cancellation is cross-linked.",
+      "2026-10-28-memory-curation-scope: captured review scopes remain independent.",
+      "2026-10-31-memory-recall-addresses: exact address deduplication remains independent."
+    ],
+    "newActive": "2026-10-31-memory-live-availability records completion-time disclosure and cancellation rules.",
+    "archived": 0,
+    "deleted": 0,
+    "classification": "Two partial extensions and two independent retained decisions; no full supersession or borderline archival."
+  },
+  "peerReports": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T142435Z/peer-r16-deployed-and-real038.json"
+  ],
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T142435Z/r6-followup-root-source-union.json",
+  "mergeRequirement": "Apply26 B407 deltas with19 matching source prerequisites and rebuild both memory consumer packages in the combined application. This capsule extends the B406 reference capsule; R16 is already deployed from B405, so apply B406/B407 only in a later combined freeze. Preserve peer Local/Gateway/UI, FortuneSheet patch and lock changes. Root performs no deployment and claims only the named live-feature availability cases.",
+  "limitations": [
+    "All12 business domains stay in_progress; B04/B25 stay implementation_in_progress.",
+    "Continue memory-curation switches, tool results and next model rounds across storage, model preparation and queued admission. Its current checks at pass/tool entry need separate delayed-completion verification.",
+    "Continue remaining resource admission, native containment and cross-computer permission paths outside peer reservations; Gateway ensureStewardSpace and production authorization/routing stay with the peer.",
+    "Peer reports R16 deployed from B405; B406 and B407 belong to a later combined candidate. Peer owns REAL038 Tunnel polling and browser acceptance. B host.describe latency remains open.",
+    "Real official/paid provider verification remains deferred at the user request.",
+    "Current platform is macOS. Local model fixtures use no external provider or physical Windows/Linux computers.",
+    "Built checks consume live shared workspace dependencies; prior Local artifacts retained in the capsule are reference-only and require a full matching combined build before deployment."
+  ],
+  "rootDeployed": false
+}

@@ -23,6 +23,17 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 
 describe('Session', () => {
+  it('rejects an inherited cut that precedes another inherited marker', () => {
+    const id = SessionId('nonfinal-inherited-cut')
+    const header: SessionHeader = { version: SESSION_FORMAT_VERSION, id, createdAt: 0, isSeeded: true }
+    const seed: SessionEvent[] = [
+      { type: 'session/end-seed', seq: SessionSeq(0), time: 0, data: { inherited: true } },
+      { type: 'session/end-seed', seq: SessionSeq(1), time: 1, data: { inherited: true } },
+    ]
+    expect(() => Session.create(id, seed, header, SessionLogOffset(0)))
+      .toThrow('session inherited event count must identify the final inherited marker')
+  })
+
   it('exposes one stable readonly surface view', () => {
     const session = Session.create(SessionId('surface-view'))
     const surface = session.surface
@@ -1683,7 +1694,9 @@ describe('SessionStore', () => {
     expect(events.at(-1)?.type).toBe('user/message')
   })
 
-  it('contains session/event observer failures after the append commit point', async () => {
+  it.each(['ordinary', 'unrenderable'] as const)('contains session/event observer failures after the append commit point (%s)', async (kind) => {
+    const failure = (message: string): unknown => kind === 'ordinary' ? new Error(message) : Object.create(null)
+    const failureText = (message: string): string => kind === 'ordinary' ? `Error: ${message}` : '[unrenderable thrown value]'
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const warnings: string[] = []
@@ -1693,9 +1706,10 @@ describe('SessionStore', () => {
     let committedBeforeNotify = false
     ctx.on('session/event', (observedSession, event) => {
       committedBeforeNotify = observedSession.snapshotEvents().at(-1) === event
-      throw new Error('sync event observer')
+      throw failure('sync event observer')
     })
-    ctx.on('session/event', () => Promise.reject(new Error('async event observer')) as never)
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- plugin observers may reject arbitrary failure values
+    ctx.on('session/event', () => Promise.reject(failure('async event observer')) as never)
     ctx.on('session/event', (_observedSession, event) => { heard.push(event) })
 
     let appended!: SessionEvent
@@ -1711,11 +1725,10 @@ describe('SessionStore', () => {
     await Promise.resolve()
 
     expect(warnings).toEqual([
-      'session "contained-event": session/event listener threw: Error: sync event observer',
-      'session "contained-event": session/event listener rejected: Error: async event observer',
+      `session "contained-event": session/event listener threw: ${failureText('sync event observer')}`,
+      `session "contained-event": session/event listener rejected: ${failureText('async event observer')}`,
     ])
   })
-
   it('runs internal dispatch validation on one frozen candidate before commit and resets after a veto', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
@@ -1864,13 +1877,16 @@ describe('SessionStore', () => {
     expect(ctx.sessions.get(session.id)).toBeUndefined()
   })
 
-  it('observes async session/created rejection without rolling back or starving peers', async () => {
+  it.each(['ordinary', 'unrenderable'] as const)('observes async session/created rejection without rolling back or starving peers (%s)', async (kind) => {
+    const failure = (message: string): unknown => kind === 'ordinary' ? new Error(message) : Object.create(null)
+    const failureText = (message: string): string => kind === 'ordinary' ? `Error: ${message}` : '[unrenderable thrown value]'
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const warnings: string[] = []
     ctx.logger.warn = ((message: unknown) => { warnings.push(String(message)) }) as typeof ctx.logger.warn
     const heard: string[] = []
-    ctx.on('session/created', () => Promise.reject(new Error('late creation failure')) as never)
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- plugin observers may reject arbitrary failure values
+    ctx.on('session/created', () => Promise.reject(failure('late creation failure')) as never)
     ctx.on('session/created', (session) => { heard.push(session.id) })
 
     const session = ctx.sessions.create(SessionId('async-created'))
@@ -1880,18 +1896,20 @@ describe('SessionStore', () => {
     expect(ctx.sessions.get(session.id)).toBe(session)
     expect(heard).toEqual(['async-created'])
     expect(warnings).toEqual([
-      'session "async-created": session/created listener rejected: Error: late creation failure',
+      `session "async-created": session/created listener rejected: ${failureText('late creation failure')}`,
     ])
   })
-
-  it('contains synchronous and async session/disposed listener failures per observer', async () => {
+  it.each(['ordinary', 'unrenderable'] as const)('contains synchronous and async session/disposed listener failures per observer (%s)', async (kind) => {
+    const failure = (message: string): unknown => kind === 'ordinary' ? new Error(message) : Object.create(null)
+    const failureText = (message: string): string => kind === 'ordinary' ? `Error: ${message}` : '[unrenderable thrown value]'
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const warnings: string[] = []
     ctx.logger.warn = ((message: unknown) => { warnings.push(String(message)) }) as typeof ctx.logger.warn
     const heard: string[] = []
-    ctx.on('session/disposed', () => { throw new Error('sync disposed') })
-    ctx.on('session/disposed', () => Promise.reject(new Error('async disposed')) as never)
+    ctx.on('session/disposed', () => { throw failure('sync disposed') })
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- plugin observers may reject arbitrary failure values
+    ctx.on('session/disposed', () => Promise.reject(failure('async disposed')) as never)
     ctx.on('session/disposed', (session) => { heard.push(session.id) })
 
     const unannounced = ctx.sessions.prepare(SessionId('never-announced'))
@@ -1908,19 +1926,20 @@ describe('SessionStore', () => {
 
     expect(heard).toEqual(['contained-disposal'])
     expect(warnings).toEqual([
-      'session "contained-disposal": session/disposed listener threw: Error: sync disposed',
-      'session "contained-disposal": session/disposed listener rejected: Error: async disposed',
+      `session "contained-disposal": session/disposed listener threw: ${failureText('sync disposed')}`,
+      `session "contained-disposal": session/disposed listener rejected: ${failureText('async disposed')}`,
     ])
   })
-
-  it('contains internal dispatch failure after session detachment', async () => {
+  it.each(['ordinary', 'unrenderable'] as const)('contains internal dispatch failure after session detachment (%s)', async (kind) => {
+    const failure = (message: string): unknown => kind === 'ordinary' ? new Error(message) : Object.create(null)
+    const failureText = (message: string): string => kind === 'ordinary' ? `Error: ${message}` : '[unrenderable thrown value]'
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const warnings: string[] = []
     ctx.logger.warn = ((message: unknown) => { warnings.push(String(message)) }) as typeof ctx.logger.warn
     const heard: Session[] = []
     ctx.on('internal/dispatch', (_mode, name) => {
-      if (name === 'session/disposed') throw new Error('disposed dispatch instrumentation')
+      if (name === 'session/disposed') throw failure('disposed dispatch instrumentation')
     })
     ctx.on('session/disposed', (session) => { heard.push(session) })
     const session = ctx.sessions.prepare(SessionId('disposed-dispatch'))
@@ -1931,10 +1950,9 @@ describe('SessionStore', () => {
     expect(ctx.sessions.get(session.id)).toBeUndefined()
     expect(heard).toEqual([])
     expect(warnings).toEqual([
-      'session "disposed-dispatch": session/disposed dispatch threw: Error: disposed dispatch instrumentation',
+      `session "disposed-dispatch": session/disposed dispatch threw: ${failureText('disposed dispatch instrumentation')}`,
     ])
   })
-
   it('does not let internal dispatch replace the disposed callback tuple', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

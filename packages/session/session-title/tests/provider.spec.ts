@@ -1,6 +1,6 @@
 import { Context } from '@deepseek-ai/cordis'
-import { describe, expect, it, vi } from 'vitest'
-import LlmRuntime, { createUserMessage, deepFreeze, markAgentLoopRequest } from '@deepseek-ai/dsh-llm'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import LlmRuntime, { createUserMessage, deepFreeze, LlmAdapter, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import SessionTitleService, {
   SessionTitleProviderId,
@@ -404,11 +404,18 @@ describe('SessionTitleService Provider lifecycle', () => {
     expect(ctx.sessionTitle.get(session)?.title).toBe('Newest complete title')
   })
 
-  it('runs an all-messages revision when the next main request reuses its logged header', async () => {
+  it.each((['model', 'orchestration'] as const).flatMap(kind =>
+    (['before-step', 'within-step'] as const).map(input => ({ kind, input })),
+  ))('runs an unchanged-header $kind revision for input logged $input and ignores an older request', async ({ kind, input }) => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionTitleService, CONFIG)
+    class Main extends LlmAdapter {
+      override readonly callKind = kind
+      async *stream(): AsyncIterable<StreamChunk> { yield { type: 'finish', reason: { kind: 'stop' } } }
+    }
+    ctx.llm.registerAdapter(['main-route'], new Main())
     const requests: SessionTitleProviderRequest[] = []
     ctx.sessionTitle.register({
       id: SessionTitleProviderId('unchanged-route'),
@@ -430,16 +437,23 @@ describe('SessionTitleService Provider lifecycle', () => {
     session.append('step/start', { turn: 1, step: 1 })
     appendRoute(session)
     await settle()
+    const previous = ctx.llm.markAgentLoopRequest(deepFreeze({
+      provider: 'main-route', model: 'chat-model', messages: session.deriveMessages(), sessionId: session.id,
+    }))
     session.append('step/end', { turn: 1, step: 1 })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
 
     session.append('turn/start', {
       turn: 2,
     })
+    if (input === 'within-step') session.append('step/start', { turn: 2, step: 1 })
     const second = appendHumanPrompt(session, 'Second prompt on the same route')
     await settle()
-    session.append('step/start', { turn: 2, step: 1 })
-    void ctx.llm.stream(markAgentLoopRequest(deepFreeze({
+    if (input === 'before-step') session.append('step/start', { turn: 2, step: 1 })
+    void ctx.llm.stream(previous)
+    await settle()
+    expect(requests).toHaveLength(1)
+    void ctx.llm.stream(ctx.llm.markAgentLoopRequest(deepFreeze({
       provider: 'main-route',
       model: 'chat-model',
       messages: session.deriveMessages(),
@@ -456,6 +470,43 @@ describe('SessionTitleService Provider lifecycle', () => {
       ],
       route: { provider: 'main-route', model: 'chat-model' },
     })
+  })
+
+  it('recognizes a loop request through its emitting isolated LLM service', async () => {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionTitleService, CONFIG)
+    const isolated = ctx.isolate('llm')
+    await isolated.plugin(LlmRuntime)
+    const requests: SessionTitleProviderRequest[] = []
+    ctx.sessionTitle.register({
+      id: SessionTitleProviderId('isolated-route'), automatic: 'all-prompts',
+      async generate(request) {
+        requests.push(request)
+        return { title: `Revision ${requests.length}`, messageSeqs: request.messages.map(message => message.seq) }
+      },
+    })
+    const session = ctx.sessions.create(SessionId('isolated-route'))
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    appendHumanPrompt(session, 'First isolated prompt')
+    appendRoute(session)
+    await settle()
+    session.append('step/end', { turn: 1, step: 1 })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    session.append('turn/start', { turn: 2 })
+    session.append('step/start', { turn: 2, step: 1 })
+    appendHumanPrompt(session, 'Second isolated prompt')
+    const request = isolated.llm.markAgentLoopRequest(deepFreeze({
+      provider: 'main-route', model: 'chat-model', messages: session.deriveMessages(), sessionId: session.id,
+    }))
+    expect(ctx.llm.isAgentLoopRequest(request)).toBe(false)
+    void isolated.llm.stream(request)
+    await settle()
+    expect(requests).toHaveLength(2)
+    expect(requests[1]?.messages.at(-1)?.text).toBe('Second isolated prompt')
   })
 
   it('ignores model streams that are not a matching loop request', async () => {
@@ -475,16 +526,16 @@ describe('SessionTitleService Provider lifecycle', () => {
     const options = { provider: 'main-route', model: 'chat-model', messages: [] }
 
     void ctx.llm.stream(deepFreeze(options))
-    void ctx.llm.stream(markAgentLoopRequest(deepFreeze({ ...options, sessionId: SessionId('missing') })))
+    void ctx.llm.stream(ctx.llm.markAgentLoopRequest(deepFreeze({ ...options, sessionId: SessionId('missing') })))
     const quiet = ctx.sessions.create(SessionId('quiet'))
-    void ctx.llm.stream(markAgentLoopRequest(deepFreeze({ ...options, sessionId: quiet.id })))
+    void ctx.llm.stream(ctx.llm.markAgentLoopRequest(deepFreeze({ ...options, sessionId: quiet.id })))
     const pending = ctx.sessions.create(SessionId('unmatched-boundary'))
     pending.append('turn/start', {
       turn: 1,
     })
     appendHumanPrompt(pending, 'Wait for a matching request boundary')
     await settle()
-    void ctx.llm.stream(markAgentLoopRequest(deepFreeze({ ...options, sessionId: pending.id })))
+    void ctx.llm.stream(ctx.llm.markAgentLoopRequest(deepFreeze({ ...options, sessionId: pending.id })))
     await settle()
 
     expect(generate).not.toHaveBeenCalled()

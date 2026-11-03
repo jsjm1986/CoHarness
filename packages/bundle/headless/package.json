@@ -28,12 +28,12 @@
     "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/startup.js",
     "cordis.patch.yml",
     "lib/json-stream-*.js",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "dsh": {

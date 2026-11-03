@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/attachment/README.md
 document:
-  en: ea2272addaf25e78a5da5be0d06773067900bc43
-  zh: 187201b0880ab73c1bb82c84fb3eecd5b2462a76
+  en: 7d0ff35be07bde580e22482605e9db2461a48ea1
+  zh: 40a7fbe292c7506f20e870b962bc9f76246f2c66
 /:
   en: 4cb8c03a6c1dcd24
   zh: 5bd6fa8ddf4daed3
 /attachment-durable-attachment-capability-family:
-  en: 32b64062f6133a51
-  zh: 4fdaac7ea0ff4989
+  en: 2a7a458b508d245f
+  zh: 7f9d26f51203ab4b
 /attachment-durable-attachment-capability-family/summary:
   en: a34dd6206d6b3ae8
   zh: acbff9279eb83953

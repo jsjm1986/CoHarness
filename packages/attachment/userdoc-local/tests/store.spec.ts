@@ -1,4 +1,4 @@
-import { mkdtemp, lstat, readFile, readdir, rm, stat, symlink, writeFile, mkdir } from 'node:fs/promises'
+import { mkdtemp, lstat, readFile, readdir, rename, rm, stat, symlink, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 /* oxlint-disable typescript/no-unsafe-assignment -- Vitest asymmetric matchers are typed as any. */
@@ -200,9 +200,9 @@ describe('saveDocFile', () => {
     const uploadRoot = await root()
     const outside = join(uploadRoot, '..', 'outside')
     await mkdir(outside)
-    await mkdir(uploadRoot)
-    await symlink(outside, join(uploadRoot, dayDirectory(new Date())))
     const target = await resolveDocTarget(uploadRoot, 'escaped.txt', new Date())
+    await rename(dirname(target.path), join(uploadRoot, 'original-date'))
+    await symlink(outside, dirname(target.path), process.platform === 'win32' ? 'junction' : 'dir')
 
     await expect(saveDocFile(uploadRoot, target, body('secret'), LIMITS)).rejects.toMatchObject({
       code: INVALID_DOCUMENT_REF_CODE,
@@ -297,9 +297,58 @@ describe('listDocFiles', () => {
   it('hides an in-progress partial file from the listing', async () => {
     const uploadRoot = await root()
     await save(uploadRoot, 'real.txt', 'real')
-    await writeFile(join(uploadRoot, dayDirectory(new Date()), 'inflight.txt.part'), 'partial')
+    await writeFile(join(uploadRoot, dayDirectory(new Date()), `.userdoc-${'a'.repeat(24)}.part`), 'partial')
 
     expect((await listDocFiles(uploadRoot)).map(ref => ref.name)).toEqual(['real.txt'])
+  })
+
+  it('lists a completed document whose ordinary filename ends in .part', async () => {
+    const uploadRoot = await root()
+    const saved = await save(uploadRoot, 'archive.part', 'finished bytes')
+    expect((await listDocFiles(uploadRoot)).map(ref => ref.docId)).toEqual([saved.docId])
+    const directory = UserDocDirectoryId(saved.docId.split('/').slice(0, -1).join('/'))
+    expect((await listDocDirectory(uploadRoot, directory)).documents.map(ref => ref.docId)).toEqual([saved.docId])
+    expect(new TextDecoder().decode((await readDocFile(uploadRoot, saved.docId)).data)).toBe('finished bytes')
+  })
+
+  it.each(['.UPLOAD-SESSIONS', '.DSH-TRASH'])('rejects a case alias of a private root directory: %s', async (alias) => {
+    const uploadRoot = await root()
+    await mkdir(join(uploadRoot, alias.toLowerCase()), { recursive: true })
+    await writeFile(join(uploadRoot, alias.toLowerCase(), 'private.txt'), 'private bytes')
+    await expect(readDocFile(uploadRoot, UserDocId(`${alias}/private.txt`))).rejects.toMatchObject({ code: INVALID_DOCUMENT_REF_CODE })
+    await expect(listDocDirectory(uploadRoot, UserDocDirectoryId(alias))).rejects.toMatchObject({ code: 'INVALID_DOCUMENT_DIRECTORY' })
+    expect(await readFile(join(uploadRoot, alias.toLowerCase(), 'private.txt'), 'utf8')).toBe('private bytes')
+  })
+
+  it('refuses reading through a document root replaced by a directory link', async () => {
+    const uploadRoot = await root(), outside = join(uploadRoot, '..', 'outside')
+    await mkdir(outside)
+    await writeFile(join(outside, 'private.txt'), 'outside bytes')
+    await symlink(outside, uploadRoot, process.platform === 'win32' ? 'junction' : 'dir')
+    await expect(readDocFile(uploadRoot, UserDocId('private.txt'))).rejects.toMatchObject({ code: INVALID_DOCUMENT_REF_CODE })
+    await expect(listDocFiles(uploadRoot)).rejects.toMatchObject({ code: 'INVALID_DOCUMENT_DIRECTORY' })
+    expect(await readFile(join(outside, 'private.txt'), 'utf8')).toBe('outside bytes')
+  })
+
+  it('omits reserved root leaves consistently from recursive and immediate listings', async () => {
+    const uploadRoot = await root()
+    await mkdir(uploadRoot)
+    await writeFile(join(uploadRoot, '.DSH-TRASH'), 'reserved bytes')
+    await save(uploadRoot, 'normal.txt', 'public bytes')
+    expect((await listDocFiles(uploadRoot)).map(ref => ref.name)).toEqual(['normal.txt'])
+    expect((await listDocDirectory(uploadRoot, UserDocDirectoryId(''))).documents).toEqual([])
+  })
+
+  it('does not recreate target directories outside a root replaced after resolution', async () => {
+    const uploadRoot = await root(), date = new Date('2026-01-02T12:00:00Z')
+    const target = await resolveDocTarget(uploadRoot, 'document.txt', date)
+    await rename(uploadRoot, join(uploadRoot, '..', 'retained-root'))
+    const outside = join(uploadRoot, '..', 'outside')
+    await mkdir(outside)
+    await symlink(outside, uploadRoot, process.platform === 'win32' ? 'junction' : 'dir')
+    await expect(saveDocFile(uploadRoot, target, body('private bytes'), LIMITS)).rejects.toMatchObject({ code: INVALID_DOCUMENT_REF_CODE })
+    await expect(resolveDocTarget(uploadRoot, 'another.txt', date)).rejects.toMatchObject({ code: INVALID_DOCUMENT_REF_CODE })
+    expect(await readdir(outside)).toEqual([])
   })
 
   it('observes cancellation', async () => {

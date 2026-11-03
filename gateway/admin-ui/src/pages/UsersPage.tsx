@@ -52,6 +52,7 @@ export function UsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [actionError, setActionError] = useState('')
   const [pending, setPending] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null)
@@ -62,7 +63,7 @@ export function UsersPage() {
   const reload = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true)
     try {
-      setUsers(await listUsers())
+      setUsers(await listUsers('computer'))
       setError('')
     } catch (cause) {
       setError(messageFrom(cause))
@@ -75,12 +76,14 @@ export function UsersPage() {
 
   async function run(key: string, action: () => Promise<void>): Promise<boolean> {
     setPending(key)
+    setActionError('')
     try {
       await action()
       await reload()
       return true
     } catch (cause) {
       setError(messageFrom(cause))
+      setActionError(messageFrom(cause))
       return false
     } finally {
       setPending('')
@@ -126,17 +129,17 @@ export function UsersPage() {
       <PageHeader
         title={t('pageTitle')}
         description={t('pageDescription')}
-        meta={loading ? undefined : t('userCount', { count: String(users.length) })}
-        actions={<Button variant="primary" icon={Plus} onClick={() => setCreateOpen(true)}>{t('createUser')}</Button>}
+        meta={loading || (users.length === 0 && error !== '') ? undefined : t('userCount', { count: String(users.length) })}
+        actions={<Button variant="primary" icon={Plus} onClick={() => { setActionError(''); setCreateOpen(true) }}>{t('createUser')}</Button>}
       />
       <ErrorBanner message={error} />
-      <Section flush className="responsiveSection" title={t('sectionTitle')} meta={loading ? undefined : t('recordCount', { count: String(users.length) })}>
-        {loading ? <LoadingState label={t('loadingUsers')} /> : users.length === 0 ? (
+      <Section flush className="responsiveSection" title={t('sectionTitle')} meta={loading || (users.length === 0 && error !== '') ? undefined : t('recordCount', { count: String(users.length) })}>
+        {loading ? <LoadingState label={t('loadingUsers')} /> : users.length === 0 && error !== '' ? null : users.length === 0 ? (
           <EmptyState
             icon={Users}
             title={t('emptyTitle')}
             detail={t('emptyDetail')}
-            action={<Button variant="primary" icon={Plus} onClick={() => setCreateOpen(true)}>{t('createUser')}</Button>}
+            action={<Button variant="primary" icon={Plus} onClick={() => { setActionError(''); setCreateOpen(true) }}>{t('createUser')}</Button>}
           />
         ) : (
           <>
@@ -166,10 +169,10 @@ export function UsersPage() {
                         <UserActions
                           user={user}
                           pending={pending}
-                          onEdit={() => setEditTarget(user)}
-                          onPassword={() => setPasswordTarget(user)}
-                          onDisable={() => setDisableTarget(user)}
-                          onDelete={() => setDeleteTarget(user)}
+                          onEdit={() => { setActionError(''); setEditTarget(user) }}
+                          onPassword={() => { setActionError(''); setPasswordTarget(user) }}
+                          onDisable={() => { setActionError(''); setDisableTarget(user) }}
+                          onDelete={() => { setActionError(''); setDeleteTarget(user) }}
                           onEnable={() => { void run(`status:${user.id}`, () => patchUser(user.id, { status: 'active' })) }}
                         />
                       </td>
@@ -199,10 +202,10 @@ export function UsersPage() {
                       mobile
                       user={user}
                       pending={pending}
-                      onEdit={() => setEditTarget(user)}
-                      onPassword={() => setPasswordTarget(user)}
-                      onDisable={() => setDisableTarget(user)}
-                      onDelete={() => setDeleteTarget(user)}
+                      onEdit={() => { setActionError(''); setEditTarget(user) }}
+                      onPassword={() => { setActionError(''); setPasswordTarget(user) }}
+                      onDisable={() => { setActionError(''); setDisableTarget(user) }}
+                      onDelete={() => { setActionError(''); setDeleteTarget(user) }}
                       onEnable={() => { void run(`status:${user.id}`, () => patchUser(user.id, { status: 'active' })) }}
                     />
                   </div>
@@ -213,11 +216,11 @@ export function UsersPage() {
         )}
       </Section>
 
-      <UserCreateDialog open={createOpen} pending={pending === 'create'} onSubmit={draft => void onCreate(draft)} onClose={() => setCreateOpen(false)} />
-      <UserEditDialog user={editTarget} pending={pending.startsWith('edit:')} onSubmit={patch => void onEdit(patch)} onClose={() => setEditTarget(null)} />
-      <UserPasswordDialog user={passwordTarget} pending={pending.startsWith('password:')} onSubmit={password => void onResetPassword(password)} onClose={() => setPasswordTarget(null)} />
-      <UserDisableConfirm user={disableTarget} pending={pending.startsWith('status:')} onConfirm={() => void onDisable()} onClose={() => setDisableTarget(null)} />
-      <UserDeleteConfirm user={deleteTarget} pending={pending.startsWith('delete:')} onConfirm={() => void onDelete()} onClose={() => setDeleteTarget(null)} />
+      <UserCreateDialog open={createOpen} pending={pending === 'create'} error={actionError} onSubmit={draft => void onCreate(draft)} onClose={() => setCreateOpen(false)} />
+      <UserEditDialog user={editTarget} pending={pending.startsWith('edit:')} error={actionError} onSubmit={patch => void onEdit(patch)} onClose={() => setEditTarget(null)} />
+      <UserPasswordDialog user={passwordTarget} pending={pending.startsWith('password:')} error={actionError} onSubmit={password => void onResetPassword(password)} onClose={() => setPasswordTarget(null)} />
+      <UserDisableConfirm user={disableTarget} pending={pending.startsWith('status:')} error={actionError} onConfirm={() => void onDisable()} onClose={() => setDisableTarget(null)} />
+      <UserDeleteConfirm user={deleteTarget} pending={pending.startsWith('delete:')} error={actionError} onConfirm={() => void onDelete()} onClose={() => setDeleteTarget(null)} />
     </div>
   )
 }

@@ -8,6 +8,7 @@
 import { Context, FiberState, getTraceable, Service, symbols } from '@deepseek-ai/cordis'
 import type { Fiber } from '@deepseek-ai/cordis'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { formatThrownValue } from '@deepseek-ai/dsh-util-values'
 import { isPromise } from 'node:util/types'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
@@ -577,10 +578,10 @@ export class AgentRegistry extends Service {
       try {
         const returned: unknown = callback(...args)
         void Promise.resolve(returned).catch((error: unknown) => {
-          this.ctx.logger.warn(`agent "${entry.id}": agent/disposed listener rejected: ${String(error)}`)
+          this.ctx.logger.warn(`agent "${entry.id}": agent/disposed listener rejected: ${formatThrownValue(error)}`)
         })
       } catch (error: unknown) {
-        this.ctx.logger.warn(`agent "${entry.id}": agent/disposed listener threw: ${String(error)}`)
+        this.ctx.logger.warn(`agent "${entry.id}": agent/disposed listener threw: ${formatThrownValue(error)}`)
       }
     }
   }

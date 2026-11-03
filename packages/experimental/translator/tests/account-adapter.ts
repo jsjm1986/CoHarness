@@ -5,7 +5,7 @@ import type { Dict } from '@deepseek-ai/cosmokit'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { catalogModelInfo, deepSeekConfigFields, plainOptions, registerDeepSeekProvider, resolveAdapterOptions } from '@deepseek-ai/dsh-llm-deepseek'
-import type { Config as DeepSeekConfig, ResolvedDeepSeekOptions } from '@deepseek-ai/dsh-llm-deepseek'
+import type { Config as DeepSeekConfig, DeepSeekRequestAuth, ResolvedDeepSeekOptions } from '@deepseek-ai/dsh-llm-deepseek'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 
 export const name = 'llm-deepseek-account'
@@ -58,7 +58,7 @@ export function apply(ctx: Context, config: Config): void {
   registerDeepSeekProvider(ctx, PROVIDER, {
     options,
     providerName: 'DeepSeek Account',
-    resolveAuth: async (connection) => {
+    resolveAuth: async (connection): Promise<DeepSeekRequestAuth> => {
       const token = await ctx.get('deepseekAccount')?.resolveToken(connection.baseURL)
       return { headers: token === undefined ? {} : { 'x-dsh-auth-token': token } }
     },

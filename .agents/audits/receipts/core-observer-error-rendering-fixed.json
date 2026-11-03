@@ -1,0 +1,14 @@
+{
+  "name": "core-observer-error-rendering-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/core/agent/tests/agent.spec.ts packages/core/session/tests/session.spec.ts packages/util/values/tests/values.spec.ts",
+  "startedAt": "2026-10-26T10:04:32.820631+00:00",
+  "seconds": 5.516,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "489dbd4268f54bfcdea70038f1c4e8db7b8be18b1f9d1698c9efa0d7f8302957",
+  "inputsAfter": "489dbd4268f54bfcdea70038f1c4e8db7b8be18b1f9d1698c9efa0d7f8302957",
+  "postgresToolDirectory": null,
+  "outputSha256": "c9b3dda0f049f224a7f89a5d1effe071ae4688a87b8e01f463f09a1d1a7b2e06",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  3 passed (3)\n      Tests  115 passed (115)\n   Start at  18:04:37\n   Duration  1.19s (transform 1.03s, setup 120ms, import 1.48s, tests 530ms, environment 0ms)\n\n"
+}

@@ -16,7 +16,13 @@ The user frontend owns the project settings entry point. Every project member ca
 
 Runtime credential requests call the selected governance method through its service object, so project decryption state remains bound during dispatch.
 
+Gateway project routing obtains management authority and theme policy together with current membership. Proxy revalidation uses the same authority read. Loading a full project member directory for every Runtime request multiplies database round trips on remote computers; permission caching instead delays revocation. The authorized projection removes those detail reads while retaining current account, computer, project and membership checks.
+
 The administrator console remains the authority for server directories, mounts, lifecycle, quotas, organization model governance, and membership overrides. Its project detail page shows configuration ownership and a safe link that enters the user frontend in the selected project scope; it does not duplicate project logic settings. Project credentials and policy writes acquire the project configuration lock before provider-row locks, keeping concurrent edits, credential rotation, and deletion ordered.
+
+Manager writes carry the authenticated actor into the owning service transaction. Account and organization-membership share locks precede the project lock, matching membership writers' ordering; the current project owner, organization availability and steward qualification determine admission. Provider and credential mutations acquire the [organization model-configuration lock](../bug-fix/2026-10-29-model-administration-authority.md) before that sequence. Retained account and project locks prevent a role or owner change from invalidating an accepted database mutation before commit. A stale browser view cannot authorize name, theme, Provider or credential changes. Discovery prepares endpoint-matched credentials under the same authority and releases its database connection before the catalog probe. Browser transports always provide the authenticated actor; an omitted service actor permits trusted internal maintenance.
+
+Administrator membership overrides require the current active organization administrator role inside the owning transaction; project ownership does not grant this authority. The target account is retained before acquiring the project lock, preserving serialization with account deletion. Authenticated administrator routes pass their server-selected actor. Typed permission denials return403 and produce a failed-attempt audit; they do not publish membership invalidations or apply directory grants.
 
 ## Alternatives considered
 

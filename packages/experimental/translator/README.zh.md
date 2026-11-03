@@ -58,13 +58,13 @@ GUI 等待首次提供方发现完成后才注册翻译控件。如果凭据或�
 
 Google 接收使用 `gtx` 客户端的表单 POST 请求；Bing 通过 Microsoft Edge 端点接收 JSON 文本数组。两者都通过请求正文接收提交的文本。Cookie、HTTP 重定向和自动切换提供者均已禁用。
 
-绑定 Session 的调用通过规范的插件记录写入器追加与提供方无关的 `plugin:translator/request` 和 `plugin:translator/result` 记录。结果通过 Session 序号引用请求。请求保留精确原文、语言、提供方、翻译配方以及可选的提供方请求元数据；结果保留译文。匿名提供方的配方标识有效配置端点的指纹及协议修订。付费配方标识固定 Flash 模型、提示词修订、关闭思考及配置的输出 token 上限。付费请求元数据按发送前准备的精确值保存 `modelRequest: { config, system, messages }`，不包含凭据。每个提供方都使用相同的请求和结果字段。原始对话事件和主模型输入保持不变。
+绑定 Session 的调用通过规范的插件记录写入器追加与提供方无关的 `plugin:translator/request` 和 `plugin:translator/result` 记录。结果通过 Session 序号引用请求。请求保留精确原文、语言、提供方、翻译配方以及可选的提供方请求元数据；结果保留译文。匿名提供方的配方标识有效配置端点的指纹及协议修订。付费配方标识固定 Flash 模型、提示词修订、关闭思考及配置的输出 token 上限。付费请求元数据按发送前准备的精确值保存 `modelRequest: { config, system, messages }`，不包含凭据。原生请求携带模型不可见的 `translation` 用途，用于用量分类。派发选项省略 `sessionId`，因此原生扩展无法附加调用方的对话日志。每个提供方都使用相同的请求和结果字段。原始对话事件和主模型输入保持不变。
 
 存储读取会校验翻译字段及请求与结果的引用。只有已持久保存的成功结果可复用；失败或中断的提供方输出不作为结果保存。缓存查找使用只读访问，不激活 Agent，也不发布迁移后的 generation。缓存未命中时，通过已激活 Session 的现有写入器调用 `appendPluginRecord` 追加记录，刷新该 Session，并从存储中确认持久化。translator 从不打开写句柄，也不激活 Session。相同翻译的并发请求会等待首次尝试及其已接纳的写入完成，即使其调用方已取消或超时，随后复用其持久结果；不同片段和 Session 可以并行发送请求。插件记录在未来 Session 格式迁移中仅提供尽力保留。
 
 `TranslationError.code` 区分输入限制、HTTP 失败、响应限制、无效提供方响应、传输失败、缺少持久 Session、存储失败、不可用的原生路由以及服务自身的 `TRANSLATION_TIMEOUT` 超时。未激活 Session 缓存未命中时，在调用任何提供方之前以 `TRANSLATION_SESSION_INACTIVE` 拒绝。诊断不包含提交的文本或提供者错误正文。`translate()` 始终返回 Promise，准入或提供者失败都会使其拒绝。调用者取消和服务卸载保留原始中止原因，包括调用者自身的超时原因。排队期间取消会立即返回拒绝；卸载会取消已接纳的请求，并等待底层存储和网络工作结束。`resolve()` 和 `translate()` 都执行输入限制。
 
-`TRANSLATION_UNAVAILABLE` 拒绝缺失的活跃内置所有者或已注册路由、未配置的凭据、目录中不存在精确的 `deepseek-flash`、派发前所有者、模型配置（官方路由的 `models` 或账号路由的 `modelOverrides`）或官方凭据引用变化、提供方卸载，以及准备后的调用推理强度不是 `off` 的情况。资格与思考检查在派发前执行，请求持久化之后会再次检查资格。原生 `finish` 的原因为 `error` 时映射为 `TRANSLATION_REQUEST_FAILED`；缺失 finish 或其他非 `stop` 原因映射为 `TRANSLATION_INVALID_RESPONSE`。
+`TRANSLATION_UNAVAILABLE` 拒绝缺失的活跃内置所有者或已注册路由、未配置的凭据、目录中不存在精确的 `deepseek-flash`、派发前所有者、模型配置（官方路由的 `models` 或账号路由的 `modelOverrides`）或官方凭据引用变化、提供方卸载，以及准备后的调用推理强度不是 `off` 的情况。资格与思考检查在派发前执行，请求持久化、资源准入与提供方异步准备之后均会再次检查资格；每次实际请求（包括重试）之前还会同步检查所有者。原生资格检查读取 Settings 中生效的凭据引用，并同时保留已解析的 Settings 快照与组合配置字段；发布或撤销该快照会使未命中的在途调用失效。原生 `finish` 的原因为 `error` 时映射为 `TRANSLATION_REQUEST_FAILED`；缺失 finish 或其他非 `stop` 原因映射为 `TRANSLATION_INVALID_RESPONSE`。
 
 </details>
 

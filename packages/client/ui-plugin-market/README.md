@@ -11,6 +11,8 @@ English | [中文](README.zh.md)
 
 Discover is the second tab of the **Plugins** page, after **Installed**. It lists the bundles that plugin market indexes offer; users manage index sources, switch between markets, search, filter by category and label, sort, open an entry's page, and install an entry after confirming it. The Host [`pluginMarket`](../../boot/plugin-market/README.md) service fetches and validates indexes; this package only presents them.
 
+Discover keeps the document’s bootstrap profile for installation and Host invalidations. Selecting a conversation on another computer does not change the profile being managed.
+
 ## Table of Contents
 
 - [Use this package](#use-this-package)

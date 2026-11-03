@@ -4,16 +4,16 @@
 - paragraph: "Choose the document scope to view:"
 - img
 - textbox "Search document scopes"
-- listbox "Document scopes":
-  - option "All accessible documents Metadata only":
+- group "Document scopes":
+  - button "All accessible documents Metadata only":
     - strong: All accessible documents
     - text: Metadata only
-  - option "Personal documents Private to you" [selected]:
+  - button "Personal documents Private to you":
     - strong: Personal documents
     - text: Private to you
-  - option "Compiler Read-only · Shared project scope":
+  - button "Compiler Read-only · Shared project scope":
     - strong: Compiler
     - text: Read-only · Shared project scope
-  - option "Payments Editable · Shared project scope":
+  - button "Payments Editable · Shared project scope":
     - strong: Payments
     - text: Editable · Shared project scope

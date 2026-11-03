@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-probes-node24",
+  "cwd": "gateway",
+  "command": "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node ../node_modules/vitest/vitest.mjs run tests/tunnel-install.spec.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-24T23:34:39.630577+00:00",
+  "seconds": 4.465,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a0d86acc16e7427c0c08b6f641c0e08be8a16c49e7580a85af667fbf17ab1395",
+  "inputsAfter": "a0d86acc16e7427c0c08b6f641c0e08be8a16c49e7580a85af667fbf17ab1395",
+  "postgresToolDirectory": null,
+  "outputSha256": "1679d30ea9dc4bd9fcee8ffe247e7ddc6d1f4f151946fba24d399f3f198bdccc",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  8 passed (8)\n   Start at  07:34:41\n   Duration  2.36s (transform 38ms, setup 0ms, import 58ms, tests 2.21s, environment 0ms)\n\n"
+}

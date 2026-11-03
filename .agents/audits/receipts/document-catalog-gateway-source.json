@@ -1,0 +1,14 @@
+{
+  "name": "document-catalog-gateway-source",
+  "cwd": "gateway",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 ../node_modules/.bin/vitest run tests/documents-local.spec.ts tests/server.spec.ts tests/runtime-api.spec.ts",
+  "startedAt": "2026-10-26T21:01:04.052075+00:00",
+  "seconds": 12.494,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d6c0572aea96a91986873738ae43ac12ff696a9ca026f7890e19e84605b8471d",
+  "inputsAfter": "d6c0572aea96a91986873738ae43ac12ff696a9ca026f7890e19e84605b8471d",
+  "postgresToolDirectory": null,
+  "outputSha256": "2e8a5e6abe0f435f75d4b10fd93f3dcec2b6c572c9570a4800c1048ff8ceea63",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  157 passed (157)\n   Start at  05:01:06\n   Duration  9.76s (transform 7.07s, setup 0ms, import 8.97s, tests 9.54s, environment 0ms)\n\n"
+}

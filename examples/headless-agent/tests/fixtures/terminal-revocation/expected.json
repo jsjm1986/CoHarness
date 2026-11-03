@@ -1,0 +1,19 @@
+{
+  "reply": "TERMINAL_REVOCATION_OK",
+  "403": {
+    "status": 403,
+    "processInitiallyAlive": true,
+    "revocationBeforeCancellationAck": true,
+    "processClosedBeforeCancellationAck": true,
+    "acknowledgementStillPending": true,
+    "newTerminalDenied": true
+  },
+  "503": {
+    "status": 503,
+    "processInitiallyAlive": true,
+    "revocationBeforeCancellationAck": true,
+    "processClosedBeforeCancellationAck": true,
+    "acknowledgementStillPending": true,
+    "newTerminalDenied": true
+  }
+}

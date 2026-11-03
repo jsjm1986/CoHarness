@@ -22,7 +22,7 @@ A launched browser belongs to the exact live Agent and Session that uses it. Cal
 
 An attached browser remains externally owned. The provider reserves it for one Session within that provider instance, preserves its existing browser state, and rejects simultaneous attachment by another Session. Teardown disconnects and leaves the external browser running. Separate DSH processes and other clients remain outside this reservation.
 
-Provider shutdown stops tool admission and waits for owned work and resource cleanup before releasing the shared provider registration. Cancellation cannot undo a browser action already delivered.
+Provider shutdown stops tool admission and waits for owned work and resource cleanup before releasing the shared provider registration. Cancellation cannot undo a browser action already delivered. A provider whose initialization rollback fails transfers its remaining cleanup through `ResourceAcquisitionCleanupError` from the shared runtime library. The resource manager preserves the failed owner and reservation until that cleanup confirms shutdown.
 
 ## MCP initialization
 
@@ -32,7 +32,7 @@ If an attachment is busy, that activation continues without the browser and does
 
 ## Tools and recorded results
 
-Provider tools use the normal DSH execution pipeline and Session log. The providers own their tool schemas, result rendering, image support, configuration, and upstream limitations; the shared service adds no model-visible content. Stagehand's AI-assisted operations use its explicitly configured native model while DSH retains the task loop. DSH model routing, credential reuse, underlying inference request/response capture, and integration into Session usage accounting are deferred; returned SDK data and metadata remain ordinary logged tool results.
+Provider tools use the normal DSH execution pipeline and Session log. The providers own their tool schemas, result rendering, image support, configuration, and upstream limitations; the shared service adds no model-visible content. Stagehand's AI-assisted operations use an independently configured registered model route while DSH retains the task loop. Each public SDK client-model callback runs through normal host model admission, current authorization, provider credentials, and usage middleware. Exact auxiliary inputs are recorded before dispatch, with images stored as durable references; returned SDK data and metadata remain ordinary logged tool results. The [native provider reference](../../packages/experimental/browser-use-stagehand-native/README.md) defines output validation and accounting limits.
 
 Browser MCP connections also expose [resources and server instructions](mcp.md). Resource calls addressed to a browser server use its Session queue and reject other Sessions; server instructions are assembled only for its owning Session.
 

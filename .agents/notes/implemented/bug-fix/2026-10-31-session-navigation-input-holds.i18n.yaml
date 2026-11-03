@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-session-navigation-input-holds.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-session-navigation-input-holds.md
+document:
+  en: 3a453244f701eff1b5cb105b69538597ce5658fa
+  zh: 5f59cc71113b9f6c93d48de5e65e5c45486620ef
+/agent-note-input-ownership-during-new-session-preparation:
+  en: 5411db80df9cf829
+  zh: 189d721ccd896c5d
+/agent-note-input-ownership-during-new-session-preparation/problem:
+  en: 491782ae9cc75ec9
+  zh: 69c7809e0723b0a4
+/agent-note-input-ownership-during-new-session-preparation/decision:
+  en: 30ac57f26c5a4823
+  zh: 90d12729f5f6f2a1
+/agent-note-input-ownership-during-new-session-preparation/alternatives-considered:
+  en: 7b00a8a59b87eb67
+  zh: 0a7ed50728770579
+/agent-note-input-ownership-during-new-session-preparation/consequences:
+  en: 5e5d0592a7b37189
+  zh: 31f504fb5c37c858
+/agent-note-input-ownership-during-new-session-preparation/verification:
+  en: 0fd6c27bfb4b331e
+  zh: 0b3de799f95e9508

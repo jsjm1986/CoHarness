@@ -1,0 +1,13 @@
+{
+  "name": "browser-retention-runtime-doc-pair",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write gateway/README.md python/sdk-runtime/README.md .agents/notes/implemented/bug-fix/2026-10-24-browser-session-retention.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-session-retention/guide.md",
+  "startedAt": "2026-10-23T20:12:20.863778+00:00",
+  "seconds": 3.224,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8cacdadaeafccbb973b5cb2975ccb73f9d8a5b627ba72aaae1c7a9178ad9a688",
+  "inputsAfter": "d549a1bd4fcb09f839158fab7516dff9398e7e01e7d310c182e32220a6067c37",
+  "outputSha256": "b4a01a8ee7c57af95cc8885651d7ae9106ca39db14d228bf5fdf8fa2315e2c0f",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write gateway/README.md python/sdk-runtime/README.md .agents/notes/implemented/bug-fix/2026-10-24-browser-session-retention.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-session-retention/guide.md\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-24-browser-session-retention.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-session-retention/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: recorded python/sdk-runtime/README.i18n.yaml\nverify-translation-pairing: 4 record(s) written; run the check to validate the pairs.\n"
+}

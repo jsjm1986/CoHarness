@@ -1,3 +1,4 @@
+import { usePendingEdits } from '../pending-edits.tsx'
 import { ArrowLeft, ExternalLink, Pencil, Settings2, Sparkles, Trash2, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -100,6 +101,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
   const [modelPending, setModelPending] = useState('')
   const [runtimeAction, setRuntimeAction] = useState<'start' | 'stop' | 'restart' | null>(null)
   const [runtimeError, setRuntimeError] = useState('')
+  usePendingEdits(pending !== '' || quotaOpen || quotaSaving || renameOpen && project !== null && projectName !== project.name)
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
 
   const reload = useCallback(async (showLoading = false) => {
@@ -362,7 +364,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
             <span>{t('ownerValue', { name: project.owner?.displayName || project.owner?.username || t('ownerFallback') })}</span>
             <span>{t('creatorValue', { name: project.createdBy?.displayName || project.createdBy?.username || t('creatorFallback') })}</span>
           </div>
-          <Section className="projectConfigurationSection" title={t('configSectionTitle')} meta={t('configSectionMeta')} actions={(
+          <Section title={t('configSectionTitle')} meta={t('configSectionMeta')} actions={(
             <a className="button button-secondary" href={`/admin/projects/${String(project.id)}/settings`}>
               <ExternalLink size={15} aria-hidden="true" />{t('openProjectSettings')}
             </a>

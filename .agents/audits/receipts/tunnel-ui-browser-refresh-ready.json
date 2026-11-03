@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-ui-browser-refresh-ready",
+  "cwd": ".",
+  "command": "env DSH_SNAPSHOT=refresh node_modules/.bin/vitest run --config vitest.web.config.ts apps/web/tests/admin-form-values.e2e.ts -t 'cancels an unregistered connector' --retry=0",
+  "startedAt": "2026-10-24T23:12:03.978932+00:00",
+  "seconds": 9.391,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f527824fac7778a6424e81cd4524ff4e5a002a2414194ca18e0356cd1d89968d",
+  "inputsAfter": "f527824fac7778a6424e81cd4524ff4e5a002a2414194ca18e0356cd1d89968d",
+  "postgresToolDirectory": null,
+  "outputSha256": "5631d4c08e30f3c5dbc3b9104665574031b7968a242e1242d1d0f9635e332d29",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ apps/web/tests/admin-form-values.e2e.ts (3 tests | 1 failed | 2 skipped) 6880ms\n   × cancels an unregistered connector through the built Admin and reports clipboard refusal 6879ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  apps/web/tests/admin-form-values.e2e.ts > cancels an unregistered connector through the built Admin and reports clipboard refusal\nError: ENOENT: no such file or directory, open '/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/apps/web/tests/snapshots/admin-tunnel-access/read-failure.expected.md'\n ❯ compareOrRefreshGolden apps/web/tests/expected.ts:31:5\n     29|   const payload = `${actual}\\n`\n     30|   if (mode === 'refresh') {\n     31|     await writeFile(goldenPath, payload)\n       |     ^\n     32|     return\n     33|   }\n ❯ apps/web/tests/admin-form-values.e2e.ts:517:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 2 skipped (3)\n   Start at  07:12:04\n   Duration  8.47s (transform 929ms, setup 0ms, import 1.49s, tests 6.88s, environment 0ms)\n\n"
+}

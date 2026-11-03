@@ -30,6 +30,8 @@ kind: "package-bundle"
 <a id="start-and-ownership"></a>
 ## 启动与所有权
 
+SDK 的自定义 spawn 回调是同步的；受管适配器在等待子进程准入时暴露受背压控制的流。运行发布等待真实句柄。SDK 终止、启动失败与成员销毁会取消排队分配，并等待任何返回进程完成清理；适配器对象本身不能证明子进程已启动。
+
 `start(request)` 只接受非空的文本块序列，并根据父会话确定子级 cwd。它会创建一个私有 `AbortController`，调用官方 SDK 的 `query()`，并仅在 SDK 的 `spawnClaudeCodeProcess` 钩子已经提供由 [`dsh-subprocess`](../../subprocess/subprocess/README.zh.md) 管理的活动 CLI 句柄后发布此次运行。若在发布前发生失败或取消，它会关闭 query、终止所有已取得的进程树并等待其退出，然后拒绝 `start()` 调用。
 
 SDK 接收由文本块原样拼接成的任务。提供方会完整迭代 SDK 消息流，而且只接受满足以下条件的 `result` 消息：其 `subtype: "success"`、`is_error: false` 且 `result` 非空白，之后迭代器还须正常结束。所有失败仍映射为 `error`：Agent SDK 0.3.263 的四种错误子类型保留准确类别；标记为错误或内容空白的成功消息成为 `invalid-success`；缺失结果成为 `missing-result`；未分类的 query 失败成为 `unknown`；CLI 提前退出成为 `process-exit`。诊断还会注明当前 `query-start`、`query-run`、`process` 或 `teardown` 阶段，并分别保留已观测到的退出码与信号。该提供方不会产生 `max-tokens` 或 `refusal`。
@@ -183,6 +185,8 @@ Claude Code 子级会在一个全新的 SDK query 中接收独立文本任务。
 
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
+
+- **受管模型控制**：持久成员路由属于 LLM 编排；外部启动和成员轮次遵守[共享父级控制限制](../subagent/README.zh.md#delegated-policy)。
 
 - **每次运行均新建一个 query 和一个进程**：不支持续接、恢复、池化、进度流或产品会话持久化。
 - **静态选择实例**：Profile 配置项固定提供方名称与工具绑定；调用无法动态选择提供方，而且每个公开工具都需要唯一的 `toolName`。

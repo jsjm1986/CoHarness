@@ -2,6 +2,7 @@
 import type { PoolClient } from 'pg'
 import { transaction } from './postgres/database.ts'
 import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
+import { lockAdministrator } from './postgres/administrator-authority.ts'
 
 /** The account or project whose resource qualification is being configured. */
 export interface ResourcePolicyOwner { kind: 'user' | 'project'; id: number }
@@ -29,7 +30,7 @@ export function resourcePolicyOwner(kind: unknown, id: unknown, resource: Resour
   return { kind, id }
 }
 
-/** PostgreSQL owns revisions and publishes changes to the existing access outbox. */
+/** PostgreSQL owns per-computer decisions/revisions and publishes changes to the existing access outbox. */
 export class ResourceAccess {
   constructor(private readonly context: PostgresRuntimeContext, private readonly resource: ResourceLane) {}
 
@@ -43,9 +44,10 @@ export class ResourceAccess {
     const column = owner.kind === 'user' ? 'user_id' : 'project_id'
     const result = await this.context.pool.query<{ enabled: boolean | null; revision: string | null }>(
       `SELECT p.enabled,p.revision::text FROM harness.${table} o LEFT JOIN harness.${this.resource}_access_policies p
-        ON p.organization_id=o.organization_id AND p.${column}=o.id
-        WHERE o.organization_id=$1 AND o.public_id=$2 ${owner.kind === 'user' ? 'AND o.deleted_at IS NULL' : ''}`,
-      [this.context.organizationId, owner.id],
+        ON p.organization_id=o.organization_id AND p.${column}=o.id AND p.node_id=$3
+        WHERE o.organization_id=$1 AND o.public_id=$2 ${owner.kind === 'user' ? 'AND o.deleted_at IS NULL'
+          : 'AND EXISTS(SELECT 1 FROM harness.instances i WHERE i.organization_id=o.organization_id AND i.project_id=o.id AND i.assigned_node_id=$3)'}`,
+      [this.context.organizationId, owner.id, this.context.nodeId],
     )
     const row = result.rows[0]
     if (row === undefined) throw new ResourceAccessError(404, `${this.resource} policy owner not found`)
@@ -57,32 +59,38 @@ export class ResourceAccess {
    * @param owner - account or project within this organization.
    * @param enabled - requested administrator decision, validated as a boolean.
    * @param revision - decimal version observed by the editor.
+   * @param actorUserId - authenticated administrator; omission permits trusted bootstrap and maintenance.
    * @returns the committed decision and version.
    */
-  async set(owner: ResourcePolicyOwner, enabled: unknown, revision: unknown): Promise<ResourceAccessPolicy> {
+  async set(owner: ResourcePolicyOwner, enabled: unknown, revision: unknown, actorUserId?: number): Promise<ResourceAccessPolicy> {
     if (typeof enabled !== 'boolean' || typeof revision !== 'string' || !/^(0|[1-9][0-9]{0,18})$/u.test(revision)) {
       throw new ResourceAccessError(400, `invalid ${this.resource} policy value or revision`)
     }
     const table = owner.kind === 'user' ? 'users' : 'projects'
     const column = owner.kind === 'user' ? 'user_id' : 'project_id'
     return transaction(this.context.pool, async (client) => {
+      if (actorUserId !== undefined) {
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-admin:${this.context.organizationId}`])
+        await lockAdministrator(client, this.context, actorUserId)
+      }
       const owners = await client.query<{ id: string }>(`SELECT id FROM harness.${table}
-        WHERE organization_id=$1 AND public_id=$2 ${owner.kind === 'user' ? 'AND deleted_at IS NULL' : ''} FOR UPDATE`,
-      [this.context.organizationId, owner.id])
+        WHERE organization_id=$1 AND public_id=$2 ${owner.kind === 'user' ? 'AND deleted_at IS NULL'
+          : 'AND EXISTS(SELECT 1 FROM harness.instances i WHERE i.organization_id=$1 AND i.project_id=projects.id AND i.assigned_node_id=$3)'} FOR UPDATE`,
+      owner.kind === 'user' ? [this.context.organizationId, owner.id] : [this.context.organizationId, owner.id, this.context.nodeId])
       const id = owners.rows[0]?.id
       if (id === undefined) throw new ResourceAccessError(404, `${this.resource} policy owner not found`)
       const rows = await client.query<{ enabled: boolean; revision: string }>(`SELECT enabled,revision::text
-        FROM harness.${this.resource}_access_policies WHERE organization_id=$1 AND ${column}=$2 FOR UPDATE`,
-      [this.context.organizationId, id])
+        FROM harness.${this.resource}_access_policies WHERE organization_id=$1 AND ${column}=$2 AND node_id=$3 FOR UPDATE`,
+      [this.context.organizationId, id, this.context.nodeId])
       const current = rows.rows[0]
       if ((current?.revision ?? '0') !== revision) throw new ResourceAccessError(409, `${this.resource} policy changed; reload before saving`)
       if (enabled) await this.checkEnabledOwner(client, owner, id)
       if (current?.enabled === enabled) return { ...owner, enabled, revision }
       const result = current === undefined
-        ? await client.query<{ revision: string }>(`INSERT INTO harness.${this.resource}_access_policies(organization_id,${column},enabled,revision)
-            VALUES($1,$2,$3,1) RETURNING revision::text`, [this.context.organizationId, id, enabled])
-        : await client.query<{ revision: string }>(`UPDATE harness.${this.resource}_access_policies SET enabled=$3,revision=revision+1
-            WHERE organization_id=$1 AND ${column}=$2 RETURNING revision::text`, [this.context.organizationId, id, enabled])
+        ? await client.query<{ revision: string }>(`INSERT INTO harness.${this.resource}_access_policies(organization_id,${column},node_id,enabled,revision)
+            VALUES($1,$2,$3,$4,1) RETURNING revision::text`, [this.context.organizationId, id, this.context.nodeId, enabled])
+        : await client.query<{ revision: string }>(`UPDATE harness.${this.resource}_access_policies SET enabled=$4,revision=revision+1
+            WHERE organization_id=$1 AND ${column}=$2 AND node_id=$3 RETURNING revision::text`, [this.context.organizationId, id, this.context.nodeId, enabled])
       return { ...owner, enabled, revision: result.rows[0]!.revision }
     })
   }

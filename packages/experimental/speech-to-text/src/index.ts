@@ -35,6 +35,7 @@ interface Registration {
   readonly lifetime: AbortController
   readonly pending: Set<Promise<Transcript>>
   readonly unsubscribe: () => void
+  removal?: Promise<void>
 }
 
 /** Registry shared by all transcription consumers in one Host composition. */
@@ -45,18 +46,43 @@ export default class SpeechToText extends Service {
   })
 
   private readonly providers = new Map<SpeechProviderId, Registration>()
+  private readonly removals = new Set<Promise<void>>()
   private readonly listeners = new Set<() => void>()
   private readonly lifetime = new AbortController()
-  /** Lazily registered persisted user selection; absent when no Settings service is mounted. */
+  /** Persisted selection owned by the current optional Settings binding. */
   private scope: SettingsScope<SpeechSelectionSection> | undefined
 
   constructor(ctx: Context, private readonly config: Config) {
     super(ctx, 'speechToText')
     ctx.on('loader/volatile-update', () => { this.changed() })
+    ctx.effect(() => {
+      const binding = ctx.inject(['settings'], (sctx) => {
+        const scope = sctx.settings.register('speech-to-text', z.object({
+          defaultProvider: z.string().min(1).required(),
+          language: z.string().min(1).required(),
+        }), {
+          base: { defaultProvider: this.config.defaultProvider.get(), language: this.config.language.get() },
+          label: { zh: '语音识别', en: 'Speech recognition' },
+        })
+        sctx.effect(() => scope.watch(() => { this.changed() }))
+        sctx.effect(() => {
+          this.scope = scope
+          return () => {
+            if (this.scope === scope) { this.scope = undefined; this.changed() }
+          }
+        })
+        this.changed()
+      })
+      return binding.dispose
+    })
     ctx.effect(() => async () => {
       this.lifetime.abort(new Error('Speech service disposed'))
-      await Promise.all([...this.providers.values()].map(registration => this.remove(registration)))
+      for (const registration of [...this.providers.values()]) void this.remove(registration)
+      const results = await Promise.allSettled(this.removals)
       this.listeners.clear()
+      const errors: unknown[] = []
+      for (const outcome of results) if (outcome.status === 'rejected') errors.push(outcome.reason)
+      if (errors.length) throw new AggregateError(errors, 'Speech provider cleanup failed')
     })
   }
 
@@ -75,13 +101,29 @@ export default class SpeechToText extends Service {
     return async () => { await this.remove(registration) }
   }
 
-  private async remove(registration: Registration): Promise<void> {
-    if (this.providers.get(registration.provider.info.id) !== registration) return
+  private remove(registration: Registration): Promise<void> {
+    if (registration.removal !== undefined) return registration.removal
+    const removal = Promise.withResolvers<void>()
+    registration.removal = removal.promise
+    this.removals.add(removal.promise)
+    void this.closeRegistration(registration).then(() => {
+      this.removals.delete(removal.promise)
+      removal.resolve(undefined)
+    }, (error: unknown) => {
+      this.removals.delete(removal.promise)
+      removal.reject(error)
+    })
+    return removal.promise
+  }
+
+  private async closeRegistration(registration: Registration): Promise<void> {
     this.providers.delete(registration.provider.info.id)
-    registration.unsubscribe()
-    this.changed()
-    registration.lifetime.abort(new Error('Speech provider unloaded'))
-    await Promise.allSettled(registration.pending)
+    try { registration.unsubscribe() }
+    finally {
+      this.changed()
+      registration.lifetime.abort(new Error('Speech provider unloaded'))
+      await Promise.allSettled(registration.pending)
+    }
   }
 
   /**
@@ -93,27 +135,6 @@ export default class SpeechToText extends Service {
   }
 
   private changed(): void { for (const listener of this.listeners) listener() }
-
-  /**
-   * Register the persisted selection namespace on first use; the Settings provider's fiber may still be
-   * starting while this plugin mounts, so construction cannot assume `settings` is resolvable yet.
-   * @returns the bound namespace scope, or `undefined` when the composition carries no Settings service.
-   */
-  private selectionScope(): SettingsScope<SpeechSelectionSection> | undefined {
-    if (this.scope !== undefined || this.lifetime.signal.aborted) return this.scope
-    const settings = this.ctx.get('settings')
-    if (settings === undefined) return undefined
-    const scope = settings.register('speech-to-text', z.object({
-      defaultProvider: z.string().min(1).required(),
-      language: z.string().min(1).required(),
-    }), {
-      base: { defaultProvider: this.config.defaultProvider.get(), language: this.config.language.get() },
-      label: { zh: '语音识别', en: 'Speech recognition' },
-    })
-    scope.watch(() => { this.changed() })
-    this.scope = scope
-    return scope
-  }
 
   /**
    * Observe complete readiness snapshots; a slow reader coalesces intermediate progress.
@@ -147,7 +168,7 @@ export default class SpeechToText extends Service {
    * @returns one detached complete observation.
    */
   snapshot(): SpeechSnapshot {
-    const section = this.selectionScope()?.get()
+    const section = this.scope?.get()
     return { providers: [...this.providers.values()].map(({ provider }) => ({ ...provider.info,
       preparation: provider.preparation?.snapshot() ?? { phase: 'ready' },
     })), selection: { providerId: (section?.defaultProvider ?? this.config.defaultProvider.get()) as SpeechProviderId,
@@ -158,15 +179,17 @@ export default class SpeechToText extends Service {
    * Persist changed selection fields into the `speech-to-text` settings section; the resulting
    * language must be accepted by the selected provider.
    * @param patch - explicit provider or language changes.
-   * @returns after the settings write commits.
+   * @returns after the settings write commits under the current binding.
+   * @throws when the Settings binding changes during the write; committed file data is retained.
    */
   async configure(patch: SpeechSelectionPatch): Promise<void> {
-    const scope = this.selectionScope()
+    const scope = this.scope
     if (scope === undefined) throw new Error('Speech selection requires the settings service')
     const current = this.snapshot().selection
     this.selectedProvider(patch.providerId ?? current.providerId, patch.language ?? current.language)
     await scope.update({ ...patch.providerId === undefined ? {} : { defaultProvider: patch.providerId },
       ...patch.language === undefined ? {} : { language: patch.language } })
+    if (this.scope !== scope) throw new Error('Speech settings provider changed while saving preferences')
   }
 
   private selectedProvider(id: SpeechProviderId, language: string): SpeechProvider {

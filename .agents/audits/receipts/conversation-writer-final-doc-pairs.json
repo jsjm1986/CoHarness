@@ -1,0 +1,14 @@
+{
+  "name": "conversation-writer-final-doc-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-conversation-writer-locks.md",
+  "startedAt": "2026-10-24T00:53:32.360303+00:00",
+  "seconds": 3.043,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0b0fb548073dd27bdb3afa14f4bfd47662e86a23350ed052d35e4e56c189e308",
+  "inputsAfter": "0b0fb548073dd27bdb3afa14f4bfd47662e86a23350ed052d35e4e56c189e308",
+  "postgresToolDirectory": null,
+  "outputSha256": "df8cc99c3be134e0e93ee9f253ccd49c0804ea4e4de63f2985feb3b4db7ead48",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/bug-fix/2026-10-24-conversation-writer-locks.md\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-24-conversation-writer-locks.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

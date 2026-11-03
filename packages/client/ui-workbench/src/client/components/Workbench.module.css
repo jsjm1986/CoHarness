@@ -1,13 +1,24 @@
 .toolbar {
+  box-sizing: border-box;
   display: flex;
   flex: none;
   align-items: center;
   justify-content: space-between;
   gap: var(--dsw-space-3);
-  min-height: 36px;
-  padding: 0 var(--dsw-space-3);
-  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
+  min-height: 44px;
+  padding: var(--dsw-space-1) var(--dsw-space-4);
   background: var(--dsw-alias-bg-layer-1);
+}
+
+.toolbar:has(.sessionTools) { flex-wrap: wrap; gap: var(--dsw-space-1) var(--dsw-space-3); }
+.toolbar:has(.sessionTools) .toolbarTitle { flex: 0 1 auto; max-width: 220px; }
+.sessionTools {
+  display: flex;
+  flex: 1 1 280px;
+  align-items: center;
+  min-width: 0;
+  padding-left: var(--dsw-space-3);
+  border-left: 0.5px solid var(--dsw-alias-border-l1);
 }
 
 .toolbarTitle,
@@ -18,90 +29,115 @@
 }
 
 .toolbarTitle { gap: var(--dsw-space-2); min-width: 0; }
-/* The workbench menu trigger shares the header's quiet-ghost family (28px,
-   8px radius, transparent at rest) so it does not read as a separate control
-   next to the Workspace chip and preset seat. */
-.workbenchTrigger { display: inline-flex; align-items: center; gap: var(--dsw-space-1); max-width: 180px; min-height: 28px; padding: 0 var(--dsw-space-2); border: none; border-radius: var(--dsw-radius-md); background: transparent; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; font-weight: 500; cursor: pointer; transition: background-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
-.workbenchTrigger { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workbenchTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  min-width: 0;
+  max-width: 280px;
+  min-height: 32px;
+  padding: 0 var(--dsw-space-2);
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.workbenchTriggerLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workbenchTrigger svg { flex: none; }
 .workbenchTrigger:not(:disabled):hover,
 .workbenchTrigger[aria-expanded='true'] { background: var(--dsw-alias-interactive-bg-hover); }
-.workbenchTrigger:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: 2px; }
-.workbenchNameInput { display: block; width: 100%; min-height: 38px; box-sizing: border-box; padding: 8px 11px; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; outline: none; transition: border-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)), box-shadow var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
-.workbenchNameInput:focus { border-color: var(--dsw-alias-state-business-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent); }
+.workbenchTrigger:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
+.workbenchNameInput { display: block; width: 100%; min-height: 38px; box-sizing: border-box; padding: 8px 12px; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; outline: none; }
+.workbenchNameInput:focus { border-color: var(--dsw-alias-state-business-primary); }
 .workbenchDeleteDescription { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 20px; }
-.toolbarTitle strong { color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 600; }
-.toolbarTitle span { color: var(--dsw-alias-label-caption); font-size: 12px; }
-.seatDots { display: inline-flex; align-items: center; gap: 3px; padding: 2px 4px; }
-.seatDot { width: 6px; height: 6px; border-radius: 50%; corner-shape: round; background: var(--dsw-alias-bg-layer-2); }
-.seatDot[data-filled] { background: var(--dsw-alias-label-secondary); }
-.attentionPill { display: inline-flex; align-items: center; gap: var(--dsw-space-1); min-height: 24px; padding: 0 var(--dsw-space-2); border: none; border-radius: var(--dsw-radius-full); corner-shape: round; background: var(--dsw-alias-state-warn-tertiary); color: var(--dsw-alias-state-warn-label); font-size: 12px; font-weight: 550; cursor: pointer; }
-.attentionPill:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: 2px; }
-.toolbarActions { gap: var(--dsw-space-2); }
+.toolbarTitle strong { color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 500; }
+.toolbarCapacity { display: inline-flex; flex: none; align-items: center; min-height: 24px; padding: 0 var(--dsw-space-2); border-radius: var(--dsw-radius-sm); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.capacityTotal { color: var(--dsw-alias-label-secondary); }
+.attentionPill { display: inline-flex; align-items: center; gap: var(--dsw-space-1); min-height: 32px; padding: 0 var(--dsw-space-2); border: 0; border-radius: var(--dsw-radius-md); background: var(--dsw-alias-state-warn-tertiary); color: var(--dsw-alias-state-warn-label); font-size: 12px; font-weight: 500; cursor: pointer; }
+.attentionPill:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
+.toolbarActions { flex: none; gap: var(--dsw-space-1); }
+.toolbarActions > .iconAction { width: 32px; height: 32px; }
+.addConversation { min-height: var(--dsw-control-height-toolbar); }
 
 .paneHeader {
   position: relative;
+  box-sizing: border-box;
   flex: none;
-  gap: var(--dsw-space-1);
-  min-height: 40px;
-  padding: 0 var(--dsw-space-1) 0 var(--dsw-space-2);
+  min-width: 0;
+  gap: var(--dsw-space-2);
+  min-height: 48px;
+  padding: var(--dsw-space-1) var(--dsw-space-2) var(--dsw-space-1) var(--dsw-space-3);
+  background: var(--dsw-alias-bg-base);
   cursor: pointer;
 }
-
-/* 20px space tile: grey personal / blue project / amber steward. */
+.paneHeader[data-active] .paneLead strong { color: var(--dsw-alias-state-business-primary); }
+.paneHeader[data-condensed] { min-height: 36px; }
+.paneHeader[data-condensed] .paneIdentity { align-items: center; }
+.paneHeader[data-condensed] .paneLead { flex-direction: row; align-items: center; gap: var(--dsw-space-2); }
+.paneHeader[data-condensed] .paneLead strong { flex: 1; font-size: 13px; line-height: 20px; }
+.paneHeader[data-condensed] .paneMeta { flex: none; min-height: 0; }
+.paneHeader[data-condensed] .paneSubtitle,
+.paneHeader[data-condensed] .paneState[data-tone='ready'] > span:last-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.paneHeader .paneIdentity { align-items: flex-start; }
+.paneHeader .scopeTile { margin-top: 0; }
 .scopeTile {
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--dsw-radius-sm);
-  corner-shape: round;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--dsw-alias-label-secondary);
   background: var(--dsw-alias-bg-layer-2);
 }
-/* Personal is the round blue user tile — the same mark the scope switcher
-   draws (tileRound + tileBlue) so the pane reads its space at a glance. */
-.scopeTile[data-scope-tone='personal'] { border-radius: 50%; corner-shape: round; color: var(--dsw-static-blue-600); background: var(--dsw-static-blue-100); }
+.scopeTile[data-scope-tone='personal'] { border-radius: 50%; corner-shape: round; color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-accent-tint); }
 .scopeTile[data-scope-tone='project'] { color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-accent-tint); }
 .scopeTile[data-scope-tone='steward'] { color: var(--dsw-alias-state-warn-label); background: var(--dsw-alias-state-warn-tertiary); }
-
-/* The identity cluster doubles as the pane-reorder drag handle. */
 .paneIdentity { display: flex; flex: 1; min-width: 0; align-items: center; gap: var(--dsw-space-2); cursor: grab; }
 .paneIdentity:active { cursor: grabbing; }
-.paneLead { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 0; }
-.paneLead strong, .paneLead span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.paneLead strong { min-width: 0; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 18px; font-weight: 500; }
-.paneLead span { min-width: 0; color: var(--dsw-alias-label-caption); font-size: 11px; line-height: 14px; }
-
-/* Persistent full-word status capsule; the receipt marker is a blue dot. */
-.paneState {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 8px;
-  border-radius: var(--dsw-radius-full);
-  corner-shape: round;
-  background: var(--dsw-alias-bg-layer-2);
-  color: var(--dsw-alias-label-secondary);
-  font-size: 11px;
-  line-height: 16px;
-  white-space: nowrap;
-}
-.paneState[data-tone='waiting'] { color: var(--dsw-alias-state-warn-label); background: var(--dsw-alias-state-warn-tertiary); }
-.paneState[data-tone='newReply'] { color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-accent-tint); }
+.paneLead { display: flex; min-width: 0; flex: 1; flex-direction: column; padding-right: var(--dsh-workbench-pane-action-width, 112px); }
+.paneLead strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-primary); font-size: 14px; line-height: 20px; font-weight: 500; }
+.paneMeta { display: flex; align-items: center; min-width: 0; min-height: 20px; gap: var(--dsw-space-2); }
+.paneSubtitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; }
+.paneState { display: inline-flex; flex: none; align-items: center; gap: var(--dsw-space-1); color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; white-space: nowrap; }
+.paneState[data-tone='waiting'] { color: var(--dsw-alias-state-warn-label); }
+.paneState[data-tone='newReply'] { color: var(--dsw-alias-state-business-primary); }
 .receiptDot { display: inline-block; flex: none; width: 6px; height: 6px; border-radius: 50%; corner-shape: round; background: var(--dsw-alias-state-business-primary); }
+.paneActions { position: absolute; right: var(--dsw-space-2); top: 50%; transform: translateY(-50%); display: inline-flex; flex: none; align-items: center; }
+.paneActions .iconAction { width: 28px; height: 28px; }
 
-/* Header actions ride in on pointer or keyboard approach; an active pane
-   keeps them pinned so the focus target stays stable. */
-.paneActions { display: inline-flex; flex: none; align-items: center; gap: 2px; opacity: 0; transition: opacity 120ms ease; }
-.paneHeader:hover .paneActions,
-.paneHeader:focus-within .paneActions,
-.paneHeader[data-active] .paneActions { opacity: 1; }
-.paneActions .iconAction { width: 24px; height: 24px; }
+@media (hover: hover) and (pointer: fine) {
+  .paneActions {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
+  }
+  .paneHeader[data-active] .paneActions,
+  .paneHeader:hover .paneActions,
+  .paneHeader:focus-within .paneActions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (any-pointer: coarse) {
+  .paneActions { opacity: 1; pointer-events: auto; }
+}
 
 /* Collapsed pane strip: tile + status + vertical title inside the 46px cell. */
 .paneStrip {
@@ -156,7 +192,11 @@
 .iconAction:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
 .picker { width: min(620px, calc(100vw - 24px)); }
 .pickerFilters { display: flex; gap: var(--dsw-space-2); }
-.pickerFilters input, .workspaceTrigger { min-width: 0; padding: 8px 10px; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); corner-shape: round; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; }
+.pickerFilters input, .workspaceTrigger, .restoreRow select { min-width: 0; padding: 8px 10px; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); corner-shape: round; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; }
+.restoreRow { display: flex; flex-direction: column; gap: var(--dsw-space-1); min-width: 0; margin-block: var(--dsw-space-3); }
+.restoreRow span { overflow-wrap: anywhere; }
+.restoreRow select { width: 100%; min-height: var(--dsw-control-height-toolbar); }
+.restoreRow select:focus-visible { outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 2px; }
 .pickerFilters input { flex: 1; }
 .workspaceTrigger { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; flex: 0 0 220px; width: 220px; min-width: 220px; max-width: none; text-align: left; cursor: pointer; transition: background-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
 .workspaceTrigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -165,7 +205,7 @@
 .workspaceMenu { min-width: 280px; max-width: min(360px, calc(100vw - 32px)); }
 .workspaceOption { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .workspaceOption strong, .workspaceOption small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workspaceOption strong { font-size: 13px; font-weight: 550; }
+.workspaceOption strong { font-size: 13px; font-weight: 500; }
 .workspaceOption small { color: var(--dsw-alias-label-caption); font-size: 11px; }
 .candidates { max-height: min(48vh, 380px); overflow: auto; scrollbar-gutter: stable; --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }
 .candidate { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: var(--dsw-space-3); padding: 10px 8px; text-align: left; border: 0; border-radius: var(--dsw-radius-md); corner-shape: round; background: transparent; color: var(--dsw-alias-label-primary); cursor: pointer; transition: background-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
@@ -222,7 +262,7 @@
 .fileBrowserPath { display: flex; flex-wrap: wrap; align-items: center; padding: 6px 8px; color: var(--dsw-alias-label-secondary); font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .fileBrowserPath button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .fileBrowserPath button:hover, .fileBrowserPath button:focus-visible { color: var(--dsw-alias-label-primary); text-decoration: underline; }
-.fileBrowserPath button[aria-current='page'] { color: var(--dsw-alias-label-primary); font-weight: 600; }
+.fileBrowserPath button[aria-current='page'] { color: var(--dsw-alias-label-primary); font-weight: 500; }
 .fileBrowserList { display: flex; max-height: 55vh; flex-direction: column; gap: 2px; overflow: auto; margin-top: 8px; }
 .fileBrowserEntry { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px; border: 0; border-radius: var(--dsw-radius-sm); background: transparent; color: var(--dsw-alias-label-primary); text-align: left; cursor: pointer; transition: background-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
 .fileBrowserEntry small { margin-left: auto; color: var(--dsw-alias-label-caption); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -293,73 +333,119 @@
   white-space: normal;
 }
 
-/* Sidebar workbench panel: roster cards under the region chrome; the footer stays pinned. */
-.sidebarPanel { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: var(--dsw-space-3); overflow-y: auto; padding: var(--dsw-space-2) var(--dsw-space-2) var(--dsw-space-2); scrollbar-width: thin; scrollbar-color: var(--dsw-alias-scrollbar-bg-l2) transparent; --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }
-.sidebarHeader { display: flex; flex: none; align-items: center; justify-content: space-between; gap: var(--dsw-space-2); min-height: 28px; padding: 0 var(--dsw-space-1); }
-.sidebarTitle { color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 600; }
+/* Navigation and preferences scroll independently of the exit action. */
+.sidebarPanel {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--dsw-space-3);
+  overflow: hidden;
+  padding: var(--dsw-space-2);
+}
+.sidebarHeader { display: flex; flex: none; align-items: center; min-height: 28px; padding: 0 var(--dsw-space-2); }
+.sidebarTitle { color: var(--dsw-alias-label-primary); font-size: 14px; line-height: 20px; font-weight: 500; }
+.sidebarBody { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: var(--dsw-space-3); overflow-y: auto; scroll-padding-block: var(--dsw-space-2); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }
 .sidebarSection { display: flex; flex: none; flex-direction: column; gap: var(--dsw-space-1); }
-.sidebarSectionTitle { display: flex; align-items: center; justify-content: space-between; gap: var(--dsw-space-2); padding: 0 var(--dsw-space-1); color: var(--dsw-alias-label-caption); font-size: 12px; }
-.sidebarCount { color: var(--dsw-alias-label-caption); font-size: 11px; font-variant-numeric: tabular-nums; }
-/* Hairline row list: rows divide on fine rules; the active row reads via a
-   business-blue tint fill with an inked title — no card chrome or edge tick. */
-.sidebarPanes { display: flex; flex-direction: column; border-top: 0.5px solid var(--dsw-alias-border-l1); }
-.sidebarEmpty { margin: var(--dsw-space-1) var(--dsw-space-2); color: var(--dsw-alias-label-caption); font-size: 12px; }
-
-.sidebarPaneRow { position: relative; display: flex; border-bottom: 0.5px solid var(--dsw-alias-border-l1); transition: background-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
+.sidebarSectionTitle { display: flex; align-items: center; justify-content: space-between; gap: var(--dsw-space-2); min-height: 28px; padding: 0 var(--dsw-space-2); color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.sidebarCount { color: var(--dsw-alias-label-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sidebarPanes { display: flex; flex-direction: column; gap: var(--dsw-space-1); }
+.sidebarEmpty { margin: var(--dsw-space-2); color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.sidebarPaneRow { display: flex; min-width: 0; align-items: center; gap: var(--dsw-space-1); border-radius: var(--dsw-radius-md); transition: background-color var(--dsw-motion-duration-micro) var(--dsw-motion-ease-smooth-out); }
 .sidebarPaneRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
-.sidebarPaneRow[data-active] { background: var(--dsw-alias-state-business-tertiary); }
-.sidebarPaneRow[data-active] .sidebarPaneTitle { color: var(--dsw-alias-state-business-primary); font-weight: 600; }
-.sidebarPaneRow[data-active] .sidebarPaneIndex { color: var(--dsw-alias-state-business-primary); font-weight: 700; }
+.sidebarPaneRow[data-active] { background: var(--dsw-alias-accent-tint); }
+.sidebarPaneRow[data-active] .sidebarPaneTitle { color: var(--dsw-alias-state-business-primary); }
+.sidebarPaneRow[data-active] .sidebarPaneIndex { color: var(--dsw-alias-state-business-primary); }
 .sidebarPaneRow[data-attention] .sidebarPaneTitle { color: var(--dsw-alias-state-warn-label); }
-/* Index cell: static numeral swaps to the pane shortcut on row hover. */
-.sidebarPaneIndex { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 14px; margin-top: 1px; color: var(--dsw-alias-label-caption); font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; pointer-events: none; }
+.sidebarPaneIndex { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 16px; min-height: 20px; color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; pointer-events: none; }
 .sidebarPaneNum { display: inline; }
-.sidebarPaneKey { display: none; color: var(--dsw-alias-state-business-primary); font-size: 9.5px; font-weight: 700; }
+.sidebarPaneKey { display: none; color: var(--dsw-alias-state-business-primary); font-size: 11px; font-weight: 500; }
 .sidebarPaneRow:hover .sidebarPaneNum,
 .sidebarPaneRow:focus-within .sidebarPaneNum { display: none; }
 .sidebarPaneRow:hover .sidebarPaneKey,
 .sidebarPaneRow:focus-within .sidebarPaneKey { display: inline; }
-.sidebarPaneFocus { display: flex; flex: 1; min-width: 0; align-items: flex-start; gap: var(--dsw-space-2); padding: 8px var(--dsw-space-2) 7px 4px; border: 0; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; text-align: left; cursor: pointer; }
-.sidebarPaneRow[data-active] .sidebarPaneFocus { color: var(--dsw-alias-label-primary); }
-.sidebarPaneFocus:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
-.sidebarPaneFocus .scopeTile { margin-top: 1px; }
-.sidebarPaneText { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 1px; }
-.sidebarPaneLine { display: flex; align-items: baseline; gap: var(--dsw-space-2); min-width: 0; }
-.sidebarPaneTitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 550; }
-/* Recency and Close share the trailing cell: the time fades out as Close fades
-   in, so the two never overlap. */
-.sidebarPaneAgo { flex: none; min-width: 20px; text-align: right; color: var(--dsw-alias-label-caption); font-size: 10.5px; font-variant-numeric: tabular-nums; transition: opacity var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
-.sidebarPaneRow:hover .sidebarPaneAgo,
-.sidebarPaneRow:focus-within .sidebarPaneAgo { opacity: 0; }
-/* Status word, space, and workspace merge into one quiet subtitle line. */
-.sidebarPaneStatus { display: flex; align-items: center; gap: 5px; min-width: 0; color: var(--dsw-alias-label-caption); font-size: 11px; }
-.sidebarPaneStatusWord { flex: none; color: var(--dsw-alias-label-secondary); font-weight: 500; }
-.sidebarPaneStatus[data-tone='warn'] .sidebarPaneStatusWord { color: var(--dsw-alias-state-warn-label); font-weight: 600; }
-.sidebarPaneStatus[data-tone='reply'] .sidebarPaneStatusWord { color: var(--dsw-alias-state-business-primary); font-weight: 600; }
+.sidebarPaneFocus { display: flex; flex: 1; min-width: 0; align-items: flex-start; gap: var(--dsw-space-2); min-height: 52px; padding: var(--dsw-space-2) var(--dsw-space-1); border: 0; border-radius: var(--dsw-radius-md); background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; text-align: left; cursor: pointer; scroll-margin-block: var(--dsw-space-2); }
+.sidebarPaneFocus:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -2px; }
+.sidebarPaneFocus .scopeTile { width: 20px; height: 20px; }
+.sidebarPaneText { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: var(--dsw-space-1); }
+.sidebarPaneLine { display: flex; align-items: flex-start; gap: var(--dsw-space-1); min-width: 0; }
+.sidebarPaneLine .sidebarPaneTitle { flex: 1; min-width: 0; }
+.sidebarCapacity { display: flex; align-items: center; justify-content: space-between; min-height: 28px; padding: 0 var(--dsw-space-2); gap: var(--dsw-space-2); color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.sidebarPaneTitle { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; font-weight: 500; overflow-wrap: anywhere; }
+.sidebarPaneAgo { flex: none; margin-left: auto; color: var(--dsw-alias-label-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.sidebarPaneStatus { display: flex; align-items: center; gap: var(--dsw-space-1); min-width: 0; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; }
+.sidebarPaneStatusWord { flex: none; font-weight: 500; }
+.sidebarPaneStatus[data-tone='warn'] .sidebarPaneStatusWord { color: var(--dsw-alias-state-warn-label); }
+.sidebarPaneStatus[data-tone='reply'] .sidebarPaneStatusWord { color: var(--dsw-alias-state-business-primary); }
 .sidebarReplyDot { flex: none; width: 7px; height: 7px; border-radius: 50%; corner-shape: round; background: var(--dsw-alias-state-business-primary); }
 .sidebarPaneScope { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.sidebarPaneClose { position: absolute; top: 7px; right: 8px; display: flex; align-items: center; justify-content: center; width: 20px; height: 18px; border: 0; border-radius: var(--dsw-radius-sm); corner-shape: round; background: transparent; color: var(--dsw-alias-label-caption); cursor: pointer; opacity: 0; transition: opacity var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
+.sidebarPaneClose { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 28px; height: 28px; margin-right: var(--dsw-space-1); padding: 0; border: 0; border-radius: var(--dsw-radius-sm); background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; opacity: 0; }
 .sidebarPaneRow:hover .sidebarPaneClose,
-.sidebarPaneRow:focus-within .sidebarPaneClose,
-.sidebarPaneClose:focus-visible { opacity: 1; }
-.sidebarPaneClose:hover { color: var(--dsw-alias-state-error-primary); }
-.sidebarPaneClose:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -1px; }
-/* Add affordance closes the row list with the same hairline rule. */
-.sidebarAdd { display: flex; align-items: center; gap: var(--dsw-space-2); width: 100%; padding: 7px var(--dsw-space-2) 6px; border: 0; border-bottom: 0.5px solid var(--dsw-alias-border-l1); background: transparent; color: var(--dsw-alias-label-caption); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.sidebarPaneRow:focus-within .sidebarPaneClose { opacity: 1; }
+.sidebarPaneClose:hover { color: var(--dsw-alias-state-error-primary); background: var(--dsw-alias-interactive-bg-hover); }
+.sidebarPaneClose:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -2px; }
+.sidebarAdd { display: flex; align-items: center; gap: var(--dsw-space-2); min-height: 36px; width: 100%; padding: var(--dsw-space-2); border: 0; border-radius: var(--dsw-radius-md); background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
 .sidebarAdd:not(:disabled):hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 .sidebarAdd:disabled { opacity: 0.5; cursor: default; }
-.sidebarAdd:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
-.sidebarAddPlus { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: 1px dashed var(--dsw-alias-border-l2); border-radius: 5px; corner-shape: round; }
-/* Capacity caption + equalize link replace the floating seat dots and button row. */
-.sidebarCapacity { display: flex; align-items: center; justify-content: space-between; padding: var(--dsw-space-1) var(--dsw-space-1) 0; color: var(--dsw-alias-label-caption); font-size: 11px; }
-.sidebarEqualize { display: inline-flex; align-items: center; border: 0; padding: 2px 4px; border-radius: var(--dsw-radius-sm); corner-shape: round; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.sidebarAdd:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -2px; }
+.sidebarAddPlus { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; }
+.sidebarEqualize { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 28px; padding: var(--dsw-space-1); border: 0; border-radius: var(--dsw-radius-sm); background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
 .sidebarEqualize:not(:disabled):hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
 .sidebarEqualize:disabled { opacity: 0.45; cursor: default; }
-.sidebarEqualize:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -1px; }
-/* Exit stays pinned at the panel foot, away from pane navigation. */
-.sidebarFooter { margin-top: auto; flex: none; padding-top: var(--dsw-space-1); border-top: 0.5px solid var(--dsw-alias-border-l2); position: sticky; bottom: 0; background: var(--dsw-specific-sidebar-fill); }
-.sidebarExit { display: flex; align-items: center; gap: var(--dsw-space-2); width: 100%; padding: 8px var(--dsw-space-2); border: 0; border-radius: var(--dsw-radius-md); corner-shape: round; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
+.sidebarEqualize:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -2px; }
+.sidebarFooter { flex: none; padding-top: var(--dsw-space-2); border-top: 0.5px solid var(--dsw-alias-border-l1); }
+.sidebarExit { display: flex; align-items: center; gap: var(--dsw-space-2); min-height: 36px; width: 100%; padding: var(--dsw-space-2); border: 0; border-radius: var(--dsw-radius-md); background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 12px; font-weight: 500; text-align: left; cursor: pointer; }
 .sidebarExit:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
-.sidebarExit:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
-.sidebarExitHint { margin-left: auto; color: var(--dsw-alias-label-caption); font-size: 10.5px; font-weight: 500; }
+.sidebarExit:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -2px; }
+.sidebarExitHint { margin-left: auto; color: var(--dsw-alias-label-secondary); font-size: 11px; font-weight: 400; }
+
+.toolbar[data-tabbed] { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--dsw-space-2); padding: var(--dsw-space-2) var(--dsw-space-3); }
+.toolbar[data-tabbed] .tabs { grid-column: 1 / -1; width: 100%; min-width: 0; margin: 0; padding: var(--dsw-space-1) 0; }
+.toolbar[data-tabbed] .tabs button { min-width: 120px; min-height: 32px; }
+
+@media (pointer: coarse) {
+  .paneActions .iconAction,
+  .toolbarActions > .iconAction,
+  .workbenchTrigger,
+  .addConversation,
+  .attentionPill,
+  .sidebarPaneClose,
+  .sidebarEqualize,
+  .sidebarAdd,
+  .sidebarExit { min-height: var(--dsw-touch-target); }
+  .paneActions .iconAction,
+  .toolbarActions > .iconAction,
+  .sidebarPaneClose,
+  .sidebarEqualize { min-width: var(--dsw-touch-target); }
+  .sidebarPaneClose { opacity: 1; }
+  .toolbar[data-tabbed] .tabs button { min-height: var(--dsw-touch-target); }
+  .paneHeader { flex-wrap: wrap; }
+  .paneIdentity { flex-basis: 100%; }
+  .paneLead { padding-right: 0; }
+  .paneMeta { min-height: 18px; padding-right: 0; }
+  .paneActions { position: static; margin-left: auto; transform: none; }
+}
+:global([data-viewport='compact']) .toolbar .iconAction,
+:global([data-viewport='compact']) .paneActions .iconAction { width: var(--dsw-touch-target); height: var(--dsw-touch-target); }
+:global([data-viewport='compact']) .workbenchTrigger,
+:global([data-viewport='compact']) .addConversation,
+:global([data-viewport='compact']) .sidebarPaneClose,
+:global([data-viewport='compact']) .sidebarEqualize,
+:global([data-viewport='compact']) .sidebarExit,
+:global([data-viewport='compact']) .tabs button { min-height: var(--dsw-touch-target); }
+:global([data-viewport='compact']) .sidebarPaneClose,
+:global([data-viewport='compact']) .sidebarEqualize { width: var(--dsw-touch-target); opacity: 1; }
+:global([data-viewport='compact']) .paneHeader { flex-wrap: wrap; }
+:global([data-viewport='compact']) .paneIdentity { flex-basis: 100%; }
+:global([data-viewport='compact']) .paneLead { padding-right: 0; }
+:global([data-viewport='compact']) .paneMeta { min-height: 18px; padding-right: 0; }
+:global([data-viewport='compact']) .paneActions { position: static; margin-left: auto; transform: none; opacity: 1; pointer-events: auto; }
+@media (max-height: 480px) {
+  .sidebarPanel { gap: var(--dsw-space-2); }
+  .sidebarHeader { display: none; }
+  .sidebarFooter { padding-top: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebarPaneRow,
+  .paneActions { transition: none; }
+}

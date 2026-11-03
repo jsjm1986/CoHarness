@@ -96,12 +96,71 @@
   min-width: 0;
 }
 
-/* WorkbenchPaneHeader is the single source for pane identity. Keep the
-   conversation tabs, but avoid repeating the same session title in each pane. */
-.workbenchPane .header .titleRow > :not(.tabs) { display: none; }
-/* With the title cluster reduced to tabs, the pane header already carries the
-   column's chrome; keep only a small rhythm around the strip. */
-.workbenchPane .header { padding: var(--dsw-space-2) var(--dsw-space-3); }
+/* The pane header supplies the current title and status. Session-owned
+   navigation, metadata and plugin controls retain their original occupants. */
+.workbenchContent .header [data-workbench-duplicate-title],
+.workbenchContent .header .sessionDot { display: none; }
+.workbenchContent .header { padding: 0 var(--dsw-space-3) var(--dsw-space-1); }
+.workbenchContent .header::after { background: var(--dsw-alias-border-l1); }
+.workbenchContent .header .titleRow { min-height: 0; flex-wrap: wrap; gap: var(--dsw-space-1) var(--dsw-space-2); }
+.workbenchContent .header .titleCluster { display: contents; }
+.workbenchContent .header .crumbs { max-width: 100%; }
+.workbenchContent .header .headerActions,
+.workbenchContent .header .headerUtilities { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+/* Empty outlets retain a display:contents anchor, even when every plugin
+   returns null. Their presence alone must not reserve a tool row. */
+.workbenchContent .header :is(.titleMeta, .headerActions, .headerUtilities, .headerCorner):has(> [data-slot]:empty),
+.workbenchContent .header .crumbs:not(:has(.crumb:not([data-workbench-duplicate-title]), [data-slot]:not(:empty))) { display: none; }
+.workbenchContent .header:not(:has(.tabs, .crumb:not([data-workbench-duplicate-title]), [data-slot]:not(:empty))) { display: none; }
+.workbenchContent .header .tabs { min-height: 24px; padding: 0; border-radius: 0; background: transparent; }
+.workbenchContent .header .tabs::before {
+  top: auto;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: calc(100% / var(--dsh-tab-count, 1));
+  border-radius: 0;
+  background: var(--dsw-alias-label-primary);
+  box-shadow: none;
+}
+.workbenchContent [data-composer-card] { border-radius: var(--dsw-radius-lg); box-shadow: var(--dsw-elevation-stroke); }
+
+/* Each header stays under its Session provider while its DOM occupies the
+   shared toolbar. Hidden peers retain their plugin and menu ownership. */
+.sharedHeader { flex: 1; min-width: 0; padding: 0; border: 0; }
+.sharedHeader[hidden] { display: none; }
+.sharedHeader::after { display: none; }
+.sharedHeader .titleRow { min-height: 32px; flex-wrap: wrap; gap: var(--dsw-space-1) var(--dsw-space-2); }
+.sharedHeader .titleCluster { flex: 1 1 140px; justify-content: flex-start; }
+.sharedHeader .crumbs { flex: 0 1 auto; max-width: 220px; }
+.sharedHeader .crumbSeg { flex: 0 1 auto; }
+.sharedHeader .crumb { padding: var(--dsw-space-1) 0; font-size: 12px; font-weight: 500; }
+.sharedHeader .crumbCurrent { color: var(--dsw-alias-state-business-primary); }
+.sharedHeader .headerActions,
+.sharedHeader .headerUtilities { flex-wrap: wrap; min-width: 0; }
+.sharedHeader :is(.titleMeta, .headerActions, .headerUtilities, .headerCorner):has(> [data-slot]:empty) { display: none; }
+.sharedHeader .tabs { min-height: 28px; padding: 0; background: transparent; }
+.sharedHeader .headerCorner { margin-left: 0; }
+.toolsContext { flex: none; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; }
+.toolsScope { flex: 0 1 auto; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; }
+
+@media (hover: hover) and (pointer: fine) {
+  /* A lone sidebar opener shares the identity row. Other contributed tools
+     retain the wrapping Session toolbar and their own display conditions. */
+  .workbenchRoot:not([data-tabbed]) .workbenchPane:has([data-sidebar-right-expand]):not(:has(.tabs, .crumb:not([data-workbench-duplicate-title]), :is(.headerActions, .headerUtilities, .titleMeta, .crumbs) [data-slot]:not(:empty))) {
+    --dsh-workbench-pane-action-width: 144px;
+
+    & .header {
+      position: absolute;
+      top: var(--dsw-space-2);
+      right: calc(112px + var(--dsw-space-2));
+      width: 28px;
+      padding: 0;
+    }
+
+    & .header::after { display: none; }
+  }
+}
 
 /* Embedded occurrences (sidebar chat): the host's column is narrower than a
    main pane, so the chat content and composer budgets tighten and there are
@@ -829,14 +888,19 @@
   height: 100%;
   overflow: hidden;
   position: relative;
+  background: var(--dsw-alias-bg-base);
 }
 
 .workbenchGrid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-auto-rows: minmax(0, 1fr);
   flex: 1;
+  min-width: 0;
   min-height: 0;
   width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .workbenchRow { display: grid; width: 100%; min-height: 0; min-width: 0; }
@@ -845,28 +909,13 @@
 .workbenchRoot[data-maximized] .workbenchGrid { display: flex; flex-direction: column; }
 .workbenchRoot[data-maximized] .workbenchRow { display: flex; flex: 1 1 100%; }
 .workbenchRoot[data-maximized] .workbenchPane { flex: 1 1 100%; width: 100%; }
-.workbenchRow + .workbenchRow { border-top: 0.5px solid var(--dsw-alias-border-l1); }
-.workbenchPane { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; transition: opacity var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)), box-shadow var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
-.workbenchUnavailable { display: grid; flex: 1; place-content: center; margin: 0; padding: var(--dsw-space-5); color: var(--dsw-alias-label-tertiary); text-align: center; }
+.workbenchPane { position: relative; display: flex; box-sizing: border-box; flex-direction: column; min-width: 0; min-height: 0; transition: opacity var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)), box-shadow var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
 .workbenchPane + .workbenchPane { border-left: 0.5px solid var(--dsw-alias-border-l1); }
+.workbenchUnavailable { display: grid; flex: 1; place-content: center; margin: 0; padding: var(--dsw-space-5); color: var(--dsw-alias-label-tertiary); text-align: center; }
 .workbenchRoot > .root, .workbenchPane > .root { flex: 1; min-height: 0; height: auto; overflow: hidden; }
 
-/* Focused pane: a quiet 2px solid edge, not a halo. */
-.workbenchPane::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: transparent;
-  z-index: 6;
-  pointer-events: none;
-}
-.workbenchPane[data-active]::before { background: var(--dsw-alias-brand-primary); }
-
 /* Collapsed panes render only the header slot's identity strip. */
-.paneBody { display: flex; flex: 1; min-height: 0; min-width: 0; flex-direction: column; }
+.paneBody { display: flex; flex: 1; min-height: 0; min-width: 0; flex-direction: column; overflow: hidden; background: var(--dsw-alias-bg-base); }
 .paneBody[hidden] { display: none; }
 .paneBody > .root { flex: 1; min-height: 0; height: auto; overflow: hidden; }
 
@@ -914,3 +963,14 @@
   pointer-events: none;
 }
 .paneSeparator[data-dragging] .paneRatioHint { opacity: 1; }
+
+@media (pointer: coarse) {
+  .workbenchContent .header .titleRow,
+  .workbenchContent .header .tabs,
+  .workbenchContent .header .tabs button { min-height: 44px; }
+}
+
+:global([data-viewport='compact']) .workbenchContent .header .titleRow,
+:global([data-viewport='compact']) .workbenchContent .header .tabs,
+:global([data-viewport='compact']) .workbenchContent .header .tabs button { min-height: 44px; }
+:global([data-viewport='compact']) .workbenchContent .header .tabs::before { bottom: 0; }

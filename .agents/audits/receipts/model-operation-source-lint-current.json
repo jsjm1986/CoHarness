@@ -1,0 +1,14 @@
+{
+  "name": "model-operation-source-lint-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/llm/llm/src/index.ts packages/llm/llm/src/model-policy.ts packages/llm/llm/tests/model-policy.spec.ts packages/llm/llm/tests/operations.spec.ts packages/web/web-search-deepseek/src/admission.ts packages/web/web-search-deepseek/src/index.ts packages/web/web-search-deepseek/src/provider.ts packages/web/web-search-deepseek/tests/prepared.spec.ts packages/llm/llm-deepseek/src/adapter.ts packages/llm/llm-deepseek/src/search-operation.ts packages/llm/llm-deepseek/src/types.ts packages/llm/llm-deepseek-api-key/src/index.ts packages/llm/llm-deepseek/tests/dynamic-config.spec.ts packages/llm/llm-deepseek/tests/search-operation.spec.ts packages/llm/llm-pi-ai/src/adapter.ts packages/llm/llm-pi-ai/src/search-operation.ts packages/llm/llm-pi-ai/tests/search-operation.spec.ts snapshots/sdk/auxiliary-model-fixture.ts examples/headless-agent/tests/governed-native-model.snapshot.ts examples/headless-agent/tests/fixtures/governed-native-model/plugin.mjs examples/headless-agent/tests/fixtures/governed-native-model/prepare.mjs",
+  "startedAt": "2026-10-24T07:05:01.967749+00:00",
+  "seconds": 3.398,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fd581496fa150ed205a692c8cd8102d392ba90e80981b8f1b4d0d377ac29d787",
+  "inputsAfter": "fd581496fa150ed205a692c8cd8102d392ba90e80981b8f1b4d0d377ac29d787",
+  "postgresToolDirectory": null,
+  "outputSha256": "e9ddb2f845179c8339ab53130279af54383eefb68977c11b3fd27c67f643fbd4",
+  "outputTail": "packages/llm/llm-pi-ai/tests/search-operation.spec.ts:29:1: error @stylistic(max-len): This line has a length of 141. Maximum allowed is 140.\n"
+}

@@ -9,6 +9,7 @@ import {
 } from '../src/desktop-coordinator.ts'
 import type { GatewayPrincipalClaims } from '../src/principal.ts'
 import type { RuntimeTarget } from '../src/instances.ts'
+import type { RuntimeId } from '../src/runtime-catalog.ts'
 
 function claims(over: Partial<{
   runtimeKind: 'user' | 'project'
@@ -51,6 +52,22 @@ function harness(options: { now?: () => number; generations?: Record<string, num
 const desktop = { node: 'node-a', desktop: 'seat-1' }
 
 describe('DesktopCoordinator', () => {
+  it('separates same-owner Runtime holders while retaining one physical lock per computer and desktop', async () => {
+    const { coordinator, db } = harness()
+    onTestFinished(() => { db.close() })
+    await coordinator.initialize()
+    const owner = claims(), first = { ...owner, runtime: { ...owner.runtime, runtimeId: '76c5b3ae-f5ca-4134-ae05-93b1ed362f32' as RuntimeId } }
+    const sibling = { ...owner, runtime: { ...owner.runtime, runtimeId: '6c3867c3-b44c-4c8a-b28d-f35f84bb8254' as RuntimeId } }
+    const held = await coordinator.acquire(first, { ...desktop, requestId: 'same-request', runId: 'same-session' })
+    expect(held.status).toBe('granted')
+    if (held.status !== 'granted') throw new Error('Expected the physical desktop lease')
+    expect((await coordinator.acquire(sibling, { ...desktop, requestId: 'same-request', runId: 'same-session' })).status).toBe('queued')
+    expect((await coordinator.acquire(sibling, { ...desktop, node: 'node-b', requestId: 'same-request', runId: 'same-session' })).status).toBe('granted')
+    await expect(coordinator.release(sibling, held.grantId, 'same-session')).rejects.toMatchObject({ code: 'forbidden' })
+    await expect(coordinator.confirmStopped(sibling, held.grantId, 'same-session')).rejects.toMatchObject({ code: 'forbidden' })
+    expect(await coordinator.heartbeat(first, held.grantId, 'same-session')).toBe('held')
+  })
+
   it('isolates grant retries, queue cancellation and lease operations by the exact driving Session', async () => {
     const { coordinator, db } = harness()
     onTestFinished(() => { db.close() })

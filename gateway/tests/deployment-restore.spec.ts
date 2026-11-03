@@ -1,5 +1,6 @@
 /** Real PostgreSQL restore commits business data and preserves the live maintenance fence atomically. */
-import { randomUUID } from 'node:crypto'
+import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -16,8 +17,11 @@ import { PostgresBackupService } from '../src/postgres/backup-service.ts'
 import { nodeConfigurationAuthority } from '../src/postgres/node-configuration-authority.ts'
 import { acquireDeploymentDataLock } from '../src/postgres/deployment-lock.ts'
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
+import { PostgresUserService } from '../src/postgres/user-service.ts'
+import { PostgresNodeAccessService } from '../src/postgres/node-access-service.ts'
+import { PostgresDeploymentTopology } from '../src/deployment-topology.ts'
 
-const databaseUrl = process.env.HGW_TEST_DATABASE_URL
+const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
 const execute = promisify(execFile)
 let pool: Pool
@@ -52,10 +56,12 @@ describePg('transactional PostgreSQL backup restore', () => {
     const backups = new PostgresBackupService(context)
     const commands = createDeploymentCommands(command(process.env.HGW_TEST_PG_DUMP_COMMAND, 'pg_dump'),
       command(process.env.HGW_TEST_PG_RESTORE_COMMAND, 'pg_restore'))
+    await pool.query("UPDATE harness.deployment_topology SET enabled=true,primary_node_id=$2,primary_origin='https://backup-primary.test',revision=3 WHERE organization_id=$1", [organization, context.nodeId])
     const dump = await commands.backup(directory, databaseUrl!, [])
     const record = await backups.record({ path: dump.dumpPath, migrationVersion: 46, writeEpoch: 1n,
       sizeBytes: dump.sizeBytes, sha256: dump.sha256, managedSnapshot: dump.managedSnapshot, actor: null })
     await backups.setVerified(record.id, true)
+    await pool.query("UPDATE harness.deployment_topology SET enabled=false,primary_origin='https://current-primary.test',revision=4 WHERE organization_id=$1", [organization])
     await pool.query("UPDATE harness.organizations SET display_name='after backup' WHERE id=$1", [organization])
     await using lease = await acquireDeploymentDataLock(pool)
     await expect(commands.restoreDump(dump.dumpPath, databaseUrl!, lease, dump.sha256)).rejects.toThrow('coordinated restoring window')
@@ -67,6 +73,7 @@ describePg('transactional PostgreSQL backup restore', () => {
     await maintenance.beginRestore(null, record.id)
     await commands.restoreDump(dump.dumpPath, databaseUrl!, lease, dump.sha256)
     expect((await pool.query('SELECT display_name FROM harness.organizations')).rows).toEqual([{ display_name: 'at backup' }])
+    expect((await pool.query('SELECT enabled,primary_origin,revision::text FROM harness.deployment_topology')).rows).toEqual([{ enabled: false, primary_origin: 'https://current-primary.test', revision: '4' }])
     const state = await maintenance.state()
     expect(state.mode).toBe('restoring')
     expect(BigInt(state.writeEpoch)).toBeGreaterThan(baseline)
@@ -81,6 +88,7 @@ describePg('transactional PostgreSQL backup restore', () => {
     await pool.query("UPDATE harness.organizations SET display_name='retained on rollback' WHERE id=$1", [organization])
     await maintenance.beginRestore(null, record.id)
     const incompatible = await commands.backup(directory, databaseUrl!, [])
+    await pool.query('DELETE FROM harness.deployment_topology WHERE organization_id=$1', [organization])
     await pool.query('DELETE FROM harness.compute_nodes WHERE organization_id=$1', [organization])
     await pool.query('DELETE FROM harness.organizations WHERE id=$1', [organization])
     const other = (await pool.query<{ id: string }>(
@@ -91,6 +99,52 @@ describePg('transactional PostgreSQL backup restore', () => {
       .toEqual([{ id: other, display_name: 'different destination' }])
     expect((await pool.query('SELECT mode,write_epoch::text FROM harness.cluster_control')).rows)
       .toEqual([{ mode: 'restoring', write_epoch: '42' }])
+  }, 30_000)
+
+  it('preserves a current enrollment and its historical issuer when the backup predates that administrator', async () => {
+    await pool.query('DROP SCHEMA harness CASCADE')
+    await runMigrations(pool, resolve(import.meta.dirname, '../deploy/postgres/migrations'))
+    const slug = randomUUID()
+    const organization = (await pool.query<{ id: string }>(
+      "INSERT INTO harness.organizations(slug,display_name) VALUES($1,'issuer history') RETURNING id", [slug])).rows[0]!.id
+    for (const name of ['issuer-entry', 'prepared-worker']) {
+      await pool.query('INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2)', [organization, name])
+    }
+    await pool.query('INSERT INTO harness.cluster_control(organization_id) VALUES($1)', [organization])
+    const context = await resolvePostgresRuntimeContext(pool, slug, 'issuer-entry')
+    const cfg = testConfig(join(directory, 'issuer-history'))
+    const users = new PostgresUserService(context, cfg)
+    const original = await users.create({ username: 'original-admin', password: 'test-password', role: 'admin' })
+    const topology = new PostgresDeploymentTopology(context, { legacyForwarding: false, refreshAfterMs: 30000,
+      pageSize: 10, maxBytes: 65536, allowedOrigins: ['https://issuer.example.test'] })
+    await topology.save(original, { revision: '0', enabled: true, primaryOrigin: 'https://issuer.example.test' })
+    const commands = createDeploymentCommands(command(process.env.HGW_TEST_PG_DUMP_COMMAND, 'pg_dump'),
+      command(process.env.HGW_TEST_PG_RESTORE_COMMAND, 'pg_restore'))
+    const dump = await commands.backup(join(directory, 'issuer-backups'), databaseUrl!, [])
+    // A pre-migration schema must fail atomically rather than restoring an incompatible history constraint.
+    await pool.query(`ALTER TABLE harness.node_agent_enrollments ADD CONSTRAINT node_agent_enrollments_created_by_organization_id_fkey
+      FOREIGN KEY(created_by,organization_id) REFERENCES harness.users(id,organization_id)`)
+    const incompatible = await commands.backup(join(directory, 'issuer-backups'), databaseUrl!, [])
+    await pool.query('ALTER TABLE harness.node_agent_enrollments DROP CONSTRAINT node_agent_enrollments_created_by_organization_id_fkey')
+    const later = await users.create({ username: 'later-admin', password: 'test-password', role: 'admin' })
+    const nodes = new PostgresNodeAccessService(context, cfg.nodeAccess, cfg.runtimeCatalog)
+    const worker = (await pool.query<{ id: string }>("SELECT id FROM harness.compute_nodes WHERE organization_id=$1 AND name='prepared-worker'", [organization])).rows[0]!.id
+    const ticket = await nodes.issue(later, { requestId: randomUUID(), nodeId: worker })
+    const issued = (await pool.query('SELECT created_by FROM harness.node_agent_enrollments WHERE id=$1', [ticket.enrollmentId])).rows[0].created_by
+    const maintenance = new PostgresMaintenanceService(context, 60_000)
+    await maintenance.enterMaintenance(null)
+    await maintenance.beginRestore(null)
+    await using lease = await acquireDeploymentDataLock(pool)
+    await expect(commands.restoreDump(incompatible.dumpPath, databaseUrl!, lease, incompatible.sha256)).rejects.toThrow('requires migration 102')
+    expect(await users.getById(later.id)).not.toBeNull()
+    await commands.restoreDump(dump.dumpPath, databaseUrl!, lease, dump.sha256)
+    expect(await users.getById(later.id)).toBeNull()
+    expect((await pool.query('SELECT id,node_id,created_by FROM harness.node_agent_enrollments WHERE organization_id=$1', [organization])).rows)
+      .toEqual([{ id: ticket.enrollmentId, node_id: worker, created_by: issued }])
+    expect(await topology.read()).toMatchObject({ mode: 'multi', revision: '2', primary: { nodeId: context.nodeId } })
+    await expect(nodes.mutate(later, worker, { action: 'detach', revision: ticket.revision })).rejects.toMatchObject({ code: 'node-access/forbidden' })
+    await expect(nodes.enroll(ticket.token, { protocolVersion: 1, platform: 'linux', architecture: 'x64',
+      credential: `dsh_node_${randomBytes(32).toString('base64url')}` })).resolves.toMatchObject({ nodeId: worker })
   }, 30_000)
 
   it('keeps serving closed after a partial file restore and lets an independent applier finish recovery', async () => {

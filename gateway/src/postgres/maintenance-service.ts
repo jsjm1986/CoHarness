@@ -11,6 +11,9 @@
  */
 import { transaction, type Queryable } from './database.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
+import { CollaborationDeniedError } from '../collaboration.ts'
+import { parseManagedSnapshot } from '../managed-files.ts'
+import { lockAdministrator } from './administrator-authority.ts'
 
 /** Database-wide exclusion shared by data snapshots, restores and maintenance exit. */
 export const DEPLOYMENT_DATA_LOCK = 'coharness:database-and-managed-files'
@@ -80,7 +83,7 @@ export interface DeploymentOperationView {
 
 /** A maintenance or node lifecycle request was invalid for the current state. */
 export class MaintenanceError extends Error {
-  constructor(readonly status: 400 | 404 | 409, message: string) { super(message) }
+  constructor(readonly status: 400 | 404 | 409 | 503, message: string, options?: ErrorOptions) { super(message, options) }
 }
 
 interface ControlRow {
@@ -161,6 +164,31 @@ export class PostgresMaintenanceService {
     return result.rows[0]?.id ?? null
   }
 
+  private async administrationTransaction<T>(actor: number | null, operation: (client: Queryable, actorUuid: string | null) => Promise<T>): Promise<T> {
+    try {
+      return await transaction(this.context.pool, async client => {
+        let actorUuid: string | null = null
+        if (actor !== null) {
+          await lockAdministrator(client, this.context, actor)
+          actorUuid = (await client.query<{ id: string }>('SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2',
+            [this.context.organizationId, actor])).rows[0]!.id
+        }
+        return operation(client, actorUuid)
+      })
+    } catch (error) {
+      if (error instanceof MaintenanceError || error instanceof CollaborationDeniedError) throw error
+      throw new MaintenanceError(503, 'deployment-unavailable', { cause: error })
+    }
+  }
+
+  private async lockControl(client: Queryable): Promise<ControlRow> {
+    await ensureControl(client, this.context.organizationId)
+    const result = await client.query<Record<string, unknown>>(
+      'SELECT mode,maintenance_epoch,write_epoch,reason,entered_at,updated_at FROM harness.cluster_control WHERE organization_id=$1 FOR UPDATE',
+      [this.context.organizationId])
+    return controlRow(result.rows[0])!
+  }
+
   /**
    * Open the HTTP write gate only while serving and while the process's
    * baseline write epoch still matches the database. A process that started
@@ -212,8 +240,23 @@ export class PostgresMaintenanceService {
 
   /** Cluster mode plus per-node convergence for the admin API and the applier. */
   async state(): Promise<ClusterState> {
-    const control = await readControl(this.context.pool, this.context.organizationId)
-    const nodes = await this.context.pool.query<{
+    return this.stateWithin(this.context.pool)
+  }
+
+  /**
+   * Read maintenance state and recent operations while retaining current administrator eligibility.
+   * @param actor - authenticated administrator public number.
+   * @returns the organization deployment state and its twenty newest operations.
+   */
+  async administration(actor: number): Promise<ClusterState & { operations: DeploymentOperationView[] }> {
+    return this.administrationTransaction(actor, async client => ({
+      ...await this.stateWithin(client), operations: await this.operationsWithin(client, 20),
+    }))
+  }
+
+  private async stateWithin(queryable: Queryable): Promise<ClusterState> {
+    const control = await readControl(queryable, this.context.organizationId)
+    const nodes = await queryable.query<{
       id: string
       name: string
       status: DeploymentNodeStatus
@@ -272,49 +315,57 @@ export class PostgresMaintenanceService {
    * Enter maintenance: bump the epoch every writer must acknowledge before a
    * restore or apply window opens. Idempotent while maintenance or restoring
    * is already active so a second administrator cannot reset the clock.
-   * @param actor - public user number of the administrator, or null for the applier
+   * @param actor - current administrator retained through commit, or explicit null for the trusted applier
    * @param reason - operator-supplied window note recorded on the control row
+   * @returns the accepted maintenance state before a subsequent transition can commit.
    */
   async enterMaintenance(actor: number | null, reason?: string): Promise<ClusterState> {
-    const actorUserId = await this.actorUuid(actor)
-    const prior = await readControl(this.context.pool, this.context.organizationId)
-    await this.context.pool.query(
-      `INSERT INTO harness.cluster_control(organization_id,mode,maintenance_epoch,reason,actor_user_id,entered_at,updated_at)
-       VALUES($1,'maintenance',1,$2,$3,now(),now())
-       ON CONFLICT (organization_id) DO UPDATE SET
-         mode = CASE WHEN harness.cluster_control.mode = 'serving' THEN 'maintenance' ELSE harness.cluster_control.mode END,
-         maintenance_epoch = CASE WHEN harness.cluster_control.mode = 'serving'
-                                  THEN harness.cluster_control.maintenance_epoch + 1
-                                  ELSE harness.cluster_control.maintenance_epoch END,
-         reason = CASE WHEN harness.cluster_control.mode = 'serving' THEN $2 ELSE harness.cluster_control.reason END,
-         actor_user_id = CASE WHEN harness.cluster_control.mode = 'serving' THEN $3 ELSE harness.cluster_control.actor_user_id END,
-         entered_at = CASE WHEN harness.cluster_control.mode = 'serving' THEN now() ELSE harness.cluster_control.entered_at END,
-         updated_at = now()`,
-      [this.context.organizationId, reason ?? null, actorUserId],
-    )
-    if (prior.mode === 'serving') {
-      await this.insertOperation('enter-maintenance', 'completed', actorUserId, { reason: reason ?? null })
-    }
-    return this.state()
+    return this.administrationTransaction(actor, async (client, actorUserId) => {
+      const prior = await this.lockControl(client)
+      await client.query(
+        `INSERT INTO harness.cluster_control(organization_id,mode,maintenance_epoch,reason,actor_user_id,entered_at,updated_at)
+         VALUES($1,'maintenance',1,$2,$3,now(),now())
+         ON CONFLICT (organization_id) DO UPDATE SET
+           mode = CASE WHEN harness.cluster_control.mode = 'serving' THEN 'maintenance' ELSE harness.cluster_control.mode END,
+           maintenance_epoch = CASE WHEN harness.cluster_control.mode = 'serving'
+                                    THEN harness.cluster_control.maintenance_epoch + 1
+                                    ELSE harness.cluster_control.maintenance_epoch END,
+           reason = CASE WHEN harness.cluster_control.mode = 'serving' THEN $2 ELSE harness.cluster_control.reason END,
+           actor_user_id = CASE WHEN harness.cluster_control.mode = 'serving' THEN $3 ELSE harness.cluster_control.actor_user_id END,
+           entered_at = CASE WHEN harness.cluster_control.mode = 'serving' THEN now() ELSE harness.cluster_control.entered_at END,
+           updated_at = now()`,
+        [this.context.organizationId, reason ?? null, actorUserId],
+      )
+      if (prior.mode === 'serving') {
+        await this.insertOperation('enter-maintenance', 'completed', actorUserId, { reason: reason ?? null }, undefined, client)
+      }
+      return this.stateWithin(client)
+    })
   }
 
-  /** Leave maintenance back to serving; refused while a restore is open. */
+  /**
+   * Leave maintenance and retain the transition and its operation row in one transaction.
+   * @param actor - current administrator, or explicit null for the trusted applier.
+   * @returns the accepted serving state; an open restore or data operation refuses exit.
+   */
   async exitMaintenance(actor: number | null): Promise<ClusterState> {
-    const actorUserId = await this.actorUuid(actor)
-    const updated = await this.context.pool.query(
-      `UPDATE harness.cluster_control SET mode='serving', reason=NULL, actor_user_id=NULL, entered_at=NULL, updated_at=now()
-       WHERE organization_id=$1 AND mode='maintenance' AND pg_try_advisory_xact_lock(hashtext($2))
-         AND pg_try_advisory_xact_lock(hashtext($3))`,
-      [this.context.organizationId, DEPLOYMENT_DATA_LOCK, DEPLOYMENT_SQL_LOCK],
-    )
-    if (updated.rowCount !== 1) {
-      const control = await readControl(this.context.pool, this.context.organizationId)
-      if (control.mode === 'restoring') throw new MaintenanceError(409, 'restore-in-progress')
-      if (control.mode !== 'maintenance') throw new MaintenanceError(409, 'not-in-maintenance')
-      throw new MaintenanceError(409, 'maintenance-exit-conflict')
-    }
-    await this.insertOperation('exit-maintenance', 'completed', actorUserId, {})
-    return this.state()
+    return this.administrationTransaction(actor, async (client, actorUserId) => {
+      await this.lockControl(client)
+      const updated = await client.query(
+        `UPDATE harness.cluster_control SET mode='serving', reason=NULL, actor_user_id=NULL, entered_at=NULL, updated_at=now()
+         WHERE organization_id=$1 AND mode='maintenance' AND pg_try_advisory_xact_lock(hashtext($2))
+           AND pg_try_advisory_xact_lock(hashtext($3))`,
+        [this.context.organizationId, DEPLOYMENT_DATA_LOCK, DEPLOYMENT_SQL_LOCK],
+      )
+      if (updated.rowCount !== 1) {
+        const control = await readControl(client, this.context.organizationId)
+        if (control.mode === 'restoring') throw new MaintenanceError(409, 'restore-in-progress')
+        if (control.mode !== 'maintenance') throw new MaintenanceError(409, 'not-in-maintenance')
+        throw new MaintenanceError(409, 'maintenance-exit-conflict')
+      }
+      await this.insertOperation('exit-maintenance', 'completed', actorUserId, {}, undefined, client)
+      return this.stateWithin(client)
+    })
   }
 
   /**
@@ -406,23 +457,30 @@ export class PostgresMaintenanceService {
    * keeps the node writable until its heartbeat goes stale or it acknowledges
    * the epoch; `offline` declares it stopped and excludes it from quiesce
    * accounting.
+   * @param actor - current administrator, or explicit null for the trusted applier.
+   * @param nodeId - organization-owned compute node.
+   * @param status - reviewed lifecycle declaration.
+   * @returns the accepted node state committed with its operation row.
    */
   async setNodeStatus(actor: number | null, nodeId: string, status: DeploymentNodeStatus): Promise<ClusterNodeView> {
     if (status !== 'active' && status !== 'draining' && status !== 'offline') {
       throw new MaintenanceError(400, 'invalid-node-status')
     }
-    const actorUserId = await this.actorUuid(actor)
-    const updated = await this.context.pool.query<{ name: string }>(
-      `UPDATE harness.compute_nodes SET status=$3 WHERE organization_id=$1 AND id=$2 RETURNING name`,
-      [this.context.organizationId, nodeId, status],
-    )
-    const row = updated.rows[0]
-    if (row === undefined) throw new MaintenanceError(404, 'node-not-found')
-    await this.insertOperation('node-status', 'completed', actorUserId, { nodeId, name: row.name, status })
-    const state = await this.state()
-    const view = state.nodes.find(node => node.nodeId === nodeId)
-    if (view === undefined) throw new MaintenanceError(404, 'node-not-found')
-    return view
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(nodeId)) throw new MaintenanceError(400, 'invalid-node-id')
+    return this.administrationTransaction(actor, async (client, actorUserId) => {
+      await this.lockControl(client)
+      const updated = await client.query<{ name: string }>(
+        `UPDATE harness.compute_nodes SET status=$3 WHERE organization_id=$1 AND id=$2 RETURNING name`,
+        [this.context.organizationId, nodeId, status],
+      )
+      const row = updated.rows[0]
+      if (row === undefined) throw new MaintenanceError(404, 'node-not-found')
+      await this.insertOperation('node-status', 'completed', actorUserId, { nodeId, name: row.name, status }, undefined, client)
+      const state = await this.stateWithin(client)
+      const view = state.nodes.find(node => node.nodeId === nodeId)
+      if (view === undefined) throw new MaintenanceError(404, 'node-not-found')
+      return view
+    })
   }
 
   /** Append one ledger row for an HTTP-facing actor; detail stays free of secrets. */
@@ -494,37 +552,56 @@ export class PostgresMaintenanceService {
     )
   }
 
-  /** Request a restore through the admin API; the applier claims pending rows. */
+  /**
+   * Register a restore while retaining administrator and verified backup eligibility.
+   * @param actor - current administrator, or explicit null for the trusted applier.
+   * @param backupId - verified complete backup in this organization.
+   * @returns the accepted pending request; the independent applier claims it after commit.
+   */
   async requestRestore(actor: number | null, backupId: string): Promise<DeploymentOperationView> {
-    const actorUserId = await this.actorUuid(actor)
-    let id: string
-    try {
-      const inserted = await this.context.pool.query<{ id: string }>(
-        `INSERT INTO harness.deployment_operations(organization_id,kind,status,detail,created_by)
-         VALUES($1,'restore','pending',$3,$2) RETURNING id`,
-        [this.context.organizationId, actorUserId, JSON.stringify({ backupId })],
-      )
-      id = inserted.rows[0]!.id
-    } catch (error) {
-      if (error instanceof Error && 'code' in error && (error as { code?: unknown }).code === '23505') {
-        throw new MaintenanceError(409, 'restore-already-pending')
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(backupId)) throw new MaintenanceError(400, 'invalid-backup-id')
+    return this.administrationTransaction(actor, async (client, actorUserId) => {
+      const selected = await client.query<{ status: string; sha256: string | null; managed_files: unknown }>(
+        'SELECT status,sha256,managed_files FROM harness.backup_records WHERE organization_id=$1 AND id=$2 FOR SHARE',
+        [this.context.organizationId, backupId])
+      const backup = selected.rows[0]
+      if (backup === undefined) throw new MaintenanceError(404, 'backup-not-found')
+      if (backup.status !== 'verified' && backup.status !== 'restored') throw new MaintenanceError(409, 'backup-not-verified')
+      if (backup.sha256 === null || backup.managed_files === null || Array.isArray(backup.managed_files)) throw new MaintenanceError(409, 'backup-lacks-complete-managed-data-manifest')
+      parseManagedSnapshot(backup.managed_files)
+      let id: string
+      try {
+        const inserted = await client.query<{ id: string }>(
+          `INSERT INTO harness.deployment_operations(organization_id,kind,status,detail,created_by)
+           VALUES($1,'restore','pending',$3,$2) RETURNING id`,
+          [this.context.organizationId, actorUserId, JSON.stringify({ backupId })],
+        )
+        id = inserted.rows[0]!.id
+      } catch (error) {
+        if (error instanceof Error && 'code' in error && (error as { code?: unknown }).code === '23505') {
+          throw new MaintenanceError(409, 'restore-already-pending')
+        }
+        throw error
       }
-      throw error
-    }
-    const row = await this.context.pool.query<Record<string, unknown>>(
-      `SELECT o.id,o.kind,o.status,o.node_name,o.detail,
-              (SELECT u.public_id FROM harness.users u WHERE u.id=o.created_by) created_by,
-              o.created_at,o.started_at,o.finished_at,o.error
-       FROM harness.deployment_operations o WHERE o.organization_id=$1 AND o.id=$2`,
-      [this.context.organizationId, id],
-    )
-    return operationView(row.rows[0]!)
+      const row = await client.query<Record<string, unknown>>(
+        `SELECT o.id,o.kind,o.status,o.node_name,o.detail,
+                (SELECT u.public_id FROM harness.users u WHERE u.id=o.created_by) created_by,
+                o.created_at,o.started_at,o.finished_at,o.error
+         FROM harness.deployment_operations o WHERE o.organization_id=$1 AND o.id=$2`,
+        [this.context.organizationId, id],
+      )
+      return operationView(row.rows[0]!)
+    })
   }
 
   /** Recent ledger rows for the admin deployment page. */
   async listOperations(limit = 50): Promise<DeploymentOperationView[]> {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) throw new RangeError('operation limit out of range')
-    const result = await this.context.pool.query<Record<string, unknown> & { created_by: string | null }>(
+    return this.operationsWithin(this.context.pool, limit)
+  }
+
+  private async operationsWithin(queryable: Queryable, limit: number): Promise<DeploymentOperationView[]> {
+    const result = await queryable.query<Record<string, unknown> & { created_by: string | null }>(
       `SELECT o.id,o.kind,o.status,o.node_name,o.detail,
               (SELECT u.public_id FROM harness.users u WHERE u.id=o.created_by) created_by,
               o.created_at,o.started_at,o.finished_at,o.error

@@ -3,6 +3,8 @@
   "include": [
     "../apps/web/tests/plugin-administration.e2e.ts",
     "../apps/web/tests/admin-form-values.e2e.ts",
+    "../apps/web/tests/admin-model-view-drafts.e2e.ts",
+    "../apps/web/tests/runtime-start-feedback.e2e.ts",
     "../apps/web/tests/admin-layout.e2e.ts"
   ]
 }

@@ -1,4 +1,5 @@
 /** Real PostgreSQL backup admission and provider-owned data selection. */
+import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
@@ -6,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type { Pool } from 'pg'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readManagedDataPaths, registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { testConfig, testEnvironment } from './test-config.ts'
 import { NodeConfigurationStore, readNodeConfiguration } from '../src/node-config-store.ts'
@@ -23,8 +24,38 @@ import { nodeConfigurationAuthority } from '../src/postgres/node-configuration-a
 import { PostgresUserService } from '../src/postgres/user-service.ts'
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
 import { TunnelCredentialCipher } from '../src/postgres/tunnel-access-service.ts'
+import { prepareUserData } from '../src/user-data.ts'
+import type { RuntimeId } from '../src/runtime-catalog.ts'
 
-const databaseUrl = process.env.HGW_TEST_DATABASE_URL
+const copyIo = vi.hoisted(() => ({ mode: 'normal' as 'normal' | 'short' | 'zero' | 'abort' | 'flush', calls: 0,
+  cancel: undefined as (() => void) | undefined }))
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  const path = await import('node:path')
+  return { ...actual, async open(...args: Parameters<typeof actual.open>) {
+    const handle = await actual.open(...args)
+    if (args[1] !== 'wx' || typeof args[0] !== 'string' || !/^[0-9]{8}\.data$/u.test(path.basename(args[0]))) return handle
+    const write = handle.write.bind(handle), sync = handle.sync.bind(handle)
+    Object.defineProperty(handle, 'write', { value: async (data: Uint8Array) => {
+      if (copyIo.mode === 'normal') return write(data)
+      copyIo.calls += 1
+      if (copyIo.mode === 'zero') {
+        if (copyIo.calls > 1) throw new Error('Fixture stopped a repeated zero-progress backup write')
+        return { bytesWritten: 0, buffer: data }
+      }
+      const result = await write(data, 0, Math.min(data.byteLength, 2))
+      if (copyIo.mode === 'abort') copyIo.cancel?.()
+      return result
+    } })
+    Object.defineProperty(handle, 'sync', { value: async () => {
+      await sync()
+      if (copyIo.mode === 'flush') copyIo.cancel?.()
+    } })
+    return handle
+  } }
+})
+
+const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
 let pool: Pool
 let directory: string
@@ -42,7 +73,10 @@ describePg('deployment backup completeness', () => {
     await runMigrations(pool, resolve(import.meta.dirname, '../deploy/postgres/migrations'))
     directory = await realpath(await mkdtemp(join(tmpdir(), 'hgw-backup-complete-')))
   })
-  afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
+  afterEach(async () => {
+    copyIo.mode = 'normal'; copyIo.calls = 0; copyIo.cancel = undefined
+    await rm(directory, { recursive: true, force: true })
+  })
   afterAll(async () => { await pool.end() })
 
   async function fixture(overrides: NodeJS.ProcessEnv = {}) {
@@ -91,10 +125,11 @@ describePg('deployment backup completeness', () => {
     for (const path of [cfg.organizationModelCredentialKeyFile, cfg.webhookSecretKeyFile]) {
       await mkdir(dirname(path), { recursive: true }); await writeFile(path, 'isolated test key', { mode: 0o600 })
     }
+    await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [f.context.organizationId, f.user.id])
     const store = new NodeConfigurationStore(f.context, cfg, environment, nodeConfigurationAuthority(f.context))
     await store.initialize()
-    const current = await store.view(), nextUsers = join(directory, 'next-users'), nextDsh = join(nextUsers, 'alice', 'dsh')
-    await store.save(f.context, current.revision, { ...current.desired, HGW_USERS_ROOT: nextUsers })
+    const current = await store.view(Number(f.user.public_id)), nextUsers = join(directory, 'next-users'), nextDsh = join(nextUsers, 'alice', 'dsh')
+    await store.save(f.context, current.revision, { ...current.desired, HGW_USERS_ROOT: nextUsers }, Number(f.user.public_id))
     await cp(f.dsh, nextDsh, { recursive: true })
     await f.approve([
       { owner: '@deepseek-ai/dsh-session-persistence-jsonl', kind: 'directory', path: join(nextDsh, 'sessions') },
@@ -104,6 +139,45 @@ describePg('deployment backup completeness', () => {
     const record = (await readNodeConfiguration(cfg.nodeConfigFile, environment))!
     return { ...f, cfg, environment, runtime, store, record, nextDsh }
   }
+
+  it.each(['short', 'zero', 'abort', 'flush'] as const)('records managed backup copy progress for %s filesystem writes', async (mode) => {
+    const f = await fixture(), sessions = join(f.dsh, 'sessions')
+    f.claim('@deepseek-ai/dsh-session-persistence-jsonl', 'directory', sessions)
+    await mkdir(sessions, { recursive: true })
+    const source = join(sessions, 'session.jsonl'), text = 'durable Session backup bytes'
+    await writeFile(source, text)
+    await f.maintenance.enterMaintenance(null)
+    await pool.query("UPDATE harness.instances SET desired_state='stopped',observed_state='stopped' WHERE organization_id=$1", [f.context.organizationId])
+    const cancellation = new AbortController(), reason = new Error(`Backup copy cancelled during ${mode}`)
+    copyIo.mode = mode
+    copyIo.cancel = () => { cancellation.abort(reason) }
+    await using lease = await acquireDeploymentDataLock(pool)
+    const signal = AbortSignal.any([lease.signal, cancellation.signal])
+    const transcript = ['# Managed backup filesystem write progress', '', `mode=${mode}`]
+    if (mode === 'short') {
+      const backup = await f.backups.createWithinLease(null, f.cfg.backupDir, signal)
+      expect(backup.status).toBe('verified')
+      const member = backup.managedSnapshot!.files.find(file => file.sourcePath === source)!
+      expect(await readFile(join(backupFilesDirectory(backup.path), member.member), 'utf8')).toBe(text)
+      expect(copyIo.calls).toBeGreaterThan(1)
+      transcript.push('backupStatus=verified', 'copiedContent=complete', 'partialWritesRetried=true')
+    } else {
+      const creating = f.backups.createWithinLease(null, f.cfg.backupDir, signal)
+      if (mode === 'zero') await expect(creating).rejects.toThrow('Managed file write made no progress')
+      else await expect(creating).rejects.toBe(reason)
+      if (mode !== 'flush') expect(copyIo.calls).toBe(1)
+      expect(await new PostgresBackupService(f.context).list()).toEqual([])
+      transcript.push('backupStatus=refused', 'registeredBackups=0', `cancelled=${String(signal.aborted)}`)
+    }
+    expect(await readFile(source, 'utf8')).toBe(text)
+    const operation = (await pool.query<{ status: string }>(
+      "SELECT status FROM harness.deployment_operations WHERE organization_id=$1 AND kind='backup'", [f.context.organizationId],
+    )).rows
+    expect(operation).toEqual([{ status: mode === 'short' ? 'completed' : 'failed' }])
+    expect((await f.maintenance.state()).mode).toBe('maintenance')
+    transcript.push(`operationStatus=${operation[0]!.status}`, 'modeAfter=maintenance', 'sourceUnchanged=true', '')
+    await expect(transcript.join('\n')).toMatchFileSnapshot(join(import.meta.dirname, `expected/deployment/copy-${mode}.expected.md`))
+  })
 
   it('rejects a copied old inventory before publishing paths and accepts its complete reviewed replacement', async () => {
     const f = await relocationFixture(), sourceInventory = await readFile(join(f.dsh, 'managed-data.jsonl'))
@@ -233,6 +307,28 @@ describePg('deployment backup completeness', () => {
     expect((await new PostgresBackupService(f.context).get(result.id)).status).toBe('failed')
   })
 
+  it('captures independent personal Runtime inventories after one assignment retires', async () => {
+    const f = await fixture(), original = join(f.dsh, 'sessions')
+    f.claim('@deepseek-ai/dsh-session-persistence-jsonl', 'directory', original)
+    await mkdir(original); await writeFile(join(original, 'session.jsonl'), 'original committed generation')
+    const runtimeId = (await pool.query<{ runtime_id: RuntimeId }>(`INSERT INTO harness.instances
+      (organization_id,user_id,assigned_node_id,port,storage_layout) VALUES($1,$2,$3,49102,'isolated') RETURNING runtime_id`,
+    [f.context.organizationId, f.user.id, f.context.nodeId])).rows[0]!.runtime_id
+    prepareUserData(f.cfg, 'alice', { runtimeId, storageLayout: 'isolated' }, f.home)
+    const privateHome = join(f.cfg.usersRoot, 'alice', 'runtimes', runtimeId, 'dsh'), sessions = join(privateHome, 'sessions')
+    registerManagedDataPath({ owner: '@deepseek-ai/dsh-session-persistence-jsonl', kind: 'directory', path: sessions }, join(privateHome, 'managed-data.jsonl'))
+    await mkdir(sessions); await writeFile(join(sessions, 'session.jsonl'), 'retained private committed generation')
+    await pool.query('DELETE FROM harness.instances WHERE runtime_id=$1', [runtimeId])
+    await f.maintenance.enterMaintenance(null)
+    const record = await f.backups.create(null)
+    for (const [sourcePath, content] of [[join(original, 'session.jsonl'), 'original committed generation'],
+      [join(sessions, 'session.jsonl'), 'retained private committed generation']] as const) {
+      const file = record.managedSnapshot!.files.find(file => file.sourcePath === sourcePath)
+      expect(file).toBeDefined()
+      expect(await readFile(join(backupFilesDirectory(record.path), file!.member), 'utf8')).toBe(content)
+    }
+  })
+
   it('backs up and restores the independent key that decrypts the stored tunnel tokens', async () => {
     const f = await fixture({ HGW_TUNNEL_CREDENTIAL_KEY_FILE: join(directory, 'separate-secrets', 'tunnel.key') })
     f.claim('@deepseek-ai/dsh-session-persistence-jsonl', 'directory', join(f.dsh, 'sessions'))
@@ -285,6 +381,21 @@ describePg('deployment backup completeness', () => {
     await f.approve([{ owner: '@deepseek-ai/dsh-storage-json', kind: 'directory', path: unrelated },
       { owner: '@deepseek-ai/dsh-storage-json', kind: 'directory', path: f.home }])
     await expect(collectDeploymentData(f.context, f.cfg)).rejects.toThrow('root-includes-unowned-workspace')
+  })
+
+  it.each(['local-runtime-supervisors', 'gateway-model-locks'])('refuses adoption and backup of approved node control %s', async control => {
+    const f = await fixture(), controlRoot = join(f.cfg.stateRoot, control), witness = join(controlRoot, 'generation.json')
+    await mkdir(controlRoot, { recursive: true })
+    await writeFile(witness, '{"phase":"stopped"}\n')
+    f.claim('@deepseek-ai/dsh-session-persistence-jsonl', 'directory', join(f.dsh, 'sessions'))
+    await f.approve([{ owner: 'fixture-plugin', kind: 'directory', path: controlRoot }])
+    await f.maintenance.enterMaintenance(null)
+    const inventory = join(f.dsh, 'managed-data.jsonl'), original = await readFile(inventory)
+    await expect(adoptDeploymentInventory(f.context, f.cfg, `user:${f.user.public_id}`)).rejects.toThrow('managed-data-root-overlaps-runtime-control')
+    expect(await readFile(inventory)).toEqual(original)
+    f.claim('fixture-plugin', 'directory', controlRoot)
+    await expect(f.backups.create(null)).rejects.toThrow('managed-data-root-overlaps-runtime-control')
+    expect(await readFile(witness, 'utf8')).toBe('{"phase":"stopped"}\n')
   })
 
   it('does not interpret a symbolic ancestor as permission to capture its external target', async () => {
@@ -381,16 +492,18 @@ describePg('deployment backup completeness', () => {
   })
 
   it('excludes configuration mutations while a backup owns the data lease and allows readonly restart initialization', async () => {
-    const f = await fixture(), store = new NodeConfigurationStore(f.context, f.cfg, f.environment, nodeConfigurationAuthority(f.context))
+    const f = await fixture()
+    await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [f.context.organizationId, f.user.id])
+    const store = new NodeConfigurationStore(f.context, f.cfg, f.environment, nodeConfigurationAuthority(f.context))
     await store.initialize()
-    const before = await readFile(f.cfg.nodeConfigFile, 'utf8'), view = await store.view()
+    const before = await readFile(f.cfg.nodeConfigFile, 'utf8'), view = await store.view(Number(f.user.public_id))
     const lease = await acquireDeploymentDataLock(pool)
     try {
       await store.initialize()
-      await expect(store.save(f.context, view.revision, { ...view.desired, HGW_PORT: '9020' }))
+      await expect(store.save(f.context, view.revision, { ...view.desired, HGW_PORT: '9020' }, Number(f.user.public_id)))
         .rejects.toMatchObject({ message: 'deployment-data-operation-already-running' })
       expect(await readFile(f.cfg.nodeConfigFile, 'utf8')).toBe(before)
     } finally { await lease[Symbol.asyncDispose]() }
-    expect((await store.save(f.context, view.revision, { ...view.desired, HGW_PORT: '9020' })).revision).toBe(view.revision + 1)
+    expect((await store.save(f.context, view.revision, { ...view.desired, HGW_PORT: '9020' }, Number(f.user.public_id))).revision).toBe(view.revision + 1)
   })
 })

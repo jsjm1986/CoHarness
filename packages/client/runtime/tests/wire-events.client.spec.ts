@@ -61,6 +61,7 @@ async function mount(): Promise<Bench> {
     $on: () => () => {},
   })
   const handle: ConnectionHandle = {
+    metadataTiming: { requestTimeoutMs: 15000, retryAfterMs: 10000 },
     api,
     isLoopback: true,
     interactions: 'none',

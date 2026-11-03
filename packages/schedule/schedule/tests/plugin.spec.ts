@@ -20,6 +20,37 @@ function scheduleEvent(data: unknown, seq: number): SessionEvent {
 }
 
 describe('shared Schedule management', () => {
+  it('retains its veto until provider cleanup has closed durable storage', async () => {
+    vi.useRealTimers()
+    const closing = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const pool = new MemoryMediaPool()
+    const test = await harness({ pool, backend: gatedScheduleBackend(pool, {
+      closeUnit: async () => { closing.resolve(undefined); await release.promise },
+    }) })
+    tests.push(test)
+    let disposal: Promise<void> | undefined
+    try {
+      disposal = test.fiber.dispose()
+      await closing.promise
+      expect(test.ctx.bail('runtime/idle-release-check')).toBe('busy')
+      release.resolve(undefined)
+      await disposal
+      expect(test.ctx.bail('runtime/idle-release-check')).toBeUndefined()
+    } finally { release.resolve(undefined); await disposal }
+  })
+
+  it('keeps the Host running for future tasks even while their original Session is inactive', async () => {
+    const { ctx, service } = await setup()
+    expect(ctx.bail('runtime/idle-release-check')).toBeUndefined()
+    const sessionId = SessionId('cold-timer-owner')
+    const record = await service.create(sessionId, { prompt: 'Later', after_seconds: 3600, title: 'Later' })
+    expect(ctx.agents.get(sessionId)).toBeUndefined()
+    expect(ctx.bail('runtime/idle-release-check')).toBe('busy')
+    expect(await service.delete({ id: record.id, sessionId })).toEqual({ id: record.id, deleted: true })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(ctx.bail('runtime/idle-release-check')).toBeUndefined()
+  })
+
   it('initializes a new task with empty known delivery history', async () => {
     const { service, pool } = await setup()
     const sessionId = SessionId('new-history')

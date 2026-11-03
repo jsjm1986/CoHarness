@@ -807,13 +807,11 @@
   justify-content: flex-end;
 }
 
-/* 40px targets, not the full 44px touch target: the single-row compact
-   toolbar seats seven controls and must still fit a 360px phone. */
 :global([data-viewport='compact']) .add,
 :global([data-viewport='compact']) .primary,
 :global([data-viewport='compact']) .documentAction {
-  width: 40px;
-  height: 40px;
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
 }
 
 :global([data-viewport='compact']) .primary {
@@ -853,10 +851,8 @@
   }
 }
 
-/* Compact composer hierarchy: the left rail owns attach/command/accessory
-   actions, while the model and send controls form one trailing icon group.
-   Grid keeps both groups on the single toolbar line; the tools column clips
-   before it ever yields a second row. */
+/* Compact controls keep the model and send group separate from extensions.
+   Extension feedback can wrap below the left controls without covering it. */
 @media (max-width: 767px) {
   :global([data-viewport='compact']) .card {
     gap: 6px;
@@ -872,16 +868,22 @@
 
   :global([data-viewport='compact']) .row {
     display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
-    align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
     gap: var(--dsw-space-1);
     padding: 0 0 4px;
   }
 
   :global([data-viewport='compact']) .tools {
-    min-width: max-content;
+    min-width: 0;
+    flex-wrap: wrap;
     gap: var(--dsw-space-1);
-    overflow: hidden;
+    overflow: visible;
+  }
+
+  :global([data-viewport='compact']) .tools .extensionItems:has(> :not(:empty)) {
+    flex: 1 1 100%;
+    overflow: visible;
   }
 
   :global([data-viewport='compact']) .modes {

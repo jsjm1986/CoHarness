@@ -25,6 +25,7 @@ Use `dsh-collaboration-context` for durable model-visible participant attributio
 <a id="runtime-contract"></a>
 ## Runtime contract
 
+- Ordinary human inputs and continued-question replies carrying project participant metadata receive the same attribution notice.
 - The participant snapshot contains the authenticated user id, username, display name, role, project id/name, and project `ro`/`rw` mode supplied by the collaboration authority at message admission.
 - Each inserted `user/message` uses plugin source `collaboration-context`, cites the following participant message id, and stores the same participant snapshot. The package invariant requires the pair to remain adjacent, text-identical to the renderer, and scoped to a project participant.
 - Malformed participant metadata throws before model admission instead of silently dropping attribution. Personal messages and messages without participant metadata pass through unchanged.

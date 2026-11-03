@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-ssh-partial-stream-allocation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-ssh-partial-stream-allocation.md
+document:
+  en: 86f0665e7d069a2924ee19368da7ab91e42a0ec0
+  zh: 716931557b382783cc1015e6f4f0518ad343c1d1
+/agent-note-failed-ssh-startup-owns-every-stream-attempt:
+  en: 70323edfd829ba7c
+  zh: 60bcc5549f45f224
+/agent-note-failed-ssh-startup-owns-every-stream-attempt/problem:
+  en: de3782fe9b26b678
+  zh: e10ed58e40132272
+/agent-note-failed-ssh-startup-owns-every-stream-attempt/decision:
+  en: 3d46152ac776bd9e
+  zh: 4fcc7a035873bee9
+/agent-note-failed-ssh-startup-owns-every-stream-attempt/alternatives-considered:
+  en: 8a87ca16ce15c523
+  zh: 2b61d1eebbf1839d
+/agent-note-failed-ssh-startup-owns-every-stream-attempt/consequences:
+  en: 9046197dadc8e34e
+  zh: cfb6fb30ead974a7
+/agent-note-failed-ssh-startup-owns-every-stream-attempt/verification:
+  en: e04c0badafc52fac
+  zh: 8a4d0df61746b5f9

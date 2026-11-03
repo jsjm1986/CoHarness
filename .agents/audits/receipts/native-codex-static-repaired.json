@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-static-repaired",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm exec tsx .agents/audits/.local/native-model-static-repaired.mts",
+  "startedAt": "2026-10-25T03:44:48.364718+00:00",
+  "seconds": 85.704,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5e85b2d3f3614e0d15f3c359633de934a196d8fed893a6640f32a2855cf9a241",
+  "inputsAfter": "5e85b2d3f3614e0d15f3c359633de934a196d8fed893a6640f32a2855cf9a241",
+  "postgresToolDirectory": null,
+  "outputSha256": "865b9cf6945f0ac03c5b6569277a1d6ddbc74f28680f990e9ab30bb0b93ea263",
+  "outputTail": "run-gates: native-model-static-repaired running 6 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start translation pairing\nrun-gates: PASS translation pairing (13.13s)\nrun-gates: start markdown wrap\nrun-gates: PASS markdown wrap (12.31s)\nrun-gates: start config catalog\nrun-gates: PASS config catalog (2.29s)\nrun-gates: start repository references\nrun-gates: PASS repository references (16.69s)\nrun-gates: start doc budgets\nrun-gates: PASS doc budgets (0.42s)\nrun-gates: start knip\nrun-gates: PASS knip (39.47s)\n\nrun-gates: 6 passed, 0 failed, 0 skipped in 84.31s.\n"
+}

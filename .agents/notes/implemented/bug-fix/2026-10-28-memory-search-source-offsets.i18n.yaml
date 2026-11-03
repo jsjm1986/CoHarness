@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-28-memory-search-source-offsets.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-28-memory-search-source-offsets.md
+document:
+  en: ed482f6323828558b39721b11714894e546cf539
+  zh: ac97e0a042180d500491fc2bb6c269dc0009ecb2
+/agent-note-memory-search-excerpts-retain-source-positions:
+  en: 8916afa0153f8676
+  zh: 88d370761a2b49ae
+/agent-note-memory-search-excerpts-retain-source-positions/problem:
+  en: a76085ad02b6099e
+  zh: ac25ee4d9b66cc4d
+/agent-note-memory-search-excerpts-retain-source-positions/decision:
+  en: e2e9ec460b5422b1
+  zh: 299e818915f4807b
+/agent-note-memory-search-excerpts-retain-source-positions/alternatives-considered:
+  en: 3c6752b27e644007
+  zh: f5a36a034fc91202
+/agent-note-memory-search-excerpts-retain-source-positions/consequences:
+  en: 80dd2dbbb2f4da1d
+  zh: 34affb5fa983622b
+/agent-note-memory-search-excerpts-retain-source-positions/verification:
+  en: d32b73f549d111bb
+  zh: 99e06b5457734b94

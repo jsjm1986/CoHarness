@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-registration-before",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/tunnel-access.spec.ts -t 'keeps a named tunnel starting' --retry=0",
+  "startedAt": "2026-10-24T22:09:20.481126+00:00",
+  "seconds": 2.8,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "642d87547a6903b69576a385b4b6ecb5e0cc8bbcdf16a562ee11d5329969f9b6",
+  "inputsAfter": "642d87547a6903b69576a385b4b6ecb5e0cc8bbcdf16a562ee11d5329969f9b6",
+  "postgresToolDirectory": null,
+  "outputSha256": "e551039e3b7ef892f23becf8e1ee8d62165c598d00ffcfb1a37d7be057d8f0de",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/tunnel-access.spec.ts (23 tests | 1 failed | 22 skipped) 7ms\n     × keeps a named tunnel starting until its connector confirms registration 6ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/tunnel-access.spec.ts > GatewayTunnelAccess > keeps a named tunnel starting until its connector confirms registration\nAssertionError: expected 'running' to be 'starting' // Object.is equality\n\nExpected: \"starting\"\nReceived: \"running\"\n\n ❯ tests/tunnel-access.spec.ts:96:38\n     94|     try {\n     95|       await vi.advanceTimersByTimeAsync(3001)\n     96|       expect(store.snapshot().state).toBe('starting')\n       |                                      ^\n     97|       expect(published).toBe(false)\n     98|     } finally { registered(); await starting }\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 22 skipped (23)\n   Start at  06:09:23\n   Duration  177ms (transform 44ms, setup 0ms, import 84ms, tests 7ms, environment 0ms)\n\n"
+}

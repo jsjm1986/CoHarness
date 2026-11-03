@@ -1,0 +1,14 @@
+{
+  "name": "document-transfer-authority-fixed",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/document-transfer.spec.ts",
+  "startedAt": "2026-10-26T01:40:22.727385+00:00",
+  "seconds": 2.348,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4d357fe7cc0e1c948b6937c58f42b0a3904c20d19edd8268d56eb53fd4b91128",
+  "inputsAfter": "4d357fe7cc0e1c948b6937c58f42b0a3904c20d19edd8268d56eb53fd4b91128",
+  "postgresToolDirectory": null,
+  "outputSha256": "1d6210f25411cddddaa3b95c9124be9502e0dfc82eca3febcd52793ac338fd94",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  26 passed (26)\n   Start at  09:40:24\n   Duration  299ms (transform 93ms, setup 0ms, import 160ms, tests 60ms, environment 0ms)\n\n"
+}

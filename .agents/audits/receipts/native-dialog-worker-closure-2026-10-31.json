@@ -1,0 +1,399 @@
+{
+  "finding": "B366",
+  "status": "fixed_named_driver_and_observed_exit_message_scope",
+  "updatedAt": "2026-10-30T19:36:51.013857+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T191018Z",
+  "sourcePaths": [
+    "packages/host/directory-picker-native/src/win32-dialog.ts",
+    "packages/host/directory-picker-native/src/win32-dialog-bindings.ts",
+    "packages/host/directory-picker-native/tests/win32-dialog.spec.ts",
+    "packages/host/directory-picker-native/tests/win32-dialog-bindings.spec.ts",
+    "packages/host/directory-picker-native/tests/worker-lifetime.spec.ts",
+    "packages/host/directory-picker-native/tests/public-worker.spec.ts",
+    "packages/host/directory-picker-native/tests/fixtures/worker-lifetime.mjs",
+    "packages/host/directory-picker-native/tests/fixtures/public-worker.mjs",
+    "packages/host/directory-picker-native/tests/expected/public-worker.jsonl",
+    "packages/host/directory-picker-native/tests/expected/worker-lifetime-result.jsonl",
+    "packages/host/directory-picker-native/tests/expected/worker-lifetime-kill-refused.jsonl",
+    "packages/host/directory-picker-native/tests/expected/worker-lifetime-pending-close.jsonl",
+    "packages/host/directory-picker-native/tests/expected/worker-lifetime-late-showing.jsonl",
+    "packages/host/directory-picker-native/README.md",
+    "packages/host/directory-picker-native/README.zh.md",
+    "packages/host/directory-picker-native/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-dialog-worker-closure.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-dialog-worker-closure.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-dialog-worker-closure.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/host/directory-picker-native/src/win32-dialog.ts": "56ef7f1e0f0e4f21d3fdf289d992dce56e3a2c4a29d91f3ca8744df587dbd70d",
+    "packages/host/directory-picker-native/src/win32-dialog-bindings.ts": "6c96e7db6fa1f1aefff3f2e9d2b2a9cf7b191ebaa85a19f544ed9afeecaceabc",
+    "packages/host/directory-picker-native/tests/win32-dialog.spec.ts": "a1a5f9abc3637841f814aa28b50d078edd2d21208b999ca23eafbd8b216c005c",
+    "packages/host/directory-picker-native/tests/win32-dialog-bindings.spec.ts": "84560b857e0fb840e3d6050254a0b508fc2c89982900433fe9678b58796fe034",
+    "packages/host/directory-picker-native/tests/worker-lifetime.spec.ts": "dce6e5f603a47d861ec9b68425973f5ad3d6e62b5bf6851cd659f1f53d961d06",
+    "packages/host/directory-picker-native/tests/public-worker.spec.ts": "053865ab41467e728ae8e25a2edcf5099a75a7746a6be8e4f99162f890d207ac",
+    "packages/host/directory-picker-native/tests/fixtures/worker-lifetime.mjs": "fb7c877306e4eaebd4a841b5a0b7c2d5248fae93cddd9f54e2c03d2330ff0f9b",
+    "packages/host/directory-picker-native/tests/fixtures/public-worker.mjs": "59e35e67ae296ba32ec94ba11072d85f94ae970550b59edd6778a851c6f14801",
+    "packages/host/directory-picker-native/tests/expected/public-worker.jsonl": "305d1b44939a2a26e7e0c9c8aa00c52d57084180b1798f0b5054007bf12fe509",
+    "packages/host/directory-picker-native/tests/expected/worker-lifetime-result.jsonl": "8217db9fdfc18ad751638e6cca2a5ece3abceac64863cc81c73eb3f58a8c0a55",
+    "packages/host/directory-picker-native/tests/expected/worker-lifetime-kill-refused.jsonl": "313dde26a1f61199ca319f610b1faaca0653a4f01ef0cca53706ec9788d35171",
+    "packages/host/directory-picker-native/tests/expected/worker-lifetime-pending-close.jsonl": "f066ebefa9e9e400b73f07ac4db75a8738adbf876ee5c833389231143fe43437",
+    "packages/host/directory-picker-native/tests/expected/worker-lifetime-late-showing.jsonl": "28db2d66e1a538f01b9ee5e70e5d84ce68fb7a91e8b286eb5377c99b4ebcc664",
+    "packages/host/directory-picker-native/README.md": "681b5cd0c02607c8e48714ee4093c8e400b64580e1f0d1873e074a6e24cca7f7",
+    "packages/host/directory-picker-native/README.zh.md": "fa86a8ebd097c62b2fde4f50d301c68bad514f27b994961e451c5039da65a423",
+    "packages/host/directory-picker-native/README.i18n.yaml": "e6fb3a7c73030ca86a0cf431c7fdd7ec61693aca7f958069257ac958c9ff3336",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-dialog-worker-closure.md": "798189a1270546f884c6706312c9616f6667d7c1df69208b9aac80bd35533712",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-dialog-worker-closure.zh.md": "c4cf7f057436f5059577af9136ab160e3faaa7656e8ab2ac519bd167ac99fdf6",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-dialog-worker-closure.i18n.yaml": "13b46b2fe5223c1003025b2629d7c45d2a4a18d844fa84debf609c9bceb9fecb"
+  },
+  "compiledArtifactHashes": {
+    "packages/host/directory-picker-native/lib/index.js": "7558c4ef99215592b15c8f93c65560cd05d3f4bd19aaba4443da9703aea7cbe1",
+    "packages/host/directory-picker-native/lib/worker.cjs": "9543fbc1a198a1c40712537f2fc982f8f6b0edc379ef9ab14a6e0b818d44b614",
+    "packages/host/directory-picker-native/lib/types/win32-dialog.js": "5dfba3b69bbac9d82a5ef76c31cf8ab06d8f7046855025dc1869cf51f541eebf",
+    "packages/host/directory-picker-native/lib/types/win32-dialog-bindings.js": "96506d2779285a4eb862feed364996cddbf2dcbe73113a26ca67018886bf14e1"
+  },
+  "repair": "The Win32 driver retains its first result/error until actual child close and outstanding window-close calls finish. Abort retries WM_CLOSE then requests SIGKILL; refused/failed termination retains the operation and observers. Observed exit ends a separate worker lifetime; delayed binding preparation refuses window messages after that known exit. Graceful close retries continue after failed force termination and accept late showing. Window-close calls are serialized; observed exit stops new controls. Event subscriptions are removed at closure and native error causes remain retained.",
+  "causalEvidence": {
+    "win32-worker-lifetime-negative-owned-parent": {
+      "status": "failed",
+      "startedAt": "2026-10-30T19:12:28.831845+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/host/directory-picker-native/tests/worker-lifetime.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T19:12:29.868410+00:00"
+    },
+    "win32-window-close-driver-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T19:17:23.473672+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/host/directory-picker-native/tests/win32-dialog-bindings.spec.ts",
+        "-t",
+        "discards delayed window closure",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T19:17:24.591079+00:00"
+    },
+    "win32-window-close-after-exit-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T19:16:47.114717+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/host/directory-picker-native/tests/win32-dialog-bindings.spec.ts",
+        "-t",
+        "refuses window messages",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T19:16:47.929151+00:00"
+    },
+    "win32-late-showing-and-exit-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T19:29:11.043093+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/host/directory-picker-native/tests/win32-dialog.spec.ts",
+        "-t",
+        "retains a child after|streams still drain",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T19:29:11.803710+00:00"
+    }
+  },
+  "negativeWitness": {
+    "realIPCScenarios": 3,
+    "lateRecoverySourceNegativeCases": 3,
+    "lateRecoveryActualIPCPositive": true,
+    "cases": [
+      "result report while worker remains alive",
+      "refused termination request while worker remains alive",
+      "pending native window-close call after actual worker exit",
+      "late showing after native force-termination refusal"
+    ],
+    "driverAndBindingsWitness": "The actual driver and real binding implementation over a mocked Koffi world post two window messages after an explicitly observed close. Current exit lifetime prevents those messages.",
+    "leafAcceptancePaths": "Both already-ended and ended-during-preparation lifetimes refuse native enumeration."
+  },
+  "verification": {
+    "uniqueRelatedSourceCases": 79,
+    "sourceFiles": 9,
+    "physicalWindowsDialogCaseSkipped": 1,
+    "keylessRunnableScenarios": 5,
+    "goldenStages": 11,
+    "sourceAndCompiledUseSameExpectedFiles": true,
+    "coverage": {
+      "files": [
+        "packages/host/directory-picker-native/src/win32-dialog.ts",
+        "packages/host/directory-picker-native/src/win32-dialog-bindings.ts"
+      ],
+      "statements": [
+        174,
+        174
+      ],
+      "branches": [
+        52,
+        52
+      ],
+      "functions": [
+        31,
+        31
+      ],
+      "lines": [
+        157,
+        157
+      ],
+      "perFileThreshold": 100,
+      "newExemptions": 0
+    },
+    "controlledNativeFailures": [
+      "kill returns false with native error",
+      "kill throws",
+      "window enumeration refuses",
+      "exit before outcome",
+      "late outcome while process closes",
+      "late showing after failed force request",
+      "cancellation before/after observed exit",
+      "single in-flight window-close call"
+    ],
+    "compiledMacNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "compiledScope": "Four real IPC programs execute the emitted driver module in lib/types; the fourth executes the public bundled package and its actual lib/worker.cjs. No source launcher is used in lib mode.",
+    "compiledLinux": {
+      "node": "22.22.1",
+      "platform": "linux/arm64",
+      "uid": 1000,
+      "scenarios": 5,
+      "network": "none",
+      "repositoryMount": "read-only",
+      "imageId": "sha256:8094c002d08262dba12645a3b4a15cd6cd627d30bc782f53229a2ec13ee22a00",
+      "ownedContainersRemoved": true
+    },
+    "rootBuildGates": 8,
+    "docQuickGates": 20,
+    "fixtureSyntaxCommands": [
+      [
+        "node",
+        "--check",
+        "packages/host/directory-picker-native/tests/fixtures/worker-lifetime.mjs"
+      ],
+      [
+        "node",
+        "--check",
+        "packages/host/directory-picker-native/tests/fixtures/public-worker.mjs"
+      ]
+    ],
+    "fixtureSyntaxExitCodes": [
+      0,
+      0
+    ],
+    "repeatedExecutionsAreNotNewCases": true,
+    "checks": {
+      "win32-worker-final-source-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:32:40.781101+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/directory-picker-native/tests",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/host/directory-picker-native/src/win32-dialog.ts",
+          "--coverage.include=packages/host/directory-picker-native/src/win32-dialog-bindings.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T191018Z/win32-worker-complete-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:33:05.824421+00:00"
+      },
+      "win32-worker-final-source-fixtures": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:35:51.489939+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/directory-picker-native/tests/worker-lifetime.spec.ts",
+          "packages/host/directory-picker-native/tests/public-worker.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:35:52.982768+00:00"
+      },
+      "win32-worker-expanded-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:30:45.916363+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/build.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:31:01.816151+00:00"
+      },
+      "win32-worker-final-host-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:32:40.781089+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:32:53.830199+00:00"
+      },
+      "win32-worker-final-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:32:40.781096+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/host/directory-picker-native/src/win32-dialog.ts",
+          "packages/host/directory-picker-native/src/win32-dialog-bindings.ts",
+          "packages/host/directory-picker-native/tests/win32-dialog.spec.ts",
+          "packages/host/directory-picker-native/tests/win32-dialog-bindings.spec.ts",
+          "packages/host/directory-picker-native/tests/worker-lifetime.spec.ts",
+          "packages/host/directory-picker-native/tests/public-worker.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:32:43.865210+00:00"
+      },
+      "win32-worker-pairing": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:21:15.340833+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "--write",
+          "packages/host/directory-picker-native/README.md",
+          ".agents/notes/implemented/bug-fix/2026-10-31-native-dialog-worker-closure.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:21:17.949319+00:00"
+      },
+      "win32-worker-expanded-pairing": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:30:45.916376+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "--write",
+          ".agents/notes/implemented/bug-fix/2026-10-31-native-dialog-worker-closure.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:30:47.194932+00:00"
+      },
+      "win32-worker-expanded-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:32:40.781169+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:33:12.916190+00:00"
+      },
+      "win32-worker-final-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:35:09.421002+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/directory-picker-native/tests/worker-lifetime.spec.ts",
+          "packages/host/directory-picker-native/tests/public-worker.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:35:10.720203+00:00"
+      },
+      "win32-worker-final-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:35:09.420998+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/directory-picker-native/tests/worker-lifetime.spec.ts",
+          "packages/host/directory-picker-native/tests/public-worker.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:35:10.680863+00:00"
+      },
+      "win32-worker-final-built-linux22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:35:51.489950+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T191018Z/win32-worker-linux-replay.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:35:52.767434+00:00"
+      }
+    }
+  },
+  "harnessCorrections": [
+    "The initial real IPC fixture allowed an unreferenced parent to exit before its close observer ran. A finite owned watchdog keeps that parent alive and kills only its owned child on deadline; the corrected pre-fix run fails on semantic golden differences.",
+    "The public fixture observes the actual close event, not only exitCode. Its spawn observer is restored in the private fixture process after joining all children.",
+    "Existing fake workers now emit close separately from an outcome, matching the real protocol; force-failure tests use controlled timers."
+  ],
+  "documentation": {
+    "pairedStems": 2,
+    "newActiveDecision": ".agents/notes/implemented/bug-fix/2026-10-31-native-dialog-worker-closure.md",
+    "independentActiveNotesRetained": [
+      "2026-10-31-native-picker-service-lifetime",
+      "2026-10-29-native-command-cancellation",
+      "2026-08-02-win32-in-process-folder-dialog"
+    ],
+    "fullySupersededActiveNotes": [],
+    "frozenArchivesEdited": false,
+    "upgradeGuide": "Published root exports, configuration and wire fields are unchanged. Package-internal worker hooks now expose close/off and explicit force signalling; every current consumer is updated."
+  },
+  "limits": [
+    "The real IPC children model dialog-worker protocol and external OS termination refusal; they are not physical COM dialogs.",
+    "The public worker acceptance verifies an actual native-surface failure on macOS/Linux. Linux uses the checkout dependencies as mounted; this does not certify a native Windows package installation.",
+    "The lifetime guard suppresses messages after observed exit. It does not prove native thread identity during an unobserved Windows process/thread-id reuse interval. Windows COM rendering, selection, kernel termination and parent-death containment remain platform acceptance.",
+    "Standalone desktop helpers retain their documented role outside Session workload admission. B04/B25and all12original domains remain in progress.",
+    "No live database, deployment or peer-owned GUI/runtime file is changed. Root real paid model success and public push remain deferred."
+  ]
+}

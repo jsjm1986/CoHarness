@@ -1,0 +1,890 @@
+{
+  "recordedAt": "2026-10-29T00:00:27.099315+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "findings": [
+    "B281",
+    "B282",
+    "B283",
+    "B284"
+  ],
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "baseline": {
+    "fetch": {
+      "name": "audit-baseline-after-desktop-fetch",
+      "status": "passed",
+      "startedAt": "2026-10-28T23:56:05.412154+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "git",
+        "fetch",
+        "origin",
+        "master"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-28T23:56:09.105697+00:00"
+    },
+    "aheadOfOriginMaster": 139,
+    "behindOriginMaster": 0,
+    "sharedUncommittedWorkPreserved": true
+  },
+  "causalNegatives": [
+    {
+      "name": "remote-desktop-independent-grants-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T23:23:55.261955+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/remote-desktop/remote-desktop-vnc/tests/grants.spec.ts",
+        "--maxWorkers=2",
+        "-t",
+        "preserves an independent|preserves independent inserts"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T23:23:58.581528+00:00"
+    },
+    {
+      "name": "remote-desktop-store-read-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T23:24:34.290589+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/remote-desktop-service.spec.ts",
+        "--maxWorkers=2",
+        "-t",
+        "read permission failure"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T23:24:34.695920+00:00"
+    },
+    {
+      "name": "remote-desktop-administrator-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T23:27:18.820050+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_ssh_authority_test",
+        "DSH_AUDIT_REMOTE_DESKTOP_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-authority-migrations-20261029",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/remote-desktop-administration-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T23:27:27.048437+00:00"
+    },
+    {
+      "name": "remote-desktop-database-loss-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T23:31:55.246711+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_ssh_authority_test",
+        "DSH_AUDIT_REMOTE_DESKTOP_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-authority-migrations-20261029",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/remote-desktop-administration-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T23:32:04.005868+00:00"
+    },
+    {
+      "name": "atomic-publication-authority-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T23:32:26.962989+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/util/atomic-write/tests/atomic-write.spec.ts",
+        "--maxWorkers=2",
+        "-t",
+        "publication signal|authority ends after"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T23:32:30.044652+00:00"
+    },
+    {
+      "name": "remote-desktop-preserved-mtime-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T23:40:23.812211+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/remote-desktop/remote-desktop-vnc/tests/grants.spec.ts",
+        "packages/remote-desktop/remote-desktop-vnc/tests/loader-composition.spec.ts",
+        "--maxWorkers=2",
+        "-t",
+        "preserves the modification|preserves a revoked|observes a revoked|keeps a committed revocation"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T23:40:26.221251+00:00"
+    },
+    {
+      "name": "remote-desktop-endpoint-preserved-mtime-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T23:41:58.413176+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/remote-desktop/remote-desktop-vnc/tests/loader-composition.spec.ts",
+        "--maxWorkers=2",
+        "-t",
+        "reloads removed endpoints"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T23:42:00.686258+00:00"
+    }
+  ],
+  "businessCounterexamples": {
+    "withdrawnAdministratorHttpAcceptances": 42,
+    "currentAdministratorControls": 7,
+    "independentWriterRevocationOrLostRows": 2,
+    "readFailureOverwrites": 2,
+    "databaseOwnershipLostBeforeFilePublication": 1,
+    "ignoredAtomicCancellationCases": 2,
+    "preservedMtimeGrantAndLoaderFailures": 2,
+    "preservedMtimeEndpointLoaderFailure": 1
+  },
+  "behavior": [
+    "Endpoint, grant and audit operations require the authenticated current active organization administrator; PostgreSQL retains eligibility and current username through file work.",
+    "Gateway and VNC provider grant mutations acquire the same local grants.jsonl writer lock and reread current committed rows; stale runtime caches cannot resurrect revoked grants or erase independent rows.",
+    "Gateway endpoint replacement serializes with grant target validation. Unexpected read failures preserve committed bytes and return safe503; only ENOENT permits initialization/empty state.",
+    "Database connection loss aborts operation lifetime. Atomic replacement checks cancellation before preparation and every rename attempt, cleaning only its acquired temporary file; already issued renames can commit and require reconciliation after a failed response.",
+    "Endpoint and grant cache revisions include device/inode/size and nanosecond modification/change times, detecting atomic replacements that preserve mtime. Revision-read failures preserve the last committed cache and reject rather than silently discarding it."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "remote-desktop-final-gateway-source",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:58:21.125140+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_ssh_authority_test",
+          "DSH_AUDIT_REMOTE_DESKTOP_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-authority-migrations-20261029",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/remote-desktop-service.spec.ts",
+          "tests/remote-desktop-authority-postgres.spec.ts",
+          "tests/remote-desktop-administration-transcript.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=src/remote-desktop-service.ts",
+          "--coverage.include=src/postgres/remote-desktop-administration.ts",
+          "--coverage.include=src/postgres/administrator-authority.ts",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/remote-desktop-final-gateway-source"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:58:30.828531+00:00"
+      },
+      {
+        "name": "remote-desktop-provider-diagnostic-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:50:33.728268+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "packages/remote-desktop/remote-desktop-vnc",
+          "--config",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/remote-desktop-diagnostic-coverage.config.mjs",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/remote-desktop-provider-diagnostic-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:50:46.427398+00:00"
+      },
+      {
+        "name": "remote-desktop-library-source-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:38:19.725011+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "packages/util/atomic-write",
+          "packages/remote-desktop/remote-desktop-vnc",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/util/atomic-write/src/index.ts",
+          "--coverage.include=packages/remote-desktop/remote-desktop-vnc/src/grants.ts",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/remote-desktop-library-source-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:38:34.617975+00:00"
+      },
+      {
+        "name": "remote-desktop-current-provider-composition",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:55:22.127648+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "packages/remote-desktop/remote-desktop-vnc/tests/loader-composition.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:55:24.596772+00:00"
+      },
+      {
+        "name": "remote-desktop-current-root-emit",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:55:22.127619+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "DSH_TSDOWN_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "build"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:55:43.053935+00:00"
+      },
+      {
+        "name": "remote-desktop-final-gateway-types",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:52:54.547741+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-preferences-typecheck.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:52:55.467852+00:00"
+      },
+      {
+        "name": "remote-desktop-private-artifact-build",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:52:45.510951+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/build-remote-desktop-artifact.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:52:48.364167+00:00"
+      },
+      {
+        "name": "remote-desktop-built-node22",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:56:16.947128+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_ssh_authority_test",
+          "DSH_AUDIT_REMOTE_DESKTOP_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-authority-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-remote-desktop-replay.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "lib",
+          "remote-desktop-fixed-node22",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/remote-desktop-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:56:27.552625+00:00"
+      },
+      {
+        "name": "remote-desktop-built-node24",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:56:16.947121+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_ssh_authority_test",
+          "DSH_AUDIT_REMOTE_DESKTOP_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-authority-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-remote-desktop-replay.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "lib",
+          "remote-desktop-fixed-node24",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/remote-desktop-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:56:27.440443+00:00"
+      },
+      {
+        "name": "remote-desktop-current-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:53:59.035254+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/remote-desktop-service.ts",
+          "gateway/src/postgres/remote-desktop-administration.ts",
+          "gateway/src/admin-api.ts",
+          "gateway/src/index.ts",
+          "gateway/tests/remote-desktop-service.spec.ts",
+          "gateway/tests/remote-desktop-authority-postgres.spec.ts",
+          "gateway/tests/remote-desktop-administration-transcript.spec.ts",
+          "gateway/tests/postgres-suite.spec.ts",
+          "packages/remote-desktop/remote-desktop-vnc/src/index.ts",
+          "packages/remote-desktop/remote-desktop-vnc/src/grants.ts",
+          "packages/remote-desktop/remote-desktop-vnc/tests/grants.spec.ts",
+          "packages/remote-desktop/remote-desktop-vnc/tests/loader-composition.spec.ts",
+          "packages/util/atomic-write/src/index.ts",
+          "packages/util/atomic-write/tests/atomic-write.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:54:04.063246+00:00"
+      },
+      {
+        "name": "remote-desktop-reviewed-doc-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:50:06.985930+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          "gateway/README.md",
+          "packages/util/atomic-write/README.md",
+          "packages/remote-desktop/remote-desktop-vnc/README.md",
+          ".agents/notes/implemented/bug-fix/2026-10-26-atomic-file-acquisition.md",
+          ".agents/notes/implemented/bug-fix/2026-10-20-remote-desktop-file-state-and-wire-error-repairs.md",
+          ".agents/notes/implemented/architecture/2026-10-20-remote-desktop-admin-surface-boundary.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/remote-desktop-authority/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:50:07.644402+00:00"
+      },
+      {
+        "name": "remote-desktop-final-doc-quick",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:52:45.510973+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:54:03.993390+00:00"
+      },
+      {
+        "name": "audit-baseline-after-desktop-fetch",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:56:05.412154+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "master"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:56:09.105697+00:00"
+      },
+      {
+        "name": "digest-ssh-desktop-private-postgres-cleanup",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:59:17.331179+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/close-digest-ssh-desktop-postgres.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:59:17.926251+00:00"
+      }
+    ],
+    "gatewaySource": {
+      "cases": 18,
+      "files": 4,
+      "actualPostgresAuthorityAndWriterCases": 6,
+      "httpGoldenObservations": 51
+    },
+    "providerSource": {
+      "cases": 58,
+      "files": 6,
+      "actualLoaderCompositions": 4
+    },
+    "utilitySource": {
+      "cases": 53,
+      "measuredFile": "packages/util/atomic-write/src/index.ts",
+      "coverage": {
+        "total": {
+          "lines": {
+            "total": 106,
+            "covered": 106,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 130,
+            "covered": 130,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 13,
+            "covered": 13,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 57,
+            "covered": 57,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/util/atomic-write/src/index.ts": {
+          "lines": {
+            "total": 106,
+            "covered": 106,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 13,
+            "covered": 13,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 130,
+            "covered": 130,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 57,
+            "covered": 57,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      }
+    },
+    "compiled": {
+      "nodes": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "observationsPerNode": 51,
+      "actualGatewayHttp": true,
+      "actualLoaderAndPublicProviderBundle": true,
+      "actualPostgresBackendTermination": true,
+      "realVncServerOrModelApiCalled": false
+    },
+    "gatewayCoverage": {
+      "total": {
+        "lines": {
+          "total": 124,
+          "covered": 119,
+          "skipped": 0,
+          "pct": 95.96
+        },
+        "statements": {
+          "total": 151,
+          "covered": 139,
+          "skipped": 0,
+          "pct": 92.05
+        },
+        "functions": {
+          "total": 41,
+          "covered": 40,
+          "skipped": 0,
+          "pct": 97.56
+        },
+        "branches": {
+          "total": 102,
+          "covered": 82,
+          "skipped": 0,
+          "pct": 80.39
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/remote-desktop-service.ts": {
+        "lines": {
+          "total": 100,
+          "covered": 96,
+          "skipped": 0,
+          "pct": 96
+        },
+        "functions": {
+          "total": 36,
+          "covered": 36,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 123,
+          "covered": 114,
+          "skipped": 0,
+          "pct": 92.68
+        },
+        "branches": {
+          "total": 90,
+          "covered": 72,
+          "skipped": 0,
+          "pct": 80
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/administrator-authority.ts": {
+        "lines": {
+          "total": 6,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 1,
+          "covered": 1,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 7,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 85.71
+        },
+        "branches": {
+          "total": 8,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 87.5
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/remote-desktop-administration.ts": {
+        "lines": {
+          "total": 18,
+          "covered": 17,
+          "skipped": 0,
+          "pct": 94.44
+        },
+        "functions": {
+          "total": 4,
+          "covered": 3,
+          "skipped": 0,
+          "pct": 75
+        },
+        "statements": {
+          "total": 21,
+          "covered": 19,
+          "skipped": 0,
+          "pct": 90.47
+        },
+        "branches": {
+          "total": 4,
+          "covered": 3,
+          "skipped": 0,
+          "pct": 75
+        }
+      }
+    },
+    "providerDiagnosticCoverage": {
+      "total": {
+        "lines": {
+          "total": 574,
+          "covered": 518,
+          "skipped": 0,
+          "pct": 90.24
+        },
+        "statements": {
+          "total": 649,
+          "covered": 572,
+          "skipped": 0,
+          "pct": 88.13
+        },
+        "functions": {
+          "total": 119,
+          "covered": 104,
+          "skipped": 0,
+          "pct": 87.39
+        },
+        "branches": {
+          "total": 335,
+          "covered": 269,
+          "skipped": 0,
+          "pct": 80.29
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/remote-desktop/remote-desktop-vnc/src/audit.ts": {
+        "lines": {
+          "total": 37,
+          "covered": 31,
+          "skipped": 0,
+          "pct": 83.78
+        },
+        "functions": {
+          "total": 11,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 90.9
+        },
+        "statements": {
+          "total": 45,
+          "covered": 36,
+          "skipped": 0,
+          "pct": 80
+        },
+        "branches": {
+          "total": 22,
+          "covered": 11,
+          "skipped": 0,
+          "pct": 50
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/remote-desktop/remote-desktop-vnc/src/bridge.ts": {
+        "lines": {
+          "total": 32,
+          "covered": 28,
+          "skipped": 0,
+          "pct": 87.5
+        },
+        "functions": {
+          "total": 12,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 58.33
+        },
+        "statements": {
+          "total": 45,
+          "covered": 33,
+          "skipped": 0,
+          "pct": 73.33
+        },
+        "branches": {
+          "total": 27,
+          "covered": 21,
+          "skipped": 0,
+          "pct": 77.77
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/remote-desktop/remote-desktop-vnc/src/grants.ts": {
+        "lines": {
+          "total": 65,
+          "covered": 64,
+          "skipped": 0,
+          "pct": 98.46
+        },
+        "functions": {
+          "total": 23,
+          "covered": 23,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 75,
+          "covered": 73,
+          "skipped": 0,
+          "pct": 97.33
+        },
+        "branches": {
+          "total": 33,
+          "covered": 31,
+          "skipped": 0,
+          "pct": 93.93
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/remote-desktop/remote-desktop-vnc/src/index.ts": {
+        "lines": {
+          "total": 278,
+          "covered": 244,
+          "skipped": 0,
+          "pct": 87.76
+        },
+        "functions": {
+          "total": 54,
+          "covered": 49,
+          "skipped": 0,
+          "pct": 90.74
+        },
+        "statements": {
+          "total": 307,
+          "covered": 265,
+          "skipped": 0,
+          "pct": 86.31
+        },
+        "branches": {
+          "total": 174,
+          "covered": 134,
+          "skipped": 0,
+          "pct": 77.01
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/remote-desktop/remote-desktop-vnc/src/managed.ts": {
+        "lines": {
+          "total": 106,
+          "covered": 95,
+          "skipped": 0,
+          "pct": 89.62
+        },
+        "functions": {
+          "total": 15,
+          "covered": 11,
+          "skipped": 0,
+          "pct": 73.33
+        },
+        "statements": {
+          "total": 111,
+          "covered": 99,
+          "skipped": 0,
+          "pct": 89.18
+        },
+        "branches": {
+          "total": 35,
+          "covered": 30,
+          "skipped": 0,
+          "pct": 85.71
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/remote-desktop/remote-desktop-vnc/src/rfb.ts": {
+        "lines": {
+          "total": 56,
+          "covered": 56,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 4,
+          "covered": 4,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 66,
+          "covered": 66,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 44,
+          "covered": 42,
+          "skipped": 0,
+          "pct": 95.45
+        }
+      }
+    },
+    "coverageScope": "The ordinary repository policy exempts this provider and a normal scoped run reports0/0. A private audit-only config measures its6sourcefiles without changing repository exclusions or thresholds. It is diagnostic evidence, not the CI coverage gate. Gateway and provider full-file coverage remain incomplete.",
+    "currentSourceFollowup": "Arrow-parenthesis formatting and call-through observer restoration followed the diagnostic measurement; the current4Loader compositions, lint and root8gate build passed after those changes.",
+    "docs": "All20 quick documentation gates pass;7reviewed bilingual pairs recorded. Current-version SSH and desktop upgrade triplets also directly passed frontmatter, section order, newline and English500word checks. No verify-upgrade-guides command exists in this checkout."
+  },
+  "sourceHashes": {
+    "gateway/src/remote-desktop-service.ts": "c8161637710f947b89f48c9175453894968893102160c3357f84f78dd63a56e9",
+    "gateway/src/postgres/remote-desktop-administration.ts": "08c4dd9eea15e767cf5aee77dcefa001bf2f463f8cc6bda6e2f0e1c47705abe7",
+    "gateway/src/admin-api.ts": "2a914b8dbb8bfe55aea1a3928c95261c8c986414930806647f191c45c5808a47",
+    "gateway/src/index.ts": "faa2184d4aaf04e4456dbc78c99cd6e9892dc015c6fceb878f5c5999292be42c",
+    "gateway/tests/remote-desktop-service.spec.ts": "e3697e5702afce6d0a1383325ccb579d31b22ba186828fb26dae1d054dd59822",
+    "gateway/tests/remote-desktop-authority-postgres.spec.ts": "e62f2872394062c8138af30a0dc8ad7a9bdf0617de6011b0ab65be547d79662e",
+    "gateway/tests/remote-desktop-administration-transcript.spec.ts": "f1240ed3ead19184eb5302f4a55b117fc7e9cb85e0ec9f0aecaa60ee662bb9cb",
+    "gateway/tests/fixtures/remote-desktop-administration.mjs": "bbe6f9e8c4e18b29f1b9c5192c439d6022e869c26cc55e368b78f761c668cae1",
+    "gateway/tests/expected/projects/remote-desktop-administration.jsonl": "c07d63510f7a39f2b5bb01ce2494a3205174a7f1c44fbed81abe51a99ae10b08",
+    "gateway/tests/postgres-suite.spec.ts": "535b96024e4a689104f9c18dc7308b6d9edd94492499070f55125ab83b0b7b8b",
+    "gateway/package.json": "449a7634bf9bfbf9f801065a882f8180496a81aaaa8b4266d6b226ccf1660dc6",
+    "packages/remote-desktop/remote-desktop-vnc/src/grants.ts": "c8fba92d86fcb3f5a22333592372c2e2a36af5df12c050a65edb728606bfcd14",
+    "packages/remote-desktop/remote-desktop-vnc/src/index.ts": "de03f2234eb539688cc98e072f360999650ef2c980784dd83d0bc55327bd396d",
+    "packages/remote-desktop/remote-desktop-vnc/tests/grants.spec.ts": "9306fbe06343b6958649b48ae35a8a6a699d71643af7cc8de2b88c4a9fe5a803",
+    "packages/remote-desktop/remote-desktop-vnc/tests/loader-composition.spec.ts": "93092dc49cb811d0b9bca0b22b4bc77e915aebee068529bc0a9e2887592990e1",
+    "packages/util/atomic-write/src/index.ts": "7cce680c11b16664af7c1f197d89598079aec4e52636310c9a4462a51533eac9",
+    "packages/util/atomic-write/tests/atomic-write.spec.ts": "dfc8ccbdf2f8e83fd2c4392a146c49a74116bda27833d335fc2a8df906bb57c3"
+  },
+  "artifacts": {
+    "privateGateway": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/remote-desktop-artifact-20261029/lib",
+    "buildMetadata": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/remote-desktop-build-inputs-20261029.json",
+    "currentDependencyFingerprint": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/remote-desktop-current-artifact-inputs-20261029.json",
+    "migrationSnapshot": "Immutable001–095; named desktop acceptance does not accept every new multi-computer feature."
+  },
+  "noteReview": {
+    "extendedExisting": [
+      ".agents/notes/implemented/bug-fix/2026-10-20-remote-desktop-file-state-and-wire-error-repairs.md",
+      ".agents/notes/implemented/architecture/2026-10-20-remote-desktop-admin-surface-boundary.md",
+      ".agents/notes/implemented/bug-fix/2026-10-26-atomic-file-acquisition.md"
+    ],
+    "keptIndependent": [
+      ".agents/notes/implemented/bug-fix/2026-10-20-remote-desktop-live-sessions-track-grant-truth.md"
+    ],
+    "new": [],
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false
+  },
+  "cleanup": {
+    "ownedContainer": "hgw-digest-authority-fcf33db9",
+    "ownedVolume": "hgw-digest-authority-fcf33db9-data",
+    "port": 58487,
+    "containerAndVolumeRemoved": true,
+    "openClientConnectionsBeforeClose": 0,
+    "productionAndPeerExcluded": [
+      5432,
+      55699
+    ],
+    "otherContainersModified": false
+  },
+  "limitations": [
+    "All12 original domains remain in_progress; B04 allocations and B25 native containment followups remain open.",
+    "Full-file coverage and independent multi-computer business review remain incomplete.",
+    "Cross-host or cross-PID-namespace shared grant paths are unsupported. Actual cross-computer/public deployment, UI and Windows feature acceptance remain pending by the peer stage.",
+    "Real model API and actual cloud push remain human-deferred."
+  ]
+}

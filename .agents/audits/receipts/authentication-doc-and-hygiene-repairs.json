@@ -1,0 +1,13 @@
+{
+  "name": "authentication-doc-and-hygiene-repairs",
+  "cwd": ".",
+  "command": "python3 -",
+  "startedAt": "2026-10-23T19:31:22.766257+00:00",
+  "seconds": 33.65,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "58b6f351d88337b0db3c52bc3b56b2b16af6fdfe3533fb892df8591006a69fd4",
+  "inputsAfter": "58b6f351d88337b0db3c52bc3b56b2b16af6fdfe3533fb892df8591006a69fd4",
+  "outputSha256": "f97a8c5d805af4ac7483948d79d7ac1be35acb02f67b5bf89c33bcc93de5b9bb",
+  "outputTail": "$ tsx scripts/gen-doc-graphs.ts --check\ngen-doc-graphs: 9 graph doc(s) are up to date.\n$ tsx scripts/gen-tool-catalog.ts --check\ngen-tool-catalog: docs/tool-catalog.md is up to date.\n$ tsx scripts/gen-plugin-packages.ts --check\ngen-plugin-packages: package lists are up to date.\n$ tsx scripts/verify-translation-pairing.ts\nverify-translation-pairing: bilingual pairing rules violated (see docs/i18n/README.md):\n  docs/event-producer-consumer.i18n.yaml: out of sync — document changed since confirmation (en, zh) (bring the other side along, then re-record with --write)\n[ELIFECYCLE] Command failed with exit code 1.\nTraceback (most recent call last):\n  File \"<stdin>\", line 3, in <module>\n  File \"/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py\", line 571, in run\n    raise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['pnpm', 'run', 'verify-translation-pairing']' returned non-zero exit status 1.\n"
+}

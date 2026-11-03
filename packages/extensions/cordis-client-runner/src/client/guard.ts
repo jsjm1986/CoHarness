@@ -14,6 +14,8 @@
  */
 
 import { Context } from '@deepseek-ai/cordis'
+import type { ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ConnectionHandle, ConnectionRuntimeTarget } from '@deepseek-ai/dsh-client-connection/client'
 import type { DynamicCordisPackage } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
@@ -34,6 +36,10 @@ export interface DynamicCordisSlotLedgerRow {
 
 /** What the facade needs beyond the real ctx to govern one package. */
 export interface DynamicCordisGuardEnv {
+  /** Browser-only identity prefix of the Runtime that owns this package. */
+  namespace?: string | undefined
+  /** Captured Runtime for Remote and Connection services; omission preserves unscoped standalone runners. */
+  runtime?: { readonly target?: ConnectionRuntimeTarget | undefined } | undefined
   /** The dispatched Package row. */
   pkg: DynamicCordisPackage
   /** Ledger sink: every Slot or Factory registration this package makes. */
@@ -120,7 +126,7 @@ function guardedSlots(slots: SlotRegistry, env: DynamicCordisGuardEnv): unknown 
           if (options.key !== 'self') {
             return rejectGuard(env, 'tool.view.cordis only accepts key "self"; the runtime binds it to this Package')
           }
-          options.key = `${env.pkg.pluginId}.${env.pkg.packageId}`
+          options.key = `${env.namespace === undefined ? '' : `${env.namespace}/`}${env.pkg.pluginId}.${env.pkg.packageId}`
         }
         // Shadowing kinds get a page-local rank. Later registrations sort first;
         // chain slots keep their own election (select order) untouched.
@@ -173,7 +179,8 @@ function guardedTheme(theme: ThemeRuntime, env: DynamicCordisGuardEnv, ctx: Cont
           )
         }
         const method = Reflect.get(target, 'overrideTokens', target)
-        const dispose = Reflect.apply(method, target, [`${env.pkg.pluginId}.${env.pkg.packageId}`, tokens]) as () => void
+        const sourceId = `${env.namespace === undefined ? '' : `${env.namespace}/`}${env.pkg.pluginId}.${env.pkg.packageId}`
+        const dispose = Reflect.apply(method, target, [sourceId, tokens]) as () => void
         // Fiber-owned lifetime; the returned handle stays valid for early
         // removal (the service disposer is idempotent per layer identity).
         ctx.effect(() => dispose, 'cordis-client-runner: dynamic theme override layer')
@@ -209,7 +216,17 @@ export function dynamicCordisContext(ctx: Context, env: DynamicCordisGuardEnv): 
   }
   const readService = (name: string, requireDeclaration: boolean): unknown => {
     if (requireDeclaration && !declared.has(name)) return denyRead(name)
-    const service = denyContext(ctx.get(name), name, env)
+    let value = ctx.get(name) as unknown
+    if (env.runtime !== undefined) {
+      if (name === 'remote' || name.startsWith('remote.')) {
+        const remote = (ctx.get('remote') as ClientRemote).$forTarget(env.runtime.target)
+        value = name === 'remote' ? remote : Reflect.get(remote, name.slice('remote.'.length))
+      } else if (name === 'connection' && env.runtime.target !== undefined) {
+        value = (value as ConnectionHandle).forTarget?.(env.runtime.target)
+        if (value === undefined) return rejectGuard(env, 'The dynamic Plugin Runtime connection is unavailable')
+      }
+    }
+    const service = denyContext(value, name, env)
     if (service === null || (typeof service !== 'object' && typeof service !== 'function')) return service
     if (name === 'slots') return guardedSlots(service as SlotRegistry, env)
     if (name === 'theme') return guardedTheme(service as ThemeRuntime, env, ctx)

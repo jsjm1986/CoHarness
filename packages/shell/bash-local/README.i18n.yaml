@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/shell/bash-local/README.md
 document:
-  en: 2fb3d3b633dadcafcbaddd8f874fe136b11cce4e
-  zh: 6448d67d6a6d448aea1abb122cd67bdde49a5b23
+  en: fdb601be8ab1fc8f4de59efeb989a63d296c4611
+  zh: 9373fd58e1d9659f7c2440ce0058d554dc24bca6
 /:
   en: f70a1e0bb1e0d56d
   zh: 927e75bc75573410
@@ -18,8 +18,8 @@ document:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
 /deepseek-ai-dsh-bash-local/use-this-package:
-  en: 95ae7843275778ca
-  zh: 43b5069075a99625
+  en: 549c89fdb1b09406
+  zh: f172fd04fc587355
 /deepseek-ai-dsh-bash-local/use-this-package/minimal-configuration:
   en: eaf71726aaf5333d
   zh: b658e8d0b77db826

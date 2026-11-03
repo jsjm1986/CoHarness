@@ -16,6 +16,8 @@ import { encodeMessage, MessageDecoder } from './framing.ts'
 
 /** How to launch the server and answer its config requests. */
 export interface ConnectionSpec {
+  /** Cancellation of queued allocation and the owning process lifetime. */
+  readonly signal?: AbortSignal
   /** The resolved absolute executable path (no shell). */
   readonly command: string
   /** Arguments passed to the executable. */
@@ -56,7 +58,7 @@ export type ConnectionWriter = (
 ) => void
 
 /** Spawn one subprocess for this connection (the provider passes `ctx.subprocess.spawn`). */
-export type ConnectionSpawner = (spec: SubprocessSpawnSpec) => SubprocessHandle
+export type ConnectionSpawner = (spec: SubprocessSpawnSpec) => SubprocessHandle | Promise<SubprocessHandle>
 
 const writeConnectionMessage: ConnectionWriter = (stdin, message, done) => {
   stdin.write(encodeMessage(message), done)
@@ -64,7 +66,6 @@ const writeConnectionMessage: ConnectionWriter = (stdin, message, done) => {
 
 /** A live JSON-RPC endpoint bound to one child process. */
 export class LspConnection {
-  private readonly handle: SubprocessHandle
   private readonly stdin: Writable
   private readonly decoder: MessageDecoder
   private readonly pending = new Map<number, Pending>()
@@ -74,22 +75,23 @@ export class LspConnection {
   readonly closed: Promise<void>
 
   /**
-   * @param spec - how to launch the server and answer its config requests.
-   * @param spawner - the subprocess seam's spawn (the provider passes `ctx.subprocess.spawn`).
-   * @param onServerRequest - answers a server→client request; rejects to send an error response.
-   * @param writer - message writer; tests inject callback failures without relying on OS pipe races.
+   * Wait for admission and allocation before publishing a protocol endpoint.
+   * @param spec - complete server launch settings.
+   * @param spawner - subprocess allocation in the selected execution world.
+   * @param onServerRequest - answers server requests.
+   * @param writer - protocol writer override.
+   * @returns the connection owning the allocated process.
    */
-  constructor(
+  static async create(
     spec: ConnectionSpec,
     spawner: ConnectionSpawner,
-    private readonly onServerRequest: (method: string, params: unknown) => Promise<unknown>,
-    private readonly writer: ConnectionWriter = writeConnectionMessage,
-  ) {
-    this.decoder = new MessageDecoder(spec.maxMessageBytes)
+    onServerRequest: (method: string, params: unknown) => Promise<unknown>,
+    writer: ConnectionWriter = writeConnectionMessage,
+  ): Promise<LspConnection> {
     // stdin/stdout are piped protocol streams this endpoint frames itself;
     // stderr is a collected diagnostic tail (no spill — the bounded tail IS
     // the contract). The seam owns managed-range signalling and observation.
-    this.handle = spawner({
+    const handle = await spawner({
       argv: [spec.command, ...spec.args],
       cwd: spec.cwd,
       stdio: {
@@ -101,7 +103,24 @@ export class LspConnection {
       // The seam merges explicit config entries after its ambient scrub, so a
       // configured credential or DSH_* fact reaches the child deliberately.
       env: spec.env,
+      ...(spec.signal === undefined ? {} : { signal: spec.signal }),
     })
+    return new LspConnection(spec, handle, onServerRequest, writer)
+  }
+
+  /**
+   * @param spec - how to launch the server and answer its config requests.
+   * @param handle - admitted server process.
+   * @param onServerRequest - answers a server→client request; rejects to send an error response.
+   * @param writer - message writer; tests inject callback failures without relying on OS pipe races.
+   */
+  private constructor(
+    spec: ConnectionSpec,
+    private readonly handle: SubprocessHandle,
+    private readonly onServerRequest: (method: string, params: unknown) => Promise<unknown>,
+    private readonly writer: ConnectionWriter = writeConnectionMessage,
+  ) {
+    this.decoder = new MessageDecoder(spec.maxMessageBytes)
     /* v8 ignore start -- 'pipe' dispositions expose both streams by the seam contract; defensive. */
     if (this.handle.stdin === undefined || this.handle.stdout === undefined) {
       throw new Error('lsp-stdio: subprocess implementation dropped a piped protocol stream')

@@ -4,8 +4,6 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - button "Feedback":
-    - img
   - button "Open right sidebar":
     - img
 - button "System prompt":
@@ -40,10 +38,6 @@
         - math: 1 5
 - paragraph: MATH_RENDERING_DONE
 - button "Copy":
-  - img
-- button "Good response":
-  - img
-- button "Bad response":
   - img
 - button "Branch into a new conversation":
   - img

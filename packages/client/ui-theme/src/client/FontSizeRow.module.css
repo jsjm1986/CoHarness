@@ -16,7 +16,6 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-right: 48px;
 }
 
 .title {
@@ -36,22 +35,24 @@
 /* Standard-size stepper with an always-visible arrow column and an external unit label. */
 .control {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 8px;
 }
 
 .stepper {
-  position: relative; /* the arrow column anchors to the pill's right edge */
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 32px minmax(28px, auto) 32px;
   align-items: center;
   justify-content: center;
-  min-width: 72px;
   height: 36px;
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-module-platform);
 }
 
 .value {
+  grid-column: 2;
+  grid-row: 1;
   min-width: 18px;
   text-align: center;
   font-size: 14px;
@@ -66,39 +67,34 @@
   color: var(--dsw-alias-label-secondary);
 }
 
-/* Arrow column: anchored right so the value stays pill-centered whether or
-   not the arrows are showing; revealed on hover/focus-within. Hidden with
-   opacity, not visibility: the buttons stay in tab order and in the
-   accessibility tree, so keyboard focus itself triggers the reveal. */
 .arrows {
-  position: absolute;
-  right: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  opacity: 0;
+  display: contents;
 }
 
-.stepper:hover .arrows,
-.stepper:focus-within .arrows {
-  opacity: 1;
-}
-
-/* Arrow buttons: small chips carrying a translucent wash of the layer-1
-   surface (white in light, the elevated layer in dark) over the module fill;
-   hover raises the full layer-1 chip. */
 .arrow {
+  grid-column: 1;
+  grid-row: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 17px;
-  height: 12px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
   border-radius: var(--dsw-radius-xs);
   background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 75%, transparent);
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
+}
+
+.arrow:last-child {
+  grid-column: 3;
+}
+
+.arrow:focus-visible,
+.expander:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color);
+  outline-offset: -2px;
 }
 
 .arrow:hover:not(:disabled) {
@@ -135,4 +131,17 @@
 
 .expander[aria-expanded='true'] svg {
   transform: rotate(180deg);
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .stepper {
+    grid-template-columns: var(--dsw-touch-target) minmax(28px, auto) var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+
+  .arrow,
+  .expander {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
 }

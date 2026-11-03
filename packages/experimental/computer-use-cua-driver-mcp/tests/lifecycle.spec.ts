@@ -50,11 +50,11 @@ describe('installed Cua Driver ownership', () => {
     const ctx = await context()
     const ready: PromiseWithResolvers<undefined> = Promise.withResolvers()
     fake.start.mockReturnValueOnce(ready.promise)
-    const first = ctx.plugin(Provider, {})
+    const first = ctx.plugin(Provider, { desktopMode: 'enabled' })
     try {
       await vi.waitFor(() => { expect(fake.start).toHaveBeenCalledTimes(1) })
       expect(ctx.computerUse.providerName).toBe('cua-driver-mcp')
-      await expect(ctx.plugin(Provider, {})).rejects.toThrow('already registered')
+      await expect(ctx.plugin(Provider, { desktopMode: 'enabled' })).rejects.toThrow('already registered')
       expect(fake.start).toHaveBeenCalledTimes(1)
       expect(() => ctx.computerUse.register(ComputerUseProviderName('another-driver'))).toThrow('already registered')
     } finally {
@@ -71,19 +71,19 @@ describe('installed Cua Driver ownership', () => {
   it('retains the reservation until child teardown completes, then permits reload', async () => {
     const ctx = await context()
     const childClosed: PromiseWithResolvers<undefined> = Promise.withResolvers()
-    const first = await ctx.plugin(Provider, {})
+    const first = await ctx.plugin(Provider, { desktopMode: 'enabled' })
     fake.close.mockReturnValueOnce(childClosed.promise)
     const closing = first.dispose()
     try {
       await vi.waitFor(() => { expect(fake.close).toHaveBeenCalledTimes(1) })
       expect(ctx.computerUse.providerName).toBe('cua-driver-mcp')
-      await expect(ctx.plugin(Provider, {})).rejects.toThrow('already registered')
+      await expect(ctx.plugin(Provider, { desktopMode: 'enabled' })).rejects.toThrow('already registered')
     } finally {
       childClosed.resolve(undefined)
       await closing
     }
     expect(ctx.computerUse.providerName).toBeUndefined()
-    const replacement = await ctx.plugin(Provider, { command: '/configured/driver', args: ['mcp', '--verbose'], toolCallTimeoutMs: 1234, reconnect: { enabled: false } })
+    const replacement = await ctx.plugin(Provider, { desktopMode: 'enabled', command: '/configured/driver', args: ['mcp', '--verbose'], toolCallTimeoutMs: 1234, reconnect: { enabled: false } })
     expect(fake.configurations[1]).toMatchObject({
       command: '/configured/driver', args: ['mcp', '--verbose'], toolCallTimeoutMs: 1234,
       reconnect: { enabled: false },
@@ -97,7 +97,7 @@ describe('installed Cua Driver ownership', () => {
     const childClosed: PromiseWithResolvers<undefined> = Promise.withResolvers()
     fake.start.mockRejectedValueOnce(new Error('driver unavailable'))
     fake.close.mockReturnValueOnce(childClosed.promise)
-    const failure = Promise.resolve(ctx.plugin(Provider, {})).then(
+    const failure = Promise.resolve(ctx.plugin(Provider, { desktopMode: 'enabled' })).then(
       () => { throw new Error('activation unexpectedly succeeded') },
       (error: unknown) => error,
     )
@@ -109,7 +109,7 @@ describe('installed Cua Driver ownership', () => {
     }
     expect(await failure).toEqual(new Error('driver unavailable'))
     expect(ctx.computerUse.providerName).toBeUndefined()
-    await ctx.plugin(Provider, {})
+    await ctx.plugin(Provider, { desktopMode: 'enabled' })
     expect(ctx.computerUse.providerName).toBe('cua-driver-mcp')
   })
 

@@ -197,7 +197,9 @@ export interface SubagentStartRequest {
 
 /**
  * Provider-facing one-shot request after {@link SubagentRuntime.start} resolves
- * the durable child descriptor.
+ * the durable child descriptor. Its signal combines caller cancellation with
+ * runtime withdrawal until publication to its holder; after publication only
+ * caller cancellation remains connected.
  */
 export interface ResolvedSubagentStartRequest extends SubagentStartRequest {
   /** Absolute directory selected once before provider startup. */
@@ -327,7 +329,11 @@ export interface SubagentRun {
   readonly result: Promise<SubagentResult>
   /**
    * Cancel remaining work, reach child quiescence, and release resources.
-   * Idempotent.
+   * Pending calls coalesce and successful cleanup is idempotent. A rejected
+   * cleanup retains caller ownership and may retry through the same handle.
+   * A foreground caller may hand failed cleanup back through
+   * `SubagentRuntime.retainFailedCleanup()`; the handle stays idempotent.
+   * @returns Cleanup completion; a settled child result remains unchanged by retry.
    */
   dispose(): Promise<void>
 }

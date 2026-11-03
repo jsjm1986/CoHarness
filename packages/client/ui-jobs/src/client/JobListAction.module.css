@@ -39,8 +39,8 @@
 }
 
 .menu {
-  position: absolute;
-  top: calc(100% + 5px);
+  position: fixed;
+  top: 0;
   left: 0;
   z-index: 100;
   box-sizing: border-box;

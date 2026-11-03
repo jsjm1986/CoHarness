@@ -1,0 +1,14 @@
+{
+  "name": "jobs-starting-slot-repository-refs-repaired",
+  "cwd": ".",
+  "command": "pnpm run verify-repository-references",
+  "startedAt": "2026-10-26T02:51:23.482768+00:00",
+  "seconds": 23.347,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a3cdf5c85be750da2821aaceca1904865182ec5ea7dce6d0414fe11d30b8ea17",
+  "inputsAfter": "a3cdf5c85be750da2821aaceca1904865182ec5ea7dce6d0414fe11d30b8ea17",
+  "postgresToolDirectory": null,
+  "outputSha256": "30831631cc03c3098ac98e4d739d2bf25f508da7838984ff13696070ac0a323b",
+  "outputTail": "$ tsx scripts/verify-repository-references.ts\nverify-repository-references: maintained files contain no repository commit identifiers or disallowed organization URLs.\n"
+}

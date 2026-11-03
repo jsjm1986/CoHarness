@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/deploy/README.md
 document:
-  en: e2c30b0d7598c4f043b583ce71be41b2c5173c5c
-  zh: d6d178ea43da615b7c45d6fb8f114d40d9267cd7
+  en: fd0f5dd86a0ad89ae4ec3d3e15143202271b1fbc
+  zh: 64662a4d49fd97edc21e7406890700d77aa2c788
 /production-deployment-runbook:
   en: bab9204fe333e354
   zh: dda096b4b8c30c4b
@@ -12,11 +12,11 @@ document:
   en: 2d51a5fadb66766e
   zh: 99955f92a7d497d9
 /production-deployment-runbook/install:
-  en: f08787dc0d79f5f7
-  zh: 894880d1f8cb6f9c
+  en: f8568468a73cf660
+  zh: a38d2d45e9da0b1c
 /production-deployment-runbook/per-user-provisioning:
-  en: 1e5a5a0691167c7a
-  zh: 3d6029d7d42b3345
+  en: eac189a38d8c6d23
+  zh: f8177e5741daaa1b
 /production-deployment-runbook/database-cutover-and-rollback:
   en: 8765a3c3b973ca05
   zh: 4096b9a05eb923c2
@@ -33,5 +33,5 @@ document:
   en: a20ac5c0443ec2df
   zh: 9c70de64f5c40a45
 /production-deployment-runbook/upgrades-and-backup:
-  en: 7da872bec4f69148
-  zh: 83b89065f5c9cd65
+  en: 4c6a963ec9d3a868
+  zh: eb865d6939e8d8ba

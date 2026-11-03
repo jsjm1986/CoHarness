@@ -1,0 +1,14 @@
+{
+  "name": "upload-and-short-write-postgres-stop",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/stop-owned-upload-postgres.py",
+  "startedAt": "2026-10-25T10:41:26.116038+00:00",
+  "seconds": 0.624,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bc45a9dc20b46848c7b7a727302822ee25d9ecbecc478da96be1a4ee47a15d3b",
+  "inputsAfter": "bc45a9dc20b46848c7b7a727302822ee25d9ecbecc478da96be1a4ee47a15d3b",
+  "postgresToolDirectory": null,
+  "outputSha256": "08c8935bb6e702f2dd69713cfbcf7562b28740856bd22e4c292ffbfcd63d6c36",
+  "outputTail": "waiting for server to shut down.... done\nserver stopped\nOwned PostgreSQL56818 stopped; retained audit data, no production cluster touched.\n"
+}

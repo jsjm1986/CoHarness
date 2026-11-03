@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-gateway-model-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-24-gateway-model-ownership.md
+document:
+  en: fdbaade63f1e174b3158a6bb2046359ca3400f32
+  zh: 4628556eb1845be71e42dec8610b284578e1c0f6
+/agent-note-gateway-owned-model-request-admission:
+  en: f3cdcd51ea0b84a0
+  zh: 9396c51b94d15ead
+/agent-note-gateway-owned-model-request-admission/problem:
+  en: 4c1c03e95f294efc
+  zh: d539959a2dd21a04
+/agent-note-gateway-owned-model-request-admission/decision:
+  en: c42b97170d358405
+  zh: 27ff4bc5d7bd84f8
+/agent-note-gateway-owned-model-request-admission/alternatives-considered:
+  en: 545127bc8f579973
+  zh: 11d7aa09366e64b1
+/agent-note-gateway-owned-model-request-admission/consequences:
+  en: 8714af4d1838c218
+  zh: 4d2df96c78732fa5
+/agent-note-gateway-owned-model-request-admission/verification:
+  en: 8c8bca2a707fbb90
+  zh: c4e63ae78b50a414

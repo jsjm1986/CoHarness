@@ -1,0 +1,14 @@
+{
+  "name": "native-search-manifest-constraints",
+  "cwd": ".",
+  "command": "pnpm run constraints",
+  "startedAt": "2026-10-24T03:41:51.762435+00:00",
+  "seconds": 2.871,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a63e35021964698d547d7f0ba328ef695538954de713b87a6f31dc8e27465548",
+  "inputsAfter": "a63e35021964698d547d7f0ba328ef695538954de713b87a6f31dc8e27465548",
+  "postgresToolDirectory": null,
+  "outputSha256": "018fe605fb12870f7d9d1184b775b8e471acb61e3266c7cf275d1847eb98cefe",
+  "outputTail": "$ tsx scripts/check-workspace-constraints.ts\n"
+}

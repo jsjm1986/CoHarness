@@ -1,0 +1,238 @@
+{
+  "finding": "B444",
+  "status": "fixed_verified_named_tool_foreground_withdrawal_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T13:26:18.032230+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-origin.json",
+    "fetchCompletedAt": "2026-11-01T13:19:58.592436+00:00"
+  },
+  "problem": "After start() handed a run to ToolSubagent, the service no longer joined the foreground result collector. Service withdrawal and tool unregistration could finish before the Consumer handed back a failed disposal; the native child response remained open with no active service drain to retry it.",
+  "fix": "A process-local symbol-keyed Host adapter retains the complete ordinary foreground operation in the originating runtime pending-operation set. Its signal combines caller cancellation with runtime withdrawal. ToolSubagent keeps startup, result collection, disposal and failure hand-back inside that operation; the runtime joins it before retrying adopted cleanup. Published holder-owned/background controls remain independent. No new named Remote operation or model/tool argument was added.",
+  "verification": {
+    "distinctBusinessCases": 753,
+    "relatedPackageCases": 741,
+    "newUnitCases": 3,
+    "typescriptSdkCases": 10,
+    "newTypescriptSdkCases": 2,
+    "pythonSdkCases": 2,
+    "versionRepeatsAndSubsetsNotAdded": true,
+    "checks": [
+      {
+        "name": "foreground-final-coverage",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-final-coverage.json"
+      },
+      {
+        "name": "foreground-final-source-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-final-source-sdk.json"
+      },
+      {
+        "name": "foreground-final-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-final-node22.json"
+      },
+      {
+        "name": "foreground-final-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-final-node24.json"
+      },
+      {
+        "name": "foreground-final-python-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-final-python-sdk.json"
+      },
+      {
+        "name": "foreground-final-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-final-build.json"
+      },
+      {
+        "name": "foreground-types-complete",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-types-complete.json"
+      },
+      {
+        "name": "foreground-export-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-export-docs.json"
+      },
+      {
+        "name": "foreground-config",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-config.json"
+      },
+      {
+        "name": "foreground-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-doc-quick.json"
+      },
+      {
+        "name": "foreground-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-python-lint.json"
+      },
+      {
+        "name": "foreground-lint-complete",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-lint-complete.json"
+      },
+      {
+        "name": "foreground-test-preservation",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-test-preservation.json"
+      },
+      {
+        "name": "foreground-origin",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-origin.json"
+      },
+      {
+        "name": "foreground-original-source-final",
+        "status": "expected_original_business_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-original-source-final.json"
+      },
+      {
+        "name": "foreground-original-built-node22",
+        "status": "expected_original_business_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-original-built-node22.json"
+      },
+      {
+        "name": "foreground-final-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-final-repository-references.json"
+      }
+    ],
+    "measuredCoverage": {
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent/src/internal.ts": {
+        "lines": {
+          "total": 11,
+          "covered": 11,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 6,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 11,
+          "covered": 11,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent/src/run-lease.ts": {
+        "lines": {
+          "total": 21,
+          "covered": 21,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 11,
+          "covered": 11,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 27,
+          "covered": 27,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "coverageScope": "Only internal.ts and run-lease.ts100% in all4 metrics; aggregate38statements/12branches/17functions/32lines. Entire Core/Consumer entry coverage remains open.",
+    "previousEntryDebtReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-final-package-coverage.json",
+    "entryDebtNotRemeasuredThisBatch": true,
+    "originalCarrier": "251-file frozen Core/Consumer carrier. Referenced original production sources match the B443 capsule; Core bundled entry matches B443, Consumer bundled entry matches its B444-start before-image. The probes execute those original source modules or bundles; unexecuted ancillary compiled faces are not claimed as original release artifacts.",
+    "originalOutcome": "Matching original Core+Consumer source and built pairs each fail2 exact FOREGROUND_WITHDRAWAL_FAILED assertions. Real model tool calls preserve result/cleanup failures, but original child signals are not cancelled, cleanup attempts remain1 and the HTTP response is still open when withdrawal completes. No module failure or timeout counts as proof.",
+    "preservedTests": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/test-preservation.json",
+    "otherUnchangedTestFiles": 16,
+    "nativeCases": "Normal model-issued subagent tool call through Loader, loop, tool registry and stdio SDK. Completed/rejected child result modes each keep the response live at the barrier, preserve the appropriate failure in the next model request, retry physical cleanup once without another child start and confirm response closure before scope completion.",
+    "invalidAcceptance": "A direct Host adapter invocation after service withdrawal rejects DRAINING and never calls its business callback.",
+    "retainedIntermediateFailures": [
+      "foreground-withdrawal-before",
+      "foreground-normal-build"
+    ],
+    "limitations": "Full entry coverage, Workflow/PTC/Ralph lifetime ownership, persistent failure recovery, cross-computer production acceptance and official Responses remain unproven."
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/foreground-scope-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.zh.md",
+    "apps/cli/tests/profiles/sdk/foreground-subagent-withdrawal.expected.e2e.ts",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/foreground-subagent-withdrawal/expected.json",
+    "examples/headless-agent/tests/fixtures/foreground-subagent-withdrawal/model.mjs",
+    "examples/headless-agent/tests/fixtures/foreground-subagent-withdrawal/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/foreground-subagent-withdrawal/runtime.cordis.yml",
+    "examples/headless-agent/tests/fixtures/foreground-subagent-withdrawal/runtime.mjs",
+    "packages/subagent/subagent/README.i18n.yaml",
+    "packages/subagent/subagent/README.md",
+    "packages/subagent/subagent/README.zh.md",
+    "packages/subagent/subagent/src/index.ts",
+    "packages/subagent/subagent/src/internal.ts",
+    "packages/subagent/subagent/tests/run-cleanup.spec.ts",
+    "packages/subagent/tool-subagent/README.i18n.yaml",
+    "packages/subagent/tool-subagent/README.md",
+    "packages/subagent/tool-subagent/README.zh.md",
+    "packages/subagent/tool-subagent/src/index.ts",
+    "packages/subagent/tool-subagent/tests/foreground-withdrawal.spec.ts",
+    "python/sdk/tests/test_foreground_subagent_withdrawal_expected.py"
+  ],
+  "removedPaths": [],
+  "readOnlyPrerequisiteCount": 187,
+  "artifactReferences": {
+    "packages/subagent/subagent/lib/index.js": "d6ddb08f62734b4c88f7508bf8c9052bca29fd07ee4cb8e50393611727001d14",
+    "packages/subagent/subagent/lib/types/index.js": "2ea5d6edd2af7c0f65209e7277d80e7ccdc3e9ebd9ff88e31c67776285dac39f",
+    "packages/subagent/subagent/lib/types/index.d.ts": "1e98c7dd4944d32ca9a241c681a4b588b2dec9d9cffa6420369c2612be9f06ab",
+    "packages/subagent/subagent/lib/types/run-lease.js": "68a420195cd7358362a8edd97d9a4cfd4c766e836d1f32e25e467d2b9ec7fa63",
+    "packages/subagent/subagent/lib/types/run-lease.d.ts": "b4a73727a97ba0369cf20f99633cef031ba8a9b3671b7ef427021ffc91fa2037",
+    "apps/cli/lib/bin.js": "a3f373cfa7a3a84aa5fb6e25c3db5b2cb9b338afe986169c00fcc38ea0044455",
+    "packages/bundle/sdk-minimal/lib/index.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "packages/subagent/subagent/lib/types/types.js": "74c4a6ef14ae2c83292457c179e22fc44885e5d92976595089107527c160f9cd",
+    "packages/subagent/subagent/lib/types/types.d.ts": "fe23d6fbb40919d51ec2b1a65934249b074f6d3b9794847d58dfe453f6887501",
+    "packages/subagent/subagent/lib/types/internal.js": "9e629487ae14104c2d46269197692279bf5c1a5209af0b2a56ee0865ac477afb",
+    "packages/subagent/subagent/lib/types/internal.d.ts": "910db97a43b6dd599126d6c7cf9057b2c007120bcf9dd761bcf1439aa2e45291",
+    "packages/subagent/tool-subagent/lib/index.js": "1dc73f2d5ed54577b5243fdc5ea6bca03a032c999982ed1dadfa76d2905a7bcf",
+    "packages/subagent/tool-subagent/lib/types/index.js": "f14f7d6c2b92d72524008f154c40ee55031fe4c08b113c250b05b07b8c6021cf",
+    "packages/subagent/tool-subagent/lib/types/index.d.ts": "8b09f71db58a223e7e965f4f5775d97941851d5d6dd8d92b3e6a83d54b6eea5c"
+  },
+  "noteReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/note-review.json",
+  "remaining": [
+    "All12 domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue Workflow/PTC/Ralph and other returned foreground Consumers: trace actual operation settlement, failed hand-back, dependency withdrawal and durable ending. B444 verifies the ordinary ToolSubagent path, not every foreground Consumer.",
+    "Persistent failed cleanup after the enclosing service drain remains unproven. Do not claim complete service lifetime ownership or release uncertain resource occupancy merely because a scope reported an error.",
+    "Complete Core/Consumer entry-file coverage debt remains open. B443 private Core index measurement was92.14/85.96/96.61/92.52 for statements/branches/functions/lines, with a reported zero at a post-directory guard. B444 measures only internal.ts and run-lease.ts at100%; the entire entries were not remeasured or removed from the baseline.",
+    "Continue remaining resource/model/tool/Inspector authorization, queued continuation/permission transitions, cross-account/computer isolation, document/runtime business rules and remaining file/platform coverage outside peer-reserved surfaces.",
+    "B416-B444 is a per-batch verified delta index, not an assembled release or production acceptance. Preserve B417 matching required-on-read writer/readers/SDKs, header7 and immutable Session generations; no old-reader downgrade.",
+    "Latest trusted peer report remains live R26/schema103, R27 tests only and frozen R28 HTML refusal candidate not deployed. Gateway html/server and corresponding tests/browser/docs plus earlier UI reservations stay peer-owned. Do not repeatedly query the peer or mutate production.",
+    "Official Responses real-interface verification remains explicitly deferred by the user."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T125955Z/B416-B444-integration-index.json"
+}

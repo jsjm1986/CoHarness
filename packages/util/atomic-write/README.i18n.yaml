@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/util/atomic-write/README.md
 document:
-  en: cf6a2946070ff838ebd589477d69b349ef4df4fe
-  zh: 34fd272f2e15af625fe199dbb5a94070a361ec29
+  en: cd434dfd58845bc3c28e643156e252dd3176af61
+  zh: 9bfa9a4e97e42f3795e05bf750748de1a1090523
 /:
   en: 1065a4fcafd0430d
   zh: 40bc911b6d01288b
@@ -21,11 +21,11 @@ document:
   en: 9cc27a0ee5ae0808
   zh: d0ee06b54452f600
 /deepseek-ai-dsh-atomic-write/use-this-package/writing-a-file-atomically:
-  en: 7b757dc3c3b27335
-  zh: a097d90a2561475d
+  en: 548c3437a706dd54
+  zh: 596c82851ef09bf7
 /deepseek-ai-dsh-atomic-write/use-this-package/coordinating-writers:
-  en: 77c865c1f78d2a0c
-  zh: 5a91874c352c6f18
+  en: 8432ee6c610da97d
+  zh: 03fd34b97d233030
 /deepseek-ai-dsh-atomic-write/use-this-package/failures-to-plan-for:
   en: 59308dc757e25273
   zh: 01113ed577a413cb
@@ -36,8 +36,8 @@ document:
   en: aee5320dc8746377
   zh: f35dbbf350f7b5cf
 /deepseek-ai-dsh-atomic-write/understand-the-implementation/write-path:
-  en: 9218cbc831592e2a
-  zh: f2d69dc33a2a7cef
+  en: 9324ed2f10bd6fac
+  zh: 62faa436ffbf2c47
 /deepseek-ai-dsh-atomic-write/understand-the-implementation/why-the-swap-stays-safe:
   en: 784e985c1fb3a25e
   zh: 4afda1b9bf5f29cc

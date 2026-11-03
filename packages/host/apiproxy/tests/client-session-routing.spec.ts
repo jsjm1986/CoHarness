@@ -1,6 +1,10 @@
 /** Remote routing uses the same explicit Session locations as Host authorization. */
 import { expect, it } from 'vitest'
-import { remoteSessionId } from '../src/api/remote-session-routing.ts'
+import { lookupRemoteSessionPolicy, remoteSessionId } from '../src/api/remote-session-routing.ts'
+
+it('keeps continued-question input attestation with its producer rather than a transient request scope', () => {
+  expect(lookupRemoteSessionPolicy('userQuestions/answer')).toMatchObject({ action: 'write', execution: 'operation' })
+})
 
 it('addresses child delivery through its parent without interpreting message content', () => {
   const args = { request: { parentSessionId: 'parent', childSessionId: 'child', content: [{ type: 'text', text: 'sessionId=other' }] } }

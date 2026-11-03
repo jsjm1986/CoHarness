@@ -1,0 +1,2 @@
+{"operation":"approved-review","mode":{"active":false},"modelRequests":2,"turn":"completed","questionAborted":false}
+{"operation":"cancelled-review","mode":{"active":true},"modelRequests":1,"turn":"aborted","questionAborted":true}

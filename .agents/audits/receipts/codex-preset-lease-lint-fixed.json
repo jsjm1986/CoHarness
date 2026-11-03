@@ -1,0 +1,14 @@
+{
+  "name": "codex-preset-lease-lint-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/subagent/subagent-codex/src/index.ts packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts packages/subagent/subagent-codex/tests/managed-ssh-loader.spec.ts packages/subagent/subagent-codex/tests/fixtures/managed-ssh-driver.mjs packages/preset/agent-preset-registry/src/index.ts packages/preset/agent-preset-registry/tests/declared.spec.ts",
+  "startedAt": "2026-10-25T14:25:15.516069+00:00",
+  "seconds": 8.399,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "91dbac748cebb307091633f1618121c05f6d35df0bf9a9bc724316635577b040",
+  "inputsAfter": "91dbac748cebb307091633f1618121c05f6d35df0bf9a9bc724316635577b040",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

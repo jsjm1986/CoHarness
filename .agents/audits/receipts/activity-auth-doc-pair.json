@@ -1,0 +1,13 @@
+{
+  "name": "activity-auth-doc-pair",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write gateway/README.md .agents/notes/implemented/feature/2026-10-17-project-activity-feed.md .agents/notes/implemented/bug-fix/2026-10-24-disabled-organization-human-auth.md",
+  "startedAt": "2026-10-23T19:46:55.083000+00:00",
+  "seconds": 4.438,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "090e054090863f5d7964bc0fac2fff61b11f76dd6510a51d716c24dab4a26873",
+  "inputsAfter": "22771f312283761546083bd425e70202539efb11dd20e6b187cb64b3cc191090",
+  "outputSha256": "bc135d25df5dba653ad2d271ebc19555ff8023bd9d1f7921dcdc3a8051ff9bfb",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write gateway/README.md .agents/notes/implemented/feature/2026-10-17-project-activity-feed.md .agents/notes/implemented/bug-fix/2026-10-24-disabled-organization-human-auth.md\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-24-disabled-organization-human-auth.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-10-17-project-activity-feed.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 3 record(s) written; run the check to validate the pairs.\n"
+}

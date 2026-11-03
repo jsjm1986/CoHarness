@@ -1,0 +1,4 @@
+{"type":"turn","actor":"first","idle":true}
+{"type":"turn","actor":"second","idle":true}
+{"type":"consolidation","requests":1,"maximumConcurrent":1,"admissions":3,"released":3}
+{"type":"memory","keys":["original"],"changedSince":0}

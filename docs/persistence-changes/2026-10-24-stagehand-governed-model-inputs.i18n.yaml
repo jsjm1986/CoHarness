@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for 2026-10-24-stagehand-governed-model-inputs.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-24-stagehand-governed-model-inputs.md
+document:
+  en: 13065a7d054aaef0287b166a2b009a3cbdba9a6b
+  zh: cd008944c250c67a4d2532c54bdd7b3eccbccb69
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-24-stagehand-governed-model-inputs:
+  en: 7f8c0d05b9e56f67
+  zh: fead1a8111d07ee5
+/2026-10-24-stagehand-governed-model-inputs/summary:
+  en: f835c5ccb06f0522
+  zh: 96038783e310803d
+/2026-10-24-stagehand-governed-model-inputs/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-24-stagehand-governed-model-inputs/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-24-stagehand-governed-model-inputs/compatibility:
+  en: ec2c574b77f49a06
+  zh: 1c0228ba3f94246e
+/2026-10-24-stagehand-governed-model-inputs/verification:
+  en: f1b45acd3347f2d9
+  zh: 7ec4de37d5fcb318
+/2026-10-24-stagehand-governed-model-inputs/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

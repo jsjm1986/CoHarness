@@ -16,7 +16,7 @@ Status: implemented
 
 授权在同一 `@deepseek-ai/dsh-model-access` Service Definition 上有三层：`apiproxy` 过滤禁用目录项、拒绝禁用模型选择，并在当前路由禁用时拒绝发送；实例插件的 `llm/stream` listener 仍是聊天、标题、压缩与直接调用进入适配器前的最终边界。listener 还会拒绝与进程局部发起 Agent 不一致的显式 `sessionId`，并在 ID 缺失时从该发起方补齐。
 
-DeepSeek 与 pi-ai 适配器只在 usage chunk 上附加非秘密凭据来源标签。治理插件把托管文件/项目/请求来源映射为个人成本，把启动环境来源映射为公司成本，未知来源按公司成本保守处理。intake 会重新计算并校验类别，而不是信任上报的类别。API Key、提示词与回复内容不会进入策略、outbox、intake 或账本。
+DeepSeek 与 pi-ai 适配器保留每次请求凭据解析时返回的来源，并仅把该非秘密标签附到实际 usage chunk。来源不从提供方 id 或密钥内容推断；原生操作和普通 Messages 调用保留相同来源。治理插件把托管文件/项目/请求来源映射为个人成本，把启动环境来源映射为公司成本，未知来源按公司成本保守处理。intake 会重新计算并校验类别，而不是信任上报的类别。API Key、提示词与回复内容不会进入策略、outbox、intake 或账本。
 
 每个调用的终态先通过同目录 rename 提交为运行时 outbox 中以 UUID 命名的 JSON 文件。后台 pump 把文件 POST 到 Bearer 鉴权的回环 intake，仅在成功后删除。HTTP 400 会原样保留被拒记录，并继续处理后续独立记录。传输、鉴权、限流和服务端故障会停止当前投递轮次；所有文件仍可重试。PostgreSQL 在企业内按 UUID 保证幂等，因此重试不会重复写入用户或项目用量。价格按事件发生时间选择；个人凭据调用保留估算成本，但公司成本为零。provider 缺少 usage 时记录明确的 `missing-usage`，不会伪造 token 数。拒绝事件也写入网关审计日志。
 

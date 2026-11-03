@@ -1,0 +1,14 @@
+{
+  "name": "memory-auxiliary-session-regressions",
+  "cwd": ".",
+  "command": "pnpm exec vitest run packages/core/session/tests/gen-persistence-catalog.spec.ts packages/core/session/tests/canonical-envelopes.spec.ts packages/core/session/tests/message-projections.spec.ts packages/core/session/tests/request-header.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T01:38:09.017821+00:00",
+  "seconds": 8.05,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e619e4cb12bb3636290c13cdaba85a4e8536e2fc903c197b93b8c5466b655691",
+  "inputsAfter": "e619e4cb12bb3636290c13cdaba85a4e8536e2fc903c197b93b8c5466b655691",
+  "postgresToolDirectory": null,
+  "outputSha256": "3ffcab184a66ecf33cb4bfba66a45fd9e0ae01cb2cdee6d32b3962305188b8ef",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  4 passed (4)\n      Tests  251 passed (251)\n   Start at  09:38:15\n   Duration  1.73s (transform 1.44s, setup 221ms, import 2.29s, tests 274ms, environment 0ms)\n\n"
+}

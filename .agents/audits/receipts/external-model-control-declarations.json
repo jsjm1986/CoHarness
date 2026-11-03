@@ -1,0 +1,14 @@
+{
+  "name": "external-model-control-declarations",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/subagent/subagent-codex/tsconfig.json packages/subagent/subagent-claude-code/tsconfig.json packages/subagent/subagent-acp/tsconfig.json",
+  "startedAt": "2026-10-24T17:03:01.265851+00:00",
+  "seconds": 3.072,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4a0affc77ed20eb55c84b57393a8f4745745d37f33d249a9aa48c9fcb2f62f39",
+  "inputsAfter": "4a0affc77ed20eb55c84b57393a8f4745745d37f33d249a9aa48c9fcb2f62f39",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

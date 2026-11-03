@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-extension-types",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsc -b tsconfig.host.build.json",
+  "startedAt": "2026-10-23T14:19:46.921165+00:00",
+  "seconds": 0.93,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b605f8e6093763f00e7bde2fb08184ff1948d7f9e6717664507800d32b4dfe7d",
+  "inputsAfter": "b605f8e6093763f00e7bde2fb08184ff1948d7f9e6717664507800d32b4dfe7d",
+  "outputSha256": "a47bd132adaf7c050a2701d2f5f720b6607411d021d4be6d1c986ad09c0a0cff",
+  "outputTail": "error TS5083: Cannot read file '/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/tsconfig.host.build.json'.\n"
+}

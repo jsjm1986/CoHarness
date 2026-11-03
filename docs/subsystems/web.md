@@ -10,6 +10,10 @@ Source: [`packages/web/web/src/types.ts`](../../packages/web/web/src/types.ts)
 
 Search and fetch share no request schema and no business logic, but they are deliberately one `ctx.web` middle layer: one provider-selection policy owner, one abort/error vocabulary, and one product-facing "how this harness reaches the web" configuration API. The cost is the parallel `searchX`/`fetchX` method pairs on the service; that parallelism is intentional, not a missed extraction. Providers register **capabilities** (a `WebSearchProvider` or `WebFetchProvider`), not tools; the model-facing names, schemas, prompt guidance, and presentation all live in the single `dsh-tool-web` consumer.
 
+## Model-backed search
+
+`ModelSearchRoute` selects a provider/model and output cap. `PreparedModelSearch<Request>` retains its model configuration, exact recordable input and deferred execution. `ModelSearchImplementation<Options, Request>` supplies protocol-specific preparation, recording and independent transport to `registerModelSearch()`. The shared registrar owns governed-mode selection, one model permit and joined plugin cancellation. `ModelSearchUsageFields` maps actual wire counters for `modelSearchUsage()`; `resolveModelSearchCredential()` supplies cancellation-aware credential settlement. Provider settings and supported protocols belong to the [web package reference](../../packages/web/web/README.md).
+
 ## Search request and result
 
 Each seam request carries exactly one `query`. The `dsh-tool-web` consumer accepts a required `queries` array and fans it out into separate seam requests; a one-item array performs one search. `maxResults` is a consumer-owned bound (`dsh-tool-web`'s `searchMaxResults` config, default `8`) passed through the seam and enforced on the way back — if a provider over-returns, the seam truncates `sources[]` and sets `truncated`.

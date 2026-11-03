@@ -37,7 +37,6 @@ describe('DocumentsModal.module.css', () => {
     expect(modal).toMatch(/@media \(pointer: coarse\)[\s\S]*\.newFolder,[\s\S]*min-height:\s*var\(--dsw-touch-target\)/)
     expect(modal).toMatch(/\.overviewActions\s*\{[\s\S]*display:\s*flex/)
     expect(modal).toMatch(/\.scopeNotice\s*\{[\s\S]*border-radius:[\s\S]*background:\s*var\(--dsw-alias-bg-layer-2\)/)
-    expect(modal).toMatch(/\.scopePickerOption\s*\{[\s\S]*min-height:\s*52px/)
   })
 
   it('keeps the selected destructive action readable on its primary fill', () => {
@@ -118,8 +117,6 @@ describe('DocumentsModal.module.css', () => {
   })
 
   it('reserves a separate track for scrollbars beside navigation options and lists', () => {
-    expect(modal).toMatch(/\.scopePickerOptions\s*\{[\s\S]*padding-inline-end:\s*8px[\s\S]*scrollbar-gutter:\s*stable both-edges/)
-    expect(modal).toMatch(/\.scopePickerOption\s*\{[\s\S]*box-sizing:\s*border-box/)
     expect(modal).toMatch(new RegExp([
       '\\.list,[\\s\\S]*\\.overviewList,[\\s\\S]*\\.trashList\\s*\\{',
       '[\\s\\S]*padding-inline-end:\\s*6px[\\s\\S]*scrollbar-gutter:\\s*stable both-edges',

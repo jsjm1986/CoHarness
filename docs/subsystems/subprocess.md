@@ -100,6 +100,10 @@ The seam applies no defaults: every disposition, limit, and directory is explici
  * request/spec split is the owning template).
  */
 interface SubprocessSpawnSpec {
+  /** Resource owner captured before waiting for allocation; omitted only for agentless work. */
+  sessionId?: Branded<'SessionId'>
+  /** Select execution, signed interactive, or explicitly Runtime-owned admission. */
+  resourceOrigin?: ResourceOriginIntent
   /** Executable and arguments; `argv[0]` is the program. Never shell-interpreted here. */
   argv: readonly string[]
   /** Working directory for the child. */
@@ -265,12 +269,12 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.subprocess` — `SubprocessRuntime` (abstract seam)
 
-Abstract subprocess service. Subclass, implement spawn, and load the subclass as a plugin — it registers as `ctx.subprocess` (one implementation per context; loading a second throws, which is cordis' standard duplicate-service behavior).
+Abstract subprocess service. Subclass, implement its allocation methods, and load the subclass as a plugin — it registers as `ctx.subprocess` (one implementation per context; loading a second throws, which is cordis' standard duplicate-service behavior).
 
 Implementations must honor these semantics:
 
 - Executable paths belong to one execution world shared with the mounted filesystem provider.
-- spawn returns a live handle synchronously. Target identity remains provider-private; `done` resolves with the spawned command's exit facts and may reject for spawn or provider failures.
+- spawn waits for resource admission and verifies its original provider before allocation. A provider withdrawn or replaced during the wait refuses allocation and returns the unused grant. Target identity remains provider-private; `done` resolves with the spawned command's exit facts and may reject for spawn or provider failures.
 - Collect-mode readers are offset-based and non-consuming, so independent readers never consume one another's output; lossy reads report truncation and the spill file holding the complete stream when one exists. Piped streams are handed to the caller raw and never buffered here.
 - SubprocessHandle.terminate (and the spec's abort signal) starts the provider's documented procedure against its managed range. SubprocessHandle.waitForExit observes that same range so a consumer-owned teardown ladder can hold each tier on real quiescence; each provider documents its signalling and observability limits.
 - Disposal of the service terminates all still-running managed processes and awaits their exit.
@@ -301,10 +305,9 @@ abstract terminalEnvironment(signal?: AbortSignal): Promise<SubprocessTerminalEn
  * Start one managed child process from a fully-specified spec; this seam
  * applies no defaults.
  * @param spec - argv, directory, stdio dispositions, grace, cancellation, and environment.
- * @returns the live process handle (streams/readers, signalling, outcome promise).
- * @throws synchronously when pre-aborted or when argv, cwd, environment, or grace is invalid before handle creation.
+ * @returns the live process handle after admission and allocation; rejection may retain uncertain accounting.
  */
-abstract spawn(spec: SubprocessSpawnSpec): SubprocessHandle
+spawn(spec: SubprocessSpawnSpec): Promise<SubprocessHandle>
 
 /**
  * Allocate a real terminal and start one owned process session. This is the
@@ -313,7 +316,7 @@ abstract spawn(spec: SubprocessSpawnSpec): SubprocessHandle
  * @param spec - fully specified argv, cwd, environment, dimensions, grace, and allocation cancellation.
  * @returns the live terminal handle after allocation succeeds.
  */
-abstract spawnTerminal(spec: SubprocessTerminalSpawnSpec): Promise<SubprocessTerminalHandle>
+spawnTerminal(spec: SubprocessTerminalSpawnSpec): Promise<SubprocessTerminalHandle>
 ```
 
 Source: [`packages/subprocess/subprocess/src/index.ts`](../../packages/subprocess/subprocess/src/index.ts)

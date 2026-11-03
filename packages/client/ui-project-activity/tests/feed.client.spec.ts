@@ -1,5 +1,5 @@
 /** Activity feed grouping, member roster, and label rendering. */
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   agoLabel,
   convTone,
@@ -9,6 +9,12 @@ import {
   timeLabel,
   type ActivityItem,
 } from '../src/client/feed.ts'
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 9, 23, 12))
+})
+afterEach(() => { vi.useRealTimers() })
 
 function item(partial: Partial<ActivityItem> & Pick<ActivityItem, 'kind' | 'occurredAt'>): ActivityItem {
   return {
@@ -25,6 +31,35 @@ function item(partial: Partial<ActivityItem> & Pick<ActivityItem, 'kind' | 'occu
 const TITLE = (sessionId: string): string => `untitled ${sessionId}`
 
 describe('groupItems', () => {
+  it('keeps different conversation IDs separate when title concatenations collide', () => {
+    const sections = groupItems([
+      item({ kind: 'message', occurredAt: '2026-10-17T10:00:00Z', sessionId: 'c', conversationTitle: 'ab' }),
+      item({ kind: 'message', occurredAt: '2026-10-17T09:00:00Z', sessionId: 'bc', conversationTitle: 'a' }),
+    ], 'conversation', TITLE)
+    expect(sections.map(section => section.rows.map(row => row.sessionId))).toEqual([['c'], ['bc']])
+  })
+
+  it('groups a renamed conversation by ID and keeps its newest answer as the digest', () => {
+    const rows = [
+      item({ kind: 'answer', occurredAt: '2026-10-17T10:00:00Z', sessionId: 'a', conversationTitle: 'Renamed', text: 'new' }),
+      item({ kind: 'answer', occurredAt: '2026-10-17T09:00:00Z', sessionId: 'a', conversationTitle: 'Old', text: 'old' }),
+    ]
+    const sections = groupItems(rows, 'conversation', TITLE)
+    expect(sections).toHaveLength(1)
+    expect(sections[0]).toMatchObject({ title: 'Renamed', answers: 2, digest: rows[0], rows })
+  })
+
+  it('keeps member identities separate and folds a renamed member into one group', () => {
+    const rows = [
+      item({ kind: 'message', occurredAt: '2026-10-17T11:00:00Z', actorUserId: 23, actorLabel: 'Lin1' }),
+      item({ kind: 'message', occurredAt: '2026-10-17T10:00:00Z', actorUserId: 3, actorLabel: 'Lin12' }),
+      item({ kind: 'message', occurredAt: '2026-10-17T09:00:00Z', actorUserId: 23, actorLabel: 'Before rename' }),
+    ]
+    const sections = groupItems(rows, 'member', TITLE)
+    expect(sections.map(section => section.rows.map(row => row.actorUserId))).toEqual([[23, 23], [3]])
+    expect(sections[0]?.title).toBe('Lin1')
+  })
+
   const rows = [
     item({ kind: 'message', occurredAt: '2026-10-17T09:00:00', sessionId: 'a', conversationTitle: 'Alpha' }),
     item({ kind: 'message', occurredAt: '2026-10-17T10:00:00', sessionId: 'b', conversationTitle: 'Beta' }),

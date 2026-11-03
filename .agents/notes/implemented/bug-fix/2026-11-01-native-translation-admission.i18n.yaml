@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-native-translation-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-native-translation-admission.md
+document:
+  en: b6a237fc4a82550b49ecbd207823cac1c2b7b908
+  zh: edfffef6ee02455a95253adec2b634b5e1dd5246
+/agent-note-native-translation-retains-its-owner-until-provider-i-o:
+  en: e36e594852d072f7
+  zh: ccfb028603ce5c63
+/agent-note-native-translation-retains-its-owner-until-provider-i-o/problem:
+  en: 9d3c48d3237fae9c
+  zh: a1b10c0505f5f0a8
+/agent-note-native-translation-retains-its-owner-until-provider-i-o/decision:
+  en: c383114cb39dad93
+  zh: d2a760f58aea3825
+/agent-note-native-translation-retains-its-owner-until-provider-i-o/alternatives-considered:
+  en: a85d6745566ad01d
+  zh: c0098be380b1003c
+/agent-note-native-translation-retains-its-owner-until-provider-i-o/consequences:
+  en: 8be87519f7448f4d
+  zh: bbcf1612543dc549
+/agent-note-native-translation-retains-its-owner-until-provider-i-o/verification:
+  en: aa9a076a21612a3e
+  zh: b7bd00565fd3390f

@@ -1,0 +1,14 @@
+{
+  "name": "sonar-persistence-record-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/persistence-changes.ts --update 2026-10-24-prepared-model-operations --decision same-version --prose .agents/audits/.local/native-model-operation-prose.json",
+  "startedAt": "2026-10-24T09:19:32.348286+00:00",
+  "seconds": 18.532,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cc99d8dd5ab56c67b813fe805d963e6f59ea8c91934d23db74f5edeb68225070",
+  "inputsAfter": "cc99d8dd5ab56c67b813fe805d963e6f59ea8c91934d23db74f5edeb68225070",
+  "postgresToolDirectory": null,
+  "outputSha256": "9dc3edfb50aeb5e8b8fdf77f20a99d0e4b4da202bd89540bd09ef61fd48c3d09",
+  "outputTail": "Updated docs/persistence-changes/2026-10-24-prepared-model-operations.md; schema artifacts and bilingual pairing are current.\n"
+}

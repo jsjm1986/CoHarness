@@ -1,0 +1,14 @@
+{
+  "name": "document-file-owner-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/util/atomic-write/src/index.ts packages/util/atomic-write/tests/ownership.spec.ts packages/attachment/userdoc-local/src/ownership.ts packages/attachment/userdoc-local/src/store.ts packages/attachment/userdoc-local/src/local-fs.ts packages/attachment/userdoc-local/src/upload.ts packages/attachment/userdoc-local/src/trash.ts packages/attachment/userdoc-local/src/migration.ts gateway/src/documents-local.ts gateway/src/document-file-owner.ts",
+  "startedAt": "2026-10-25T22:56:39.989565+00:00",
+  "seconds": 8.352,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7d2f18a79b9c7a12809002007eba1c27509dcde79155f5671c1c6cf1d2165d5c",
+  "inputsAfter": "7d2f18a79b9c7a12809002007eba1c27509dcde79155f5671c1c6cf1d2165d5c",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-consolidation-cursor-concurrency.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-consolidation-cursor-concurrency.md
+document:
+  en: d218468f334084942cbca6b96eec3c2673e0e5d1
+  zh: 1ccf1cbae8bf9b5af18e28bc31cbece84e45e7c8
+/agent-note-consolidation-cursor-concurrency:
+  en: cb895bcc93938bd9
+  zh: 94f6c55785c6116e
+/agent-note-consolidation-cursor-concurrency/problem:
+  en: a769a6eb81ef3faa
+  zh: 9642980ca312f3ce
+/agent-note-consolidation-cursor-concurrency/decision:
+  en: 8b811a0ecb1b526a
+  zh: 74d4395c9f20afdd
+/agent-note-consolidation-cursor-concurrency/alternatives-considered:
+  en: 133b7cbfe8768bf6
+  zh: b71b65ed80793bf9
+/agent-note-consolidation-cursor-concurrency/consequences:
+  en: 8aa0dcb1e2a242f4
+  zh: 7eae7c1fd5e610f1
+/agent-note-consolidation-cursor-concurrency/verification:
+  en: 9cbdfa04f26a7dfc
+  zh: d589ebc6e6a46ae7

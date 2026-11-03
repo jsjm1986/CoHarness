@@ -108,6 +108,10 @@ class FactoryOwnership {
     return this.accepting && !INACTIVE_STATES.has(this.fiber.state)
   }
 
+  hasPendingStartup(): boolean {
+    return this.startupTasks.size > 0
+  }
+
   /** Track one live agent's shared teardown until it has run. */
   track(dispose: () => Promise<void>): () => void {
     this.liveAgents.add(dispose)
@@ -400,6 +404,7 @@ export class AgentLoop extends Service implements AgentFactory {
   /** Validated configuration owned by the agent-loop service. */
   readonly config: ResolvedConfig
   private readonly ownership: FactoryOwnership
+  private readonly idleChecks = new Map<Agent, () => boolean>()
   /** Plain holder prevents Cordis from re-tracing the factory's dependency context through a caller shadow. */
   private readonly runtime: { ctx: Context }
 
@@ -449,16 +454,23 @@ export class AgentLoop extends Service implements AgentFactory {
     // Register only after every config validation above has passed, so a
     // rejected constructor leaves no projection unit behind.
     const ownership = this.ownership = new FactoryOwnership(ctx.fiber)
+    const idleChecks = this.idleChecks
     this.runtime = { ctx }
     ctx.effect(function* () {
       const unregisterTurnBoundary = ctx.sessionProjections.register(turnBoundaryProjectionDefinition)
       yield unregisterTurnBoundary
       const unregisterInbox = ctx.sessionProjections.register(inboxProjectionDefinition)
       yield unregisterInbox
+      const releaseRuntimeIdle = ctx.root.on('runtime/idle-release-check', () =>
+        ownership.hasPendingStartup() || [...idleChecks.values()].some(check => check()) ? 'busy' : undefined, { global: true })
+      const releaseAgentIdle = ctx.root.on('agent/idle-release-check', ({ agent }) =>
+        idleChecks.get(agent)?.() === true ? 'busy' : undefined, { global: true })
       // Cordis skips later disposers after a rejection; finally still releases projections.
       yield () => ownership.dispose().finally(() => {
         unregisterInbox()
         unregisterTurnBoundary()
+        releaseAgentIdle()
+        releaseRuntimeIdle()
       })
     }, 'agentLoop.transactions()')
     ctx.effect(() => ctx.agents.setFactory(this), 'agentLoop.setFactory()')
@@ -656,6 +668,7 @@ export class AgentLoop extends Service implements AgentFactory {
         detachAgent?.()
         detachSession?.()
       } finally {
+        if (machine !== undefined) this.idleChecks.delete(machine)
         untrack()
       }
       throwCollectedFailures(failures, `agent "${id}" disposal failed`)
@@ -670,10 +683,13 @@ export class AgentLoop extends Service implements AgentFactory {
       }
     }
     const untrack = this.ownership.track(dispose)
+    const idleChecks = this.idleChecks
+    const factoryOwnership = this.ownership
     const inbox = this.config.inbox
     try {
       unfollowOwner = ownerCtx.effect(function* () {
         const created = machine = new ReactLoopAgent(loopCtx, id, options, session, inbox)
+        idleChecks.set(created, () => disposing !== undefined || !factoryOwnership.isActive() || !created.canReleaseIdle())
         machineReady.resolve(undefined)
         // Adopt the scope on its original fiber so it cannot unload before teardown.
         // A loop already unloading during minting owns the provisional scope itself.

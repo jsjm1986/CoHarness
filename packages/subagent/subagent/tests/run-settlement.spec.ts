@@ -100,6 +100,20 @@ describe('outcome mapping helpers', () => {
     })
   })
 
+  it.each(['result', 'dispose', 'both'] as const)('disposes and reports an unrenderable %s failure', async (stage) => {
+    let disposed = false
+    const failure: unknown = Object.create(null)
+    const outcome = await settleRun({
+      id: SessionId('child-unrenderable'), localAgent: undefined,
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- Provider rejections can carry arbitrary JavaScript values.
+      result: stage === 'dispose' ? Promise.resolve({ output: [], stopReason: 'completed' }) : Promise.reject(failure),
+      dispose: async () => { disposed = true; if (stage !== 'result') throw failure },
+    })
+    expect(disposed).toBe(true)
+    expect(outcome).toEqual({ status: 'failed', detail: stage === 'result' ? '<unrenderable thrown value>'
+      : `${stage === 'both' ? '<unrenderable thrown value>; ' : ''}dispose failed: <unrenderable thrown value>` })
+  })
+
   it('bounds multibyte diagnostics and marks truncation', async () => {
     const exact = 'x'.repeat(MAX_SUBAGENT_DIAGNOSTIC_BYTES)
     const oversized = '权限'.repeat(MAX_SUBAGENT_DIAGNOSTIC_BYTES)

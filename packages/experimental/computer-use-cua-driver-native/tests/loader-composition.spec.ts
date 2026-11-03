@@ -74,6 +74,7 @@ it('loads from cordis.yml and logs the native screenshot before the next model r
   await writeFile(configPath, [...modules.keys()].flatMap(name => [
     `- name: '${name}'`,
     ...name === '@deepseek-ai/dsh-attachment-local' ? ['  config:', `    dshHome: ${JSON.stringify(root)}`] : [],
+    ...name === '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native' ? ['  config:', '    desktopMode: enabled'] : [],
   ]).join('\n') + '\n')
 
   const context = ctx = new Context()

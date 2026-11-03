@@ -7,7 +7,7 @@ import type { Browser, BrowserContext, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
-  captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedSession,
+  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedSession,
   watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { saveFailureShot } from './support.ts'
@@ -18,7 +18,7 @@ const MESSAGE_TEXT = 'Pinned the migration checklist to the top of the plan.'
 const ANSWER_TEXT = 'Proceed with the staged rollout'
 const QUESTION_TEXT = 'Roll out to production now or stage first?'
 const OTHER_PROJECT_TEXT = 'Unrelated project activity'
-const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/project-activity', import.meta.url))
+const EXPECTED_DIR = fileURLToPath(new URL('./expected/project-activity', import.meta.url))
 const MODE = webSnapshotMode()
 
 let scaffold: WebScaffold
@@ -28,7 +28,7 @@ let page: Page | undefined
 let tripwire: ReturnType<typeof watchConsole> | undefined
 
 /** Account-scoped Gateway fakes for the project scope and one feed page. */
-async function mockActivityGateway(target: Page): Promise<void> {
+async function mockActivityGateway(target: Page, day = '2026-10-23'): Promise<void> {
   await target.route(/\/api\/host\.describe(?:\?.*)?$/, async (route) => {
     const response = await route.fetch()
     const body = await response.json() as {
@@ -57,17 +57,17 @@ async function mockActivityGateway(target: Page): Promise<void> {
       json: {
         items: selector === 'project:10' ? [{
           kind: 'message', sessionId: 'another-project', conversationTitle: 'Other project',
-          actorUserId: 8, actorLabel: 'Zhou', occurredAt: '2026-10-23T09:00:00.000Z',
+          actorUserId: 8, actorLabel: 'Zhou', occurredAt: `${day}T09:00:00.000Z`,
           seq: 1, text: OTHER_PROJECT_TEXT,
         }] : [
           {
             kind: 'message', sessionId: SESSION_ID, conversationTitle: 'Release plan',
-            actorUserId: 8, actorLabel: 'Zhou', occurredAt: '2026-10-23T09:00:00.000Z',
+            actorUserId: 8, actorLabel: 'Zhou', occurredAt: `${day}T09:00:00.000Z`,
             seq: 1, text: MESSAGE_TEXT,
           },
           {
             kind: 'answer', sessionId: SESSION_ID, conversationTitle: 'Release plan',
-            actorUserId: 7, actorLabel: 'Lin', occurredAt: '2026-10-23T08:59:00.000Z',
+            actorUserId: 7, actorLabel: 'Lin', occurredAt: `${day}T08:59:00.000Z`,
             seq: 2, text: ANSWER_TEXT, questionText: QUESTION_TEXT,
           },
         ],
@@ -133,6 +133,7 @@ describe('project activity tab', () => {
   it('keeps project activity pinned after another tab changes scope, then reveals the conversation row', async () => {
     context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', timezoneId: 'UTC' })
     page = await context.newPage()
+    await page.clock.setFixedTime(new Date('2026-10-23T12:00:00.000Z'))
     tripwire = watchConsole(page)
     await mockActivityGateway(page)
     onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-activity'))
@@ -171,10 +172,42 @@ describe('project activity tab', () => {
     await feed.getByText(MESSAGE_TEXT, { exact: true }).waitFor()
     expect(await feed.getByText(OTHER_PROJECT_TEXT, { exact: true }).count()).toBe(0)
     const snapshot = await captureStableAria(page, '[class*="feed"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'ui.expected.md'), snapshot, MODE)
+    await compareOrRefreshGolden(join(EXPECTED_DIR, 'ui.expected.md'), snapshot, MODE)
 
     const seeded = page.getByText('DONE', { exact: true })
     await feed.getByText('Jump to conversation', { exact: true }).click()
     await seeded.waitFor({ timeout: 15_000 })
   }, 90_000)
+
+  it.each([
+    { season: 'spring', day: '2026-03-08', now: '2026-03-09T04:30:00.000Z' },
+    { season: 'fall', day: '2026-10-31', now: '2026-11-02T04:30:00.000Z' },
+  ])('uses the previous local calendar day after the $season daylight-saving change', async ({ season, day, now }) => {
+    context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', timezoneId: 'America/New_York' })
+    page = await context.newPage()
+    await page.clock.setFixedTime(new Date(now))
+    tripwire = watchConsole(page)
+    await mockActivityGateway(page, day)
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await openBlankSession(page)
+    await openActivityTab(page)
+    const feed = page.locator('[class*="feed"]')
+    await feed.getByText('No progress journal yet', { exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Time', exact: true }).click()
+    await feed.getByRole('button', { name: /Zhou · Lin 2/ }).waitFor()
+    expect(await feed.getByRole('button', { name: `Yesterday · ${day.slice(5)} Zhou · Lin 2`, exact: true }).count()).toBe(1)
+    const time = await captureStableAria(page, '[class*="feed"]', scaffold.workspaceCwd)
+    await page.getByRole('button', { name: 'Conversation', exact: true }).click()
+    await feed.getByText('Yesterday 05:00', { exact: true }).waitFor()
+    const conversation = await captureStableAria(page, '[class*="feed"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(join(EXPECTED_DIR, `${season}-calendar-day.expected.md`),
+      `Time view\n${time}\n\nConversation view\n${conversation}`, MODE)
+  })
+
+  it('owns its browser expectations', async () => {
+    await assertFixtureInventory(EXPECTED_DIR, [
+      'fall-calendar-day.expected.md', 'spring-calendar-day.expected.md', 'ui.expected.md',
+    ])
+  })
 })

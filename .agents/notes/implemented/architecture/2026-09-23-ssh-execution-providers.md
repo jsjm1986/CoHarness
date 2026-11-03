@@ -16,6 +16,8 @@ Providers preserve guarded filesystem writes, asynchronous launch, cancellation 
 
 The transport service does not grant product access. The Gateway enforcement face ships in `gateway/src/postgres/ssh-target-service.ts` over migration 038: `resolveForRuntime` authorizes the subject and reads the target configuration inside one PostgreSQL transaction, so qualification and configuration cannot diverge; `share` locks the user and membership rows together, so a concurrent role downgrade cannot preserve stale sharing. The runtime-side `GatewaySshAuthorization` in `packages/context/gateway-execution/src/ssh.ts` resolves only through the signed `/internal/runtime/ssh/resolve` route, captures an invalidation revision before each request and rejects a response that arrives after revocation; each resolved target carries an AbortSignal that the owning grant aborts on invalidation. Personal passwords and keys require a credential service and must not become model arguments, command arguments, ordinary environment variables or Session data.
 
+Target catalog reads, registration, coordinate updates, enable/disable/removal and administrative sharing retain the active organization and current active administrator account and membership in their database transaction. The authenticated actor comes from the Gateway, and coordinate and state changes still require the observed target revision. Administrative sharing requires an administrator even when that account owns the project. Project self-service listing and sharing retain the same active organization and account eligibility, then require current organization administration or ownership of the locked active project. Permission loss before admission changes no targets or shares and creates no successful-action audit.
+
 The filesystem adapter carries CoHarness source-version guards and directory enumeration bounds through validated helper requests. Cached preview inputs cannot substitute a changed source, and a small listing does not require enumerating every remote entry. These helper changes require the matching configured artifact digest.
 
 ## Alternatives considered
@@ -29,5 +31,7 @@ Both endpoints require Linux or macOS and a preinstalled helper. Source alignmen
 ## Verification
 
 Protocol tests cover malformed input, capacity, cancellation, stream authentication and cleanup. Live acceptance additionally needs actual SSH, the installed helper, sandbox enforcement, file mutations, terminal and PTC traffic, plus disconnect cleanup. Product acceptance must cover credential and qualification revocation and remote previews, diffs and delivery cards; these obligations remain open until exercised through their real entry points.
+
+Actual Gateway HTTP replays and PostgreSQL row barriers cover current administrator and project-owner controls, account and organization withdrawal, foreign-organization actors and targets, revision checks, and retained authority while target rows are locked. These local configuration checks do not require a remote SSH connection.
 
 The portable consumer note remains active. No existing active note is fully superseded by this provider adoption.

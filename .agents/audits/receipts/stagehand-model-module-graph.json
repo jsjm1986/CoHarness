@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-module-graph",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm run gen-module-graph",
+  "startedAt": "2026-10-23T18:45:09.560132+00:00",
+  "seconds": 5.609,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "inputsAfter": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "outputSha256": "789aaecfde7cd649ca9b3b26b8c0910d3cf77f22da5971fe7d3df65010a08446",
+  "outputTail": "$ tsx scripts/gen-module-graph.ts\ngen-module-graph: 3 artifact(s) computed, 3 written.\n"
+}

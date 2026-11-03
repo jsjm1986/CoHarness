@@ -1,0 +1,155 @@
+{
+  "finding": "B404",
+  "title": "SSH stream cancellation leaks completed forwards and accepts work after unconfirmed cleanup",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "at": "2026-10-31T12:47:24.640036+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T120849Z",
+  "paths": [
+    "packages/ssh/ssh/src/index.ts",
+    "packages/ssh/ssh/tests/startup-behavior.spec.ts",
+    "packages/ssh/ssh/tests/fixtures/stream-forwarding.mjs",
+    "packages/ssh/ssh/tests/stream-forwarding.expected.e2e.ts",
+    "packages/ssh/ssh/tests/fixtures/stream-forwarding.expected.jsonl",
+    "vitest.expected.config.ts",
+    "packages/ssh/ssh/README.md",
+    "packages/ssh/ssh/README.zh.md",
+    "packages/ssh/ssh/README.i18n.yaml",
+    "docs/subsystems/ssh.md",
+    "docs/subsystems/ssh.zh.md",
+    "docs/subsystems/ssh.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-ssh-stream-forwarding-cancellation.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-ssh-stream-forwarding-cancellation.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-ssh-stream-forwarding-cancellation.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-stream-forwarding-cancellation/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-stream-forwarding-cancellation/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-stream-forwarding-cancellation/guide.i18n.yaml",
+    "packages/extensions/tool-cordis/src/api-catalog.ts"
+  ],
+  "matchingPrerequisites": [
+    "packages/ssh/ssh/src/helper-entry.ts",
+    "packages/ssh/ssh/src/helper-processes.ts",
+    "packages/ssh/ssh/src/helper.ts",
+    "packages/ssh/ssh/src/protocol.ts",
+    "packages/ssh/ssh/src/schemas.ts",
+    "packages/ssh/ssh/src/stream-security.ts",
+    "packages/ssh/ssh/package.json",
+    "packages/ssh/ssh/tsconfig.json",
+    "packages/ssh/ssh/tsdown.config.ts",
+    "packages/ssh/ssh/tests/fixtures/local-ssh-carrier.mjs",
+    "packages/ssh/ssh/tests/fixtures/local-transport.ts",
+    "tsdown.config.ts",
+    "vitest.shared.ts",
+    "scripts/test-proxy-environment.ts"
+  ],
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchedAt": "2026-10-31T12:40:11.662889+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T120849Z/origin-fetch-retry.json",
+    "initialTransportFailure": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T120849Z/origin-fetch.json",
+    "sharedChangesPreserved": true
+  },
+  "cause": "The post-forward cancellation check ran outside reservation rollback. Cleanup swallowed mux cancellation failure and failed to invalidate a reusable master after cancellation or socket-path removal failed.",
+  "implementation": "Include post-command cancellation in rollback; invalidate and terminate the native master after unconfirmed rollback, join native observation, preserve independent failures and retain private evidence when native cleanup cannot be confirmed. Normal enclosing consumer cleanup avoids joining its own owner.",
+  "verification": {
+    "uniqueRelatedCases": 292,
+    "unitCases": 291,
+    "unitFiles": 29,
+    "assembledExpectedOutputCases": 1,
+    "positiveRows": [
+      {
+        "phase": "caller-cancel",
+        "callerCancelled": true,
+        "cancelCommands": 1,
+        "removedBeforeDispose": true,
+        "reusable": true,
+        "stoppedAfterFailure": false,
+        "allNativePermitsCompleted": true,
+        "uncertainties": 0
+      },
+      {
+        "phase": "cancel-failure",
+        "callerCancelled": false,
+        "cancelCommands": 1,
+        "removedBeforeDispose": true,
+        "reusable": false,
+        "stoppedAfterFailure": true,
+        "allNativePermitsCompleted": true,
+        "uncertainties": 0
+      }
+    ],
+    "oldRows": [
+      {
+        "phase": "caller-cancel",
+        "callerCancelled": true,
+        "cancelCommands": 0,
+        "removedBeforeDispose": false,
+        "reusable": true,
+        "stoppedAfterFailure": false,
+        "allNativePermitsCompleted": true,
+        "uncertainties": 0
+      },
+      {
+        "phase": "cancel-failure",
+        "callerCancelled": false,
+        "cancelCommands": 1,
+        "removedBeforeDispose": true,
+        "reusable": true,
+        "stoppedAfterFailure": false,
+        "allNativePermitsCompleted": true,
+        "uncertainties": 0
+      }
+    ],
+    "beforeFix": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T120849Z/ssh-stream-before-fix.json",
+    "oldCompiledNegative": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T120849Z/ssh-stream-old-negative.json",
+    "coverage": {
+      "packages/ssh/ssh/src/index.ts": {
+        "statements": [
+          313,
+          313
+        ],
+        "branches": [
+          133,
+          133
+        ],
+        "functions": [
+          61,
+          61
+        ],
+        "lines": [
+          244,
+          244
+        ]
+      }
+    },
+    "nodeMajors": [
+      22,
+      24
+    ],
+    "builtReplays": "Both native two-row stream flows and the existing ten-row remote process/PTY admission flow pass on Node22 and Node24. Repeated runtimes are not extra unique cases.",
+    "types": "Two changed test faces and project references have zero diagnostics; SSH and tool-cordis package builds pass. The no-emit test face disables emit-only extension rewriting and names the cross-package test dependencies.",
+    "build": "Normal scoped SSH four-entry build plus its reachable runtime chunk; generated tool-cordis package compiled and bundled.",
+    "documentation": "Final twenty doc-quick gates pass after catalog regeneration; export JSDoc and complete generated catalog freshness checks pass.",
+    "lint": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T120849Z/ssh-stream-lint-final.json"
+  },
+  "peerReports": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T120849Z/peer-r15-report.json"
+  ],
+  "peerCorrection": "Reported large-directory admission delay was actual macOS memory pressure. Closing seven saved idle pages restored credits; file-count causality is not established. Thresholds remain unchanged; ordinary model authorization remains per user.",
+  "noteReview": "New Host stream rollback rationale complements active subprocess admission ownership, remote helper cleanup retry and POSIX SSH architecture notes. Their independent ownership decisions remain active; no complete supersession.",
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T120849Z/r6-followup-root-source-union.json",
+  "mergeRequirement": "Apply only the nineteen B404 source deltas while preserving newer peer Local/Gateway/UI changes. Fourteen unchanged inputs are verification prerequisites. Rebuild SSH and the generated tool-cordis catalog with the combined distribution; retain the complete reachable SSH runtime chunk. B404 changes only Host connection behavior and generated source coordinates; the helper entry digest is byte-identical to B403. Do not deploy this reference capsule or overwrite newer peer Local artifacts. B398 onward are outside the serving R14 and reported R15 input-fix candidate.",
+  "limitations": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Continue remaining SSH asynchronous pipe/stream allocation, resource-only remote execution and allocation consumers.",
+    "Continue cross-computer permissions and native containment outside peer-reserved paths; carrier tests do not establish physical Linux/Windows or production acceptance.",
+    "Peer owns Gateway topology/auth/resource, reserved Local/UI paths and REAL033 submission settlement. Serving R14 and reported R15 candidate exclude B398 onward; preserve per-user model authorization.",
+    "Real paid model API validation remains deferred by the user.",
+    "Native tests use a private OpenSSH carrier stand-in and actual helper; no physical SSH server, remote encryption or separate computer acceptance is claimed.",
+    "Built replays use live shared workspace dependencies. The reference capsule preserves prior root Local artifacts and explicitly excludes newer peer outputs; deployment requires a combined rebuild."
+  ],
+  "rootDeployed": false
+}

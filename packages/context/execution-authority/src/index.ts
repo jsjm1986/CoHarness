@@ -70,6 +70,12 @@ export abstract class ExecutionAuthority extends Service {
   abstract capture(agent: Agent): ExecutionInheritance
 
   /**
+   * Read the execution captured by the current asynchronous callback.
+   * @returns immutable references for its live owner, or absence outside captured execution.
+   */
+  abstract current(): ExecutionInheritance | undefined
+
+  /**
    * Capture the current execution of a cold or live source for an explicit fork.
    * @param sessionId - source already authorized by the fork transport.
    * @returns current execution references, independently of the selected history cut.
@@ -99,7 +105,7 @@ export abstract class ExecutionAuthority extends Service {
    * @param agent - actual executing Agent.
    * @param signal - operation-owned cancellation.
    * @param execution - exact tool call when authorization precedes other execution wrappers.
-   * @returns verified participants for attribution; one call incurs one charge.
+   * @returns verified participants for attribution. Permission checks do not reserve or bill model requests.
    */
   abstract authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal,
     execution?: ToolExecution): Promise<ExecutionState>

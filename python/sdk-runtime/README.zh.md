@@ -29,6 +29,8 @@ Office 操作技能通过提供方在加载时追加的绝对路径，调用随�
 
 两种载体执行相同的 `dsh` 语法与随附 profile，包括独立的 `sdk-minimal` 配置树，以及包含前端产物的完整 `web` profile。私有 `dsh-python-runtime-closure` manifest（元数据清单）定义打包依赖闭包。本包还检入 `runtime/cordis.yml`，这是一个可通过显式 `DSH_CORDIS_CONFIG` 或 argv 配置路径选择的内置 bootstrap 组合。
 
+依赖闭包包含模型、原生操作与子进程 Consumer 所需的 [resource-budget 服务定义](../../packages/context/resource-budget/README.zh.md)和 [model-access 服务定义](../../packages/llm/model-access/README.zh.md)。提供方的启用仍由选定的组合负责。
+
 ## Python 模块 API
 
 - `bundled_package_dir() -> Path` 返回已安装模块数据根目录，并校验发布元数据。

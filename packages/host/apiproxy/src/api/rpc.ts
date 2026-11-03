@@ -33,6 +33,7 @@ export function RpcId(id: string): RpcId {
 export interface RpcErrorDetailsMap {
   'bad-request': { issues: ZodIssue[] }
   'cancelled': {}
+  'desktop-unavailable': { reason: 'headless' | 'disabled' }
   'collaboration-forbidden': {
     sessionId?: SessionId
     action: 'read' | 'write' | 'manage' | 'approve'

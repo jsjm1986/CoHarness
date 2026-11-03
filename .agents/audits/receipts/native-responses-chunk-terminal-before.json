@@ -1,0 +1,14 @@
+{
+  "name": "native-responses-chunk-terminal-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/llm/llm-pi-ai/tests/native-stream.spec.ts -t 'trailing-frame chunking' --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T03:20:49.983369+00:00",
+  "seconds": 3.639,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cfd31deaec395260c7f727d13c92f3eb50ca819d497d9bf42644bc2cb58a55f0",
+  "inputsAfter": "cfd31deaec395260c7f727d13c92f3eb50ca819d497d9bf42644bc2cb58a55f0",
+  "postgresToolDirectory": null,
+  "outputSha256": "1a9607b62f09c7effcbfa67de4cea0f531bc34c701e80c2e03bfbf878c4a2b8a",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/llm/llm-pi-ai/tests/native-stream.spec.ts (27 tests | 1 failed | 25 skipped) 20ms\n   × preserves a terminal response independently of trailing-frame chunking: batched=true 16ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/llm/llm-pi-ai/tests/native-stream.spec.ts > preserves a terminal response independently of trailing-frame chunking: batched=true\nAssertionError: promise rejected \"LlmError: Native model emitted data after… { …(2) }\" instead of resolving\n ❯ packages/llm/llm-pi-ai/tests/native-stream.spec.ts:227:38\n    225|   onTestFinished(() => { fetch.mockRestore() })\n    226|   const call = await f.prepare()\n    227|   await expect(call.run(call.config)).resolves.toBeUndefined()\n       |                                      ^\n    228|   expect(f.events).toEqual([{ event: 'response.completed', data: '{\"ty…\n    229| })\n\nCaused by: LlmError: Native model emitted data after completion.\n ❯ Object.run packages/llm/llm/src/operation-call.ts:78:19\n ❯ packages/llm/llm-pi-ai/tests/native-stream.spec.ts:227:3\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\nSerialized Error: { code: 'MALFORMED_RESPONSE', failure: { message: 'Native model emitted data after completion.', code: 'MALFORMED_RESPONSE' } }\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 1 passed | 25 skipped (27)\n   Start at  11:20:53\n   Duration  484ms (transform 278ms, setup 28ms, import 367ms, tests 20ms, environment 0ms)\n\n"
+}

@@ -39,6 +39,10 @@ Providers advertise preparation origins through `downloadSources`. `prepare(id, 
 
 `defaultProvider` and `language` are volatile Config fields acting as composition defaults: `configure()` merges the supplied fields into the `speech-to-text` section through the `settings` service, and the running instance reads the registered scope's resolved values without remounting. `configure()` fails without `settings`, and rejects a language unsupported by the selected provider before saving. Providers advertise accepted language hints through `languages`; `resolve()` validates the selected hint before transcription. Provider-owned preparation is observed through complete `SpeechSnapshot` values; closing an observer never cancels preparation.
 
+The selection scope follows the current optional Settings provider. Withdrawal restores live composition defaults and refuses preference writes; replacement binds the new provider’s persisted values and file. Readiness observers receive both transitions without restarting the speech registry or recognizers. Saving checks the binding again after persistence; a provider change rejects the acknowledgement even when the original file write already committed. Committed data stays in that file.
+
+Provider withdrawal removes routing immediately and cancels accepted recordings. Concurrent disposer calls share one completion; registry shutdown also joins providers already removed from routing. Subscription cleanup failures are reported after accepted work settles.
+
 The `./wave` helper validates canonical 16 kHz mono PCM16 WAV for the Remote consumer and the native recognition process. Both reject inconsistent headers and lengths before decoding samples.
 
 </details>

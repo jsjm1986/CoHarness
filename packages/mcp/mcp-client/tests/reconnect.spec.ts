@@ -49,9 +49,7 @@ vi.mock('@modelcontextprotocol/client', async importOriginal => ({
   StreamableHTTPClientTransport: vi.fn(),
 }))
 
-vi.mock('@modelcontextprotocol/client/stdio', () => ({
-  StdioClientTransport: vi.fn(function () { return { close: () => Promise.resolve() } }),
-}))
+vi.mock('../src/transport.ts', () => ({ createTransport: vi.fn(() => ({ close: async () => {} })) }))
 
 // vi.mock is hoisted above static imports, so the modules under test see the
 // mocked SDK even through a static import.
@@ -347,7 +345,6 @@ describe('reconnect supervisor', () => {
   it.each(['connect', 'discovery'] as const)('bounds disposal during %s when the transport never reports closure', async (phase) => {
     vi.useFakeTimers()
     try {
-      const { errors } = captureLogs(ctx)
       const gate: PromiseWithResolvers<undefined> = Promise.withResolvers()
       if (phase === 'connect') mockConnect.mockImplementation(() => gate.promise)
       else mockListTools.mockImplementation(() => gate.promise.then(() => listing('late')))
@@ -355,7 +352,7 @@ describe('reconnect supervisor', () => {
       const handle = startConnection(ctx, stdioConfig(), resolveReconnectPolicy(undefined, 'reconnect'))
       await vi.advanceTimersByTimeAsync(0)
 
-      const disposing = handle.dispose()
+      const disposing = expect(handle.dispose()).rejects.toThrow('server shutdown may be incomplete')
       await vi.advanceTimersByTimeAsync(5_000)
       gate.resolve(undefined)
       await vi.advanceTimersByTimeAsync(5_000)
@@ -363,7 +360,8 @@ describe('reconnect supervisor', () => {
 
       expect(mockListTools).toHaveBeenCalledTimes(phase === 'connect' ? 0 : 1)
       expect(ctx.tools.get('mcp__srv__late')).toBeUndefined()
-      expect(errors.some(line => line.includes('server shutdown may be incomplete'))).toBe(true)
+      instances[0]?.onclose?.()
+      await handle.dispose()
     } finally {
       vi.useRealTimers()
     }
@@ -381,6 +379,23 @@ describe('reconnect supervisor', () => {
     await disposing
     expect(mockClose).toHaveBeenCalledTimes(1)
     expect(mockListTools).not.toHaveBeenCalled()
+  })
+
+  it('bounds HTTP shutdown and allows a retry after its transport eventually reports closure', async () => {
+    vi.useFakeTimers()
+    try {
+      mockClose.mockResolvedValue(undefined)
+      const handle = startConnection(ctx, {
+        transport: 'streamable-http', serverName: 'http', url: 'http://mcp.example.test', headers: {},
+        toolCallTimeoutMs: 60_000, failOnStartupError: false,
+      }, resolveReconnectPolicy(undefined, 'reconnect'))
+      await handle.ready
+      const rejected = expect(handle.dispose()).rejects.toThrow('server shutdown may be incomplete')
+      await vi.advanceTimersByTimeAsync(5_000)
+      await rejected
+      instances[0]!.onclose?.()
+      await handle.dispose()
+    } finally { vi.useRealTimers() }
   })
 
   it('discards a queued tool refresh when disposal starts before it runs', async () => {

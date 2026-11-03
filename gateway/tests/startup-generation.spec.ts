@@ -1,4 +1,5 @@
 /** A Gateway starting across data restoration must not publish stale cached dependencies as current. */
+import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
@@ -19,7 +20,7 @@ import { nodeConfigurationAuthority } from '../src/postgres/node-configuration-a
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
 import { PostgresUserService } from '../src/postgres/user-service.ts'
 
-const databaseUrl = process.env.HGW_TEST_DATABASE_URL
+const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const execute = promisify(execFile)
 const gateway = resolve(import.meta.dirname, '..')
 
@@ -31,7 +32,6 @@ async function reservePort(reservations: Server[]): Promise<number> {
 }
 
 it.skipIf(databaseUrl === undefined)('rejects a startup whose cached files predate its completed database restore', async () => {
-  if (!/(_test|_accept|_acceptance)(\?|$)/u.test(databaseUrl!)) throw new Error('disposable PostgreSQL database required')
   const root = await mkdtemp(join(tmpdir(), 'hgw-startup-generation-'))
   const pool = createPostgresPool(databaseUrl!, { max: 5 })
   const reservations: Server[] = []

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { mkdir, realpath, rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { PoolClient } from 'pg'
 import { CollaborationDeniedError } from '../collaboration.ts'
 import type { GatewayConfig } from '../config.ts'
 import { assertProjectImportPathAllowed } from '../project-directories.ts'
@@ -23,6 +24,7 @@ import {
 } from '../projects.ts'
 import { transaction, type Queryable } from './database.ts'
 import { allocateInstancePorts } from './port-allocation.ts'
+import { lockProjectManagement } from './project-management-authority.ts'
 import {
   internalProjectId,
   internalUserId,
@@ -73,25 +75,77 @@ export class PostgresProjectService {
   constructor(
     private readonly context: PostgresRuntimeContext,
     private readonly cfg: GatewayConfig,
+    private readonly entryNodeId?: string,
   ) {}
 
-  async create(input: { name: string; path?: string; createdBy: number }): Promise<ProjectRow> {
+  /** Serialize new operational relationships with account deletion before taking project/link locks. */
+  private async mutationUser(client: PoolClient, publicId: number): Promise<string | null> {
+    const result = await client.query<{ id: string }>(`SELECT id FROM harness.users
+      WHERE organization_id=$1 AND public_id=$2 AND deleted_at IS NULL FOR SHARE`, [this.context.organizationId, publicId])
+    return result.rows[0]?.id ?? null
+  }
+
+  /** Retain active account/membership rows and any required administrator role; unavailable actors are forbidden. */
+  private async activeMutationUser(
+    client: PoolClient, publicId: number, purpose: 'actor' | 'recipient', requiredRole: 'member' | 'administrator' = 'member',
+  ): Promise<string> {
+    const user = await this.mutationUser(client, publicId)
+    if (user === null) {
+      if (purpose === 'actor') throw new CollaborationDeniedError('forbidden')
+      throw new Error(`unknown user ${String(publicId)}`)
+    }
+    const authority = await client.query<{ user_status: string; membership_status: string; role: 'admin' | 'member' }>(`SELECT
+      u.status user_status,m.status membership_status,m.role FROM harness.users u
+      JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
+      WHERE u.organization_id=$1 AND u.id=$2 FOR SHARE OF m`, [this.context.organizationId, user])
+    const current = authority.rows[0]
+    if (current === undefined || current.user_status !== 'active' || current.membership_status !== 'active'
+      || requiredRole === 'administrator' && current.role !== 'admin') {
+      if (purpose === 'actor') throw new CollaborationDeniedError('forbidden')
+      throw new Error('user-disabled')
+    }
+    return user
+  }
+
+  /** Read organization availability after the transaction's project or allocation wait. */
+  private async assertOrganizationActive(client: PoolClient): Promise<void> {
+    if ((await client.query("SELECT 1 FROM harness.organizations WHERE id=$1 AND status='active'",
+      [this.context.organizationId])).rowCount !== 1) throw new CollaborationDeniedError('forbidden')
+  }
+
+  /** Retain an account's permission on the project's fixed computer until the invitation transaction commits. */
+  private async lockInvitationComputer(client: PoolClient, projectId: string, userId: string,
+    denial: 'forbidden' | 'invitation-computer-required' = 'invitation-computer-required'): Promise<void> {
+    const permission = await client.query(`SELECT permission.node_id FROM harness.instances instance
+      JOIN harness.computer_use_permissions permission ON permission.organization_id=instance.organization_id
+        AND permission.node_id=instance.assigned_node_id AND permission.user_id=$3
+      WHERE instance.organization_id=$1 AND instance.project_id=$2 AND permission.enabled
+        AND harness.computer_use_allowed(instance.organization_id,$3,instance.assigned_node_id)
+        AND ($4::uuid IS NULL OR harness.entry_node_visible(instance.organization_id,$4,instance.assigned_node_id))
+      FOR SHARE OF permission`, [this.context.organizationId, projectId, userId, this.entryNodeId ?? null])
+    if (permission.rowCount !== 1) throw new CollaborationDeniedError(denial)
+  }
+
+  /** Import or allocate with current administrator authority; actor omission permits trusted internal maintenance. */
+  async create(input: { name: string; path?: string; createdBy: number; actorUserId?: number }): Promise<ProjectRow> {
+    if (input.actorUserId !== undefined && input.createdBy !== input.actorUserId) throw new CollaborationDeniedError('forbidden')
     const requestedPath = input.path?.trim()
-    const managed = requestedPath === undefined || requestedPath === ''
-      ? ensureManagedProjectDirectory(this.cfg, input.name)
-      : undefined
-    const canonical = managed !== undefined ? managed.path : resolveProjectDirectory(requestedPath!)
+    const name = normalizeProjectName(input.name)
     return this.insert({
-      name: managed?.name ?? normalizeProjectName(input.name),
-      canonical,
+      name,
+      resolveDirectory: () => requestedPath === undefined || requestedPath === ''
+        ? ensureManagedProjectDirectory(this.cfg, name).path : resolveProjectDirectory(requestedPath),
       createdBy: input.createdBy,
       origin: 'admin',
       ownerUserId: null,
+      actorUserId: input.actorUserId,
     })
   }
 
-  /** Allocate below HGW_USER_PROJECTS_ROOT; preserve the directory once a commit can have succeeded. */
-  async createManaged(input: { name: string; ownerUserId: number; createdBy?: number }): Promise<ProjectRow> {
+  /** Allocate a self-owned authenticated project, or trusted internal maintenance when actorUserId is omitted; preserve uncertain commits. */
+  async createManaged(input: { name: string; ownerUserId: number; createdBy?: number; actorUserId?: number }): Promise<ProjectRow> {
+    if (input.actorUserId !== undefined && (input.actorUserId !== input.ownerUserId
+      || input.createdBy !== undefined && input.createdBy !== input.actorUserId)) throw new CollaborationDeniedError('forbidden')
     const name = normalizeProjectName(input.name)
     await mkdir(this.cfg.userProjectsRoot, { recursive: true, mode: 0o770 })
     let canonical: string | undefined
@@ -109,36 +163,48 @@ export class PostgresProjectService {
     if (canonical === undefined) throw new Error('managed project directory allocation failed')
     return this.insert({
       name,
-      canonical,
+      resolveDirectory: () => canonical,
       createdBy: input.createdBy ?? input.ownerUserId,
       origin: 'user',
       ownerUserId: input.ownerUserId,
-      allocatedDirectory: true,
+      allocatedDirectory: canonical,
+      actorUserId: input.actorUserId,
     })
   }
 
   private async insert(input: {
     name: string
-    canonical: string
+    resolveDirectory: () => string
     createdBy: number | null
     origin: ProjectOrigin
     ownerUserId: number | null
     kind?: ProjectKind
-    allocatedDirectory?: true
+    allocatedDirectory?: string
+    actorUserId?: number
   }): Promise<ProjectRow> {
     let commitMayHaveSucceeded = false
     try {
       const publicId = await transaction(this.context.pool, async (client) => {
+        if (input.actorUserId !== undefined) {
+          const actor = await this.activeMutationUser(client, input.actorUserId, 'actor',
+            input.origin === 'admin' ? 'administrator' : 'member')
+          if (input.origin === 'user' && (await client.query(`SELECT 1 FROM harness.computer_use_permissions
+            WHERE organization_id=$1 AND user_id=$2 AND node_id=$3 AND enabled
+              AND harness.computer_use_allowed($1,$2,$3) FOR SHARE`,
+          [this.context.organizationId, actor, this.context.nodeId])).rowCount !== 1) throw new CollaborationDeniedError('forbidden')
+        }
         const createdBy = input.createdBy === null
           ? null
-          : await internalUserId(client, this.context.organizationId, input.createdBy)
+          : await this.mutationUser(client, input.createdBy)
         if (createdBy === null && input.createdBy !== null) throw new Error(`unknown user ${String(input.createdBy)}`)
         const owner = input.ownerUserId === null
           ? null
-          : await internalUserId(client, this.context.organizationId, input.ownerUserId)
+          : await this.mutationUser(client, input.ownerUserId)
         if (input.ownerUserId !== null && owner === null) throw new Error(`unknown user ${String(input.ownerUserId)}`)
         await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-port:${this.context.nodeId}`])
-        await this.assertNotReserved(client, input.canonical, input.origin === 'user')
+        if (input.actorUserId !== undefined) await this.assertOrganizationActive(client)
+        const canonical = input.resolveDirectory()
+        await this.assertNotReserved(client, canonical, input.origin === 'user')
         const project = await client.query<{ id: string; public_id: string }>(`INSERT INTO harness.projects(
           organization_id,name,created_by,origin,owner_user_id,model_access_default_allowed,kind
         ) VALUES($1,$2,$3,$4,$5,true,$6) RETURNING id,public_id::text`, [
@@ -148,7 +214,7 @@ export class PostgresProjectService {
         if (row === undefined) throw new Error('project insert returned no row')
         await client.query(`INSERT INTO harness.project_mounts(
           organization_id,project_id,node_id,local_path,canonical_path
-        ) VALUES($1,$2,$3,$4,$4)`, [this.context.organizationId, row.id, this.context.nodeId, input.canonical])
+        ) VALUES($1,$2,$3,$4,$4)`, [this.context.organizationId, row.id, this.context.nodeId, canonical])
         // The steward space keeps an empty member list: admission comes from
         // the steward qualification lane, so no creator row is written.
         const member = input.kind === 'steward' ? null : owner ?? createdBy
@@ -174,8 +240,8 @@ export class PostgresProjectService {
       if (detail === null) throw new Error('project insert returned no detail')
       return detail
     } catch (error) {
-      if (input.allocatedDirectory === true && !commitMayHaveSucceeded) {
-        await rm(input.canonical, { recursive: true, force: true })
+      if (input.allocatedDirectory !== undefined && !commitMayHaveSucceeded) {
+        await rm(input.allocatedDirectory, { recursive: true, force: true })
       }
       if (isCodedError(error) && error.code === '23505') {
         if (error.constraint === 'projects_organization_id_name_key') throw new Error(`duplicate project name: ${input.name}`)
@@ -202,7 +268,7 @@ export class PostgresProjectService {
     try {
       return await this.insert({
         name,
-        canonical,
+        resolveDirectory: () => canonical,
         createdBy: input.createdBy ?? null,
         origin: 'admin',
         ownerUserId: null,
@@ -214,7 +280,7 @@ export class PostgresProjectService {
       if (error instanceof Error && error.message.startsWith('duplicate project name')) {
         return this.insert({
           name: normalizeProjectName(`${name}-steward`),
-          canonical,
+          resolveDirectory: () => canonical,
           createdBy: input.createdBy ?? null,
           origin: 'admin',
           ownerUserId: null,
@@ -378,12 +444,15 @@ export class PostgresProjectService {
     return (await this.getByIds([id]))[0] ?? null
   }
 
-  async rename(id: number, name: string): Promise<void> {
+  async rename(id: number, name: string, actorUserId?: number): Promise<void> {
     const normalized = normalizeProjectName(name)
-    await this.assertNotSteward(this.context.pool, await internalProjectId(this.context.pool, this.context.organizationId, id))
     try {
-      await this.context.pool.query(`UPDATE harness.projects SET name=$3,updated_at=now(),version=version+1
-        WHERE organization_id=$1 AND public_id=$2`, [this.context.organizationId, id, normalized])
+      await transaction(this.context.pool, async (client) => {
+        const project = await lockProjectManagement(client, this.context, id, actorUserId)
+        await this.assertNotSteward(client, project)
+        await client.query(`UPDATE harness.projects SET name=$3,updated_at=now(),version=version+1
+          WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, project, normalized])
+      })
     } catch (error) {
       if (isCodedError(error) && error.code === '23505') throw new Error(`duplicate project name: ${normalized}`)
       throw error
@@ -391,60 +460,81 @@ export class PostgresProjectService {
   }
 
   /** Update the project UI theme policy without changing its filesystem identity. */
-  async setThemePolicy(id: number, policy: ProjectThemePolicy): Promise<void> {
+  async setThemePolicy(id: number, policy: ProjectThemePolicy, actorUserId?: number): Promise<void> {
     if (policy !== 'follow-user' && policy !== 'light' && policy !== 'dark') {
       throw new Error('invalid project theme policy')
     }
-    const result = await this.context.pool.query(
-      `UPDATE harness.projects SET ui_theme_policy=$3,updated_at=now(),version=version+1
-       WHERE organization_id=$1 AND public_id=$2`,
-      [this.context.organizationId, id, policy],
-    )
-    if (result.rowCount !== 1) throw new Error(`unknown project ${String(id)}`)
+    await transaction(this.context.pool, async (client) => {
+      const project = await lockProjectManagement(client, this.context, id, actorUserId)
+      await client.query(`UPDATE harness.projects SET ui_theme_policy=$3,updated_at=now(),version=version+1
+        WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, project, policy])
+    })
   }
 
-  async remove(id: number): Promise<number[]> {
+  async remove(id: number, actorUserId?: number): Promise<number[]> {
     return transaction(this.context.pool, async (client) => {
-      const projectId = await internalProjectId(client, this.context.organizationId, id)
-      if (projectId === null) return []
+      if (actorUserId !== undefined) await lockProjectManagement(client, this.context, id, actorUserId, 'administrator')
+      const selected = await client.query<{ id: string }>(
+        'SELECT id FROM harness.projects WHERE organization_id=$1 AND public_id=$2 FOR UPDATE',
+        [this.context.organizationId, id])
+      const projectId = selected.rows[0]?.id
+      if (projectId === undefined) return []
       await this.assertNotSteward(client, projectId)
       const members = await client.query<{ public_id: string }>(`SELECT u.public_id::text
         FROM harness.project_members m
         JOIN harness.users u ON u.id=m.user_id AND u.organization_id=m.organization_id
         WHERE m.organization_id=$1 AND m.project_id=$2 ORDER BY u.public_id`,
       [this.context.organizationId, projectId])
+      await client.query('DELETE FROM harness.model_runtime_intake_tokens WHERE organization_id=$1 AND project_id=$2',
+        [this.context.organizationId, projectId])
       await client.query('DELETE FROM harness.projects WHERE organization_id=$1 AND id=$2',
         [this.context.organizationId, projectId])
       return members.rows.map(row => publicNumber(row.public_id, 'user'))
     })
   }
 
-  async setMember(projectId: number, userId: number, mode: GrantMode): Promise<void> {
+  /** Set current membership and revoke pending invitations superseded by this decision. */
+  async setMember(projectId: number, userId: number, mode: GrantMode, actorUserId?: number): Promise<void> {
     await transaction(this.context.pool, async (client) => {
       const project = await internalProjectId(client, this.context.organizationId, projectId)
-      const user = await internalUserId(client, this.context.organizationId, userId)
+      const user = await this.mutationUser(client, userId)
       if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+      if (actorUserId !== undefined) await lockProjectManagement(client, this.context, projectId, actorUserId, 'administrator')
       await this.assertNotSteward(client, project)
       if (user === null) throw new Error(`unknown user ${String(userId)}`)
       const owner = await client.query<{ owner_user_id: string | null }>(
         'SELECT owner_user_id FROM harness.projects WHERE organization_id=$1 AND id=$2 FOR UPDATE',
         [this.context.organizationId, project],
       )
-      if (owner.rows[0]?.owner_user_id === user && mode !== 'rw') throw new Error('owner-must-be-rw')
+      const current = owner.rows[0]
+      if (current === undefined) throw new Error(`unknown project ${String(projectId)}`)
+      if (current.owner_user_id === user && mode !== 'rw') throw new Error('owner-must-be-rw')
       await client.query(`INSERT INTO harness.project_members(
         organization_id,project_id,user_id,access_mode
       ) VALUES($1,$2,$3,$4) ON CONFLICT(project_id,user_id) DO UPDATE SET
         access_mode=excluded.access_mode,updated_at=now()`, [this.context.organizationId, project, user, mode])
+      await client.query(`UPDATE harness.project_invitations SET status='revoked',responded_at=now()
+        WHERE organization_id=$1 AND project_id=$2 AND invitee_user_id=$3 AND status='pending'`,
+      [this.context.organizationId, project, user])
     })
   }
 
-  async removeMember(projectId: number, userId: number): Promise<void> {
+  /** Remove membership and revoke pending invitations, including for an account not yet enrolled. */
+  async removeMember(projectId: number, userId: number, actorUserId?: number): Promise<void> {
     await transaction(this.context.pool, async (client) => {
       const project = await internalProjectId(client, this.context.organizationId, projectId)
+      const user = await this.mutationUser(client, userId)
+      if (project !== null && actorUserId !== undefined) {
+        await lockProjectManagement(client, this.context, projectId, actorUserId, 'administrator')
+      }
       // A memberless steward row must still refuse the mutation rather than
       // reporting success for a membership that can never exist.
       await this.assertNotSteward(client, project)
       if (project === null) return
+      const owner = await client.query<{ owner_user_id: string | null }>(
+        'SELECT owner_user_id FROM harness.projects WHERE organization_id=$1 AND id=$2 FOR UPDATE',
+        [this.context.organizationId, project],
+      )
       const membership = await client.query<{ project_id: string; user_id: string }>(`SELECT
         m.project_id,m.user_id
         FROM harness.project_members m
@@ -453,11 +543,12 @@ export class PostgresProjectService {
         WHERE m.organization_id=$1 AND p.public_id=$2 AND u.public_id=$3
         FOR UPDATE OF m`, [this.context.organizationId, projectId, userId])
       const locked = membership.rows[0]
-      if (locked === undefined) return
-      const owner = await client.query<{ owner_user_id: string | null }>(
-        'SELECT owner_user_id FROM harness.projects WHERE organization_id=$1 AND id=$2 FOR UPDATE',
-        [this.context.organizationId, locked.project_id],
-      )
+      if (locked === undefined) {
+        if (user !== null) await client.query(`UPDATE harness.project_invitations SET status='revoked',responded_at=now()
+          WHERE organization_id=$1 AND project_id=$2 AND invitee_user_id=$3 AND status='pending'`,
+        [this.context.organizationId, project, user])
+        return
+      }
       if (owner.rows[0]?.owner_user_id === locked.user_id) throw new Error('owner-protected')
       const privateConversation = await client.query<{ blocked: boolean }>(`SELECT EXISTS(
         SELECT 1 FROM harness.conversation_sessions c
@@ -469,6 +560,9 @@ export class PostgresProjectService {
       }
       await client.query(`DELETE FROM harness.project_members
         WHERE organization_id=$1 AND project_id=$2 AND user_id=$3`,
+      [this.context.organizationId, locked.project_id, locked.user_id])
+      await client.query(`UPDATE harness.project_invitations SET status='revoked',responded_at=now()
+        WHERE organization_id=$1 AND project_id=$2 AND invitee_user_id=$3 AND status='pending'`,
       [this.context.organizationId, locked.project_id, locked.user_id])
     })
   }
@@ -495,7 +589,7 @@ export class PostgresProjectService {
     }))
   }
 
-  /** Create a pending invitation for one organization user. */
+  /** Create a pending invitation, retiring an expired pending invitation for the same recipient. */
   async createInvitation(input: {
     projectId: number
     inviteeUserId: number
@@ -503,42 +597,47 @@ export class PostgresProjectService {
     mode: GrantMode
   }): Promise<ProjectInvitation> {
     try {
-      const projectId = await internalProjectId(this.context.pool, this.context.organizationId, input.projectId)
-      if (projectId === null) throw new Error(`unknown project ${String(input.projectId)}`)
-      await this.assertNotSteward(this.context.pool, projectId)
-      const inviteeId = await internalUserId(this.context.pool, this.context.organizationId, input.inviteeUserId)
-      if (inviteeId === null) throw new Error(`unknown user ${String(input.inviteeUserId)}`)
-      const inviterId = await internalUserId(this.context.pool, this.context.organizationId, input.inviterUserId)
-      if (inviterId === null) throw new Error(`unknown user ${String(input.inviterUserId)}`)
-      const authority = await this.context.pool.query<{ role: 'admin' | 'member'; status: 'active' | 'disabled'; owner_user_id: string | null }>(`SELECT
-        m.role,u.status,p.owner_user_id
-        FROM harness.users u
-        JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
-        JOIN harness.projects p ON p.organization_id=u.organization_id AND p.id=$3
-        WHERE u.organization_id=$1 AND u.id=$2`, [this.context.organizationId, inviterId, projectId])
-      const authorityRow = authority.rows[0]
-      if (authorityRow === undefined || authorityRow.status !== 'active'
-        || (authorityRow.role !== 'admin' && authorityRow.owner_user_id !== inviterId)) {
-        throw new Error('invitation-forbidden')
-      }
-      const invitee = await this.context.pool.query<{ status: 'active' | 'disabled' }>(
-        'SELECT status FROM harness.users WHERE organization_id=$1 AND id=$2',
-        [this.context.organizationId, inviteeId],
-      )
-      if (invitee.rows[0] === undefined) throw new Error(`unknown user ${String(input.inviteeUserId)}`)
-      if (invitee.rows[0].status !== 'active') throw new Error('user-disabled')
-      const existing = await this.context.pool.query(`SELECT 1 FROM harness.project_members
-        WHERE organization_id=$1 AND project_id=$2 AND user_id=$3`, [this.context.organizationId, projectId, inviteeId])
-      if (existing.rowCount !== null && existing.rowCount > 0) throw new Error('invitation-already-member')
-      const row = await this.context.pool.query<{ id: string }>(`INSERT INTO harness.project_invitations(
-        organization_id,project_id,invitee_user_id,inviter_user_id,access_mode
-      ) VALUES($1,$2,$3,$4,$5) RETURNING id::text`, [
-        this.context.organizationId,
-        projectId, inviteeId, inviterId,
-        input.mode,
-      ])
-      const invitationId = row.rows[0]?.id
-      if (invitationId === undefined) throw new Error('invitation insert returned no row')
+      const invitationId = await transaction(this.context.pool, async (client) => {
+        const projectId = await internalProjectId(client, this.context.organizationId, input.projectId)
+        if (projectId === null) throw new Error(`unknown project ${String(input.projectId)}`)
+        const inviteeId = await this.activeMutationUser(client, input.inviteeUserId, 'recipient')
+        const inviterId = await this.activeMutationUser(client, input.inviterUserId, 'actor')
+        const selected = await client.query<{ status: string }>('SELECT status FROM harness.projects WHERE organization_id=$1 AND id=$2 FOR UPDATE',
+          [this.context.organizationId, projectId])
+        if (selected.rows[0] === undefined) throw new Error(`unknown project ${String(input.projectId)}`)
+        if (selected.rows[0].status !== 'active') throw new CollaborationDeniedError('forbidden')
+        await this.assertNotSteward(client, projectId)
+        const authority = await client.query<{ role: 'admin' | 'member'; status: 'active' | 'disabled'; membership_status: 'active' | 'disabled'; owner_user_id: string | null }>(`SELECT
+          m.role,u.status,m.status membership_status,p.owner_user_id
+          FROM harness.users u
+          JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
+          JOIN harness.projects p ON p.organization_id=u.organization_id AND p.id=$3
+          WHERE u.organization_id=$1 AND u.id=$2 FOR SHARE OF u,m`, [this.context.organizationId, inviterId, projectId])
+        const authorityRow = authority.rows[0]
+        if (authorityRow === undefined || authorityRow.status !== 'active' || authorityRow.membership_status !== 'active'
+          || (authorityRow.role !== 'admin' && authorityRow.owner_user_id !== inviterId)) {
+          throw new Error('invitation-forbidden')
+        }
+        await this.assertOrganizationActive(client)
+        await this.lockInvitationComputer(client, projectId, inviterId, 'forbidden')
+        await this.lockInvitationComputer(client, projectId, inviteeId)
+        const existing = await client.query(`SELECT 1 FROM harness.project_members
+          WHERE organization_id=$1 AND project_id=$2 AND user_id=$3`, [this.context.organizationId, projectId, inviteeId])
+        if (existing.rowCount !== null && existing.rowCount > 0) throw new Error('invitation-already-member')
+        await client.query(`UPDATE harness.project_invitations SET status='expired',responded_at=clock_timestamp()
+          WHERE organization_id=$1 AND project_id=$2 AND invitee_user_id=$3
+            AND status='pending' AND expires_at<=clock_timestamp()`, [this.context.organizationId, projectId, inviteeId])
+        const row = await client.query<{ id: string }>(`INSERT INTO harness.project_invitations(
+          organization_id,project_id,invitee_user_id,inviter_user_id,access_mode
+        ) VALUES($1,$2,$3,$4,$5) RETURNING id::text`, [
+          this.context.organizationId,
+          projectId, inviteeId, inviterId,
+          input.mode,
+        ])
+        const id = row.rows[0]?.id
+        if (id === undefined) throw new Error('invitation insert returned no row')
+        return id
+      })
       return await this.invitationById(invitationId)
     } catch (error) {
       if (isCodedError(error) && error.code === '23505') throw new Error('invitation-already-pending')
@@ -546,22 +645,48 @@ export class PostgresProjectService {
     }
   }
 
+  /** Read a bounded recipient directory using current management and project-computer authority. */
+  async listInvitableUsers(projectId: number, actorUserId: number, cursor = 0): Promise<{
+    items: Array<{ id: number; username: string; displayName: string }>; nextCursor: number | null
+  }> {
+    if (!Number.isSafeInteger(cursor) || cursor < 0) throw new Error('invalid-user-cursor')
+    return transaction(this.context.pool, async client => {
+      const project = await lockProjectManagement(client, this.context, projectId, actorUserId)
+      await this.assertNotSteward(client, project)
+      const limit = this.cfg.runtimeCatalog.pageSize
+      const result = await client.query<{ id: string; username: string; display_name: string }>(`SELECT
+        u.public_id::text id,u.username::text,u.display_name FROM harness.users u
+        JOIN harness.instances instance ON instance.organization_id=u.organization_id AND instance.project_id=$2
+        WHERE u.organization_id=$1 AND u.public_id>$3 AND u.public_id<>$4
+          AND harness.computer_use_allowed(u.organization_id,u.id,instance.assigned_node_id)
+          AND NOT EXISTS(SELECT 1 FROM harness.project_members member
+            WHERE member.organization_id=u.organization_id AND member.project_id=$2 AND member.user_id=u.id)
+        ORDER BY u.public_id LIMIT $5`, [this.context.organizationId, project, cursor, actorUserId, limit + 1])
+      const items = result.rows.slice(0, limit).map(row => ({ id: publicNumber(row.id, 'user'),
+        username: row.username, displayName: row.display_name }))
+      const page = { items, nextCursor: result.rows.length > limit ? items.at(-1)!.id : null }
+      if (Buffer.byteLength(JSON.stringify(page)) > this.cfg.runtimeCatalog.maxBytes) throw new Error('invitation-directory-too-large')
+      return page
+    })
+  }
+
   async listInvitations(userId: number, projectId?: number): Promise<ProjectInvitation[]> {
     const internalUser = await internalUserId(this.context.pool, this.context.organizationId, userId)
     if (internalUser === null) return []
-    const values: unknown[] = [this.context.organizationId, internalUser]
+    const values: unknown[] = [this.context.organizationId, internalUser, this.entryNodeId ?? null]
     let projectClause = ''
     if (projectId !== undefined) {
       const internalProject = await internalProjectId(this.context.pool, this.context.organizationId, projectId)
       if (internalProject === null) return []
       values.push(internalProject)
-      projectClause = ' AND i.project_id=$3'
+      projectClause = ' AND i.project_id=$4'
     }
     const result = await this.context.pool.query<InvitationSelectRow>(`SELECT i.id::text id,
       p.public_id::text project_public_id,p.name::text project_name,
       iu.public_id::text invitee_public_id,iu.username::text invitee_username,iu.display_name invitee_display_name,
       ru.public_id::text inviter_public_id,ru.username::text inviter_username,ru.display_name inviter_display_name,
-      i.access_mode mode,i.status,i.expires_at,i.created_at,i.responded_at
+      i.access_mode mode,CASE WHEN i.status='pending' AND i.expires_at<=clock_timestamp() THEN 'expired' ELSE i.status END status,
+      i.expires_at,i.created_at,i.responded_at
       FROM harness.project_invitations i
       JOIN harness.projects p ON p.id=i.project_id AND p.organization_id=i.organization_id
       JOIN harness.users iu ON iu.id=i.invitee_user_id AND iu.organization_id=i.organization_id
@@ -571,6 +696,9 @@ export class PostgresProjectService {
         WHERE administrator.organization_id=i.organization_id AND administrator.user_id=$2
           AND administrator.role='admin' AND administrator.status='active'
       ))
+        AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM harness.instances target
+          WHERE target.organization_id=i.organization_id AND target.project_id=i.project_id
+            AND harness.entry_node_visible(target.organization_id,$3,target.assigned_node_id)))
         ${projectClause} ORDER BY i.created_at DESC,i.id`, values)
     return result.rows.map(row => this.invitationFromRow(row.id, row))
   }
@@ -579,9 +707,13 @@ export class PostgresProjectService {
     const internalUser = await internalUserId(this.context.pool, this.context.organizationId, userId)
     if (internalUser === null) return 0
     const result = await this.context.pool.query<{ n: string }>(
-      `SELECT COUNT(*)::text n FROM harness.project_invitations
-       WHERE organization_id=$1 AND invitee_user_id=$2 AND status='pending'`,
-      [this.context.organizationId, internalUser],
+      `SELECT COUNT(*)::text n FROM harness.project_invitations i
+       WHERE organization_id=$1 AND invitee_user_id=$2 AND status='pending'
+         AND (expires_at IS NULL OR expires_at>clock_timestamp())
+         AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM harness.instances target
+           WHERE target.organization_id=i.organization_id AND target.project_id=i.project_id
+             AND harness.entry_node_visible(target.organization_id,$3,target.assigned_node_id)))`,
+      [this.context.organizationId, internalUser, this.entryNodeId ?? null],
     )
     return Number(result.rows[0]?.n ?? 0)
   }
@@ -589,23 +721,33 @@ export class PostgresProjectService {
   async acceptInvitation(invitationId: string, userId: number): Promise<void> {
     if (!isUuid(invitationId)) throw new Error('invitation-not-found')
     const result = await transaction(this.context.pool, async (client) => {
-      const internalUser = await internalUserId(client, this.context.organizationId, userId)
-      if (internalUser === null) throw new Error(`unknown user ${String(userId)}`)
+      const internalUser = await this.activeMutationUser(client, userId, 'actor')
+      // Membership edits and invitation acceptance share the project lock before either row is changed.
+      const selected = await client.query<{ status: string }>(`SELECT p.status FROM harness.projects p
+        JOIN harness.project_invitations i ON i.project_id=p.id AND i.organization_id=p.organization_id
+        WHERE i.organization_id=$1 AND i.id=$2 FOR UPDATE OF p`, [this.context.organizationId, invitationId])
+      if (selected.rows[0] === undefined) throw new Error('invitation-not-found')
+      if (selected.rows[0].status !== 'active') throw new CollaborationDeniedError('forbidden')
       const invitation = await client.query<{
-        project_id: string; invitee_user_id: string; access_mode: GrantMode; status: ProjectInvitationStatus; expires_at: Date | null
-      }>(`SELECT project_id,invitee_user_id,access_mode,status,expires_at FROM harness.project_invitations
-        WHERE organization_id=$1 AND id=$2 FOR UPDATE`, [this.context.organizationId, invitationId])
+        project_id: string; invitee_user_id: string; access_mode: GrantMode; status: ProjectInvitationStatus; expired: boolean
+      }>(`WITH invitation AS MATERIALIZED (
+        SELECT project_id,invitee_user_id,access_mode,status,expires_at FROM harness.project_invitations
+        WHERE organization_id=$1 AND id=$2 FOR UPDATE
+      ) SELECT project_id,invitee_user_id,access_mode,status,
+        (expires_at IS NOT NULL AND expires_at<=clock_timestamp()) expired FROM invitation`, [this.context.organizationId, invitationId])
       const row = invitation.rows[0]
       if (row === undefined) throw new Error('invitation-not-found')
       if (row.invitee_user_id !== internalUser) throw new Error('invitation-forbidden')
       if (row.status !== 'pending') throw new Error('invitation-not-pending')
-      if (row.expires_at !== null && row.expires_at.getTime() <= Date.now()) {
+      await this.assertOrganizationActive(client)
+      await this.lockInvitationComputer(client, row.project_id, internalUser)
+      if (row.expired) {
         await client.query(`UPDATE harness.project_invitations SET status='expired',responded_at=now()
           WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, invitationId])
         return 'expired' as const
       }
       await client.query(`INSERT INTO harness.project_members(organization_id,project_id,user_id,access_mode)
-        VALUES($1,$2,$3,$4) ON CONFLICT(project_id,user_id) DO UPDATE SET access_mode=excluded.access_mode,updated_at=now()`, [
+        VALUES($1,$2,$3,$4) ON CONFLICT(project_id,user_id) DO NOTHING`, [
         this.context.organizationId, row.project_id, internalUser, row.access_mode,
       ])
       await client.query(`UPDATE harness.project_invitations SET status='accepted',responded_at=now()
@@ -634,7 +776,8 @@ export class PostgresProjectService {
     const result = await this.context.pool.query<Omit<InvitationSelectRow, 'id'>>(`SELECT p.public_id::text project_public_id,p.name::text project_name,
       iu.public_id::text invitee_public_id,iu.username::text invitee_username,iu.display_name invitee_display_name,
       ru.public_id::text inviter_public_id,ru.username::text inviter_username,ru.display_name inviter_display_name,
-      i.access_mode mode,i.status,i.expires_at,i.created_at,i.responded_at
+      i.access_mode mode,CASE WHEN i.status='pending' AND i.expires_at<=clock_timestamp() THEN 'expired' ELSE i.status END status,
+      i.expires_at,i.created_at,i.responded_at
       FROM harness.project_invitations i
       JOIN harness.projects p ON p.id=i.project_id AND p.organization_id=i.organization_id
       JOIN harness.users iu ON iu.id=i.invitee_user_id AND iu.organization_id=i.organization_id
@@ -647,8 +790,10 @@ export class PostgresProjectService {
 
   async effectiveGrants(userId: number): Promise<EffectiveGrant[]> {
     const home = await this.context.pool.query<{ home_path: string }>(
-      'SELECT home_path FROM harness.users WHERE organization_id=$1 AND public_id=$2',
-      [this.context.organizationId, userId],
+      `SELECT a.home_path FROM harness.users u JOIN harness.node_user_accounts a
+        ON a.organization_id=u.organization_id AND a.user_id=u.id AND a.node_id=$3
+        WHERE u.organization_id=$1 AND u.public_id=$2`,
+      [this.context.organizationId, userId, this.context.nodeId],
     )
     const grants: EffectiveGrant[] = []
     if (home.rows[0] !== undefined) grants.push({ path: home.rows[0].home_path, mode: 'rw', label: '主目录' })
@@ -668,15 +813,16 @@ export class PostgresProjectService {
   private async assertNotReserved(queryable: Queryable, canonical: string, allowUserProjectsRoot: boolean): Promise<void> {
     assertProjectImportPathAllowed(this.cfg, canonical, { allowUserProjectsRoot })
     const users = await queryable.query<{ username: string; home_path: string }>(
-      'SELECT username::text,home_path FROM harness.users WHERE organization_id=$1',
-      [this.context.organizationId],
+      `SELECT u.username::text,a.home_path FROM harness.users u JOIN harness.node_user_accounts a
+        ON a.organization_id=u.organization_id AND a.user_id=u.id AND a.node_id=$2 WHERE u.organization_id=$1`,
+      [this.context.organizationId, this.context.nodeId],
     )
     for (const user of users.rows) {
       const home = realpathIfPresent(user.home_path) ?? user.home_path
       if (projectPathsOverlap(canonical, home)) {
         throw new Error('project-path-reserved')
       }
-      const dsh = join(this.cfg.usersRoot, user.username, 'dsh')
+      const dsh = join(this.cfg.usersRoot, user.username)
       const canonicalDsh = realpathIfPresent(dsh) ?? dsh
       if (projectPathsOverlap(canonical, canonicalDsh)) {
         throw new Error('project-path-reserved')

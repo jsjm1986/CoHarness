@@ -1,0 +1,14 @@
+{
+  "name": "systemd-control-gateway-unit",
+  "cwd": "gateway",
+  "command": "npm test -- --retry=0",
+  "startedAt": "2026-10-25T00:49:39.008651+00:00",
+  "seconds": 31.751,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d2d4f9f1c9681583f12fb4f216494b4e575b68f61e622651ef4e92558155b32d",
+  "inputsAfter": "d2d4f9f1c9681583f12fb4f216494b4e575b68f61e622651ef4e92558155b32d",
+  "postgresToolDirectory": null,
+  "outputSha256": "84fcdd4de39bdab36fdba9e613a04e0ac3f3d2a6eee53e6c31d00fd41aa06d61",
+  "outputTail": "\n> test\n> vitest run --exclude tests/postgres.spec.ts --exclude tests/auth-postgres.spec.ts --exclude tests/project-activity-postgres.spec.ts --exclude tests/project-progress-postgres.spec.ts --exclude tests/project-service-postgres.spec.ts --exclude tests/access-invalidation.spec.ts --exclude tests/execution.spec.ts --exclude tests/ssh.spec.ts --exclude tests/webhook.spec.ts --exclude tests/maintenance.spec.ts --exclude tests/deployment-restore.spec.ts --exclude tests/deployment-backups.spec.ts --exclude tests/node-config-process.spec.ts --exclude tests/startup-generation.spec.ts --exclude tests/execution-scopes.spec.ts --exclude tests/admin-business-postgres.spec.ts --exclude tests/instance-capacity-postgres.spec.ts --retry=0\n\n\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯\n\nVitest caught 1 unhandled error during the test run.\nThis might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.\n\n⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯\nError: fixture child published an invalid listener\n ❯ Server.<anonymous> tests/runtime-relay.ts:26:13\n     24|     if (!Number.isInteger(port) || port < 1 || port > 65535) {\n     25|       downstream.destroy()\n     26|       throw new Error('fixture child published an invalid listener')\n       |             ^\n     27|     }\n     28|     const upstream = connect(port, '127.0.0.1')\n ❯ Server.emit node:events:508:20\n ❯ TCP.onconnection node:net:2370:8\n\nThis error originated in \"tests/instances.spec.ts\" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.\nThe latest test that might've caused the error is \"keeps warm runtimes usable while cold starts wait, merges retries and cancels a queued target on stop\". It might mean one of the following:\n- The error was thrown, while Vitest was running this test.\n- If the error occurred after the test had been completed, this was the last documented test before it was thrown.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n\n\n Test Files  72 passed | 3 skipped (75)\n      Tests  853 passed | 93 skipped (946)\n     Errors  1 error\n   Start at  08:49:42\n   Duration  28.40s (transform 28.35s, setup 0ms, import 41.53s, tests 153.59s, environment 6ms)\n\n"
+}

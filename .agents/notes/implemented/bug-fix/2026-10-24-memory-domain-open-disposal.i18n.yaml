@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-memory-domain-open-disposal.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-memory-domain-open-disposal.md
+document:
+  en: 19c7693762edda46f65cae1abcab507c978f6863
+  zh: 3e2e5dff6c82409a3cb45f544fd326b7ffa3510b
+/agent-note-memory-domain-ownership-during-asynchronous-setup:
+  en: 5a5188feb9be568d
+  zh: eeb477a031351e33
+/agent-note-memory-domain-ownership-during-asynchronous-setup/problem:
+  en: 148debf48bf08700
+  zh: 1332ea075ec97a8e
+/agent-note-memory-domain-ownership-during-asynchronous-setup/decision:
+  en: 62d9613e3321f17c
+  zh: c047abb5bd706db3
+/agent-note-memory-domain-ownership-during-asynchronous-setup/alternatives-considered:
+  en: 172a5d704a8235af
+  zh: 3a57683a1a6c474d
+/agent-note-memory-domain-ownership-during-asynchronous-setup/consequences:
+  en: aca4ddcfebd795a6
+  zh: 3fca8c7448a24ef6
+/agent-note-memory-domain-ownership-during-asynchronous-setup/verification:
+  en: b3f0f137ab65d074
+  zh: 2a698a408fdd6409

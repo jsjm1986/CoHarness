@@ -49,6 +49,8 @@ const endpoint = launchEnvironmentOf(ctx).get('DEEPSEEK_BASE_URL')?.value
 
 `launchedThroughSsh(snapshot)` 只在继承的进程层存在非空 `SSH_CONNECTION` 或 `SSH_TTY` 时返回 true。Web 浏览器接力、自适应目录选择器与 Open In 共用该判定；项目与用户 `.env` 的值不会建立 SSH 会话。
 
+`launchedByGateway(snapshot)` 识别继承环境中非空的 `DSH_GATEWAY_CREDENTIAL_FD` 或 `DSH_GATEWAY_CREDENTIAL_FILE`。它在服务完成挂载前选择受管部署行为，不认证调用者。项目和用户环境文件不能建立或取消这一启动事实。
+
 ### 层级如何排序
 
 | 层 | 它是什么 |

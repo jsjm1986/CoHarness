@@ -1,0 +1,13 @@
+{
+  "name": "ssh-built-enclosing-owner-native",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=2 pnpm run test:e2e packages/ssh/ssh/tests/resource-admission.e2e.ts --retry=0",
+  "startedAt": "2026-10-23T15:39:23.408955+00:00",
+  "seconds": 10.202,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "970c9322be05c9dd282bc316787eec23bdb18ca33c831733a5777670c80da926",
+  "inputsAfter": "970c9322be05c9dd282bc316787eec23bdb18ca33c831733a5777670c80da926",
+  "outputSha256": "7d7f19310c33b28f1a7aececb5722ad3313ad910cf661b3859bfcf457ed36257",
+  "outputTail": "$ vitest run --config vitest.e2e.config.ts packages/ssh/ssh/tests/resource-admission.e2e.ts --retry=0\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ packages/ssh/ssh/tests/resource-admission.e2e.ts (2 tests | 1 failed) 6886ms\n   × admits its compiled local carrier and helper through plain Node 6211ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  packages/ssh/ssh/tests/resource-admission.e2e.ts > admits its compiled local carrier and helper through plain Node\nAssertionError: node:internal/per_context/domexception:76\n    const self = new Error();\n                 ^\n\nDOMException [TimeoutError]: The operation was aborted due to timeout\n    at new DOMException (node:internal/per_context/domexception:76:18)\n    at Timeout._onTimeout (node:internal/abort_controller:154:9)\n    at listOnTimeout (node:internal/timers:605:17)\n    at process.processTimers (node:internal/timers:541:7)\n\nNode.js v25.8.1\n: expected { exitCode: 1, signal: null } to deeply equal { exitCode: +0, signal: null }\n\n- Expected\n+ Received\n\n  {\n-   \"exitCode\": 0,\n+   \"exitCode\": 1,\n    \"signal\": null,\n  }\n\n ❯ packages/ssh/ssh/tests/resource-admission.e2e.ts:29:61\n     27|   })\n     28|   const outcome = await child.done\n     29|   expect(outcome, child.collected.stderr?.readFrom(0).text).toEqual({ …\n       |                                                             ^\n     30|   expect(await child.waitForExit()).toBe(true)\n     31|   const result = z.object({\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 1 passed (2)\n   Start at  23:39:26\n   Duration  7.20s (transform 168ms, setup 24ms, import 216ms, tests 6.89s, environment 0ms)\n\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

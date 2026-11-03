@@ -1,0 +1,14 @@
+{
+  "name": "resource-model-root-build-final",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm run build",
+  "startedAt": "2026-10-24T02:15:33.401682+00:00",
+  "seconds": 40.47,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "de917fd7b2d20801be5e2b3aaf3c005d72a2edc6b4585113d01b246767fedee6",
+  "inputsAfter": "de917fd7b2d20801be5e2b3aaf3c005d72a2edc6b4585113d01b246767fedee6",
+  "postgresToolDirectory": null,
+  "outputSha256": "f7176fb5350de842b23ff7d4afdedff69dfee4c0952a4ad597dfb6fdd31bd3a2",
+  "outputTail": "$ tsx scripts/build.ts\nrun-gates: build running 8 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start native addon\nrun-gates: PASS native addon (0.93s)\nrun-gates: start host compiler\nrun-gates: PASS host compiler (1.49s)\nrun-gates: start Host bundle\nrun-gates: PASS Host bundle (6.13s)\nrun-gates: start client compiler\nrun-gates: PASS client compiler (0.47s)\nrun-gates: start Client bundle\nrun-gates: PASS Client bundle (7.02s)\nrun-gates: start Web build\nrun-gates: PASS Web build (5.09s)\nrun-gates: start host aggregate check\n\n== FAILED host aggregate check (11.73s) ==\ncommand: tsc -p tsconfig.host.json\noutcome: exit 2\npackages/memory/memory-context/tests/memory-context.spec.ts(260,32): error TS2345: Argument of type '{ catalogMaxBytes: number; delegatedSessions: false; recallMaxBytes: number; recallEntryMaxBytes: number; recallInputMaxBytes: number; recallSessionMaxBytes: number; recallMaxSelections: number; }' is not assignable to parameter of type 'Config'.\n  Property 'maxOutputTokens' is missing in type '{ catalogMaxBytes: number; delegatedSessions: false; recallMaxBytes: number; recallEntryMaxBytes: number; recallInputMaxBytes: number; recallSessionMaxBytes: number; recallMaxSelections: number; }' but required in type 'Config'.\nrun-gates: start client aggregate check\nrun-gates: PASS client aggregate check (4.41s)\n\nrun-gates: 7 passed, 1 failed, 0 skipped in 37.27s.\nrun-gates: unsuccessful gates:\n  - FAILED host aggregate check (11.73s, exit 2)\n    tsc -p tsconfig.host.json\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

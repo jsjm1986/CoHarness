@@ -1,0 +1,14 @@
+{
+  "name": "python-model-access-runtime-closure",
+  "cwd": ".",
+  "command": "pnpm run verify-runtime-closure",
+  "startedAt": "2026-10-25T05:33:31.649697+00:00",
+  "seconds": 6.429,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9700ee2d65995c9af46bcc0fa847efe5ec2df9f64ba92f0741f3538364cc2141",
+  "inputsAfter": "9700ee2d65995c9af46bcc0fa847efe5ec2df9f64ba92f0741f3538364cc2141",
+  "postgresToolDirectory": null,
+  "outputSha256": "e7e617bdad0c66ec21332478b3e77983784e115f41d5d446d3bf3c3a0211c459",
+  "outputTail": "$ tsx scripts/verify-runtime-closure.ts\nverify-runtime-closure: 4 agent presets and 171 workspace packages form a closed runtime dependency graph.\n"
+}

@@ -1,0 +1,497 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-28T16:32:05.808589+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "findings": [
+    "B251",
+    "B252",
+    "B253",
+    "B254"
+  ],
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "dirtyChangesPreserved": true,
+    "exactRevisionEvidence": "External model-policy-authority-baseline.json; no resolved commit ids recorded here."
+  },
+  "behavior": {
+    "B251": "Personal model policy resolves current active nondeleted account/membership/organization authority after configuration admission; PostgreSQL share-locks current account/member facts and SQLite uses one read transaction. Cached UserRow roles no longer determine authorization.",
+    "B252": "Eager file reuse and bounded lazy cache compare complete effective policy contents and revision. Account role changes converge without a catalog revision bump and retain valid subject-bound intake credentials.",
+    "B253": "Combined role plus disabled status updates confirm stop and skip restart for inactive owners; model refresh skips inactive accounts; Admin retains disabled-account configuration inspection with an empty effective policy and stored overrides.",
+    "B254": "Only invalid persisted JSON is recovered; file-read and credential-validation errors propagate before credential rotation or file replacement. Non-object JSON remains repairable."
+  },
+  "negativeEvidence": [
+    "model-policy-account-before:three deterministic queue/eager/lazy cases retain administrator authorization before repair.",
+    "model-policy-account-postgres-before-current-fixture:seven real configuration-lock cases retain stale role or withdrawn eligibility; current-admin control passes.",
+    "model-policy-account-inactive-consumers-before:combined role/disable wrongly400 and attempts restart; strict-policy compatibility checks also expose disabled inspection/refresh regressions, corrected before acceptance.",
+    "model-policy-token-validation-before:injected lookup outage resolves successfully instead of propagating, allowing silent token replacement."
+  ],
+  "fixtureCorrection": "The first PG reproduction attempted an outbox-emitting mutation on a separate connection behind its own organization lock; its timeout evidence is discarded. Mutations in the held transaction produce the seven deterministic product counterexamples. No test or database process was terminated.",
+  "verification": {
+    "source": {
+      "cohortCases": 216,
+      "cohortFiles": 11,
+      "skips": 0,
+      "followupCases": 36,
+      "oneNewReadFailureTestAfterCohort": true,
+      "uniqueCoveredCasesInExpandedCohort": 217,
+      "productionChangedAfterCohort": false
+    },
+    "postgresBaseline": {
+      "cases": 41,
+      "skips": 0,
+      "migrationExpectationRepair": "Released078 is now explicitly included in upgrade-from015 and idempotent baseline expectations; migration SQL is unchanged."
+    },
+    "runtimeSnapshots": {
+      "source": 4,
+      "compiledConsumer": 4,
+      "mode": "Keyless real Loader/model-policy consumer; includes role demotion with unchanged model catalog revision."
+    },
+    "compiled": {
+      "privateOutput": true,
+      "sharedGatewayLibWritten": false,
+      "node22": "22.22.1; actual PostgreSQL store/projection transcript and six HTTP/LocalLauncher scenarios including combined disable, plus restricted retries.",
+      "node24": "24.19.0; same maintained goldens.",
+      "hostSqlite": "25.8.1; store/projection transcript and three HTTP/LocalLauncher scenarios including combined disable.",
+      "ownedSourceDriftSinceBuild": [],
+      "peerFeatures": "Concurrent node-channel/service/router development remains unaccepted by this receipt."
+    },
+    "docs": "20passed,0failed,0skipped",
+    "commands": [
+      {
+        "name": "model-policy-account-source-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-28T16:20:26.490621+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/model-governance.spec.ts",
+          "tests/model-governance-integration.spec.ts",
+          "tests/model-policy-account-postgres.spec.ts",
+          "tests/model-policy-authority-transcript.spec.ts",
+          "tests/runtime-personal-policy-transcript.spec.ts",
+          "tests/runtime-personal-policy-postgres.spec.ts",
+          "tests/admin-api.spec.ts",
+          "tests/apply-grants.spec.ts",
+          "tests/users.spec.ts",
+          "tests/user-service-postgres.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=src/model-governance.ts",
+          "--coverage.include=src/postgres/model-governance-service.ts",
+          "--coverage.include=src/apply-model-governance.ts",
+          "--coverage.include=src/apply-grants.ts",
+          "--coverage.include=src/admin-api.ts",
+          "--coverage.include=src/services.ts",
+          "--coverage.reportsDirectory=coverage/model-policy-authority-current-20261029",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T16:20:42.932525+00:00"
+      },
+      {
+        "name": "model-policy-read-failure-followup",
+        "status": "passed",
+        "startedAt": "2026-10-28T16:24:19.756847+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/model-governance-integration.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T16:24:22.501987+00:00"
+      },
+      {
+        "name": "model-policy-account-postgres-regression-current",
+        "status": "passed",
+        "startedAt": "2026-10-28T16:12:36.007993+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/postgres.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T16:12:41.633691+00:00"
+      },
+      {
+        "name": "model-policy-account-snapshot-source",
+        "status": "passed",
+        "startedAt": "2026-10-28T16:01:40.641569+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_SNAPSHOT_MAX_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:snapshot",
+          "gateway/tests/model-policy.snapshot.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T16:01:44.938974+00:00"
+      },
+      {
+        "name": "model-policy-account-snapshot-lib",
+        "status": "passed",
+        "startedAt": "2026-10-28T16:24:19.756792+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_SNAPSHOT_MAX_CONCURRENCY=1",
+          "DSH_EXAMPLE_MODE=lib",
+          "pnpm",
+          "run",
+          "test:snapshot",
+          "gateway/tests/model-policy.snapshot.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T16:24:23.344480+00:00"
+      },
+      {
+        "name": "model-policy-account-private-build-final",
+        "status": "passed",
+        "startedAt": "2026-10-28T16:22:04.199075+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.build.json",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/model-policy-artifact-20261029/lib",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/model-policy-artifact-20261029/build.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T16:22:06.852093+00:00"
+      },
+      {
+        "name": "model-policy-account-built-node22",
+        "status": "passed",
+        "startedAt": "2026-10-28T16:23:40.879935+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-current-model-artifacts.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "postgres"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T16:23:45.835372+00:00"
+      },
+      {
+        "name": "model-policy-account-built-node24",
+        "status": "passed",
+        "startedAt": "2026-10-28T16:23:45.871712+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-current-model-artifacts.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "postgres"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T16:23:50.673040+00:00"
+      },
+      {
+        "name": "model-policy-account-built-sqlite-host",
+        "status": "passed",
+        "startedAt": "2026-10-28T16:23:50.704884+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-current-model-artifacts.py",
+          "node",
+          "sqlite"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T16:23:53.193329+00:00"
+      },
+      {
+        "name": "model-policy-account-types-final",
+        "status": "passed",
+        "startedAt": "2026-10-28T16:22:04.199091+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T16:22:08.002909+00:00"
+      },
+      {
+        "name": "model-policy-account-lint-final",
+        "status": "passed",
+        "startedAt": "2026-10-28T16:22:04.199091+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "gateway/src/model-governance.ts",
+          "gateway/src/postgres/model-governance-service.ts",
+          "gateway/src/apply-model-governance.ts",
+          "gateway/src/apply-grants.ts",
+          "gateway/src/admin-api.ts",
+          "gateway/src/services.ts",
+          "gateway/tests/model-governance-integration.spec.ts",
+          "gateway/tests/model-policy-account-postgres.spec.ts",
+          "gateway/tests/model-policy-authority-transcript.spec.ts",
+          "gateway/tests/fixtures/model-policy-authority.mjs",
+          "gateway/tests/runtime-personal-policy-transcript.spec.ts",
+          "gateway/tests/fixtures/runtime-personal-policy.mjs",
+          "gateway/tests/admin-api.spec.ts",
+          "gateway/tests/postgres.spec.ts",
+          "gateway/tests/postgres-suite.spec.ts",
+          "gateway/tests/model-policy.snapshot.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T16:22:05.789622+00:00"
+      },
+      {
+        "name": "model-policy-account-docs-final",
+        "status": "passed",
+        "startedAt": "2026-10-28T16:24:19.756866+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T16:25:34.474443+00:00"
+      },
+      {
+        "name": "model-policy-authority-final-repository-references",
+        "status": "passed",
+        "startedAt": "2026-10-28T16:32:35.100841+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-repository-references"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T16:32:51.244185+00:00"
+      }
+    ],
+    "newFileWhitespaceAndNewlines": "25 selected new authority documentation/test files checked; zero errors."
+  },
+  "coverage": {
+    "total": {
+      "lines": {
+        "total": 2482,
+        "covered": 1084,
+        "skipped": 0,
+        "pct": 43.67
+      },
+      "statements": {
+        "total": 3149,
+        "covered": 1248,
+        "skipped": 0,
+        "pct": 39.63
+      },
+      "functions": {
+        "total": 324,
+        "covered": 140,
+        "skipped": 0,
+        "pct": 43.2
+      },
+      "branches": {
+        "total": 2941,
+        "covered": 1055,
+        "skipped": 0,
+        "pct": 35.87
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "gateway/src/admin-api.ts": {
+      "lines": {
+        "total": 1187,
+        "covered": 580,
+        "skipped": 0,
+        "pct": 48.86
+      },
+      "functions": {
+        "total": 45,
+        "covered": 29,
+        "skipped": 0,
+        "pct": 64.44
+      },
+      "statements": {
+        "total": 1596,
+        "covered": 679,
+        "skipped": 0,
+        "pct": 42.54
+      },
+      "branches": {
+        "total": 1585,
+        "covered": 673,
+        "skipped": 0,
+        "pct": 42.46
+      }
+    },
+    "gateway/src/apply-grants.ts": {
+      "lines": {
+        "total": 65,
+        "covered": 56,
+        "skipped": 0,
+        "pct": 86.15
+      },
+      "functions": {
+        "total": 6,
+        "covered": 6,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 83,
+        "covered": 63,
+        "skipped": 0,
+        "pct": 75.9
+      },
+      "branches": {
+        "total": 68,
+        "covered": 46,
+        "skipped": 0,
+        "pct": 67.64
+      }
+    },
+    "gateway/src/apply-model-governance.ts": {
+      "lines": {
+        "total": 179,
+        "covered": 150,
+        "skipped": 0,
+        "pct": 83.79
+      },
+      "functions": {
+        "total": 42,
+        "covered": 33,
+        "skipped": 0,
+        "pct": 78.57
+      },
+      "statements": {
+        "total": 216,
+        "covered": 174,
+        "skipped": 0,
+        "pct": 80.55
+      },
+      "branches": {
+        "total": 93,
+        "covered": 74,
+        "skipped": 0,
+        "pct": 79.56
+      }
+    },
+    "gateway/src/model-governance.ts": {
+      "lines": {
+        "total": 230,
+        "covered": 195,
+        "skipped": 0,
+        "pct": 84.78
+      },
+      "functions": {
+        "total": 67,
+        "covered": 50,
+        "skipped": 0,
+        "pct": 74.62
+      },
+      "statements": {
+        "total": 290,
+        "covered": 225,
+        "skipped": 0,
+        "pct": 77.58
+      },
+      "branches": {
+        "total": 244,
+        "covered": 189,
+        "skipped": 0,
+        "pct": 77.45
+      }
+    },
+    "gateway/src/services.ts": {
+      "lines": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "gateway/src/postgres/model-governance-service.ts": {
+      "lines": {
+        "total": 821,
+        "covered": 103,
+        "skipped": 0,
+        "pct": 12.54
+      },
+      "functions": {
+        "total": 164,
+        "covered": 22,
+        "skipped": 0,
+        "pct": 13.41
+      },
+      "statements": {
+        "total": 964,
+        "covered": 107,
+        "skipped": 0,
+        "pct": 11.09
+      },
+      "branches": {
+        "total": 951,
+        "covered": 73,
+        "skipped": 0,
+        "pct": 7.67
+      }
+    }
+  },
+  "cleanup": {
+    "ownedPostgres": "stopped_and_removed",
+    "ownedVolume": "removed",
+    "remainingConnectionsBeforeClose": 0,
+    "productionPortUntouched": 5432,
+    "compilerArtifact": "Retained private compiler output and hashes outside the repository for reproducibility; no running resource."
+  },
+  "remaining": [
+    "All twelve domains and their complete file/branch review remain open.",
+    "Large model-governance,projection,Admin and lifecycle modules still have per-file coverage debt; no gate was disabled or threshold lowered.",
+    "General administrator Runtime controls and other mutation actors still require review beyond named account-deletion/start-owner cases.",
+    "Remote execution/device access, multi-computer owner selection and native Windows are separate acceptance.",
+    "Live model API verification remains explicitly user-deferred."
+  ]
+}

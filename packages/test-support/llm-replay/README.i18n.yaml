@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/test-support/llm-replay/README.md
 document:
-  en: 32f60d39ea5871f02515ad63c9a673e1f9becc4e
-  zh: 86ecb05c487fa3cdba843d66810bab7cf2481531
+  en: ebc9ef990f188302fe23cc594e70b3e6c8caee89
+  zh: 46a8dc50107900c19335af08ada9ad557517326f
 /:
-  en: 859b61dd561538fb
+  en: 733dd8b299d66095
   zh: 61495d48365178df
 /deepseek-ai-dsh-llm-replay:
-  en: 38c4ef0c09f0f4e1
-  zh: 0b5c8558e7c3338c
+  en: 3e969f5cbae8d8ca
+  zh: 0d9c2c3e90e74995
 /deepseek-ai-dsh-llm-replay/summary:
   en: 9db70d252b8e2902
   zh: 26c3e40a0fef9b53
@@ -27,8 +27,8 @@ document:
   en: 8c0ac404199e4c80
   zh: 72dc38e45e64f2f8
 /deepseek-ai-dsh-llm-replay/exports:
-  en: 25c397927b3a2efc
-  zh: abb7736ff5c9e8af
+  en: 0571b6cf31f8ca1d
+  zh: 64ae0cb0e4cffff2
 /deepseek-ai-dsh-llm-replay/plugin-export-shape:
   en: 81c1a05fc0204072
   zh: 4d70d5c205981cba

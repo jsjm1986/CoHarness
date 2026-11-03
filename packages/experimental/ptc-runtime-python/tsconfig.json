@@ -28,6 +28,12 @@
     },
     {
       "path": "../../sandbox/sandbox-policy"
+    },
+    {
+      "path": "../../subprocess/subprocess"
+    },
+    {
+      "path": "../../subprocess/subprocess-local"
     }
   ]
 }

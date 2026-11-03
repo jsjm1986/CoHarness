@@ -1,0 +1,20 @@
+{
+  "reply": "WORKFLOW_CLEANUP_OK",
+  "holder-retry": {
+    "mode": "holder-retry",
+    "cleanupRejected": true,
+    "retainedTransport": true,
+    "transportClosedByRetry": true
+  },
+  "background-retry": {
+    "mode": "background-retry",
+    "liveDuringCleanup": true,
+    "cleanupNotice": "Workflow cleanup is unconfirmed; request termination again to retry. AggregateError: Workflow child cleanup failed.",
+    "ownerBusy": true,
+    "endEventsBeforeCleanup": 0,
+    "finalStatus": "failed",
+    "transportClosed": true,
+    "runEndsAfterCleanup": 1,
+    "jobEndsAfterCleanup": 1
+  }
+}

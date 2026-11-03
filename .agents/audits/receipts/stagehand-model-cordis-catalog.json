@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-cordis-catalog",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm run gen-cordis-catalog",
+  "startedAt": "2026-10-23T18:46:22.178097+00:00",
+  "seconds": 16.459,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "inputsAfter": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "outputSha256": "903884dbb31be5c656a3e138117d7c859dedd2fe9f95cdef52de5b569aff327b",
+  "outputTail": "$ tsx scripts/gen-cordis-catalog.ts\ngen-cordis-catalog: 127 artifact(s) computed, 0 written.\n"
+}

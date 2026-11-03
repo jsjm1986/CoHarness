@@ -1,11 +1,12 @@
 import { once } from 'node:events'
-import { createServer } from 'node:http'
+import { createServer, get, type IncomingMessage } from 'node:http'
 import { generateKeyPairSync } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import type { AddressInfo, Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { AuditService } from '../src/audit.ts'
@@ -18,9 +19,10 @@ import { RUNTIME_READINESS_NONCE_HEADER, RUNTIME_READINESS_PATH, runtimeReadines
 import { ProjectService } from '../src/projects.ts'
 import { createProxyHandlers, projectRuntimeGrants } from '../src/proxy.ts'
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
+import type { RuntimeId, RuntimeNodeId } from '../src/runtime-catalog.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
-import { runtimeRelay } from './runtime-relay.ts'
+import { RUNTIME_PORT_PUBLISHER, runtimeRelay } from './runtime-relay.ts'
 import { barrier } from './barrier.ts'
 
 // Resolve from a real cwd path (not import.meta.url, which is a virtual URL
@@ -55,13 +57,14 @@ const server = http.createServer((req, res) => {
   }
   if (req.url === '/api/redirect') { res.writeHead(302, { location: 'http://127.0.0.1:' + process.argv[1] + '/landing' }); res.end(); return }
   if (req.url === '/api/external-redirect') { res.writeHead(302, { location: 'https://127.0.0.1.evil/landing' }); res.end(); return }
+  if (req.url === '/api/refused') { res.writeHead(403); res.end('refused'); return }
   res.setHeader('content-type', 'application/json')
   res.end(JSON.stringify({ host: req.headers.host, origin: req.headers.origin ?? null, url: req.url, principal: req.headers[${JSON.stringify('x-dsh-gateway-principal')}] ?? null }))
 })
 const wss = new WebSocketServer({ server })
 wss.on('connection', (socket, req) => { socket.send(JSON.stringify({ host: req.headers.host, principal: req.headers[${JSON.stringify('x-dsh-gateway-principal')}] ?? null })) })
 server.listen(0, '127.0.0.1', () => {
-  fs.writeFileSync(process.argv[2], String(server.address().port))
+  ${RUNTIME_PORT_PUBLISHER}(process.argv[2], server.address().port)
 })
 `
 
@@ -76,7 +79,7 @@ afterEach(async () => {
 })
 
 
-async function setup(withPrincipal = false, env: Record<string, string> = {}, launcher?: Launcher) {
+async function setup(withPrincipal = false, env: Record<string, string> = {}, launcher?: Launcher, runtimeRouter?: GatewayDeps['runtimeRouter']) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   cleanup.push(() => rmSync(root, { recursive: true, force: true }))
   const db = openDb(join(root, 'g.sqlite'))
@@ -92,6 +95,7 @@ async function setup(withPrincipal = false, env: Record<string, string> = {}, la
     projects: new ProjectService(db, cfg),
     audit: new AuditService(db),
     instances: new InstanceManager(db, cfg, launcher),
+    ...(runtimeRouter === undefined ? {} : { runtimeRouter }),
   }
   cleanup.push(() => deps.instances.stopAll())
   const alice = await deps.users.create({ username: 'alice', password: 'pw-12345678' })
@@ -127,6 +131,28 @@ async function setup(withPrincipal = false, env: Record<string, string> = {}, la
 }
 
 describe('proxy handlers', () => {
+  it('reports unavailable supervision without restarting or releasing the live Runtime', async () => {
+    const { deps, base, cookie, alice } = await setup()
+    await deps.instances.ensureRunning(alice)
+    const directory = join(deps.cfg.stateRoot, 'local-runtime-supervisors')
+    const name = readdirSync(directory).find(name => name.endsWith('.json'))!
+    const path = join(directory, name), original = readFileSync(path, 'utf8')
+    const record = JSON.parse(original) as { url: string }
+    const starts = vi.spyOn(deps.instances, 'startRequest')
+    const prior = deps.instances.capacitySnapshot?.().resident
+    expect(prior).toBe(1)
+    writeFileSync(path, JSON.stringify({ ...record, url: 'http://127.0.0.1:0/' }))
+    try {
+      const response = await fetch(`${base}/api/echo`, { headers: { cookie } })
+      expect(response.status).toBe(503)
+      expect(await response.json()).toMatchObject({ error: { code: 'INSTANCE_UNAVAILABLE' } })
+      expect(starts).not.toHaveBeenCalled()
+      expect(deps.instances.capacitySnapshot?.().resident).toBe(prior)
+    } finally { writeFileSync(path, original) }
+    const recovered = await fetch(`${base}/api/echo`, { headers: { cookie } })
+    expect(recovered.status).toBe(200)
+    await recovered.arrayBuffer()
+  })
   it('reports a full cold-start queue through real HTTP admission and recovers without waiting for readiness', async () => {
     const starts: number[] = []
     const states = new Map<number, {
@@ -197,9 +223,13 @@ describe('proxy handlers', () => {
     cleanup.push(() => { process.off('unhandledRejection', onUnhandled) })
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     cleanup.push(() => log.mockRestore())
-    const firstWaiting = await fetch(base + '/', { headers: { cookie, accept: 'text/html' } })
+    const firstWaiting = await fetch(base + '/', { headers: { cookie: `${cookie}; hgw_lang=en`, accept: 'text/html' } })
     expect(firstWaiting.status).toBe(200)
-    expect(await firstWaiting.text()).toContain('aria-busy="true"')
+    const firstWaitingPage = await firstWaiting.text()
+    expect(firstWaitingPage).toContain('aria-busy="true"')
+    expect(firstWaitingPage).toContain('<html lang="en">')
+    expect(firstWaitingPage).toContain('Starting your workbench…')
+    await expect(`${firstWaitingPage}\n`).toMatchFileSnapshot(fileURLToPath(new URL('./snapshots/runtime-gates/starting-en.expected.html', import.meta.url)))
     await states.get(alice.id)!.entered.promise
     expect(states.get(alice.id)!.alive).toBe(false)
     const first = deps.instances.startRequest(alice)
@@ -264,6 +294,28 @@ describe('proxy handlers', () => {
     expect(JSON.parse(readFileSync(grantsFile, 'utf8'))).toEqual(await deps.projects.effectiveGrants(1))
   })
 
+  it('records the selected environment and actual generation when a routed API refuses work', async () => {
+    const environment = {
+      id: '00000000-0000-4000-8000-000000000091' as RuntimeId,
+      nodeId: '00000000-0000-4000-8000-000000000092' as RuntimeNodeId,
+    }
+    const { deps, base, cookie } = await setup(false, {}, undefined, {
+      async placement() { return { target: 'personal', local: true, resetScope: false } },
+      async landing() { return { target: 'personal', local: true, resetScope: false } },
+      async resolve(user) {
+        return { context: { user, scope: { kind: 'personal' }, runtime: user, environment }, resetScope: false }
+      },
+    })
+    await deps.instances.ensureRunning((await deps.users.getByUsername('alice'))!)
+    const response = await fetch(`${base}/api/refused`, { headers: { cookie } })
+    expect(response.status).toBe(403)
+    expect(await response.text()).toBe('refused')
+    const rows = await deps.audit.query({ action: 'api' })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ userId: 1, methodPath: 'GET /api/refused', status: 403 })
+    expect(JSON.parse(rows[0]!.detail!)).toEqual({ runtimeId: environment.id, nodeId: environment.nodeId, generation: 1 })
+  })
+
   it('does not create one audit row for every resumable upload data request', async () => {
     const { deps, base, cookie } = await setup()
     await deps.instances.ensureRunning((await deps.users.getByUsername('alice'))!)
@@ -311,6 +363,13 @@ describe('proxy handlers', () => {
     const page = await stopped.text()
     expect(page).toContain('启动并打开')
     expect(page).not.toContain('http-equiv="refresh"')
+    const englishStopped = await fetch(`${base}/`, { headers: { cookie: `${cookie}; hgw_lang=en`, accept: 'text/html' } })
+    const englishPage = await englishStopped.text()
+    expect(englishPage).toContain('<html lang="en">')
+    expect(englishPage).toContain('Start and open')
+    await expect(`${englishPage}\n`).toMatchFileSnapshot(fileURLToPath(new URL('./snapshots/runtime-gates/stopped-en.expected.html', import.meta.url)))
+    const englishApi = await fetch(`${base}/api/echo`, { headers: { cookie: `${cookie}; hgw_lang=en` } })
+    expect(await englishApi.json()).toMatchObject({ error: { code: 'INSTANCE_STOPPED', message: expect.stringContaining('The workbench was stopped manually') } })
     const passive = await fetch(`${base}/api/echo`, {
       method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' }, body: '{}',
     })
@@ -439,22 +498,32 @@ describe('proxy handlers', () => {
     expect(body).toBe('data: open\n\ndata: tick\n\n')
   })
 
-  it('survives an upstream reset that lands mid-response', async () => {
+  it('aborts incomplete responses when the upstream resets', async () => {
     const { deps, base, cookie, alice } = await setup(true)
     await deps.instances.ensureRunning(alice)
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     cleanup.push(() => spy.mockRestore())
     const port = await deps.instances.portOf(alice.id)
-    // Headers have flushed, so the fetch resolves while the body stays open;
-    // killing the runtime then errors the in-flight upstream response stream,
-    // which used to crash the gateway with an unhandled 'error' event.
-    const response = await fetch(`${base}/api/hang-headers`, { headers: { cookie } })
-    expect(response.status).toBe(200)
+    const response = await new Promise<IncomingMessage>((resolve, reject) => {
+      const request = get(`${base}/api/hang-headers`, { headers: { cookie }, signal: AbortSignal.timeout(5000) }, resolve)
+      const closed = new Promise<void>(done => request.once('close', done))
+      cleanup.push(async () => { request.destroy(); await closed })
+      request.once('error', reject)
+    })
+    expect(response.statusCode).toBe(200)
+    const closed = new Promise<void>(resolve => response.once('close', resolve))
+    const body = new Promise<Error | undefined>(resolve => {
+      response.once('error', resolve)
+      response.once('end', () => resolve(undefined))
+      response.resume()
+    })
     await fetch(`http://127.0.0.1:${port}/exit`, { signal: AbortSignal.timeout(5000) })
     await vi.waitFor(() => {
       expect(spy).toHaveBeenCalledWith(expect.stringContaining('proxy response stream error'))
     }, { timeout: 5000 })
-    await response.body?.cancel().catch(() => {})
+    expect(await body).toMatchObject({ code: 'ECONNRESET' })
+    await closed
+    expect(response.complete).toBe(false)
     // An unauthenticated request never reaches instance admission, so a fast
     // 401 proves the gateway itself is still serving after the upstream reset.
     const probe = await fetch(`${base}/api/echo`, { signal: AbortSignal.timeout(5000) })

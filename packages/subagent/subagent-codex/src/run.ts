@@ -130,15 +130,18 @@ export function codexStartupFailure(cause: unknown): Error {
 /**
  * Fixed package-local app-server command, independent of the host `PATH`.
  * @param executable - pre-resolved target command; omitted uses the bundled local program.
+ * @param config - parent-owned native provider overrides, each supplied as one `-c` argument.
  * @returns Node, the official wrapper, and the fixed app-server arguments.
  */
-export function codexAppServerArgv(executable?: string): string[] {
-  if (executable !== undefined) return [executable, 'app-server', '--stdio']
-  return [process.execPath, CODEX_PACKAGE_BIN, 'app-server', '--stdio']
+export function codexAppServerArgv(executable?: string, config: readonly string[] = []): string[] {
+  const program = executable === undefined ? [process.execPath, CODEX_PACKAGE_BIN] : [executable]
+  return [...program, ...config.flatMap(value => ['-c', value]), 'app-server', '--stdio']
 }
 
 /** Fully resolved inputs for one Codex app-server run. */
 export interface CodexRunSpec {
+  /** Parent-owned native model-provider overrides; no upstream credentials. */
+  readonly nativeConfig?: readonly string[]
   /** Target-local program when execution belongs to SSH. */
   readonly executable?: string
   /** Parent Session workspace, also supplied to `thread/start`. */
@@ -152,7 +155,7 @@ export interface CodexRunSpec {
   /** Subprocess termination grace passed to the shared process-tree owner. */
   readonly disposeGraceMs: number
   /** Shared subprocess service spawn operation. */
-  readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle
+  readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle | Promise<SubprocessHandle>
   /** Diagnostic sink for a post-publication error flattened into a result. */
   readonly onError?: (error: Error, stopReason: SubagentStopReason) => void
 }
@@ -228,8 +231,8 @@ export async function startCodexRun(
 
   let child: SubprocessHandle
   try {
-    child = spec.spawn({
-      argv: codexAppServerArgv(spec.executable),
+    child = await spec.spawn({
+      argv: codexAppServerArgv(spec.executable, spec.nativeConfig),
       cwd: spec.cwd,
       stdio: { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
       graceMs: spec.disposeGraceMs,

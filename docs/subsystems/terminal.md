@@ -108,9 +108,9 @@ In-process registry for replaceable PTY backends and exact-Agent sessions.
 /**
  * Register one backend type for this effect scope.
  * @param backend - provider with a non-empty unique type.
- * @returns disposer that removes exactly this contribution.
+ * @returns disposer that withdraws this contribution and joins its unpublished setup and rollback.
  */
-registerBackend(backend: TerminalBackend): () => void
+registerBackend(backend: TerminalBackend): () => Promise<void>
 
 /**
  * List registered backend types in registration order.

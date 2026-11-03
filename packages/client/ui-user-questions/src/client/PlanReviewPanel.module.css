@@ -77,8 +77,13 @@
   background: var(--dsw-alias-state-warn-primary);
 }
 
-/* The plan is the panel's message: it takes the whole body and the scroll. */
-.body {
+.previewActions {
+  display: flex;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.summary {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -86,6 +91,21 @@
   padding: var(--dsw-space-3) var(--dsw-space-4) var(--dsw-space-1);
   font-size: 14px;
   line-height: 22px;
+}
+
+.title {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+.description {
+  margin: var(--dsw-space-2) 0 0;
+  color: var(--dsw-alias-label-secondary);
+  overflow-wrap: anywhere;
 }
 
 .footer {
@@ -129,7 +149,7 @@
     border-radius: var(--dsw-radius-xl);
   }
 
-  .body {
+  .summary {
     padding: 10px var(--dsw-space-3) var(--dsw-space-1);
   }
 

@@ -1,0 +1,639 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-28T14:22:31.957962+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "findings": [
+    "B243",
+    "B244",
+    "B245",
+    "B246",
+    "B247"
+  ],
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "exactRevisions": "External project-removal-baseline.json receipt; no reset, commit, push or PR."
+  },
+  "behavior": {
+    "authority": "Current active organization administrator is checked before project stop intent/cancellation and again in catalog removal; Steward409 before any stop. Late revocation can retain a manually stopped project.",
+    "ownership": "078 fence binds stable RuntimeId, node, generation, operation UUID and exact native-kernel-backed Gateway owner. Independent stopped publication cannot allow generation change, ready publication, reassignment or replacement assignment for the same owner. Retired directory identity retains the fence after assignment deletion.",
+    "recovery": "No heartbeat/TTL death assumptions. close joins lifecycle callbacks without model credits. Exact matching unlocked inode recovery or clean owner retirement releases abandoned operations; surviving stopping assignment still requires confirmed Runtime termination. Unknown acquisition or failed release remains fenced.",
+    "failures": "Stop and owner-admission failures503, no data callback. Callback sync failure, publication failure and release failure retain causes. Post-commit cleanup errors do not roll back catalog deletion.",
+    "accounting": "Confirmed process quiescence -> stopping/non-executable empty registration -> stopped publication/catalog removal -> final registration removal and wakeup; normal/destructive stop, failed start and dead-ready recovery all covered."
+  },
+  "negativeEvidence": [
+    "project-removal-before-emitted-negative",
+    "project-removal-resource-retention-before",
+    "project-removal-cross-coordinator-stop-negative",
+    "project-removal-closed-owner-before"
+  ],
+  "verification": {
+    "source": {
+      "files": 22,
+      "cases": 465,
+      "skips": 0
+    },
+    "deployment": {
+      "files": 6,
+      "cases": 55,
+      "skips": 0,
+      "postgres": "18.6",
+      "client": "18.6"
+    },
+    "compiled": {
+      "node22": "22.22.1",
+      "node24": "24.19.0",
+      "replaysPerNode": 7,
+      "observationsPerNode": 59,
+      "newRemovalObservationsPerNode": 17,
+      "sqliteHost": "25.8.1; one independent-connection invitation observation"
+    },
+    "docs": {
+      "quickAggregate": "19 passed,1 failed due newly recorded commit hashes in audit ledger; hashes moved to external evidence.",
+      "repair": "Only failed verify-repository-references leaf rerun; passed. Other19 passed leaves retained. No threshold or rule disabled.",
+      "bilingualPairs": 6
+    },
+    "commands": [
+      {
+        "name": "project-removal-post-recovery-source-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:16:04.067013+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:50809/hgw_projects_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/admin-api.spec.ts",
+          "tests/instances.spec.ts",
+          "tests/projects.spec.ts",
+          "tests/project-service-postgres.spec.ts",
+          "tests/node-resource-budget-postgres.spec.ts",
+          "tests/runtime-stop-lease-postgres.spec.ts",
+          "tests/runtime-resource-api.spec.ts",
+          "tests/runtime-resource-provider.spec.ts",
+          "tests/instance-capacity-postgres.spec.ts",
+          "tests/project-account-admission-transcript.spec.ts",
+          "tests/project-administration-transcript.spec.ts",
+          "tests/project-deletion-transcript.spec.ts",
+          "tests/project-removal-transcript.spec.ts",
+          "tests/project-provisioning-transcript.spec.ts",
+          "tests/project-invitation-admission-transcript.spec.ts",
+          "tests/project-management-transcript.spec.ts",
+          "tests/sqlite-invitation-admission-transcript.spec.ts",
+          "tests/project-model-settings.spec.ts",
+          "tests/model-governance-integration.spec.ts",
+          "tests/server.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "tests/postgres-test-database.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=src/admin-api.ts",
+          "--coverage.include=src/instances.ts",
+          "--coverage.include=src/projects.ts",
+          "--coverage.include=src/services.ts",
+          "--coverage.include=src/postgres/project-service.ts",
+          "--coverage.include=src/postgres/project-management-authority.ts",
+          "--coverage.include=src/postgres/instance-repository.ts",
+          "--coverage.include=src/gateway-model-budget.ts",
+          "--coverage.include=src/node-resource-budget.ts",
+          "--coverage.reportsDirectory=coverage/project-removal-current-20261028",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:16:41.439864+00:00"
+      },
+      {
+        "name": "project-removal-deployment-after-docker-recovery",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:14:28.811366+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "PATH=/opt/homebrew/opt/libpq@18/bin:/Users/a1234/.nvm/versions/node/v25.8.1/bin:/opt/homebrew/bin:/usr/bin:/bin",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:50809/hgw_projects_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/startup-generation.spec.ts",
+          "tests/maintenance.spec.ts",
+          "tests/deployment-restore.spec.ts",
+          "tests/deployment-backups.spec.ts",
+          "tests/deployment-data.spec.ts",
+          "tests/deployment-commands.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:15:00.955910+00:00"
+      },
+      {
+        "name": "project-removal-final-entry-types",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:08:47.103006+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:08:51.506671+00:00"
+      },
+      {
+        "name": "project-removal-final-lint",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:18:56.935798+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "gateway/src/admin-api.ts",
+          "gateway/src/instances.ts",
+          "gateway/src/gateway-model-budget.ts",
+          "gateway/src/node-resource-budget.ts",
+          "gateway/src/postgres/instance-repository.ts",
+          "gateway/src/postgres/project-service.ts",
+          "gateway/src/projects.ts",
+          "gateway/src/services.ts",
+          "gateway/src/index.ts",
+          "gateway/tests/admin-api.spec.ts",
+          "gateway/tests/instances.spec.ts",
+          "gateway/tests/instance-capacity-postgres.spec.ts",
+          "gateway/tests/node-resource-budget-postgres.spec.ts",
+          "gateway/tests/runtime-stop-lease-postgres.spec.ts",
+          "gateway/tests/project-service-postgres.spec.ts",
+          "gateway/tests/runtime-resource-api.spec.ts",
+          "gateway/tests/fixtures/runtime-stop-owner.ts",
+          "gateway/tests/fixtures/project-deletion.mjs",
+          "gateway/tests/fixtures/project-removal.mjs",
+          "gateway/tests/project-removal-transcript.spec.ts",
+          "gateway/tests/postgres-suite.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:18:58.894207+00:00"
+      },
+      {
+        "name": "project-removal-current-gateway-build",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:12:46.860797+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.build.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:12:49.363630+00:00"
+      },
+      {
+        "name": "project-removal-emitted-node22",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:16:46.147507+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:50809/hgw_projects_test",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/project-provisioning-transcript.spec.ts",
+          "tests/project-account-admission-transcript.spec.ts",
+          "tests/project-invitation-admission-transcript.spec.ts",
+          "tests/project-deletion-transcript.spec.ts",
+          "tests/project-administration-transcript.spec.ts",
+          "tests/project-management-transcript.spec.ts",
+          "tests/project-removal-transcript.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:16:52.936651+00:00"
+      },
+      {
+        "name": "project-removal-emitted-node24",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:18:55.784827+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:50809/hgw_projects_test",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/project-provisioning-transcript.spec.ts",
+          "tests/project-account-admission-transcript.spec.ts",
+          "tests/project-invitation-admission-transcript.spec.ts",
+          "tests/project-deletion-transcript.spec.ts",
+          "tests/project-administration-transcript.spec.ts",
+          "tests/project-management-transcript.spec.ts",
+          "tests/project-removal-transcript.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:19:03.588749+00:00"
+      },
+      {
+        "name": "project-removal-host-compiled-sqlite",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:13:34.956451+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "node",
+          "tests/fixtures/sqlite-invitation-admission.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:13:35.110154+00:00"
+      },
+      {
+        "name": "project-removal-repository-reference-current",
+        "status": "passed",
+        "startedAt": "2026-10-28T14:13:33.803721+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-repository-references"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T14:13:49.869480+00:00"
+      },
+      {
+        "name": "project-removal-closed-owner-current",
+        "status": "passed",
+        "startedAt": "2026-10-28T13:57:46.297710+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-removal-single-driver.py",
+          "owner-closed"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T13:57:46.941202+00:00"
+      }
+    ]
+  },
+  "coverage": {
+    "kind": "Diagnostic selected whole-module coverage, not the100percent CI acceptance",
+    "requestedFiles": 9,
+    "runtimeModules": 7,
+    "typeOnlyModules": 1,
+    "authorityHelperFullyCovered": true,
+    "summary": {
+      "lines": {
+        "total": 2654,
+        "covered": 1930,
+        "skipped": 0,
+        "pct": 72.72
+      },
+      "statements": {
+        "total": 3368,
+        "covered": 2236,
+        "skipped": 0,
+        "pct": 66.38
+      },
+      "functions": {
+        "total": 348,
+        "covered": 314,
+        "skipped": 0,
+        "pct": 90.22
+      },
+      "branches": {
+        "total": 2814,
+        "covered": 1633,
+        "skipped": 0,
+        "pct": 58.03
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "files": {
+      "gateway/src/admin-api.ts": {
+        "lines": {
+          "total": 1165,
+          "covered": 565,
+          "skipped": 0,
+          "pct": 48.49
+        },
+        "functions": {
+          "total": 44,
+          "covered": 30,
+          "skipped": 0,
+          "pct": 68.18
+        },
+        "statements": {
+          "total": 1561,
+          "covered": 658,
+          "skipped": 0,
+          "pct": 42.15
+        },
+        "branches": {
+          "total": 1554,
+          "covered": 656,
+          "skipped": 0,
+          "pct": 42.21
+        }
+      },
+      "gateway/src/gateway-model-budget.ts": {
+        "lines": {
+          "total": 100,
+          "covered": 92,
+          "skipped": 0,
+          "pct": 92
+        },
+        "functions": {
+          "total": 19,
+          "covered": 18,
+          "skipped": 0,
+          "pct": 94.73
+        },
+        "statements": {
+          "total": 131,
+          "covered": 115,
+          "skipped": 0,
+          "pct": 87.78
+        },
+        "branches": {
+          "total": 44,
+          "covered": 28,
+          "skipped": 0,
+          "pct": 63.63
+        }
+      },
+      "gateway/src/instances.ts": {
+        "lines": {
+          "total": 578,
+          "covered": 537,
+          "skipped": 0,
+          "pct": 92.9
+        },
+        "functions": {
+          "total": 91,
+          "covered": 87,
+          "skipped": 0,
+          "pct": 95.6
+        },
+        "statements": {
+          "total": 673,
+          "covered": 605,
+          "skipped": 0,
+          "pct": 89.89
+        },
+        "branches": {
+          "total": 440,
+          "covered": 356,
+          "skipped": 0,
+          "pct": 80.9
+        }
+      },
+      "gateway/src/node-resource-budget.ts": {
+        "lines": {
+          "total": 222,
+          "covered": 215,
+          "skipped": 0,
+          "pct": 96.84
+        },
+        "functions": {
+          "total": 60,
+          "covered": 57,
+          "skipped": 0,
+          "pct": 95
+        },
+        "statements": {
+          "total": 288,
+          "covered": 264,
+          "skipped": 0,
+          "pct": 91.66
+        },
+        "branches": {
+          "total": 188,
+          "covered": 156,
+          "skipped": 0,
+          "pct": 82.97
+        }
+      },
+      "gateway/src/projects.ts": {
+        "lines": {
+          "total": 205,
+          "covered": 179,
+          "skipped": 0,
+          "pct": 87.31
+        },
+        "functions": {
+          "total": 48,
+          "covered": 46,
+          "skipped": 0,
+          "pct": 95.83
+        },
+        "statements": {
+          "total": 247,
+          "covered": 211,
+          "skipped": 0,
+          "pct": 85.42
+        },
+        "branches": {
+          "total": 215,
+          "covered": 157,
+          "skipped": 0,
+          "pct": 73.02
+        }
+      },
+      "gateway/src/services.ts": {
+        "lines": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "gateway/src/postgres/instance-repository.ts": {
+        "lines": {
+          "total": 114,
+          "covered": 105,
+          "skipped": 0,
+          "pct": 92.1
+        },
+        "functions": {
+          "total": 34,
+          "covered": 30,
+          "skipped": 0,
+          "pct": 88.23
+        },
+        "statements": {
+          "total": 134,
+          "covered": 112,
+          "skipped": 0,
+          "pct": 83.58
+        },
+        "branches": {
+          "total": 105,
+          "covered": 76,
+          "skipped": 0,
+          "pct": 72.38
+        }
+      },
+      "gateway/src/postgres/project-management-authority.ts": {
+        "lines": {
+          "total": 19,
+          "covered": 19,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 1,
+          "covered": 1,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 25,
+          "covered": 25,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 32,
+          "covered": 32,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "gateway/src/postgres/project-service.ts": {
+        "lines": {
+          "total": 251,
+          "covered": 218,
+          "skipped": 0,
+          "pct": 86.85
+        },
+        "functions": {
+          "total": 51,
+          "covered": 45,
+          "skipped": 0,
+          "pct": 88.23
+        },
+        "statements": {
+          "total": 309,
+          "covered": 246,
+          "skipped": 0,
+          "pct": 79.61
+        },
+        "branches": {
+          "total": 236,
+          "covered": 172,
+          "skipped": 0,
+          "pct": 72.88
+        }
+      }
+    }
+  },
+  "files": {
+    "sourceAndEmitted": {
+      "gateway/src/instances.ts": "fc6a8da8312dc297175ec7c6494a249d2aa1f7732ddb949cebd3a8f463224201",
+      "gateway/src/gateway-model-budget.ts": "a61d2fa851f04e1301f89fd173a285e843596c08bdb56987fa7cb0c6034bf5c8",
+      "gateway/src/node-resource-budget.ts": "94670c0bf78b5de25fd5546073d29f6f289f1d5ed31df087600335d91410bffc",
+      "gateway/src/postgres/instance-repository.ts": "d749f12dfe6dc0d5cc331028ba2bd43a9de28f20985c8a59a510d94e84976373",
+      "gateway/src/postgres/project-service.ts": "7077575560d5cab13c9bf570b153b13d3b82838c419529b82accc8a1e0b26a04",
+      "gateway/src/projects.ts": "2887b3521414a5e608d5412662266ae2c46d5dc9d35b6320acb1c2fc444bddec",
+      "gateway/src/admin-api.ts": "817667c80794dd563d055585fd570bfcb5887182e09f14abfac11092b71e201d",
+      "gateway/src/services.ts": "35b0740bb686fd09ea35d61caf44a8c1496d2c026895b34627e83bdf06e66bb0",
+      "gateway/src/index.ts": "b57837d3ac1c9f7d30ad5945d4ec9a1244aa235a89d336ef1cd1f7f716f0064a",
+      "gateway/lib/instances.js": "ec01d4d23443eb6fdadf2da71b1d00966cbe61a77843db7f58e6a27234023605",
+      "gateway/lib/gateway-model-budget.js": "cef62b8b54d91fe58ca3c08072834b904e49b0ff5ce47a7944db4fd883cac93b",
+      "gateway/lib/node-resource-budget.js": "009108b26a18e2f88a1450e6a715b07265a6f4703e7af3118fe6acf202fb0715",
+      "gateway/lib/postgres/instance-repository.js": "12f75f4ff0a7a0ff2e8453504cd188d49548296fa43f3fe0225731226e9b665e",
+      "gateway/lib/postgres/project-service.js": "5ec7667d6156282efb892ec0486fcdc230c7584191f1d25b16a44527bdf2b682",
+      "gateway/lib/projects.js": "100e36167621357939e5f28810cdf2475e0d8d9d8477d2ea968f3027735feff5",
+      "gateway/lib/admin-api.js": "cd60967a4263c68cdfc6d31ba2232109f3c14412e685fea7bd706b2bd68ae325",
+      "gateway/lib/services.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+      "gateway/lib/index.js": "3faf682d40589866eddc88eb3a60622d3574d5840a8ad497dfdd9d90997f982e",
+      "gateway/deploy/postgres/migrations/078_runtime_destructive_operations.sql": "b019b42d6e0ae1cb5980bf3a77428efb3ef9bce5033aa6dd570a0198da56e2da"
+    },
+    "tests": {
+      "gateway/tests/instances.spec.ts": "bfe40265cef2d5c16b9a177677e05dd6a1bba49014d6b12759ccedc3339bb115",
+      "gateway/tests/node-resource-budget-postgres.spec.ts": "ce4e4d2bc2ca218577a4f99d664499ca7d93398bf5f6492c2941260c9c3dc5b3",
+      "gateway/tests/runtime-stop-lease-postgres.spec.ts": "820752965d1b8fb03538cbd6b6deade1de4dd1b051231d9ba409c5ea475b9ccf",
+      "gateway/tests/project-service-postgres.spec.ts": "2564bbc3c68e1c7425cbb1441211622ec29a5e7f526568d7734631eeef926f39",
+      "gateway/tests/instance-capacity-postgres.spec.ts": "9fd73740793146245c19b50c7c20fed0238051b133b4f7d95d1dc09dbb03c04a",
+      "gateway/tests/runtime-resource-api.spec.ts": "c9b65a138a9934b170f4bc550ac1433638d9e19ecf6c2973028bd68b7e58f919",
+      "gateway/tests/admin-api.spec.ts": "9bfd51b6d59e0f441b0733159b72086a908f049ec7925e4aec3e7e684a8b3edc",
+      "gateway/tests/fixtures/runtime-stop-owner.ts": "a81644d79f09697386523c76188c7b59d24df567718f614bc4e297f8d9787950",
+      "gateway/tests/fixtures/project-removal.mjs": "1c821e45139500be50a5d0f6460db77efc2d119e9ac827e68e14c4825ad60a51",
+      "gateway/tests/fixtures/project-deletion.mjs": "2fa2a4b63a502eeafcdbf6e8dac8ef142e5a0daf4eb4b8008f1a61744e716f58",
+      "gateway/tests/project-removal-transcript.spec.ts": "32e9c34d6a39b1d4755165a142c636e39ab89ea562891ee6baa2061f07fad4ed",
+      "gateway/tests/expected/projects/removal.jsonl": "966e53340e1652064109b79425e86570ebef01b5212a42b8e2c525e150e2737b",
+      "gateway/tests/postgres-suite.spec.ts": "e376ffad81c07f1460dd850ce33d658ce41f3a9633cbbfd183854f79d2f3f3cb",
+      "gateway/package.json": "d6f133dc707cbafbee2614f6ac0b90e726207dbe7855df21c4a4d00de2e07e57"
+    },
+    "documentation": {
+      "gateway/README.md": "7cc5f73dace556690fd2d492c9540ad63ee267273b9aa29306e46c741f787bad",
+      "gateway/README.zh.md": "44231b043d2517dce2a53de6c8acdadf0a0daf10ae4277df3bcfd2dc52e36dfa",
+      "gateway/README.i18n.yaml": "9d3a6ce3e010bbf4aef25d0841ed412f33faeee8df17d93be4638a275c659ae7",
+      ".agents/notes/implemented/bug-fix/2026-10-28-project-deletion-lifecycle.md": "9f15d2d52b677617c943b9efa490bb0ec52cf8ec4919fb816f1dd0ffa3855b5e",
+      ".agents/notes/implemented/bug-fix/2026-10-28-project-deletion-lifecycle.zh.md": "2875d80b386595d616bbfa1f108ee6689061226d8b07408d3d0f145baae60987",
+      ".agents/notes/implemented/bug-fix/2026-10-28-project-deletion-lifecycle.i18n.yaml": "9a3e1b2708605b05e62d960c84a4217a14643c84c5e0b2aa64223522780b28f6",
+      ".agents/notes/implemented/architecture/2026-10-24-gateway-model-ownership.md": "88dd4bc54057c839c6b6713cfa827e4cceaf16c64cd844f5a7987cf73c26fbd4",
+      ".agents/notes/implemented/architecture/2026-10-24-gateway-model-ownership.zh.md": "0a68df7cd2d012d672837cea03a35484763f4efa4ecb792b1412bbf51e481de1",
+      ".agents/notes/implemented/architecture/2026-10-24-gateway-model-ownership.i18n.yaml": "1824790df6c8e80670739b8389e340eff9ba758fd5a744d06ae001a7898bd767",
+      ".agents/notes/implemented/bug-fix/2026-10-23-project-creation-transactions.md": "1d9e323811a43852fb48b2395b3288ca4ee43b8f0c8d4b4ef3aa74727c06d964",
+      ".agents/notes/implemented/bug-fix/2026-10-23-project-creation-transactions.zh.md": "45a255de0f9e9001a3cd761d6bc10687b1de1579fd0c7a8216922ab8855e69b3",
+      ".agents/notes/implemented/bug-fix/2026-10-23-project-creation-transactions.i18n.yaml": "40f942627985bce9d2f5ca8f3ddce7ab61d8fe3cf726a3e0b419de924cb33123",
+      "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-deletion-lifecycle/guide.md": "007b47be5a6d98d862862d33e152ab8598ce7c9628a27e6b880489034a3bf24b",
+      "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-deletion-lifecycle/guide.zh.md": "54becaec05b4c482c317ff4a73bf66e39abaa88e41400a3eac3bd867c197ef75",
+      "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-deletion-lifecycle/guide.i18n.yaml": "908ab1915e9dfca3fa89c7254c6a984fb83cefda50f2361ddbaf632a4df5ef43",
+      "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.md": "7a9621f23e7ce285c53429ae7b2e66fadf37fc8150f3e1ade12e26d185406eaf",
+      "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.zh.md": "f58f4ae281881a5bbaa578cb01f31f2b87c3ad99ec99e387898065b2db94bd02",
+      "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.i18n.yaml": "09ccb14176ce29468c243839846e005758648f963c86c80ca53934f2dd2ed860"
+    }
+  },
+  "environment": {
+    "preliminaryFailure": "Missing pg_dump PATH and owned256MiB PostgreSQL tmpfs exhausted. Replaced only exact registered container with owned volume-backed container and used installed18.6 clients.",
+    "interruption": "Host transient ENOSPC and Docker backend failure interrupted final receipt writes; these runs are recorded as interrupted, not passed. Human restored Docker.",
+    "recovery": "Only exact owned container started;55 deployment and465 source plus compiled acceptance rerun after recovery.",
+    "ownedDatabase": "50809,hgw_projects_test; retained for immediately following account-administration audit, later cleanup must remove only registered owned container/volume.",
+    "production5432Untouched": true,
+    "peer56339Untouched": true
+  },
+  "coordination": {
+    "peerTitle": "多电脑连接架构",
+    "migration078HashStable": true,
+    "publicRuntimeTargetUnchanged": true,
+    "scope": "Peer owns runtime routing/nodes/Admin UI; audit owns destructive lifecycle. Only concrete shared decisions/build windows coordinated.",
+    "peerReportedEvidence": "External node-access-routing-20261028.json; independent feature review remains open."
+  },
+  "limits": [
+    "Original12 domains remain in_progress; this receipt is one verified set of scenarios.",
+    "Module coverage remains below100percent; no thresholds lowered or affected production files excluded.",
+    "Cross-coordinator HTTP Runtime carrier is synthetic observable listener; LocalLauncher tests execute actual POSIX child processes.",
+    "No native Windows or real cross-computer execution proof; remote execution remains intentionally disabled.",
+    "Real model API validation remains explicitly deferred by user.",
+    "New actual account-administration revocation counterexample reproduced in PostgreSQL and SQLite after this phase; not repaired or counted complete here."
+  ]
+}

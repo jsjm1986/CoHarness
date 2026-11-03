@@ -1,6 +1,8 @@
 /** Archives page copy: header, folder tabs, filters, records table, detail dialog, maintenance dialog, and confirmations. */
 
 export const zh = {
+  runtimeIdentity: 'Runtime {id}',
+  unassignedRuntime: '未分配',
   // Page header and toolbar
   pageTitle: '归档对话',
   pageDescription: '查看和管理组织内已归档的个人与项目对话。',
@@ -125,6 +127,8 @@ export const zh = {
 export type ArchivesCopyKey = keyof typeof zh
 
 export const en = {
+  runtimeIdentity: 'Runtime {id}',
+  unassignedRuntime: 'unassigned',
   // Page header and toolbar
   pageTitle: 'Archived conversations',
   pageDescription: 'View and manage archived personal and project conversations across the organization.',

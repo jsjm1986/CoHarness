@@ -6,6 +6,11 @@
 
 <a id="profile-boot"></a>
 
+<a id="managed-launch"></a>
+## 托管启动
+
+不可变启动快照中继承的非空 `DSH_GATEWAY_CREDENTIAL_FD` 或 `DSH_GATEWAY_CREDENTIAL_FILE` 会选择托管执行。应用在 SDK 引导和 profile 条目挂载前，就要求模型策略、资源准入和执行身份。提供方等待激活或不可用时，相关操作会被拒绝；凭据通道标记不会认证调用者，也不会授予权限。环境文件中的值不能选择此模式。独立启动保留可选提供方。这些要求属于应用，在 profile 提供方重载期间保持有效。
+
 ## Profile 启动
 
 `dsh <name>` 是 `dsh --profile <name>` 的简写，启动位于 `$DSH_HOME/profiles/<name>` 的 profile。简写中的名称必须紧跟 `dsh`；`plugin` 仍为插件管理命令，因此启动同名 profile 时须使用 `dsh --profile plugin`。生效配置树以空根节点为起点，依次叠加 profile manifest（元数据清单）的 `dsh.profile.bundles` 列表中指定的各组合包 patch、profile 自身的 `cordis.patch.yml`、home 级的 `$DSH_HOME/cordis.patch.yml`（这是各 profile 共享的机器本地偏好，因此优先于逐 profile 配置层），以及按 argv 顺序指定的各个 `--patch <path>` 覆盖层。对同一配置行，后应用的层优先。patch 会替换目标行的整个 `config` 值，而不是深度合并其中的键；patch 也可以插入新行。最终 YAML 组合决定是否由 `dsh-hmr` 监视配置；未启用 HMR 时，更改需要重启。配置解析、schema 校验、模块解析或插件启动失败时，系统会报告错误并以非零状态退出。收到 SIGINT 或 SIGTERM 时，挂载的根节点会先 dispose（资源释放）再退出。

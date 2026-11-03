@@ -1,0 +1,14 @@
+{
+  "name": "document-trash-conflict-build",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/build.ts",
+  "startedAt": "2026-10-25T05:04:38.086441+00:00",
+  "seconds": 66.96,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b7a2d39e65b5d7fe462e5fe4ed1e6cc332ab1b039decbfceff0de918d44dead9",
+  "inputsAfter": "b7a2d39e65b5d7fe462e5fe4ed1e6cc332ab1b039decbfceff0de918d44dead9",
+  "postgresToolDirectory": null,
+  "outputSha256": "a4c8bca0880749f969c1b9fe6f449faa4ffb0d639b593e9960b81ed68ef0c086",
+  "outputTail": "run-gates: build running 8 gate(s) with 8 worker(s) from 10 local default worker(s) of 10 CPU(s).\nrun-gates: start native addon\nrun-gates: PASS native addon (0.87s)\nrun-gates: start host compiler\nrun-gates: PASS host compiler (3.98s)\nrun-gates: start Host bundle\nrun-gates: start host aggregate check\nrun-gates: PASS Host bundle (6.45s)\nrun-gates: start client compiler\nrun-gates: PASS client compiler (4.88s)\nrun-gates: start Client bundle\nrun-gates: start client aggregate check\nrun-gates: PASS Client bundle (5.73s)\nrun-gates: start Web build\nrun-gates: PASS Web build (3.30s)\nrun-gates: PASS client aggregate check (43.85s)\n\n== FAILED host aggregate check (60.56s) ==\ncommand: tsc -p tsconfig.host.json\noutcome: exit 2\npackages/host/userdoc-http/tests/acl.spec.ts(116,5): error TS2322: Type 'Mock<() => Promise<{ directoryId: string; trashedAt: number; purgeAfter: number; docId: UserDocId; path: string; name: string; bytes: number; mediaType: string; modifiedAt: number; }[]>>' is not assignable to type '(signal?: AbortSignal | undefined) => Promise<UserDocTrashRef[]>'.\n  Type 'Promise<{ directoryId: string; trashedAt: number; purgeAfter: number; docId: UserDocId; path: string; name: string; bytes: number; mediaType: string; modifiedAt: number; }[]>' is not assignable to type 'Promise<UserDocTrashRef[]>'.\n    Type '{ directoryId: string; trashedAt: number; purgeAfter: number; docId: UserDocId; path: string; name: string; bytes: number; mediaType: string; modifiedAt: number; }[]' is not assignable to type 'UserDocTrashRef[]'.\n      Type '{ directoryId: string; trashedAt: number; purgeAfter: number; docId: UserDocId; path: string; name: string; bytes: number; mediaType: string; modifiedAt: number; }' is not assignable to type 'UserDocTrashRef'.\n        Types of property 'directoryId' are incompatible.\n          Type 'string' is not assignable to type 'UserDocDirectoryId'.\n            Type 'string' is not assignable to type '{ readonly [BRAND]: \"UserDocDirectoryId\"; }'.\n\nrun-gates: 7 passed, 1 failed, 0 skipped in 65.41s.\nrun-gates: unsuccessful gates:\n  - FAILED host aggregate check (60.56s, exit 2)\n    tsc -p tsconfig.host.json\n"
+}

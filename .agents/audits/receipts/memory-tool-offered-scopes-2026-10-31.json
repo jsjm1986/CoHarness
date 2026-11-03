@@ -1,0 +1,438 @@
+{
+  "finding": "B374",
+  "title": "Explicit personal and implicit project memory tools return stored content after the memory feature is disabled",
+  "status": "fixed_named_scope_admission_cases_verified_remaining_full_review_open",
+  "updatedAt": "2026-10-30T22:20:51.471510+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T220235Z",
+  "sourcePaths": [
+    "packages/memory/tool-memory/src/index.ts",
+    "packages/memory/tool-memory/tests/tool-memory.spec.ts",
+    "examples/headless-agent/memory-disabled-tools.cordis.snapshot.yml",
+    "examples/headless-agent/tests/fixtures/memory-disabled-tools-model.ts",
+    "examples/headless-agent/tests/fixtures/memory-disabled-tools-driver.ts",
+    "examples/headless-agent/tests/memory-disabled-tools.snapshot.ts",
+    "examples/headless-agent/tests/snapshots/memory-disabled-tools/personal.expected.jsonl",
+    "examples/headless-agent/tests/snapshots/memory-disabled-tools/project.expected.jsonl",
+    "packages/memory/tool-memory/README.md",
+    "packages/memory/tool-memory/README.zh.md",
+    "packages/memory/tool-memory/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-tool-scopes.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-tool-scopes.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-tool-scopes.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-member-authority/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-member-authority/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-member-authority/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/memory/tool-memory/src/index.ts": "f53190284e42aa26cdad9ed03ecb3f06ab837f4b54ea70c55342491ceebd2b9d",
+    "packages/memory/tool-memory/tests/tool-memory.spec.ts": "2e7812acad870e6dfb4fa5eb703f0dc10482ed5977c327340047b7d8f6890940",
+    "examples/headless-agent/memory-disabled-tools.cordis.snapshot.yml": "4b2268ed44fa9c899d80c053681aa89f54580194c62af7f660e10b2de120b80d",
+    "examples/headless-agent/tests/fixtures/memory-disabled-tools-model.ts": "74b2da19753d4c3a4b553add334fbcda231276f11e6c5bc73477e04e1d14a467",
+    "examples/headless-agent/tests/fixtures/memory-disabled-tools-driver.ts": "5d04c5091643186aca6a4cad2223d498f68e3e1da68954ebd8c26daf8aebcdf3",
+    "examples/headless-agent/tests/memory-disabled-tools.snapshot.ts": "99917554f71088bbe137467617b7f20f069e77f217eda52117418a83e7175ef7",
+    "examples/headless-agent/tests/snapshots/memory-disabled-tools/personal.expected.jsonl": "8e4193c718218273835081540e1d4de5318290aefbcbf8415974f57119c44e17",
+    "examples/headless-agent/tests/snapshots/memory-disabled-tools/project.expected.jsonl": "65fc0c06a1d68f62c362986e8af3a6be3046ad6ae5c2bc4467a8c330d081deca",
+    "packages/memory/tool-memory/README.md": "e3c270505c005782744646cf41ed48a6a4a30d7aefff121a6c224e951d2cdff5",
+    "packages/memory/tool-memory/README.zh.md": "64d049e749bb8e112d131d7d5a41b3cc56bc41b5b59d2a1920d7ee3814d13941",
+    "packages/memory/tool-memory/README.i18n.yaml": "1395f9ac5119836362e47f17db3c38140d71797515704e02fafbc71b34445bc3",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-tool-scopes.md": "3a6e321362f5ff6d2b9e8f6854264d6f56aa554768cd2fe3b6fc30cb7707875f",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-tool-scopes.zh.md": "796ec277a0a0365dd3c7160aac03ad86b0c0f7b4ce36377eeef11efc9c1cbfae",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-tool-scopes.i18n.yaml": "d0ef94b03ffa2814acd3cafe7fa9d94ceabedac5d9a07b3f68380034da6b9978",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-member-authority/guide.md": "7ae12bb8dfcc4b647e3dae5025695060e007df4af06d3b6d0c807ce29b8747f2",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-member-authority/guide.zh.md": "8bcfc2cc48c85a976e60a791a07bd3b9028847026df468873925fdd7ffd11aec",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-member-authority/guide.i18n.yaml": "73c19d0ab643e2c8d9d18dd56c6dff7fc8610050ab389c74f68cbb6df93103e8"
+  },
+  "compiledArtifactHashes": {
+    "packages/memory/tool-memory/lib/index.js": "edd607d1c4a8ed0ee7af91502215782b710ebdea0e44d5800aea876e9ab830f9"
+  },
+  "repair": "All main-conversation memory tools resolve explicit or implicit scopes from the current offered Agent set at execution entry. Missing scopes refuse with memory_invalid before storage reads/searches or mutations. Owner member reads remain inspectable; re-enabling restores access to unchanged records.",
+  "causalEvidence": {
+    "privateSourceNegative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T22:04:17.478938+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "--config",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T220235Z/vitest-disabled.mts",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T220235Z/tool-memory-disabled.spec.ts",
+        "--maxWorkers=2",
+        "-t",
+        "refuses explicit model"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T22:04:20.519894+00:00"
+    },
+    "realLoaderNegatives": {
+      "disabled-memory-loader-personal-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:13:12.474662+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T220235Z/run-disabled-loader.py",
+          "personal",
+          "negative"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:13:13.060118+00:00"
+      },
+      "disabled-memory-loader-project-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:14:28.679202+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T220235Z/run-disabled-loader.py",
+          "project",
+          "negative"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:14:29.275130+00:00"
+      }
+    },
+    "meaning": "The two successful negative-detector receipts contain private pre-fix Loader children exiting1 after read/search returned disabled entry text to the model. Shared source stays repaired. Earlier private-config startup and alias failures are setup failures and do not count as product negatives."
+  },
+  "verification": {
+    "uniqueRelatedCases": 285,
+    "memoryPackageCases": 264,
+    "toolMemoryCases": 22,
+    "newFocusedCases": 3,
+    "composedMemoryGatewayExecutionAndTypeScriptSdkCases": 20,
+    "pythonSdkCases": 1,
+    "repeatedSourceAndEngineRunsAreNotAdditionalCases": true,
+    "coverage": {
+      "file": "packages/memory/tool-memory/src/index.ts",
+      "statements": [
+        87,
+        87
+      ],
+      "branches": [
+        86,
+        86
+      ],
+      "functions": [
+        28,
+        28
+      ],
+      "lines": [
+        80,
+        80
+      ],
+      "allFourMetrics": 100,
+      "newExemptions": 0
+    },
+    "actualLoaderControls": {
+      "settingsProvider": "real file provider with committed namespace updates",
+      "storage": "real JSON domain with fixed revisions",
+      "personalSpace": {
+        "disabledModelToolCalls": 7,
+        "enabledToolCalls": 5,
+        "ownerReads": 4
+      },
+      "projectSpace": {
+        "disabledModelToolCalls": 4,
+        "enabledToolCalls": 2,
+        "ownerReads": 2
+      },
+      "retainedData": "No blocked new entry is created and no original entry is deleted; original content and revision remain unchanged.",
+      "transcript": "Complete tool text, stable refusal codes and member-read content are pinned in the two maintained goldens."
+    },
+    "platforms": "Mac source and compiled Node22.22.1/24.19.0. No new physical Linux/Windows acceptance claim.",
+    "sdk": "Existing TypeScript and Python real Loader/SDK auxiliary-request and persisted resume goldens pass. No root real API request.",
+    "checks": {
+      "disabled-memory-source-coverage-corrected": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:12:10.981920+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/memory",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/memory/tool-memory/src/index.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T220235Z/tool-scope-final-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:12:26.012983+00:00"
+      },
+      "disabled-memory-loader-personal-source": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:12:10.981925+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T220235Z/run-disabled-loader.py",
+          "personal"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:12:12.195339+00:00"
+      },
+      "disabled-memory-loader-project-source": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:13:12.474659+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T220235Z/run-disabled-loader.py",
+          "project"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:13:13.080151+00:00"
+      },
+      "disabled-memory-loader-personal-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:13:12.474662+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T220235Z/run-disabled-loader.py",
+          "personal",
+          "negative"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:13:13.060118+00:00"
+      },
+      "disabled-memory-loader-project-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:14:28.679202+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T220235Z/run-disabled-loader.py",
+          "project",
+          "negative"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:14:29.275130+00:00"
+      },
+      "disabled-memory-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:14:44.425088+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/memory-disabled-tools.snapshot.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:14:45.881817+00:00"
+      },
+      "disabled-memory-regression-sdk-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:15:54.227238+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/memory-disabled-tools.snapshot.ts",
+          "examples/headless-agent/tests/memory-recall-integrity.snapshot.ts",
+          "examples/headless-agent/tests/memory.snapshot.ts",
+          "examples/headless-agent/tests/memory-curation-race.snapshot.ts",
+          "examples/headless-agent/tests/memory-consolidation-sessions.snapshot.ts",
+          "examples/headless-agent/tests/memory-execution.snapshot.ts",
+          "examples/headless-agent/tests/gateway-memory.snapshot.ts",
+          "snapshots/sdk/memory-auxiliary.snapshot.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:15:59.973137+00:00"
+      },
+      "disabled-memory-python-sdk": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:17:36.549328+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "uv",
+          "run",
+          "--no-sync",
+          "--project",
+          "python/sdk",
+          "python",
+          "-m",
+          "pytest",
+          "python/sdk/tests/test_memory_model_snapshot.py",
+          "-q"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:17:40.933253+00:00"
+      },
+      "disabled-memory-host-types-final": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:14:28.679066+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:14:34.100848+00:00"
+      },
+      "disabled-memory-lint-final": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:14:28.679163+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/memory/tool-memory/src/index.ts",
+          "packages/memory/tool-memory/tests/tool-memory.spec.ts",
+          "examples/headless-agent/tests/fixtures/memory-disabled-tools-model.ts",
+          "examples/headless-agent/tests/fixtures/memory-disabled-tools-driver.ts",
+          "examples/headless-agent/tests/memory-disabled-tools.snapshot.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:14:30.896190+00:00"
+      },
+      "disabled-memory-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:15:10.870434+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:15:37.670245+00:00"
+      },
+      "disabled-memory-config-and-guide": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:15:54.227235+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-cordis-config.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:15:55.704413+00:00"
+      },
+      "disabled-memory-entrypoint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:17:36.549674+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-application-entrypoints.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:17:36.976018+00:00"
+      },
+      "disabled-memory-guide-artifact-final": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:19:09.538495+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T220235Z/verify-memory-guide.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:19:09.594084+00:00"
+      },
+      "disabled-memory-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:17:36.549326+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "master"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:17:40.107051+00:00"
+      }
+    }
+  },
+  "build": {
+    "firstCompleteInvocation": {
+      "status": "failed",
+      "startedAt": "2026-10-30T22:11:09.781045+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "--import",
+        "tsx/esm",
+        "scripts/build.ts"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T22:11:47.143033+00:00"
+    },
+    "failedGate": "Only Host aggregate: the new fixture used callId instead of ToolResultMessage.toolCallId.",
+    "successfulFailedGateRetest": {
+      "status": "passed",
+      "startedAt": "2026-10-30T22:14:28.679066+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "tsconfig.host.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T22:14:34.100848+00:00"
+    },
+    "result": "Eight required gates converge across the complete build and the corrected Host aggregate retest. The first invocation is not represented as passing."
+  },
+  "fixtureCorrections": [
+    "Enabled search returns an excerpt; a focused fixture originally expected the full read body. The assertion now checks the documented search result.",
+    "The standalone verify-upgrade-guides command named by the skill is absent in this checkout. The failed invocation is retained and not called passing; a private artifact check verifies edited guide frontmatter, sections, English budget and scope instructions while all20repository doc gates verify links/pairing. No unrelated dependency was installed."
+  ],
+  "noteReview": {
+    "newNote": ".agents/notes/implemented/bug-fix/2026-10-31-memory-tool-scopes.md",
+    "newNotes": 1,
+    "retainedActive": {
+      ".agents/notes/implemented/bug-fix/2026-10-23-memory-member-authority.md": "Queued mutation authority and final persistence checks remain independent of tool entry admission.",
+      ".agents/notes/implemented/bug-fix/2026-10-28-memory-curation-scope.md": "Auxiliary passes additionally restrict access to reviewed scopes; main-conversation tool resolution does not supersede it.",
+      ".agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.md": "Request logging, model attribution and auxiliary lifetime remain current."
+    },
+    "archivedOrDeleted": 0,
+    "frozenNotesEdited": false,
+    "upgradeGuide": "Updated the current unreleased memory-member-authority guide pair with disabled tool error handling and the unchanged owner-read path. No settings key, tool argument, wire/SDK field, Session event or durable schema changes."
+  },
+  "coordination": {
+    "peerRelease": "coharness-full-real-20261031-r3",
+    "peerSourceSnapshot": "/Users/a1234/harness-gateway-releases/coharness-full-real-20261031-r3",
+    "sourceFreezeAcknowledgement": "Peer reported18756source files copied and hash-stable; root applied B374only after that acknowledgement.",
+    "snapshotModuleHash": "11f336e017943a2cd7e2e0d37efa13ee621499d4226b191f98eeb11f2944a218",
+    "scope": "The frozen r3contains B368throughB373but not B374. This source correction belongs to a subsequent peer release. Root did not modify the frozen tree, deploy, use Docker or touch production databases.",
+    "peerEnvironment": "Peer reports Docker stopped after disk exhaustion and is restoring services without deleting data volumes. Root continues disjoint keyless code work and performs no host service recovery."
+  },
+  "additionalSourceReview": {
+    "paths": [
+      "packages/memory/memory/src/search.ts",
+      "packages/memory/memory/src/client.ts",
+      "packages/context/resource-budget/src/index.ts"
+    ],
+    "scope": "Read the search implementation and browser vocabulary plus the generic resource-budget service. No whole-file completion or new defect is claimed from these read-only observations."
+  },
+  "limits": [
+    "Tool availability is checked at executor entry; this does not cancel a storage read that already entered. Service-owned writes retain additional queue/persistence authority checks.",
+    "The actualLoader scenario exercises independent owner member reads. It does not substitute for real multi-account Gateway or computer-grant acceptance.",
+    "The skill-specific standalone upgrade-guide gate is unavailable; its absence is recorded rather than treated as a passing repository check.",
+    "B04/B25 and all12original domains remain open. Provider-specific root Responses verification remains human-deferred. Peer real-model/dual-host cases are tracked separately."
+  ]
+}

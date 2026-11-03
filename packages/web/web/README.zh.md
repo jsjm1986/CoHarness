@@ -49,6 +49,8 @@ kind: "package-reference"
 
 本包还导出 `readWebResponseBytes()` 和 `readWebResponseJson()`。搜索提供方使用这些 reader，在解析上游 body 前执行正数 `maxResponseBytes` 预算；声明长度和分块响应使用同一个上限，配置值最高为 256 MiB，超限时由 `WebResponseTooLargeError` 标识。
 
+`registerModelSearch()` 为适配器搜索共用策略选择、资源所有权和卸载等待。`ModelSearchImplementation` 提供路由选项、协议准备、精确请求记录与独立传输；`ModelSearchRoute` 和 `PreparedModelSearch` 保留选定模型及延迟操作。独立传输接收第四个参数 `assertOwnership`，必须在异步准备后、HTTP 派发前调用。现有搜索提供者在请求记录前后都进行检查。资源提供者变化或新要求模型策略时，旧请求被拒绝，未使用的许可归还原所有者；新请求可以重试。参见[派发决策](../../../.agents/notes/implemented/bug-fix/2026-10-31-model-search-dispatch-ownership.zh.md)。`modelSearchUsage()` 按 `ModelSearchUsageFields` 验证实际协议计数；缺失用量保持缺失，不一致的总数被省略。`resolveModelSearchCredential()` 在遵守调用方取消的同时观察延迟的凭据结算。
+
 <a id="selection"></a>
 ## 选择
 

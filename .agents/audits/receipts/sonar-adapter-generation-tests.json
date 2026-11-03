@@ -1,0 +1,14 @@
+{
+  "name": "sonar-adapter-generation-tests",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/llm/llm-pi-ai/tests/search-operation.spec.ts --retry=0",
+  "startedAt": "2026-10-24T09:07:16.769054+00:00",
+  "seconds": 5.934,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "dea0512daacef68a7d3bdf6b15fca59d933e6f12be085118ef519c5438ce7fa8",
+  "inputsAfter": "dea0512daacef68a7d3bdf6b15fca59d933e6f12be085118ef519c5438ce7fa8",
+  "postgresToolDirectory": null,
+  "outputSha256": "db18fb670ed54838d356bc1acbb6d047f72c80621f7ac8e11cda3b196c4e1f1f",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  9 passed (9)\n   Start at  17:07:21\n   Duration  1.05s (transform 579ms, setup 61ms, import 748ms, tests 125ms, environment 0ms)\n\n"
+}

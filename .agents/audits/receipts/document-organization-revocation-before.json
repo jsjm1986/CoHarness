@@ -1,0 +1,14 @@
+{
+  "name": "document-organization-revocation-before",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/admin-business-postgres.spec.ts -t 'rechecks project '\"'\"'organization'\"'\"' revocation' --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T00:18:28.024627+00:00",
+  "seconds": 3.287,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "126c2d8ac2ebe139c3d3c489ed42044de152df189e01a6793b379e29906a68b7",
+  "inputsAfter": "126c2d8ac2ebe139c3d3c489ed42044de152df189e01a6793b379e29906a68b7",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "1f0dbb0de3633d7b65e70f311e73e9f26626d6db4faf1a135bbc65d33f156c08",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/admin-business-postgres.spec.ts (67 tests | 4 failed | 63 skipped) 276ms\n       × rechecks project 'organization' revocation after a catalog row wait for 'sync' 79ms\n       × rechecks project 'organization' revocation after a catalog row wait for 'delete' 58ms\n       × rechecks project 'organization' revocation after a catalog row wait for 'batch-delete' 59ms\n       × rechecks project 'organization' revocation after a catalog row wait for 'purge' 60ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/admin-business-postgres.spec.ts > Admin business PostgreSQL regressions > document project authority > rechecks project 'organization' revocation after a catalog row wait for 'sync'\n FAIL  tests/admin-business-postgres.spec.ts > Admin business PostgreSQL regressions > document project authority > rechecks project 'organization' revocation after a catalog row wait for 'delete'\n FAIL  tests/admin-business-postgres.spec.ts > Admin business PostgreSQL regressions > document project authority > rechecks project 'organization' revocation after a catalog row wait for 'batch-delete'\n FAIL  tests/admin-business-postgres.spec.ts > Admin business PostgreSQL regressions > document project authority > rechecks project 'organization' revocation after a catalog row wait for 'purge'\nAssertionError: promise resolved \"undefined\" instead of rejecting\n\n- Expected:\nError {\n  \"message\": \"rejected promise\",\n}\n\n+ Received:\nundefined\n\n ❯ tests/admin-business-postgres.spec.ts:790:30\n    788|         else await pool.query(\"UPDATE harness.project_members SET acce…\n    789|         await blocker.query('COMMIT')\n    790|         await expect(changed).rejects.toMatchObject({ code: 'COLLABORA…\n       |                              ^\n    791|         expect((await service.detail(catalogId))?.document).toMatchObj…\n    792|       } finally {\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯\n\n\n Test Files  1 failed (1)\n      Tests  4 failed | 63 skipped (67)\n   Start at  08:18:30\n   Duration  1.07s (transform 562ms, setup 0ms, import 723ms, tests 276ms, environment 0ms)\n\n"
+}

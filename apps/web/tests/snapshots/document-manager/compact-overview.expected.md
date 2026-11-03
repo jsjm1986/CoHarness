@@ -1,3 +1,4 @@
+- status: Open a conversation to add documents to it. Browsing, downloads and copying remain available.
 - region "All accessible documents":
   - heading "All accessible documents" [level=2]
   - paragraph: Metadata only
@@ -10,6 +11,8 @@
   - group "Document filters":
     - img
     - textbox "Search document name"
+    - button "More actions":
+      - img
   - list:
     - listitem:
       - text: notes.txt Personal documents · 30.0 KB · Alice

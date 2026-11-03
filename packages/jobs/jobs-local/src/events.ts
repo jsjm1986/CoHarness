@@ -9,6 +9,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { AnonymousEntries, ScopedLayers, scopeOf } from '@deepseek-ai/dsh-scope'
 import type { ScopeLayer } from '@deepseek-ai/dsh-scope'
 import type { JobEvent, JobEventFilter, JobEventListener } from '@deepseek-ai/dsh-jobs'
+import { renderJobFailure } from '@deepseek-ai/dsh-jobs'
 
 /** One registered listener and the filter it declared. */
 interface Subscription {
@@ -42,6 +43,8 @@ export class JobLayer implements ScopeLayer {
  */
 export class JobEventHub {
   private readonly unscoped = new Set<Subscription>()
+  private readonly pending: Array<{ event: JobEvent; owner: Agent | undefined }> = []
+  private delivering = false
 
   /**
    * @param layers - the scope-layer table shared with the controller handshake.
@@ -73,12 +76,29 @@ export class JobEventHub {
   }
 
   /**
-   * Deliver one event to every matching subscription, containing each
-   * listener so an observer cannot break the commit already made.
+   * Deliver committed events in publication order. Nested notifications wait
+   * until every current subscriber has received the preceding event.
    * @param event - the event to deliver.
    * @param owner - the job's exact owner, or undefined for unowned work.
+   * @param beforeDelivery - optional non-throwing callback that publishes durable facts before subscribers react.
    */
-  emit(event: JobEvent, owner: Agent | undefined): void {
+  emit(event: JobEvent, owner: Agent | undefined, beforeDelivery?: () => void): void {
+    this.pending.push({ event, owner })
+    const nested = this.delivering
+    this.delivering = true
+    try {
+      beforeDelivery?.()
+      if (nested) return
+      for (const publication of this.pending) this.deliverEvent(publication.event, publication.owner)
+    } finally {
+      if (!nested) {
+        this.pending.length = 0
+        this.delivering = false
+      }
+    }
+  }
+
+  private deliverEvent(event: JobEvent, owner: Agent | undefined): void {
     const ownerId = owner?.id
     for (const subscription of this.unscoped) {
       const { filter } = subscription
@@ -96,7 +116,7 @@ export class JobEventHub {
     try {
       subscription.listener(event)
     } catch (error: unknown) {
-      this.warn(`jobs: event listener threw on ${event.type}: ${String(error)}`)
+      this.warn(`jobs: event listener threw on ${event.type}: ${renderJobFailure(error)}`)
     }
   }
 }

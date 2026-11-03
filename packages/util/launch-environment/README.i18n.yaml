@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/util/launch-environment/README.md
 document:
-  en: 9c2037158852309044ed83404f56f1f2b5a5b8c6
-  zh: dcbe974e4bc4464bf1635bb4f98203842f4e0e1d
+  en: 01601d0663ac4d7a421a226a1ba660d94ca63c6a
+  zh: cde6fc905f18e043042d664159881bde11970fbc
 /:
   en: 1929293fd2056315
   zh: 0a51af1cad6486b4
@@ -18,8 +18,8 @@ document:
   en: a21fd63e81311e12
   zh: eef655f6b908892a
 /dsh-launch-environment/resolving:
-  en: 56ff8e9cafdb4b60
-  zh: cd848b4553e7f484
+  en: 509d9243d6ef3b3e
+  zh: 49a739ab8a0d9df1
 /dsh-launch-environment/resolving/how-layers-rank:
   en: ed6c00ea45dbd45d
   zh: 2a0d5fb2bb68c357

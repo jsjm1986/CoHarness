@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-node22-built-stores",
+  "cwd": "gateway",
+  "command": "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node ../node_modules/vitest/vitest.mjs run tests/document-upload-postgres.spec.ts tests/documents-local.spec.ts tests/document-catalog-service.spec.ts tests/postgres-suite.spec.ts --retry=0 --maxWorkers=1 --no-file-parallelism",
+  "startedAt": "2026-10-25T10:25:23.748405+00:00",
+  "seconds": 9.335,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "796b292af8022f51d6932e70b74c52ece82bbe22e2ab4fff4061a8309bd9b75d",
+  "inputsAfter": "796b292af8022f51d6932e70b74c52ece82bbe22e2ab4fff4061a8309bd9b75d",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "ddedc639f75e14db6815850cdadcd57a2f5d76a29e1438b759345445043c0fd0",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  4 passed (4)\n      Tests  22 passed (22)\n   Start at  18:25:25\n   Duration  7.88s (transform 2.58s, setup 0ms, import 3.70s, tests 3.12s, environment 0ms)\n\n"
+}

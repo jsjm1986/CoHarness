@@ -28,6 +28,7 @@ export function gatedScheduleBackend(
   traps: {
     putRecord?: (table: string, key: string) => Promise<void> | undefined
     deleteRecord?: (table: string, key: string) => Promise<void> | undefined
+    closeUnit?: () => Promise<void>
   } = {},
 ): StorageBackend {
   const memory = new MemoryStorageBackend(pool)
@@ -49,7 +50,7 @@ export function gatedScheduleBackend(
             await unit.deleteRecord(table, key)
           },
           setGlobal: value => unit.setGlobal(value),
-          close: () => unit.close(),
+          close: async () => { await traps.closeUnit?.(); await unit.close() },
           ...(backup === undefined ? {} : { backupRecord: backup }),
         }
       },

@@ -28,12 +28,49 @@ const alice = {
 }
 
 describe('UsersPage', () => {
+  it('keeps an edit failure inside the dialog and retains the submitted fields', async () => {
+    vi.mocked(api.patchUser).mockRejectedValueOnce(new Error('save-unavailable'))
+    const user = userEvent.setup()
+    render(<MemoryRouter><UsersPage /></MemoryRouter>)
+    await screen.findAllByText('@alice · ID 1')
+    await user.click(screen.getByRole('button', { name: '编辑用户' }))
+    const dialog = within(screen.getByRole('dialog', { name: '编辑 alice' }))
+    await user.clear(dialog.getByLabelText('显示名'))
+    await user.type(dialog.getByLabelText('显示名'), 'Renamed')
+    await user.click(dialog.getByRole('button', { name: '保存更改' }))
+    expect((await dialog.findByRole('alert')).textContent).toBe('save-unavailable')
+    expect((dialog.getByLabelText('显示名') as HTMLInputElement).value).toBe('Renamed')
+    expect(api.patchUser).toHaveBeenCalledExactlyOnceWith(1, { displayName: 'Renamed' })
+    expect(api.listUsers).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a failed deletion visible in its confirmation and retains the account', async () => {
+    vi.mocked(api.deleteUser).mockRejectedValueOnce(new Error('delete-unavailable'))
+    render(<MemoryRouter><UsersPage /></MemoryRouter>)
+    await screen.findAllByText('@alice · ID 1')
+    await userEvent.click(screen.getByRole('button', { name: '删除用户' }))
+    const dialog = within(screen.getByRole('dialog', { name: '删除用户' }))
+    await userEvent.click(dialog.getByRole('button', { name: '确认删除' }))
+    expect((await dialog.findByRole('alert')).textContent).toBe('delete-unavailable')
+    expect(screen.getAllByText('@alice · ID 1')).toHaveLength(2)
+    expect(api.deleteUser).toHaveBeenCalledExactlyOnceWith(1)
+  })
+
+  it('does not present a failed initial request as an empty account list', async () => {
+    vi.mocked(api.listUsers).mockRejectedValueOnce(new Error('list-unavailable'))
+    render(<MemoryRouter><UsersPage /></MemoryRouter>)
+    expect((await screen.findByRole('alert')).textContent).toBe('list-unavailable')
+    expect(screen.queryByText('还没有用户')).toBeNull()
+    expect(screen.queryByText('0 位用户')).toBeNull()
+    expect(api.listUsers).toHaveBeenCalledOnce()
+  })
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
   })
 
   beforeEach(() => {
+    vi.clearAllMocks()
     vi.mocked(api.listUsers).mockResolvedValue([alice])
     vi.mocked(api.patchUser).mockResolvedValue(undefined)
     vi.mocked(api.deleteUser).mockResolvedValue(undefined)

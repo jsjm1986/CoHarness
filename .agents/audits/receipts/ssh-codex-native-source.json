@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-native-source",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/run-managed-native-ssh.py src",
+  "startedAt": "2026-10-25T12:13:37.477155+00:00",
+  "seconds": 9.465,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c3b78ab538c5fb4d0817f91edaa4e5e5a98f483d9823dbd053d93e6961fcc0a0",
+  "inputsAfter": "c3b78ab538c5fb4d0817f91edaa4e5e5a98f483d9823dbd053d93e6961fcc0a0",
+  "postgresToolDirectory": null,
+  "outputSha256": "562416f56c37949db0b3e4735202aedb7c4cd0358cf26890fb07c26b26ff4067",
+  "outputTail": "{\"artifact\":\"src\",\"node\":\"v25.8.1\",\"nativeOpenSSH\":true,\"scenarios\":[{\"mode\":\"one-shot\",\"outcome\":\"completed\",\"nativeRequests\":2,\"modelAdmissions\":2,\"usageOwners\":[\"ssh-model-parent\"],\"originalActor\":true,\"allPermitsSettled\":true,\"upstreamKeyStayedInParent\":true,\"nativeProcessesStopped\":true,\"remoteModelListenersClosed\":true},{\"mode\":\"member\",\"outcome\":\"completed\",\"nativeRequests\":4,\"modelAdmissions\":4,\"usageOwners\":[\"ssh-model-member\"],\"originalActor\":true,\"allPermitsSettled\":true,\"upstreamKeyStayedInParent\":true,\"nativeProcessesStopped\":true,\"remoteModelListenersClosed\":true},{\"mode\":\"revoked\",\"outcome\":\"error\",\"nativeRequests\":1,\"modelAdmissions\":2,\"usageOwners\":[\"ssh-model-parent\"],\"originalActor\":true,\"allPermitsSettled\":true,\"upstreamKeyStayedInParent\":true,\"nativeProcessesStopped\":true,\"remoteModelListenersClosed\":true},{\"mode\":\"quota\",\"outcome\":\"error\",\"nativeRequests\":1,\"modelAdmissions\":2,\"usageOwners\":[\"ssh-model-parent\"],\"originalActor\":true,\"allPermitsSettled\":true,\"upstreamKeyStayedInParent\":true,\"nativeProcessesStopped\":true,\"remoteModelListenersClosed\":true}]}\n"
+}

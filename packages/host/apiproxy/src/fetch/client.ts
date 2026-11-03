@@ -15,6 +15,7 @@ import { INTERACTIONS_QUERY, interactionsUnavailableError, type ConnectionIntera
 import type { RequestPayload, ResponseValue, RpcMethodMap } from '../api/rpc-map.ts'
 import type { ClientRequest, ClientResponse, RpcError, RpcMessage, RpcReceipt, RpcRequest, RpcResponse, ServerRequest } from '../api/rpc.ts'
 import { RpcId } from '../api/rpc.ts'
+import { addressRuntimeUrl } from '../api/client-session.ts'
 import type { Wire } from '../api/rpc.schema.ts'
 import { rpcReceiptSchema, serverRequestSchema, serverResponseSchema } from '../api/rpc.schema.ts'
 import { hostFrameSchema, muxFrameSchema } from '../api/events.schema.ts'
@@ -530,6 +531,13 @@ export function readApiResponseText(
   return readBoundedText(response, limit, signal)
 }
 
+/** Request body release without delaying the primary HTTP or callback failure. */
+function cancelRejectedResponseBody(body: Response['body']): void {
+  void body?.cancel().catch(() => {
+    // A rejected cancellation acknowledgement cannot replace the primary failure.
+  })
+}
+
 /**
  * Abstract fetch-carrier client. Subclasses supply the transport (doFetch) and may refine the
  * per-message tap (onEnvelope) — platform aspects stay in subclasses, protocol invariants stay
@@ -616,11 +624,7 @@ export abstract class AbstractApiClient implements IApiClient {
   /** Resolve one API URL, carrying an explicit runtime target and the connection's interaction mode. */
   protected resolveUrl(path: string): URL {
     const url = new URL(path, this.resolveBase())
-    if (this.target !== undefined) {
-      url.searchParams.set('dshTarget', this.target.kind === 'personal'
-        ? 'personal'
-        : `project:${String(this.target.projectId)}`)
-    }
+    if (this.target !== undefined) addressRuntimeUrl(url, this.target)
     url.searchParams.set(INTERACTIONS_QUERY, this.interactions)
     return url
   }
@@ -652,8 +656,7 @@ export abstract class AbstractApiClient implements IApiClient {
         ...lease.signal === undefined ? {} : { signal: lease.signal },
       })
       if (!response.ok) {
-        await response.body?.cancel().catch(() => {})
-        lease.dispose()
+        cancelRejectedResponseBody(response.body)
         throw new ApiTransportError(response.status, path)
       }
       return { response, signal: lease.signal, dispose: () => { lease.dispose() } }
@@ -722,13 +725,13 @@ export abstract class AbstractApiClient implements IApiClient {
   ): AsyncGenerator<RpcRequest<F>> {
     const response = await this.doFetch(this.resolveUrl(path), { signal })
     if (!response.ok || response.body === null) {
-      await response.body?.cancel().catch(() => {})
+      cancelRejectedResponseBody(response.body)
       throw new ApiTransportError(response.status, path)
     }
     try {
       onOpen?.()
     } catch (error) {
-      await response.body.cancel().catch(() => {})
+      cancelRejectedResponseBody(response.body)
       throw error
     }
     const reader = response.body.getReader()

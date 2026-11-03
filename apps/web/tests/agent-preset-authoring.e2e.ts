@@ -250,25 +250,26 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     // the way to a composed host session.
     await settingsDialog().getByRole('button', { name: '关闭' }).last().click()
     await connectFreshWorkspaceZh(page, scaffold.workspaceCwd)
+    const workspacePath = join(scaffold.workspaceCwd, 'workspace')
+    const originalAgents = scaffold.ctx.agents.list().filter(candidate => candidate.session.header.parentSession === undefined
+      && candidate.session.header.cwd === workspacePath)
+    const originalPresets = new Map(originalAgents.map(agent => [agent.id, resolveSessionPreset(agent.session)]))
     await page.getByRole('button', { name: '设置', exact: true }).click()
     const dialog = settingsDialog()
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: 'Agent 预设' }).click()
     await dialog.getByRole('button', { name: '用「创造模式」创作自定义预设' }).click()
 
-    // Leaving settings is part of the gesture: the flow lands on the
-    // new-session screen with the self-referential preset staged, and the
-    // blank session the flow produces composes from it on the host. Blank
-    // draft sessions are intentionally omitted from `session.list`, so read
-    // the in-process Host registry for the workspace's root agent instead.
+    // Blank draft Sessions are omitted from session.list; the Host registry
+    // identifies the new root independently of the blank root it replaces.
     await dialog.waitFor({ state: 'detached', timeout: 10_000 })
     await page.getByRole('button', { name: '创造模式' }).waitFor({ timeout: 10_000 })
-    const workspacePath = join(scaffold.workspaceCwd, 'workspace')
     await expect.poll(() => {
       const agent = scaffold.ctx.agents.list().find(candidate => candidate.session.header.parentSession === undefined
-        && candidate.session.header.cwd === workspacePath)
+        && candidate.session.header.cwd === workspacePath && !originalPresets.has(candidate.id))
       return agent === undefined ? undefined : resolveSessionPreset(agent.session)
     }, { timeout: 15_000 }).toBe('cordis')
+    for (const agent of originalAgents) expect(resolveSessionPreset(agent.session)).toBe(originalPresets.get(agent.id))
   }, 60_000)
 
   it('drove every surface without a page error or a stream warning', () => {

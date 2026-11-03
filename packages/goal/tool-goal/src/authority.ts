@@ -18,7 +18,12 @@ export interface GoalToolExecution {
 /** Hard authority granted to one state-changing call. */
 export type GoalToolAuthority =
   | { readonly kind: 'direct-human' }
-  | { readonly kind: 'goal-round'; readonly goal: GoalView }
+  | {
+    readonly kind: 'goal-round'
+    readonly goal: GoalView
+    /** Admitted rounds after this goal's latest create or explicit resume. */
+    readonly roundsSinceResume: number
+  }
 
 /** Throw one structured tool-policy failure. */
 function reject(message: string, code = 'GOAL_TOOL_AUTHORITY_REQUIRED'): never {
@@ -99,6 +104,18 @@ function isMatchingGoalRound(execution: GoalToolExecution, goal: GoalView): bool
     && event.data.source.round === goal.roundsStarted)
 }
 
+/** Count the current continuation interval without resetting the lifetime round budget. */
+function roundsSinceResume(execution: GoalToolExecution, goal: GoalView): number {
+  let resumedAt = 0
+  for (const event of execution.events) {
+    if (event.type === 'goal/change' && event.data.operation === 'resume'
+      && event.data.goal.id === goal.id) {
+      resumedAt = event.data.roundsStarted
+    }
+  }
+  return goal.roundsStarted - resumedAt
+}
+
 /**
  * Require authority originating in a human message accepted by a runtime root.
  * @param ctx - Context carrying the live agent graph.
@@ -119,7 +136,7 @@ export function completionAuthority(ctx: Context, execution: GoalToolExecution):
   if (hasDirectHumanInput(ctx, execution)) return { kind: 'direct-human' }
   const goal = ctx.goals.get(execution.agent)
   if (goal !== undefined && isMatchingGoalRound(execution, goal)) {
-    return { kind: 'goal-round', goal }
+    return { kind: 'goal-round', goal, roundsSinceResume: roundsSinceResume(execution, goal) }
   }
   return reject('complete and blocked require a direct human turn or the current goal round')
 }

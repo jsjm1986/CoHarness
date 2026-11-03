@@ -1,0 +1,14 @@
+{
+  "name": "jobs-native-lifecycle-node22",
+  "cwd": ".",
+  "command": "env -u NODE_OPTIONS -u NODE_PATH /Users/a1234/.nvm/versions/node/v22.22.1/bin/node .agents/audits/.local/jobs-native-lifecycle-probe.mjs",
+  "startedAt": "2026-10-26T03:02:17.305160+00:00",
+  "seconds": 2.331,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "94600b2574453ddc72fc2888db80b2dc3c5c96a9ccec8ec49bd95bab54d7ff9c",
+  "inputsAfter": "94600b2574453ddc72fc2888db80b2dc3c5c96a9ccec8ec49bd95bab54d7ff9c",
+  "postgresToolDirectory": null,
+  "outputSha256": "45f524194a759f74e333709b09702db1835c7a0994d91cbdb9f55a2e0eefe154",
+  "outputTail": "{\"node\":\"22.22.1\",\"artifact\":\"lib\",\"rejectedProducerStarts\":0,\"cancelledAcceptedJobs\":1,\"rowsAfterDisposal\":0}\n"
+}

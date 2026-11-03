@@ -1,0 +1,14 @@
+{
+  "name": "native-search-web-error-coverage-final",
+  "cwd": ".",
+  "command": "pnpm exec vitest run packages/web/web-search-deepseek/tests scripts/coverage-baseline.spec.ts --coverage '--coverage.include=packages/web/web-search-deepseek/src/{admission,index}.ts' --coverage.reportsDirectory=.agents/audits/.local/native-search-web-error-coverage-final --coverage.reporter=text --coverage.reporter=json --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T03:55:37.871636+00:00",
+  "seconds": 17.862,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f58009fff83faeee5d67436c99b4eea250cd025d65ad66547044014610e1e7f0",
+  "inputsAfter": "f58009fff83faeee5d67436c99b4eea250cd025d65ad66547044014610e1e7f0",
+  "postgresToolDirectory": null,
+  "outputSha256": "22f88af4a1f3cd9fca2c53168c898dba909c94bef79e619661887a02601daaa7",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  6 passed (6)\n      Tests  83 passed (83)\n   Start at  11:55:54\n   Duration  1.59s (transform 931ms, setup 151ms, import 1.31s, tests 346ms, environment 0ms)\n\n % Coverage report from v8\n--------------|---------|----------|---------|---------|-------------------\nFile          | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n--------------|---------|----------|---------|---------|-------------------\n--------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 61/61 )\nBranches     : 100% ( 49/49 )\nFunctions    : 100% ( 15/15 )\nLines        : 100% ( 52/52 )\n================================================================================\n"
+}

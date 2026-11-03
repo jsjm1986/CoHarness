@@ -1,0 +1,6 @@
+- heading "公网访问" [level=2]
+- text: 已停止 未配置
+- alert: cloudflared download failed with HTTP 503
+- paragraph: 未检测到 cloudflared。一键安装会下载钉选版本并校验 SHA-256；也可以在宿主机上用 brew install cloudflared 或包管理器自行安装后刷新。
+- button "安装 cloudflared"
+- paragraph: 更新于 2026-10-25T00:00:00Z · 由本节点上的 cloudflared 进程承载；网关停止时隧道随之停止

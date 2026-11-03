@@ -1,0 +1,14 @@
+{
+  "name": "native-search-current-built-replay",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.snapshot.config.ts snapshots/session/headless.snapshot.ts -t web-search-endpoint-guidance --retry=0",
+  "startedAt": "2026-10-24T04:10:08.476611+00:00",
+  "seconds": 8.065,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "21d2a07d66ae3c7cdcc9bbbe3df12065deb15e639866d0cefd8606479956f361",
+  "inputsAfter": "21d2a07d66ae3c7cdcc9bbbe3df12065deb15e639866d0cefd8606479956f361",
+  "postgresToolDirectory": null,
+  "outputSha256": "abf5c0c577994677b0cd05ab9ba835337d1a0ec9259b1683e8f650d1a4236afa",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  1 passed | 149 skipped (150)\n   Start at  12:10:12\n   Duration  4.27s (transform 1.12s, setup 46ms, import 2.32s, tests 1.80s, environment 0ms)\n\n"
+}

@@ -1,0 +1,7 @@
+{"phase":"queued","change":"withdrawn","finish":"error","code":"RESOURCE_BUDGET_UNAVAILABLE","adapterCalls":0,"wireCalls":0,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"phase":"queued","change":"replaced","finish":"error","code":"RESOURCE_BUDGET_UNAVAILABLE","adapterCalls":0,"wireCalls":0,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"phase":"physical-request","change":"replaced","finish":"error","code":"RESOURCE_BUDGET_UNAVAILABLE","adapterCalls":1,"wireCalls":0,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"phase":"admission-failure","admissionReason":"unavailable","finish":"error","code":"RESOURCE_BUDGET_UNAVAILABLE","admissions":1,"adapterCalls":0,"wireCalls":0}
+{"phase":"admission-failure","admissionReason":"cancelled","finish":"aborted","code":"ABORTED","admissions":1,"adapterCalls":0,"wireCalls":0}
+{"phase":"admission-failure","admissionReason":"expired","finish":"error","code":"RESOURCE_ADMISSION_EXPIRED","admissions":1,"adapterCalls":0,"wireCalls":0}
+{"phase":"admission-failure","admissionReason":"refused","finish":"error","code":"RESOURCE_ADMISSION_REFUSED","admissions":1,"adapterCalls":0,"wireCalls":0}

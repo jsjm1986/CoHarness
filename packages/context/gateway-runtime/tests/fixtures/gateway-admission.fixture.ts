@@ -47,15 +47,20 @@ export interface GatewayComposition {
 
 /**
  * Boot the deployed runtime composition under a private credential and port.
+ * @param options - shared-project identity and external Gateway origin for the scenario.
  * @returns the composed context, its assertion issuer, and its loopback origin.
  */
-export async function loadGatewayComposition(): Promise<GatewayComposition> {
+export async function loadGatewayComposition(
+  options: { projectId?: number; gatewayUrl?: string; requiredPlugins?: string[] } = {},
+): Promise<GatewayComposition> {
   const pair = generateKeyPairSync('ed25519')
   const credential: GatewayRuntimeCredential = {
     version: 1,
-    gatewayUrl: 'http://127.0.0.1:8899',
+    gatewayUrl: options.gatewayUrl ?? 'http://127.0.0.1:8899',
     organization: 'acme',
-    runtime: { kind: 'user', id: 9, generation: 7 },
+    runtime: options.projectId === undefined
+      ? { kind: 'user', id: 9, generation: 7 }
+      : { kind: 'project', id: options.projectId, generation: 7 },
     token: 'runtime-secret',
     principalPublicKey: pair.publicKey.export({ format: 'pem', type: 'spki' }).toString(),
   }
@@ -67,8 +72,10 @@ export async function loadGatewayComposition(): Promise<GatewayComposition> {
       audience: 'dsh-runtime',
       organization: 'acme',
       user: { id: 9, username: 'lin', displayName: 'Lin', role: 'user' },
-      scope: { kind: 'personal' },
-      runtime: { kind: 'user', id: 9, generation: 7 },
+      scope: credential.runtime.kind === 'project'
+        ? { kind: 'project', projectId: credential.runtime.id, projectName: 'Compiler', mode: 'rw' }
+        : { kind: 'personal' },
+      runtime: credential.runtime,
       issuedAt: now,
       expiresAt: now + 30_000,
       nonce: 'nonce-1',
@@ -99,6 +106,7 @@ export async function loadGatewayComposition(): Promise<GatewayComposition> {
     '  config:',
     `    distIndex: '${join(dist, 'index.html')}'`,
     "- name: '@deepseek-ai/dsh-gateway-runtime'",
+    ...(options.requiredPlugins === undefined ? [] : ['  config:', `    requiredPlugins: ${JSON.stringify(options.requiredPlugins)}`]),
     "- name: 'probe'",
     '',
   ].join('\n'))

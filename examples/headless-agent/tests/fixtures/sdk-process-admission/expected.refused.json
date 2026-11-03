@@ -1,0 +1,15 @@
+{
+  "admissions": [
+    "model",
+    "process",
+    "model"
+  ],
+  "released": [
+    "model",
+    "model"
+  ],
+  "uncertain": [],
+  "processRefused": true,
+  "childRan": false,
+  "childStopped": false
+}

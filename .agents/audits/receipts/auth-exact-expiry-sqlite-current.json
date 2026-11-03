@@ -1,0 +1,14 @@
+{
+  "name": "auth-exact-expiry-sqlite-current",
+  "cwd": "gateway",
+  "command": "npx vitest run tests/auth.spec.ts --retry=0",
+  "startedAt": "2026-10-24T01:49:14.893043+00:00",
+  "seconds": 4.346,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "029939098249046f45771e412e9060c0055a75ef975b57df9b6f76ba9cff2bc9",
+  "inputsAfter": "029939098249046f45771e412e9060c0055a75ef975b57df9b6f76ba9cff2bc9",
+  "postgresToolDirectory": null,
+  "outputSha256": "d7f378300290d427936473a404df47167d72ad0b4104d65c8b33a5f61436ce52",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  5 passed (5)\n   Start at  09:49:17\n   Duration  1.38s (transform 667ms, setup 0ms, import 806ms, tests 451ms, environment 0ms)\n\n"
+}

@@ -1,0 +1,4 @@
+{"scenario":"helper-pre","rejected":true,"callerCancelled":true,"cancellationReasonPreserved":true,"missingExecutable":false}
+{"scenario":"helper-post","rejected":true,"callerCancelled":true,"cancellationReasonPreserved":true,"missingExecutable":false}
+{"scenario":"maintenance-post","rejected":true,"callerCancelled":true,"cancellationReasonPreserved":false,"missingExecutable":true}
+{"scenario":"maintenance-active","rejected":true,"callerCancelled":false,"cancellationReasonPreserved":false,"missingExecutable":true}

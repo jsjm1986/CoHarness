@@ -16,22 +16,32 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { SubagentCapabilities, SubagentProvider, ResolvedSubagentStartRequest } from '@deepseek-ai/dsh-subagent'
-import { assertPositiveFinite, assertUsableCwd, NO_START_CAPABILITIES } from '@deepseek-ai/dsh-subagent'
+import { assertPositiveFinite, assertUsableCwd, NO_START_CAPABILITIES, SubagentError } from '@deepseek-ai/dsh-subagent'
 import {
   DEFAULT_DISPOSE_EOF_GRACE_MS,
   DEFAULT_DISPOSE_GRACE_MS,
   DEFAULT_INITIALIZE_TIMEOUT_MS,
   DEFAULT_SHUTDOWN_TIMEOUT_MS,
   sdkConfigurationFailure,
-  startSdkRun,
   type SdkRunSpec,
 } from './run.ts'
+import { SdkRunLifetime } from './admission.ts'
 
 export const name = 'subagent-dsh-sdk'
 export const inject = ['subagents']
 
 /** Config: how to spawn and drive the child SDK runtime process. */
 export interface Config {
+  /** Maximum serialized private parent-control request or response bytes. */
+  maxControlBytes?: number
+  /** Maximum simultaneous model spans and resource operations; HTTP concurrency permits two requests per operation. */
+  maxControlOperations?: number
+  /** Maximum duration of one private parent-control exchange. */
+  controlRequestTimeoutMs?: number
+  /** Polling interval and maximum held output read. */
+  controlPollMs?: number
+  /** Maximum joined control and resource shutdown time. */
+  controlCleanupTimeoutMs?: number
   /** Provider name on `ctx.subagents` (default `dsh-sdk`). */
   providerName: string
   /** Explicit dsh CLI module, resolved and checked at plugin load; omission uses the SDK dependency. */
@@ -73,6 +83,11 @@ export interface Config {
 }
 
 export const Config: z<Config> = z.object({
+  maxControlBytes: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(8 * 1024 * 1024),
+  maxControlOperations: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(1024),
+  controlRequestTimeoutMs: z.number().step(1).min(1).max(2_147_483_647).default(1000),
+  controlPollMs: z.number().step(1).min(1).max(2_147_483_647).default(100),
+  controlCleanupTimeoutMs: z.number().step(1).min(1).max(2_147_483_647).default(4000),
   providerName: z.string().default('dsh-sdk'),
   dshBin: z.string(),
   profile: z.string().default('sdk'),
@@ -109,18 +124,25 @@ function resolveConfiguredFile(field: string, value: string): string {
  * unsupported because their ownership does not cross this process boundary.
  */
 class SdkSubagentProvider implements SubagentProvider {
+  private readonly lifetime: SdkRunLifetime
   readonly capabilities: SubagentCapabilities = { ...NO_START_CAPABILITIES, agentOptions: true }
   readonly agentRouteDefaults: Readonly<{ provider: string; model: string }>
   // Context contract: an out-of-process SDK child starts fresh — no parent conversation crosses the process boundary.
   readonly inheritsParentContext = false
 
   constructor(readonly name: string, private readonly ctx: Context, private readonly config: ResolvedConfig) {
+    this.lifetime = new SdkRunLifetime(ctx, { maxBytes: config.maxControlBytes, maxOperations: config.maxControlOperations,
+      requestTimeoutMs: config.controlRequestTimeoutMs, pollMs: config.controlPollMs, cleanupTimeoutMs: config.controlCleanupTimeoutMs })
     this.agentRouteDefaults = Object.freeze({ provider: config.provider, model: config.model })
   }
 
   start(request: ResolvedSubagentStartRequest) {
     if (request.signal.aborted) {
       throw new Error('subagent request was aborted before the SDK child started')
+    }
+    if (request.parent.session.header.sshTarget !== undefined) {
+      throw new SubagentError('SDK subagents require a local Session. Choose a subagent provider that supports the Session’s SSH target.',
+        'UNSUPPORTED_CAPABILITY')
     }
     let cwd: string
     try {
@@ -132,10 +154,11 @@ class SdkSubagentProvider implements SubagentProvider {
     }
     const requested = request.agentOptions
     const maxTokens = requested?.maxTokens ?? this.config.maxTokens
+    const reasoningEffort = requested?.reasoningEffort ?? this.config.reasoningEffort
     const route = {
       provider: requested?.provider ?? this.config.provider,
       model: requested?.model ?? this.config.model,
-      ...requested?.reasoningEffort === undefined ? {} : { reasoningEffort: requested.reasoningEffort },
+      ...reasoningEffort === undefined ? {} : { reasoningEffort },
       ...maxTokens === undefined ? {} : { maxTokens },
     }
     const spec: SdkRunSpec = {
@@ -157,13 +180,17 @@ class SdkSubagentProvider implements SubagentProvider {
         this.ctx.logger.warn(`subagent-dsh-sdk "${this.name}": child run failed (${stopReason}): ${error.message}`)
       },
     }
-    return startSdkRun(request, spec)
+    return this.lifetime.start(request, spec)
   }
 }
 
 export function apply(ctx: Context, config: Config): void {
   // schemastery (Config) has already filled every defaulted field.
   const resolved = config as ResolvedConfig
+  if (resolved.controlPollMs >= resolved.controlRequestTimeoutMs
+    || resolved.controlRequestTimeoutMs >= resolved.controlCleanupTimeoutMs) {
+    throw new TypeError('SDK parent control requires poll < request timeout < cleanup timeout.')
+  }
   assertPositiveFinite('subagent-dsh-sdk', 'initializeTimeoutMs', resolved.initializeTimeoutMs)
   assertPositiveFinite('subagent-dsh-sdk', 'shutdownTimeoutMs', resolved.shutdownTimeoutMs)
   assertPositiveFinite('subagent-dsh-sdk', 'disposeEofGraceMs', resolved.disposeEofGraceMs)

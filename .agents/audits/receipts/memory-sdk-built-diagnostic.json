@@ -1,0 +1,14 @@
+{
+  "name": "memory-sdk-built-diagnostic",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/probe-memory-sdk-built.mjs",
+  "startedAt": "2026-10-24T01:36:33.575570+00:00",
+  "seconds": 1.797,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e619e4cb12bb3636290c13cdaba85a4e8536e2fc903c197b93b8c5466b655691",
+  "inputsAfter": "e619e4cb12bb3636290c13cdaba85a4e8536e2fc903c197b93b8c5466b655691",
+  "postgresToolDirectory": null,
+  "outputSha256": "34f98a5e32b1e00f32e594c9e733f49119048cd5766a017f3d0282e367c8b6d4",
+  "outputTail": "JsonRpcResponseError: no adapter registered for provider \"memory-fixture\"\n    at JsonRpcLineTransport.handleIncomingResponse (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/sdk/protocol/lib/index.js:287:19)\n    at JsonRpcLineTransport.handleLine (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/sdk/protocol/lib/index.js:248:9)\n    at JsonRpcLineTransport.appendDecoded (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/sdk/protocol/lib/index.js:205:9)\n    at Socket.onData (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/sdk/protocol/lib/index.js:185:8)\n    at Socket.emit (node:events:508:20)\n    at addChunk (node:internal/streams/readable:564:12)\n    at readableAddChunkPushByteMode (node:internal/streams/readable:515:3)\n    at Readable.push (node:internal/streams/readable:395:5)\n    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {\n  code: -32603,\n  data: undefined\n}\n[]\n"
+}

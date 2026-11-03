@@ -10,6 +10,7 @@
  */
 
 import type { JobAppendOptions, JobOutputSource } from '@deepseek-ai/dsh-jobs'
+import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 
 /** One pump run; `done` resolves after the final post-settlement drain. */
 export interface PumpHandle {
@@ -46,7 +47,7 @@ export interface PumpSink {
  * subscription on `until` for the whole run and one pending timer at a time.
  * @param sources - producer streams, each pumped at its own offset.
  * @param sink - receives each copied chunk and each source's current spill file.
- * @param pollMs - poll interval in milliseconds; a positive finite number.
+ * @param pollMs - positive finite interval, no greater than Node's timer limit.
  * @param until - settles (or rejects, which counts as settlement) when the producer finished; only its `then` is used.
  * @returns the handle whose `done` resolves after the final drain.
  */
@@ -56,8 +57,8 @@ export function startPump(
   pollMs: number,
   until: PromiseLike<unknown>,
 ): PumpHandle {
-  if (!Number.isFinite(pollMs) || pollMs <= 0) {
-    throw new Error(`invalid pump pollMs: expected a positive finite number of milliseconds, got ${JSON.stringify(pollMs)}`)
+  if (!Number.isFinite(pollMs) || pollMs <= 0 || pollMs > MAX_TIMER_DELAY_MS) {
+    throw new Error(`invalid pump pollMs: expected a positive finite number of milliseconds no greater than ${MAX_TIMER_DELAY_MS}, got ${JSON.stringify(pollMs)}`)
   }
   const states = sources.map(source => ({ source, cursor: 0 }))
   const drain = (): void => {

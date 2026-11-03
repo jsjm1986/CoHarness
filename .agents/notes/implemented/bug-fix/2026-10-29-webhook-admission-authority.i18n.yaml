@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-29-webhook-admission-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-29-webhook-admission-authority.md
+document:
+  en: a29e33fd67a91a66a5cad02b98136de5c7d12ea6
+  zh: eb9558dab692a221543dfd6bdfce5cbbd1273965
+/agent-note-webhook-admission-retains-administrator-and-endpoint-authority:
+  en: 1aeee4f716aa1d1b
+  zh: 8d85e1db71258b98
+/agent-note-webhook-admission-retains-administrator-and-endpoint-authority/problem:
+  en: c7cd93461714d1d1
+  zh: 6e34425744b0754b
+/agent-note-webhook-admission-retains-administrator-and-endpoint-authority/decision:
+  en: 90716fcc33eafc52
+  zh: 33747258c9a001c1
+/agent-note-webhook-admission-retains-administrator-and-endpoint-authority/alternatives-considered:
+  en: 0e4501a5f8a056a0
+  zh: 4ba3eaed120c192e
+/agent-note-webhook-admission-retains-administrator-and-endpoint-authority/consequences:
+  en: 25578af0a400e533
+  zh: 9cacda3bc9c79792
+/agent-note-webhook-admission-retains-administrator-and-endpoint-authority/verification:
+  en: 6fb2652b732ba86a
+  zh: 92a7006ad0e658d4

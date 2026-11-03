@@ -1,0 +1,14 @@
+{
+  "name": "sonar-documentation-quick",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 node_modules/.bin/tsx scripts/run-gates.ts doc-quick",
+  "startedAt": "2026-10-24T09:27:51.671299+00:00",
+  "seconds": 0.632,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "inputsAfter": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "postgresToolDirectory": null,
+  "outputSha256": "a543e0fb1bdf0460d99351a8d47a4fe2f3026bacf87b958b2b536fb405940e4b",
+  "outputTail": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/pnpm-invocation.ts:15\n    throw new Error('pnpm invocation: npm_execpath is unavailable; invoke the script through pnpm run.')\n          ^\n\nError: pnpm invocation: npm_execpath is unavailable; invoke the script through pnpm run.\n    at pnpmInvocation (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/pnpm-invocation.ts:15:11)\n    at pnpmScript (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/run-gates.ts:282:8)\n    at docSyncLeafGates (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/run-gates.ts:959:5)\n    at docQuickLeafGates (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/run-gates.ts:1018:10)\n    at gatesForMode (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/run-gates.ts:404:14)\n    at main (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/run-gates.ts:120:17)\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/run-gates.ts:112:28)\n\nNode.js v25.8.1\n"
+}

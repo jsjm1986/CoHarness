@@ -1,0 +1,14 @@
+{
+  "name": "document-authority-steward-http-final-cases",
+  "cwd": "gateway",
+  "command": "node_modules/.bin/vitest run tests/admin-business-postgres.spec.ts --retry=0",
+  "startedAt": "2026-10-25T00:31:28.718774+00:00",
+  "seconds": 7.587,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "843f7f68de4c83b8ab97a1902704c68e03b724245bea1af81303d7778835d8c3",
+  "inputsAfter": "843f7f68de4c83b8ab97a1902704c68e03b724245bea1af81303d7778835d8c3",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "8ce337502795203c70767dacc58f52b873ab40753a67364beb33683e7bc521b8",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  113 passed (113)\n   Start at  08:31:30\n   Duration  5.84s (transform 970ms, setup 0ms, import 1.21s, tests 4.57s, environment 0ms)\n\n"
+}

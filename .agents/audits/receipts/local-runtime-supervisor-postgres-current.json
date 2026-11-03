@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-supervisor-postgres-current",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/instance-capacity-postgres.spec.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-24T19:16:21.473168+00:00",
+  "seconds": 3.774,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9c004ca6e6d6a3932c22ea86a163c6d19c772ab233f2ac34c05ed541493e425c",
+  "inputsAfter": "9c004ca6e6d6a3932c22ea86a163c6d19c772ab233f2ac34c05ed541493e425c",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "cf87846db8d71d0c70d3a5cba349baaf6c31ce03546b850a9e4c9a6cf3a052e0",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  7 passed (7)\n   Start at  03:16:23\n   Duration  1.40s (transform 515ms, setup 0ms, import 645ms, tests 653ms, environment 0ms)\n\n"
+}

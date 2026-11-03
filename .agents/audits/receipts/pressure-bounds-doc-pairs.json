@@ -1,0 +1,14 @@
+{
+  "name": "pressure-bounds-doc-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write gateway/README.md .agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+  "startedAt": "2026-10-23T23:30:34.293016+00:00",
+  "seconds": 3.481,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a17b744fce0a67eea49049df5d1fc65e760349beb4915530596d0e173b527aea",
+  "inputsAfter": "a34b1ca90caedfcbe5b6b48df3aba655b6d88bd2a1a116a8daebc83cda11818d",
+  "postgresToolDirectory": null,
+  "outputSha256": "77d2511cde9e3a9110e528bd2fdba7ab1ea42bb0b72fd697642d2ed138e324c6",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write gateway/README.md .agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md\nverify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 3 record(s) written; run the check to validate the pairs.\n"
+}

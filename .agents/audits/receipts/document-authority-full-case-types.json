@@ -1,0 +1,14 @@
+{
+  "name": "document-authority-full-case-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-25T00:24:50.559813+00:00",
+  "seconds": 5.373,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cf50758c13f4c918385bbb4a9e541ea22ffd10e238793c833f0881e88b96d70a",
+  "inputsAfter": "cf50758c13f4c918385bbb4a9e541ea22ffd10e238793c833f0881e88b96d70a",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

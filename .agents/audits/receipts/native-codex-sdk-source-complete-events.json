@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-sdk-source-complete-events",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=src DSH_SNAPSHOT_MAX_CONCURRENCY=1 node_modules/.bin/vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/managed-codex-model.snapshot.ts --retry=0",
+  "startedAt": "2026-10-25T02:40:37.375673+00:00",
+  "seconds": 4.985,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5c69bd5e0e6480d330087dded6c7487a2c5898850999c75b2fa4488b215cfb78",
+  "inputsAfter": "5c69bd5e0e6480d330087dded6c7487a2c5898850999c75b2fa4488b215cfb78",
+  "postgresToolDirectory": null,
+  "outputSha256": "c53d2affc732b0033a295615e78dbfe05e9d891e8c1d9b42db9ef14e4672bdb3",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ examples/headless-agent/tests/managed-codex-model.snapshot.ts (1 test | 1 failed) 1653ms\n   × projects every native Codex request and resumes its parent in a fresh process 1653ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  examples/headless-agent/tests/managed-codex-model.snapshot.ts > projects every native Codex request and resumes its parent in a fresh process\nAssertionError: {\"terminal\":[{\"type\":\"turn/end\",\"seq\":19,\"time\":1792896042299,\"data\":{\"turn\":1,\"reason\":{\"kind\":\"error\",\"error\":{\"message\":\"The expression evaluated to a falsy value:\\n\\n  assert(options.messages.some(message => message.role === 'tool' && message.content.some(block =>\\n\",\"code\":\"UNKNOWN\"}}}}],\"nativeRequests\":1}: expected '' to be 'PARENT_CODEX_DONE' // Object.is equality\n\n- Expected\n+ Received\n\n- PARENT_CODEX_DONE\n\n ❯ examples/headless-agent/tests/managed-codex-model.snapshot.ts:18:113\n     16|       const result = await harness.run('Run managed Codex.', { session…\n     17|       expect(result.finalResponse, JSON.stringify({ terminal: result.e…\n     18|         nativeRequests: result.events.filter(event => event.type === '…\n       |                                                                                                                 ^\n     19|       const requests: unknown[] = []\n     20|       let completion: unknown\n ❯ withAuxiliaryModelHarness examples/headless-agent/tests/auxiliary-model-fixture.ts:44:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  10:40:39\n   Duration  2.67s (transform 675ms, setup 36ms, import 889ms, tests 1.65s, environment 0ms)\n\n"
+}

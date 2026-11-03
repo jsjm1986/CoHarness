@@ -1,0 +1,3 @@
+{"launch":"standalone","modelDispatches":1,"processAllocated":true,"executionDenied":false}
+{"launch":"file","modelDispatches":0,"processAllocated":false,"executionDenied":true,"modelError":"MODEL_POLICY_UNAVAILABLE","processError":"unavailable"}
+{"launch":"descriptor","modelDispatches":0,"processAllocated":false,"executionDenied":true,"modelError":"MODEL_POLICY_UNAVAILABLE","processError":"unavailable"}

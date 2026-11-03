@@ -1,0 +1,14 @@
+{
+  "name": "governed-native-model-pipeline-current",
+  "cwd": "plugins/dsh-model-governance",
+  "command": "../../node_modules/.bin/vitest run tests/execution-billing.spec.ts --retry=0",
+  "startedAt": "2026-10-24T06:46:16.572493+00:00",
+  "seconds": 3.612,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b6756e2a929381175575b1fc28d53d483255fa1f6f473200105b3325f10646db",
+  "inputsAfter": "b6756e2a929381175575b1fc28d53d483255fa1f6f473200105b3325f10646db",
+  "postgresToolDirectory": null,
+  "outputSha256": "69f5c72a9161e1a3b9a7abe732d1ab886079eca9de71d62e75db3ef85824a7ea",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/plugins/dsh-model-governance\n\n ❯ tests/execution-billing.spec.ts (21 tests | 1 failed) 198ms\n     × uses the authorized route and records actual personal usage for its verified actor 44ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/execution-billing.spec.ts > governed native Messages search > uses the authorized route and records actual personal usage for its verified actor\nAssertionError: expected [ 'admit', 'http', 'release' ] to deeply equal [ Array(4) ]\n\n- Expected\n+ Received\n\n  [\n-   \"record\",\n    \"admit\",\n    \"http\",\n    \"release\",\n  ]\n\n ❯ tests/execution-billing.spec.ts:156:21\n    154|     const event = f.session.snapshotEvents().find(event => event.type …\n    155|     expect(event?.data).toMatchObject({ body: f.requests[0]?.body })\n    156|     expect(f.order).toEqual(['record', 'admit', 'http', 'release'])\n       |                     ^\n    157|     expect(acquire).toHaveBeenCalledOnce()\n    158|     expect(release).toHaveBeenCalledOnce()\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 20 passed (21)\n   Start at  14:46:18\n   Duration  1.29s (transform 663ms, setup 0ms, import 993ms, tests 198ms, environment 0ms)\n\n"
+}

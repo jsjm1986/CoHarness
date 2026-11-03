@@ -1,0 +1,14 @@
+{
+  "name": "jobs-durable-recording-final-host-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p tsconfig.host.json",
+  "startedAt": "2026-10-26T08:21:21.350931+00:00",
+  "seconds": 13.287,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a03e3dff58247044e19d5269a661049ce9df606e12ee8bafe5002f2d79648875",
+  "inputsAfter": "a03e3dff58247044e19d5269a661049ce9df606e12ee8bafe5002f2d79648875",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

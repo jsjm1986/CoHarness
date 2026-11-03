@@ -1,0 +1,164 @@
+{
+  "status": "completed_named_scenarios_only",
+  "recordedAt": "2026-10-27T14:31:03.003064+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "checks": [
+    {
+      "name": "source-coverage-after-second-reboot",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/attachment/userdoc-local/tests",
+        "packages/attachment/userdoc-gateway/tests",
+        "packages/host/userdoc-http/tests",
+        "--coverage",
+        "--coverage.include=packages/attachment/userdoc-local/src/**",
+        "--coverage.include=packages/attachment/userdoc-gateway/src/**",
+        "--coverage.include=packages/host/userdoc-http/src/**",
+        "--coverage.reporter=text",
+        "--coverage.reporter=json",
+        "--coverage.reportsDirectory=coverage/document-permissions-audit-current"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T13:16:11.944860+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness"
+    },
+    {
+      "name": "gateway-document-domain-final",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "--config",
+        "vitest.config.ts",
+        "tests/runtime-api.spec.ts",
+        "tests/document-upload-postgres.spec.ts",
+        "tests/documents-local.spec.ts",
+        "tests/document-catalog.spec.ts",
+        "tests/document-catalog-service.spec.ts",
+        "tests/document-transfer.spec.ts",
+        "tests/document-backups.spec.ts",
+        "tests/document-catalog-maintenance.spec.ts",
+        "tests/admin-business-postgres.spec.ts",
+        "tests/document-scope-storage.spec.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T13:59:09.095210+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway"
+    },
+    {
+      "name": "gateway-document-coverage-final",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "--config",
+        "vitest.config.ts",
+        "tests/runtime-api.spec.ts",
+        "tests/document-upload-postgres.spec.ts",
+        "tests/documents-local.spec.ts",
+        "tests/document-catalog.spec.ts",
+        "tests/document-catalog-service.spec.ts",
+        "tests/document-transfer.spec.ts",
+        "tests/document-backups.spec.ts",
+        "tests/document-catalog-maintenance.spec.ts",
+        "tests/admin-business-postgres.spec.ts",
+        "tests/document-scope-storage.spec.ts",
+        "--coverage",
+        "--coverage.provider=v8",
+        "--coverage.include=src/document-scope-storage.ts",
+        "--coverage.include=src/document-storage.ts",
+        "--coverage.include=src/document-backups.ts",
+        "--coverage.include=src/documents-local.ts",
+        "--coverage.include=src/document-catalog.ts",
+        "--coverage.include=src/runtime-document-store.ts",
+        "--coverage.include=src/postgres/document-catalog-service.ts",
+        "--coverage.include=src/postgres/deployment-data.ts",
+        "--coverage.reporter=text",
+        "--coverage.reporter=json",
+        "--coverage.reportsDirectory=coverage/document-business-current"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T14:05:32.761722+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway"
+    },
+    {
+      "name": "build-after-scope-retirement",
+      "command": [
+        "pnpm",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T14:12:08.949846+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness"
+    },
+    {
+      "name": "gateway-emit-scope-final",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "-p",
+        "tsconfig.build.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T14:18:04.626429+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway"
+    },
+    {
+      "name": "compiled-document-authority-scope-final",
+      "command": [
+        "node",
+        "tests/fixtures/document-stream-built.mjs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T14:20:44.958793+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway"
+    },
+    {
+      "name": "compiled-document-maintenance-scope-final",
+      "command": [
+        "node",
+        "tests/fixtures/document-background-writes.mjs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T14:20:45.084090+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway"
+    },
+    {
+      "name": "docs-after-scope-retirement",
+      "command": [
+        "pnpm",
+        "run",
+        "doc-sync"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T14:22:22.995721+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness"
+    }
+  ],
+  "sourceTests": {
+    "passed": 671,
+    "skipped": 5,
+    "note": "Scoped coverage measurement, not the100%CI gate"
+  },
+  "gatewayTests": {
+    "passed": 320,
+    "skipped": 0,
+    "files": 10
+  },
+  "linuxUID": {
+    "versions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "cases": [
+      "personal",
+      "project"
+    ],
+    "privateAccessDenied": true
+  },
+  "constraints": [
+    "No real model API validation",
+    "Whole project audit remains in progress",
+    "No commits, pushes or resets",
+    "Owned PostgreSQL and guest tool directories removed; user VM left running"
+  ]
+}

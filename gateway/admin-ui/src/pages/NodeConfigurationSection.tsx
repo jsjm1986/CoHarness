@@ -1,10 +1,12 @@
 /** Desired and effective deployment settings for the server-confirmed current node. */
+import { usePendingEdits } from '../pending-edits.tsx'
 import { useEffect, useMemo, useState } from 'react'
 import { NODE_CONFIG_FIELDS } from '../../../src/node-config-fields.ts'
 import { getNodeConfiguration, mutateNodeConfiguration, type NodeConfigurationView, type NodeSettingValues } from '../api.ts'
 import { adminLanguage, translateCopy } from '../language.ts'
 import { zh, en } from './node-configuration.copy.ts'
 import { Button, Dialog, ErrorBanner, Field, LoadingState, Section, StatusBadge } from '../components/ui.tsx'
+import { DesktopEnvironmentNotice } from '../components/DesktopEnvironmentNotice.tsx'
 
 function configurationMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
@@ -35,10 +37,21 @@ export function NodeConfigurationSection() {
   const [confirm, setConfirm] = useState(false)
   const [filter, setFilter] = useState('')
   const applying = view?.operation?.status === 'pending' || view?.operation?.status === 'applying'
+  useEffect(() => {
+    const appendOrigin = (event: Event): void => {
+      if (!(event instanceof CustomEvent) || view === null || draft === null || busy || applying || event.detail?.nodeId !== view.nodeId || typeof event.detail?.origin !== 'string') return
+      event.preventDefault()
+      const origin = event.detail.origin as string
+      setDraft(current => current === null ? null : { ...current, HGW_PUBLIC_ORIGINS: [...new Set([...current.HGW_PUBLIC_ORIGINS.split(',').map(value => value.trim()), origin])].join(',') })
+    }
+    window.addEventListener('hgw-node-connection-origin', appendOrigin)
+    return () => { window.removeEventListener('hgw-node-connection-origin', appendOrigin) }
+  }, [view?.nodeId, draft === null, busy, applying])
   const dirty = draft !== null && view !== null && NODE_CONFIG_FIELDS.some(field => draft[field.key] !== view.desired[field.key])
+  usePendingEdits(dirty || busy)
   useEffect(() => {
     const lifetime = new AbortController()
-    void getNodeConfiguration(lifetime.signal).then(value => { setView(value); setDraft(value.desired) })
+    void getNodeConfiguration(lifetime.signal).then(value => { if (!lifetime.signal.aborted) { setView(value); setDraft(value.desired) } })
       .catch((cause: unknown) => { if (!lifetime.signal.aborted) setError(configurationMessage(cause)) })
     return () => { lifetime.abort() }
   }, [])
@@ -68,6 +81,7 @@ export function NodeConfigurationSection() {
   }
 
   return <Section title={t('sectionTitle')} meta={view === null ? t('metaLoading') : t('metaNode', { node: view.nodeId, revision: String(view.revision), running: String(view.runningRevision) })}>
+    <DesktopEnvironmentNotice />
     {view === null || draft === null ? <><ErrorBanner message={error} />{error === '' ? <LoadingState label={t('loading')} /> : null}</> : <>
       <p>{t('intro')}</p>
       <StatusBadge tone={applying ? 'warning' : view.operation?.status === 'failed' ? 'danger' : 'neutral'}>

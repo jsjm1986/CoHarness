@@ -16,7 +16,7 @@ CoHarness selection and Workbench adapters acquire ordinary references through t
 
 Navigation intent has a separate cancellation lifetime from Session ownership. Workspace creation, fork, initial selection, and cross-runtime Workbench loading must still belong to the latest intent when they update the view. Explicit selection, clearing, layout changes, and plugin disposal invalidate older updates without undoing Host-side mutations or discarding another view’s draft.
 
-View navigation holds a temporary reference until history is usable. Selection then transfers ownership to the view before that reference is released. Failed loading preserves the previous view and its draft; the navigation consumer reports the error and allows retry. Reference readiness keeps the upstream attempt-settlement semantics, so operation callers that require usable history check the resulting snapshot.
+View navigation holds a temporary reference until history is usable. Selection then transfers ownership to the view before that reference is released. Failed loading preserves the previous view and its draft; the navigation consumer reports the error and allows retry. If reconnect replaces an initial history read, pending readiness follows the replacement rather than completing on the cancelled predecessor. A current read error still settles readiness, so operation callers that require usable history check the resulting snapshot.
 
 Each generation has its own scope tag and cancellation signal. Root disposal rejects pending readiness and invalidates bindings. A retired context cannot resolve or dispatch into a replacement with the same durable id. Asynchronous cleanup removes only the input shell it owns.
 

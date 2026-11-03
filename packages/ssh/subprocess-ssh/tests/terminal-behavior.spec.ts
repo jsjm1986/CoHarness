@@ -11,13 +11,23 @@ const id = 'aa910b47-e7d7-467b-8421-3331569dd02b'
 const spec: SubprocessTerminalSpawnSpec = { argv: ['bash'], cwd: '/remote/workspace', terminalType: 'dumb', rows: 24, cols: 80, graceMs: 100 }
 const completion = { outcome: { exitCode: 0, signal: null }, spills: {}, collected: {} }
 
+class TerminalProbe extends SshSubprocessRuntime {
+  backendTerminal(request: SubprocessTerminalSpawnSpec) { return this.spawnTerminalProcess(request) }
+}
+
 async function setup(options: {
   connectFailure?: Error
   terminateFailure?: Error | undefined
   pauseConnect?: boolean
+  pausePrepare?: boolean
   missingEndpoint?: boolean
+  permit?: AbortController
 } = {}) {
   const ctx = new Context()
+  if (options.permit !== undefined) {
+    const permit = options.permit
+    ctx.provide('resourceBudget', { acquire: async () => ({ signal: permit.signal, release: async () => {}, uncertain: async () => {} }) } as never)
+  }
   const cleanupErrors: unknown[] = []
   ctx.logger.error = ((error: unknown) => { cleanupErrors.push(error) }) as typeof ctx.logger.error
   const [host, remote] = duplexPair({ allowHalfOpen: true })
@@ -30,11 +40,13 @@ async function setup(options: {
   const calls: { method: string; params: unknown; longRunning?: boolean }[] = []
   let foreground: { processGroupId: number; inputWaiting: boolean } | null = null
   const connection = {
+    retainConsumer: (cleanup: () => Promise<void>) => cleanup,
     dispose: vi.fn(() => { host.destroy(); remote.destroy(); return Promise.resolve() }),
     request: async <T>(method: string, params: unknown, schema: z.ZodType<T>, _signal?: AbortSignal, longRunning?: boolean): Promise<T> => {
       calls.push({ method, params, ...(longRunning === undefined ? {} : { longRunning }) })
       let value: unknown
       if (method === 'process.prepare') {
+        if (options.pausePrepare) { entered.resolve(undefined); await release.promise }
         value = { id, streams: options.missingEndpoint ? {} : { terminal: { path: '/tmp/terminal', capability: 'a'.repeat(64) } } }
       } else if (method === 'process.start') value = { pid: 321 }
       else if (method === 'process.done') value = await finished.promise
@@ -57,7 +69,7 @@ async function setup(options: {
     }),
   }
   ctx.provide('ssh', connection as never)
-  const fiber = await ctx.plugin(SshSubprocessRuntime)
+  const fiber = await ctx.plugin(TerminalProbe)
   let closing: Promise<void> | undefined
   const dispose = (): Promise<void> => closing ??= fiber.dispose()
   const close = (): Promise<void> => {
@@ -73,12 +85,59 @@ async function setup(options: {
     if (closing === undefined) await close()
   })
   return {
-    runtime: ctx.subprocess, connection, calls, host, remote, finished, close, dispose, cleanupErrors,
+    ctx, runtime: ctx.subprocess as TerminalProbe, connection, calls, host, remote, finished, close, dispose, cleanupErrors,
     entered: entered.promise, release: () => { release.resolve(undefined) },
     allocationAborted: allocationAborted.promise,
     setForeground: (value: typeof foreground) => { foreground = value },
   }
 }
+
+it('uses provider lifetime for independent backend terminal entry without caller cancellation', async () => {
+  const test = await setup()
+  const handle = await test.runtime.backendTerminal(spec)
+  expect(handle.pid).toBe(321)
+  await test.dispose()
+  expect(test.calls.some(call => call.method === 'process.terminate')).toBe(true)
+})
+
+it.each((['prepare', 'connect'] as const).flatMap(pause => (['withdrawn', 'replaced'] as const).map(change => ({ pause, change }))))(
+  'refuses remote terminal start when its resource owner is $change during $pause', async ({ pause, change }) => {
+    const test = await setup({ pausePrepare: pause === 'prepare', pauseConnect: pause === 'connect' })
+    const release = vi.fn(async () => {}), uncertain = vi.fn(async () => {})
+    const replacement = vi.fn(async () => { throw new Error('No replacement capacity may be borrowed.') })
+    test.ctx.provide('resourceBudgetRequired', true)
+    const withdraw = test.ctx.provide('resourceBudget', { acquire: async () => ({ signal: new AbortController().signal, release, uncertain }) })
+    const allocation = test.runtime.spawnTerminal(spec).then(() => undefined, (error: unknown) => error)
+    try {
+      await test.entered
+      withdraw()
+      if (change === 'replaced') test.ctx.provide('resourceBudget', { acquire: replacement })
+      test.release()
+      const error: unknown = await allocation
+      expect(test.calls.filter(call => call.method === 'process.start')).toEqual([])
+      expect(error).toMatchObject({ reason: 'unavailable' })
+      expect(release).toHaveBeenCalledOnce()
+      expect(uncertain).not.toHaveBeenCalled()
+      expect(replacement).not.toHaveBeenCalled()
+    } finally { test.release(); await test.close() }
+  },
+)
+
+it.each(['prepare', 'connect'] as const)('retains uncertain occupation when revoked %s terminal cleanup fails', async (pause) => {
+  const cleanup = new Error('Remote termination unavailable.')
+  const test = await setup({ pausePrepare: pause === 'prepare', pauseConnect: pause === 'connect', terminateFailure: cleanup })
+  const release = vi.fn(async () => {}), uncertain = vi.fn(async () => {})
+  test.ctx.provide('resourceBudgetRequired', true)
+  const withdraw = test.ctx.provide('resourceBudget', { acquire: async () => ({ signal: new AbortController().signal, release, uncertain }) })
+  const pending = test.runtime.spawnTerminal(spec).then(() => undefined, (error: unknown) => error)
+  await test.entered
+  withdraw(); test.release()
+  const error: unknown = await pending
+  expect(error).toMatchObject({ errors: [expect.objectContaining({ reason: 'unavailable' }), cleanup] })
+  expect(test.calls.some(call => call.method === 'process.start')).toBe(false)
+  expect(uncertain).toHaveBeenCalledOnce()
+  expect(release).not.toHaveBeenCalled()
+})
 
 describe('SSH terminal behavior', () => {
   it('publishes output and forwards terminal operations with remote process observations', async () => {
@@ -139,24 +198,27 @@ describe('SSH terminal behavior', () => {
     expect(handle.output.destroyed).toBe(true)
   })
 
-  it('terminates a published terminal when its caller aborts', async () => {
+  it('retains a published terminal after its allocation caller aborts until explicit termination', async () => {
     const test = await setup()
     const controller = new AbortController()
     const handle = await test.runtime.spawnTerminal({ ...spec, signal: controller.signal })
     controller.abort(new Error('caller stopped'))
+    await handle.write('still available')
+    expect(test.calls.filter(call => call.method === 'process.terminate')).toHaveLength(0)
     await handle.terminate()
     expect(test.calls.filter(call => call.method === 'process.terminate')).toHaveLength(1)
     expect(handle.output.destroyed).toBe(true)
     expect(await handle.done).toEqual(completion.outcome)
   })
 
-  it('releases the SSH connection when abort cannot confirm remote termination', async () => {
-    const options = { terminateFailure: new Error('termination lost') as Error | undefined }
+  it('releases the SSH connection when permit withdrawal cannot confirm remote termination', async () => {
+    const permit = new AbortController()
+    const options = { terminateFailure: new Error('termination lost') as Error | undefined, permit }
     const test = await setup(options)
     test.connection.dispose.mockRejectedValueOnce(new Error('transport already lost'))
     const controller = new AbortController()
     const handle = await test.runtime.spawnTerminal({ ...spec, signal: controller.signal })
-    controller.abort()
+    permit.abort()
     await expect.poll(() => test.connection.dispose.mock.calls.length).toBe(1)
     options.terminateFailure = undefined
     await handle.terminate()

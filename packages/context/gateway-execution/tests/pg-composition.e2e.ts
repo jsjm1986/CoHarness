@@ -1,11 +1,11 @@
 /** Keyless Loader integration backed by a disposable PostgreSQL Gateway. */
 import { fork, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { Context } from '@deepseek-ai/cordis'
+import { Context, type Plugin } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
@@ -13,6 +13,7 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { HostConnectionService } from '@deepseek-ai/dsh-client-connection'
 import GatewayRuntime, { GATEWAY_PRINCIPAL_HEADER, type GatewayRuntimeCredential } from '@deepseek-ai/dsh-gateway-runtime'
+import GatewayResourceBudget from '@deepseek-ai/dsh-gateway-runtime/resource-budget'
 import LlmRuntime, { createUserMessage, LlmAdapter, ToolCallId, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import PermissionPresets, { AUTO_PRESET } from '@deepseek-ai/dsh-permission-presets'
 import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
@@ -21,7 +22,7 @@ import * as AutoReview from '@deepseek-ai/dsh-experimental-auto-review'
 import type { JobOutcome } from '@deepseek-ai/dsh-jobs'
 import type { ExecutionQuestionId } from '@deepseek-ai/dsh-execution-authority'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
-import SessionStore, { SessionDraftId, SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { appendPluginRecord, SessionDraftId, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import GatewayCollaboration from '@deepseek-ai/dsh-collaboration-gateway'
 import GatewaySessionPersistence from '@deepseek-ai/dsh-session-persistence-gateway'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -32,6 +33,15 @@ import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import Approval from '@deepseek-ai/dsh-user-approval'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import GatewayExecution from '../src/index.ts'
+import CommandRuntime from '@deepseek-ai/dsh-commands'
+import PlanMode from '@deepseek-ai/dsh-plan-mode'
+import * as CommandCompact from '@deepseek-ai/dsh-command-compact'
+import BasicCompaction from '@deepseek-ai/dsh-compaction-basic'
+import TokenMeter from '@deepseek-ai/dsh-token-meter'
+import UserQuestions from '@deepseek-ai/dsh-user-questions'
+import * as AskUser from '@deepseek-ai/dsh-tool-ask-user'
+import * as CollaborationContext from '@deepseek-ai/dsh-collaboration-context'
+import { lookupRemoteSessionPolicy } from '@deepseek-ai/dsh-host-apiproxy/src/api/remote-session-routing.ts'
 import { executionInputOf, executionState, inputDigest } from '../src/input.ts'
 import GoalService from '@deepseek-ai/dsh-goal'
 import * as GoalRoundDriver from '@deepseek-ai/dsh-goal-round-driver'
@@ -39,6 +49,11 @@ import TerminalController, { type WebTerminalId, type TerminalAttachmentId, type
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { SubprocessTerminalHandle } from '@deepseek-ai/dsh-subprocess'
+import Subagents from '@deepseek-ai/dsh-subagent'
+import * as SdkSubagent from '@deepseek-ai/dsh-subagent-dsh-sdk'
+import * as CodexSubagent from '@deepseek-ai/dsh-subagent-codex'
+import * as PiAi from '@deepseek-ai/dsh-llm-pi-ai'
+import { materializeProfilePatch } from '@deepseek-ai/dsh-session-snapshot'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 const cleanup: Array<() => Promise<void>> = []
@@ -60,7 +75,14 @@ interface Ready {
   principals: { admin: string; member: string; terminalAdmin: string }
 }
 
-async function gateway() {
+async function withHuman<T>(ctx: Context, assertion: string, pathname: string, action: () => Promise<T>): Promise<T> {
+  let result!: T
+  await ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname,
+    headers: { [GATEWAY_PRINCIPAL_HEADER]: assertion } }, async () => { result = await action() })
+  return result
+}
+
+async function gateway(options: { stopDuringStartup?: boolean } = {}) {
   if (!process.env.HGW_TEST_DATABASE_URL) throw new Error('HGW_TEST_DATABASE_URL must select a disposable PostgreSQL database')
   const child: ChildProcess = fork(join(root, 'gateway/tests/execution-fixture-server.ts'), [], {
     cwd: root, silent: true,
@@ -75,6 +97,12 @@ async function gateway() {
   const exited = Promise.withResolvers<Error | undefined>()
   child.on('message', (message: unknown) => {
     if (message === null || typeof message !== 'object') return
+    if ('initializing' in message && message.initializing === true) {
+      if (!child.connected) return
+      if (options.stopDuringStartup === true) child.disconnect()
+      else child.send({ continueStartup: true }, (error) => { if (error) ready.reject(error) })
+      return
+    }
     if ('ready' in message && message.ready === true) { ready.resolve(message as Ready); return }
     if (!('id' in message) || typeof message.id !== 'number') return
     const request = pending.get(message.id)
@@ -84,12 +112,12 @@ async function gateway() {
     else request.resolve('value' in message ? message.value : undefined)
   })
   child.once('error', (error) => { ready.reject(error); exited.resolve(error) })
-  child.once('exit', (code) => {
-    const error = new Error(`Gateway fixture exited (${String(code)}): ${stderr}`)
+  child.once('exit', (code, signal) => {
+    const error = Object.assign(new Error(`Gateway fixture exited (${String(code)}, ${String(signal)}): ${stderr}`), { exitCode: code, signal })
     ready.reject(error)
     for (const request of pending.values()) request.reject(error)
     pending.clear()
-    exited.resolve(code === 0 ? undefined : error)
+    exited.resolve(code === 0 && signal === null ? undefined : error)
   })
   const command = (action: string, extra: Record<string, unknown> = {}): Promise<unknown> => {
     const id = ++nextId, request = Promise.withResolvers<unknown>()
@@ -98,12 +126,16 @@ async function gateway() {
     return request.promise
   }
   cleanup.push(async () => {
-    if (child.exitCode === null && child.connected) {
-      await command('stop')
-      child.disconnect()
-    }
-    const error = await exited.promise
-    if (error !== undefined) throw error
+    // The fixture owns no subprocesses; bound teardown of a failed startup's HTTP server.
+    const force = setTimeout(() => { child.kill('SIGKILL') }, 10_000)
+    try {
+      if (child.exitCode === null && child.connected) {
+        await command('stop')
+        child.disconnect()
+      }
+      const error = await exited.promise
+      if (error !== undefined) throw error
+    } finally { clearTimeout(force) }
   })
   return { ...await ready.promise, command }
 }
@@ -127,13 +159,30 @@ class Connection extends HostConnectionService {
 }
 
 class ScriptedModel extends LlmAdapter {
-  script: Array<'tool' | 'job-output' | 'text' | 'hold'> = []
+  readonly requestScopes: Array<ReturnType<GatewayExecution['capture']>> = []
+  readonly paused = Promise.withResolvers<undefined>()
+  readonly resume = Promise.withResolvers<undefined>()
+  readonly compactions: Array<ReturnType<GatewayExecution['capture']>> = []
+  constructor(private readonly ctx: Context) { super() }
+  script: Array<'tool' | 'job-output' | 'text' | 'hold' | 'question' | 'gated-text'> = []
   /** Job id the next 'job-output' action names; filled from the registry's minted id. */
   jobId = 'bash-1'
   readonly reviews: GenerateOptions[] = []
   readonly entered = Promise.withResolvers<undefined>()
   readonly cancelled = Promise.withResolvers<undefined>()
   async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    const owner = options.sessionId === undefined ? undefined : this.ctx.agents.get(options.sessionId)
+    if (owner !== undefined) this.requestScopes.push(this.ctx.executionAuthority.capture(owner))
+    if (options.purpose === 'compaction') {
+      const agent = options.sessionId === undefined ? undefined : this.ctx.agents.get(options.sessionId)
+      if (agent === undefined) throw new Error('Compaction fixture requires its live Agent')
+      this.compactions.push(this.ctx.executionAuthority.capture(agent))
+      yield { type: 'block-start', index: 0, blockType: 'text' }
+      yield { type: 'block-end', index: 0, block: { type: 'text', text: 'checkpoint' } }
+      yield { type: 'usage', usage: { inputTokens: 10, outputTokens: 4 } }
+      yield { type: 'finish', reason: { kind: 'stop' } }
+      return
+    }
     if (options.purpose === 'auto-review') {
       this.reviews.push(options)
       const text = '{"risk":"low","decision":"allow"}'
@@ -144,6 +193,17 @@ class ScriptedModel extends LlmAdapter {
       return
     }
     const action = this.script.shift()
+    if (action === 'gated-text') {
+      this.paused.resolve(undefined)
+      await this.resume.promise
+    }
+    if (action === 'question') {
+      yield { type: 'block-start', index: 0, blockType: 'tool-call' }
+      yield { type: 'block-end', index: 0, block: { type: 'tool-call', id: ToolCallId('continued-scope-question'),
+        name: 'ask_user_question', arguments: JSON.stringify({ questions: [{ id: 'scope', question: 'Which constraints should remain?' }] }) } }
+      yield { type: 'finish', reason: { kind: 'tool-calls' } }
+      return
+    }
     if (action === 'hold') {
       this.entered.resolve(undefined)
       try {
@@ -162,7 +222,7 @@ class ScriptedModel extends LlmAdapter {
       yield { type: 'block-start', index: 0, blockType: 'tool-call' }
       yield { type: 'block-end', index: 0, block: { type: 'tool-call', id: ToolCallId(`managed-${name}`), name, arguments: args } }
       yield { type: 'finish', reason: { kind: 'tool-calls' } }
-    } else if (action === 'text') {
+    } else if (action === 'text' || action === 'gated-text') {
       yield { type: 'block-start', index: 0, blockType: 'text' }
       yield { type: 'block-end', index: 0, block: { type: 'text', text: 'finished' } }
       yield { type: 'finish', reason: { kind: 'stop' } }
@@ -170,7 +230,10 @@ class ScriptedModel extends LlmAdapter {
   }
 }
 
-async function composition(credential: GatewayRuntimeCredential, goals = false, jobsAndAuto = false, drafts = false) {
+async function composition(
+  credential: GatewayRuntimeCredential, goals = false, jobsAndAuto = false, drafts = false, plans = false, compacts = false,
+  questions = false,
+) {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-execution-pg-'))
   cleanup.push(() => rm(directory, { recursive: true, force: true }))
   const credentialFile = join(directory, 'runtime.json')
@@ -181,14 +244,24 @@ async function composition(credential: GatewayRuntimeCredential, goals = false, 
   const config = await readFile(new URL('./fixtures/postgres.cordis.yml', import.meta.url), 'utf8')
   await writeFile(configFile, config + (jobsAndAuto
     ? "- name: '@deepseek-ai/dsh-jobs-local'\n- name: '@deepseek-ai/dsh-tool-jobs'\n- name: '@deepseek-ai/dsh-experimental-auto-review'\n" : '') + (goals ? "- name: '@deepseek-ai/dsh-goal'\n- name: '@deepseek-ai/dsh-goal-round-driver'\n" : '') + (drafts
-    ? "- name: '@deepseek-ai/dsh-collaboration-gateway'\n- name: '@deepseek-ai/dsh-session-persistence-gateway'\n" : ''))
+    ? "- name: '@deepseek-ai/dsh-collaboration-gateway'\n- name: '@deepseek-ai/dsh-session-persistence-gateway'\n" : '') + (plans
+    ? "- name: '@deepseek-ai/dsh-commands'\n- name: '@deepseek-ai/dsh-plan-mode'\n  config:\n    section: Plan the requested change before editing.\n" : '') + (compacts
+    ? "- name: '@deepseek-ai/dsh-commands'\n- name: '@deepseek-ai/dsh-token-meter'\n- name: '@deepseek-ai/dsh-compaction-basic'\n  config:\n    auto: false\n- name: '@deepseek-ai/dsh-command-compact'\n" : '') + (questions
+    ? "- name: '@deepseek-ai/dsh-user-questions'\n- name: '@deepseek-ai/dsh-tool-ask-user'\n  config:\n    mode: timed\n    timeout: 1\n- name: '@deepseek-ai/dsh-collaboration-context'\n" : ''))
   const ctx = new Context()
+  const withdrawModelAccess = ctx.provide('modelAccess', { decide: target => target.provider === 'fixture'
+    ? { allowed: true } : { allowed: false, reason: 'Fixture only authorizes its scripted route.' } })
   provideWorkingDirectoryFixture(ctx, directory)
   cleanup.push(() => ctx.fiber.dispose())
   ctx.baseUrl = pathToFileURL(directory).href + '/'
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
+    ['@deepseek-ai/dsh-commands', CommandRuntime], ['@deepseek-ai/dsh-plan-mode', PlanMode],
+    ['@deepseek-ai/dsh-command-compact', CommandCompact], ['@deepseek-ai/dsh-compaction-basic', BasicCompaction],
+    ['@deepseek-ai/dsh-token-meter', TokenMeter],
+    ['@deepseek-ai/dsh-user-questions', UserQuestions], ['@deepseek-ai/dsh-tool-ask-user', AskUser],
+    ['@deepseek-ai/dsh-collaboration-context', CollaborationContext],
     ['@deepseek-ai/dsh-jobs-local', LocalJobRegistry], ['@deepseek-ai/dsh-tool-jobs', ToolJobs],
     ['@deepseek-ai/dsh-experimental-auto-review', AutoReview],
     ['@deepseek-ai/dsh-goal', GoalService], ['@deepseek-ai/dsh-goal-round-driver', GoalRoundDriver],
@@ -198,6 +271,7 @@ async function composition(credential: GatewayRuntimeCredential, goals = false, 
     ['fixture:unused-shell', UnusedShell], ['@deepseek-ai/dsh-user-approval', Approval],
     ['@deepseek-ai/dsh-permission-presets', PermissionPresets], ['@deepseek-ai/dsh-sandbox-policy', SandboxPolicy],
     ['fixture:connection', Connection], ['@deepseek-ai/dsh-gateway-runtime', GatewayRuntime], ['@deepseek-ai/dsh-gateway-execution', GatewayExecution],
+    ['@deepseek-ai/dsh-gateway-runtime/resource-budget', GatewayResourceBudget],
     ...(drafts
       ? [['@deepseek-ai/dsh-collaboration-gateway', GatewayCollaboration],
         ['@deepseek-ai/dsh-session-persistence-gateway', GatewaySessionPersistence]] as Array<[string, unknown]>
@@ -211,7 +285,7 @@ async function composition(credential: GatewayRuntimeCredential, goals = false, 
   await ctx.loader.await()
   expect([...ctx.loader.entries()].filter(entry => !entry.disabled && entry.fiber === undefined)).toEqual([])
   expect(ctx.executionAuthority).toBeInstanceOf(GatewayExecution)
-  const model = new ScriptedModel()
+  const model = new ScriptedModel(ctx)
   ctx.llm.registerAdapter(['fixture'], model)
   const writes: string[] = []
   const attempts: SessionId[] = []
@@ -225,19 +299,466 @@ async function composition(credential: GatewayRuntimeCredential, goals = false, 
     },
   }))
   const send = async (agent: Agent, assertion: string, text: string): Promise<void> => {
-    await ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname: '/api/test/send',
-      headers: { [GATEWAY_PRINCIPAL_HEADER]: assertion } }, async () => {
+    await withHuman(ctx, assertion, '/api/test/send', async () => {
       const message = await ctx.executionAuthority.stamp(agent.session,
         createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))
       agent.followup(message)
     })
   }
-  return { ctx, model, writes, attempts, send, directory }
+  return { ctx, model, writes, attempts, send, directory, withdrawModelAccess }
 }
 
 // The dedicated keyless command rejects a missing database before Vitest; the
 // general provider inventory can discover this suite without provisioning one.
 describe.skipIf(process.env.HGW_TEST_DATABASE_URL === undefined)('Gateway execution through Loader and PostgreSQL', () => {
+  it.each([false, true])('restores a continued-question receipt and its original answerer after revocation: %s', async (revoked) => {
+    const server = await gateway()
+    const first = await composition(server.credential, false, false, true, false, false, true)
+    const sessionId = SessionId(String(await server.command('session')))
+    const handle = await first.ctx.agents.resume({ resumeSessionId: sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } })
+    first.model.script.push('question', 'text')
+    await first.send(handle.agent, server.principals.admin, 'Ask about the constraints and continue independent work.')
+    await handle.agent.whenIdle()
+    first.model.script.push('text')
+    await withHuman(first.ctx, server.principals.member, '/api/remote/userQuestions/answer', async () => {
+      expect(await first.ctx.userQuestions.answer(handle.agent, ToolCallId('continued-scope-question'),
+        { answers: [{ id: 'scope', selected: [], custom: 'Retain the answerer after restoration.' }] },
+        new AbortController().signal)).toBe(true)
+    })
+    await handle.agent.whenIdle()
+    const original = handle.agent.session.snapshotEvents().find(event => event.type === 'user/message'
+      && event.data.source.kind === 'user-question-reply')
+    const receipt = original?.type === 'user/message' ? executionInputOf(original.data) : undefined
+    expect(receipt).toBeDefined()
+    expect(original?.type === 'user/message' ? original.data.source : undefined).toMatchObject({
+      participant: { userId: server.member },
+    })
+    await handle.dispose()
+    await first.ctx.fiber.dispose()
+    if (revoked) await server.command('revoke')
+    const restored = await composition(server.credential, false, false, true, false, false, true)
+    const next = await restored.ctx.agents.resume({ resumeSessionId: sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } })
+    const reply = next.agent.session.snapshotEvents().find(event => event.type === 'user/message'
+      && event.data.source.kind === 'user-question-reply')
+    expect(reply).toEqual(original)
+    expect(reply?.type === 'user/message' ? executionInputOf(reply.data) : undefined).toBe(receipt)
+    expect(restored.ctx.executionAuthority.capture(next.agent)).toMatchObject({
+      primaryActorUserId: server.member, unverifiedHistory: false,
+    })
+    if (revoked) await expect(restored.ctx.executionAuthority.authorize('execute', next.agent)).rejects.toThrow()
+    else expect(await restored.ctx.executionAuthority.authorize('execute', next.agent)).toMatchObject({
+      primaryActorUserId: server.member, unverifiedHistory: false,
+    })
+    await next.dispose()
+  }, 30_000)
+
+  it.each([{ queued: false, revoked: false, verified: true }, { queued: true, revoked: false, verified: true },
+    { queued: true, revoked: true, verified: true }, { queued: true, revoked: false, verified: false }])(
+    'retains a continued-question answerer: queued=$queued, revoked=$revoked, verified=$verified', async ({ queued, revoked, verified }) => {
+      const server = await gateway()
+      const world = await composition(server.credential, false, false, false, false, false, true)
+      const { ctx, model } = world
+      const sessionId = SessionId(String(await server.command('session')))
+      const agent = (await ctx.agents.create({ sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } })).agent
+      const callId = ToolCallId('continued-scope-question')
+      model.script.push('question', 'text')
+      await world.send(agent, server.principals.admin, 'Ask about constraints, then continue independent work.')
+      await agent.whenIdle()
+      expect(ctx.sessionProjections.stateOf(agent.session, 'userQuestions')?.questions.active)
+        .toContainEqual(expect.objectContaining({ callId, state: 'continued' }))
+      model.script.push(...(queued ? ['gated-text', 'text'] as const : ['text'] as const))
+      if (queued) {
+        await world.send(agent, server.principals.admin, 'Continue while the question remains pending.')
+        await model.paused.promise
+      }
+      try {
+        const answer = async () => {
+          const invoke = () => ctx.userQuestions.answer(agent, callId,
+            { answers: [{ id: 'scope', selected: [], custom: 'Preserve my constraints.' }] }, new AbortController().signal)
+          const policy = lookupRemoteSessionPolicy('userQuestions/answer')
+          const result = policy?.action !== 'read' && policy?.execution === 'request'
+            ? await ctx.executionAuthority.runRequest(agent, { endpoint: 'userQuestions/answer', args: { callId } }, invoke)
+            : await invoke()
+          expect(result).toBe(true)
+        }
+        if (verified) await withHuman(ctx, server.principals.member, '/api/remote/userQuestions/answer', answer)
+        else {
+          await expect(answer()).rejects.toThrow('A verified interactive caller is required.')
+          agent.steer(createUserMessage({ source: { kind: 'user-question-reply', callId, outcome: 'answered' },
+            content: [{ type: 'text', text: JSON.stringify({ kind: 'answer_to_pending_question', tool: 'ask_user_question',
+              callId, questions: [{ id: 'scope', question: 'Which constraints should remain?' }],
+              answers: [{ id: 'scope', selected: [], custom: 'Legacy reply without verified origin.' }] }) }] }))
+        }
+        const entered = model.requestScopes.length
+        if (revoked) await server.command('revoke')
+        model.resume.resolve(undefined)
+        await agent.whenIdle()
+        if (revoked) {
+          expect(model.requestScopes).toHaveLength(entered)
+          expect(model.script).toEqual(['text'])
+        } else if (!verified) {
+          expect(model.requestScopes).toHaveLength(entered + 1)
+          expect(model.requestScopes.at(-1)?.unverifiedHistory).toBe(true)
+          await expect(ctx.executionAuthority.authorize('plugin-management', agent)).rejects.toThrow('without verified human identity')
+          expect(model.script).toEqual([])
+        } else {
+          expect(model.requestScopes.at(-1)).toMatchObject({ primaryActorUserId: server.member, unverifiedHistory: false })
+          const reply = agent.session.snapshotEvents().find(event => event.type === 'user/message'
+            && event.data.source.kind === 'user-question-reply')
+          expect(reply?.type === 'user/message' ? executionInputOf(reply.data) : undefined).toBeDefined()
+          expect(model.requestScopes.at(-1)?.inputs).toContain(reply?.type === 'user/message' ? executionInputOf(reply.data) : undefined)
+          expect(model.script).toEqual([])
+        }
+      } finally { model.resume.resolve(undefined) }
+    }, 30_000)
+
+  it.each([false, true])('owns manual compaction by its current caller, including revoked execution: %s', async (revoked) => {
+    const server = await gateway()
+    const world = await composition(server.credential, false, false, false, false, true)
+    const { ctx, model } = world
+    const sessionId = SessionId(String(await server.command('session')))
+    const agent = (await ctx.agents.create({ sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } })).agent
+    model.script.push('text')
+    await world.send(agent, server.principals.admin, 'Preserve the migration details. '.repeat(100))
+    await agent.whenIdle()
+    expect(ctx.executionAuthority.capture(agent).primaryActorUserId).toBe(server.admin)
+    if (revoked) await server.command('revoke')
+    await withHuman(ctx, server.principals.member, '/api/commands/execute', async () => {
+      const command = () => ctx.commands.execute(agent, '/compact', [], new AbortController().signal)
+      if (revoked) await expect(command()).rejects.toThrow(/Gateway refused/)
+      else expect((await command())?.result.kind).toBe('success')
+    })
+    if (revoked) {
+      expect(model.compactions).toEqual([])
+      expect(agent.session.snapshotEvents().some(event => event.type === 'compaction/start')).toBe(false)
+    } else {
+      expect(model.compactions).toHaveLength(1)
+      expect(model.compactions[0]).toMatchObject({ primaryActorUserId: server.member, unverifiedHistory: false })
+      expect(model.compactions[0]?.inputs.length).toBeGreaterThan(0)
+    }
+  }, 30_000)
+
+  it('keeps a plan command message owned by its verified interactive caller', async () => {
+    const server = await gateway()
+    const world = await composition(server.credential, false, false, false, true)
+    const { ctx, model } = world
+    const sessionId = SessionId(String(await server.command('session')))
+    const agent = (await ctx.agents.create({ sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } })).agent
+    await vi.waitFor(async () => {
+      await expect(ctx.executionAuthority.authorize('execute', agent)).rejects.toThrow(/Gateway refused/)
+    })
+    model.script.push('text')
+    await withHuman(ctx, server.principals.admin, '/api/test/plan', async () => {
+      await expect(ctx.commands.execute(agent, '/plan draft the safe migration', [], new AbortController().signal))
+        .resolves.toMatchObject({ result: { kind: 'success' } })
+    })
+    await agent.whenIdle()
+    const input = agent.session.snapshotEvents().find(event => event.type === 'user/message'
+      && event.data.content.some(block => block.type === 'text' && block.text === 'draft the safe migration'))
+    expect(input?.type).toBe('user/message')
+    if (input?.type !== 'user/message') throw new Error('Plan command did not publish its input')
+    expect(executionInputOf(input.data)).toBeDefined()
+    expect(ctx.executionAuthority.capture(agent)).toMatchObject({ primaryActorUserId: server.admin, unverifiedHistory: false })
+    expect((await ctx.executionAuthority.authorize('execute', agent)).actors).toEqual([{ userId: server.admin }])
+    expect(model.script).toHaveLength(0)
+  }, 30_000)
+
+  it('bills a manual summary to its command caller rather than the previous model user', async () => {
+    const server = await gateway()
+    const world = await composition(server.credential, false, false, false, false, true)
+    const { ctx, model, directory } = world
+    const intake = await server.command('model-governance')
+    const policy = join(directory, 'model-governance.json')
+    await writeFile(policy, JSON.stringify({ version: 1, defaultAllowed: false, userDeclaredAllowed: false, providers: [],
+      models: [{ provider: 'fixture', model: 'fixture', allowed: true }], ...intake as Record<string, unknown> }))
+    vi.stubEnv('DSH_HOME', directory)
+    vi.stubEnv('DSH_MODEL_GOVERNANCE', policy)
+    world.withdrawModelAccess()
+    const governancePlugin = await import(new URL('../../../../plugins/dsh-model-governance/src/index.ts', import.meta.url).href) as Plugin<void>
+    const governance = await ctx.plugin(governancePlugin)
+    const sessionId = SessionId(String(await server.command('session')))
+    const agent = (await ctx.agents.create({ sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } })).agent
+    model.script.push('text', 'text')
+    await world.send(agent, server.principals.member, 'Initial design constraints. '.repeat(100))
+    await agent.whenIdle()
+    await world.send(agent, server.principals.admin, 'Preserve the migration details. '.repeat(100))
+    await agent.whenIdle()
+    expect(ctx.executionAuthority.capture(agent).primaryActorUserId).toBe(server.admin)
+    await withHuman(ctx, server.principals.member, '/api/commands/execute', async () => {
+      expect((await ctx.commands.execute(agent, '/compact', [], new AbortController().signal))?.result.kind).toBe('success')
+    })
+    await governance.dispose()
+    const usage = await server.command('model-usage') as Array<{ actor_user_id: string; session_id: string; purpose: string; status: string }>
+    const assistant = usage.filter(row => row.purpose === 'assistant')
+    const summary = usage.filter(row => row.purpose === 'compaction')
+    expect(assistant).toHaveLength(2)
+    expect(summary).toHaveLength(1)
+    expect(summary[0]).toMatchObject({ actor_user_id: String(server.member), session_id: sessionId, status: 'succeeded', input_tokens: '10', output_tokens: '4' })
+    expect(summary[0]!.actor_user_id).toBe(assistant[0]!.actor_user_id)
+    expect(summary[0]!.actor_user_id).not.toBe(assistant[1]!.actor_user_id)
+  }, 30_000)
+
+  it.each((['one-shot', 'persistent'] as const).flatMap(mode =>
+    (['allowed', 'execution-revoked', 'model-revoked'] as const).map(change => ({ mode, change }))))(
+    'retains native Codex Session and actor ownership across later parent activity: $mode, $change', async ({ mode, change }) => {
+      const server = await gateway(), world = await composition(server.credential, false, false, true)
+      const { ctx, directory } = world
+      const intake = await server.command('model-governance')
+      const policy = join(directory, 'model-governance.json')
+      const policyDocument = { version: 1, defaultAllowed: false, userDeclaredAllowed: false, providers: [],
+        models: [{ provider: 'parent-responses', model: 'codex-fixture', allowed: true }],
+        ...intake as Record<string, unknown>,
+      }
+      await writeFile(policy, JSON.stringify(policyDocument))
+      vi.stubEnv('DSH_HOME', directory)
+      vi.stubEnv('DSH_MODEL_GOVERNANCE', policy)
+      world.withdrawModelAccess()
+      const governancePlugin = await import(new URL('../../../../plugins/dsh-model-governance/src/index.ts', import.meta.url).href) as Plugin<void>
+      const governance = await ctx.plugin(governancePlugin)
+      await ctx.plugin(Subagents)
+      await ctx.plugin(LocalSubprocessRuntime)
+      const httpCounterFile = join(directory, 'native-codex-http-count.txt')
+      await writeFile(httpCounterFile, '0')
+      const fixture = await import('../../../../examples/headless-agent/tests/fixtures/managed-codex-model/plugin.mjs')
+      await ctx.plugin(fixture.createManagedCodexFixture({
+        llm: { LlmAdapter, ToolCallId }, session: { appendPluginRecord, SessionId, SessionLogOffset },
+        tools: { defineContentToolFixture }, piAi: PiAi, codex: CodexSubagent,
+      }), { inheritParentAdmission: true, httpCounterFile })
+      const sessionId = SessionId(String(await server.command('session')))
+      const agent = (await withHuman(ctx, server.principals.member, '/api/test/native-codex-resume', () =>
+        ctx.agents.resume({ resumeSessionId: sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } }))).agent
+      const endings = new Map<SessionId, { kind: string }>()
+      const inputs: SessionId[] = []
+      const failures: string[] = []
+      ctx.on('agent/error', ({ error }) => { if (error instanceof Error) failures.push(error.stack ?? error.message) })
+      ctx.on('session/event', (session, event) => {
+        if (event.type === 'turn/end') endings.set(session.id, event.data.reason)
+        if (event.type === 'subagent/codex-model-request') inputs.push(session.id)
+      })
+      const entered = Promise.withResolvers<undefined>(), admit = Promise.withResolvers<undefined>()
+      const acquire = ctx.resourceBudget.acquire.bind(ctx.resourceBudget)
+      let modelCalls = 0
+      const admissions = vi.spyOn(ctx.resourceBudget, 'acquire').mockImplementation(async (request) => {
+        if (request.kind === 'model' && ++modelCalls === 2) { entered.resolve(undefined); await admit.promise }
+        return acquire(request)
+      })
+      const run = await withHuman(ctx, server.principals.member, '/api/test/native-codex', () =>
+        ctx.executionAuthority.runRequest(agent, { operation: 'owned-native-codex' }, async () => {
+          const request = { parent: agent, prompt: [{ type: 'text' as const, text: 'Run the fixture command and return the final marker.' }] }
+          const signal = new AbortController().signal
+          if (mode === 'one-shot') return { ...await ctx.subagents.start('owned-codex', { ...request, signal }), owner: sessionId }
+          const started = await ctx.subagents.startContinuable({ provider: 'owned-codex', label: 'Managed native member', request, signal })
+          return { owner: started.childId,
+            result: ctx.subagents.waitForChildren(agent).then(() => ({
+              stopReason: endings.get(started.childId)?.kind === 'completed' ? 'completed' : 'error',
+            })),
+            dispose: () => ctx.subagents.drainContinuableChildren(agent, [started.childId]),
+          }
+        }))
+      try {
+        await Promise.race([entered.promise, run.result.then(() => { throw new Error('Native Codex did not wait for its second request.') })])
+        await withHuman(ctx, server.principals.admin, '/api/test/later-native-parent-request', () =>
+          ctx.executionAuthority.runRequest(agent, { operation: 'later-parent-request' }, async () => {
+            expect(ctx.executionAuthority.capture(agent).primaryActorUserId).toBe(server.admin)
+            if (change === 'execution-revoked') await server.command('revoke')
+            else if (change === 'model-revoked') {
+              policyDocument.models[0]!.allowed = false
+              await writeFile(policy, JSON.stringify(policyDocument))
+            }
+            admit.resolve(undefined)
+            expect(await run.result, JSON.stringify({ endings: [...endings], failures,
+              httpRequests: await readFile(httpCounterFile, 'utf8') })).toMatchObject({ stopReason: change === 'allowed' ? 'completed' : 'error' })
+          }))
+        await run.dispose()
+        await governance.dispose()
+        expect(Number(await readFile(httpCounterFile, 'utf8'))).toBe(change === 'allowed' ? 2 : 1)
+        const allRecords = await server.command('model-usage') as Array<Record<string, unknown>>
+        const records = allRecords.filter(record => record.provider_key === 'parent-responses')
+        expect(records).toHaveLength(2)
+        expect(records.every(record => record.session_id === run.owner
+          && record.actor_user_id === String(server.member) && record.project_id === String(server.credential.runtime.id))).toBe(true)
+        expect(records[0]).toMatchObject({ provider_key: 'parent-responses', model_key: 'codex-fixture',
+          status: 'succeeded', input_tokens: '8', output_tokens: '5' })
+        const executionRevokedStatus = mode === 'persistent' ? 'cancelled' : 'failed'
+        expect(records[1]).toMatchObject({ status: change === 'allowed' ? 'succeeded' : change === 'model-revoked' ? 'denied' : executionRevokedStatus,
+          input_tokens: change === 'allowed' ? '8' : '0', output_tokens: change === 'allowed' ? '1' : '0' })
+        expect(admissions.mock.calls.filter(([request]) => request.sessionId === run.owner)
+          .map(([request]) => request.kind)).toEqual(['process', 'model', 'model'])
+        expect(inputs).toEqual([run.owner, run.owner])
+        expect(allRecords.some(record => String(record.provider_key).startsWith('codex-member'))).toBe(false)
+        await vi.waitFor(async () => {
+          expect(await server.command('resource-snapshot')).toMatchObject({ kinds: {
+            process: { active: 0, queued: 0 }, model: { active: 0, queued: 0 },
+          } })
+        })
+      } finally { admit.resolve(undefined); await run.dispose() }
+    }, 60_000)
+
+  it('joins an acquired Gateway fixture when its parent disconnects before readiness', async () => {
+    await expect(gateway({ stopDuringStartup: true })).rejects.toMatchObject({ exitCode: 0, signal: null })
+  })
+
+  it.each((['messages', 'sonar'] as const).flatMap(protocol =>
+    (['allowed', 'execution-revoked', 'model-revoked'] as const).map(change => ({ protocol, change }))))(
+    'retains SDK child ownership and queued permissions: $protocol, $change', async ({ protocol, change }) => {
+      const server = await gateway(), world = await composition(server.credential)
+      const { ctx, directory } = world
+      const intake = await server.command('model-governance')
+      const route = protocol === 'sonar' ? 'sonar-owned' : 'deepseek-official'
+      const model = protocol === 'sonar' ? 'sonar' : 'deepseek-v4-flash'
+      const policy = join(directory, 'model-governance.json')
+      const policyDocument = { version: 1, defaultAllowed: false, userDeclaredAllowed: false, providers: [],
+        models: [{ provider: 'native-fixture', model: 'conversation', allowed: true }, { provider: route, model, allowed: true }],
+        ...intake as Record<string, unknown>,
+      }
+      await writeFile(policy, JSON.stringify(policyDocument))
+      vi.stubEnv('DSH_HOME', directory)
+      vi.stubEnv('DSH_MODEL_GOVERNANCE', policy)
+      world.withdrawModelAccess()
+      // This private source plugin has its own compiler program rather than a workspace declaration entry.
+      const governancePlugin = await import(new URL('../../../../plugins/dsh-model-governance/src/index.ts', import.meta.url).href) as Plugin<void>
+      const governance = await ctx.plugin(governancePlugin)
+      const childRoot = join(directory, '.sdk-child'), patchesRoot = join(childRoot, '.patches')
+      await mkdir(patchesRoot, { recursive: true })
+      const patch = materializeProfilePatch(join(root, 'examples/headless-agent/tests/fixtures',
+        protocol === 'sonar' ? 'governed-sonar-model/runtime.cordis.yml' : 'governed-native-model/runtime.cordis.yml'),
+      childRoot, 'sdk-minimal', patchesRoot, 0)
+      const inherited = join(patchesRoot, 'parent-admission.patch.yml')
+      const httpCounterFile = join(directory, 'native-child-http-count.txt')
+      const startupProcessFile = join(directory, 'native-child-process.json')
+      await writeFile(httpCounterFile, '0')
+      await writeFile(inherited, `- id: native-model-fixture\n  config: { protocol: ${protocol}, inheritParentAdmission: true, httpCounterFile: ${JSON.stringify(httpCounterFile)}, startupProcessFile: ${JSON.stringify(startupProcessFile)} }\n`)
+      await ctx.plugin(Subagents)
+      await ctx.plugin(SdkSubagent, { providerName: 'owned-sdk', dshBin: join(root, 'apps/cli/lib/bin.js'), profile: 'sdk-minimal',
+        patches: [patch, inherited], dshHome: join(childRoot, '.dsh'), provider: 'native-fixture', model: 'conversation',
+        initializeTimeoutMs: 30_000, shutdownTimeoutMs: 5_000, disposeEofGraceMs: 10_000, disposeGraceMs: 5_000,
+        env: { DSH_TELEMETRY_DISABLED: '1', DSH_AGENTS_HOME: join(directory, '.sdk-child-agents') },
+      })
+      const sessionId = SessionId(String(await server.command('session')))
+      const agent = (await ctx.agents.create({ sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } })).agent
+      const entered = Promise.withResolvers<undefined>(), admit = Promise.withResolvers<undefined>()
+      const acquire = ctx.resourceBudget.acquire.bind(ctx.resourceBudget)
+      let modelCalls = 0
+      const admissions = vi.spyOn(ctx.resourceBudget, 'acquire').mockImplementation(async (request) => {
+        if (request.kind === 'model' && ++modelCalls === (change === 'allowed' ? 1 : 2)) {
+          entered.resolve(undefined)
+          await admit.promise
+        }
+        return acquire(request)
+      })
+      const run = await withHuman(ctx, server.principals.member, '/api/test/sdk-child', () =>
+        ctx.executionAuthority.runRequest(agent, { operation: 'owned-sdk-child' }, () => ctx.subagents.start('owned-sdk', {
+          parent: agent, prompt: [{ type: 'text', text: 'Search the owned native fixture.' }], signal: new AbortController().signal,
+        })))
+      try {
+        await Promise.race([entered.promise, run.result.then(() => { throw new Error('SDK child did not wait for model admission.') })])
+        await withHuman(ctx, server.principals.admin, '/api/test/later-parent-request', () =>
+          ctx.executionAuthority.runRequest(agent, { operation: 'later-parent-request' }, async () => {
+            expect(ctx.executionAuthority.capture(agent).primaryActorUserId).toBe(server.admin)
+            if (change === 'execution-revoked') await server.command('revoke')
+            else if (change === 'model-revoked') {
+              policyDocument.models[1]!.allowed = false
+              await writeFile(policy, JSON.stringify(policyDocument))
+            }
+            admit.resolve(undefined)
+            if (change === 'allowed') {
+              expect(await run.result).toMatchObject({ stopReason: 'completed', output: [{ type: 'text', text: 'NATIVE_SEARCH_DONE' }] })
+            } else expect(await run.result).toMatchObject({ stopReason: 'error' })
+          }))
+        await run.dispose()
+        await governance.dispose()
+        expect(Number(await readFile(httpCounterFile, 'utf8'))).toBe(change === 'allowed' ? 1 : 0)
+        const childProcess = JSON.parse(await readFile(startupProcessFile, 'utf8')) as { pid: number; closed: boolean }
+        expect(childProcess.closed).toBe(true)
+        expect(childProcess.pid).not.toBe(process.pid)
+        expect(() => process.kill(childProcess.pid, 0)).toThrow(expect.objectContaining({ code: 'ESRCH' }))
+        const records = await server.command('model-usage') as Array<Record<string, unknown>>
+        expect(records.every(record => record.session_id === sessionId
+          && record.project_id === String(server.credential.runtime.id))).toBe(true)
+        const nativeUsage = change === 'allowed' ? {
+          provider_key: route, model_key: model, credential_source: 'file', credential_class: 'personal',
+          status: 'succeeded', input_tokens: '3', output_tokens: '2',
+          actor_user_id: String(server.member),
+        } : {
+          purpose: 'web-search', actor_user_id: String(server.member),
+          status: change === 'model-revoked' ? 'denied' : 'failed', input_tokens: '0', output_tokens: '0',
+        }
+        expect(records.filter(record => record.purpose === 'web-search')).toEqual([expect.objectContaining(nativeUsage)])
+        if (change === 'allowed') {
+          expect(admissions.mock.calls.map(([request]) => request.kind)).toEqual(['process', 'process', 'model', 'model', 'model'])
+          expect(records).toHaveLength(3)
+          expect(records.every(record => record.actor_user_id === String(server.member))).toBe(true)
+        }
+        await vi.waitFor(async () => {
+          expect(await server.command('resource-snapshot')).toMatchObject({ kinds: {
+            process: { active: 0, queued: 0 }, model: { active: 0, queued: 0 },
+          } })
+        })
+      } finally { admit.resolve(undefined); await run.dispose() }
+    }, 60_000)
+
+  it('cancels a pressure-queued model request before dispatch and admits the next request after recovery', async () => {
+    const server = await gateway(), world = await composition(server.credential)
+    const { ctx, model } = world
+    const sessionId = SessionId(String(await server.command('session')))
+    const agent = (await ctx.agents.create({ sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } })).agent
+    await server.command('resource-pause')
+    model.script.push('text')
+    await world.send(agent, server.principals.admin, 'wait for model capacity')
+    await vi.waitFor(async () => {
+      expect(await server.command('resource-snapshot'), JSON.stringify(agent.session.snapshotEvents().slice(-3)))
+        .toMatchObject({ kinds: { model: { queued: 1, active: 0 } } })
+    })
+    expect(model.script).toEqual(['text'])
+    agent.cancel({ kind: 'user' })
+    await agent.whenIdle()
+    await vi.waitFor(async () => {
+      expect(await server.command('resource-snapshot')).toMatchObject({ kinds: { model: { queued: 0, active: 0 } } })
+    })
+    expect(model.script).toEqual(['text'])
+    await server.command('resource-resume')
+    await world.send(agent, server.principals.admin, 'use recovered model capacity')
+    await agent.whenIdle()
+    expect(model.script).toEqual([])
+    expect(agent.session.snapshotEvents().some(event => event.type === 'assistant/message'
+      && event.data.message.content.some(block => block.type === 'text' && block.text === 'finished'))).toBe(true)
+  }, 30_000)
+
+  it('cancels a pressure-queued native process before allocation and starts it after recovery', async () => {
+    const server = await gateway(), world = await composition(server.credential)
+    const { ctx } = world
+    await ctx.plugin(LocalSubprocessRuntime)
+    const target = join(world.directory, 'admitted-process.txt')
+    const controller = new AbortController()
+    const spawn = (signal: AbortSignal) => withHuman(ctx, server.principals.admin, '/api/test/process',
+      () => ctx.subprocess.spawn({ resourceOrigin: 'interactive', signal,
+        argv: [process.execPath, '-e', `require('node:fs').writeFileSync(${JSON.stringify(target)}, 'allocated')`],
+        cwd: world.directory, graceMs: 1000,
+        stdio: { stdin: 'ignore', stdout: { maxBytes: 1024 }, stderr: { maxBytes: 1024 } },
+      }))
+    await server.command('resource-pause')
+    const pending = spawn(controller.signal)
+    const cancelled = expect(pending).rejects.toMatchObject({ reason: 'cancelled' })
+    await vi.waitFor(async () => {
+      expect(await server.command('resource-snapshot')).toMatchObject({ kinds: { process: { queued: 1, active: 0 } } })
+    })
+    await expect(readFile(target)).rejects.toMatchObject({ code: 'ENOENT' })
+    controller.abort(new Error('cancel queued process'))
+    await cancelled
+    await vi.waitFor(async () => {
+      expect(await server.command('resource-snapshot')).toMatchObject({ kinds: { process: { queued: 0, active: 0 } } })
+    })
+    await expect(readFile(target)).rejects.toMatchObject({ code: 'ENOENT' })
+    await server.command('resource-resume')
+    const handle = await spawn(new AbortController().signal)
+    expect(await handle.done).toEqual({ exitCode: 0, signal: null })
+    expect(await handle.waitForExit()).toBe(true)
+    expect(await readFile(target, 'utf8')).toBe('allocated')
+    await vi.waitFor(async () => {
+      expect(await server.command('resource-snapshot')).toMatchObject({ kinds: { process: { queued: 0, active: 0 } } })
+    })
+  }, 30_000)
+
   it('keeps a real user PTY private and waits for termination after PostgreSQL revocation', async () => {
     const server = await gateway(), world = await composition(server.credential)
     const { ctx } = world
@@ -249,12 +770,8 @@ describe.skipIf(process.env.HGW_TEST_DATABASE_URL === undefined)('Gateway execut
     await vi.waitFor(async () => {
       await expect(ctx.executionAuthority.authorize('execute', agent)).rejects.toThrow(/Gateway refused/)
     })
-    const asHuman = async <T>(assertion: string, action: () => Promise<T>, method = 'test'): Promise<T> => {
-      let result!: T
-      await ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname: `/api/terminal/${method}`,
-        headers: { [GATEWAY_PRINCIPAL_HEADER]: assertion } }, async () => { result = await action() })
-      return result
-    }
+    const asHuman = <T>(assertion: string, action: () => Promise<T>, method = 'test'): Promise<T> =>
+      withHuman(ctx, assertion, `/api/terminal/${method}`, action)
     const terminal = 'creator-private-pty' as WebTerminalId, attachment = 'human-view' as TerminalAttachmentId
     const create = () => ctx.terminalController.create(agent, { id: terminal, cols: 80, rows: 24 }, new AbortController().signal)
     await expect(asHuman(server.principals.member, create)).rejects.toMatchObject({ code: 'terminal/forbidden' })

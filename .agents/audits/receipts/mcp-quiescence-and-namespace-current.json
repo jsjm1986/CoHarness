@@ -1,0 +1,13 @@
+{
+  "name": "mcp-quiescence-and-namespace-current",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/mcp/mcp-client/tests/resource-admission.spec.ts packages/mcp/mcp-client/tests/reconnect.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-23T16:36:17.139489+00:00",
+  "seconds": 3.495,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7f3d094e558336a769b96bcfa01a02c52282746b4f23a4f38389b458d10c88e7",
+  "inputsAfter": "7f3d094e558336a769b96bcfa01a02c52282746b4f23a4f38389b458d10c88e7",
+  "outputSha256": "f8981a780855f9b94d58e4729559952a9025e98e9b75c619c85e778a2371cb91",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  2 passed (2)\n      Tests  35 passed (35)\n   Start at  00:36:18\n   Duration  1.96s (transform 807ms, setup 82ms, import 952ms, tests 2.30s, environment 0ms)\n\n"
+}

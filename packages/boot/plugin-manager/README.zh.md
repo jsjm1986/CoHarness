@@ -39,6 +39,8 @@ kind: "package-reference"
 
 插件开关只更新 profile 的 `cordis.patch.yml` 中最后一条匹配覆盖项的 `disabled`；没有匹配项时追加。匹配依据是条目 id，以及覆盖项声明的模块名称。组合包开关修改 `package.json` 的有序 `dsh.profile.bundles` 列表。关闭保留依赖；开启追加到列表末尾，可能改变配置优先级。安装新组合包默认启用。home 和单次启动 patch 保留更高优先级。
 
+`setPluginConfig` 替换条目的有效配置。传入 `null` 会清除当前 profile patch 中所有匹配覆盖项的配置，保留启停状态和无关条目。条目随后使用组合默认值，并继续受更高优先级 patch 约束。
+
 已选择但无法加载的组合包仍会出现在 `listBundles` 中，并携带 `error`；`enabled` 表示保存的选择，不代表加载成功。插件页面显示错误并允许取消选择。损坏的组合包无法启用。管理组合包的文件变得不可读后仍受保护。
 
 `listBundles` 为各组合包及其声明的插件行提供可选的展示 `meta`，包括已禁用的组合包。Client 从这些值中选择语言。单独的 `description` 字段是该组合包原始的 `package.json.description`；元信息诊断不会阻止管理操作。`source` 把 profile 依赖写成 `pnpm add` 接受的 spec：git 地址或 URL 按记录值去掉 http(s) URL 的用户信息（查询串保持记录原样），`file:` 或 `link:` 路径相对 profile 或 `~` 的家目录解析为绝对路径，注册表区间、tag 或别名跟在包名之后——以其他名字安装的包的 spec 同样如此；安装提供的组合包没有 `source`，即使 profile 也依赖它，因为实际加载的是安装的那一份。`plugin_manager` 工具的列表结果不包含 UI 展示元信息。

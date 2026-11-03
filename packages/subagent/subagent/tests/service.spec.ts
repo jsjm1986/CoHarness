@@ -20,6 +20,7 @@ import SubagentRuntime, {
 } from '@deepseek-ai/dsh-subagent'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { hasPendingDirectChildren } from '../src/internal.ts'
 
 function fakeParent(id = 'parent-1'): Agent {
   return {
@@ -80,6 +81,30 @@ async function service(): Promise<{ ctx: Context; subagents: SubagentRuntime }> 
 }
 
 describe('SubagentRuntime', () => {
+  it.each<{ kind: string; cleanupFailure: unknown }>([
+    { kind: 'ordinary', cleanupFailure: new Error('provider disposal failed') },
+    { kind: 'unrenderable', cleanupFailure: Object.create(null) },
+  ])('preserves one-shot catalog failure after an $kind provider disposal failure', async ({ cleanupFailure }) => {
+    const { ctx, subagents } = await service()
+    const request = baseRequest({ parent: { ...fakeParent(), ctx: ctx.plugin(() => {}).ctx } })
+    const catalogFailure = new Error('one-shot catalog append failed')
+    vi.spyOn(request.parent.session, 'append').mockImplementation(() => { throw catalogFailure })
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    const dispose = vi.fn(async () => { throw cleanupFailure })
+    subagents.registerProvider({
+      name: 'catalog-failure', capabilities: NO_CAPS, inheritsParentContext: false,
+      start: async () => ({
+        id: SessionId('failed-catalog-child'), localAgent: undefined,
+        result: Promise.resolve({ output: [], stopReason: 'completed' }), dispose,
+      }),
+    })
+    try {
+      await expect(subagents.start('catalog-failure', request)).rejects.toBe(catalogFailure)
+      expect(dispose).toHaveBeenCalledOnce()
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('disposal after catalog append failure also failed:'))
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it.each([
     { maxContinuableActivations: 0 },
     { maxContinuableActivationsPerParent: 1.5 },
@@ -131,11 +156,13 @@ describe('SubagentRuntime', () => {
     const { subagents } = await service()
     const provider = new StubProvider('one-shot')
     subagents.registerProvider(provider)
-    const request = baseRequest()
+    const controller = new AbortController()
+    const request = baseRequest({ signal: controller.signal })
     await subagents.start('one-shot', request)
 
     expect(provider.lastRequest).toEqual({
       ...request,
+      signal: provider.lastRequest?.signal,
       // The runtime resolves the parent's effective directory before startup;
       // the stub parent has no Session, so the fixture's default applies.
       cwd: process.cwd(),
@@ -146,6 +173,11 @@ describe('SubagentRuntime', () => {
       },
     })
     expect(provider.lastRequest).not.toBe(request)
+    expect(provider.lastRequest?.signal).toBeInstanceOf(AbortSignal)
+    expect(provider.lastRequest?.signal.aborted).toBe(false)
+    const reason = new Error('caller cancellation')
+    controller.abort(reason)
+    expect(provider.lastRequest?.signal.reason).toBe(reason)
     expectTypeOf<Parameters<SubagentRuntime['start']>[1]>().toExtend<SubagentStartRequest>()
     expect('resume' in subagents).toBe(false)
     expect('resume' in provider).toBe(false)
@@ -515,4 +547,25 @@ describe('subagent descriptors', () => {
   ])('rejects a malformed persisted descriptor: %s', (_case, data, detail) => {
     expect(() => foldSubagentDescriptor([event(data)])).toThrow(detail)
   })
+})
+
+it.each([
+  { maxContinuableActivations: 0 }, { maxContinuableActivations: Number.MAX_SAFE_INTEGER + 1 },
+  { maxContinuableActivationsPerParent: 0 }, { maxContinuableActivationsPerParent: Number.NaN },
+])('refuses invalid direct-construction activation limits: %j', async (config) => {
+  const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
+  try { expect(() => new SubagentRuntime(ctx, config)).toThrow('must be a positive safe integer') }
+  finally { await ctx.fiber.dispose() }
+})
+
+it('reports no child work in a direct composition without continuation services', async () => {
+  const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
+  try {
+    const runtime = new SubagentRuntime(ctx, {})
+    const parent = fakeParent('no-continuation-owner')
+    expect(hasPendingDirectChildren(runtime, parent)).toBe(false)
+    await expect(runtime.waitForChildren(parent)).resolves.toBe(false)
+  } finally { await ctx.fiber.dispose() }
 })

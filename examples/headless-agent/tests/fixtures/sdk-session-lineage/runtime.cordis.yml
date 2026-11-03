@@ -1,0 +1,6 @@
+- id: llm-deepseek
+  disabled: true
+
+- insert:
+    - id: sdk-lineage-fixture
+      name: './plugin.mjs'

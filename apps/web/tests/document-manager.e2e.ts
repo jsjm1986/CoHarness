@@ -5,6 +5,8 @@
  * no model turns are required.
  */
 import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
@@ -23,6 +25,7 @@ const COMPACT_SCOPE_EXPECTED = join(SNAPSHOT_DIR, 'compact-scope.expected.md')
 const COMPACT_BATCH_EXPECTED = join(SNAPSHOT_DIR, 'compact-batch.expected.md')
 const COMPACT_OVERVIEW_EXPECTED = join(SNAPSHOT_DIR, 'compact-overview.expected.md')
 const PAGED_EXPECTED = join(SNAPSHOT_DIR, 'desktop-paged.expected.md')
+const TRASH_CONFLICT_EXPECTED = join(SNAPSHOT_DIR, 'trash-conflict.expected.md')
 const MODE = webSnapshotMode()
 
 const LIMITS = {
@@ -72,6 +75,33 @@ async function mockDocuments(page: Page, payload: typeof LIST_PAYLOAD = LIST_PAY
   })
 }
 
+
+async function assertRowActionClearance(page: Page, manager: ReturnType<Page['getByRole']>, width: number): Promise<void> {
+  await manager.evaluate(async element => Promise.allSettled(element.getAnimations().map(animation => animation.finished)))
+  const controls = manager.locator('[data-documents-row-kind] button[aria-label^="More actions:"]')
+  expect(await controls.count()).toBeGreaterThan(0)
+  for (const button of await controls.all()) {
+    const name = await button.getAttribute('aria-label')
+    if (name?.startsWith('More actions:') !== true) continue
+    await button.focus()
+    await button.press('Tab')
+    await page.keyboard.press('Shift+Tab')
+    if (width >= 768) await button.hover()
+    const box = await button.evaluate((element) => {
+      const row = element.closest('[data-documents-row-kind]')!
+      const a = element.getBoundingClientRect(), b = row.getBoundingClientRect()
+      return { rightClearance: b.right-a.right, leftClearance: a.left-b.left, width: a.width, height: a.height,
+        outlineOffset: getComputedStyle(element).outlineOffset, focusVisible: element.matches(':focus-visible') }
+    })
+    expect(box.focusVisible).toBe(true)
+    expect(Number.parseFloat(box.outlineOffset)).toBeLessThanOrEqual(0)
+    expect(box.rightClearance).toBeGreaterThanOrEqual(7.5)
+    expect(box.leftClearance).toBeGreaterThanOrEqual(0)
+    expect(box.width).toBeGreaterThanOrEqual(width === 390 ? 44 : 32)
+    expect(box.height).toBeGreaterThanOrEqual(width === 390 ? 44 : 32)
+  }
+}
+
 describe('web e2e: document manager', () => {
   let scaffold: WebScaffold
   let browser: Browser
@@ -112,8 +142,66 @@ describe('web e2e: document manager', () => {
     await dialog.getByText('brief.txt').waitFor({ timeout: 10_000 })
     await dialog.getByText('notes.txt').waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: 'Open folder reports' }).waitFor({ timeout: 10_000 })
+    await page.route(/\/api\/documents\/content(?:\?.*)?$/, async (route) => {
+      await route.fulfill({ contentType: 'text/plain', body: 'Preview fixture for the document manager.' })
+    })
+    await dialog.getByRole('button', { name: 'Preview brief.txt', exact: true }).click()
+    const preview = dialog.getByRole('complementary', { name: 'Preview: brief.txt' })
+    await preview.getByText('Preview fixture for the document manager.', { exact: true }).waitFor()
+    expect(await dialog.getByRole('checkbox', { name: 'brief.txt', exact: true }).isChecked()).toBe(false)
     const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DESKTOP_EXPECTED, snapshot, MODE)
+  }, 60_000)
+
+  it('desktop: reports a real reused-path trash conflict and preserves both documents', async () => {
+    const name = 'reused-path-audit.txt'
+    const upload = async (text: string): Promise<string> => {
+      const digest = createHash('sha256').update(text).digest('hex')
+      const started = await scaffold.hostFetch('/api/documents/uploads', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ version: 1, name, directory: '', bytes: text.length, fingerprint: digest }),
+      })
+      expect(started.status).toBe(200)
+      const session = await started.json() as { uploadId: string }
+      const path = `/api/documents/uploads/${session.uploadId}`
+      const chunk = await scaffold.hostFetch(`${path}/chunks/0`, {
+        method: 'PUT', headers: { 'content-range': `bytes 0-${text.length - 1}/${text.length}`, 'x-dsh-chunk-sha256': digest }, body: text,
+      })
+      expect(chunk.status).toBe(200)
+      expect((await scaffold.hostFetch(`${path}/complete`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: 1, sha256: digest }),
+      })).status).toBe(202)
+      let completed: { state: string; ref?: { docId: string } } | undefined
+      await expect.poll(async () => {
+        const response = await scaffold.hostFetch(path)
+        completed = await response.json() as NonNullable<typeof completed>
+        return completed.state
+      }).toBe('complete')
+      return completed!.ref!.docId
+    }
+    const original = await upload('old')
+    expect((await scaffold.hostFetch(`/api/documents/trash?id=${encodeURIComponent(original)}`, { method: 'POST' })).status).toBe(200)
+    expect(await upload('new')).toBe(original)
+    page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: 'en-US' })
+    tripwire = watchConsole(page)
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-document-trash-conflict'))
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await page.getByRole('button', { name: 'Documents', exact: true }).click()
+    const manager = page.getByRole('dialog', { name: 'Document Manager' })
+    await manager.getByRole('button', { name: `More actions: ${name}`, exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
+    const response = page.waitForResponse(item => new URL(item.url()).pathname === '/api/documents/trash' && item.request().method() === 'POST')
+    await page.getByRole('dialog', { name: 'Confirm Deletion' }).getByRole('button', { name: 'Confirm Delete' }).click()
+    expect((await response).status()).toBe(409)
+    await page.getByRole('alert').getByText('An older document remains in trash at this path.', { exact: false }).waitFor()
+    expect(await manager.getByText(name, { exact: true }).count()).toBe(1)
+    await compareOrRefreshGolden(TRASH_CONFLICT_EXPECTED, await captureStableAria(page, '[role="alert"]', scaffold.workspaceCwd), MODE)
+    expect(await readFile(join(scaffold.documentRoot, original), 'utf8')).toBe('new')
+    const restored = await scaffold.hostFetch(`/api/documents/restore?id=${encodeURIComponent(original)}&name=saved-old-audit.txt`, { method: 'POST' })
+    expect(restored.status).toBe(200)
+    expect(await readFile(join(scaffold.documentRoot, 'saved-old-audit.txt'), 'utf8')).toBe('old')
+    expect(await readFile(join(scaffold.documentRoot, original), 'utf8')).toBe('new')
   }, 60_000)
 
   it('desktop: pages a 21-file list and shows the oldest file on page two', async () => {
@@ -161,7 +249,7 @@ describe('web e2e: document manager', () => {
     await dialog.getByRole('button', { name: /Compiler/ }).waitFor({ timeout: 10_000 })
     const beforeUrl = page.url()
     await dialog.getByRole('button', { name: /Compiler/ }).click()
-    await dialog.getByRole('status').getByText('Upload target: Compiler', { exact: true }).waitFor({ timeout: 10_000 })
+    await dialog.getByRole('heading', { name: 'Compiler', exact: true }).waitFor({ timeout: 10_000 })
     await dialog.getByText('shared.txt', { exact: true }).waitFor({ timeout: 10_000 })
     expect(page.url()).toBe(beforeUrl)
     expect(await page.getByRole('dialog').count()).toBe(1)
@@ -214,12 +302,62 @@ describe('web e2e: document manager', () => {
     const dialog = page.getByRole('dialog', { name: 'Document Manager' })
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: /Compiler/ }).click()
-    await dialog.getByRole('status').getByText('Upload target: Compiler', { exact: true }).waitFor({ timeout: 10_000 })
+    await dialog.getByRole('heading', { name: 'Compiler', exact: true }).waitFor({ timeout: 10_000 })
     const beforeUrl = page.url()
     await dialog.locator('input[type="file"]').setInputFiles({ name: 'target.txt', mimeType: 'text/plain', buffer: Buffer.from('target') })
     await expect.poll(() => uploadRequests.some(request => request.startsWith('POST /api/documents/transfer/uploads?'))).toBe(true)
     await expect.poll(() => uploadRequests.some(request => request.includes('scope=project%3A41'))).toBe(true)
     expect(page.url()).toBe(beforeUrl)
+  }, 60_000)
+
+  it.each(['personal', 'project'] as const)('desktop: keeps the default %s upload on its computer for metadata and chunks', async (kind) => {
+    page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: 'en-US' })
+    tripwire = watchConsole(page)
+    onTestFailed(() => saveFailureShot(page, `web-e2e-document-manager-default-${kind}-upload`))
+    const nodeId = '00000000-0000-4000-8000-000000000041'
+    const scopeKey = kind === 'personal' ? 'personal' : 'project:41'
+    const document = { docId: 'default-target.txt', name: 'default-target.txt', bytes: 6,
+      mediaType: 'text/plain', modifiedAt: Date.UTC(2026, 7, 14), path: '' }
+    const session = { uploadId: '00000000-0000-4000-8000-000000000041', name: document.name,
+      directoryId: '', bytes: document.bytes, fingerprint: 'fixture', chunkBytes: 8 * 1024 * 1024,
+      receivedBytes: 0, expiresAt: Date.now() + 60_000, state: 'uploading' }
+    let published = false
+    const uploads: Array<{ method: string; path: string; scope: string | null; node: string | null }> = []
+    await page.route(/\/account\/api\/context(?:\?.*)?$/, route => route.fulfill({ json: {
+      scope: kind === 'personal' ? { kind } : { kind, projectId: 41, projectName: 'Compiler', mode: 'rw' },
+      environment: { nodeId, nodeName: 'Office computer' },
+      projects: kind === 'personal' ? [] : [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+    } }))
+    await page.route(/\/api\/documents(?:\/scope)?(?:\?.*)?$/, route => route.fulfill({ json: {
+      limits: LIMITS, directoryId: '', directories: [], documents: published ? [document] : [], totalDocuments: published ? 1 : 0,
+    } }))
+    await page.route(/\/api\/documents\/(?:transfer\/)?uploads(?:\/[^?]*)?(?:\?.*)?$/, async (route) => {
+      const request = route.request(), url = new URL(request.url())
+      const addressed = { method: request.method(), path: url.pathname,
+        scope: url.searchParams.get('scope'), node: url.searchParams.get('dshNode') }
+      uploads.push(addressed)
+      if (!addressed.path.startsWith('/api/documents/transfer/uploads') || addressed.scope !== scopeKey || addressed.node !== nodeId) {
+        await route.fulfill({ status: 409, json: { error: 'runtime-catalog/ambiguous-target' } }); return
+      }
+      if (url.pathname.endsWith('/complete')) {
+        published = true
+        await route.fulfill({ json: { ...session, receivedBytes: document.bytes, state: 'complete', ref: document } })
+      } else await route.fulfill({ json: session })
+    })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    await page.getByRole('button', { name: 'Documents', exact: true }).click()
+    const manager = page.getByRole('dialog', { name: kind === 'personal' ? 'Document Manager' : 'Project Documents: Compiler', exact: true })
+    await manager.getByText('No documents uploaded yet', { exact: true }).waitFor()
+    const beforeUrl = page.url()
+    const chosen = page.waitForEvent('filechooser')
+    await manager.getByRole('button', { name: 'Upload Document', exact: true }).first().click()
+    await (await chosen).setFiles({ name: document.name, mimeType: 'text/plain', buffer: Buffer.from('target') })
+    await manager.getByText(document.name, { exact: true }).waitFor({ timeout: 10_000 })
+    expect(uploads.map(upload => upload.method)).toEqual(['POST', 'PUT', 'POST'])
+    expect(page.url()).toBe(beforeUrl)
+    expect(await manager.getByRole('alert').count()).toBe(0)
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, `default-${kind}-upload.expected.md`),
+      await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), MODE)
   }, 60_000)
 
   it('compact: uses a scope trigger, upload primary, and one row action sheet', async () => {
@@ -239,6 +377,10 @@ describe('web e2e: document manager', () => {
     const dialog = page.getByRole('dialog', { name: 'Document Manager' })
     await dialog.waitFor({ timeout: 10_000 })
 
+    const rowMore = dialog.getByRole('button', { name: 'More actions: brief.txt' })
+    const name = dialog.getByText('brief.txt', { exact: true })
+    await name.scrollIntoViewIfNeeded()
+    await dialog.evaluate(async element => Promise.allSettled(element.getAnimations().map(animation => animation.finished)))
     const dialogBox = await dialog.boundingBox()
     const searchBox = await dialog.getByPlaceholder('Search document name').boundingBox()
     const uploadBox = await dialog.getByRole('button', { name: 'Upload Document' }).boundingBox()
@@ -246,9 +388,6 @@ describe('web e2e: document manager', () => {
     const more = dialog.locator('[data-documents-toolbar-more]')
     const scopeBox = await scopeTrigger.boundingBox()
     const moreBox = await more.boundingBox()
-    const rowMore = dialog.getByRole('button', { name: 'More actions: brief.txt' })
-    const name = dialog.getByText('brief.txt', { exact: true })
-    await name.scrollIntoViewIfNeeded()
     const nameBox = await name.boundingBox()
     const rowMoreBox = await rowMore.boundingBox()
     if (dialogBox === null
@@ -385,9 +524,10 @@ describe('web e2e: document manager', () => {
     const moreSheet = page.locator('[data-documents-sheet="toolbar-more"]')
     await moreSheet.waitFor({ timeout: 10_000 })
     expect(await moreSheet.locator('[data-documents-sheet-scrollport]').count()).toBe(1)
-    expect(await moreSheet.locator('select').count()).toBe(2)
+    expect(await moreSheet.locator('select').count()).toBe(1)
+    expect(await moreSheet.getByRole('radio').count()).toBe(5)
     await moreSheet.locator('select').nth(0).selectOption('pdf')
-    await moreSheet.locator('select').nth(1).selectOption('name:asc')
+    await moreSheet.getByRole('radio', { name: 'Name', exact: true }).check()
     expect(browseRequests).toBe(browseBeforeMore)
     for (const control of [
       moreSheet.getByRole('button', { name: 'New Folder' }),
@@ -445,7 +585,7 @@ describe('web e2e: document manager', () => {
     const scopeSnapshot = await captureStableAria(page, '[data-documents-sheet="scope-view"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(COMPACT_SCOPE_EXPECTED, scopeSnapshot, MODE)
     await scopeSheet.getByPlaceholder('Search document scopes').fill('Compiler')
-    await scopeSheet.getByRole('option', { name: /Compiler/ }).click()
+    await scopeSheet.getByRole('button', { name: /Compiler/ }).click()
     await manager.locator('[data-documents-panel]').getByText('Viewing: Compiler', { exact: true }).waitFor({ timeout: 10_000 })
     await manager.getByText('shared.txt', { exact: true }).waitFor({ timeout: 10_000 })
     expect(await page.locator('[role="dialog"]').count()).toBe(1)
@@ -502,7 +642,7 @@ describe('web e2e: document manager', () => {
     await manager.waitFor({ timeout: 10_000 })
     await manager.locator('[data-documents-scope-trigger]').click()
     const scopeSheet = page.locator('[data-documents-sheet="scope-view"]')
-    await scopeSheet.getByRole('option', { name: /All accessible documents/ }).click()
+    await scopeSheet.getByRole('button', { name: /All accessible documents/ }).click()
     await manager.getByRole('heading', { name: 'All accessible documents' }).waitFor({ timeout: 10_000 })
     await manager.locator('[class*="overviewList"]').getByText('notes.txt', { exact: true }).waitFor({ timeout: 10_000 })
     const overviewSnapshot = await captureStableAria(page, '[data-documents-panel]', scaffold.workspaceCwd)
@@ -529,10 +669,216 @@ describe('web e2e: document manager', () => {
     const dialog = page.getByRole('dialog', { name: 'Document Manager' })
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.locator('[data-documents-list] [title="brief.txt"]').waitFor({ timeout: 10_000 })
-    expect(await dialog.locator('[data-documents-scope-trigger]').count()).toBe(0)
+    expect(await dialog.locator('[data-documents-scope-trigger]').count()).toBe(1)
+    expect(await dialog.locator('aside[aria-label="Document scopes"]').isVisible()).toBe(false)
     expect(await dialog.locator('aside[aria-label="Document scopes"]').count()).toBe(1)
     const overflow = await dialog.evaluate(element => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }))
     expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1)
+  }, 60_000)
+
+  it.each([1280, 1024, 768, 390])('secondary dialogs keep complete names, destination values and pinned actions at %ipx', async (width) => {
+    page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'en-US', hasTouch: width === 390 })
+    tripwire = watchConsole(page)
+    const out = process.env.DSH_DOCUMENT_DIALOG_SCREENSHOTS
+    const longName = '客户交付资料与产品需求说明_完整的目录名称必须可以阅读_2026年10月'
+    const folders = Array.from({ length: 7 }, (_, index) => ({ directoryId: `folder-${index}`, name: index === 6 ? longName : `Archive ${index}`, path: '', modifiedAt: 1 }))
+    const moves: string[] = []
+    const creations: string[] = []
+    await mockDocuments(page)
+    await page.route(/\/account\/api\/context(?:\?.*)?$/, route => route.fulfill({ json: {
+      scope: { kind: 'personal' }, projects: [
+        { projectId: 41, name: 'Compiler', mode: 'rw' }, { projectId: 42, name: longName, mode: 'rw' },
+      ],
+    } }))
+    await page.route(/\/api\/documents\/directories(?:\?.*)?$/, route => route.fulfill({ json: { directories: folders } }))
+    await page.route(/\/api\/documents\/transfer\/directories(?:\?.*)?$/, route => route.fulfill({
+      json: { version: 1, directories: folders },
+    }))
+    await page.route(/\/api\/documents\/move(?:\?.*)?$/, (route) => {
+      moves.push(new URL(route.request().url()).searchParams.get('directory') ?? '')
+      return route.fulfill({ status: 409, json: { error: 'Move could not be completed' } })
+    })
+    await page.route(/\/api\/documents\/folders(?:\?.*)?$/, (route) => {
+      const name = new URL(route.request().url()).searchParams.get('name') ?? ''
+      creations.push(name)
+      return route.fulfill({ json: { directoryId: 'new', name, path: '', modifiedAt: 1 } })
+    })
+    await page.route(/\/api\/documents(?:\/scope)?\/history(?:\?.*)?$/, route => route.fulfill({ json: { version: 1, items: [
+      { id: 'history-1', eventKind: 'upload', documentName: longName+'.pdf', createdAt: 1, actor: { displayName: 'Design review' } },
+    ] } }))
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    if (width === 390) await page.getByRole('button', { name: 'Open sidebar' }).click()
+    await page.getByRole('button', { name: 'Documents', exact: true }).click()
+    const manager = page.getByRole('dialog', { name: 'Document Manager', exact: true })
+    await manager.getByText('brief.txt', { exact: true }).waitFor()
+    await assertRowActionClearance(page, manager, width)
+    if (out !== undefined) await page.screenshot({ path: join(out, `row-hover-${width}.png`) })
+    if (width >= 768) {
+      await page.route(/\/api\/documents\/content(?:\?.*)?$/, route => route.fulfill({ contentType: 'text/plain', body: 'Reading fixture' }))
+      await manager.getByRole('button', { name: 'Preview brief.txt', exact: true }).click()
+      await assertRowActionClearance(page, manager, width)
+      if (out !== undefined) await page.screenshot({ path: join(out, `row-hover-preview-${width}.png`) })
+      await manager.getByRole('button', { name: 'Close preview', exact: true }).click()
+    }
+    const assertFits = async (dialog: ReturnType<Page['getByRole']>) => {
+      const geometry = await dialog.evaluate(element => ({
+        x: element.getBoundingClientRect().x, right: element.getBoundingClientRect().right,
+        scroll: element.scrollWidth, client: element.clientWidth,
+      }))
+      expect(geometry.x).toBeGreaterThanOrEqual(0)
+      expect(geometry.right).toBeLessThanOrEqual(width+1)
+      expect(geometry.scroll).toBeLessThanOrEqual(geometry.client+1)
+      const footer = dialog.locator('[data-documents-dialog-actions]')
+      if (await footer.count() > 0) for (const button of await footer.getByRole('button').all()) {
+        const box = await button.boundingBox()
+        expect(box?.height).toBeGreaterThanOrEqual(width === 390 ? 44 : 32)
+      }
+    }
+    const shot = async (kind: string) => {
+      if (out !== undefined) await page.screenshot({ path: join(out, `${kind}-${width}.png`) })
+    }
+    const rowAction = async (name: string) => {
+      await manager.getByRole('button', { name: 'More actions: brief.txt', exact: true }).click()
+      if (width === 390) await page.getByRole('dialog', { name: 'More actions', exact: true }).getByRole('button', { name, exact: true }).click()
+      else await page.getByRole('menuitem', { name, exact: true }).click()
+    }
+    if (width === 390) {
+      await manager.getByRole('button', { name: 'More actions', exact: true }).click()
+      await page.getByRole('dialog', { name: 'More actions', exact: true }).getByRole('button', { name: 'New Folder', exact: true }).click()
+    } else await manager.getByRole('button', { name: 'New Folder', exact: true }).click()
+    const create = page.getByRole('dialog', { name: 'New Folder', exact: true })
+    await create.getByRole('textbox', { name: 'Folder name' }).fill('review-folder')
+    await assertFits(create)
+    await shot('create')
+    await create.getByRole('textbox', { name: 'Folder name' }).press('Enter')
+    await create.waitFor({ state: 'hidden' })
+    expect(creations).toEqual(['review-folder'])
+
+    await rowAction('Move')
+    const move = page.getByRole('dialog', { name: 'Move Documents', exact: true })
+    const group = move.getByRole('radiogroup', { name: 'Destination folder' })
+    await group.getByRole('radio', { name: longName, exact: true }).check()
+    await group.getByRole('radio', { name: longName, exact: true }).press('ArrowUp')
+    expect(await group.getByRole('radio', { name: 'Archive 5', exact: true }).isChecked()).toBe(true)
+    await group.getByRole('radio', { name: 'Archive 5', exact: true }).press('ArrowDown')
+    expect(await group.getByRole('radio', { name: longName, exact: true }).isChecked()).toBe(true)
+    await group.getByRole('textbox', { name: 'Search destination folders' }).fill('no-matching-folder')
+    expect(await group.getByText('Selected: '+longName, { exact: true }).isVisible()).toBe(true)
+    await group.getByRole('textbox', { name: 'Search destination folders' }).fill('')
+    await assertFits(move)
+    await shot('move')
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'secondary-move.expected.md'), await captureStableAria(page, '[data-documents-dialog="move"]', scaffold.workspaceCwd), MODE)
+    await move.getByRole('button', { name: 'Confirm Move', exact: true }).click()
+    await move.getByRole('alert').waitFor()
+    expect(moves).toEqual(['folder-6'])
+    await shot('move-error')
+    await move.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    await rowAction('Copy to…')
+    const copy = page.getByRole('dialog', { name: 'Copy Document Snapshots', exact: true })
+    await copy.getByRole('radiogroup', { name: 'Target folder' }).getByRole('radio', { name: 'Root folder', exact: true }).waitFor()
+    await assertFits(copy)
+    await shot('copy')
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'secondary-copy.expected.md'), await captureStableAria(page, '[data-documents-dialog="copy"]', scaffold.workspaceCwd), MODE)
+    await copy.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    if (width === 390) {
+      await manager.getByRole('button', { name: 'More actions', exact: true }).click()
+      await page.getByRole('dialog', { name: 'More actions', exact: true }).getByRole('button', { name: 'History', exact: true }).click()
+    } else if (width <= 1100) {
+      await manager.getByRole('button', { name: 'More actions', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'History', exact: true }).click()
+    } else await manager.getByRole('button', { name: 'History', exact: true }).click()
+    const history = page.getByRole('dialog', { name: 'Document operation history', exact: true })
+    await history.getByText(longName+'.pdf', { exact: false }).waitFor()
+    await assertFits(history)
+    await shot('history')
+    await history.getByRole('button', { name: 'Close', exact: true }).click()
+  }, 60_000)
+
+  it('keeps a search in the destination folder when its response is delayed', async () => {
+    page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: 'en-US' })
+    tripwire = watchConsole(page)
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-folder-search'))
+    let releaseFolder!: () => void
+    let enteredFolder!: () => void
+    const ready = new Promise<void>((resolve) => { releaseFolder = resolve })
+    const entered = new Promise<void>((resolve) => { enteredFolder = resolve })
+    const reads: Array<{ directory: string; query: string }> = []
+    await page.route(/\/api\/documents(?:\?.*)?$/, async (route) => {
+      const url = new URL(route.request().url())
+      if (route.request().method() !== 'GET') { await route.continue(); return }
+      const directory = url.searchParams.get('directory') ?? ''
+      const query = url.searchParams.get('q') ?? ''
+      reads.push({ directory, query })
+      if (directory === 'reports' && query === '') { enteredFolder(); await ready }
+      await route.fulfill({ json: { ...LIST_PAYLOAD, directoryId: directory,
+        directories: directory === '' ? LIST_PAYLOAD.directories : [],
+        documents: directory === '' ? [] : [{ ...LIST_PAYLOAD.documents[0]!, docId: 'reports/report.txt', name: 'report.txt' }],
+        totalDocuments: directory === '' ? 0 : 1 } })
+    })
+    try {
+      await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+      await page.getByRole('button', { name: 'Documents', exact: true }).click()
+      const manager = page.getByRole('dialog', { name: 'Document Manager', exact: true })
+      await manager.getByRole('button', { name: 'Open folder reports', exact: true }).click()
+      await entered
+      await manager.getByRole('textbox', { name: 'Search document name', exact: true }).fill('report')
+      releaseFolder()
+      await manager.getByText('report.txt', { exact: true }).waitFor()
+      await expect.poll(() => reads.at(-1)).toEqual({ directory: 'reports', query: 'report' })
+      expect(reads.some(read => read.directory === '' && read.query === 'report')).toBe(false)
+      await manager.getByRole('button', { name: 'Close', exact: true }).click()
+      await page.getByRole('button', { name: 'Documents', exact: true }).click()
+      await manager.getByText('report.txt', { exact: true }).waitFor()
+      expect(await manager.getByRole('textbox', { name: 'Search document name', exact: true }).inputValue()).toBe('report')
+      await manager.getByRole('navigation', { name: 'Document path', exact: true }).getByRole('button', { name: 'reports', exact: true }).waitFor()
+      await expect.poll(() => reads.at(-1)?.directory).toBe('reports')
+      await expect.poll(() => manager.getByRole('button', { name: 'Back', exact: true }).isEnabled()).toBe(true)
+      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'folder-search.expected.md'),
+        await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), MODE)
+    } finally {
+      releaseFolder()
+      await page.unrouteAll({ behavior: 'wait' })
+    }
+  }, 60_000)
+
+  it('explains the real receiving limit without deleting retained upload sessions', async () => {
+    const retained: string[] = []
+    const uploadPage = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' })
+    try {
+      for (let i = 0; i < 2; i += 1) {
+        const created = await scaffold.hostFetch('/api/documents/uploads', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ version: 1, name: `retained-${i}.txt`, directory: '', bytes: 1,
+            fingerprint: createHash('sha256').update(`retained-upload-limit-${i}`).digest('hex') }),
+        })
+        expect(created.status).toBe(200)
+        retained.push((await created.json() as { uploadId: string }).uploadId)
+      }
+      await uploadPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      await uploadPage.getByRole('button', { name: 'Documents', exact: true }).click()
+      const manager = uploadPage.getByRole('dialog', { name: 'Document Manager', exact: true })
+      const chosen = uploadPage.waitForEvent('filechooser')
+      await manager.getByRole('button', { name: 'Upload Document', exact: true }).first().click()
+      await (await chosen).setFiles({ name: 'limit-new-file.txt', mimeType: 'text/plain', buffer: Buffer.from('x') })
+      const alert = manager.getByRole('alert')
+      await expect.poll(() => alert.innerText()).toContain('Reselect a previous file to resume it')
+      for (const uploadId of retained) {
+        const inspected = await scaffold.hostFetch(`/api/documents/uploads/${uploadId}`)
+        expect(inspected.status).toBe(200)
+        expect(await inspected.json()).toMatchObject({ state: 'uploading', receivedBytes: 0 })
+      }
+      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'upload-busy.expected.md'),
+        await captureStableAria(uploadPage, '[role="alert"]', scaffold.workspaceCwd), MODE)
+    } finally {
+      await uploadPage.close()
+      for (const uploadId of retained) {
+        expect((await scaffold.hostFetch(`/api/documents/uploads/${uploadId}`, { method: 'DELETE' })).status).toBe(204)
+      }
+    }
   }, 60_000)
 
   it('commits exactly the document-manager snapshot inventory', async () => {
@@ -544,6 +890,13 @@ describe('web e2e: document manager', () => {
       'compact-scope.expected.md',
       'desktop-paged.expected.md',
       'desktop.expected.md',
+      'default-personal-upload.expected.md',
+      'default-project-upload.expected.md',
+      'folder-search.expected.md',
+      'secondary-move.expected.md',
+      'secondary-copy.expected.md',
+      'trash-conflict.expected.md',
+      'upload-busy.expected.md',
     ])
   })
 })

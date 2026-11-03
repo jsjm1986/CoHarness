@@ -11,17 +11,21 @@ Wire consumer layer: the client plugin's apply mounts `ctx.connection` (shared a
 
 `ConnectionHandle.forTarget(target)` creates a separate browser API and stream owner for an authenticated Gateway runtime target. The target is carried as a server-validated `dshTarget` selector on HTTP, WebSocket, and generic RPC requests; callers must still obtain a target from the account catalog and the Gateway rechecks membership before issuing its principal.
 
+A target handle retains its identity when its stream closes. A subsequent owner can reopen it; an earlier owner’s disposer or identity callback cannot stop the replacement stream.
+
 The client handle also exposes an observable connection state and an immediate `reconnect()` action. The WebSocket downlink heartbeat permits two missed Pongs before scheduling termination, which tolerates one busy event-loop interval while still recovering a stalled host.
 
 Browser Session addresses carry runtime identity without changing Host IDs. The application registers one address resolver; `api` routes declared Session fields while `wireApi` is reserved for the runtime owner holding original IDs. Remote routing also accepts generated Agent lookup fields and application-declared JSON paths; unrelated payload strings are never rewritten. A managed Host must declare its runtime target before buffered frames become visible. An explicit personal target remains separate when the bootstrap carrier belongs to a project.
 
-One document pins its verified Gateway account. Its fetch wrapper covers only same-origin `/api` and `/account/api/` requests, carrying `x-dsh-expected-principal-id`; sockets wait for the initial HTTP identity outcome and carry `dshPrincipal`. Gateway compares these with its authenticated user and returns `x-dsh-principal-id`. An explicit mismatch, revoked authentication or bootstrap access denial aborts old requests, withdraws Runtime-owned Session and slot state, and then reloads the document. Missing identity during a transient connection failure does not become a different account. Legacy clients without the expected-ID field retain server authorization behavior.
+One document pins its verified Gateway account. The optional `onPrincipalChange` cleanup is present only when this document fence owns the connection; explicit transports and fixture carriers do not advertise it. Its fetch wrapper covers only same-origin `/api` and `/account/api/` requests, carrying `x-dsh-expected-principal-id`; sockets wait for the initial HTTP identity outcome and carry `dshPrincipal`. Gateway compares these with its authenticated user and returns `x-dsh-principal-id`. An explicit mismatch, revoked authentication or bootstrap access denial aborts old requests, withdraws Runtime-owned Session and slot state, and then reloads the document. Missing identity during a transient connection failure does not become a different account. Legacy clients without the expected-ID field retain server authorization behavior.
 
 The decoded Host description fixes the document’s bootstrap runtime before scope-sensitive requests and sockets open. Requests without an explicit runtime use that fixed target, including project activity pages, so another tab’s scope cookie cannot redirect them. Application-generated private preview and download URLs use `privateResourceUrl` to carry the same account and runtime checks through native navigation; public links remain unchanged.
 
 ## Summary
 
 The package carries browser-to-Host Remote calls, exact Fetch responses, and connection generations. The Client plugin mounts `ctx.connection` with current-page loopback state, generic RPC, the active generation and its Host facts, observable recovery state, an immediate reconnect command, and the registration point for one generation source. A generation becomes visible when its source reports ready; source completion, failure, withdrawal, or an explicit stop clears it before `ConnectionController` applies its retry policy.
+
+A managed tab pins its initial `dshRuntime` before connecting; the Host must confirm it. Explicit document locations remain independent. See [browser environments](../../../gateway/docs/node-agent/browser/README.md).
 
 ## Table of Contents
 
@@ -37,11 +41,13 @@ The package carries browser-to-Host Remote calls, exact Fetch responses, and con
 <a id="host-configuration"></a>
 ## Host configuration
 
+Host `rpcTimeoutMs` configures bounded browser unary RPC calls; its default remains 30000 milliseconds. The served page and its pooled Runtime connections inherit the value. Custom API carriers retain their own deadlines, and user-paced calls and event streams keep their existing lifetime. Browser generation recovery remains separately configurable through `recovery`.
+
 `historyPageTargetBytes` accepts a positive integer and sets the target size of each complete uncompressed history RPC `server-response` JSON body in UTF-8 bytes. It defaults to 131072 bytes. Because pagination preserves complete append-origin message groups, one indivisible group may exceed the target. Fetch history responses still pack remaining `assistant/chunk` runs and round-trip optional `omittedSpans` from `detail: 'conversation'`; the [two-tier conversation history decision](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.md) owns the download gears.
 
 The shared unary carrier reads successful JSON responses through a 16 MiB byte budget by default; `AbstractApiClient` and `InProcessApiClient` accept a positive override where a deployment needs a smaller limit. The bounded reader accepts an optional `AbortSignal` and cancels a response body when the caller disconnects. An over-limit response is rejected before envelope parsing.
 
-The browser connection also exposes optional Gateway transports for account preferences and project-owned model settings. Account preference requests are same-origin, revision-fenced, and value-safe; they cover locale, theme, busy-Enter, transcript width, and transcript font size. Project model requests cover the project Provider descriptor, encrypted-credential state, endpoint discovery, and mutation responses without putting a key value in a response. A host that does not provide these routes leaves the transports absent, so callers show an explicit unavailable state instead of falling back to another account's settings.
+The browser connection also exposes optional Gateway transports for account preferences and project-owned model settings. Account preference requests are same-origin, revision-fenced, and value-safe; they cover locale, appearance and six font fields, busy-Enter, transcript display, and link-opening preferences. Project model requests cover the project Provider descriptor, encrypted-credential state, endpoint discovery, and mutation responses without putting a key value in a response. A host that does not provide these routes leaves the transports absent, so callers show an explicit unavailable state instead of falling back to another account's settings.
 
 <a id="api-browser-trust-fence"></a>
 ## /api browser-trust fence

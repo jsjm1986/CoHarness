@@ -1,0 +1,14 @@
+{
+  "name": "gateway-shutdown-final-baseline",
+  "cwd": ".",
+  "command": "git fetch origin --quiet",
+  "startedAt": "2026-10-26T12:10:40.554197+00:00",
+  "seconds": 5.949,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "59a4732a8b4ca8e68fd77ca23e4549ff8403b9208a6ac32d142a0983157bafde",
+  "inputsAfter": "59a4732a8b4ca8e68fd77ca23e4549ff8403b9208a6ac32d142a0983157bafde",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -29,6 +29,8 @@ This package is a library, not a Cordis plugin. A provider plugin registers dire
 <a id="route-and-failure-contract"></a>
 ## Route and failure contract
 
+Title requests retain their Session reference and explicitly select Runtime infrastructure resource admission. A later browser caller cannot become the title task's execution owner. Governance keeps the explicit Session as a trace and leaves default activity unattributed, whether its Agent is cold, live or has accepted later execution. Project or personal Runtime billing retains its own owner.
+
 
 `provider` and `model` overrides are optional but must be supplied together as non-empty strings. Without that pair, the function uses the exact provider/model route captured from the current session's logged `request/header`; an explicit refresh before any route exists therefore needs overrides. The function measures the final prepared user input against `maxInputBytes` before logging or dispatch instead of truncating it. Timeout and caller cancellation are rechecked while consuming the stream and after it completes, so a late successful result cannot be accepted even if an interceptor or adapter ignores abort. The title request uses `maxOutputTokens` independently of the conversation's cap. Its route must have a registered adapter so `ctx.llm.prepareCall()` can resolve the request before it is recorded.
 

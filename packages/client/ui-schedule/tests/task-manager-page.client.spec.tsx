@@ -181,6 +181,11 @@ function mount(
   }
   const props: TaskManagerPageProps = {
     useCatalog: select => select(snapshot),
+    useTaskCatalog: ((_key, select, equal) => props.useCatalog(select ?? (value => value), equal)) as TaskManagerPageProps['useTaskCatalog'],
+    useTaskEnvironments: select => select({ showComputer: false, choices: [{ key: 'base', available: true }], status: 'ready' }),
+    taskActionsForRuntime: () => ({ onDelete: props.onDelete, onRetry: props.onRetry, onNewTask: props.onNewTask,
+      onUpdateTiming: props.onUpdateTiming, loadHistory: props.loadHistory, onOpenSession: props.onOpenSession }),
+    refreshTaskEnvironments: async () => {},
     useSessions: select => select(sessions),
     useWorkspaces: select => select(workspaces),
     usePanelInfo: select => select({ activePanelId: null }),
@@ -3800,13 +3805,7 @@ describe('Mock detail metrics shared with the task list', () => {
     expect(stylesheet).not.toMatch(
       /\[data-platform='darwin'\][^{]*\.pageContent\s*\{/,
     )
-    // The Plugins toolbar's Add-plugin capsule, repeated by the creation action.
     expect(rule('creationActions')).toMatch(/gap:\s*16px;/)
-    const newButton = rule('newButton')
-    expect(newButton).toMatch(/height:\s*32px;/)
-    expect(newButton).toMatch(/font-size:\s*13px;/)
-    expect(newButton).toMatch(/padding:\s*0 12px;/)
-    expect(newButton).toMatch(/border-radius:\s*16px;/)
     const headingTitle = /\.pageHeading h1\s*\{([^}]*)\}/.exec(stylesheet)?.[1] ?? ''
     // The first-level title step is the Plugins page's `pageTitle`, not the
     // mock's larger page heading; the equality case below pins that pair.

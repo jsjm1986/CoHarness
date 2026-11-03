@@ -1,0 +1,14 @@
+{
+  "name": "progress-live-access-built-complete",
+  "cwd": "gateway",
+  "command": "node tests/run-built-resource-admission.mjs",
+  "startedAt": "2026-10-23T23:14:29.909651+00:00",
+  "seconds": 2.563,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e9f20cf2eb00ac987114e803af19210b76a788c4dec149ce480d5e6e9cb4dda3",
+  "inputsAfter": "e9f20cf2eb00ac987114e803af19210b76a788c4dec149ce480d5e6e9cb4dda3",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "f1251ef62a2a67297459cd5179afc9f5c40f8ff6fd14175e7035de27633c4e88",
+  "outputTail": "{\"freshPressureRequired\":true,\"sharedCreditSpent\":true,\"cancellationBeforeAllocation\":true,\"activeAssignmentPreserved\":true}\n{\"compiledGatewayModel\":true,\"kernelOwnerLoaded\":true,\"waitedForNodeGrant\":true,\"exactRequestEvidence\":true,\"sessionFormatReconstruction\":true,\"liveAccessCancellation\":true,\"deploymentHeaders\":true,\"harnessAttribution\":true,\"disjointTokenTotal\":17,\"releasedAfterCompletion\":true}\n"
+}

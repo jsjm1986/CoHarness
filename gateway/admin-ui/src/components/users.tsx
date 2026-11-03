@@ -1,10 +1,13 @@
 /** Shared user identity, state badges, instance controls, and account dialogs. */
+import { usePendingEdits } from '../pending-edits.tsx'
 import { Play, RefreshCw, Square } from 'lucide-react'
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { controlInstance, type AdminUser } from '../api.ts'
 import { adminLanguage, translateCopy } from '../language.ts'
-import { Button, ConfirmDialog, Dialog, Field, IconButton, StatusBadge, Switch } from './ui.tsx'
+import { Button, ConfirmDialog, Dialog, ErrorBanner, Field, IconButton, StatusBadge, Switch } from './ui.tsx'
 import { zh, en } from './users.copy.ts'
+import { instanceStateLabel } from './instance-state-label.ts'
 
 export type UserRole = AdminUser['role']
 
@@ -39,15 +42,8 @@ export function AccountBadge({ status }: { status: AdminUser['status'] }) {
 }
 
 export function InstanceState({ state }: { state: string }) {
-  const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
-  const labels: Record<string, string> = {
-    ready: t('stateReady'),
-    starting: t('stateStarting'),
-    stopping: t('stateStopping'),
-    stopped: t('stateStopped'),
-  }
   const tone = state === 'ready' ? 'success' : state === 'starting' ? 'info' : state === 'stopping' ? 'warning' : 'neutral'
-  return <StatusBadge tone={tone}>{labels[state] ?? state}</StatusBadge>
+  return <StatusBadge tone={tone}>{instanceStateLabel(state)}</StatusBadge>
 }
 
 export function InstanceCell({ user, pending, run }: { user: AdminUser; pending: string; run: UserActionRunner }) {
@@ -62,6 +58,7 @@ export function InstanceCell({ user, pending, run }: { user: AdminUser; pending:
 export function InstanceControls({ user, pending, run }: { user: AdminUser; pending: string; run: UserActionRunner }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   const busy = pending.startsWith(`instance:${user.id}:`)
+  if ((user.runtimeCount ?? 1) > 1) return <Link className="backLink" to={`/users/${user.id}`}>{t('multipleRuntimes', { count: String(user.runtimeCount) })}</Link>
   return (
     <div className="compactActions" aria-label={t('instanceActionsAria', { name: user.username })}>
       <IconButton
@@ -107,14 +104,16 @@ export const EMPTY_USER_DRAFT: UserDraft = {
   role: 'user',
 }
 
-export function UserCreateDialog({ open, pending, onSubmit, onClose }: {
+export function UserCreateDialog({ open, pending, error = '', onSubmit, onClose }: {
   open: boolean
   pending: boolean
+  error?: string
   onSubmit: (draft: UserDraft) => void
   onClose: () => void
 }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   const [draft, setDraft] = useState<UserDraft>(EMPTY_USER_DRAFT)
+  usePendingEdits(open && (pending || JSON.stringify(draft) !== JSON.stringify(EMPTY_USER_DRAFT)))
   useEffect(() => { if (open) setDraft(EMPTY_USER_DRAFT) }, [open])
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -133,6 +132,7 @@ export function UserCreateDialog({ open, pending, onSubmit, onClose }: {
         </>
       )}
     >
+      <ErrorBanner message={error} />
       <form id="create-user-form" className="formGrid" onSubmit={submit}>
         <Field label={t('fieldUsername')} hint={t('hintUsername')}>
           <input className="input" required autoComplete="off" value={draft.username} onChange={event => setDraft({ ...draft, username: event.target.value })} />
@@ -154,9 +154,10 @@ export function UserCreateDialog({ open, pending, onSubmit, onClose }: {
   )
 }
 
-export function UserEditDialog({ user, pending, onSubmit, onClose }: {
+export function UserEditDialog({ user, pending, error = '', onSubmit, onClose }: {
   user: AdminUser | null
   pending: boolean
+  error?: string
   onSubmit: (patch: { displayName?: string; role?: UserRole; autoReviewEligible?: boolean }) => void
   onClose: () => void
 }) {
@@ -164,6 +165,7 @@ export function UserEditDialog({ user, pending, onSubmit, onClose }: {
   const [name, setName] = useState('')
   const [role, setRole] = useState<UserRole>('user')
   const [eligible, setEligible] = useState(false)
+  usePendingEdits(user !== null && (pending || name !== user.displayName || role !== user.role || eligible !== user.autoReviewEligible))
   useEffect(() => {
     if (user === null) return
     setName(user.displayName)
@@ -192,6 +194,7 @@ export function UserEditDialog({ user, pending, onSubmit, onClose }: {
         </>
       )}
     >
+      <ErrorBanner message={error} />
       <form id="edit-user-form" className="formGrid" onSubmit={submit}>
         <Field label={t('fieldDisplayName')}>
           <input className="input" value={name} onChange={event => setName(event.target.value)} />
@@ -211,14 +214,16 @@ export function UserEditDialog({ user, pending, onSubmit, onClose }: {
   )
 }
 
-export function UserPasswordDialog({ user, pending, onSubmit, onClose }: {
+export function UserPasswordDialog({ user, pending, error = '', onSubmit, onClose }: {
   user: AdminUser | null
   pending: boolean
+  error?: string
   onSubmit: (password: string) => void
   onClose: () => void
 }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   const [password, setPassword] = useState('')
+  usePendingEdits(user !== null && (pending || password !== ''))
   useEffect(() => { if (user !== null) setPassword('') }, [user])
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -237,6 +242,7 @@ export function UserPasswordDialog({ user, pending, onSubmit, onClose }: {
         </>
       )}
     >
+      <ErrorBanner message={error} />
       <form id="reset-password-form" onSubmit={submit}>
         <Field label={t('fieldNewPassword')}>
           <input className="input" required autoFocus type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} />
@@ -246,9 +252,10 @@ export function UserPasswordDialog({ user, pending, onSubmit, onClose }: {
   )
 }
 
-export function UserDisableConfirm({ user, pending, onConfirm, onClose }: {
+export function UserDisableConfirm({ user, pending, error = '', onConfirm, onClose }: {
   user: AdminUser | null
   pending: boolean
+  error?: string
   onConfirm: () => void
   onClose: () => void
 }) {
@@ -260,15 +267,17 @@ export function UserDisableConfirm({ user, pending, onConfirm, onClose }: {
       description={t('disableDescription', { name: user?.username ?? '' })}
       confirmLabel={t('disableConfirm')}
       pending={pending}
+      error={error}
       onClose={() => { if (!pending) onClose() }}
       onConfirm={onConfirm}
     />
   )
 }
 
-export function UserDeleteConfirm({ user, pending, onConfirm, onClose }: {
+export function UserDeleteConfirm({ user, pending, error = '', onConfirm, onClose }: {
   user: AdminUser | null
   pending: boolean
+  error?: string
   onConfirm: () => void
   onClose: () => void
 }) {
@@ -280,6 +289,7 @@ export function UserDeleteConfirm({ user, pending, onConfirm, onClose }: {
       description={t('deleteDescription', { name: user?.username ?? '' })}
       confirmLabel={t('deleteConfirm')}
       pending={pending}
+      error={error}
       onClose={() => { if (!pending) onClose() }}
       onConfirm={onConfirm}
     />

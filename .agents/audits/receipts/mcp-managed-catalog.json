@@ -1,0 +1,13 @@
+{
+  "name": "mcp-managed-catalog",
+  "cwd": ".",
+  "command": "pnpm run gen-cordis-catalog",
+  "startedAt": "2026-10-23T16:40:30.305076+00:00",
+  "seconds": 13.614,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d65166e10fd16c0ee95d87877c2c719e55e42ac9e6bdda3f2f3151274b2452c8",
+  "inputsAfter": "d65166e10fd16c0ee95d87877c2c719e55e42ac9e6bdda3f2f3151274b2452c8",
+  "outputSha256": "903884dbb31be5c656a3e138117d7c859dedd2fe9f95cdef52de5b569aff327b",
+  "outputTail": "$ tsx scripts/gen-cordis-catalog.ts\ngen-cordis-catalog: 127 artifact(s) computed, 0 written.\n"
+}

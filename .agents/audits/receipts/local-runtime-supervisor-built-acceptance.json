@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-supervisor-built-acceptance",
+  "cwd": "gateway",
+  "command": "node tests/run-built-local-supervision.mjs",
+  "startedAt": "2026-10-24T19:15:02.504905+00:00",
+  "seconds": 2.373,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3c4e67c3b11251973bc0397e5db4dc7768549db2eb92d17a9dfadc216763a389",
+  "inputsAfter": "3c4e67c3b11251973bc0397e5db4dc7768549db2eb92d17a9dfadc216763a389",
+  "postgresToolDirectory": null,
+  "outputSha256": "740800bde16b81fc129699da5c6c2807c846eed004db589bac2b76f9f69be388",
+  "outputTail": "file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/local-runtime-owner.js:246\n                throw new Error('Local runtime generation is already fenced');\n                      ^\n\nError: Local runtime generation is already fenced\n    at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/local-runtime-owner.js:246:23\n    at async file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/local-runtime-owner.js:281:87\n\nNode.js v25.8.1\n"
+}

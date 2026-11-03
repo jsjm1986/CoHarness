@@ -1,0 +1,14 @@
+{
+  "name": "native-model-public-nodenext",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-node-next-types.ts",
+  "startedAt": "2026-10-24T07:38:02.503110+00:00",
+  "seconds": 6.738,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "inputsAfter": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "postgresToolDirectory": null,
+  "outputSha256": "c800a8b9d98b5ed389cd217c55af2f98a1d2b439ddf6beeba2448e4a63201eb8",
+  "outputTail": "verify-node-next-types: 363 workspace package declaration API(s) compile under NodeNext.\n"
+}

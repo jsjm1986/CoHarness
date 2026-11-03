@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-19-job-events.md
 document:
-  en: 70eb1665ded28309697fa0f49d6118b57ad1d37b
-  zh: 87ebb15794b7ce1b70d159665abc2b1b54f168d1
+  en: 1d9d3424c7311f5536aa69c6f05cf09a1a4196e3
+  zh: 9741cad85b2f9fe3783e9c2a4cf2e289f9cebae3
 /:
   en: 3d5a424ae7d7e46b
   zh: c22a8e4a62d8cc1a
@@ -24,8 +24,8 @@ document:
   en: e222e668c4004688
   zh: 73c8c66f00af2fa3
 /2026-10-19-job-events/verification:
-  en: 6b8cdb3ba962c272
-  zh: 463c64649f77c245
+  en: 75cc001ebc16fdad
+  zh: e298fa42cd93e01c
 /2026-10-19-job-events/dev-note:
   en: b75c8458928b72b9
   zh: 003ba4e17b4b5269

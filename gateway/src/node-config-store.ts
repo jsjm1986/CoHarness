@@ -7,10 +7,11 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { loadConfig, type GatewayConfig } from './config.ts'
 import { NODE_CONFIG_FIELDS, type NodeConfigurationIdentity, type NodeConfigurationOperation, type NodeConfigurationView, type NodeSettingValues } from './node-config-fields.ts'
+import type { Queryable } from './postgres/database.ts'
 
 /** Invalid input, identity mismatch or a concurrent configuration edit. */
 export class NodeConfigurationError extends Error {
-  constructor(readonly status: 400 | 409, message: string) { super(message) }
+  constructor(readonly status: 400 | 409 | 503, message: string, options?: ErrorOptions) { super(message, options) }
 }
 
 /** Stored desired/applied revisions; previous remains available while an apply is incomplete. */
@@ -28,8 +29,20 @@ export interface NodeConfigurationRecord extends NodeConfigurationIdentity {
 
 /** Database exclusion and generation capture supplied by the Gateway's deployment owner. */
 export interface NodeConfigurationMutationAuthority {
-  run<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T>
-  writeEpoch(): Promise<string>
+  /**
+   * Retain current administrator eligibility through a configuration read.
+   * @param actorUserId - server-authenticated administrator public id.
+   * @param operation - read using the retained transaction before it commits.
+   * @returns the read result.
+   */
+  authorize<T>(actorUserId: number, operation: (query: Queryable) => Promise<T>): Promise<T>
+  /**
+   * Exclude deployment data operations and retain administrator eligibility through publication.
+   * @param actorUserId - authenticated administrator; explicit undefined is reserved for trusted bootstrap.
+   * @param operation - file work with the lease signal, write epoch and query handle from that same leased connection.
+   * @returns the committed operation result.
+   */
+  run<T>(actorUserId: number | undefined, operation: (signal: AbortSignal, writeEpoch: () => Promise<string>, query: Queryable) => Promise<T>): Promise<T>
 }
 
 const MAX_CONFIG_BYTES = 1024 * 1024
@@ -101,6 +114,11 @@ export function nodeSettingsFromConfig(cfg: GatewayConfig, environment: NodeJS.P
     HGW_WEBHOOK_SECRET_KEY_FILE: cfg.webhookSecretKeyFile, HGW_DEFAULT_ENV_FILE: cfg.defaultEnvFile,
     HGW_INSTANCE_PORT_BASE: String(cfg.instancePortBase), HGW_IDLE_TIMEOUT_MS: String(cfg.idleTimeoutMs),
     HGW_RESOURCE_SAMPLE_MS: String(cfg.resourceBudget.sampleMs),
+    HGW_RUNTIME_REQUEST_TIMEOUT_MS: String(cfg.runtimeRequestTimeoutMs),
+    HGW_RUNTIME_CLEANUP_TIMEOUT_MS: String(cfg.runtimeCleanupTimeoutMs),
+    HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS: String(cfg.runtimeBrowserReadyTimeoutMs),
+    HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS: String(cfg.runtimeBrowserStreamTimeoutMs),
+    HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS: String(cfg.runtimeBrowserRpcTimeoutMs),
     HGW_RESOURCE_STALE_MS: String(cfg.resourceBudget.staleMs),
     HGW_RESOURCE_CPU_TARGET_PERCENT: String(cfg.resourceBudget.cpuTarget * 100),
     HGW_RESOURCE_EVENT_LOOP_TARGET_MS: String(cfg.resourceBudget.eventLoopTargetMs),
@@ -129,16 +147,22 @@ export function nodeSettingsFromConfig(cfg: GatewayConfig, environment: NodeJS.P
  */
 export async function readNodeConfiguration(file: string, environment: NodeJS.ProcessEnv): Promise<NodeConfigurationRecord | undefined> {
   let handle
-  try { handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW) } catch (error) {
+  try { handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK) } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
     throw error
   }
-  let value: unknown
-  try {
-    const info = await handle.stat()
-    if (!info.isFile() || info.size > MAX_CONFIG_BYTES || (info.mode & 0o077) !== 0) throw new NodeConfigurationError(409, 'node-configuration-file-must-be-private')
-    value = JSON.parse(await handle.readFile('utf8'))
-  } finally { await handle.close() }
+  await using reader = handle
+  const info = await reader.stat()
+  if (!info.isFile() || info.size > MAX_CONFIG_BYTES || (info.mode & 0o077) !== 0) throw new NodeConfigurationError(409, 'node-configuration-file-must-be-private')
+  const bytes = Buffer.alloc(MAX_CONFIG_BYTES + 1)
+  let length = 0
+  while (length < bytes.length) {
+    const { bytesRead } = await reader.read(bytes, length, bytes.length - length, null)
+    if (bytesRead === 0) break
+    length += bytesRead
+  }
+  if (length > MAX_CONFIG_BYTES) throw new NodeConfigurationError(409, 'node-configuration-file-must-be-private')
+  const value: unknown = JSON.parse(bytes.subarray(0, length).toString('utf8'))
   const row = object(value)
   if (row.version !== 1 || ['organizationId', 'nodeId', 'organizationSlug', 'nodeName'].some(key => typeof row[key] !== 'string' || row[key] === '')) throw new NodeConfigurationError(409, 'invalid-node-configuration-identity')
   const previous = row.previous === null ? null : object(row.previous)
@@ -174,25 +198,36 @@ export async function readNodeConfiguration(file: string, environment: NodeJS.Pr
  * Commit the private config file durably; the caller holds its deployment and file locks.
  * @param file - fixed private filename.
  * @param value - complete validated next record.
- * @param signal - lease lifetime; cancellation prevents publication.
+ * @param signal - lease lifetime; cancellation prevents unissued publication, while a rename already issued can commit.
  * @returns after file and containing directory have been flushed.
  */
 export async function writeNodeConfiguration(file: string, value: NodeConfigurationRecord, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted()
   await mkdir(dirname(file), { recursive: true, mode: 0o700 })
   const temporary = `${file}.${randomUUID()}.tmp`
+  let acquired = false, published = false
   try {
-    const handle = await open(temporary, 'wx', 0o600)
-    try {
+    {
+      await using handle = await open(temporary, 'wx', 0o600)
+      acquired = true
       await handle.writeFile(JSON.stringify(value, null, 2) + '\n')
       await handle.sync()
-    } finally { await handle.close() }
+    }
     signal?.throwIfAborted()
     await rename(temporary, file)
-    const directory = await open(dirname(file), 'r')
-    try { await directory.sync() } finally { await directory.close() }
+    published = true
+    {
+      await using directory = await open(dirname(file), 'r')
+      await directory.sync()
+    }
     signal?.throwIfAborted()
-  } finally { await rm(temporary, { force: true }) }
+  } catch (error) {
+    if (acquired && !published) {
+      try { await rm(temporary, { force: true }) }
+      catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Node configuration write and temporary cleanup failed') }
+    }
+    throw error
+  }
 }
 
 /**
@@ -237,7 +272,7 @@ export class NodeConfigurationStore {
     await mkdir(dirname(this.cfg.nodeConfigFile), { recursive: true, mode: 0o700 })
     const existing = await readNodeConfiguration(this.cfg.nodeConfigFile, this.environment)
     if (existing !== undefined) { this.assertIdentity(existing); return }
-    await this.authority.run(signal => withFileLock(this.cfg.nodeConfigFile, async () => {
+    await this.authority.run(undefined, signal => withFileLock(this.cfg.nodeConfigFile, async () => {
       const raced = await readNodeConfiguration(this.cfg.nodeConfigFile, this.environment)
       if (raced !== undefined) { this.assertIdentity(raced); return }
       // Database passwords remain in their existing private file, never this record.
@@ -259,9 +294,16 @@ export class NodeConfigurationStore {
     return record
   }
 
-  /** Return desired values together with the actual values of this serving process. */
-  async view(): Promise<NodeConfigurationView> {
-    const record = await this.read()
+  /**
+   * Read desired values together with the actual values of this serving process.
+   * @param actorUserId - authenticated current administrator.
+   * @returns the node-bound committed configuration view.
+   */
+  async view(actorUserId: number): Promise<NodeConfigurationView> {
+    return this.authority.authorize(actorUserId, async () => this.viewRecord(await this.read()))
+  }
+
+  private viewRecord(record: NodeConfigurationRecord): NodeConfigurationView {
     return { ...this.identity, revision: record.revision, runningRevision: this.runningRevision,
       appliedRevision: record.appliedRevision, desired: record.desired, effective: this.effective,
       operation: record.operation, configFile: this.cfg.nodeConfigFile }
@@ -272,20 +314,21 @@ export class NodeConfigurationStore {
    * @param identity - node and organization shown to the editor.
    * @param expectedRevision - revision read before editing.
    * @param values - untrusted settings payload.
+   * @param actorUserId - authenticated administrator retained through publication.
    * @returns the persisted candidate and unchanged effective values.
    */
-  async save(identity: NodeConfigurationIdentity, expectedRevision: number, values: unknown): Promise<NodeConfigurationView> {
+  async save(identity: NodeConfigurationIdentity, expectedRevision: number, values: unknown, actorUserId: number): Promise<NodeConfigurationView> {
     this.assertIdentity(identity)
     const desired = parseNodeSettingValues(values, this.environment)
-    await this.authority.run(signal => withFileLock(this.cfg.nodeConfigFile, async () => {
+    return this.authority.run(actorUserId, signal => withFileLock(this.cfg.nodeConfigFile, async () => {
       const record = await this.read()
       if (record.revision !== expectedRevision) throw new NodeConfigurationError(409, 'node-configuration-revision-conflict')
       if (record.operation?.status === 'pending' || record.operation?.status === 'applying') throw new NodeConfigurationError(409, 'node-configuration-apply-in-progress')
       record.revision += 1
       record.desired = desired
       await writeNodeConfiguration(this.cfg.nodeConfigFile, record, signal)
+      return this.viewRecord(record)
     }))
-    return this.view()
   }
 
   /**
@@ -297,14 +340,14 @@ export class NodeConfigurationStore {
    */
   async requestApply(identity: NodeConfigurationIdentity, expectedRevision: number, actor: number): Promise<NodeConfigurationView> {
     this.assertIdentity(identity)
-    await this.authority.run(signal => withFileLock(this.cfg.nodeConfigFile, async () => {
+    return this.authority.run(actor, (signal, writeEpoch) => withFileLock(this.cfg.nodeConfigFile, async () => {
       const record = await this.read()
       if (record.revision !== expectedRevision) throw new NodeConfigurationError(409, 'node-configuration-revision-conflict')
       if (record.operation?.status === 'pending' || record.operation?.status === 'applying') throw new NodeConfigurationError(409, 'node-configuration-apply-in-progress')
       if (record.revision === record.appliedRevision) throw new NodeConfigurationError(409, 'node-configuration-already-applied')
-      record.operation = { id: randomUUID(), revision: record.revision, writeEpoch: await this.authority.writeEpoch(), actor, status: 'pending', requestedAt: new Date().toISOString(), error: null }
+      record.operation = { id: randomUUID(), revision: record.revision, writeEpoch: await writeEpoch(), actor, status: 'pending', requestedAt: new Date().toISOString(), error: null }
       await writeNodeConfiguration(this.cfg.nodeConfigFile, record, signal)
+      return this.viewRecord(record)
     }))
-    return this.view()
   }
 }

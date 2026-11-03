@@ -1,0 +1,14 @@
+{
+  "name": "document-identity-directory-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/attachment/userdoc-local",
+  "startedAt": "2026-10-25T16:58:09.726733+00:00",
+  "seconds": 3.138,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8b543e79d24b1c1768902e2b9443229e4889cd4f10434c514d5c37e71ddbe8ca",
+  "inputsAfter": "8b543e79d24b1c1768902e2b9443229e4889cd4f10434c514d5c37e71ddbe8ca",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

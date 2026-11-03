@@ -1,0 +1,30 @@
+- region "Spreadsheet":
+  - region "Keyboard Shortcuts":
+    - heading "Keyboard Shortcuts" [level=2]
+    - list:
+      - listitem: "Toggle sheet focus lock: Shift, Control, F."
+      - listitem: "Select range: Shift, arrow keys."
+      - listitem: "Auto-fill selection down from first cell: Control or Meta key, D."
+      - listitem: "Auto-fill selection right from first cell: Control or Meta key, R."
+      - listitem: "Bold text: Control or Meta key, B."
+      - listitem: "Copy: Control or Meta key, C."
+      - listitem: "Paste: Control or Meta key, V."
+      - listitem: "Undo: Control or Meta key, Z."
+      - listitem: "Redo: Control or Meta key, Shift, Z."
+      - listitem: "Delete cell content: Delete or Backspace."
+      - listitem: "Confirm cell edit and move down: Enter."
+      - listitem: "Move right: Tab."
+      - listitem: "Move left: Shift, Tab."
+  - img:
+    - img
+  - complementary:
+    - text: A1
+    - textbox "Current cell input"
+  - main:
+    - alert: A. 1 key
+    - alert: A. 1 key. Sheet focus lock enabled.
+  - button "CSV"
+  - complementary "Zoom settings":
+    - button "Zoom out"
+    - text: 100%
+    - button "Zoom in"

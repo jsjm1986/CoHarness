@@ -1,0 +1,14 @@
+{
+  "name": "invitation-expiry-source-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/projects.spec.ts tests/apply-grants.spec.ts tests/users.spec.ts",
+  "startedAt": "2026-10-24T00:14:34.074402+00:00",
+  "seconds": 6.311,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "69bdf803b982bd54e913035f16b9b7691bd722432fbcfca02eebf600c0ce426e",
+  "inputsAfter": "69bdf803b982bd54e913035f16b9b7691bd722432fbcfca02eebf600c0ce426e",
+  "postgresToolDirectory": null,
+  "outputSha256": "b7a5be7451b3e3bf7fe15f49553a1c4c84d8eb9229f08bbaf324bd31c36cc1a2",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  36 passed (36)\n   Start at  08:14:36\n   Duration  3.68s (transform 2.56s, setup 0ms, import 3.17s, tests 6.45s, environment 0ms)\n\n"
+}

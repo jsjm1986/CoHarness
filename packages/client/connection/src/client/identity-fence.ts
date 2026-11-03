@@ -1,5 +1,5 @@
 /** One browser document's authenticated Gateway identity and request lifetime. */
-import type { ClientRuntimeTarget } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { addressRuntimeUrl, runtimeTargetKey, type ClientRuntimeTarget } from '@deepseek-ai/dsh-host-apiproxy/api'
 
 const RESPONSE_ID = 'x-dsh-principal-id'
 const EXPECTED_ID = 'x-dsh-expected-principal-id'
@@ -32,12 +32,14 @@ export interface BrowserIdentityFence {
  * @param fetcher - original browser fetch, before installing the returned wrapper.
  * @param origin - this document's same-origin Gateway authority.
  * @param reload - complete Client replacement after cleanup, supplied by the page owner.
+ * @param search - this document's explicit Runtime selector, retained before its first handshake.
  * @returns one fence shared by every pooled runtime connection.
  */
-export function createBrowserIdentityFence(fetcher: typeof fetch, origin: string, reload: () => void): BrowserIdentityFence {
+export function createBrowserIdentityFence(fetcher: typeof fetch, origin: string, reload: () => void, search = ''): BrowserIdentityFence {
   let principal: number | undefined
   let invalid = false
-  let runtime: string | undefined
+  let runtime: ClientRuntimeTarget | undefined
+  const bootstrap = new URLSearchParams(search)
   let runtimeKnown = false
   const runtimeReady = Promise.withResolvers<undefined>()
   const lifetime = new AbortController()
@@ -71,7 +73,13 @@ export function createBrowserIdentityFence(fetcher: typeof fetch, origin: string
   const scopeSensitive = (url: URL): boolean => url.pathname === '/api' || url.pathname.startsWith('/api/')
     || ['/account/api/context', '/account/api/workbench/catalog', '/account/api/usage', '/account/api/activity'].includes(url.pathname)
   const pinRuntime = (url: URL): void => {
-    if (runtime !== undefined && !url.searchParams.has('dshTarget') && scopeSensitive(url)) url.searchParams.set('dshTarget', runtime)
+    if (!scopeSensitive(url) || url.searchParams.has('dshRuntime') || url.searchParams.has('dshTarget')
+      || url.pathname.startsWith('/api/documents') && url.searchParams.has('dshNode')) return
+    if (runtime !== undefined) addressRuntimeUrl(url, runtime)
+    else for (const key of ['dshRuntime', 'dshTarget']) {
+      const value = bootstrap.get(key)
+      if (value !== null) url.searchParams.set(key, value)
+    }
   }
   const fencedFetch: typeof fetch = async (input, init) => {
     const request = typeof input !== 'string' && 'url' in input ? input : undefined
@@ -86,7 +94,8 @@ export function createBrowserIdentityFence(fetcher: typeof fetch, origin: string
     const suppliedSignal = init?.signal ?? request?.signal
     const signal = suppliedSignal === undefined ? lifetime.signal
       : AbortSignal.any([lifetime.signal, suppliedSignal])
-    if (url.pathname !== '/api/host.describe' && scopeSensitive(url) && !url.searchParams.has('dshTarget')) {
+    if (url.pathname !== '/api/host.describe' && scopeSensitive(url) && !url.searchParams.has('dshTarget')
+      && !url.searchParams.has('dshRuntime') && !url.searchParams.has('dshNode')) {
       await waitFor(runtimeReady.promise, signal)
     }
     if (principal !== undefined) headers.set(EXPECTED_ID, String(principal))
@@ -112,10 +121,13 @@ export function createBrowserIdentityFence(fetcher: typeof fetch, origin: string
     invalidate,
     setRuntimeTarget: (target) => {
       lifetime.signal.throwIfAborted()
-      const selected = target === undefined ? undefined : target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`
-      if (runtimeKnown && selected !== runtime) { invalidate(); throw new BrowserIdentityChanged() }
+      const selected = target === undefined ? undefined : runtimeTargetKey(target)
+      if (runtimeKnown && selected !== (runtime === undefined ? undefined : runtimeTargetKey(runtime))
+        || bootstrap.has('dshRuntime') && target?.runtimeId !== bootstrap.get('dshRuntime')) {
+        invalidate(); throw new BrowserIdentityChanged()
+      }
       runtimeKnown = true
-      runtime = selected
+      runtime = target
       runtimeReady.resolve(undefined)
     },
     subscribe: (cleanup) => { cleanups.add(cleanup); return () => { cleanups.delete(cleanup) } },

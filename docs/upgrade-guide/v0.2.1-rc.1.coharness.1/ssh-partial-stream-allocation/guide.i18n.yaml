@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-partial-stream-allocation/guide.md
+document:
+  en: 5784a7ad3a10617d306a16bb7875cd6e63c64e41
+  zh: ff5598b9bca99860c2eb88ceb8b6ab8bf7e6bea3
+/:
+  en: 28d1837517b59f81
+  zh: 112fac46e2d14d3e
+/failed-ssh-startup-waits-for-all-stream-attempts:
+  en: 09e35d128a46090d
+  zh: e234814f05221226
+/failed-ssh-startup-waits-for-all-stream-attempts/change:
+  en: 92ae4cdf06c6253a
+  zh: 28b7608c05108002
+/failed-ssh-startup-waits-for-all-stream-attempts/migration:
+  en: 43e74c317cb840e1
+  zh: d33aa1a2372a6796

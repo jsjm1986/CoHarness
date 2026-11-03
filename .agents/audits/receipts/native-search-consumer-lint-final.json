@@ -1,0 +1,14 @@
+{
+  "name": "native-search-consumer-lint-final",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/web/web-search-deepseek/src/admission.ts packages/web/web-search-deepseek/src/index.ts packages/web/web-search-deepseek/tests/admission.spec.ts packages/web/web-search-deepseek/tests/settings.spec.ts scripts/coverage-baseline.ts snapshots/session/web-search-endpoint-guidance/web-search-error-fixture.mjs",
+  "startedAt": "2026-10-24T04:00:54.499514+00:00",
+  "seconds": 13.368,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c7a4d1c2697392c80ccdfbd4fc98523c23f584d721747b5a767e3f4731829bd2",
+  "inputsAfter": "c7a4d1c2697392c80ccdfbd4fc98523c23f584d721747b5a767e3f4731829bd2",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

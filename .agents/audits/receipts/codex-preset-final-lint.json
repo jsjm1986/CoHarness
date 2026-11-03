@@ -1,0 +1,14 @@
+{
+  "name": "codex-preset-final-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/subagent/subagent-codex/src/index.ts packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts packages/subagent/subagent-codex/tests/managed-ssh-loader.spec.ts packages/subagent/subagent-codex/tests/fixtures/managed-ssh-driver.mjs packages/preset/agent-preset-registry/src/index.ts packages/preset/agent-preset-registry/tests/declared.spec.ts",
+  "startedAt": "2026-10-25T14:22:18.702587+00:00",
+  "seconds": 9.905,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bb682403b9f5b7b60ed3fc7f315bde7b84477f1ef6c80cfb7cedf39aeb5e3cb3",
+  "inputsAfter": "bb682403b9f5b7b60ed3fc7f315bde7b84477f1ef6c80cfb7cedf39aeb5e3cb3",
+  "postgresToolDirectory": null,
+  "outputSha256": "e8039ad153639b7d8fdb2c666df37bf09d57efb26425e5387088478b4833adbf",
+  "outputTail": "packages/preset/agent-preset-registry/tests/declared.spec.ts:170:20: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/preset/agent-preset-registry/tests/declared.spec.ts:202:20: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/preset/agent-preset-registry/tests/declared.spec.ts:220:20: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/preset/agent-preset-registry/tests/declared.spec.ts:236:20: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/preset/agent-preset-registry/tests/declared.spec.ts:238:14: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/preset/agent-preset-registry/tests/declared.spec.ts:252:101: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/preset/agent-preset-registry/src/index.ts:961:58: error typescript(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`. help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.\n"
+}

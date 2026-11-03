@@ -1,0 +1,14 @@
+{
+  "name": "account-invitation-doc-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.md .agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md gateway/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.md",
+  "startedAt": "2026-10-24T00:16:58.308701+00:00",
+  "seconds": 2.806,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "91a75fada67c0403d285d9387be525b3a0a6300ba4c7996d8e578f2fcf2cb768",
+  "inputsAfter": "80e56f754d30746ae80f4300312c676d56b7a38b440e72b94fd0113e5d472442",
+  "postgresToolDirectory": null,
+  "outputSha256": "37dab9de4dda79c7d313605a8635fe741c97f557a300f36e0c818d9b6ea10dd9",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.md .agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md gateway/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.md\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 4 record(s) written; run the check to validate the pairs.\n"
+}

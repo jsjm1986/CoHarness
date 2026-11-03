@@ -1,0 +1,14 @@
+{
+  "name": "conversation-steward-http-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-service-postgres.spec.ts tests/steward.spec.ts tests/postgres.spec.ts tests/admin-business-postgres.spec.ts tests/access-invalidation.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-24T00:39:34.651971+00:00",
+  "seconds": 24.235,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "26d02a96689b6b7a59e6b4de92379dfa56459b1edee3eaa0b0b23e0c3f8dfde0",
+  "inputsAfter": "26d02a96689b6b7a59e6b4de92379dfa56459b1edee3eaa0b0b23e0c3f8dfde0",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "16541e9f8acc47b5b0c53fb7c449ab61db058428d5c6a53e017ef1f7f2fa3e1f",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  5 passed (5)\n      Tests  146 passed (146)\n   Start at  08:39:35\n   Duration  23.08s (transform 1.99s, setup 0ms, import 3.10s, tests 19.50s, environment 0ms)\n\n"
+}

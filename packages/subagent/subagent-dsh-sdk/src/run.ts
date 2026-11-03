@@ -25,9 +25,14 @@ import type { SessionEvent, SessionId, TurnEndReason } from '@deepseek-ai/dsh-se
 import type { SubagentResult, SubagentRun, SubagentStartRequest, SubagentStopReason } from '@deepseek-ai/dsh-subagent'
 import { AssistantOutputFold, settleRunResult, subprocessRunHandle } from '@deepseek-ai/dsh-subagent'
 import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'
+import type { ResourceLease } from '@deepseek-ai/dsh-resource-budget'
 
 /** Resolved spawn spec for an SDK runtime child process (no defaults — see Config). */
 export interface SdkRunSpec {
+  /** Synchronous owner check before native startup, first turn dispatch and publication. */
+  assertOwnership?: () => void
+  /** Managed parent verification after the SDK handshake and before publication. */
+  onInitialized?: () => void
   /** Explicit dsh CLI module; omission resolves the SDK client's same-version dependency. */
   dshBin?: string
   /** Named child profile. */
@@ -82,6 +87,25 @@ export const DEFAULT_DISPOSE_GRACE_MS = 3_000
 
 /** Default bound on the protocol `shutdown` exchange during dispose. */
 export const DEFAULT_SHUTDOWN_TIMEOUT_MS = 1_000
+
+/** A rejected unpublished SDK start retains its original cleanup owner. */
+export class SdkStartupCleanupError extends AggregateError {
+  private completion: Promise<void> | undefined
+
+  /** @param failure - original startup and cleanup failures. @param rollback - original process and accounting cleanup. */
+  constructor(failure: Error, private readonly rollback: () => Promise<void>) {
+    super(failure instanceof AggregateError ? failure.errors : [failure], failure.message, { cause: failure })
+    this.name = 'SdkStartupCleanupError'
+  }
+
+  /** Retry retained cleanup without reallocating the child. @returns acknowledged cleanup, shared while pending and after success. */
+  cleanup(): Promise<void> {
+    return this.completion ??= Promise.resolve().then(() => this.rollback()).catch((error: unknown) => {
+      this.completion = undefined
+      throw error
+    })
+  }
+}
 
 type SdkFailureStage = 'initialize' | 'session-run' | 'shutdown'
 
@@ -224,38 +248,67 @@ function sdkStartupFailure(spec: SdkRunSpec, error: unknown): Error {
  * Start and publish one SDK runtime child after its `initialize` handshake.
  * Child failures resolve through the run result. Startup rejects with fixed
  * safe facts after SDK-owned cleanup; successful cleanup proves process reap.
- * Cleanup failure preserves initialize plus shutdown for an ordinary failure,
+ * Cleanup failure transfers retryable ownership through SdkStartupCleanupError
+ * and preserves initialize plus shutdown for an ordinary failure,
  * or shutdown alone after cancellation, without claiming quiescence. Disposal
  * shuts the runtime down and reaps it.
  * @param request - the start request; its signal is the cancellation channel.
  * @param spec - the resolved spawn spec: profile/patches/home/cwd, the child's
  * provider/model/reasoning route, output cap, env, timeouts, and the optional
  * error sink.
+ * @param admission - optional process permit transferred to this function, including failed startup cleanup.
  * @returns the ready run handle for the child subprocess.
+ * @throws SdkStartupCleanupError when rollback still owns a process, control endpoint or unacknowledged permit.
  */
-export async function startSdkRun(request: SubagentStartRequest, spec: SdkRunSpec): Promise<SubagentRun> {
-  if (request.signal.aborted) throw new Error('subagent request was aborted before the SDK child started')
+export async function startSdkRun(request: SubagentStartRequest, spec: SdkRunSpec, admission?: ResourceLease): Promise<SubagentRun> {
+  if (request.signal.aborted) {
+    const failure = new Error('subagent request was aborted before the SDK child started')
+    try { await admission?.release() } catch (cleanupError) {
+      throw new SdkStartupCleanupError(new AggregateError([failure, cleanupError], 'SDK cancelled startup and unused permit release failed.'),
+        async () => { await admission?.release() })
+    }
+    throw failure
+  }
   // The run id lives in the parent namespace; the child runtime's session id
   // (minted below, private to the wire) exists only inside the child process.
   const id = brandString<SessionId>(randomUUID())
 
-  const harness = internals.createHarness({
-    ...spec.dshBin === undefined ? {} : { dshBin: spec.dshBin },
-    profile: spec.profile,
-    patches: spec.patches,
-    dshHome: spec.dshHome,
-    processCwd: spec.cwd,
-    env: { ...scrubbedParentEnv(), ...spec.env },
-    initializeTimeoutMs: spec.initializeTimeoutMs,
-    shutdownTimeoutMs: spec.shutdownTimeoutMs,
-    disposeEofGraceMs: spec.disposeEofGraceMs,
-    disposeGraceMs: spec.disposeGraceMs,
-    cwd: spec.originCwd ?? spec.cwd,
-    provider: spec.provider,
-    model: spec.model,
-    ...spec.reasoningEffort === undefined ? {} : { reasoningEffort: spec.reasoningEffort },
-    ...spec.maxTokens === undefined ? {} : { maxTokens: spec.maxTokens },
-  })
+  let harness: DeepSeekHarness
+  try {
+    spec.assertOwnership?.()
+    harness = internals.createHarness({
+      ...spec.dshBin === undefined ? {} : { dshBin: spec.dshBin },
+      profile: spec.profile,
+      patches: spec.patches,
+      dshHome: spec.dshHome,
+      processCwd: spec.cwd,
+      env: { ...scrubbedParentEnv(), ...spec.env },
+      initializeTimeoutMs: spec.initializeTimeoutMs,
+      shutdownTimeoutMs: spec.shutdownTimeoutMs,
+      disposeEofGraceMs: spec.disposeEofGraceMs,
+      disposeGraceMs: spec.disposeGraceMs,
+      cwd: spec.originCwd ?? spec.cwd,
+      provider: spec.provider,
+      model: spec.model,
+      ...spec.reasoningEffort === undefined ? {} : { reasoningEffort: spec.reasoningEffort },
+      ...spec.maxTokens === undefined ? {} : { maxTokens: spec.maxTokens },
+    })
+  } catch (error: unknown) {
+    try { await admission?.release() } catch (releaseError: unknown) {
+      throw new SdkStartupCleanupError(new AggregateError([error, releaseError], 'SDK child construction and unused permit release failed.'),
+        async () => { await admission?.release() })
+    }
+    throw error
+  }
+  const closeOwned = async (): Promise<void> => {
+    try { await harness.close() } catch (error: unknown) {
+      try { await admission?.uncertain() } catch (accountingError: unknown) {
+        throw new AggregateError([error, accountingError], 'SDK child cleanup and uncertain accounting failed.')
+      }
+      throw error
+    }
+    await admission?.release()
+  }
 
   // Cancellation settles the result without waiting for a cooperative child.
   const flags = { cancelled: false }
@@ -273,6 +326,7 @@ export async function startSdkRun(request: SubagentStartRequest, spec: SdkRunSpe
   // Establish the child handshake before publishing a handle. Any failure
   // owns the still-private process and reaps it before rejecting.
   try {
+    spec.assertOwnership?.()
     await Promise.race([
       harness.start(),
       cancelSettled.then((): never => { throw cancelledStartup }),
@@ -282,20 +336,25 @@ export async function startSdkRun(request: SubagentStartRequest, spec: SdkRunSpe
     // so current callback ordering cannot schedule the recheck; it guards future reentrancy.
     /* v8 ignore next */
     if (flags.cancelled) throw cancelledStartup
+    spec.assertOwnership?.()
+    spec.onInitialized?.()
   } catch (error: unknown) {
     request.signal.removeEventListener('abort', onAbort)
-    if (error !== cancelledStartup) {
-      throw sdkStartupFailure(spec, error)
-    }
     try {
-      await harness.close()
+      await closeOwned()
     } catch (cleanupError: unknown) {
+      if (error !== cancelledStartup) {
+        const initializeError: unknown = error instanceof AggregateError ? error.errors[0] : error
+        throw new SdkStartupCleanupError(sdkStartupFailure(spec,
+          new AggregateError([initializeError, cleanupError], 'SDK child start and cleanup failed.')), closeOwned)
+      }
       reportFailure(spec, cleanupError)
       const cleanupFailure = new SdkRunFailure({ stage: 'shutdown', category: 'unknown' }, cleanupError)
       // Preserve failed cleanup as a failed Job; settleStart treats only an
       // aborted non-AggregateError rejection as a cleanly killed startup.
-      throw new AggregateError([cleanupFailure], cleanupFailure.message)
+      throw new SdkStartupCleanupError(new AggregateError([cleanupFailure], cleanupFailure.message), closeOwned)
     }
+    if (error !== cancelledStartup) throw sdkStartupFailure(spec, error)
     throw new Error('subagent request was aborted before the SDK child started')
   }
 
@@ -310,7 +369,7 @@ export async function startSdkRun(request: SubagentStartRequest, spec: SdkRunSpe
   const collectOutput = (): readonly ContentBlock[] => fold.collect() ?? []
   const teardown = async (): Promise<void> => {
     try {
-      await harness.close()
+      await closeOwned()
     } catch (error: unknown) {
       reportFailure(spec, error)
       throw new SdkRunFailure({ stage: 'shutdown', category: 'unknown' }, error)
@@ -326,6 +385,7 @@ export async function startSdkRun(request: SubagentStartRequest, spec: SdkRunSpe
         // The child session's origin is the parent's project root; move its
         // effective directory to the delegation-selected cwd before the turn.
         await harness.session(childSessionId).setWorkingDirectory(spec.cwd)
+        spec.assertOwnership?.()
         const turn = await Promise.race([
           harness.session(childSessionId).run(request.prompt, { onNotification: observe }),
           cancelSettled.then(() => 'cancelled' as const),

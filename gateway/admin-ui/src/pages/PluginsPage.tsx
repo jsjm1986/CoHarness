@@ -1,5 +1,8 @@
 /** Per-owner plugin management: one friendly plugin list over the shared composition, with the entry-level matrix folded below. */
+import { usePendingEdits, useProtectedNavigation } from '../pending-edits.tsx'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { RuntimePicker } from '../components/RuntimePicker.tsx'
+import type { RuntimeCatalogEntry } from '../api.ts'
 import { AdminRequestError, getPluginPolicy, listProjects, listUsers, pluginManagementOverview, pluginManagementTarget, setPluginPolicy, type AdminResourcePolicy, type PluginManagementOverviewRow, type PluginManagementTarget } from '../api.ts'
 import { ErrorBanner, Field, PageHeader, Button, LoadingState, Section, StatusBadge, Switch } from '../components/ui.tsx'
 import { adminLanguage } from '../language.ts'
@@ -63,6 +66,7 @@ function TargetPolicy({ kind, id, t }: { kind: 'user' | 'project'; id: number; t
   const [error, setError] = useState('')
   const [unavailable, setUnavailable] = useState(false)
   const [saving, setSaving] = useState(false)
+  usePendingEdits(saving || policy !== null && enabled !== policy.enabled)
   useEffect(() => {
     const abort = new AbortController()
     setPolicy(null); setError(''); setUnavailable(false)
@@ -107,6 +111,7 @@ function TargetPolicy({ kind, id, t }: { kind: 'user' | 'project'; id: number; t
 
 /** The startup draft shared by every control on the page, with its save and discard actions. */
 function DraftBar({ composition, t }: { readonly composition: PluginComposition; readonly t: Translate }) {
+  usePendingEdits(composition.persist && (composition.dirty || composition.busy))
   if (!composition.persist || !composition.dirty) return null
   return <div className="draftBar" role="status">
     <span className="draftBarText">{t('draftPending', { count: `${composition.pending}` })}</span>
@@ -172,6 +177,9 @@ export function PluginsPage() {
   const t = useMemo(() => translatePlugin(adminLanguage()), [])
   const [targets, setTargets] = useState<Array<{ key: string; kind: 'user' | 'project'; id: number; label: string }>>([])
   const [selected, setSelected] = useState('')
+  const navigation = useProtectedNavigation()
+  const [runtime, setRuntime] = useState<RuntimeCatalogEntry>()
+  const [runtimeAvailable, setRuntimeAvailable] = useState(false)
   const [binding, setBinding] = useState<PluginManagementTarget | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -191,35 +199,38 @@ export function PluginsPage() {
   }, [reload, t])
   useEffect(() => {
     const target = targets.find(item => item.key === selected)
-    if (target === undefined) return
+    if (target === undefined || runtime === undefined || runtime.owner.id !== target.id || runtime.owner.kind !== (target.kind === 'user' ? 'personal' : 'project')) return
     const attempt = ++generation.current, abort = new AbortController()
     setLoading(true); setBinding(null); setError('')
-    void pluginManagementTarget(target.kind, target.id, abort.signal).then(value => {
+    void pluginManagementTarget(target.kind, target.id, abort.signal, runtime.id).then(value => {
       if (attempt !== generation.current) return
-      if (value.target.kind !== target.kind || value.target.id !== target.id) throw new Error(t('targetMismatch'))
+      if (value.target.kind !== target.kind || value.target.id !== target.id || value.target.runtimeId !== runtime.id) throw new Error(t('targetMismatch'))
       setBinding(value)
     }).catch(cause => { if (attempt === generation.current) setError(String(cause)) })
       .finally(() => { if (attempt === generation.current) setLoading(false) })
     return () => { generation.current++; abort.abort() }
-  }, [selected, targets, t])
+  }, [selected, targets, runtime, t])
   return <div className="page">
     <PageHeader title={t('title')} description={t('pageDescription')} />
-    <SpacesOverview t={t} onPick={key => { generation.current++; setBinding(null); setSelected(key) }} />
+    <SpacesOverview t={t} onPick={key => { if (!navigation.canReplace()) return; generation.current++; setBinding(null); setRuntime(undefined); setSelected(key) }} />
     <Section title={t('targetSection')}>
       <ErrorBanner message={error} />
       <div className="targetPicker">
         <Field label={t('targetField')}><select className="select" aria-label={t('targetAria')} value={selected} onChange={event => {
-          generation.current++; setBinding(null); setSelected(event.target.value)
+          if (!navigation.canReplace()) return
+          generation.current++; setBinding(null); setRuntime(undefined); setSelected(event.target.value)
         }}><option value="">{t('targetPlaceholder')}</option>{targets.map(target => <option key={target.key} value={target.key}>{target.label}</option>)}</select></Field>
-        <Button onClick={() => { setBinding(null); setReload(value => value + 1) }}>{t('pageReload')}</Button>
+        <Button onClick={() => { if (!navigation.canReplace()) return; setBinding(null); setReload(value => value + 1) }}>{t('pageReload')}</Button>
       </div>
+      {targets.find(item => item.key === selected) === undefined ? null : <RuntimePicker key={selected} owner={targets.find(item => item.key === selected)!} value={runtime} onAvailabilityChange={setRuntimeAvailable}
+        onSelect={value => { generation.current++; setBinding(null); setRuntime(value) }} />}
       {loading ? <LoadingState label={t('targetLoading')} /> : null}
       {binding === null ? null : <p className="muted">
         {binding.generation === null ? t('instanceStopped') : t('instanceRunning', { generation: `${binding.generation}` })}
       </p>}
       {binding === null ? null : <TargetPolicy kind={binding.target.kind} id={binding.target.id} t={t} />}
     </Section>
-    {binding === null ? null : <BoundPlugins key={`${binding.target.kind}:${binding.target.id}:${binding.generation ?? 'stopped'}`} binding={binding} invalidate={invalidate} t={t} />}
+    {binding === null ? null : <div className="adminRouteContent" inert={!runtimeAvailable || undefined} aria-disabled={!runtimeAvailable || undefined}><BoundPlugins key={`${binding.target.kind}:${binding.target.id}:${binding.generation ?? 'stopped'}`} binding={binding} invalidate={invalidate} t={t} /></div>}
     <PluginPermissions />
   </div>
 }

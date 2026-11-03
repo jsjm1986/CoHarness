@@ -27,6 +27,8 @@ kind: "package-reference"
 
 在 Web profile 中组合本插件；它注册 `remoteDesktop` 侧边栏标签类型。调用方通过 `openTabIn(sessionId, 'remoteDesktop', { params: { nodeId, desktop? } })` 打开标签页。
 
+端点不可用时，标签页在确认、挂接或启动 RFB 之前停止。提示说明图形桌面与 VNC 前提，并允许明确重试状态读取。提供服务的节点本身没有 GUI 时，已配置的外部 VNC 目标仍可使用。
+
 标签页经 `ctx.remoteDesktops` 读取端点状态。当调用方的授权集尚未获得确认时，卡片标明确切级别——**仅查看**或**可操控**——以及管理员开启录制时的录制标志；**确认并连接**记录确认并完成挂载。当确认已覆盖授权时，标签页直接挂载。拒绝会以稳定能力码呈现本地化提示并提供**重试**。存活的附件显示有效级别并提供**断开连接**；已关闭的流提供**重新连接**，按已记录的确认重走 status → attach 流程。
 
 <a id="understand-the-implementation"></a>

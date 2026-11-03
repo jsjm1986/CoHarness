@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-integration-lint",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-gateway packages/host/userdoc-http/tests/loader-composition.spec.ts packages/goal/goal/src/index.ts packages/core/agent/tests/agent.spec.ts packages/core/session/tests/session.spec.ts packages/jobs/jobs/tests/archive-admission.spec.ts packages/subagent/subagent/tests/archive-admission.spec.ts packages/subagent/subagent/tests/continuation.spec.ts packages/subagent/subagent/tests/service.spec.ts packages/subagent/tool-subagent/tests/tool-subagent.spec.ts gateway/src/documents-local.ts scripts/check-workspace-constraints.ts scripts/check-workspace-constraints.spec.ts",
+  "startedAt": "2026-10-26T18:13:12.171265+00:00",
+  "seconds": 10.386,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3bbabf8baa483466d9d1ee306127586101cfbd1bb8254c7a6926e0059755a301",
+  "inputsAfter": "3bbabf8baa483466d9d1ee306127586101cfbd1bb8254c7a6926e0059755a301",
+  "postgresToolDirectory": null,
+  "outputSha256": "ff25ffa11d18aa88b914a997fdc59ffdf6253dba2679dba82f6b25f10d5c7a69",
+  "outputTail": "packages/attachment/userdoc-gateway/src/index.ts:121:24: error typescript(no-non-null-assertion): Forbidden non-null assertion.\npackages/jobs/jobs/tests/archive-admission.spec.ts:119:29: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\npackages/subagent/subagent/tests/archive-admission.spec.ts:33:27: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\npackages/subagent/subagent/tests/service.spec.ts:85:29: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\npackages/subagent/tool-subagent/tests/tool-subagent.spec.ts:928:29: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\npackages/subagent/subagent/tests/continuation.spec.ts:788:29: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\npackages/subagent/subagent/tests/continuation.spec.ts:844:29: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "progress-live-access-revocation-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-progress-postgres.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-23T23:06:51.417156+00:00",
+  "seconds": 14.067,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "597ec875983664fc726ab7d9bf3c71f6bb56245e7229c92d05970c9e055ff9eb",
+  "inputsAfter": "597ec875983664fc726ab7d9bf3c71f6bb56245e7229c92d05970c9e055ff9eb",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "ebbe7a322178960d5263ba3555049a55aa0b68831327c804202949e4a76bd46a",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  22 passed (22)\n   Start at  07:06:54\n   Duration  11.35s (transform 1.55s, setup 0ms, import 1.90s, tests 9.32s, environment 0ms)\n\n"
+}

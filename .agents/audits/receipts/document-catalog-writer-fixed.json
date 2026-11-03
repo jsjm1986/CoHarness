@@ -1,0 +1,14 @@
+{
+  "name": "document-catalog-writer-fixed",
+  "cwd": "gateway",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 ../node_modules/.bin/vitest run tests/documents-local.spec.ts -t 'counts read-driven|keeps initialized listings|retains an accepted mutation catalog'",
+  "startedAt": "2026-10-26T20:59:54.175218+00:00",
+  "seconds": 4.343,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cf537dff3c32758daf49e943c85a21d161408b81f5318837c9c060ad1bfb067c",
+  "inputsAfter": "cf537dff3c32758daf49e943c85a21d161408b81f5318837c9c060ad1bfb067c",
+  "postgresToolDirectory": null,
+  "outputSha256": "1a6f8470332a801b87b035ecb62aee4d456f4d44354abace05baa4268222b1ef",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/documents-local.spec.ts (29 tests | 1 failed | 26 skipped) 64ms\n     × retains an accepted mutation catalog write while it waits behind an older listing 27ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/documents-local.spec.ts > Gateway local document broker > retains an accepted mutation catalog write while it waits behind an older listing\nAssertionError: expected \"vi.fn()\" to be called 3 times, but got 4 times\n ❯ tests/documents-local.spec.ts:344:28\n    342|       release.resolve(undefined)\n    343|       await broker.dispose()\n    344|       expect(catalog.sync).toHaveBeenCalledTimes(3)\n       |                            ^\n    345|       expect(admission.active).toBe(0)\n    346|     } finally {\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 2 passed | 26 skipped (29)\n   Start at  04:59:56\n   Duration  1.51s (transform 1.06s, setup 0ms, import 1.31s, tests 64ms, environment 0ms)\n\n"
+}

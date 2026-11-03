@@ -168,6 +168,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { grantArgs, launcherPath, probe } from '@deepseek-ai/node-addon-system/landlock-run';
 import { tryLockExclusive } from '@deepseek-ai/node-addon-system/flock';
+import { DirectoryHandle } from '@deepseek-ai/node-addon-system/directory';
 
 await assert.rejects(import('@deepseek-ai/node-addon-system'), {
   code: 'ERR_PACKAGE_PATH_NOT_EXPORTED',
@@ -227,6 +228,27 @@ if (process.platform === 'linux' || process.platform === 'darwin') {
   } finally {
     for (const fd of handles) fs.closeSync(fd);
     fs.rmSync(lockRoot, { recursive: true, force: true });
+  }
+  const directoryRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'native-system-directory-')));
+  let directory;
+  try {
+    const owned = path.join(directoryRoot, 'owned'), foreign = path.join(directoryRoot, 'foreign'), retained = path.join(directoryRoot, 'retained');
+    fs.mkdirSync(owned); fs.mkdirSync(foreign); fs.mkdirSync(path.join(owned, 'permitted'));
+    directory = await DirectoryHandle.open(owned);
+    const volume = await directory.volumeIdentity();
+    if (process.platform === 'darwin') assert.ok(volume === undefined || /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(volume));
+    else assert.equal(volume, undefined);
+    fs.renameSync(owned, retained); fs.symlinkSync(foreign, owned);
+    assert.equal(await directory.volumeIdentity(), volume);
+    assert.deepEqual((await directory.read(16)).map(entry => entry.name), ['permitted']);
+    await directory.createDirectory('created');
+    assert.ok(fs.statSync(path.join(retained, 'created')).isDirectory());
+    assert.equal(fs.existsSync(path.join(foreign, 'created')), false);
+    await assert.rejects(DirectoryHandle.open(owned), error => ['ELOOP', 'ENOTDIR'].includes(error.code));
+    console.log('installed Node-API directory: retained-object listing and creation verified');
+  } finally {
+    await directory?.close();
+    fs.rmSync(directoryRoot, { recursive: true, force: true });
   }
 }
 `);

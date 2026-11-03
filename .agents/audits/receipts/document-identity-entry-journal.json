@@ -1,0 +1,14 @@
+{
+  "name": "document-identity-entry-journal",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests/identity.spec.ts",
+  "startedAt": "2026-10-25T15:26:40.517046+00:00",
+  "seconds": 4.678,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5bb150f213a7aa86bdeb8243529cf5c85db2a53643d60e90c38709737a3e75d6",
+  "inputsAfter": "5bb150f213a7aa86bdeb8243529cf5c85db2a53643d60e90c38709737a3e75d6",
+  "postgresToolDirectory": null,
+  "outputSha256": "8b2fa9cc6b5ae6ed5a4d0048b48bccc83a9a95d4a400067da49357404bb9b412",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/attachment/userdoc-local/tests/identity.spec.ts (15 tests | 1 failed) 29ms\n   × commits a complete directory rename and refuses an authorization snapshot missing a new file 4ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/attachment/userdoc-local/tests/identity.spec.ts > commits a complete directory rename and refuses an authorization snapshot missing a new file\nAssertionError: expected [ 'renamed/nested/b.txt', …(1) ] to deeply equal [ 'renamed/a.txt', …(1) ]\n\n- Expected\n+ Received\n\n  [\n-   \"renamed/a.txt\",\n    \"renamed/nested/b.txt\",\n+   \"renamed/a.txt\",\n  ]\n\n ❯ packages/attachment/userdoc-local/tests/identity.spec.ts:169:45\n    167|   expect(store.active(first.docId)).toEqual(first)\n    168|   const moved = store.commit(batch)\n    169|   expect(moved.map(record => record.docId)).toEqual(['renamed/a.txt', …\n       |                                             ^\n    170|   store.finish(batch)\n    171|   expect(store.active(first.docId)).toBeUndefined()\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 14 passed (15)\n   Start at  23:26:44\n   Duration  247ms (transform 106ms, setup 34ms, import 102ms, tests 29ms, environment 0ms)\n\n"
+}

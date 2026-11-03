@@ -1,0 +1,14 @@
+{
+  "name": "runtime-control-final-checking-face",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T19:37:16.514955+00:00",
+  "seconds": 8.646,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b5614c2316575bae79fb3b09431bdc7ecd84de7f05c06ec2f97caf558b465a0d",
+  "inputsAfter": "b5614c2316575bae79fb3b09431bdc7ecd84de7f05c06ec2f97caf558b465a0d",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

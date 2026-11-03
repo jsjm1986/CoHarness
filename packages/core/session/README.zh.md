@@ -64,6 +64,8 @@ kind: "package-reference"
 
 ### 实时服务事件
 
+失败报告会隔离异常文本转换；无法渲染的观察者值不能阻止后续观察者，也不能替换已提交的结果。同步的 `session/created` 失败与提交前校验仍可否决发布。
+
 会话存储会将已通知的创建与释放配对，在提交后发布追加通知并逐个监听器收容失败，同时提供受等待的持久性检查点。确切签名和作用域行为见 [session.md](../../../docs/subsystems/session.zh.md#cordis-surface) 的生成区块；载荷见[持久化目录](../../../docs/persistence-catalog.zh.md)。
 
 ### 类：`Session`

@@ -1,0 +1,14 @@
+{
+  "name": "native-model-operation-catalog",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-cordis-catalog.ts",
+  "startedAt": "2026-10-24T07:15:43.901169+00:00",
+  "seconds": 6.297,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ab9ae91b7fa70aee5237f3dc4fbf02cec1533dc84a292115283781d18161c378",
+  "inputsAfter": "ab9ae91b7fa70aee5237f3dc4fbf02cec1533dc84a292115283781d18161c378",
+  "postgresToolDirectory": null,
+  "outputSha256": "c23e156539574a6233f5cc190de1ad6e0d4477e048c3dc19757ad9e75917c57b",
+  "outputTail": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/gen-cordis-catalog.ts:1277\n  if (problems.length > 0) throw new Error(`gen-cordis-catalog: ${problems.length} partition violation(s):\\n${problems.map(p => `  ${p}`).join('\\n')}`)\n                                 ^\n\nError: gen-cordis-catalog: 1 partition violation(s):\n  ctx.modelAccessRequired (packages/llm/model-access/src/index.ts) is declared in a Context merge but invisible to the rendering projection; map it in SERVICE_PAGE (after making it renderable) or name it in SERVICE_WALK_EXEMPTIONS with its documentation owner.\n    at computeOutputs (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/gen-cordis-catalog.ts:1277:34)\n    at main (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/gen-cordis-catalog.ts:1321:8)\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/scripts/gen-cordis-catalog.ts:1359:3)\n    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)\n    at async node:internal/modules/esm/loader:639:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v25.8.1\n"
+}

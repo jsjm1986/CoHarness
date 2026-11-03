@@ -5,7 +5,9 @@
  * (`@deepseek-ai/dsh-client-ui-open-in-app`) posts to.
  *
  * Security is local to this optional desktop-only capability. Every route
- * accepts loopback requests only. On top of that fence
+ * requires the composition's browser authentication and a loopback Host.
+ * Authentication withdrawal removes the routes; already dispatched handlers
+ * refuse work while the service is unavailable. On top of those checks
  * the open route validates its body at the wire: an `application/json` media
  * type, a 64 KiB ceiling, string `app`/`path` fields, a resolved-available
  * catalog id, and an absolute path naming an existing directory.
@@ -40,8 +42,8 @@ export type * from './shared.ts'
 
 /** Cordis function-plugin name. */
 export const name = 'open-in-app'
-/** The route carrier, the trust fence guarding every route, and the PATH resolver. */
-export const inject = ['webServer', 'subprocess']
+/** HTTP routes, PATH resolution and mandatory browser authentication. */
+export const inject = ['webServer', 'subprocess', 'connection']
 
 /** Open-in-app host configuration. */
 export interface Config {
@@ -72,15 +74,14 @@ export const Config: z<Config> = z.object({
   launchWatchMs: boundedMs(),
 })
 
-/** Trust surface consumed here; the browser-side connection package owns the full type. */
 /** Accept only loopback browser requests; Open in App is a local desktop capability. */
 function trustedLocalRequest(req: IncomingMessage): boolean {
   const host = (req.headers.host ?? '').toLowerCase().replace(/:\d+$/, '')
   return host === 'localhost' || host === '127.0.0.1' || host === '[::1]'
 }
 
-interface OptionalConnectionFence {
-  requestRejection?: (request: { readonly headers: IncomingMessage['headers'] }) => 401 | 403 | undefined
+interface ConnectionFence {
+  requestRejection: (request: { readonly headers: IncomingMessage['headers'] }) => 401 | 403 | undefined
 }
 
 /** Open-route request bodies are tiny JSON objects; anything larger is hostile. */
@@ -134,6 +135,8 @@ function parseOpenBody(text: string): { app: string; path: string } | null {
 
 /** Register the apps, icon, and open routes behind the connection trust fence. */
 export function apply(ctx: Context, config: Config): void {
+  const lifetime = new AbortController()
+  ctx.effect(() => () => { lifetime.abort() }, 'open-in-app: request admission')
   const ssh = launchedThroughSsh(launchEnvironmentOf(ctx))
   /** Test-seam facts completed with the composition's PATH resolver. */
   const catalogInternals = (): OpenInAppInternals => ({
@@ -181,8 +184,13 @@ export function apply(ctx: Context, config: Config): void {
   }
   /** Answer an untrusted/unauthenticated request; true when it was rejected. */
   const rejected = (req: IncomingMessage, res: ServerResponse): boolean => {
-    const fence = ctx.get('connection') as OptionalConnectionFence | undefined
-    const rejection = fence?.requestRejection?.(req)
+    const fence = ctx.get('connection') as ConnectionFence | undefined
+    if (lifetime.signal.aborted || fence === undefined) {
+      res.statusCode = 503
+      res.end('authentication unavailable')
+      return true
+    }
+    const rejection = fence.requestRejection(req)
     if (rejection !== undefined) {
       res.statusCode = rejection
       res.end()
@@ -194,6 +202,9 @@ export function apply(ctx: Context, config: Config): void {
     return true
   }
 
+  const launchForRequest = (resolved: OpenInAppResolvedLaunch, path: string, req: IncomingMessage, res: ServerResponse) =>
+    launchResolved(resolved, path, config.launchWatchMs, catalogInternals(), () => !rejected(req, res))
+
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',
     path: OPEN_IN_APP_APPS_PATH,
@@ -203,7 +214,9 @@ export function apply(ctx: Context, config: Config): void {
         sendMethodNotAllowed(res, 'GET')
         return
       }
-      sendJson(res, 200, { apps: [...(await availability()).keys()] })
+      const apps = await availability()
+      if (rejected(req, res)) return
+      sendJson(res, 200, { apps: [...apps.keys()] })
     },
   }), `open-in-app: GET ${OPEN_IN_APP_APPS_PATH}`)
 
@@ -226,11 +239,13 @@ export function apply(ctx: Context, config: Config): void {
         return
       }
       const resolved = (await availability()).get(app.id)
+      if (rejected(req, res)) return
       if (resolved === undefined) {
         noIcon()
         return
       }
       const icon = await iconOf(app, resolved)
+      if (rejected(req, res)) return
       if (icon === null) {
         noIcon()
         return
@@ -266,6 +281,7 @@ export function apply(ctx: Context, config: Config): void {
         sendJson(res, 400, { code: 'bad-request', message: 'request body unreadable' })
         return
       }
+      if (rejected(req, res)) return
       if (text === null) {
         sendJson(res, 413, { code: 'payload-too-large', message: 'request body is too large' })
         return
@@ -277,6 +293,7 @@ export function apply(ctx: Context, config: Config): void {
       }
       const app = OPEN_IN_APP_CATALOG.find(entry => entry.id === parsed.app)
       const resolved = app === undefined ? undefined : (await availability()).get(app.id)
+      if (rejected(req, res)) return
       if (app === undefined || resolved === undefined) {
         sendJson(res, 400, { code: 'bad-request', message: `unknown or unavailable app: ${parsed.app}` })
         return
@@ -292,18 +309,22 @@ export function apply(ctx: Context, config: Config): void {
         // Swallows ENOENT/EACCES: both mean there is no directory to open.
         directory = false
       }
+      if (rejected(req, res)) return
       if (!directory) {
         sendJson(res, 404, { code: 'not-found', message: `directory does not exist: ${parsed.path}` })
         return
       }
-      let outcome = await launchResolved(resolved, parsed.path, config.launchWatchMs, catalogInternals())
+      let outcome = await launchForRequest(resolved, parsed.path, req, res)
+      if (outcome === 'refused') return
       if (outcome === 'missing') {
         // The verified launcher is gone (uninstalled since resolution):
         // refresh this one entry and retry once with the fresh launcher.
         const fresh = await refreshResolution(app)
+        if (rejected(req, res)) return
         outcome = fresh === undefined
           ? 'failed'
-          : await launchResolved(fresh, parsed.path, config.launchWatchMs, catalogInternals())
+          : await launchForRequest(fresh, parsed.path, req, res)
+        if (outcome === 'refused') return
       }
       if (outcome === 'launched') {
         sendJson(res, 200, { ok: true })

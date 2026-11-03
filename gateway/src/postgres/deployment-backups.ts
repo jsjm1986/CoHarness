@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { GatewayConfig } from '../config.ts'
 import type { DeploymentCommands } from '../deployment-commands.ts'
 import { parseManagedSnapshot } from '../managed-files.ts'
+import { verifyGatewayDocumentBackup } from '../document-backups.ts'
 import { PostgresBackupService, BackupError, type BackupRecordView } from './backup-service.ts'
 import { migrationPlan } from './database.ts'
 import { collectDeploymentData } from './deployment-data.ts'
@@ -61,6 +62,7 @@ export class PostgresDeploymentBackups {
     try {
       const roots = await collectDeploymentData(this.context, this.cfg)
       const dump = await this.commands.backup(directory, this.databaseUrl, roots, signal)
+      await verifyGatewayDocumentBackup(dump.managedSnapshot, backupFilesDirectory(dump.dumpPath), signal)
       const plan = await migrationPlan(this.context.pool, this.cfg.deployMigrationsDir)
       const record = await this.records.record({ path: dump.dumpPath, migrationVersion: plan.current,
         writeEpoch: BigInt(state.writeEpoch), sizeBytes: dump.sizeBytes, sha256: dump.sha256,

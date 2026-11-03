@@ -1,0 +1,14 @@
+{
+  "name": "archive-sdk-config-catalog-current",
+  "cwd": ".",
+  "command": "pnpm run verify-config-catalog",
+  "startedAt": "2026-10-26T09:33:14.500692+00:00",
+  "seconds": 10.468,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "86f7b6abe1790d4cbcaf1a7006e75b40260072d00181167ed4de8a0dc0b08176",
+  "inputsAfter": "86f7b6abe1790d4cbcaf1a7006e75b40260072d00181167ed4de8a0dc0b08176",
+  "postgresToolDirectory": null,
+  "outputSha256": "f2b5e1da4136c3bd6d71a25b31284bb6be0de901a23329dd0b4a816a371fa0cf",
+  "outputTail": "$ tsx scripts/gen-config-catalog.ts --check\ngen-config-catalog: 3 artifact(s) are up to date.\n"
+}

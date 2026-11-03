@@ -1,0 +1,14 @@
+{
+  "name": "conversation-writer-note-pair-check-final",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing .agents/notes/implemented/bug-fix/2026-10-24-conversation-writer-locks.md",
+  "startedAt": "2026-10-24T00:59:38.681271+00:00",
+  "seconds": 2.341,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0b0fb548073dd27bdb3afa14f4bfd47662e86a23350ed052d35e4e56c189e308",
+  "inputsAfter": "0b0fb548073dd27bdb3afa14f4bfd47662e86a23350ed052d35e4e56c189e308",
+  "postgresToolDirectory": null,
+  "outputSha256": "a9c909c6695569a9ec8b4714d6cb0cc19438853bc6ac4cee8e2bd00568779e24",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts .agents/notes/implemented/bug-fix/2026-10-24-conversation-writer-locks.md\nverify-translation-pairing: 1 named pair(s) consistent; the corpus-wide check still runs in doc-sync.\n"
+}

@@ -2,6 +2,7 @@
 
 import {
   RpcId,
+  addressRuntimeUrl,
   serverResponseSchema,
   type ClientRequest,
 } from '@deepseek-ai/dsh-host-apiproxy/api'
@@ -33,7 +34,7 @@ export function createWebConnectionRpc(doFetch?: RpcFetch, target?: ConnectionRu
       if (channel !== '/api') throw new Error('Streaming RPC requires the shared /api channel')
       const message: ClientRequest = { type: 'client-request', rpcId: RpcId(randomUuid()), method: endpoint, payload }
       const url = new URL(`${RPC_STREAM_ROUTE}/${endpoint}`, resolveBase())
-      if (target !== undefined) url.searchParams.set('dshTarget', target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`)
+      if (target !== undefined) addressRuntimeUrl(url, target)
       return readRpcStream(send, url, message, signal)
     },
     async call(channel, endpoint, payload, signal) {
@@ -48,7 +49,7 @@ export function createWebConnectionRpc(doFetch?: RpcFetch, target?: ConnectionRu
       // The channel key is absolute; a page posts the document-relative form, and
       // a carrier that resolves against the Host root accepts the same form.
       const url = new URL(`${channel}/${endpoint}`.slice(1), resolveBase())
-      if (target !== undefined) url.searchParams.set('dshTarget', target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`)
+      if (target !== undefined) addressRuntimeUrl(url, target)
       const response = await send(
         url,
         {

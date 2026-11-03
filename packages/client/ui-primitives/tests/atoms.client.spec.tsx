@@ -7,9 +7,18 @@ import { POINTER_GRACE_MS } from '../src/pointer-grace.ts'
 afterEach(cleanup)
 
 describe('Button', () => {
-  it('renders children, icon, and forwards clicks', () => {
+  it('keeps an icon-only toolbar action named and clickable', () => {
     const onClick = vi.fn()
-    render(<Button variant="primary" icon={<svg data-testid="ic" />} onClick={onClick}>Go</Button>)
+    render(<Button variant="soft" size="toolbar" aria-label="Refresh" icon={<svg />} onClick={onClick} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    expect(onClick).toHaveBeenCalledOnce()
+  })
+  it.each([
+    { variant: 'primary' as const, size: 'md' as const },
+    { variant: 'soft' as const, size: 'toolbar' as const },
+  ])('renders children, icon, and forwards clicks: $variant / $size', ({ variant, size }) => {
+    const onClick = vi.fn()
+    render(<Button variant={variant} size={size} icon={<svg data-testid="ic" />} onClick={onClick}>Go</Button>)
     const button = screen.getByRole('button', { name: 'Go' })
     expect(screen.getByTestId('ic')).toBeDefined()
     fireEvent.click(button)

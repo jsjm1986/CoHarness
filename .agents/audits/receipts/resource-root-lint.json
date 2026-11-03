@@ -1,0 +1,13 @@
+{
+  "name": "resource-root-lint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts gateway/src/instances.ts gateway/src/launcher.ts gateway/src/node-resource-budget.ts gateway/src/postgres/instance-repository.ts gateway/tests/instances.spec.ts gateway/tests/launcher.spec.ts gateway/tests/node-resource-budget-postgres.spec.ts gateway/tests/config.spec.ts gateway/tests/runtime-capacity.spec.ts gateway/tests/postgres.spec.ts",
+  "startedAt": "2026-10-23T12:32:08.426320+00:00",
+  "seconds": 2.619,
+  "exitCode": 0,
+  "inputsBefore": "7385c98deffb4fc9ee9d55318d5f753c7eeaee502fedfecc3be15fdc7c4ae88b",
+  "inputsAfter": "7385c98deffb4fc9ee9d55318d5f753c7eeaee502fedfecc3be15fdc7c4ae88b",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": "",
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf"
+}

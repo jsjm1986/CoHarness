@@ -1,0 +1,14 @@
+{
+  "name": "document-private-storage-core-regressions",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests/identity.spec.ts packages/attachment/userdoc-local/tests/file-object.spec.ts packages/attachment/userdoc-local/tests/mutation.spec.ts packages/attachment/userdoc-local/tests/identity-fs.spec.ts packages/attachment/userdoc-local/tests/projection.spec.ts",
+  "startedAt": "2026-10-25T23:43:21.623876+00:00",
+  "seconds": 5.548,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "aac81f935bc15399a5cf445034698c4085665470f02f7b68565d6174aff20565",
+  "inputsAfter": "aac81f935bc15399a5cf445034698c4085665470f02f7b68565d6174aff20565",
+  "postgresToolDirectory": null,
+  "outputSha256": "2a0d6e53fb0510a2522cf4494d3c6c13e7fb20fb0c89d631aaec9bc131830763",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/attachment/userdoc-local/tests/identity-fs.spec.ts (27 tests | 1 failed) 1072ms\n   × preserves an unindexed legacy payload instead of publishing an incomplete identity manifest 15ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/attachment/userdoc-local/tests/identity-fs.spec.ts > preserves an unindexed legacy payload instead of publishing an incomplete identity manifest\nError: ENOENT: no such file or directory, open '/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/dsh-document-legacy-identity-V9yoxw/files/trash/a6adf5f2-a809-4a44-a5cf-e21405dee360.bin'\n ❯ packages/attachment/userdoc-local/tests/identity-fs.spec.ts:130:10\n    128|   expect(await readFile(f.manifest, 'utf8')).toBe(before)\n    129|   expect(await readFile(orphan, 'utf8')).toBe('unindexed bytes')\n    130|   expect(await readFile(join(f.locations.filesRoot, 'trash', basename(…\n       |          ^\n    131| })\n    132|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 4 passed (5)\n      Tests  1 failed | 125 passed (126)\n   Start at  07:43:25\n   Duration  1.58s (transform 1.25s, setup 251ms, import 1.39s, tests 2.23s, environment 0ms)\n\n"
+}

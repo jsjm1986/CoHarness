@@ -1,0 +1,14 @@
+{
+  "name": "sdk-fixture-resolver-host-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p tsconfig.host.json",
+  "startedAt": "2026-10-26T09:41:56.571711+00:00",
+  "seconds": 10.804,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e1ab9271a038438cb05b0446d4ef69c0b7ec6fc1d20898db85e260f5feff4f11",
+  "inputsAfter": "e1ab9271a038438cb05b0446d4ef69c0b7ec6fc1d20898db85e260f5feff4f11",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

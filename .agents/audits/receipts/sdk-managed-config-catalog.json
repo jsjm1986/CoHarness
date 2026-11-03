@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-config-catalog",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-config-catalog.ts",
+  "startedAt": "2026-10-24T14:38:07.251678+00:00",
+  "seconds": 1.649,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "76ba49588cffdfa348790afede85d62f34312129a9bb34491f2fd0c9c5f11796",
+  "inputsAfter": "76ba49588cffdfa348790afede85d62f34312129a9bb34491f2fd0c9c5f11796",
+  "postgresToolDirectory": null,
+  "outputSha256": "7250b71e630a06b4c1dab97dd4706e27f169c9ea4ffe628f7fb3d315122bf8c8",
+  "outputTail": "gen-config-catalog: 3 artifact(s) computed, 3 written.\n"
+}

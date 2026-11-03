@@ -25,6 +25,8 @@ Execute model-written TypeScript with host-provided async functions. The default
 <a id="use-this-package"></a>
 ## Use this package
 
+A retained kernel holds one process permit through its complete managed-range lifetime. Startup passes the kernel lifetime signal to subprocess admission, so cancellation or owner release also cancels a queued allocation.
+
 Mount this provider in a composition that supplies `fs`, `subprocess`, `sandbox` and `sandboxPolicy`. PTC mode in `dsh-tools` supplies the calling Session's directory and standing policy; direct runtime consumers resolve those options before execution.
 
 ### Configuration

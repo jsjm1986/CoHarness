@@ -8,6 +8,7 @@ import Schema from '@deepseek-ai/schemastery'
 import { ComputerUseProviderName } from '@deepseek-ai/dsh-computer-use/brand'
 import { createMcpToolDefinition } from '@deepseek-ai/dsh-mcp-client'
 import { z } from 'zod'
+import { inspectDesktopEnvironment } from '@deepseek-ai/dsh-native-command'
 import type { CuaDriver as NativeDriver } from '@trycua/cua-driver'
 import type {} from '@deepseek-ai/dsh-computer-use'
 import type {} from '@deepseek-ai/dsh-system-prompt'
@@ -19,8 +20,17 @@ export const name = 'experimental-computer-use-cua-driver-native'
 /** Services required before the native runtime can publish tools. */
 export const inject = ['computerUse', 'tools', 'systemPrompt']
 
-/** The native provider uses the installed SDK's same-process defaults. */
-export const Config = Schema.object({})
+/** Native desktop selection; an explicit enable supports desktops outside OS session discovery. */
+export interface Config {
+  /** Detect local session evidence, select a prepared desktop explicitly, or omit desktop effects. */
+  desktopMode: 'auto' | 'enabled' | 'disabled'
+}
+
+/** Desktop discovery never starts a GUI or requests operating-system permissions. */
+export const Config: Schema<Config> = Schema.object({
+  desktopMode: Schema.union(['auto', 'enabled', 'disabled']).default('auto')
+    .description('Auto detects a graphical session. Disabled exposes no desktop tools. Enable explicitly only for a configured desktop that session discovery cannot identify.'),
+})
 
 const ToolCatalog = z.object({
   tools: z.array(z.object({
@@ -45,9 +55,10 @@ On macOS, cursor-overlay operations may return facility_unavailable even when sc
  * Startup failures roll back every registration. Unload removes tools, aborts
  * calls and image admission, awaits settlement and SDK shutdown, then releases computer use.
  * @param ctx - context providing the exclusive registration and tool services.
+ * @param config - validated native-desktop selection.
  * @returns after native import, runtime creation, and tool discovery complete.
  */
-export async function apply(ctx: Context): Promise<void> {
+export async function apply(ctx: Context, config: Config): Promise<void> {
   const lifetime = new AbortController()
   const pending = new Set<Promise<unknown>>()
   let driver: NativeDriver | undefined
@@ -55,6 +66,20 @@ export async function apply(ctx: Context): Promise<void> {
   ctx.on('internal/plugin', (fiber) => {
     if (fiber === ctx.fiber && fiber.uid === null) lifetime.abort()
   }, { global: true })
+  const environment = config.desktopMode === 'auto' ? await inspectDesktopEnvironment() : undefined
+  lifetime.signal.throwIfAborted()
+  const unavailable = config.desktopMode === 'disabled' ? 'disabled'
+    : environment?.state === 'not-detected' ? 'headless' : undefined
+  if (unavailable !== undefined) {
+    ctx.computerUse.register(ComputerUseProviderName('cua-driver-native'), { unavailableReason: unavailable })
+    ctx.systemPrompt.section({
+      name: 'computer-use:cua-driver-native', order: ctx.systemPrompt.getSectionOrder('TOOL_COMPUTER_USE'),
+      text: unavailable === 'headless'
+        ? 'This server has no detected graphical desktop. Native Computer Use is unavailable. Do not attempt native desktop actions. File, terminal and separately configured headless-browser tools remain independent. An administrator can configure a desktop or a remote Computer Use provider.'
+        : 'Native Computer Use is disabled in this provider configuration. Do not attempt native desktop actions. File, terminal and separately configured headless-browser tools remain independent.',
+    })
+    return
+  }
   let ready: Promise<void> = Promise.resolve()
   const dispose = ctx.effect(function* () {
     yield ctx.computerUse.register(ComputerUseProviderName('cua-driver-native'))

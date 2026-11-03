@@ -1,0 +1,13 @@
+{
+  "name": "chromium-managed-installed-current",
+  "cwd": ".",
+  "command": "env -u NODE_USE_ENV_PROXY -u DSH_STAGEHAND_MODEL -u DSH_STAGEHAND_MODEL_API_KEY DSH_STAGEHAND_E2E=1 'DSH_BROWSER_EXECUTABLE=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' ./node_modules/.bin/vitest run --config vitest.e2e.config.ts packages/experimental/browser-use-stagehand-native/tests/native.e2e.ts -t 'preserves external Chromium|admits the built attachment Worker' --retry=0",
+  "startedAt": "2026-10-23T17:19:55.167701+00:00",
+  "seconds": 14.909,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6119d6131594153d607d564616b634391625559630c34644d3796c18243a26a3",
+  "inputsAfter": "6119d6131594153d607d564616b634391625559630c34644d3796c18243a26a3",
+  "outputSha256": "a81d04d181e15201f73b4683119b24474b0fcb9786f81ed4f65811d8a199117c",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  3 passed | 3 skipped (6)\n   Start at  01:19:55\n   Duration  14.15s (transform 1.01s, setup 24ms, import 1.32s, tests 12.74s, environment 0ms)\n\n"
+}

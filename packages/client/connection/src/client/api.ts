@@ -10,7 +10,7 @@ export type {
   ApprovalResponsePayload, QuestionResponsePayload, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
   SessionAssistantStreamBaseline, SessionAssistantStreamFrame,
   SessionHistoryIndex, SessionHistoryIndexItem, ToolEventView,
-  DirectoryEntry, DirectoryListing, DesktopConfirmation,
+  DirectoryEntry, DirectoryListing, DesktopConfirmation, DesktopStatus,
   ResponseValue, WorkspaceApi, WorkspaceId, WorkspaceView,
   SkillsApi, SkillEntry, SkillPreview,
   ModelCatalogFailure, ModelCatalogModel, ModelProviderGroup, ModelReasoning,

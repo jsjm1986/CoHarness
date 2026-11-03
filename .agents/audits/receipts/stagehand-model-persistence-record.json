@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-persistence-record",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm --silent run persistence-changes --record 2026-10-24-stagehand-governed-model-inputs --prose .agents/audits/.local/stagehand-model-persistence-prose.json --json",
+  "startedAt": "2026-10-23T18:47:36.330819+00:00",
+  "seconds": 22.451,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "inputsAfter": "f7da5ea9373cb2d470d492b16264a138ddf1c56d2371e3432cb2058934e0dd43",
+  "outputSha256": "550cf6f03cf3822c07e65985cafd8e0525dc305710c2c725c6c05e5641f80647",
+  "outputTail": "{\"schemaVersion\":1,\"ok\":true,\"operation\":\"record\",\"recordId\":\"2026-10-24-stagehand-governed-model-inputs\",\"message\":\"Created docs/persistence-changes/2026-10-24-stagehand-governed-model-inputs.md; schema artifacts and bilingual pairing are current.\",\"changes\":[{\"root\":\"event:browser-use/stagehand-llm-request\",\"path\":\"event:browser-use/stagehand-llm-request\",\"kind\":\"root-added\",\"description\":\"root added\",\"requiresCompatibilityReview\":false}],\"roots\":[{\"root\":\"event:browser-use/stagehand-llm-request\",\"kind\":\"event\",\"before\":null,\"after\":\"25c645080c2da89aa1c6f386d7348d315e4c35c76883399268bd5e227495e33e\"}],\"files\":[\"docs/persistence-catalog.md\",\"docs/persistence-catalog.zh.md\",\"docs/persistence-catalog.i18n.yaml\",\"docs/experimental-persistence-catalog.md\",\"docs/experimental-persistence-catalog.zh.md\",\"docs/experimental-persistence-catalog.i18n.yaml\",\"packages/core/session/src/known-event-types.ts\",\"docs/persistence-schema.json\",\"docs/persistence-changes/2026-10-24-stagehand-governed-model-inputs.md\",\"docs/persistence-changes/2026-10-24-stagehand-governed-model-inputs.zh.md\",\"docs/persistence-changes/2026-10-24-stagehand-governed-model-inputs.i18n.yaml\",\"docs/persistence-changes/2026-10-24-stagehand-governed-model-inputs.schema.json\"]}\n"
+}

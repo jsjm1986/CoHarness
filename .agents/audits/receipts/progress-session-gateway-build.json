@@ -1,0 +1,14 @@
+{
+  "name": "progress-session-gateway-build",
+  "cwd": "gateway",
+  "command": "npm run build",
+  "startedAt": "2026-10-23T22:54:26.404005+00:00",
+  "seconds": 4.674,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5d2194a224fc5fd13d86f8aa49f5770557656dd2e087f9746e4ea9cad5210596",
+  "inputsAfter": "5d2194a224fc5fd13d86f8aa49f5770557656dd2e087f9746e4ea9cad5210596",
+  "postgresToolDirectory": null,
+  "outputSha256": "898095a3ceeb02add8ff851ae671d7fc499316aab1c64f358d6b61663d57feb4",
+  "outputTail": "\n> build\n> tsc -p tsconfig.build.json\n\n"
+}

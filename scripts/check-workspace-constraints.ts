@@ -50,7 +50,7 @@ const publicNativePackages = new Set([
 ])
 /** Deliberate source payloads whose exact bytes are part of the package's audit surface. */
 const publicationSourceAllowlist: Readonly<Record<string, readonly string[]>> = {
-  '@deepseek-ai/node-addon-system': ['src/main.c', 'src/flock.c'],
+  '@deepseek-ai/node-addon-system': ['src/main.c', 'src/flock.c', 'src/directory.c'],
 }
 /** Public source home recorded in maintained package manifests. */
 const publishedRepositoryUrl = 'git+https://github.com/deepseek-ai/deepseek-harness.git'
@@ -204,6 +204,8 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // TODO(alpha.2): restore 'lib/apply-injections.js' when the worker-page
   // index-injection interpreter is ported with its first consumer.
   '@deepseek-ai/dsh-client-web': ['lib/**/*.css'],
+  // Document icons distribute their upstream license notice.
+  '@deepseek-ai/dsh-client-ui-documents': ['LICENSE.material-icon-theme'],
   '@deepseek-ai/dsh-client-ui-theme': ['lib/styles'],
   // The physical-key protocol is a public entry usable without the browser service.
   '@deepseek-ai/dsh-client-shortcuts': ['lib/protocol.js'],
@@ -222,6 +224,16 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // The Web Host mounts the default-off settings owner independently of each
   // Agent-scoped delegation-tool instance.
   '@deepseek-ai/dsh-tool-subagent': ['lib/model-selection-settings.js'],
+  // The Gateway's resource wire entry includes its standalone validators.
+  '@deepseek-ai/dsh-resource-budget': ['lib/wire.js'],
+  // Browser consumers decode document identity without loading the document service.
+  '@deepseek-ai/dsh-userdoc': ['lib/identity.js'],
+  // The runtime provider and Gateway server adapter share generated frame and protocol chunks.
+  '@deepseek-ai/dsh-userdoc-gateway': ['lib/protocol.js', 'lib/server.js', 'lib/frame-*.js', 'lib/protocol-*.js'],
+  '@deepseek-ai/dsh-gateway-runtime': ['lib/resource-budget.js'],
+  '@deepseek-ai/dsh-gateway-execution': ['lib/desktop-availability.js'],
+  // SDK children load their independent control plugin before profile entries.
+  '@deepseek-ai/dsh-subagent-dsh-sdk': ['lib/managed.js'],
   // The JSONL backend resolves its private verification Worker relative to
   // import.meta.url; it is shipped without a public package subpath.
   '@deepseek-ai/dsh-session-persistence-jsonl': ['lib/worker.cjs'],

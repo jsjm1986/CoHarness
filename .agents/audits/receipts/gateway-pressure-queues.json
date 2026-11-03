@@ -1,0 +1,13 @@
+{
+  "name": "gateway-pressure-queues",
+  "cwd": ".",
+  "command": "pnpm exec vitest run --config vitest.e2e.config.ts packages/context/gateway-execution/tests/pg-composition.e2e.ts -t pressure-queued --retry=0",
+  "startedAt": "2026-10-23T13:04:13.598675+00:00",
+  "seconds": 5.976,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "deda2a985ce434253d0329dce6f9a49e1259d889d86533592391c0608ac71a6d",
+  "inputsAfter": "deda2a985ce434253d0329dce6f9a49e1259d889d86533592391c0608ac71a6d",
+  "outputSha256": "b98516c53e468ca4601e6bc05c8e6c6bad07f35b305c0f44bf8a8834db30db50",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  2 passed | 10 skipped (12)\n   Start at  21:04:16\n   Duration  3.10s (transform 1.41s, setup 21ms, import 1.79s, tests 1.21s, environment 0ms)\n\n"
+}

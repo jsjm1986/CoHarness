@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-type-equiv",
+  "cwd": ".",
+  "command": "pnpm run verify-type-equiv",
+  "startedAt": "2026-10-25T13:07:08.160631+00:00",
+  "seconds": 14.131,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "inputsAfter": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "postgresToolDirectory": null,
+  "outputSha256": "c8ce72e1f2cf1726e9e3056496b38015ac603a2e2b2fa4c674f10dc9ff70fe22",
+  "outputTail": "$ tsx scripts/verify-type-equiv.ts\nverify-type-equiv: 530 type-equiv block(s) match source structure and JSDoc (1:1 with manifest); 530 paired derivative(s).\n"
+}

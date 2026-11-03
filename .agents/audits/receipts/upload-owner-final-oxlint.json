@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-final-oxlint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc/src/brand.ts packages/attachment/userdoc/src/index.ts packages/attachment/userdoc-local/src/index.ts packages/attachment/userdoc-local/src/local-fs.ts packages/attachment/userdoc-local/src/upload.ts packages/attachment/userdoc-local/src/store.ts packages/attachment/userdoc-local/tests/upload.spec.ts packages/host/userdoc-http/src/index.ts packages/host/userdoc-http/tests/acl.spec.ts gateway/tests/documents-local.spec.ts gateway/tests/document-upload-postgres.spec.ts gateway/tests/document-catalog-service.spec.ts scripts/gen-cordis-catalog.ts",
+  "startedAt": "2026-10-25T10:18:56.509294+00:00",
+  "seconds": 6.098,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "30f5981afeb13ba3319473ada0ec3e79341f86a9bf501ac9012a8c86777e692e",
+  "inputsAfter": "30f5981afeb13ba3319473ada0ec3e79341f86a9bf501ac9012a8c86777e692e",
+  "postgresToolDirectory": null,
+  "outputSha256": "ef93d00272409a684d19ea2fe494f1b08a7ce92cdb2f9a78c5e09379b1fe1bbe",
+  "outputTail": "packages/attachment/userdoc-local/tests/upload.spec.ts:80:1: error @stylistic(max-len): This line has a length of 141. Maximum allowed is 140.\n"
+}

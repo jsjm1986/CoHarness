@@ -1,0 +1,27 @@
+- heading "Move Documents" [level=2]
+- button "Close":
+  - img
+- paragraph: "Move 1 documents to:"
+- list "Documents in this operation":
+  - listitem: brief.txt 21 B
+- radiogroup "Destination folder":
+  - text: Destination folder
+  - img
+  - textbox "Search destination folders"
+  - radio "Archive 0"
+  - text: Archive 0
+  - radio "Archive 1"
+  - text: Archive 1
+  - radio "Archive 2"
+  - text: Archive 2
+  - radio "Archive 3"
+  - text: Archive 3
+  - radio "Archive 4"
+  - text: Archive 4
+  - radio "Archive 5"
+  - text: Archive 5
+  - radio "客户交付资料与产品需求说明_完整的目录名称必须可以阅读_2026年10月" [checked]
+  - text: 客户交付资料与产品需求说明_完整的目录名称必须可以阅读_2026年10月
+  - paragraph: "Selected: 客户交付资料与产品需求说明_完整的目录名称必须可以阅读_2026年10月"
+- button "Cancel"
+- button "Confirm Move"

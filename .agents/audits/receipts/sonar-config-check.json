@@ -1,0 +1,14 @@
+{
+  "name": "sonar-config-check",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-config-catalog.ts --check",
+  "startedAt": "2026-10-24T09:33:47.813728+00:00",
+  "seconds": 2.372,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "inputsAfter": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "postgresToolDirectory": null,
+  "outputSha256": "a1652449aaf0d73a66b03fc831d22fd102283579404228e1b8b81fb92c2c5155",
+  "outputTail": "gen-config-catalog: 3 artifact(s) are up to date.\n"
+}

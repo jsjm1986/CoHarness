@@ -1,0 +1,14 @@
+{
+  "name": "real-managed-web-path-corrected",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx --tsconfig gateway/tsconfig.run.json .agents/audits/.local/probe-managed-web.ts",
+  "startedAt": "2026-10-24T20:36:35.136295+00:00",
+  "seconds": 4.089,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b3b07a8e81ae38d14f2b74475a37a195e32d57dbf41ed061fe71ecaac2b1703b",
+  "inputsAfter": "b3b07a8e81ae38d14f2b74475a37a195e32d57dbf41ed061fe71ecaac2b1703b",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "55f00d97d832a95c83bd745d6231aacdaf5d9eb48726037e244898e80af6c833",
+  "outputTail": "managed-ready {\"port\":51144,\"generation\":2} registered true\nproxy-status 404 \nsafe-log dsh: all_proxy names a SOCKS proxy, which is not supported; connecting directly for that scheme — set an http:// or https:// proxy URL instead\ndsh web: http://127.0.0.1:51219/?token=[fixture-token]\n\n/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/node_modules/.pnpm/pg-pool@3.14.0_pg@8.16.3/node_modules/pg-pool/index.js:45\n    Error.captureStackTrace(err)\n          ^\n\nerror: update or delete on table \"organizations\" violates foreign key constraint \"users_organization_id_fkey\" on table \"users\"\n    at /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/node_modules/.pnpm/pg-pool@3.14.0_pg@8.16.3/node_modules/pg-pool/index.js:45:11\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/probe-managed-web.ts:71:106) {\n  length: 321,\n  severity: 'ERROR',\n  code: '23503',\n  detail: 'Key (id)=(4d7507ce-5c2e-4746-8dc7-96eaa4d77be5) is still referenced from table \"users\".',\n  hint: undefined,\n  position: undefined,\n  internalPosition: undefined,\n  internalQuery: undefined,\n  where: undefined,\n  schema: 'harness',\n  table: 'users',\n  column: undefined,\n  dataType: undefined,\n  constraint: 'users_organization_id_fkey',\n  file: 'ri_triggers.c',\n  line: '2811',\n  routine: 'ri_ReportViolation'\n}\n\nNode.js v25.8.1\n"
+}

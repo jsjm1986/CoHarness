@@ -1,0 +1,4 @@
+{"operation":"live-approval","toolRuns":1,"outcome":"allowed-once"}
+{"operation":"dispatch-cancelled","answerers":0,"toolRuns":1,"outcome":"cancelled"}
+{"operation":"late-cancelled","answerers":0,"toolRuns":1,"outcome":"cancelled"}
+{"operation":"late-withdrawn","answerers":0,"toolRuns":1,"outcome":"cancelled"}

@@ -14,7 +14,9 @@ Status: implemented
 
 ## Decision
 
-`LlmRuntime` 是一次适配器尝试的规范化边界。它只捕获最终适配器选择、同步分发、iterator 构造与 `next()` 失败，将抛出值转换为不可变 `LlmFailure`，并发出一个终止 `finish`。调用方取消或 `ABORTED` 失败选择 aborted 结束原因；其他适配器失败选择 error 结束原因。适配器也可以直接发出任一终止原因。
+`LlmRuntime` 是一次适配器尝试的规范化边界。它捕获资源准入、最终适配器选择、同步分发、iterator 构造与 `next()` 失败，将抛出值转换为不可变 `LlmFailure`，并发出一个终止 `finish`。调用方取消或 `ABORTED` 失败选择 aborted 结束原因；其他适配器失败选择 error 结束原因。适配器也可以直接发出任一终止原因。
+
+自有 `ResourceAdmissionError` 的原因映射为 `RESOURCE_BUDGET_UNAVAILABLE`、`ABORTED`、`RESOURCE_ADMISSION_EXPIRED` 或 `RESOURCE_ADMISSION_REFUSED`。分类读取自有数据属性中的原因，不调用访问器；外部 SDK 的原因字段不进入此分类。已校验的携带失败事实优先。本地队列或权限拒绝不能确定上游 HTTP 状态或重试策略，因此规范化不添加这些信息。
 
 适配器所属的 catch 会在每个分片被 yield 前结束。来自 `llm/stream` middleware、嵌套调用、适配器清理、分片消费方、日志记录、signal 检查与组装的错误仍作为缺陷或生命周期失败抛出；它们绝不进入模型请求恢复。部分 delta 之后的传输失败可能在结束原因为 error 或 aborted 的终止 finish 之前留下未关闭块。不会从这些不完整输出组装 assistant 消息或工具调用。
 

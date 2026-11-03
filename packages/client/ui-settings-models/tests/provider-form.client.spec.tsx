@@ -1139,6 +1139,7 @@ describe('hand-declared providers', () => {
 
       expect(screen.getByText(en.customBaseUrlInvalid)).toBeTruthy()
       expect(screen.getByLabelText(en.baseUrl).getAttribute('aria-invalid')).toBe('true')
+      expect(screen.getByLabelText(en.baseUrl).getAttribute('aria-describedby')).toBe(screen.getByText(en.customBaseUrlInvalid).id)
       expect(buttonNamed(en.fetchModels).disabled).toBe(true)
       expect(buttonNamed(en.fetchModels).title).toBe(en.customBaseUrlInvalid)
       expect(buttonNamed(en.create).disabled).toBe(true)

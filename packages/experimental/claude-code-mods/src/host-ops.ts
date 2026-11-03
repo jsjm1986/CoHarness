@@ -509,7 +509,7 @@ export function createHostOps(options: HostOpsOptions): OpTable<AgentBinding> {
       const cwd = typeof settings.cwd === 'string' ? settings.cwd : await currentDirectory(context.binding.agent, context.signal) ?? process.cwd()
       const env = typeof settings.env === 'object' && settings.env !== null ? settings.env as Record<string, string> : undefined
       const deadline = AbortSignal.any([context.signal, AbortSignal.timeout(timeoutMs)])
-      const handle = subprocess.spawn({
+      const handle = await subprocess.spawn({
         argv,
         cwd,
         stdio: { stdin: 'ignore', stdout: { maxBytes: PROCESS_OUTPUT_MAX_BYTES }, stderr: { maxBytes: PROCESS_OUTPUT_MAX_BYTES } },

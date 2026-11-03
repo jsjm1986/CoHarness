@@ -111,6 +111,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * `id` is added beside the shipped entries instead of replacing them.
      */
     'shell.overlay': { kind: 'list'; scope: 'root' }
+    /** Tab-wide identity in the compact topbar or above the center beside a collapsed rail, available before Session selection. */
+    'shell.mobile.header.context': { kind: 'list'; scope: 'root'; owner: { compact: boolean } }
     /** Session-scoped actions rendered in the compact AppFrame topbar. */
     'shell.mobile.header.actions': { kind: 'list'; scope: 'session'; owner: MobileHeaderActionOwnerProps }
   }
@@ -224,6 +226,7 @@ export function apply(ctx: ClientContext): void {
         'rightbar': { kind: 'single', scope: 'root' },
         'shell.bottom': { kind: 'single', scope: 'root' },
         'shell.overlay': { kind: 'list', scope: 'root' },
+        'shell.mobile.header.context': { kind: 'list', scope: 'root' },
         'shell.mobile.header.actions': { kind: 'list', scope: 'session' },
       },
       store,

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-browser-startup-resource-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-browser-startup-resource-ownership.md
+document:
+  en: 42d674391550450d503212dbb0a7e67b2c669cf8
+  zh: 0ed8d8aefd66699cfff4e9ed17c41809d0f88510
+/agent-note-browser-startup-retains-its-resource-owner:
+  en: 119f879f8b0817d2
+  zh: 9446dd81697305d6
+/agent-note-browser-startup-retains-its-resource-owner/problem:
+  en: e35f28e33af23e73
+  zh: a6e44a8c2003f9d5
+/agent-note-browser-startup-retains-its-resource-owner/decision:
+  en: 2e799afc12b54e6d
+  zh: 10ae6d68ba7e9f55
+/agent-note-browser-startup-retains-its-resource-owner/alternatives-considered:
+  en: 39cde92cf1b4654f
+  zh: 2daff4cc2123abf6
+/agent-note-browser-startup-retains-its-resource-owner/consequences:
+  en: 664b193d59c2744e
+  zh: 8c3ccf4401e07b25
+/agent-note-browser-startup-retains-its-resource-owner/verification:
+  en: b0dbd600a35ecebf
+  zh: 7a1bd01ee229a249

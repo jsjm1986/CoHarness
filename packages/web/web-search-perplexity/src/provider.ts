@@ -1,12 +1,15 @@
 /**
  * Perplexity search over its OpenAI-compatible chat-completions endpoint. The generated answer
  * becomes `content`; sources prefer structured `search_results[]` and fall back to URL-only
- * `citations[]`. The wire format and native `fetch` client are provider-private and do not use
- * `ctx.llm`.
+ * `citations[]`. Preparation separates exact model input from deferred credentials and HTTP;
+ * governed adapter operations and independent web compositions share this transport.
  * @module @deepseek-ai/dsh-web-search-perplexity/provider
  */
 
+import { attributionHeaders, deepFreeze, type TokenUsage } from '@deepseek-ai/dsh-llm'
 import {
+  modelSearchUsage,
+  resolveModelSearchCredential,
   DEFAULT_WEB_RESPONSE_MAX_BYTES,
   MAX_WEB_RESPONSE_MAX_BYTES,
   readWebResponseJson,
@@ -38,11 +41,12 @@ export const PERPLEXITY_DEFAULT_MAX_RESPONSE_BYTES = DEFAULT_WEB_RESPONSE_MAX_BY
 /** Recency filter values Perplexity accepts for `search_recency_filter`. */
 export type PerplexityRecency = 'day' | 'week' | 'month' | 'year'
 
-/** Attribution header sent on every request. Bump with the package version. */
-const USER_AGENT = 'deepseek-harness/0.0.1'
-
 /** Resolved provider options (the plugin's `apply` supplies env-var and constant defaults). */
 export interface PerplexitySearchProviderOptions {
+  /** Request-owned adapter authentication; excludes API-key fallback when supplied. */
+  resolveHeaders?: (endpoint: string, signal?: AbortSignal) => Promise<Readonly<Record<string, string>>>
+  /** Exact input recorder; a failure prevents HTTP dispatch. */
+  recordRequest?: (request: PerplexitySearchLlmRequest) => void
   /** Perplexity API key. Empty/absent makes the provider unavailable. */
   apiKey: string
   /** Endpoint base; `/chat/completions` is appended. */
@@ -55,6 +59,41 @@ export interface PerplexitySearchProviderOptions {
   maxResponseBytes?: number
   /** Optional recency window sent as `search_recency_filter`; omitted = no filter. */
   searchRecency?: PerplexityRecency
+}
+
+/** Secret-free native Perplexity model input recorded before dispatch. */
+export interface PerplexitySearchLlmRequest {
+  /** Fully resolved chat-completions endpoint. */
+  readonly endpoint: string
+  /** Exact JSON request body. */
+  readonly body: {
+    readonly model: string
+    readonly max_tokens: number
+    readonly messages: readonly [{ readonly role: 'user'; readonly content: string }]
+    readonly search_recency_filter?: PerplexityRecency
+  }
+}
+
+declare module '@deepseek-ai/dsh-session/types' {
+  interface SessionEventMap {
+    /** Exact secret-free Perplexity model request recorded before dispatch. */
+    'web/perplexity-search-llm-request': PerplexitySearchLlmRequest
+  }
+}
+
+/** Native search prepared without credentials or provider I/O. */
+export interface PreparedPerplexitySearch {
+  /** Frozen exact request sent by execution. */
+  readonly request: PerplexitySearchLlmRequest
+  /**
+   * Execute the prepared request, including bounded response processing.
+   * @param signal - caller and model resource cancellation.
+   * @param onUsage - actual provider counters, reported before result mapping.
+   * @param resolveHeaders - request-owned authentication overriding prepared sources.
+   * @returns normalized search results after transport cleanup.
+   */
+  run(signal?: AbortSignal, onUsage?: (usage: TokenUsage) => void,
+    resolveHeaders?: PerplexitySearchProviderOptions['resolveHeaders']): Promise<WebSearchResult>
 }
 
 /**
@@ -98,11 +137,15 @@ export class PerplexitySearchProvider implements WebSearchProvider {
 
   constructor(private readonly options: PerplexitySearchProviderOptions) {}
 
+  private assertActive(signal: AbortSignal | undefined): void {
+    if (signal?.aborted === true) throw new WebError('Perplexity search aborted', 'WEB_ABORTED', { cause: signal.reason })
+  }
+
   // Availability checks stay beside each provider's distinct config contract;
   // a shared base class would obscure which fields make this backend usable.
   /* jscpd:ignore-start */
   available(): boolean {
-    return this.options.apiKey.length > 0
+    return (this.options.resolveHeaders !== undefined || this.options.apiKey.length > 0)
       && URL.canParse(this.options.baseURL)
       && isPositiveInteger(this.options.maxTokens)
       && isPositiveSafeInteger(this.options.maxResponseBytes ?? PERPLEXITY_DEFAULT_MAX_RESPONSE_BYTES)
@@ -110,28 +153,55 @@ export class PerplexitySearchProvider implements WebSearchProvider {
   /* jscpd:ignore-end */
 
   async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult> {
-    const responseLimit = this.options.maxResponseBytes ?? PERPLEXITY_DEFAULT_MAX_RESPONSE_BYTES
+    return this.prepare(request).run(signal)
+  }
+
+  /**
+   * Freeze wire input while deferring credentials and HTTP until execution.
+   * @param request - validated search request.
+   * @returns exact request and its deferred transport.
+   */
+  prepare(request: WebSearchRequest): PreparedPerplexitySearch {
+    const options = { ...this.options }
+    const endpoint = new URL(options.baseURL)
+    endpoint.pathname = `${endpoint.pathname.replace(/\/+$/u, '')}/chat/completions`
+    const input: PerplexitySearchLlmRequest = deepFreeze({ endpoint: endpoint.toString(), body: {
+      model: options.model, max_tokens: options.maxTokens,
+      messages: [{ role: 'user', content: request.query }],
+      ...options.searchRecency === undefined ? {} : { search_recency_filter: options.searchRecency },
+    } })
+    const responseLimit = options.maxResponseBytes ?? PERPLEXITY_DEFAULT_MAX_RESPONSE_BYTES
+    return Object.freeze({ request: input, run: (signal?: AbortSignal, onUsage?: (usage: TokenUsage) => void,
+      resolveHeaders?: PerplexitySearchProviderOptions['resolveHeaders']) =>
+      this.dispatch(resolveHeaders === undefined ? options : { ...options, resolveHeaders }, input, responseLimit, signal, onUsage),
+    })
+  }
+
+  private async dispatch(options: PerplexitySearchProviderOptions, input: PerplexitySearchLlmRequest,
+    responseLimit: number, signal?: AbortSignal, onUsage?: (usage: TokenUsage) => void): Promise<WebSearchResult> {
+    this.assertActive(signal)
+    const resolveHeaders = options.resolveHeaders
+    const headers = resolveHeaders === undefined ? { authorization: `Bearer ${options.apiKey}` }
+      : await resolveModelSearchCredential(() => resolveHeaders(input.endpoint, signal), signal, 'Perplexity search')
+    this.assertActive(signal)
+    options.recordRequest?.(input)
+    this.assertActive(signal)
     let response: Response
     try {
-      response = await fetch(`${this.options.baseURL}/chat/completions`, {
+      response = await fetch(input.endpoint, {
         method: 'POST',
         redirect: 'error',
         headers: {
-          'authorization': `Bearer ${this.options.apiKey}`,
+          ...headers,
           'content-type': 'application/json',
           'accept': 'application/json',
-          'user-agent': USER_AGENT,
+          ...attributionHeaders(),
         },
-        body: JSON.stringify({
-          model: this.options.model,
-          max_tokens: this.options.maxTokens,
-          messages: [{ role: 'user', content: request.query }],
-          ...this.options.searchRecency !== undefined ? { search_recency_filter: this.options.searchRecency } : {},
-        }),
+        body: JSON.stringify(input.body),
         ...signal !== undefined ? { signal } : {},
       })
     } catch (error: unknown) {
-      if (isAbortError(error)) throw new WebError('Perplexity search aborted', 'WEB_ABORTED', { cause: error })
+      if (signal?.aborted === true || isAbortError(error)) throw new WebError('Perplexity search aborted', 'WEB_ABORTED', { cause: error })
       throw new WebError(`Perplexity search request failed: ${String(error)}`, 'WEB_PROVIDER_ERROR', { cause: error })
     }
 
@@ -146,7 +216,7 @@ export class PerplexitySearchProvider implements WebSearchProvider {
         // An abort fired mid-body must surface as WEB_ABORTED, not be swallowed
         // into a generic HTTP-error message — cancellation is not a provider
         // error (the seam's cancellation contract).
-        if (isAbortError(error)) throw new WebError('Perplexity search aborted', 'WEB_ABORTED', { cause: error })
+        if (signal?.aborted === true || isAbortError(error)) throw new WebError('Perplexity search aborted', 'WEB_ABORTED', { cause: error })
         // Otherwise: the HTTP status is already captured in `message` above; a
         // malformed/non-JSON error body (normal for gateway 5xx/429s) can only
         // cost a richer provider message, never the real error.
@@ -156,6 +226,9 @@ export class PerplexitySearchProvider implements WebSearchProvider {
 
     try {
       const payload = await readWebResponseJson(response, responseLimit) as PerplexityResponse
+      const usage = modelSearchUsage(payload.usage, { inputTokens: 'prompt_tokens', outputTokens: 'completion_tokens',
+        totalTokens: 'total_tokens', reasoningTokens: 'reasoning_tokens' }, 'Perplexity search')
+      if (usage !== undefined) onUsage?.(usage)
       return mapPerplexityResponse(payload)
     } catch (error: unknown) {
       if (signal?.aborted === true || isAbortError(error)) throw new WebError('Perplexity search aborted', 'WEB_ABORTED', { cause: error })

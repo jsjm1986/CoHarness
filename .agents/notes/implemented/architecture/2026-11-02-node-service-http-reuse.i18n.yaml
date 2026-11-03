@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-02-node-service-http-reuse.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-02-node-service-http-reuse.md
+document:
+  en: ee44feb4b27102bd9bb35eb405d21cbe790dce27
+  zh: 473e7f20ab6006cf9b4636db6d0dd885da482867
+/agent-note-node-service-http-connection-reuse:
+  en: 1e1bcad40efe8011
+  zh: 9e19613d9a85d09f
+/agent-note-node-service-http-connection-reuse/problem:
+  en: 349917245b7f96cb
+  zh: f44d15b2da7538d0
+/agent-note-node-service-http-connection-reuse/decision:
+  en: c2b315ab328199e6
+  zh: 3f2850eee8998e5f
+/agent-note-node-service-http-connection-reuse/alternatives-considered:
+  en: 4376cd5ee59f00a6
+  zh: 173402908eab59f5
+/agent-note-node-service-http-connection-reuse/consequences:
+  en: a26b18ce9357e4e5
+  zh: 4d116a1c7778dd4c
+/agent-note-node-service-http-connection-reuse/verification:
+  en: 0b7b36705a2d7627
+  zh: bb597ab604c408d2

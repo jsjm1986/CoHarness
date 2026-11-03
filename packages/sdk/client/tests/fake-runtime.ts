@@ -14,7 +14,7 @@
  * - `FAKE_ECHO_ENV`: comma-separated env names to echo as `name=value` lines in the assistant text.
  * - `FAKE_MALFORMED`: `initialize` returns `{}` (no serverInfo); `prompt` returns `{}` (no messageId).
  * - `FAKE_MALFORMED_PROMPT`: `initialize` is normal; only `prompt` returns `{}` (no messageId).
- * - `FAKE_MALFORMED_DIRECTORY`: `session/working-directory/*` replies `{cwd: 17}` (non-string cwd probe).
+ * - `FAKE_MALFORMED_DIRECTORY`: replies `{cwd: 17}`, or `null` for `null`, to working-directory requests.
  * - `FAKE_INIT_ERROR`: `initialize` answers a JSON-RPC error response with code 7.
  * - `FAKE_INIT_ERROR_ONCE_FILE`: fail `initialize` (code 7) only when this
  *   marker file does NOT exist yet, creating it — so the first runtime
@@ -45,14 +45,27 @@
  * - `FAKE_STDERR`: write this line to stderr at boot (diagnostics-tail probe).
  * - `FAKE_STDERR_NO_NEWLINE`: write this to stderr WITHOUT a newline (buffer-flush probe).
  * - `FAKE_RECORD_INIT`: append each `initialize` params JSON to this file (handshake probe).
+ * - `FAKE_PID_FILE`: record this owned process id before its initialize handshake.
+ * - `FAKE_NOTIFICATION_BATCHES_FILE`: JSON notification batches emitted before successive working-directory responses.
  */
 
-import { appendFileSync, existsSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { createInterface } from 'node:readline'
 
 const env = process.env
+const notificationBatches = env.FAKE_NOTIFICATION_BATCHES_FILE === undefined ? []
+  : JSON.parse(readFileSync(env.FAKE_NOTIFICATION_BATCHES_FILE, 'utf8')) as { method: string; params: Record<string, unknown> }[][]
+if (env.DSH_SDK_PARENT_CONTROL !== undefined && env.FAKE_SKIP_PARENT_CONTROL === undefined) {
+  // This transport fixture acknowledges managed startup; real-profile tests own actual guard installation.
+  const control = JSON.parse(env.DSH_SDK_PARENT_CONTROL) as { url: string; token: string }
+  const response = await fetch(new URL('/runtime/ready', control.url), { method: 'POST',
+    headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ id: '1' }) })
+  if (!response.ok) throw new Error('Fake runtime parent-control acknowledgement failed.')
+  await response.body?.cancel()
+}
+if (env.FAKE_PID_FILE !== undefined) writeFileSync(env.FAKE_PID_FILE, String(process.pid))
 
 /** Legacy flat `assistant/message` field carrying the model source record. */
 const LEGACY_ASSISTANT_SOURCE_KEY = ['pro', 'venance'].join('')
@@ -227,7 +240,7 @@ reader.on('line', (line) => {
   if (line.trim().length === 0) return
   const frame = JSON.parse(line) as { id?: string | number; method?: string; params?: Record<string, unknown> }
   if (frame.method === undefined || frame.id === undefined) return
-  const respond = (result: object): void => { write({ jsonrpc: '2.0', id: frame.id, result }) }
+  const respond = (result: unknown): void => { write({ jsonrpc: '2.0', id: frame.id, result }) }
   switch (frame.method) {
     case 'initialize':
       if (typeof frame.params?.cwd === 'string') originCwd = frame.params.cwd
@@ -272,8 +285,9 @@ reader.on('line', (line) => {
       return
     case 'session/working-directory/get':
     case 'session/working-directory/set': {
+      for (const frame of notificationBatches.shift() ?? []) notify(frame.method, frame.params)
       if (env.FAKE_MALFORMED_DIRECTORY !== undefined) {
-        respond({ cwd: 17 })
+        respond(env.FAKE_MALFORMED_DIRECTORY === 'null' ? null : { cwd: 17 })
         return
       }
       const sessionId = sessionIdOf(frame.params)

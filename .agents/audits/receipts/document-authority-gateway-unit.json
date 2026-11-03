@@ -1,0 +1,14 @@
+{
+  "name": "document-authority-gateway-unit",
+  "cwd": "gateway",
+  "command": "npm test -- --retry=0",
+  "startedAt": "2026-10-25T00:33:23.663103+00:00",
+  "seconds": 25.185,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "86bf85bbac39e662723bb01f26e433fe25335eb3375d90b45c35236f2d8b3aea",
+  "inputsAfter": "86bf85bbac39e662723bb01f26e433fe25335eb3375d90b45c35236f2d8b3aea",
+  "postgresToolDirectory": null,
+  "outputSha256": "435b32f26b97f6b96a9e40f3199fde83ea5994d07f147691c3463693da5e2e17",
+  "outputTail": "\n> test\n> vitest run --exclude tests/postgres.spec.ts --exclude tests/auth-postgres.spec.ts --exclude tests/project-activity-postgres.spec.ts --exclude tests/project-progress-postgres.spec.ts --exclude tests/project-service-postgres.spec.ts --exclude tests/access-invalidation.spec.ts --exclude tests/execution.spec.ts --exclude tests/ssh.spec.ts --exclude tests/webhook.spec.ts --exclude tests/maintenance.spec.ts --exclude tests/deployment-restore.spec.ts --exclude tests/deployment-backups.spec.ts --exclude tests/node-config-process.spec.ts --exclude tests/startup-generation.spec.ts --exclude tests/execution-scopes.spec.ts --exclude tests/admin-business-postgres.spec.ts --exclude tests/instance-capacity-postgres.spec.ts --retry=0\n\n\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/local-runtime-launcher.spec.ts (16 tests | 1 failed) 8495ms\n     × retains uncertain occupancy when an unavailable owner record says stopped 507ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/local-runtime-launcher.spec.ts > recoverable LocalLauncher > retains uncertain occupancy when an unavailable owner record says stopped\nError: kill EPERM\n ❯ LocalRuntimeControl.groupExists src/local-runtime-control.ts:86:19\n     84|\n     85|   private groupExists(pid: number): boolean {\n     86|     try { process.kill(-pid, 0); return true } catch (error) {\n       |                   ^\n     87|       if ((error as NodeJS.ErrnoException).code === 'ESRCH') return fa…\n     88|       throw error\n ❯ LocalRuntimeControl.confirmStopped src/local-runtime-control.ts:73:110\n ❯ LocalRuntimeControl.stop src/local-runtime-control.ts:53:11\n ❯ tests/local-runtime-launcher.spec.ts:164:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 70 passed | 3 skipped (74)\n      Tests  1 failed | 844 passed | 93 skipped (938)\n   Start at  08:33:24\n   Duration  24.13s (transform 14.18s, setup 0ms, import 24.54s, tests 129.75s, environment 5ms)\n\n"
+}

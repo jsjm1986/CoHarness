@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { ExecutionInheritance, ExecutionInputId, ExecutionScopeId } from '@deepseek-ai/dsh-execution-authority'
-import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { describe, expect, expectTypeOf, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import AgentRegistry, { agentCarrier } from '@deepseek-ai/dsh-agent'
@@ -14,6 +14,7 @@ import type {
 } from '@deepseek-ai/dsh-jobs'
 import LocalJobRegistry, { type Config as JobsConfig } from '@deepseek-ai/dsh-jobs-local'
 import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 
 vi.mock('node:crypto', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:crypto')>()
@@ -265,6 +266,13 @@ describe('LocalJobRegistry.start', () => {
     await expect(ctx.plugin(LocalJobRegistry, { pumpPollMs: 0 })).rejects.toThrow()
   })
 
+  it('rejects a pump interval that Node would clamp to one millisecond', async () => {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    const activated = await ctx.plugin(LocalJobRegistry, { pumpPollMs: 2_147_483_648 }).then(() => true, () => false)
+    expect(activated).toBe(false)
+  })
+
   it('accepts the largest safe integer limit', async () => {
     const ctx = await harness({ maxConcurrentJobsPerOwner: Number.MAX_SAFE_INTEGER })
     expect(ctx.jobs).toBeInstanceOf(LocalJobRegistry)
@@ -311,6 +319,65 @@ describe('LocalJobRegistry.start', () => {
     first.settle({ status: 'killed' })
     await tick()
     expect(ctx.jobs.start(replacement.spec)).toMatch(/^bash-[0-9a-f]{16}$/)
+  })
+
+  it.each([false, true])('counts a producer still inside its start callback (owned: %s)', async (owned) => {
+    const ctx = await harness({ maxConcurrentJobsPerOwner: 1 })
+    const owner = owned ? await liveAgent(ctx, 'reentrant-owner') : undefined
+    const overrides = owner === undefined ? {} : { owner }
+    const outer = producer(overrides), inner = producer(overrides)
+    onTestFinished(async () => {
+      outer.settle({ status: 'completed' }); inner.settle({ status: 'completed' })
+      await ctx.fiber.dispose()
+    })
+    const runInner = vi.fn((handle: JobHandle) => inner.spec.run(handle))
+    let rejection: unknown
+    const id = ctx.jobs.start({ ...outer.spec, run: (handle) => {
+      try { ctx.jobs.start({ ...inner.spec, run: runInner }) } catch (error) { rejection = error }
+      return outer.spec.run(handle)
+    } })
+    expect(rejection).toBeInstanceOf(Error)
+    expect(String(rejection)).toContain('(limit: 1)')
+    expect(runInner).not.toHaveBeenCalled()
+    expect(ctx.jobs.list(owner?.id).map(job => job.id)).toEqual([id])
+  })
+
+  it('releases the starting slot when the producer throws before registration', async () => {
+    const ctx = await harness({ maxConcurrentJobsPerOwner: 1 })
+    const completed = producer()
+    onTestFinished(async () => { completed.settle({ status: 'completed' }); await ctx.fiber.dispose() })
+    const failure = new Error('Producer could not start.')
+    expect(() => ctx.jobs.start({ kind: 'bash', label: 'failed start', run: () => {
+      expect(() => ctx.jobs.start(completed.spec)).toThrow('(limit: 1)')
+      throw failure
+    } })).toThrow(failure)
+    expect(ctx.jobs.list()).toEqual([])
+    expect(ctx.bail('runtime/idle-release-check')).toBeUndefined()
+    expect(() => ctx.jobs.start(completed.spec)).not.toThrow()
+  })
+
+  it('shares a two-job limit across nested starts and registered jobs until settlement', async () => {
+    const ctx = await harness({ maxConcurrentJobsPerOwner: 2 })
+    const outer = producer(), inner = producer(), replacement = producer()
+    let innerId: JobId | undefined
+    onTestFinished(async () => {
+      outer.settle({ status: 'completed' }); inner.settle({ status: 'completed' }); replacement.settle({ status: 'completed' })
+      await ctx.fiber.dispose()
+    })
+    ctx.jobs.start({ ...outer.spec, run: (outerHandle) => {
+      innerId = ctx.jobs.start({ ...inner.spec, run: (innerHandle) => {
+        expect(() => ctx.jobs.start(replacement.spec)).toThrow('(limit: 2)')
+        return inner.spec.run(innerHandle)
+      } })
+      expect(() => ctx.jobs.start(replacement.spec)).toThrow('(limit: 2)')
+      return outer.spec.run(outerHandle)
+    } })
+    expect(ctx.jobs.list()).toHaveLength(2)
+    if (innerId === undefined) throw new Error('The fixture did not register its nested producer.')
+    inner.settle({ status: 'completed' })
+    await ctx.jobs.wait(innerId, 1_000)
+    expect(() => ctx.jobs.start(replacement.spec)).not.toThrow()
+    expect(ctx.jobs.list().filter(job => job.status === 'running')).toHaveLength(2)
   })
 
   it.each(['completed', 'killed', 'failed'] as const)(
@@ -501,6 +568,7 @@ describe('LocalJobRegistry reads and settlement', () => {
 
     expect(ctx.jobs.get(id)).toMatchObject({ status: 'failed', detail: 'Error: transport exploded' })
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('producer contract violation'))
+    expect(ctx.bail('runtime/idle-release-check')).toBe('busy')
   })
 
   it('unregisters event listeners with the contributing fiber (HMR safety)', async () => {
@@ -823,6 +891,28 @@ describe('LocalJobRegistry owner isolation', () => {
     expect(ctx.jobs.start(producer().spec)).toMatch(/^bash-[0-9a-f]{16}$/)
   })
 
+  it('refuses owner admission when the optional agent registry disappears during preflight', async () => {
+    const ctx = new Context()
+    await ctx.plugin(AgentRegistry)
+    const fiber = await ctx.plugin(LocalJobRegistry)
+    const jobs = ctx.jobs
+    jobs.attachController('test-controller')
+    const owner = await liveAgent(ctx, 'withdrawn-registry-owner')
+    const pending = producer({ owner }), run = vi.fn((handle: JobHandle) => pending.spec.run(handle))
+    const get = vi.spyOn(fiber.ctx, 'get')
+    try {
+      // Withdrawal after owner lookup must still refuse work before its producer runs.
+      const spec: JobSpec = { ...pending.spec, run, get label() { get.mockReturnValue(undefined); return 'late registry withdrawal' } }
+      expect(() => jobs.start(spec)).toThrow('background job ownership requires the agent registry')
+      expect(run).not.toHaveBeenCalled()
+      expect(jobs.list(owner.id)).toEqual([])
+    } finally {
+      get.mockRestore()
+      pending.settle({ status: 'completed' })
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('rejects a session without a live agent and attaches cleanup once it has one', async () => {
     const ctx = await harness()
     const ghost = stubAgent(ctx, 'ghost') // never registered in ctx.agents
@@ -1020,6 +1110,8 @@ describe('LocalJobRegistry owner cleanup', () => {
     void drain.then(() => { drained = true })
     await tick()
     const drainedWithoutProducerDone = drained
+    const busyWhileProducerPending = ctx.bail('runtime/idle-release-check')
+    const ownerBusyWhileProducerPending = ctx.bail(agentCarrier(owner), 'agent/idle-release-check', { agent: owner })
     if (!drainedWithoutProducerDone) {
       // Release the producer if the assertion fails so the test can finish.
       settle({ status: 'completed' })
@@ -1031,6 +1123,9 @@ describe('LocalJobRegistry owner cleanup', () => {
     }
 
     expect(drainedWithoutProducerDone).toBe(true)
+    expect(busyWhileProducerPending).toBe('busy')
+    expect(ownerBusyWhileProducerPending).toBe('busy')
+    expect(ctx.bail('runtime/idle-release-check')).toBeUndefined()
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('work may be orphaned'))
     expect(seen).toHaveLength(1)
     expect(seen[0]).toMatchObject({ cause: 'teardown', job: { status: 'failed' } })
@@ -1040,6 +1135,34 @@ describe('LocalJobRegistry owner cleanup', () => {
 })
 
 describe('LocalJobRegistry idle release veto', () => {
+  it.each([false, true])('retains its veto while provider cleanup waits for a producer (owned: %s)', async (owned) => {
+    const ctx = new Context()
+    await ctx.plugin(AgentRegistry)
+    const owner = owned ? await liveAgent(ctx, 'unloading-job-owner') : undefined
+    const cancelling = Promise.withResolvers<undefined>()
+    const task = producer({ ...owner === undefined ? {} : { owner }, cancel: () => { cancelling.resolve(undefined) } })
+    let disposal: Promise<void> | undefined
+    try {
+      const fiber = await ctx.plugin(LocalJobRegistry)
+      const jobs = ctx.jobs
+      jobs.attachController('test-controller')
+      jobs.start(task.spec)
+      disposal = fiber.dispose()
+      await cancelling.promise
+      expect(jobs.list(owner?.id).map(job => job.status)).toEqual(['stopping'])
+      expect(ctx.bail('runtime/idle-release-check')).toBe('busy')
+      if (owner !== undefined) expect(ctx.bail(agentCarrier(owner), 'agent/idle-release-check', { agent: owner })).toBe('busy')
+      task.settle({ status: 'killed' })
+      await disposal
+      expect(ctx.bail('runtime/idle-release-check')).toBeUndefined()
+      if (owner !== undefined) expect(ctx.bail(agentCarrier(owner), 'agent/idle-release-check', { agent: owner })).toBeUndefined()
+    } finally {
+      task.settle({ status: 'killed' })
+      await disposal
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('reports busy while the asked Agent owns a running job and releases it once settled', async () => {
     const ctx = await harness()
     const owner = await liveAgent(ctx, 'owner')
@@ -1057,11 +1180,51 @@ describe('LocalJobRegistry idle release veto', () => {
     const ctx = await harness()
     const agent = await liveAgent(ctx, 'agent')
     ctx.jobs.start(producer().spec)
+    expect(ctx.bail('runtime/idle-release-check')).toBe('busy')
     expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBeUndefined()
   })
 })
 
 describe('LocalJobRegistry disposal', () => {
+  it('refuses new starts through a captured registry while teardown waits for accepted work', async () => {
+    const ctx = new Context()
+    const cancelling = Promise.withResolvers<undefined>()
+    const first = producer({ cancel: () => { cancelling.resolve(undefined) } }), late = producer()
+    let disposal: Promise<void> | undefined
+    try {
+      const fiber = await ctx.plugin(LocalJobRegistry)
+      const jobs = ctx.jobs
+      jobs.attachController('test-controller')
+      jobs.start(first.spec)
+      disposal = fiber.dispose()
+      await cancelling.promise
+      const run = vi.fn((handle: JobHandle) => late.spec.run(handle))
+      expect(() => jobs.start({ ...late.spec, run })).toThrow('job registry is closed')
+      expect(run).not.toHaveBeenCalled()
+    } finally {
+      first.settle({ status: 'killed' }); late.settle({ status: 'completed' })
+      await disposal
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('refuses new starts through a captured registry after service disposal', async () => {
+    const ctx = new Context()
+    const late = producer()
+    try {
+      const fiber = await ctx.plugin(LocalJobRegistry)
+      const jobs = ctx.jobs
+      jobs.attachController('test-controller')
+      await fiber.dispose()
+      const run = vi.fn((handle: JobHandle) => late.spec.run(handle))
+      expect(() => jobs.start({ ...late.spec, run })).toThrow('job registry is closed')
+      expect(run).not.toHaveBeenCalled()
+    } finally {
+      late.settle({ status: 'completed' })
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('cancels live jobs, awaits settlement, and announces the teardown to outside subscribers', async () => {
     const ctx = new Context()
     await ctx.plugin(AgentRegistry)
@@ -1115,6 +1278,7 @@ describe('LocalJobRegistry disposal', () => {
     void disposal.then(() => { disposed = true })
     await tick()
     const disposedWithoutProducerDone = disposed
+    const busyWhileProducerPending = ctx.bail('runtime/idle-release-check')
     if (!disposedWithoutProducerDone) {
       // Release the producer if the assertion fails so the test can finish.
       settle({ status: 'completed' })
@@ -1125,6 +1289,8 @@ describe('LocalJobRegistry disposal', () => {
     }
 
     expect(disposedWithoutProducerDone).toBe(true)
+    expect(busyWhileProducerPending).toBe('busy')
+    expect(ctx.bail('runtime/idle-release-check')).toBeUndefined()
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('work may be orphaned'))
     expect(seen).toMatchObject([{ type: 'settled', cause: 'teardown', job: { status: 'failed' } }])
   })
@@ -1613,5 +1779,96 @@ describe('LocalJobRegistry pull sources', () => {
     await new Promise(resolve => setTimeout(resolve, 5))
     // The forced failure is the only warning: the pump's later drains are silent.
     expect(warn.mock.calls.map(call => String(call[0]))).toEqual([expect.stringContaining('work may be orphaned')])
+  })
+})
+
+describe('owned job Session lifecycle records', () => {
+  async function journalHarness(): Promise<Context> {
+    const ctx = await harness()
+    onTestFinished(() => ctx.fiber.dispose())
+    return ctx
+  }
+
+  it('publishes lifecycle records before synchronous observer reactions', async () => {
+    const ctx = await journalHarness(), owner = await liveAgent(ctx, 'ordered-journal-owner')
+    const p = producer({ owner, cancel: () => { p.settle({ status: 'killed' }) } })
+    ctx.jobs.events.subscribe({ owners: 'all' }, (event) => {
+      if (event.type !== 'registered' && event.type !== 'settled') return
+      owner.session.append('agent/inbox/spliced', { target: 'next-step', start: 0,
+        inserted: [createUserMessage({ content: [{ type: 'text', text: event.type }], source: { kind: 'user' } })] })
+    })
+    const id = ctx.jobs.start(p.spec)
+    p.settle({ status: 'completed' })
+    await ctx.jobs.wait(id, 1000, owner.id)
+    expect(owner.session.snapshotEvents().map(event => event.type)).toEqual([
+      'job/registered', 'agent/inbox/spliced', 'job/settled', 'agent/inbox/spliced',
+    ])
+  })
+
+  it('retains the original owner, timestamps and nested tool identity independently of output reads', async () => {
+    const ctx = await journalHarness(), owner = await liveAgent(ctx, 'attributed-journal-owner')
+    const p = producer({ owner, cancel: () => { p.settle({ status: 'killed' }) } })
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000)
+    try {
+      const toolCall = { callId: ToolCallId('root:ptc:1'), rootCallId: ToolCallId('root') }
+      const id = ctx.jobs.start({ ...p.spec, toolCall })
+      toolCall.callId = ToolCallId('later:ptc:2')
+      p.job().append('unread result')
+      const registered = owner.session.snapshotEvents().find(event => event.type === 'job/registered')
+      expect(registered?.data).toMatchObject({ jobId: id, owner: owner.id, startedAt: 1000,
+        toolCall: { callId: 'root:ptc:1', rootCallId: 'root' } })
+      clock.mockReturnValue(2500)
+      p.settle({ status: 'completed', detail: 'exit code: 0' })
+      await ctx.jobs.wait(id, 1000, owner.id)
+      const settled = owner.session.snapshotEvents().find(event => event.type === 'job/settled')
+      expect(settled?.data).toEqual({ ...registered?.data, finishedAt: 2500, status: 'completed', cause: 'producer',
+        producerReported: true, detail: 'exit code: 0' })
+      expect(ctx.jobs.read(id, owner.id).chunks.map(chunk => chunk.text)).toEqual(['unread result'])
+      expect(owner.session.deriveMessages()).toEqual([])
+    } finally { clock.mockRestore() }
+  })
+
+  it.each(['completed', 'failed', 'rejected'] as const)('records whether the producer reported %s', async (status) => {
+    const ctx = await journalHarness(), owner = await liveAgent(ctx, `journal-${status}`)
+    const p = producer({ owner, cancel: () => { p.settle({ status: 'killed' }) } })
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    try {
+      const id = ctx.jobs.start(p.spec)
+      if (status === 'rejected') p.reject(new Error('producer rejected'))
+      else p.settle({ status })
+      await ctx.jobs.wait(id, 1000, owner.id)
+      expect(owner.session.snapshotEvents().find(event => event.type === 'job/settled')?.data)
+        .toMatchObject({ status: status === 'rejected' ? 'failed' : status, cause: 'producer', producerReported: status !== 'rejected' })
+    } finally { warn.mockRestore() }
+  })
+
+  it('records a forced teardown failure once before removing the owned row', async () => {
+    const ctx = await journalHarness(), owner = await liveAgent(ctx, 'forced-journal-owner')
+    const p = producer({ owner, cancel() { throw new Error('cancel failed') } })
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    try {
+      ctx.jobs.start(p.spec)
+      await disposeAgentScope(owner)
+      p.settle({ status: 'completed' })
+      await tick()
+      const events = owner.session.snapshotEvents().filter(event => event.type === 'job/settled')
+      expect(events).toHaveLength(1)
+      expect(events[0]?.data).toMatchObject({ status: 'failed', cause: 'teardown', producerReported: false })
+      expect(ctx.jobs.list(owner.id)).toEqual([])
+    } finally { p.settle({ status: 'killed' }); warn.mockRestore() }
+  })
+
+  it('contains journal append failures without orphaning the producer or retaining waiters', async () => {
+    const ctx = await journalHarness(), owner = await liveAgent(ctx, 'failed-journal-owner')
+    const p = producer({ owner, cancel: () => { p.settle({ status: 'killed' }) } })
+    const append = vi.spyOn(owner.session, 'append').mockImplementation(() => { throw Object.create(null) })
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    try {
+      const id = ctx.jobs.start(p.spec)
+      p.settle({ status: 'completed' })
+      expect((await ctx.jobs.wait(id, 1000, owner.id)).status).toBe('completed')
+      expect(warn).toHaveBeenCalledTimes(2)
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('failed to record lifecycle'))
+    } finally { append.mockRestore(); warn.mockRestore() }
   })
 })

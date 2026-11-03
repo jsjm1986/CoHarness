@@ -97,6 +97,6 @@ export function executionScope(value: unknown): ExecutionInheritance {
 export function hasUnverifiedExecutionInput(message: UserMessage): boolean {
   const source = message.source as unknown as Record<string, unknown>
   if (source.gatewayExecutionScope !== undefined) return executionScope(source.gatewayExecutionScope).unverifiedHistory
-  return (source.kind === 'user' && executionInputOf(message) === undefined)
+  return ((source.kind === 'user' || source.kind === 'user-question-reply') && executionInputOf(message) === undefined)
     || source.kind === 'agent-message' || source.kind === 'subagent-settled' || source.kind === 'team-message'
 }

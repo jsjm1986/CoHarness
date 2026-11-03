@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-24-disabled-organization-human-auth.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-disabled-organization-human-auth.md
+document:
+  en: 666e08af448de9a3795dd7c1e89c688d6a77586e
+  zh: 8d641681b3624292f55022d14765f2f9930c2f30
+/agent-note-disabled-organization-human-authentication:
+  en: db5db322da2cf84b
+  zh: 02e7a3d9aa60fe57
+/agent-note-disabled-organization-human-authentication/problem:
+  en: 9380e82695d0fe6f
+  zh: 51ff77b8cc5cbc0b
+/agent-note-disabled-organization-human-authentication/decision:
+  en: ad35b7b6b0e6d7dc
+  zh: ad08fa58e1778267
+/agent-note-disabled-organization-human-authentication/alternatives-considered:
+  en: 431c4165a325367b
+  zh: f919bfd64714c15e
+/agent-note-disabled-organization-human-authentication/consequences:
+  en: d4b1208436d7fb5d
+  zh: e8a08bdbcf638981

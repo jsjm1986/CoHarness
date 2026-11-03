@@ -1,0 +1,13 @@
+{
+  "name": "resource-root-unit",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/instances.spec.ts tests/launcher.spec.ts tests/systemd.spec.ts tests/config.spec.ts tests/runtime-capacity.spec.ts tests/node-resource-pressure.spec.ts",
+  "startedAt": "2026-10-23T12:27:59.342748+00:00",
+  "seconds": 14.369,
+  "exitCode": 0,
+  "inputsBefore": "ae6d3ada920e49aeb584da0ecdede9430a9e42ab7d517cdf5fbedede3d7be8c6",
+  "inputsAfter": "ae6d3ada920e49aeb584da0ecdede9430a9e42ab7d517cdf5fbedede3d7be8c6",
+  "outputSha256": "558b26f808ebaf971e609a2acad33d206014c656b3590e8afe150a8e3170c7bc",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  6 passed (6)\n      Tests  109 passed (109)\n   Start at  20:28:01\n   Duration  12.17s (transform 670ms, setup 0ms, import 1.01s, tests 12.18s, environment 0ms)\n\n",
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "sdk-parent-control-provider-unit-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts packages/subagent/subagent-dsh-sdk/tests/subagent-dsh-sdk.spec.ts packages/llm/llm/tests plugins/dsh-model-governance/tests --retry=0",
+  "startedAt": "2026-10-24T12:24:55.531835+00:00",
+  "seconds": 11.027,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e1db332ee7c64a413ce7dfcc5349dff9c9b4ae343f1b03c4335a0568a0c2d5df",
+  "inputsAfter": "e1db332ee7c64a413ce7dfcc5349dff9c9b4ae343f1b03c4335a0568a0c2d5df",
+  "postgresToolDirectory": null,
+  "outputSha256": "9e0df516f082dadb07be0651bf5d71200a7961b88694083eb69c9fd86ffe312e",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts (16 tests | 1 failed) 89ms\n   × joins a late grant during provider unload without constructing a client 6ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts > joins a late grant during provider unload without constructing a client\nAssertionError: expected [Function] to throw error including 'aborted before the SDK child started' but got 'SDK subagent provider was unloaded.'\n\nExpected: \"aborted before the SDK child started\"\nReceived: \"SDK subagent provider was unloaded.\"\n\n ❯ packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts:90:27\n     88|     closing = f.ctx.fiber.dispose()\n     89|     grant.resolve(f.lease)\n     90|     await expect(starting).rejects.toThrow('aborted before the SDK chi…\n       |                           ^\n     91|     await closing\n     92|     expect(f.create).not.toHaveBeenCalled()\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 17 passed (18)\n      Tests  1 failed | 423 passed (424)\n   Start at  20:24:59\n   Duration  6.93s (transform 10.96s, setup 1.03s, import 15.89s, tests 3.78s, environment 2ms)\n\n"
+}

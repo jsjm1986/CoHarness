@@ -1,0 +1,14 @@
+{
+  "name": "memory-lifecycle-lint-final",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/memory/memory/src/index.ts packages/memory/memory/tests/harness.ts packages/memory/memory/tests/lifecycle.spec.ts examples/headless-agent/tests/memory-lifecycle.snapshot.ts examples/headless-agent/tests/fixtures/memory-lifecycle-driver.ts",
+  "startedAt": "2026-10-24T01:21:41.630921+00:00",
+  "seconds": 6.08,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2141cb5c0b5d312b10286990ad48e9e937ed8f017cecbfb4bcc96c61b7a80b2b",
+  "inputsAfter": "2141cb5c0b5d312b10286990ad48e9e937ed8f017cecbfb4bcc96c61b7a80b2b",
+  "postgresToolDirectory": null,
+  "outputSha256": "94476841d4b6c3cfca6fffeede3cee5b4c0874d461255c3f44e56b6d39a5afa8",
+  "outputTail": "packages/memory/memory/tests/lifecycle.spec.ts:12:37: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/memory/memory/tests/lifecycle.spec.ts:20:20: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/memory/memory/tests/lifecycle.spec.ts:21:16: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/memory/memory/tests/lifecycle.spec.ts:22:17: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/memory/memory/tests/lifecycle.spec.ts:24:31: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\nexamples/headless-agent/tests/memory-lifecycle.snapshot.ts:21:20: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\nexamples/headless-agent/tests/fixtures/memory-lifecycle-driver.ts:17:44: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\nexamples/headless-agent/tests/fixtures/memory-lifecycle-driver.ts:18:45: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\n"
+}

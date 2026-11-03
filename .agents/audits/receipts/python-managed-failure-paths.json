@@ -1,0 +1,13 @@
+{
+  "name": "python-managed-failure-paths",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/ptc-runtime-python/tests/boot-write-failure.spec.ts --retry=0",
+  "startedAt": "2026-10-23T16:03:41.692909+00:00",
+  "seconds": 6.888,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b6263916d7d24cefc95a923f1a7d8158275d7d6ca0893f87f4be3d7302135090",
+  "inputsAfter": "b6263916d7d24cefc95a923f1a7d8158275d7d6ca0893f87f4be3d7302135090",
+  "outputSha256": "d221053b882195d06768b0daae9065bf6d62dc49fadc24f2f3d5585cd032af47",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  20 passed (20)\n   Start at  00:03:44\n   Duration  3.89s (transform 326ms, setup 25ms, import 393ms, tests 3.40s, environment 0ms)\n\n"
+}

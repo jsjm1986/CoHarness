@@ -49,6 +49,8 @@ The context source is `{ kind: 'session-reference', version: 1, references }`; e
 
 Retention applies `maxReferenceBytes` independently to each source, keeps compact checkpoints and the newest message before dropping older non-checkpoint units, and uses `dsh-output-retention` head/tail truncation with an exact UTF-8 omission notice. If one source's fixed serialized fields cannot fit, preparation fails with `SESSION_REFERENCE_BUDGET_EXCEEDED` instead of returning a partial context.
 
+Candidate discovery and reference preparation retain the [application authorization requirement](../collaboration/README.md#application-authorization) across provider replacement.
+
 <a id="model-experience"></a>
 ## Model Experience
 
@@ -69,7 +71,7 @@ The request and snapshot are consecutive append-only target messages and preserv
 ## Known Limitations and Deferred Work
 
 - **No body discovery** — candidate queries inspect projected titles (or the compatibility log-backed fallback) but do not search message bodies. Sessions without a projection are discoverable by id/cwd until opened once; a dedicated title index may replace that path without changing URI, snapshot, or persistence contracts.
-- **Collaboration filtering** — when `ctx.collaboration` is composed, candidate discovery and snapshot preparation use its current readable-session authority. Preparation checks all sources before reading, before saving full snapshots, and before publishing context; a revocation or provider disappearance rejects the complete preparation. Final checks are batched, not per source. A completed authorization response is the publication checkpoint, not an atomic transaction with later ACL changes. Compositions that start without that service retain the trusted-caller behavior; this is not a model-facing search tool.
+- **Collaboration filtering** — when `ctx.collaboration` is composed, candidate discovery and snapshot preparation use its current readable-session authority. Preparation checks all sources before reading, before saving full snapshots, and before publishing context; a revocation or provider disappearance rejects the complete preparation. Final checks are batched, not per source. A completed authorization response is the publication checkpoint, not an atomic transaction with later ACL changes. Independent applications without a collaboration requirement retain the trusted-caller behavior; this is not a model-facing search tool.
 - **Text projection only** — non-text user and assistant blocks are not propagated across sessions.
 - **No live link** — references are snapshots, not forks, resumes, subscriptions, or source-session mutations.
 - **`zod` is a runtime dependency of generated Typert faces, not of `src`.** The published `./typert` and `./remote` exports resolve to unbundled `lib/typert.*.js` files with bare `zod` imports. The manifest must retain `zod`; `knip.config.ts` adds a workspace-scoped exception only when neither generated JavaScript face exists, while a built checkout lets Knip observe the import directly.

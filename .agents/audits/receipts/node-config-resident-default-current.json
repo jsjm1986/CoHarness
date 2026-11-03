@@ -1,0 +1,13 @@
+{
+  "name": "node-config-resident-default-current",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/node-config-store.spec.ts --retry=0",
+  "startedAt": "2026-10-23T20:27:15.100756+00:00",
+  "seconds": 3.078,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "61126578c0d8291e76098cf680859f510c6ca6d2a9080588f18df299125b6acb",
+  "inputsAfter": "61126578c0d8291e76098cf680859f510c6ca6d2a9080588f18df299125b6acb",
+  "outputSha256": "d85357707eb9a5a332d47dea55f09e9cf8b9f61594e2102418bcefb3d49625ab",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  7 passed (7)\n   Start at  04:27:17\n   Duration  520ms (transform 95ms, setup 0ms, import 151ms, tests 245ms, environment 0ms)\n\n"
+}

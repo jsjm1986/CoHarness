@@ -1,5 +1,6 @@
 /** Project progress digest: gates, lease, material folding, output validation. */
-import type { Pool } from 'pg'
+import { Client, Pool } from 'pg'
+import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   PostgresProgressService,
@@ -8,36 +9,58 @@ import {
   resolveDigestOutput,
 } from '../src/postgres/progress-service.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
+import type { GatewayModelBudget } from '../src/gateway-model-budget.ts'
+import type { ResourceOperationId } from '@deepseek-ai/dsh-resource-budget/types'
+import type { PostgresProgressUsage, ProgressRequestId } from '../src/postgres/progress-usage.ts'
 
 const context = {
   organizationId: 'org-1', organizationSlug: 'org', nodeId: 'node-1', nodeName: 'node',
-  pool: undefined as unknown as Pool,
 }
+const SOURCE_RUNTIME = '22222222-2222-4222-8222-222222222222'
+const pools = new Set<Pool>()
 
-interface Handler { readonly match: RegExp; readonly result: () => { rows: unknown[]; rowCount?: number } }
+interface Handler { readonly match: RegExp; readonly result: (values?: readonly unknown[]) => { rows: unknown[]; rowCount?: number } }
 
 /** A pool whose `query` resolves through the first matching SQL handler. */
 function scriptedPool(handlers: Handler[]): Pool & { query: ReturnType<typeof vi.fn> } {
-  const query = vi.fn(async (sql: string) => {
+  const query = vi.fn(async (sql: string, values?: readonly unknown[]) => {
     if (/^\s*(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return { rows: [], rowCount: 0 }
     const handler = handlers.find(entry => entry.match.test(sql))
     if (handler === undefined) {
       if (/digest_model FROM harness\.organizations/.test(sql)) return { rows: [{ digest_model: null }], rowCount: 1 }
+      if (/SELECT source\.id FROM/.test(sql)) {
+        const ids = values?.[3]
+        if (!Array.isArray(ids)) throw new Error('Expected material Session ids')
+        return { rows: ids.map(id => ({ id })), rowCount: ids.length }
+      }
+      if (/SELECT 1 FROM harness\.(organizations|projects)/.test(sql)) return { rows: [{}], rowCount: 1 }
+      if (/generation_id=\$3 RETURNING project_id/.test(sql)) return { rows: [{}], rowCount: 1 }
+      if (/INSERT INTO harness\.project_journal_materials/.test(sql)) return { rows: [], rowCount: 1 }
+
       throw new Error(`unhandled query: ${sql.slice(0, 140)}`)
     }
-    return handler.result()
+    const result = handler.result(values)
+    if (!sql.includes('cursor_ts')) return result
+    return { ...result, rows: result.rows.map(row => {
+      if (row === null || typeof row !== 'object' || !('ts' in row) || !(row.ts instanceof Date)) return row
+      const item = row as Record<string, unknown>
+      return { ...item, runtime_id: item.runtime_id ?? SOURCE_RUNTIME, runtime_namespace: item.runtime_namespace ?? SOURCE_RUNTIME, cursor_ts: row.ts.toISOString().replace('Z', '000Z'), ts_us: String(BigInt(row.ts.getTime()) * 1000n),
+        entry_id: item.entry_id ?? `${item.kind === 'decision' ? 'question:fixture' : 'message'}:${String(item.seq)}` }
+    }) }
   })
-  return {
+  const pool = new Pool()
+  pools.add(pool)
+  return Object.assign(pool, {
     query,
-    connect: async () => ({ query, release: vi.fn() }),
-  } as unknown as Pool & { query: ReturnType<typeof vi.fn> }
+    connect: async () => Object.assign(new Client(), { query, release: vi.fn() }),
+  })
 }
 
 const rows = (list: unknown[], rowCount?: number): { rows: unknown[]; rowCount: number } =>
   ({ rows: list, rowCount: rowCount ?? list.length })
 
 const authority = (mode: 'rw' | 'ro', administrator = false) => ({
-  projectId: 9, name: 'P', path: '/p', mode, administrator,
+  projectId: 9, name: 'P', path: '/p', mode, administrator, canManage: administrator, uiThemePolicy: 'follow-user' as const,
 })
 
 const POLICY = {
@@ -53,7 +76,8 @@ const POLICY = {
 
 function serviceFor(
   pool: Pool,
-  options?: { mode?: 'rw' | 'ro'; denied?: boolean; policy?: unknown; config?: Partial<typeof DEFAULT_PROGRESS_CONFIG> },
+  options?: { mode?: 'rw' | 'ro'; denied?: boolean; policy?: unknown; config?: Partial<typeof DEFAULT_PROGRESS_CONFIG>;
+    budget?: Pick<GatewayModelBudget, 'run'>; usage?: Pick<PostgresProgressUsage, 'prepare' | 'complete' | 'flush'> },
 ): PostgresProgressService {
   const collaboration = {
     projectForUser: vi.fn(async () => options?.denied === true ? null : authority(options?.mode ?? 'rw')),
@@ -62,12 +86,21 @@ function serviceFor(
     policyForProject: vi.fn(async () => options?.policy ?? POLICY),
     resolveManagedCredential: vi.fn(async () => 'sk-test'),
   }
-  return new PostgresProgressService({ ...context, pool }, { collaboration, governance: governance as never }, {
+  const budget: Pick<GatewayModelBudget, 'run'> = options?.budget ?? { run: async (request, execute) => execute(request.signal, randomUUID() as ResourceOperationId) }
+  const usage: Pick<PostgresProgressUsage, 'prepare' | 'complete' | 'flush'> = options?.usage ?? {
+    prepare: async () => randomUUID() as ProgressRequestId, complete: async () => {}, flush: async () => {},
+  }
+  const deps = { collaboration, governance: governance as never, budget, usage }
+  return new PostgresProgressService({ ...context, pool }, deps, {
     ...DEFAULT_PROGRESS_CONFIG, ...options?.config,
   })
 }
 
-afterEach(() => { vi.unstubAllGlobals() })
+afterEach(async () => {
+  vi.unstubAllGlobals()
+  await Promise.all([...pools].map(pool => pool.end()))
+  pools.clear()
+})
 
 describe('periodKeyOf', () => {
   it('maps instants to their ISO week key', () => {
@@ -239,8 +272,8 @@ describe('PostgresProgressService.sweep', () => {
       { match: /SELECT id,kind[\s\S]*kind='period' AND period_key/, result: () => rows([]) },
       { match: /AND kind='current'\s*$/, result: () => rows([]) },
       { match: /SELECT name FROM harness\.projects/, result: () => rows([{ name: 'Payments' }]) },
-      { match: /INSERT INTO harness\.project_journal/, result: () => { writes.push('journal-insert'); return rows([], 1) } },
-      { match: /SET watermark_ts/, result: () => { writes.push('watermark'); return rows([], 1) } },
+      { match: /INSERT INTO harness\.project_journal\(/, result: () => { writes.push('journal-insert'); return rows([], 1) } },
+      { match: /SET \(watermark_ts/, result: () => { writes.push('watermark'); return rows([], 1) } },
     ])
     const service = serviceFor(pool, {
       config: { idleMs: 0, intervalMs: 0, minActivity: 8 },
@@ -248,8 +281,8 @@ describe('PostgresProgressService.sweep', () => {
     await service.sweep()
     // A decision row bypasses the minActivity threshold; entries + watermark committed.
     expect(writes).toEqual(['journal-insert', 'journal-insert', 'watermark'])
-    const model = pool.query.mock.calls.find(([sql]) => String(sql).includes('SET watermark_ts'))
-    expect(model?.[1]).toEqual(['org-1', 'p-internal', '2026-10-20T09:10:00.000Z', '11111111-1111-1111-1111-111111111111', 4])
+    const model = pool.query.mock.calls.find(([sql]) => String(sql).includes('SET (watermark_ts'))
+    expect(model?.[1]).toEqual(['org-1', 'p-internal', '2026-10-20T09:10:00.000000Z', '11111111-1111-1111-1111-111111111111', 4, expect.any(String), SOURCE_RUNTIME])
   })
 
   it('stays idle when gates fail: below threshold, not quiet, or too soon', async () => {
@@ -296,12 +329,12 @@ describe('PostgresProgressService.sweep', () => {
       { match: /AND kind='current'\s*$/, result: () => rows([]) },
       { match: /SELECT name FROM harness\.projects/, result: () => rows([{ name: 'P' }]) },
       { match: /SET generating_since=NULL,last_error/, result: () => { errors.push('recorded'); return rows([], 1) } },
-      { match: /SET watermark_ts/, result: () => { throw new Error('watermark must not move') } },
+      { match: /SET \(watermark_ts/, result: () => { throw new Error('watermark must not move') } },
     ])
     const service = serviceFor(pool, { config: { idleMs: 0 } })
     await service.sweep()
     expect(errors).toEqual(['recorded'])
-    expect(pool.query.mock.calls.some(([sql]) => String(sql).includes('SET watermark_ts'))).toBe(false)
+    expect(pool.query.mock.calls.some(([sql]) => String(sql).includes('SET (watermark_ts'))).toBe(false)
   })
 })
 
@@ -328,8 +361,8 @@ describe('PostgresProgressService material folding', () => {
       { match: /SELECT id,kind[\s\S]*kind='period' AND period_key/, result: () => rows([]) },
       { match: /AND kind='current'\s*$/, result: () => rows([]) },
       { match: /SELECT name FROM harness\.projects/, result: () => rows([{ name: 'P' }]) },
-      { match: /INSERT INTO harness\.project_journal/, result: () => rows([], 1) },
-      { match: /SET watermark_ts/, result: () => rows([], 1) },
+      { match: /INSERT INTO harness\.project_journal\(/, result: () => rows([], 1) },
+      { match: /SET \(watermark_ts/, result: () => rows([], 1) },
     ])
     const service = serviceFor(pool, { config: { idleMs: 0 } })
     await service.sweep()
@@ -368,8 +401,8 @@ describe('PostgresProgressService material folding', () => {
       { match: /SELECT id,kind[\s\S]*kind='period' AND period_key/, result: () => rows([]) },
       { match: /AND kind='current'\s*$/, result: () => rows([]) },
       { match: /SELECT name FROM harness\.projects/, result: () => rows([{ name: 'P' }]) },
-      { match: /INSERT INTO harness\.project_journal/, result: () => rows([], 1) },
-      { match: /SET watermark_ts/, result: () => rows([], 1) },
+      { match: /INSERT INTO harness\.project_journal\(/, result: () => rows([], 1) },
+      { match: /SET \(watermark_ts/, result: () => rows([], 1) },
     ])
     const service = serviceFor(pool, { config: { idleMs: 0, maxMaterialRows: 2 } })
     await service.sweep()
@@ -377,7 +410,103 @@ describe('PostgresProgressService material folding', () => {
     expect(captured[0]).toContain('first')
     expect(captured[0]).toContain('second')
     expect(captured[0]).not.toContain('agent tail')
-    const watermark = pool.query.mock.calls.find(([sql]) => String(sql).includes('SET watermark_ts'))
-    expect(watermark?.[1]).toEqual(['org-1', 'p-internal', '2026-10-20T09:30:00.000Z', 'sess-1', 2])
+    const watermark = pool.query.mock.calls.find(([sql]) => String(sql).includes('SET (watermark_ts'))
+    expect(watermark?.[1]).toEqual(['org-1', 'p-internal', '2026-10-20T09:30:00.000000Z', 'sess-1', 2, expect.any(String), SOURCE_RUNTIME])
+  })
+})
+
+/** Ordinary eligible project exercising the public sweep and its actual prompt assembly. */
+function eligiblePool(outcome: unknown = null, text = 'Prepare the release.'): ReturnType<typeof scriptedPool> {
+  const instant = new Date('2026-10-20T09:10:00Z')
+  return scriptedPool([
+    { match: /SELECT id FROM harness\.projects/, result: () => rows([{ id: 'p-internal' }]) },
+    { match: /GROUP BY pid/, result: () => rows([{ pid: 'p-internal', mx: instant }]) },
+    { match: /FROM harness\.project_journal_state/, result: () => rows([]) },
+    { match: /count\(\*\)::int pending/, result: () => rows([{ pending: 9, latest: instant, decided: true }]) },
+    { match: /SELECT public_id/, result: () => rows([{ public_id: '9' }]) },
+    { match: /INSERT INTO harness\.project_journal_state/, result: () => rows([], 1) },
+    { match: /conversation_interaction_responses/, result: () => rows([{
+      kind: outcome === null ? 'member' : 'decision', session_id: 'session-one', seq: 3, ts: instant,
+      text, actor_label: 'Lin', outcome, question_args: null, title: 'Release',
+    }]) },
+    { match: /role='assistant'/, result: () => rows([]) },
+    { match: /SELECT id,kind/, result: () => rows([]) },
+    { match: /SELECT name FROM harness\.projects/, result: () => rows([{ name: 'Release' }]) },
+    { match: /INSERT INTO harness\.project_journal\(/, result: () => rows([], 1) },
+    { match: /SET \(watermark_ts|SET generating_since=NULL/, result: () => rows([], 1) },
+  ])
+}
+
+describe('project digest extension admission', () => {
+  it('rejects invalid durable headers without exposing their sensitive values in an error cause', async () => {
+    const policy = { ...POLICY, providers: [{ ...POLICY.providers[0], profile: { headers: { 'x-api-key': 'synthetic-secret\ninvalid' } } }] }
+    const service = serviceFor(eligiblePool(), { policy })
+    await expect(service.progressForUser(9, 7)).rejects.toMatchObject({ message: 'Digest provider headers are not valid for HTTP' })
+    try { await service.progressForUser(9, 7) } catch (error) {
+      if (!(error instanceof Error)) throw error
+      expect(error.cause).toBeUndefined()
+      expect(String(error)).not.toContain('synthetic-secret')
+    }
+  })
+  it('respects the served model output limit when the digest cap is higher', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => new Response(JSON.stringify({ choices: [{ message: { content: '{"summary":"Ready"}' } }] })))
+    vi.stubGlobal('fetch', fetch)
+    const policy = { ...POLICY, providers: [{ ...POLICY.providers[0], models: [{ id: 'deepseek-chat', maxTokens: 128 }] }] }
+    await serviceFor(eligiblePool(), { policy, config: { idleMs: 0, maxOutputTokens: 4096 } }).sweep()
+    const body = fetch.mock.calls[0]?.[1]?.body
+    if (typeof body !== 'string') throw new Error('Expected a serialized model request')
+    expect(JSON.parse(body).max_tokens).toBe(128)
+  })
+  it('preserves replacement metacharacters and template-like text in member input', async () => {
+    const literal = "literal $& $` $' {maxItems}"
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => new Response(JSON.stringify({ choices: [{ message: { content: '{"summary":"Ready"}' } }] })))
+    vi.stubGlobal('fetch', fetch)
+    await serviceFor(eligiblePool(null, literal), { config: { idleMs: 0 } }).sweep()
+    const body = fetch.mock.calls[0]?.[1]?.body
+    if (typeof body !== 'string') throw new Error('Expected a serialized model request')
+    expect(JSON.parse(body).messages[0].content).toContain(literal)
+  })
+  it('waits for node admission before starting the model request', async () => {
+    let grant: () => void = () => { throw new Error('admission has not been requested') }
+    const admission = new Promise<void>(resolve => { grant = resolve })
+    const budget: Pick<GatewayModelBudget, 'run'> = { run: vi.fn(async (request, execute) => {
+      await admission
+      return execute(request.signal, randomUUID() as ResourceOperationId)
+    }) }
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => new Response(JSON.stringify({ choices: [{ message: { content: '{"summary":"Ready"}' } }] })))
+    vi.stubGlobal('fetch', fetch)
+    const service = serviceFor(eligiblePool(), { budget, config: { idleMs: 0 } })
+    const sweep = service.sweep()
+    try {
+      await vi.waitFor(() => { expect(budget.run).toHaveBeenCalledOnce() })
+      expect(fetch).not.toHaveBeenCalled()
+    } finally { grant(); await sweep }
+    expect(fetch).toHaveBeenCalledOnce()
+  })
+
+  it('keeps distinct provider/model tuples when their concatenated strings coincide', async () => {
+    const pool = eligiblePool()
+    const policy = {
+      ...POLICY,
+      models: [{ provider: 'org-ab', model: 'c', allowed: true }, { provider: 'org-a', model: 'bc', allowed: true }],
+      providers: [
+        { ...POLICY.providers[0], provider: 'org-ab', models: [{ id: 'c' }] },
+        { ...POLICY.providers[0], provider: 'org-a', models: [{ id: 'bc' }] },
+      ],
+    }
+    const page = await serviceFor(pool, { policy, config: { model: 'org-a/bc' } }).progressForUser(9, 7)
+    expect(page.enabled).toBe(true)
+  })
+
+  it('ignores non-object historical answer elements while keeping usable selections', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => new Response(JSON.stringify({ choices: [{ message: { content: '{"summary":"Ready"}' } }] })))
+    vi.stubGlobal('fetch', fetch)
+    await serviceFor(eligiblePool({ answers: [null, 7, [], { selected: ['Release on Friday'] }] }), {
+      config: { idleMs: 0 },
+    }).sweep()
+    expect(fetch).toHaveBeenCalledOnce()
+    const body = fetch.mock.calls[0]![1]!.body
+    if (typeof body !== 'string') throw new Error('Expected a serialized model request')
+    expect(JSON.parse(body).messages[0].content).toContain('Release on Friday')
   })
 })

@@ -1,0 +1,14 @@
+{
+  "name": "external-model-control-doc-pairs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write packages/subagent/subagent/README.md packages/subagent/subagent-codex/README.md packages/subagent/subagent-claude-code/README.md packages/subagent/subagent-acp/README.md .agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.md",
+  "startedAt": "2026-10-24T17:05:39.683727+00:00",
+  "seconds": 1.853,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4a0affc77ed20eb55c84b57393a8f4745745d37f33d249a9aa48c9fcb2f62f39",
+  "inputsAfter": "1345ea06bc8e47a01c5e629368a55777bde7fb7415c5c4b7173b35db96d84cf9",
+  "postgresToolDirectory": null,
+  "outputSha256": "741c99a4e37f86da886183714503ae882ac3bcefa41d35eeae88fd3b9ad98668",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.i18n.yaml\nverify-translation-pairing: recorded packages/subagent/subagent-acp/README.i18n.yaml\nverify-translation-pairing: recorded packages/subagent/subagent-claude-code/README.i18n.yaml\nverify-translation-pairing: recorded packages/subagent/subagent-codex/README.i18n.yaml\nverify-translation-pairing: recorded packages/subagent/subagent/README.i18n.yaml\nverify-translation-pairing: 6 record(s) written; run the check to validate the pairs.\n"
+}

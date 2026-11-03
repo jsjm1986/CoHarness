@@ -1,0 +1,14 @@
+{
+  "name": "sdk-subscription-close-during-filter-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/sdk/client/tests/sdk-client.spec.ts -t 'does not deliver a frame after its filter closes' --retry=0",
+  "startedAt": "2026-10-24T10:43:57.394346+00:00",
+  "seconds": 4.012,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e0791f4a6e1f8cfcfbb4705f1087f81a77a4cbc07b2484d85058eac92086d50c",
+  "inputsAfter": "e0791f4a6e1f8cfcfbb4705f1087f81a77a4cbc07b2484d85058eac92086d50c",
+  "postgresToolDirectory": null,
+  "outputSha256": "44ccec9a5d5bb6203a1c17347e3017d11087706d7dedfacfa3913762b86dd6de",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/sdk/client/tests/sdk-client.spec.ts (45 tests | 1 failed | 44 skipped) 6ms\n   × does not deliver a frame after its filter closes the subscription 5ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/sdk/client/tests/sdk-client.spec.ts > does not deliver a frame after its filter closes the subscription\nAssertionError: promise resolved \"{ method: 'owned-frame', params: {} }\" instead of rejecting\n\n- Expected\n+ Received\n\n- Error {\n-   \"message\": \"rejected promise\",\n+ {\n+   \"method\": \"owned-frame\",\n+   \"params\": {},\n  }\n\n ❯ packages/sdk/client/tests/sdk-client.spec.ts:703:36\n    701|   const subscription = client.subscribe(() => { subscription.close(); …\n    702|   ;(client as unknown as { dispatchNotification(n: HarnessNotification…\n    703|   await expect(subscription.next()).rejects.toThrow('notification subs…\n       |                                    ^\n    704| })\n    705|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 44 skipped (45)\n   Start at  18:44:01\n   Duration  206ms (transform 79ms, setup 36ms, import 67ms, tests 6ms, environment 0ms)\n\n"
+}

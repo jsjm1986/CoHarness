@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-session-handoff-input.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-session-handoff-input.md
+document:
+  en: 5907989d1746e56554b69c40e6b251b215b4444f
+  zh: 67eedde02efd40c402b7196a22e5b81f5b9656ba
+/agent-note-handoff-model-input-is-retained-before-dispatch:
+  en: 12365d48ef6616d2
+  zh: aae797c3302e3fa8
+/agent-note-handoff-model-input-is-retained-before-dispatch/problem:
+  en: 359a6c1db3f565d8
+  zh: 010973e47f038a10
+/agent-note-handoff-model-input-is-retained-before-dispatch/decision:
+  en: 700673c408e7f65f
+  zh: 4a8343a804ab629c
+/agent-note-handoff-model-input-is-retained-before-dispatch/alternatives-considered:
+  en: 2e4131d55739c31c
+  zh: 29bbcf16ae53325f
+/agent-note-handoff-model-input-is-retained-before-dispatch/consequences:
+  en: 293d2a3bc5d3c274
+  zh: 660afac193985358
+/agent-note-handoff-model-input-is-retained-before-dispatch/verification:
+  en: fd2fef539d9802e6
+  zh: ea1abaf14ec24438

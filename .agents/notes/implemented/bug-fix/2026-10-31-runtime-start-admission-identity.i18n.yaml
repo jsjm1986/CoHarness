@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-31-runtime-start-admission-identity.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-runtime-start-admission-identity.md
+document:
+  en: 13c7a4848facc6b25ae69da3f5f5ceb587086e74
+  zh: 17a2c7745366a4315881f1936acabcd1c8157d94
+/agent-note-runtime-start-admission-identity:
+  en: 10bb50225e094eb3
+  zh: fc0d184c4dce238b
+/agent-note-runtime-start-admission-identity/problem:
+  en: bc5ef586d1dcc52e
+  zh: 154cff840c3f5807
+/agent-note-runtime-start-admission-identity/decision:
+  en: 52b45ab82f33f40b
+  zh: 6ab78beb9a2a9c6c
+/agent-note-runtime-start-admission-identity/alternatives-considered:
+  en: e29b81c7ae474939
+  zh: d335d7bc6e1f1959
+/agent-note-runtime-start-admission-identity/consequences:
+  en: 7356db4b7560b11d
+  zh: 782ea5b7d7b2aaf2

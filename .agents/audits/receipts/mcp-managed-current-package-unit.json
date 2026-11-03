@@ -1,0 +1,13 @@
+{
+  "name": "mcp-managed-current-package-unit",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/mcp/mcp-client/tests --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-23T16:22:06.547426+00:00",
+  "seconds": 5.511,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fd2672ccc5e33e67f988c6750e7cbd96ece48d2b5af68c5c3ca1c6578eb9eeba",
+  "inputsAfter": "fd2672ccc5e33e67f988c6750e7cbd96ece48d2b5af68c5c3ca1c6578eb9eeba",
+  "outputSha256": "eb0b0a8b5080828b9c49b4d5e3aaafa6bcdc9a22d630950b4f4d1297757e411e",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  11 passed (11)\n      Tests  129 passed (129)\n   Start at  00:22:09\n   Duration  2.61s (transform 755ms, setup 103ms, import 1.56s, tests 2.74s, environment 0ms)\n\n"
+}

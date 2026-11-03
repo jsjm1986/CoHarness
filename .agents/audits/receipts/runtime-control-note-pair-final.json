@@ -1,0 +1,14 @@
+{
+  "name": "runtime-control-note-pair-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/architecture/2026-10-25-local-runtime-supervisor.md",
+  "startedAt": "2026-10-24T20:09:48.778403+00:00",
+  "seconds": 1.992,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1f8b4c1f971e09e8c17655fc3e8355498f2943569b4ea83e933e3449cdd7d912",
+  "inputsAfter": "1f8b4c1f971e09e8c17655fc3e8355498f2943569b4ea83e933e3449cdd7d912",
+  "postgresToolDirectory": null,
+  "outputSha256": "86787c5794c383df1f7ec8926ba30773d2f9160b0773c435aa99c312f70c3252",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-25-local-runtime-supervisor.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

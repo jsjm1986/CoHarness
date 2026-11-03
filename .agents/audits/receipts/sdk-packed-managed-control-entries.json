@@ -1,0 +1,14 @@
+{
+  "name": "sdk-packed-managed-control-entries",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/verify-packed-sdk-control.py",
+  "startedAt": "2026-10-24T17:59:52.057389+00:00",
+  "seconds": 3.052,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d25db61b5e834c6a8d9dbca0731f3ae82f3a8ecbc313f719e146233031b66840",
+  "inputsAfter": "d25db61b5e834c6a8d9dbca0731f3ae82f3a8ecbc313f719e146233031b66840",
+  "postgresToolDirectory": null,
+  "outputSha256": "74c648bb6f6d1adf116adc4c3d25bddd1be7b38289aead7b33c6decead54e8f4",
+  "outputTail": "{\"packedParent\":true,\"packedManagedBootstrap\":true,\"declaredBuiltPeers\":true}\n{\"packedFiles\": 18, \"requiredEntries\": 4, \"temporaryPackRemoved\": true}\n"
+}

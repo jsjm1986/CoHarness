@@ -29,6 +29,8 @@ This capability is intended for a Web Host running on the user's desktop. CoHarn
 
 Mount the package in a composition that carries `webServer`, `connection`, and `subprocess`, normally beside its browser surface [`dsh-client-ui-open-in-app`](../../client/ui-open-in-app/README.md); the pair puts an "Open In..." split button in the Web Session header whenever the host resolved at least one installed catalog application.
 
+All three services are required. Without `connection`, the desktop routes remain unregistered. Authentication withdrawal or plugin unload refuses unfinished catalog, icon and launch work; a request already dispatched to a withdrawn handler receives 503. Current authentication is checked after asynchronous reads and before each primary, fallback or refreshed launcher. Applications already handed to the operating system retain their independent lifetime.
+
 ### When to choose it
 
 Choose it for a Web deployment whose users work beside a local editor, Git GUI, terminal, or file manager and want the workspace directory opened there in one click. Avoid it for opening one path with the OS-default application from host code — that is `dsh-apiproxy`'s `openPath`; this package's subject is *which* application, with per-application resolution and launchers.

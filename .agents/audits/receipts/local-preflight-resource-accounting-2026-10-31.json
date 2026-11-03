@@ -1,0 +1,118 @@
+{
+  "at": "2026-10-31T05:22:55.674285+00:00",
+  "finding": "B390",
+  "title": "Known local validation failures retain unused process capacity as uncertain work",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "paths": [
+    "packages/subprocess/subprocess-local/src/index.ts",
+    "packages/subprocess/subprocess-local/tests/preflight-admission.spec.ts",
+    "packages/subprocess/subprocess/tests/fixtures/resource-owner.mjs",
+    "packages/subprocess/subprocess/tests/resource-owner-example.host.spec.ts",
+    "packages/subprocess/subprocess/tests/expected/resource-owner.jsonl",
+    "packages/subprocess/subprocess-local/README.md",
+    "packages/subprocess/subprocess-local/README.zh.md",
+    "packages/subprocess/subprocess-local/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/process-resource-ownership/guide.i18n.yaml"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051509Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051509Z/local-preflight-source-coverage.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051509Z/local-preflight-loader-source.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051509Z/local-preflight-build.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051509Z/local-preflight-doc-quick.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051509Z/local-preflight-built-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051509Z/local-preflight-built-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051509Z/local-preflight-sdk-projection.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051509Z/local-preflight-python-projection.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051509Z/local-preflight-lint.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051509Z/local-preflight-guide.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051509Z/local-preflight-origin-fetch.json"
+  ],
+  "causalEvidence": "Eight pre-fix cases report uncertain occupation for ordinary argv/grace or terminal empty-program rejection before launch. The private previous compiled local entry, with unchanged adjacent runtime dependencies, also retains both single-slot reservations and refuses subsequent valid work. Updated source and Node22/24 Loader applications preserve the original errors, return capacity, and physically create the next markers.",
+  "behavior": "Use the shared confirmed-cleanup rejection only at existing known local preflight validation failures. Failures after physical allocation or without cleanup proof retain uncertain accounting. No public signatures, settings, data fields or cancellation policy changed.",
+  "verification": {
+    "uniqueRelatedCases": 501,
+    "sourceCases": 493,
+    "platformSkipped": 16,
+    "typescriptSdkSnapshots": 4,
+    "pythonSdkSnapshots": 4,
+    "standardCoverage": {
+      "packages/subprocess/subprocess-local/src/index.ts": {
+        "statements": [
+          185,
+          185
+        ],
+        "branches": [
+          118,
+          118
+        ],
+        "functions": [
+          41,
+          41
+        ],
+        "lines": [
+          151,
+          151
+        ]
+      },
+      "packages/subprocess/subprocess/src/index.ts": {
+        "statements": [
+          125,
+          125
+        ],
+        "branches": [
+          39,
+          39
+        ],
+        "functions": [
+          35,
+          35
+        ],
+        "lines": [
+          91,
+          91
+        ]
+      }
+    },
+    "coverageLimits": "Only the two named modules have all four metrics at 100%; existing exclusions and thresholds are unchanged. No whole-project coverage claim.",
+    "applicationReplay": "The twelve-row resource-owner transcript passes in source before build and on matching Node22/24 artifacts; it extends the same existing Loader test after the full source coverage run, so reruns are not added to unique counts.",
+    "buildGates": 8,
+    "quickDocumentationGates": 20,
+    "guideEnglishWords": 268,
+    "diagnosticSetup": "The first private artifact probe lacked an adjacent compiled chunk and is not causal evidence. The completed private dependency graph preserves the original old index and reproduces both capacity failures.",
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "noteReview": {
+    "owner": ".agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.md",
+    "decision": "Extended the current admission/cleanup owner and unreleased process-resource-ownership guide; no duplicate note or frozen archive edit. The local provider now requires its matching shared subprocess artifact."
+  },
+  "baseline": {
+    "at": "2026-10-31T05:20:36.411187+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "at": "2026-10-31T05:22:55.674285+00:00",
+    "source": "Peer direct report; no root production acceptance.",
+    "serving": "Peer reports R9 serving on both nodes, epoch86, schema102 unchanged, A project generation9 and B personal generation11; frozen through B388.",
+    "acceptedByPeer": "Field font authority, authenticated reconnect/draft identity, independent native logins and read-only isolation pass. Real high-RTT terminal batching remains under verification.",
+    "openByPeer": "REAL001 cold B HTML/assets sometimes returned 503. Missing first-response body and later logout/cancellation interference prevent attribution; independent fresh tabs recover. Kept open.",
+    "currentRootCandidate": "B389, resource-only regression coverage and B390 remain outside R9. Root has not deployed.",
+    "ownership": "Keep existing topology, client, HMR, settings and management reservations; no routine coordination interruption."
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Review other prelaunch setup/native allocation failure accounting, remaining remote pipe consumers and resource-only remote execution.",
+    "Continue nonconflicting cross-computer permission and business logic review; peer REAL001 cold-asset delivery remains open.",
+    "No root paid API, production database operation or deployment; fresh owned PostgreSQL and physical Linux/Windows acceptance remain unclaimed."
+  ]
+}

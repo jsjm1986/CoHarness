@@ -1,0 +1,14 @@
+{
+  "name": "document-catalog-private-postgres-ready",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/prepare-catalog-postgres.py",
+  "startedAt": "2026-10-26T21:04:27.461667+00:00",
+  "seconds": 4.428,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fdc5b0bfcc799f6f6a1e16fbe20224fb64ced252cc007591152149bba30322da",
+  "inputsAfter": "fdc5b0bfcc799f6f6a1e16fbe20224fb64ced252cc007591152149bba30322da",
+  "postgresToolDirectory": null,
+  "outputSha256": "e51bf7f1af70915a195a83894b0879b121519c764b13a342b7495a640a4ad920",
+  "outputTail": "The files belonging to this database system will be owned by user \"a1234\".\nThis user must also own the server process.\n\nThe database cluster will be initialized with locale \"C\".\nThe default text search configuration will be set to \"english\".\n\nData page checksums are enabled.\n\ncreating directory /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/pgdata-document-catalog-20261027 ... ok\ncreating subdirectories ... ok\nselecting dynamic shared memory implementation ... posix\nselecting default \"max_connections\" ... 100\nselecting default \"shared_buffers\" ... 128MB\nselecting default time zone ... Asia/Shanghai\ncreating configuration files ... ok\nrunning bootstrap script ... ok\nperforming post-bootstrap initialization ... ok\nsyncing data to disk ... ok\n\nSuccess. You can now start the database server using:\n\n    '/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/postgres-runtime/package/native/bin/pg_ctl' -D '/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/pgdata-document-catalog-20261027' -l logfile start\n\nwaiting for server to start.... done\nserver started\nOwned standalone PostgreSQL18.4 ready on127.0.0.1:56818 for disposable audit database.\n"
+}

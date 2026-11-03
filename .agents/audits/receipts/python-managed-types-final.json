@@ -1,0 +1,13 @@
+{
+  "name": "python-managed-types-final",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=2 ./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T15:52:23.329880+00:00",
+  "seconds": 6.757,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4c91956d4f7c906e650556bc46f2589d58c966dd1cd67555c353a2d25ba840d4",
+  "inputsAfter": "4c91956d4f7c906e650556bc46f2589d58c966dd1cd67555c353a2d25ba840d4",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -4,6 +4,42 @@ import { BrowserIdentityChanged, createBrowserIdentityFence } from '../src/clien
 
 const ORIGIN = 'https://gateway.example'
 
+it('pins two personal Runtime tabs independently and keeps document locations independent of execution', async () => {
+  const first = '10000000-0000-4000-8000-000000000001' as NonNullable<import('../src/client/index.ts').ConnectionRuntimeTarget['runtimeId']>
+  const second = '10000000-0000-4000-8000-000000000002' as typeof first
+  const node = '20000000-0000-4000-8000-000000000001'
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async input => Response.json({ address: requestedUrl(input).search }, {
+    headers: { 'x-dsh-principal-id': '7' },
+  }))
+  const a = createBrowserIdentityFence(fetcher, ORIGIN, vi.fn(), `?dshRuntime=${first}`)
+  const b = createBrowserIdentityFence(fetcher, ORIGIN, vi.fn(), `?dshRuntime=${second}`)
+  a.confirm(7); b.confirm(7)
+  a.setRuntimeTarget({ kind: 'personal', runtimeId: first }); b.setRuntimeTarget({ kind: 'personal', runtimeId: second })
+  try {
+    await a.fetch(`${ORIGIN}/api/session.list`)
+    expect(requestedUrl(fetcher.mock.calls.at(-1)?.[0]).searchParams.get('dshRuntime')).toBe(first)
+    await b.fetch(`${ORIGIN}/api/session.list`)
+    expect(requestedUrl(fetcher.mock.calls.at(-1)?.[0]).searchParams.get('dshRuntime')).toBe(second)
+    await a.fetch(`${ORIGIN}/api/documents/scope/content?scope=personal&dshNode=${node}&id=same.txt`)
+    const document = requestedUrl(fetcher.mock.calls.at(-1)?.[0])
+    expect(document.searchParams.get('dshNode')).toBe(node)
+    expect(document.searchParams.has('dshRuntime')).toBe(false)
+    await a.fetch(`${ORIGIN}/api/session.list`)
+    expect(requestedUrl(fetcher.mock.calls.at(-1)?.[0]).searchParams.get('dshRuntime')).toBe(first)
+    const socket = await b.socketUrl(new URL('/api/events.mux', ORIGIN), new AbortController().signal)
+    expect(socket.searchParams.get('dshRuntime')).toBe(second)
+  } finally { a.dispose(); b.dispose() }
+})
+
+it('rejects a handshake for another Runtime before exposing account-owned state', () => {
+  const runtime = '10000000-0000-4000-8000-000000000001'
+  const fence = createBrowserIdentityFence(vi.fn(), ORIGIN, vi.fn(), `?dshRuntime=${runtime}`)
+  try {
+    expect(() => fence.setRuntimeTarget({ kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000002' as NonNullable<import('../src/client/index.ts').ConnectionRuntimeTarget['runtimeId']> }))
+      .toThrow(BrowserIdentityChanged)
+  } finally { fence.dispose() }
+})
+
 function requestedUrl(input: RequestInfo | URL | undefined): URL {
   if (input === undefined) throw new Error('Expected an emitted request')
   return new URL(typeof input === 'string' ? input : 'url' in input ? input.url : input.href)

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-node-control-response-recovery.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-node-control-response-recovery.md
+document:
+  en: b5a079dcac33bea26341dc8b9fd0ec2016a79b81
+  zh: 3feccdadbf87e036d3c5db79c483e901466a25c0
+/agent-note-node-control-response-recovery:
+  en: da096a9a34050b91
+  zh: 4595e68c8a38b020
+/agent-note-node-control-response-recovery/problem:
+  en: 64b69030ca60fdd6
+  zh: ffb5bc11e6e3ed11
+/agent-note-node-control-response-recovery/decision:
+  en: e86f05f7025021d2
+  zh: fafbd9b9e5c4988e
+/agent-note-node-control-response-recovery/alternatives-considered:
+  en: 098b78f79ef35b9f
+  zh: 22ea3fc72d2f7b53
+/agent-note-node-control-response-recovery/consequences:
+  en: 38ea1bc8fdf2076c
+  zh: a7b3c5feb73c82d1
+/agent-note-node-control-response-recovery/verification:
+  en: 8ce580d05ed69b5d
+  zh: 988aae76a050593b

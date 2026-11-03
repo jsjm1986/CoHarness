@@ -179,6 +179,7 @@ export function SidebarRoot({
   return (
     <div
       ref={column}
+      data-sidebar-root=""
       className={clsx(
         css.root, !wide && css.collapsed, !wide && everWide.current && css.railIn,
         collapsed && wide && css.fading, !pointerInside && css.quietBars,
@@ -274,7 +275,7 @@ export function SidebarRoot({
           foot in both states; its rail icon column rides the same slot. Its
           box is published on the column for overlay alignment (see the
           ResizeObserver above). */}
-      <div ref={region} className={css.regionArea}>
+      <div ref={region} className={css.regionArea} data-sidebar-browsing="">
         {renderSlot('sidebar.workspaces', {
           wide,
           expandSidebar: () => { if (collapsed) toggleSidebar() },

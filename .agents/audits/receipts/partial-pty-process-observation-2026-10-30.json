@@ -1,0 +1,279 @@
+{
+  "finding": "B340",
+  "status": "fixed_and_verified_for_named_scope",
+  "updatedAt": "2026-10-30T08:53:37.925715+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T083500Z",
+  "sourcePaths": [
+    "packages/subprocess/subprocess-local/src/terminal.ts",
+    "packages/subprocess/subprocess-local/tests/terminal.spec.ts",
+    "packages/subprocess/subprocess-local/tests/local.spec.ts",
+    "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+    "packages/subprocess/subprocess-local/tests/expected/terminal-clock.expected.md",
+    "packages/subprocess/subprocess-local/README.md",
+    "packages/subprocess/subprocess-local/README.zh.md",
+    "packages/subprocess/subprocess-local/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/local-runtime-native-ownership/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/local-runtime-native-ownership/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/local-runtime-native-ownership/guide.i18n.yaml"
+  ],
+  "sourceArtifactHashes": "pty-partial-source-artifact-hashes.json",
+  "problem": "Fallback PTY cleanup treats absent rows in partial POSIX observations as exited identities, drops a captured live descendant and acknowledges quiescence after root exit.",
+  "causalEvidence": {
+    "source": "pty-partial-observation-source-negative.json",
+    "sourceFailures": 2,
+    "actualPriorCompiledNative": "pty-partial-native-prior-compiled-negative.json",
+    "nativeFailure": "Cleanup resolves instead of refusing while the real TERM-resistant descendant survives; the first3existing native scenarios pass before the new failure.",
+    "negativeFixtureCleanup": "Private descendant PIDs are independently checked and force-stopped when the buggy handle falsely acknowledges cleanup. No test child is intentionally retained."
+  },
+  "repair": [
+    "Captured POSIX identities survive partial or unverified process tables.",
+    "Successful fallback cleanup requires a final complete table; unknown observation rejects and leaves the handle retryable with its owner exit protection retained.",
+    "Recovery reuses exact captured identities, stops the surviving descendant and only then publishes quiescence.",
+    "Windows keeps authoritative direct per-identity liveness; native Linux managed ranges retain their independent owner."
+  ],
+  "verification": {
+    "sourceUniqueTests": 110,
+    "sourceFiles": 4,
+    "sourceNativeTranscriptScenarios": 4,
+    "nativeTranscriptIsOneOf110Tests": true,
+    "missingCompletenessDeclarationRefused": true,
+    "linuxAndDarwinUnitCases": 4,
+    "actualNativeAcceptanceHost": "macOS",
+    "nativeSource": "pty-partial-current-source-acceptance.json",
+    "compiledNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "compiledTestsOverlapSource": true,
+    "compiledRuntimeNoTypeScriptLoader": true,
+    "completeBuildGatesPassed": 8,
+    "hostTypes": "pty-partial-final-host-types.json",
+    "lint": "pty-partial-current-lint.json",
+    "checks": {
+      "pty-partial-current-source-acceptance": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:50:55.950781+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "packages/subprocess/subprocess-local/tests/terminal.spec.ts",
+          "packages/subprocess/subprocess-local/tests/local.spec.ts",
+          "packages/subprocess/subprocess-local/tests/process-inspector.spec.ts",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/subprocess/subprocess-local/src/terminal.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T083500Z/terminal-current-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:51:11.358702+00:00"
+      },
+      "pty-partial-complete-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:42:23.653708+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "build"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:43:29.501461+00:00"
+      },
+      "pty-partial-compiled-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:44:26.401593+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:44:30.059899+00:00"
+      },
+      "pty-partial-compiled-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:44:26.401562+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:44:30.006428+00:00"
+      },
+      "pty-partial-final-host-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:50:55.950790+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:51:03.276443+00:00"
+      },
+      "pty-partial-current-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:50:55.950780+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "tsx",
+          "scripts/run-oxlint.ts",
+          "packages/subprocess/subprocess-local/src/terminal.ts",
+          "packages/subprocess/subprocess-local/tests/terminal.spec.ts",
+          "packages/subprocess/subprocess-local/tests/local.spec.ts",
+          "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:50:59.569855+00:00"
+      },
+      "pty-partial-own-document-pairs": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:49:21.822267+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "packages/subprocess/subprocess-local/README.md",
+          ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/local-runtime-native-ownership/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:49:23.309348+00:00"
+      }
+    }
+  },
+  "coverage": {
+    "path": "packages/subprocess/subprocess-local/src/terminal.ts",
+    "summary": {
+      "total": {
+        "lines": {
+          "total": 236,
+          "covered": 236,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 279,
+          "covered": 279,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 55,
+          "covered": 55,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 169,
+          "covered": 169,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subprocess/subprocess-local/src/terminal.ts": {
+        "lines": {
+          "total": 236,
+          "covered": 236,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 55,
+          "covered": 55,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 279,
+          "covered": 279,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 169,
+          "covered": 169,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "scope": "This module only. The native Loader child is separate acceptance evidence; no whole provider, project or platform coverage claim."
+  },
+  "documentation": {
+    "aggregate": "pty-partial-docs.json",
+    "passedGates": 19,
+    "aggregatePassed": false,
+    "remainingFailure": "Concurrent peer-owned translation pairing; own3pairs pass the named check.",
+    "ownedPairs": "pty-partial-own-document-pairs.json"
+  },
+  "fixtureCorrections": [
+    "Six local provider observation fixtures explicitly declare their complete tables.",
+    "The retained fake terminal is cleaned after its expected failure.",
+    "The real PTY fixture treats Linux zombies as stopped and independently confirms owned PIDs before suppressing fallback cleanup."
+  ],
+  "noteReview": {
+    "updatedExisting": ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md",
+    "fullySupersededActiveNotes": [],
+    "frozenArchivesEdited": false,
+    "retainedIndependentDecisions": [
+      "Persistent PTY lifetimes",
+      "Unattended terminal idle policy",
+      "Native scope ownership and command deadlines"
+    ]
+  },
+  "limitations": [
+    "B04and B25remain open and all12original domains remain in_progress.",
+    "Partial-table refusal does not make process tables atomic or discover every escaped, unobserved descendant.",
+    "Physical Windows and a Linux-native PTY acceptance host are not exercised by this named change.",
+    "The local provider unit lane still emits a MaxListenersExceededWarning; diagnostics do not establish a production leak. Further test-owner assessment remains open; no global listener limit is raised.",
+    "The full document corpus still has peer-owned in-flight pairing errors.",
+    "Real external model success and public push remain human-deferred."
+  ],
+  "baseline": {
+    "headRef": "codex/business-logic-audit-2026-10-23",
+    "upstreamRef": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetch": "pty-partial-latest-baseline-fetch.json",
+    "sharedWorkPreserved": true
+  },
+  "finalRepositoryReferences": "pty-partial-final-repository-references.json",
+  "finalOwnedSourceUnchanged": true
+}

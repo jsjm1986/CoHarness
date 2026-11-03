@@ -1,0 +1,14 @@
+{
+  "name": "jobs-disposal-admission-lint-repaired",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/jobs/jobs-local/src/index.ts packages/jobs/jobs-local/tests/jobs.spec.ts packages/jobs/jobs-local/tests/loader-composition.spec.ts",
+  "startedAt": "2026-10-26T02:58:05.600143+00:00",
+  "seconds": 5.988,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "94600b2574453ddc72fc2888db80b2dc3c5c96a9ccec8ec49bd95bab54d7ff9c",
+  "inputsAfter": "94600b2574453ddc72fc2888db80b2dc3c5c96a9ccec8ec49bd95bab54d7ff9c",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

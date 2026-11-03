@@ -3,16 +3,16 @@ import type { AuditRow } from './audit.ts'
 
 const IDS = new Set(['id', 'targetId', 'userId', 'ownerUserId', 'projectId', 'nodeId', 'catalogId',
   'rootSessionId', 'sessionId', 'grantId', 'backupId', 'operationId', 'receiptId', 'redispatchId', 'subjectId',
-  'approvalId', 'responderUserId'])
+  'approvalId', 'responderUserId', 'runtimeId', 'requestId'])
 const NAMES = new Set(['username', 'model', 'provider', 'purpose'])
 const COUNTS = new Set(['revision', 'generation', 'count', 'requested', 'succeeded', 'trashed', 'opCount',
-  'rowCount', 'resultBytes'])
+  'rowCount', 'resultBytes', 'maxTotal', 'maxPerNode'])
 const FLAGS = new Set(['allowed', 'shared', 'enabled', 'autoReviewEligible', 'terminalEnabled', 'sshEligible',
-  'desktopEligible', 'dryRun', 'truncated'])
+  'desktopEligible', 'dryRun', 'truncated', 'dataRetained'])
 const STATES = new Set(['active', 'disabled', 'deleted', 'pending', 'running', 'stopped', 'stopping',
   'ready', 'failed', 'verified', 'restored', 'submitted', 'ignored', 'rejected', 'dispatching', 'unknown',
   'complete', 'completed', 'partial', 'cancelled', 'success', 'failure', 'draining', 'offline', 'online',
-  'ok', 'denied', 'error'])
+  'ok', 'denied', 'error', 'preparing', 'allocated', 'retired'])
 
 /** Safe audit projection; request success is separate from asynchronous resource state. */
 export interface AuditSummary {

@@ -52,7 +52,8 @@ export function parseParticipant(value: unknown): CollaborationParticipant {
  */
 export function projectParticipantFromSource(source: unknown): ProjectParticipant | undefined {
   const candidate = record(source)
-  if (candidate?.kind !== 'user' || !Object.hasOwn(candidate, 'participant')) return undefined
+  if ((candidate?.kind !== 'user' && candidate?.kind !== 'user-question-reply')
+    || !Object.hasOwn(candidate, 'participant')) return undefined
   const participant = parseParticipant(candidate.participant)
   return participant.scope.kind === 'project' ? participant as ProjectParticipant : undefined
 }

@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-lint-auto-format",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts --fix packages/experimental/browser-use-stagehand-native/src/model.ts packages/experimental/browser-use-stagehand-native/src/index.ts packages/experimental/browser-use-stagehand-native/src/worker.ts packages/experimental/browser-use-stagehand-native/tests/model.spec.ts packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts packages/experimental/browser-use-stagehand-native/tests/fixtures/stagehand.ts packages/experimental/browser-use-stagehand-native/tests/provider.spec.ts plugins/dsh-model-governance/tests/execution-billing.spec.ts",
+  "startedAt": "2026-10-23T18:35:57.106080+00:00",
+  "seconds": 8.175,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "33550b38e6fb49fbe0c047f2bcca63915bedf0ff1029e96385091f4d57a7a4b8",
+  "inputsAfter": "19ff75d72d4b7c55b969c261eb29c0e8f8a75171efb8ec4ed8d367c4046a70cb",
+  "outputSha256": "6ad19476653c0f56c89cef3b1f8e8e4fda29bd23fe431d7cbd09619dcf3eedcd",
+  "outputTail": "packages/experimental/browser-use-stagehand-native/tests/model.spec.ts:62:1: error @stylistic(max-len): This line has a length of 143. Maximum allowed is 140.\npackages/experimental/browser-use-stagehand-native/tests/model.spec.ts:208:1: error @stylistic(max-len): This line has a length of 147. Maximum allowed is 140.\npackages/experimental/browser-use-stagehand-native/src/index.ts:130:1: error @stylistic(max-len): This line has a length of 143. Maximum allowed is 140.\npackages/experimental/browser-use-stagehand-native/src/model.ts:114:1: error @stylistic(max-len): This line has a length of 142. Maximum allowed is 140.\npackages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts:280:1: error @stylistic(max-len): This line has a length of 145. Maximum allowed is 140.\npackages/experimental/browser-use-stagehand-native/tests/provider.spec.ts:256:37: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\n"
+}

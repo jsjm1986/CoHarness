@@ -1,0 +1,14 @@
+{
+  "name": "external-model-control-python-transcript",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest -q python/sdk/tests/test_external_model_admission.py",
+  "startedAt": "2026-10-24T17:14:20.426585+00:00",
+  "seconds": 3.755,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "278ecde7825b0cb7036b27006a9684f92608f544b9c18fc8130dee25400db685",
+  "inputsAfter": "278ecde7825b0cb7036b27006a9684f92608f544b9c18fc8130dee25400db685",
+  "postgresToolDirectory": null,
+  "outputSha256": "423b1d0e014eb1eab96f4420f7b344c2615be505dd574b756ac884826ca74f2d",
+  "outputTail": ".                                                                        [100%]\n"
+}

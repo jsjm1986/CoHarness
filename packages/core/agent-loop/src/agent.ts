@@ -24,7 +24,6 @@ import {
   createAssistantMessage,
   createDeveloperMessage,
   errorChain,
-  markAgentLoopRequest,
 } from '@deepseek-ai/dsh-llm'
 import type { Scope } from '@deepseek-ai/dsh-scope'
 import { createScope } from '@deepseek-ai/dsh-scope'
@@ -163,9 +162,14 @@ export class ReactLoopAgent implements Agent {
 
   /** Refuse busy release without cancelling a turn, maintenance task, or queued input. */
   closeIdleAdmission(): boolean {
-    if (this.phase.kind !== 'idle' || this.inbox.hasPending) return false
+    if (!this.canReleaseIdle()) return false
     this.closeAdmission()
     return true
+  }
+
+  /** @returns whether no driver, maintenance task or inbox input requires this Agent to remain live. */
+  canReleaseIdle(): boolean {
+    return this.phase.kind === 'idle' && !this.inbox.hasPending
   }
 
   /** Commit a phase and publish its externally visible status transition. */
@@ -761,7 +765,7 @@ export class ReactLoopAgent implements Agent {
       this.frozenMessages.add(message)
     }
     Object.freeze(boundaryMessages)
-    const request = markAgentLoopRequest(Object.freeze({
+    const request = this.loopCtx.llm.markAgentLoopRequest(Object.freeze({
       ...header.config,
       messages: boundaryMessages,
       toolHistory: session.toolHistory(),

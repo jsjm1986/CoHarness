@@ -1,0 +1,14 @@
+{
+  "name": "postgres-business-typed-fixtures",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/project-service-postgres.spec.ts tests/auth-postgres.spec.ts --no-file-parallelism --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-24T23:57:01.860023+00:00",
+  "seconds": 9.823,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "32f65e9b43074c6bd39dbd4e14a2bf516cf79683d224b8190c844cc63a4d78ec",
+  "inputsAfter": "32f65e9b43074c6bd39dbd4e14a2bf516cf79683d224b8190c844cc63a4d78ec",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "7657d99b2d9fa59afbf23ff9653e75b6c466501a034e11bbd32b97ebe82f6c71",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  41 passed (41)\n   Start at  07:57:04\n   Duration  7.23s (transform 1.92s, setup 0ms, import 2.67s, tests 4.38s, environment 0ms)\n\n"
+}

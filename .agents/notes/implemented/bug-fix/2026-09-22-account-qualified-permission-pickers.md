@@ -16,6 +16,8 @@ The composer, `/permission` popup, and new-session default row disable unavailab
 
 A popup may subscribe to invalidation of its own option source. It closes when that source changes, releases the subscription on every completion path, and leaves unrelated command popups open. Connection-specific sources keep separately staged targets independent.
 
+The Host command checks the exact registered Agent after asynchronous selection authorization and before changing any preset or knob. A closed caller, another Agent reusing its Session id, or a withdrawn registry cannot consume the earlier grant. A newly composed registry must recognize the caller; independent compositions with no registry retain their direct-call behavior.
+
 ## Alternatives considered
 
 **Filter the shared Host catalog by the most recent account request.** Rejected because other accounts and Sessions share the process capability table.

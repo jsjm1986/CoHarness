@@ -1,3 +1,4 @@
+import { usePendingEdits } from '../pending-edits.tsx'
 import { Gauge, Settings2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
@@ -49,6 +50,7 @@ export function UsagePage() {
   const [costMode, setCostMode] = useState<QuotaMode>('unlimited')
   const [tokenLimit, setTokenLimit] = useState('')
   const [costLimit, setCostLimit] = useState('')
+  usePendingEdits(quotaOpen || quotaSaving)
 
   const monthRef = useRef('')
   const requestGeneration = useRef(0)

@@ -51,6 +51,34 @@ describe('web e2e: private user terminal lifecycle', () => {
     await expect.poll(async () => readFile(join(world.workspaceCwd, 'terminal-proof.txt'), 'utf8').catch(() => '')).toContain('terminal-browser-proof')
     const inventory = await world.ctx.terminalController.list(SESSION)
     expect(inventory).toHaveLength(1)
+    const release = Promise.withResolvers<undefined>()
+    let firstInputReady = false
+    let inputRequests = 0
+    const inputRoute = /\/api\/terminal\/write(?:\?.*)?$/
+    await page.route(inputRoute, async (route) => {
+      inputRequests += 1
+      const response = await route.fetch()
+      if (inputRequests === 1) {
+        firstInputReady = true
+        await release.promise
+      }
+      await route.fulfill({ response })
+    })
+    try {
+      await input.fill('printf ')
+      await expect.poll(() => firstInputReady).toBe(true)
+      await page.keyboard.type('QA_界_BATCH > terminal-batch-proof.txt')
+      await input.press('Enter')
+      expect(inputRequests).toBe(1)
+      release.resolve(undefined)
+      await expect.poll(async () => readFile(join(world.workspaceCwd, 'terminal-batch-proof.txt'), 'utf8').catch(() => '')).toBe('QA_界_BATCH')
+      expect(inputRequests).toBe(2)
+      await compareOrRefreshGolden(join(DIRECTORY, 'queued-input.expected.md'),
+        `Queued input RPCs: ${inputRequests}\n\nTerminal file: ${await readFile(join(world.workspaceCwd, 'terminal-batch-proof.txt'), 'utf8')}`, webSnapshotMode())
+    } finally {
+      release.resolve(undefined)
+      await page.unroute(inputRoute)
+    }
     const management = async (method: string, args: object) => {
       const response = await world.hostFetch(`/api/terminal/${method}`, { method: 'POST',
         headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: 'terminal-administration', method: `terminal/${method}`, payload: { args } }) })
@@ -84,5 +112,5 @@ describe('web e2e: private user terminal lifecycle', () => {
     expect(await page.locator('[data-slot-error]').count()).toBe(0)
   })
 
-  it('owns one regional terminal guide golden', async () => { await assertFixtureInventory(DIRECTORY, ['guide.expected.md']) })
+  it('owns terminal guide and queued-input goldens', async () => { await assertFixtureInventory(DIRECTORY, ['guide.expected.md', 'queued-input.expected.md']) })
 })

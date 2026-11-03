@@ -10754,7 +10754,7 @@
         "packages/experimental/badge-skill-bundle/src/index.ts",
         "packages/experimental/badge-skill-bundle/tsconfig.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-18: 0/10 target files byte-identical locally; 0 carry fork diffs; 10 not carried; 0 removed upstream this round. Fork bundle created; enables parked skill-badge row."
     },
     {
@@ -10836,7 +10836,7 @@
         "packages/experimental/browser-use-runtime/tests/mcp.spec.ts",
         "packages/experimental/browser-use-runtime/tsconfig.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/experimental/browser-use-runtime",
@@ -10862,7 +10862,7 @@
         "packages/experimental/browser-use-stagehand-native/README.zh.md",
         "packages/experimental/browser-use-stagehand-native/package.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/experimental/browser-use-stagehand-native",
@@ -10946,7 +10946,7 @@
         "packages/experimental/claude-code-mods/tests/testing.spec.ts",
         "packages/experimental/claude-code-mods/tsconfig.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "localPlan": "P8 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.1-rc.2.md",
       "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-19: 58/62 target files byte-identical locally; 4 carry fork diffs; 0 not carried; 0 removed upstream this round. All upstream target files under this scope are carried at their upstream paths."
     },
@@ -12370,7 +12370,7 @@
         "packages/experimental/worktree/tests/worktree.spec.ts",
         "packages/experimental/worktree/tsconfig.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "localPlan": "P8 per upgrades/plans/UPGRADE-PLAN-dsh-v0.2.1-rc.2.md",
       "notes": "Cumulative dsh-v0.2.0-rc.1→dsh-v0.2.1-rc.2 review 2026-10-19: 6/13 target files byte-identical locally; 7 carry fork diffs; 0 not carried; 0 removed upstream this round. All upstream target files under this scope are carried at their upstream paths."
     },
@@ -14307,7 +14307,7 @@
         "packages/ptc-runtime/ptc-runtime-node/tests/setup.ts",
         "packages/ptc-runtime/ptc-runtime-node/tsdown.config.ts"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/ptc-runtime/ptc-runtime-node",
@@ -16146,7 +16146,7 @@
         "packages/ssh/subprocess-ssh/README.zh.md",
         "packages/ssh/subprocess-ssh/package.json"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
         "area": "packages/ssh/subprocess-ssh",

@@ -1,0 +1,14 @@
+{
+  "name": "project-account-mutation-postgres-final",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-service-postgres.spec.ts tests/admin-business-postgres.spec.ts tests/postgres.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-23T23:56:54.082127+00:00",
+  "seconds": 16.635,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "34d5af27e6779640541feac331ea5dad1b590797b3b09aec5491a9928ada4734",
+  "inputsAfter": "34d5af27e6779640541feac331ea5dad1b590797b3b09aec5491a9928ada4734",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "62b5c22723acc21d2c0a122d1bd0fecb9cf22149eaa65c17d3c339c77c9377a9",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  91 passed (91)\n   Start at  07:56:56\n   Duration  13.80s (transform 2.07s, setup 0ms, import 2.89s, tests 10.61s, environment 0ms)\n\n"
+}

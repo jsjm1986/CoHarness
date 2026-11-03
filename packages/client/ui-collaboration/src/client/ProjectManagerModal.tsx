@@ -1,6 +1,6 @@
 import { useEffect, useState, type SyntheticEvent } from 'react'
 import { Button, Input, Modal, IconFolderOpenOutline16, IconPlusOutline16, IconUsersOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ProjectInvitation, UserSummary } from './collaboration-client.ts'
+import type { CollaborationComputer, CollaborationComputerId, ProjectInvitation, UserSummary } from './collaboration-client.ts'
 import type { CollaborationKey } from './locales.ts'
 import css from './ProjectManagerModal.module.css'
 
@@ -15,11 +15,15 @@ export interface ProjectManagerModalProps {
   canManage?: boolean
   currentUserId: number
   t: (key: CollaborationKey, params?: Record<string, string | number>) => string
-  createProject?: (name: string) => Promise<number>
+  createProject?: (name: string, nodeId?: CollaborationComputerId) => Promise<number>
+  listComputers?: () => Promise<CollaborationComputer[]>
+  initialNodeId?: string
+  /** Only this computer is available when this entry has local scope. */
+  allowedNodeId?: CollaborationComputerId
   listInvitations?: (projectId?: number) => Promise<ProjectInvitation[]>
   inviteMember?: (projectId: number, username: string, mode: 'ro' | 'rw') => Promise<ProjectInvitation>
   acceptInvitation?: (id: string) => Promise<void>
-  listUsers?: () => Promise<UserSummary[]>
+  listUsers?: (projectId?: number) => Promise<UserSummary[]>
   onCreated: (projectId: number) => void
   onClose: () => void
 }
@@ -31,6 +35,7 @@ function errorText(error: unknown, t: ProjectManagerModalProps['t']): string {
       'invitation-already-member': 'manager.alreadyMember',
       'user-not-found': 'manager.userNotFound',
       'user-disabled': 'manager.userDisabled',
+      'invitation-computer-required': 'manager.computerRequired',
       'invitation-forbidden': 'manager.invitationForbidden',
       forbidden: 'manager.invitationForbidden',
       'invitation-expired': 'manager.invitationExpired',
@@ -49,10 +54,29 @@ function errorText(error: unknown, t: ProjectManagerModalProps['t']): string {
   return t('manager.failed')
 }
 
+/** Keep incoming invitations readable when a separate project-management read fails. */
+async function readInvitations(
+  list: (projectId?: number) => Promise<ProjectInvitation[]>,
+  managedProjectId: number | undefined,
+): Promise<{ invitations: ProjectInvitation[]; failures: unknown[] }> {
+  const results = await Promise.allSettled([
+    list(),
+    ...managedProjectId === undefined ? [] : [list(managedProjectId)],
+  ])
+  const invitations = new Map<string, ProjectInvitation>()
+  const failures: unknown[] = []
+  for (const result of results) {
+    if (result.status === 'rejected') failures.push(result.reason)
+    else for (const invitation of result.value) invitations.set(invitation.id, invitation)
+  }
+  return { invitations: [...invitations.values()], failures }
+}
+
 /** Render the user-owned project creation and member invitation dialog. */
 export function ProjectManagerModal({
   open, mode, projectId, canManage = false, currentUserId, t,
-  createProject, listInvitations, inviteMember, acceptInvitation, listUsers, onCreated, onClose,
+  createProject, listComputers, initialNodeId, allowedNodeId, listInvitations, inviteMember, acceptInvitation, listUsers,
+  onCreated, onClose,
 }: ProjectManagerModalProps) {
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
@@ -60,41 +84,81 @@ export function ProjectManagerModal({
   const [invitations, setInvitations] = useState<ProjectInvitation[]>([])
   const [users, setUsers] = useState<UserSummary[]>([])
   const [loadingInvitations, setLoadingInvitations] = useState(false)
+  const [loadingUsers, setLoadingUsers] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  const [computers, setComputers] = useState<CollaborationComputer[]>([])
+  const [nodeId, setNodeId] = useState<CollaborationComputerId | ''>('')
+  const [loadingComputers, setLoadingComputers] = useState(false)
+  const managedProjectId = mode === 'members' && canManage ? projectId : undefined
+  const capturedNodeId = mode === 'create' && nodeId !== '' ? nodeId : initialNodeId
+  const unavailableComputer = capturedNodeId !== undefined && allowedNodeId !== undefined && capturedNodeId !== allowedNodeId
+    || mode === 'create' && nodeId !== '' && listComputers !== undefined && !loadingComputers
+      && !computers.some(computer => computer.nodeId === nodeId && computer.status === 'active')
+
+  useEffect(() => {
+    if (!open || mode !== 'create' || listComputers === undefined) return
+    let active = true
+    setLoadingComputers(true)
+    void listComputers().then((next) => {
+      if (!active) return
+      setComputers(next)
+      setNodeId(current => current !== '' ? current
+        : next.find(item => item.nodeId === initialNodeId && item.status === 'active')?.nodeId
+          ?? next.find(item => item.status === 'active')?.nodeId ?? '')
+    }).catch(() => { if (active) setError(t('manager.computersFailed')) })
+      .finally(() => { if (active) setLoadingComputers(false) })
+    return () => { active = false }
+  }, [open, mode, listComputers, initialNodeId, t])
 
   useEffect(() => {
     if (!open) return
     setName('')
+    if (mode === 'create') setNodeId('')
     setUsername('')
     setMemberMode('rw')
     setError(undefined)
     setUsers([])
+    setLoadingUsers(false)
     if (mode !== 'members' || listInvitations === undefined) {
       setInvitations([])
       return
     }
     let active = true
     setLoadingInvitations(true)
-    void listInvitations(projectId)
-      .then((next) => { if (active) setInvitations(next) })
+    void readInvitations(listInvitations, managedProjectId)
+      .then((next) => {
+        if (!active) return
+        setInvitations(next.invitations)
+        if (next.failures.length > 0) setError(errorText(next.failures[0], t))
+      })
       .catch((nextError: unknown) => { if (active) setError(errorText(nextError, t)) })
       .finally(() => { if (active) setLoadingInvitations(false) })
-    if (listUsers !== undefined) {
-      void listUsers()
+    if (listUsers !== undefined && managedProjectId !== undefined) {
+      setLoadingUsers(true)
+      void listUsers(managedProjectId)
         .then((next) => { if (active) setUsers(next) })
-        .catch(() => { /* user list is non-critical; the form stays usable */ })
+        .catch(() => { if (active) setError(t('manager.usersFailed')) })
+        .finally(() => { if (active) setLoadingUsers(false) })
     }
     return () => { active = false }
-  }, [open, mode, projectId, listInvitations, listUsers, t])
+  }, [open, mode, managedProjectId, listInvitations, listUsers, t])
+
+  const refreshInvitations = async (): Promise<void> => {
+    if (listInvitations === undefined) return
+    const next = await readInvitations(listInvitations, managedProjectId)
+    setInvitations(next.invitations)
+    if (next.failures.length > 0) setError(errorText(next.failures[0], t))
+  }
 
   const submitCreate = async (event: SyntheticEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
-    if (busy || createProject === undefined || name.trim() === '') return
+    if (busy || unavailableComputer || createProject === undefined || name.trim() === ''
+      || listComputers !== undefined && (loadingComputers || nodeId === '')) return
     setBusy(true)
     setError(undefined)
     try {
-      onCreated(await createProject(name.trim()))
+      onCreated(await createProject(name.trim(), nodeId === '' ? undefined : nodeId))
     } catch (nextError) {
       setError(errorText(nextError, t))
     } finally {
@@ -104,13 +168,13 @@ export function ProjectManagerModal({
 
   const submitInvite = async (event: SyntheticEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
-    if (busy || projectId === undefined || inviteMember === undefined || username.trim() === '') return
+    if (busy || unavailableComputer || projectId === undefined || inviteMember === undefined || username.trim() === '') return
     setBusy(true)
     setError(undefined)
     try {
       await inviteMember(projectId, username.trim(), memberMode)
       setUsername('')
-      if (listInvitations !== undefined) setInvitations(await listInvitations(projectId))
+      await refreshInvitations()
     } catch (nextError) {
       setError(errorText(nextError, t))
     } finally {
@@ -119,12 +183,12 @@ export function ProjectManagerModal({
   }
 
   const accept = async (id: string): Promise<void> => {
-    if (busy || acceptInvitation === undefined) return
+    if (busy || unavailableComputer || acceptInvitation === undefined) return
     setBusy(true)
     setError(undefined)
     try {
       await acceptInvitation(id)
-      if (listInvitations !== undefined) setInvitations(await listInvitations(projectId))
+      await refreshInvitations()
     } catch (nextError) {
       setError(errorText(nextError, t))
     } finally {
@@ -152,6 +216,7 @@ export function ProjectManagerModal({
         </Button>
       )}
     >
+      {unavailableComputer && <div className={css.error} role="alert">{t('manager.targetUnavailable')}</div>}
       {mode === 'create' ? (
         <form className={css.form} onSubmit={(event) => { void submitCreate(event) }}>
           <label className={css.label} htmlFor="collaboration-project-name">{t('manager.nameLabel')}</label>
@@ -164,12 +229,27 @@ export function ProjectManagerModal({
             maxLength={120}
             required
           />
+          {listComputers !== undefined && <>
+            <label className={css.label} htmlFor="collaboration-project-computer">{t('manager.computerLabel')}</label>
+            <select id="collaboration-project-computer" className={css.select} value={nodeId}
+              disabled={busy || loadingComputers} required onChange={(event) => { setNodeId(computers.find(computer => computer.nodeId === event.target.value)?.nodeId ?? '') }}>
+              <option value="">{t(loadingComputers ? 'manager.computersLoading' : 'manager.computerPlaceholder')}</option>
+              {nodeId !== '' && !computers.some(computer => computer.nodeId === nodeId) && <option value={nodeId} disabled>
+                {t('manager.targetUnavailable')}
+              </option>}
+              {computers.map(computer => <option key={computer.nodeId} value={computer.nodeId} disabled={computer.status !== 'active'}>
+                {computer.name}{computer.status === 'active' ? '' : ` · ${t('manager.computerOffline')}`}
+              </option>)}
+            </select>
+            <p className={css.muted}>{t('manager.computerNote')}</p>
+          </>}
           <div className={css.pathNote}>
             <IconFolderOpenOutline16 size={16} />
             <span>{t('manager.folderNote')}</span>
           </div>
           {error !== undefined && <div className={css.error} role="alert">{error}</div>}
-          <Button variant="primary" type="submit" disabled={busy || name.trim() === ''} icon={<IconPlusOutline16 size={16} />}>
+          <Button variant="primary" type="submit" disabled={busy || unavailableComputer || name.trim() === ''
+            || listComputers !== undefined && (loadingComputers || nodeId === '')} icon={<IconPlusOutline16 size={16} />}>
             {busy ? t('manager.creating') : t('manager.create')}
           </Button>
         </form>
@@ -182,6 +262,7 @@ export function ProjectManagerModal({
                 id="collaboration-invite-username"
                 className={css.select}
                 value={username}
+                disabled={loadingUsers || busy}
                 onChange={(event) => { setUsername(event.target.value) }}
                 autoFocus
                 required
@@ -193,6 +274,7 @@ export function ProjectManagerModal({
                     <option key={u.id} value={u.username}>{u.displayName}</option>
                   ))}
               </select>
+              {!loadingUsers && !loadingInvitations && error === undefined && users.length === 0 && <p className={css.muted}>{t('manager.noInvitableUsers')}</p>}
               <label className={css.label} htmlFor="collaboration-invite-mode">{t('manager.modeLabel')}</label>
               <select
                 id="collaboration-invite-mode"
@@ -203,7 +285,7 @@ export function ProjectManagerModal({
                 <option value="rw">{t('manager.readWrite')}</option>
                 <option value="ro">{t('manager.readOnly')}</option>
               </select>
-              <Button variant="primary" type="submit" disabled={busy || username.trim() === ''} icon={<IconUsersOutline16 size={16} />}>
+              <Button variant="primary" type="submit" disabled={busy || unavailableComputer || username.trim() === ''} icon={<IconUsersOutline16 size={16} />}>
                 {busy ? t('manager.inviting') : t('manager.invite')}
               </Button>
             </form>
@@ -221,7 +303,7 @@ export function ProjectManagerModal({
                     : t('manager.invitedUser', { name: invitation.invitee.displayName })}</span>
                 </div>
                 {invitation.invitee.id === currentUserId && (
-                  <Button variant="outline" size="sm" disabled={busy} onClick={() => { void accept(invitation.id) }}>
+                  <Button variant="outline" size="sm" disabled={busy || unavailableComputer} onClick={() => { void accept(invitation.id) }}>
                     {t('manager.accept')}
                   </Button>
                 )}

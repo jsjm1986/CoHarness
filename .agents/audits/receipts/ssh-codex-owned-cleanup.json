@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-owned-cleanup",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/ssh/ssh/tests/startup-behavior.spec.ts packages/ssh/ssh/tests/connection-disposal.spec.ts packages/subagent/subagent-codex/tests/managed-model-http.spec.ts packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts packages/preset/agent-preset-registry/tests/realm.spec.ts",
+  "startedAt": "2026-10-25T12:10:18.986564+00:00",
+  "seconds": 5.903,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f3b4c43fa21712cc46c32c7ce3a56dfa29b91582db80cc819b96b02697a3fd27",
+  "inputsAfter": "f3b4c43fa21712cc46c32c7ce3a56dfa29b91582db80cc819b96b02697a3fd27",
+  "postgresToolDirectory": null,
+  "outputSha256": "48583d4c68bfe4c315d1b25853aed6bfd0b7f296f65792ba06ebc2cd7f470f48",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  5 passed (5)\n      Tests  132 passed (132)\n   Start at  20:10:22\n   Duration  1.88s (transform 3.57s, setup 209ms, import 5.11s, tests 937ms, environment 0ms)\n\n"
+}

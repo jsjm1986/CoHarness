@@ -1,0 +1,14 @@
+{
+  "name": "hmr-pending-watch-built-current",
+  "cwd": ".",
+  "command": "node --expose-internals packages/boot/hmr/tests/fixtures/pending-watch-owner.mjs",
+  "startedAt": "2026-10-24T02:32:00.249180+00:00",
+  "seconds": 0.578,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cdf34c484804ab98e77f7402b3bc5163aa605708fe90fe4c79a56d0cbb7bc1c6",
+  "inputsAfter": "cdf34c484804ab98e77f7402b3bc5163aa605708fe90fe4c79a56d0cbb7bc1c6",
+  "postgresToolDirectory": null,
+  "outputSha256": "fffb6d339290cb9b9f74b65299f5b9826dae4e35928d24636093fd8840354e5b",
+  "outputTail": "{\"closedBeforeReady\":true,\"replacementReady\":true}\n"
+}

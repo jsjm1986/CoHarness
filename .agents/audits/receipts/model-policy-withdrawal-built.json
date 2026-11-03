@@ -1,0 +1,14 @@
+{
+  "name": "model-policy-withdrawal-built",
+  "cwd": ".",
+  "command": "node --import ./.agents/audits/.local/native-policy-built-peers.mjs .agents/audits/.local/verify-built-policy-withdrawal.mjs",
+  "startedAt": "2026-10-24T07:30:16.111736+00:00",
+  "seconds": 0.444,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b4b41fde1551170987bb07c9e670e15d5f9c5fdd1cf50ba7ea494acb267f816e",
+  "inputsAfter": "b4b41fde1551170987bb07c9e670e15d5f9c5fdd1cf50ba7ea494acb267f816e",
+  "postgresToolDirectory": null,
+  "outputSha256": "583935ca1ad953e9ad6a071328f8ffb8ac8c7acf0f23ddf91708bc1af7ead1ef",
+  "outputTail": "{\"dispatched\":0,\"released\":1,\"uncertain\":0,\"failure\":\"MODEL_POLICY_UNAVAILABLE\",\"preservedOutboxRecords\":1}\n"
+}

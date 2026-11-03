@@ -441,6 +441,10 @@
       "note": ".agents/notes/implemented/bug-fix/2026-07-28-web-agent-runtime-context.md",
       "sovereignty": "adapted"
     },
+    "context/resource-budget": {
+      "sovereignty": "owned",
+      "note": "packages/context/resource-budget/README.md"
+    },
     "context/session-reference": {
       "sovereignty": "adapted"
     },
@@ -525,7 +529,7 @@
       "sovereignty": "adapted"
     },
     "experimental/badge-skill-bundle": {
-      "sovereignty": "tracked",
+      "sovereignty": "adapted",
       "note": ".agents/notes/implemented/feature/2026-10-18-experimental-feature-bundles.md"
     },
     "experimental/browser-use-chrome-devtools-mcp": {
@@ -535,14 +539,15 @@
       "sovereignty": "adapted"
     },
     "experimental/browser-use-runtime": {
-      "sovereignty": "tracked",
+      "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-10-15-session-working-directory.md"
     },
     "experimental/browser-use-stagehand-native": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/proposed/feature/2026-10-23-node-resource-admission.md"
     },
     "experimental/claude-code-mods": {
-      "sovereignty": "tracked",
+      "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-10-17-experimental-claude-code-mods-extraction.md"
     },
     "experimental/client-ui-agent-team": {
@@ -632,7 +637,8 @@
       "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     },
     "experimental/worktree": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/proposed/feature/2026-10-23-node-resource-admission.md"
     },
     "extensions/cordis-client-runner": {
       "sovereignty": "adapted"
@@ -834,7 +840,8 @@
       "sovereignty": "adapted"
     },
     "ptc-runtime/ptc-runtime-node": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/proposed/feature/2026-10-23-node-resource-admission.md"
     },
     "remote-desktop/remote-desktop": {
       "sovereignty": "owned"
@@ -1052,7 +1059,8 @@
       "sovereignty": "tracked"
     },
     "ssh/subprocess-ssh": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/proposed/feature/2026-10-23-node-resource-admission.md"
     },
     "storage/storage": {
       "sovereignty": "tracked"

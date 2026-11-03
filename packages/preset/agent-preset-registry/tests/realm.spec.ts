@@ -260,6 +260,15 @@ describe('standing realms', () => {
     expect(host.resolveExecutable).not.toHaveBeenCalled()
   })
 
+  it('addresses a declared preset realm through the fiber that installed its environment', async () => {
+    const unregister = await ctx.agentPresets.register({ id: 'declared-remote', plugins: [] })
+    ctx.effect(() => unregister)
+    ctx.agentPresets.registerRealm('declared-ssh', (scope) => { shadowFs(scope, 'declared-remote') })
+    const remote = await agentOn(ctx, 'declared-session', 'declared-remote', 'declared-ssh')
+    expect(environmentForAgent(ctx, remote, 'fs')).toEqual({ marker: 'declared-remote' })
+    expect(environmentForAgent(ctx, remote, 'subprocess')).toBeUndefined()
+  })
+
   it('exposes the realm-installed environment through environmentForAgent', async () => {
     ctx.agentPresets.registerRealm('ssh-a', async (scopeCtx) => { shadowFs(scopeCtx, 'realm-a') })
 

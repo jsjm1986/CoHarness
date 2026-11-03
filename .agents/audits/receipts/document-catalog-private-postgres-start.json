@@ -1,0 +1,14 @@
+{
+  "name": "document-catalog-private-postgres-start",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/prepare-catalog-postgres.py",
+  "startedAt": "2026-10-26T21:03:05.573778+00:00",
+  "seconds": 3.246,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fdc5b0bfcc799f6f6a1e16fbe20224fb64ced252cc007591152149bba30322da",
+  "inputsAfter": "fdc5b0bfcc799f6f6a1e16fbe20224fb64ced252cc007591152149bba30322da",
+  "postgresToolDirectory": null,
+  "outputSha256": "e70708a0f42dffdaede2a7790552509db20237c22d5e1fb569e7df594e85636b",
+  "outputTail": "dyld[73158]: Library not loaded: @loader_path/../lib/libicudata.77.dylib\n  Referenced from: <18FD2F6C-AB2C-3E76-A746-DBD509B1D964> /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/postgres-runtime/package/native/lib/libicuuc.77.1.dylib\n  Reason: tried: '/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/postgres-runtime/package/native/lib/../lib/libicudata.77.dylib' (no such file)\nTraceback (most recent call last):\n  File \"/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/prepare-catalog-postgres.py\", line 24, in <module>\n    subprocess.run([str(binary/'initdb'),'-D',str(data),'--locale=C','--encoding=UTF8','--auth-host=scram-sha-256','--auth-local=trust','--username='+username,'--pwfile='+str(password_file)],check=True)\n  File \"/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py\", line 571, in run\n    raise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/postgres-runtime/package/native/bin/initdb', '-D', '/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/pgdata-document-catalog-20261027', '--locale=C', '--encoding=UTF8', '--auth-host=scram-sha-256', '--auth-local=trust', '--username=postgres', '--pwfile=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/.sdk-postgres-password']' died with <Signals.SIGABRT: 6>.\n"
+}

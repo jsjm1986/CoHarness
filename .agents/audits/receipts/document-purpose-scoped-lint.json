@@ -1,0 +1,14 @@
+{
+  "name": "document-purpose-scoped-lint",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts packages/context/gateway-runtime/src/index.ts packages/context/gateway-runtime/tests/gateway-admission.host.spec.ts packages/host/userdoc-http/src/index.ts packages/host/userdoc-http/tests/acl.spec.ts gateway/src/runtime-api.ts gateway/tests/runtime-api.spec.ts",
+  "startedAt": "2026-10-26T14:44:28.504463+00:00",
+  "seconds": 4.884,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4d8c7ec4dcfc91a62eaf7722745d1632efb9222a674fffaa0374c12fb2c81a43",
+  "inputsAfter": "4d8c7ec4dcfc91a62eaf7722745d1632efb9222a674fffaa0374c12fb2c81a43",
+  "postgresToolDirectory": null,
+  "outputSha256": "6c6c064cc7fe1c3a6f852c9c9a25649729369179a3aaa212ad4b4623476a90b6",
+  "outputTail": "packages/context/gateway-runtime/tests/gateway-admission.host.spec.ts:236:53: error typescript(no-unnecessary-type-assertion): This assertion is unnecessary since it does not change the type of the expression.\n"
+}

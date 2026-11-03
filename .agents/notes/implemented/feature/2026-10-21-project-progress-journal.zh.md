@@ -1,4 +1,4 @@
-# Agent Note: 项目进展纪要——面向人的共享活动 AI 梳理
+# Agent Note: 项目进展纪要
 
 Status: implemented
 
@@ -6,54 +6,54 @@ Status: implemented
 
 ## 问题
 
-[项目动态](2026-10-17-project-activity-feed.zh.md) 逐行回答「谁说了什么、选了什么」，但离开一阵回来的成员仍要翻原始记录才能知道项目定了什么、完成了什么、卡在哪。需求是一份人读的梳理——「让成员不读聊天记录也能拿到近期变化」——带两条硬边界：无事发生时不许空转（不做周期性空梳理）；它是**面向人的纪要，不是 agent 记忆**——harness 的记忆系统成熟且独立；纪要可以读成员可见的素材，但 agent 不消费纪要，纪要也不进入记忆域。
+[项目动态](2026-10-17-project-activity-feed.zh.md) 记录逐条成员消息和回答。返回项目的成员还需要了解已定事项、完成工作和阻塞的综合梳理。该产物面向人，其生成及隐私规则属于 Gateway 掌握的权威共享会话数据。
 
-## 决定
+## 决策
 
-新增**项目进展纪要**：Gateway Postgres 侧一个事件门控的 AI 梳理 pass，把共享可见的成员活动折叠成持久化纪要条目，加上 `ui-project-activity` 面板的 `progress` 档——第一档、默认视图。
+`PostgresProgressService` 从共享可见的根会话生成滚动当前条目和 ISO 周期次条目。`visible` 查询要求组织与项目匹配、未删除且 `visibility='project'`。成员消息与已认领提问回答提供带署名素材，单独限量的代理消息流提供上下文。事件 JSON 导航在解码前跳过含 NUL 的负载。历史回答中的无效元素不贡献文本。
 
-### 存储：迁移 059
+扫描只考虑固定电脑与 Gateway 相同的项目。候选选择、公共编号解析和租约准入检查该归属；模型发送在资源等待后再次检查。组织所有权及本地 Gateway 进程预留不能授权处理另一台电脑的项目。扫描要求有新素材、足够成员活动或一项决策、足够静默时间，并满足距上次处理的间隔。写入者可以请求异步手动处理。各消息流分别限量，只保留确定完整的素材前缀。空项目不发起推理。
 
-- `harness.project_journal`：条目。`kind='current'` 是滚动覆写的「项目现在到哪了」行（部分唯一索引，每项目一行，每次 pass upsert）；`kind='period'` 行携带 ISO 周 `period_key`（`YYYY-Www`）、结构化 `content`（`summary` 加 `定了`/`完成`/`进行中`/`卡点` 四节，节内条目署名 `{ text, actor?, sessionId, sessionTitle, seq? }`）、`activity_count`、素材周期边界与解析出的 `model` 路由。
-- `harness.project_journal_state`：每项目 pass 状态——已提交水位线（`watermark_ts`、`watermark_session`、`watermark_seq`，与 feed keyset 同序）、`last_run_at`、`generating_since`（在途租约）、`last_error`。
+来源是否可处理由 Session 与稳定消息/回答标识组成的逐条消费记录决定，而非时间戳水位。延迟到达的旧消息及新认领的未绑定消息回答仍可处理。SQL 与应用按完整微秒时间、UTF-8 Session 字节、序号及稳定条目标识字节排列完整前缀。空来源行也会写入消费记录，但不发起空推理。展示水位仅记录已处理的最远位置。待处理计数在解码事件 JSON 前排除已消费行，并省略不需要的标题查询。
 
-### 素材：仅成员可见
+### 请求所有权与证据
 
-一次 pass 从 `visible` CTE 读取——要求组织/项目归属、根会话、未删除、`visibility='project'`，与 `listConversations` 同一归属边界。成员私有会话不可能进入项目级纪要。边界内收集成员 `user/message` 行（feed 的 `source.kind='user'` 口径）与带答案数组的 `question` 交互响应——选中答案即决策——再把行折成编号素材行（`[n] 时间 · 人 · 会话 · 说了/定了: 内容`）进提示词。会话标题取 `harness.human_session_title` 加首条人类行兜底。行数有界（`maxMaterialRows`、`maxAssistantRows`、`maxItemsPerSection`），素材限于 `materialWindowDays` 窗口。真实事件负载可能含 `\u0000` JSON 转义（粘贴的二进制内容、工具变更 scope）；Postgres `json` 导航会解码该转义并使整条查询中止，因此所有 `event->`/`event->>` 访问都先经 `SAFE_EVENT` CASE 守卫在文本层跳过这些行，再做 JSON 导航。
+[Gateway 模型所有者](../architecture/2026-10-24-gateway-model-ownership.zh.md) 与 Runtime 工作共用节点准入，等待后复查当前权限和路由，并在释放占用前等待 HTTP 取消结束。每次提供商尝试在发送前将完整请求正文写入 `project_journal_requests`；凭据不进入该日志。响应保留有字节上限。提示词替换保留成员原文，包括替换元字符和类似模板的文本。路由标识使用提供商与模型二元组。每次请求使用最新部署请求头，Harness 署名覆盖保留名称，输出 token 同时遵守纪要上限与实际模型上限。
 
-### 触发：三道门，绝不定时空跑
+每次处理持续订阅既有持久权限监视器，直到发布结束。捕获、模型发送及发布前都补读变更。匹配的项目/发起者变更取消排队和活跃 HTTP 工作；组织失效或监视连接丢失会取消本地全部处理。无关账户变化不影响当前处理。取消阻止提供商回退和发布，包括 HTTP 已完成的情况。通知确认表示已发起取消；HTTP 与记账清理结束前，资源记账仍保留占用。关闭会停止所有处理并移除订阅。
 
-服务以短的 unref 间隔（`sweepMs`）扫候选项目，但只有三门全过才启动 pass：
+同一次插入还会保存不可变的 `request_session` 快照，使用当前安装的 Session 格式、普通 turn/step 事件、`request/header` 及带标识的 `user/message` 事件。生产者来源为 `gateway-project-progress`，不携带人类参与者。快照支持已发布的逻辑目录，规范 Session 消息/请求头读取器可重建实际发送的输入。它在发送前记录未完成请求；响应、完成状态与用量保存在同一行的其他证据字段。它不登记为成员会话，也不会成为自身的摘要输入。迁移 070 添加该产物；更早的证据行保留原始请求 JSON。迁移 071 让证据与其他项目进展数据遵循相同的项目永久删除级联规则；归档仍保留证据。
 
-1. **活动门**——水位后至少 `minActivity` 条新行；一条新决策（`hasDecision`）即可降阈。
-2. **静默门**——最新活动已过去 `idleMs`，工作一阵收口后梳理，不在流中打断。
-3. **间隔门**——距上次已提交 pass 至少 `intervalMs`。
+同一请求 UUID 标识可重放的项目基础设施用量记录。成功响应将缓存提示词 token 与未缓存输入分开；无法取得或无效的计数保留为用量缺失。失败与取消的尝试保留对应状态。记账插入完成但确认丢失时，重放不会重复收费。中断尝试仅在实际资源所有权结束后才能以用量缺失重放。手动点击保留排队署名及请求证据，不虚构模型输入参与者。项目归档不使历史记账失效。配额保持提醒性质。
 
-数周静默不产生候选事件，因此零模型调用。`POST /account/api/progress/generate` 绕过门控供成员强制梳理。水位线持久化在 Postgres，重启后从上次提交处继续。
+### 发布与来源隐私
 
-### Pass：单飞、只在成功时提交
+原子租约 upsert 分配唯一代次。发送仅续期该代次；发布依次锁定可见来源行、对应代次行、纪要条目及消费记录。条目 upsert、消费记录与水位线在同一事务提交。被替代的任务不能发布、清除后继租约或覆盖其错误。失败让素材保持可处理，并通过 `last_run_at` 退避。手动后台工作参与维护静默；关闭会取消并等待所有任务，再释放依赖。
 
-`acquire()` 以一条原子条件 upsert（`ON CONFLICT … DO UPDATE … WHERE` 租约空闲或已陈旧）取 `generating_since` 租约，并发 sweep 与手动 pass 不会双重启动；超过 `leaseMs` 的陈旧租约被回收，崩溃的 pass 不会卡死项目。pass 从模型治理策略（`policyForProject`）解析默认路由、取组织托管凭据，再以编号引用提示词调用 chat-completions 端点。模型输出须校验：`定了/完成/进行中` 的每条必须带能解析到真实素材行的 `ref`（署名从行拷贝，不让模型杜撰），`blocked` 条目允许独立成立，解析不了的引用丢条目，既没有可用 summary 也没有有效条目的输出整轮拒绝。成功时一个事务写入 `current` upsert、`period` upsert 与水位线提交；失败的 pass 记录 `last_error`、同时盖 `last_run_at` 让间隔门把重试退到 `intervalMs`、水位不动，同样的行进入下一次 pass。由于成员与代理素材各自限量，某个到上限的流尾部可能缺另一条流的行——pass 只消化确定完整的前缀（到各到上限流末键的最早者为止），其余留在水位下。无素材的 pass 释放租约、不虚构条目。手动梳理是异步的——HTTP 处理器返回 `{ started }` 后 pass 在后台跑——慢模型不会拖死请求。
+共享根会话改为私有或删除时，来源变更事务会使项目综合纪要失效，并重置消费记录、水位与代次。根会话改为共享也会重置，确保更早的新可见素材被纳入。失效条目仍被保存，但不用于读取和后续提示词。自由文本摘要及沿用的当前/期次内容无法按单条引用可靠删改，因此须保守重建。迁移 068 会一次性使已有条目失效；迁移 069 重置选择状态以建立逐条消费记录。重新生成使用配置的可见素材窗口。来源事件与记账证据继续保留。
 
-### 客户端：`progress` 作为默认档
+### 产品入口
 
-`ui-project-activity` 新增 `fetchProgress`/`generateProgress` 线路函数、`ActivityMode = 'progress' | ActivityGrouping`，以及渲染滚动当前摘要、折叠期次条目（最新默认展开）、节头、点击 `reveal` 源会话的署名 chip、生成说明行与报告 `pending` 未梳理行数加「立即梳理」动作的状态条的 `ProgressView`。store 默认 `grouping` 为 `'progress'`。页面报告 `generating` 期间 inject 面轮询纪要到落地——包括打开面板时已在途的 pass。路由返回 `400`/`404` 渲染为「功能未启用」页而非传输失败，未挂载服务的部署安静降级。
+`GET /account/api/progress` 返回当前条目、期次与实时状态；`POST /account/api/progress/generate` 要求项目写权限。`ui-project-activity` 插件默认显示进展，轮询活跃任务，并通过带 Runtime 身份的 Session 视口跳转署名来源。普通代理请求与代理记忆目录不读取该纪要。纪要生成本身会将符合条件的前次当前/期次文本作为上下文。
 
 ## 考虑过的替代方案
 
-- **runtime 侧 curation pass 写记忆条目**（第一版设计草图）：否决。共享/私有边界的权威在 Gateway SQL（`conversation_*` 可见性）；runtime 折叠看不到 `visibility='project'`，有把私有会话泄进项目级产物的风险。Gateway 还已经持有模型路由与托管凭据通路。
-- **纪要条目放进 agent 记忆域**：按需求否决。人读纪要与 agent 记忆保持两个域——记忆 catalog 永不列纪要条目，模型请求永不读它们。反向（梳理时参考记忆事实）留作开放未实现。
-- **workspace 里的纪要文件或会话**：否决——文件跨期碎裂、会话把产物埋进聊天列表；专用存储保持面板渲染的「当前+期次」形态。
-- **定时 pass**：否决——固定周期在静默周白烧 token；事件门控的 sweep 在无事发生时零调用。
+- Runtime 侧整理无法仅凭本地日志授权共享/私有来源可见性。Gateway SQL 负责来源选择与失效。
+- 将纪要放入代理记忆会扩大受众和执行参与范围。面向人的产物保留独立数据域。
+- 只删带署名条目会留下无引用的 summary 文本和沿用上下文。使综合产物失效并重新生成才能维持来源隐私规则。
+- 仅用时间戳的租约不能隔离恢复后延迟返回的前任。每次发布与清理都使用唯一代次。
+- 时间戳选择游标无法区分 JavaScript 日期丢失的 PostgreSQL 微秒、共用锚点的回答或延迟到达的来源。逐条来源消费记录保留这些输入；时间戳仅适合展示。
+- 不等待确认就发送记账会丢失中断尝试或产生重复确认问题。持久请求证据与 UUID 去重保留这些记录。
+- 独立的实用模型请求 Session 维持正常模型输入重建规则，避免将基础设施提示词放入共享会话索引。不可变的发送前快照和同一行的结果字段各自承担不同职责。
 
 ## 后果
 
-- 一次新增 Postgres 迁移、两条 account 路由、一个 `progress` 配置段（`HGW_PROGRESS*`）、一个 unref sweep 定时器、一个客户端档位。无 session 格式、模型请求或 runtime 变化；记忆域未动。
-- token 成本受 `intervalMs` 与素材上限约束；`enabled: false` 时零调用。非 Postgres 部署不挂服务、显示不可用页。
-- feed 早先对[模型侧召回的否决](2026-10-17-project-activity-feed.zh.md)仍然成立：纪要条目永不进入模型请求。本 note 是那个否决预期中的面向人的姊妹篇。
+纪要具有独立的条目、代次、来源消费记录和请求证据表，保留既有 account 路由与客户端响应字段。模型超时、响应字节上限、重放批量、素材上限和扫描门控都是经过验证的 Gateway 配置。部署与首次重建步骤见[升级指南](../../../../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.zh.md)。
 
-## 测试
+## 验证
 
-- `gateway/tests/progress-service.spec.ts`（17 例）：ISO 周键、输出引用校验（含 blocked 独立成立例外）、不可用路由、空闲/陈旧/已占租约、活动/决策/静默/间隔门、成功写入加水位提交、记录 `last_error` 不动水位、提问加答案的决策折叠、共享可见素材口径。
-- `packages/client/ui-project-activity` 单测（14）照旧覆盖分组与注册；`apps/web/tests/project-activity.e2e.ts` 增加进展路由 mock 并断言进展优先的默认视图再切到 feed。
-- `apps/web/tests/project-progress.e2e.ts` 在 mock Gateway 上启动真实 Web 组合：纪要落地、期次折叠、署名 chip 跳源、强制 pass 从在途轮询到落地、以及无「立即梳理」入口的不可用态。
+两个逻辑电脑配合真实节点预算及内核锁保护的 Gateway 所有者，验证仅扫描本机项目、精确的请求节点归属、各项目独立记账及消费记录重放。其他电脑的项目不会获得租约或错误状态。
+
+单测覆盖门控、完整前缀、输出引用、路由二元组、提示词原文和无效历史回答。真实 Gateway HTTP/PostgreSQL 快照覆盖排队生成、当前授权与来源变化。回归覆盖陈旧前任发布、响应取消、归档项目记账、记账确认重放、来源转私有/共享后的重建、逐条来源排序、延迟到达及消费记录的原子回滚。HTTP 检查在请求发送时观察已有 Session；已发布目录及普通 Node 下的规范读取器重建完整请求。数据库检查拒绝无效的 Session 标识及替换已提交的请求快照。Web 展示继续由既有可运行进展和动态示例覆盖。
+
+[构建产物读取诊断](../../../../gateway/tests/progress-material.perf.ts) 通过生产 `progressForUser` 路径与提交 `2896f75419ca38682a4a96151ee15beee009ccac` 对比，每种实现使用三个全新进程、十次预热及三批各十次读取，PostgreSQL 连接池大小为一，并保留一个完整页面。在 macOS arm64、Node 25.8.1 与 PostgreSQL 17.6 上，四个根会话和 200 条消息在 0/20/全部来源待处理时的耗时中位数，原实现为 6.21/6.77/6.82 毫秒，消费记录实现为 5.95/7.06/7.27；二十个根会话和 20,000 条消息时，原实现为 41.27/40.06/183.79，消费记录实现为 53.96/53.74/143.40。进程 RSS 中位数原实现约 67 MiB，消费记录实现约 70 MiB。不包含 HTTP、模型查询/推理、数据库服务端内存和并发负载。逐条记录查询会增加大部分来源已消费的大历史读取工作；提前排除可避免解码这些负载。复现时使用已构建 Gateway 和可丢弃的 `HGW_TEST_DATABASE_URL`，将 `HGW_PROGRESS_PERF_BASELINE_REF` 设为上述提交，通过 `HGW_PROGRESS_PERF_SCALE=ordinary` 或 `large` 运行 `TSX_TSCONFIG_PATH=tsconfig.run.json node --import tsx/esm tests/progress-material.perf.ts`。

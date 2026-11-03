@@ -1,0 +1,14 @@
+{
+  "name": "document-short-write-export-jsdoc",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-export-jsdoc.ts",
+  "startedAt": "2026-10-25T10:40:24.225722+00:00",
+  "seconds": 7.204,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bc45a9dc20b46848c7b7a727302822ee25d9ecbecc478da96be1a4ee47a15d3b",
+  "inputsAfter": "bc45a9dc20b46848c7b7a727302822ee25d9ecbecc478da96be1a4ee47a15d3b",
+  "postgresToolDirectory": null,
+  "outputSha256": "a44102982eb1b0bceccea64b86e7c51bee5c5a277ee03f5b989e4bc802574393",
+  "outputTail": "verify-export-jsdoc: every exported name in each package API is documented.\n"
+}

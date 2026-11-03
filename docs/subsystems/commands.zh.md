@@ -73,7 +73,7 @@ interface CommandInvocation {
    * error so the dispatching composer retains the originals.
    */
   readonly attachments: readonly (ImageBlock | FileBlock)[]
-  /** Cancellation signal owned by the dispatching UI request. */
+  /** Cancellation from the dispatching UI request or withdrawal of the commands service. */
   readonly signal: AbortSignal
 }
 ```
@@ -183,12 +183,21 @@ find(agent: Agent, name: string): CommandDefinition | undefined
  * the handler runs. Validation rejection starts no attachment writes;
  * a storage failure can leave only unreachable content-addressed objects
  * for deferred collection.
+ * The selected registration must still be effective at handler entry;
+ * removal, replacement, or a scoped override settles the run as an error.
+ * Cancellation before handler entry rejects and settles any published run
+ * as an error, including commands without attachments.
+ * A composed Agent registry must still contain this exact Agent at entry.
+ * Pending admission and real handler cleanup veto automatic idle disposal,
+ * including cleanup that outlives the UI's cancelled wait.
+ * Service withdrawal cancels accepted commands and awaits their real cleanup
+ * before removing that idle veto; retained service references cannot start work.
  *
  * @param agent - exact receiving agent.
  * @param line - complete slash-command line.
  * @param submittedAttachments - encoded images and staged file receipts accompanying the line,
  *   in submission order; empty for a plain invocation.
- * @param signal - cancellation signal owned by the UI request.
+ * @param signal - UI cancellation, combined with service withdrawal for the handler.
  * @returns the settled execution (result + lifecycle pairing id), or
  *   `undefined` when syntax or name does not resolve.
  */

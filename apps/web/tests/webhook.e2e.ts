@@ -38,6 +38,7 @@ class WebhookAuthority extends ExecutionAuthority {
   async authorizeSelection(): Promise<void> {}
   async answer(): Promise<never> { throw new Error('Webhook fixture has no interactive questions') }
   capture(): never { throw new Error('Webhook fixture does not delegate') }
+  current(): undefined { return undefined }
   async captureSession(): Promise<never> { throw new Error('Webhook fixture does not fork') }
   inherit(): never { throw new Error('Webhook fixture has no inherited execution') }
   async relay(): Promise<never> { throw new Error('Webhook fixture does not relay messages') }

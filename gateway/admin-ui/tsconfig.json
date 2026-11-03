@@ -13,11 +13,15 @@
     "isolatedModules": true,
     "types": ["vite/client"],
     "paths": {
+      "@deepseek-ai/dsh-brand": ["../../packages/util/brand/src/index.ts"],
       "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
       "@deepseek-ai/cosmokit": ["../../vendor/cosmokit/lib/types/index.d.ts"],
       "@deepseek-ai/schemastery": ["../../vendor/schemastery/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-client-runtime/client": ["../../packages/client/runtime/src/client/index.ts"],
-      "@deepseek-ai/dsh-client-ui-primitives": ["./src/model-settings-primitives.ts"]
+      "@deepseek-ai/dsh-client-ui-primitives": ["./src/model-settings-primitives.ts"],
+      "@deepseek-ai/dsh-native-command": [
+        "../../packages/util/native-command/lib/types/index.d.ts"
+      ]
     }
   },
   "include": ["src", "../../scripts/types/client-build-environment/index.d.ts"]

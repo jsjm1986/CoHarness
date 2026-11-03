@@ -1,0 +1,14 @@
+{
+  "name": "document-reuse-real-user-built-characterization",
+  "cwd": "gateway",
+  "command": "node ../.agents/audits/.local/document-reuse-probe.mjs",
+  "startedAt": "2026-10-25T01:35:19.715381+00:00",
+  "seconds": 2.129,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8301c9c40da476c684889e5bb0624131e29af5978697ce921d4542e728ad0a5f",
+  "inputsAfter": "8301c9c40da476c684889e5bb0624131e29af5978697ce921d4542e728ad0a5f",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "73c1771206791b06fd8e0633887f39f972aed6517acf047854fd45755d5ba5e3",
+  "outputTail": "file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/principal.js:137\n        throw new Error('invalid principal assertion');\n              ^\n\nError: invalid principal assertion\n    at principalClaims (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/principal.js:137:15)\n    at GatewayPrincipalSigner.verify (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/principal.js:84:24)\n    at LocalDocumentBroker.issueAuthority (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/documents-local.js:269:45)\n    at LocalDocumentBroker.authorize (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/documents-local.js:303:42)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async LocalDocumentBroker.serveUpload (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/documents-local.js:425:28)\n    at async upload (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/.agents/audits/.local/document-reuse-probe.mjs:46:19)\n    at async file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/.agents/audits/.local/document-reuse-probe.mjs:63:17\n\nNode.js v25.8.1\n"
+}

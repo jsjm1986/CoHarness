@@ -1,0 +1,13 @@
+{
+  "name": "inspector-admission-packed-current",
+  "cwd": ".",
+  "command": "pnpm run test:e2e packages/experimental/inspector/tests/built-lib.e2e.ts --retry=0",
+  "startedAt": "2026-10-23T14:50:06.156354+00:00",
+  "seconds": 3.377,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5e2b6bde82c8e0619f6c8d9783601d4f27441f3b8910e62578d8244280debb95",
+  "inputsAfter": "5e2b6bde82c8e0619f6c8d9783601d4f27441f3b8910e62578d8244280debb95",
+  "outputSha256": "35bcd6d185a784a9058b89ef60cfec5dbce1273a2e57b2961b798c845931e99e",
+  "outputTail": "$ vitest run --config vitest.e2e.config.ts packages/experimental/inspector/tests/built-lib.e2e.ts --retry=0\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  22:50:07\n   Duration  1.85s (transform 37ms, setup 20ms, import 48ms, tests 1.72s, environment 0ms)\n\n"
+}

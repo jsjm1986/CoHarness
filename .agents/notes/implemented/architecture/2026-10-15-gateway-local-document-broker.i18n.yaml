@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-15-gateway-local-document-broker.md
 document:
-  en: ea295cf2cb8c9a554abff716410d7b72063e52dc
-  zh: 95cb04fa9129cbc3b9b75c2d08c08b7e8a9adfcc
+  en: 90e3df06847ea3994f49204831cf7f622feb344a
+  zh: 97bd342536c7facf1aa84bb1f6b1daf6f5bce741
 /agent-note-gateway-local-document-broker:
   en: 2be9c000a3fd32e5
   zh: 000ebe926d430dd4
@@ -12,11 +12,11 @@ document:
   en: 22ec2f3b329d6515
   zh: 6dfb7da792bc0576
 /agent-note-gateway-local-document-broker/decision:
-  en: 706a791085da5bfc
-  zh: 4fac39dc98f3a7cf
+  en: 25d7ce2fa1cf0f25
+  zh: a9a9d10fa242b1a2
 /agent-note-gateway-local-document-broker/alternatives-considered:
-  en: ba6777e368fdf3d7
-  zh: ea8474e620163442
+  en: 4535f35ded5da167
+  zh: b61d5d8d03651fbb
 /agent-note-gateway-local-document-broker/consequences:
-  en: 918f46440e444f8b
-  zh: 5e8a067da5d177ea
+  en: 4b21b085ef2a1192
+  zh: 6b4c934572803552

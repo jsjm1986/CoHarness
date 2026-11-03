@@ -1,0 +1,1378 @@
+[
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 0,
+        "id": "receipt-read-1",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":1,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-1",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":1,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 1,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 1,
+        "id": "receipt-read-2",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":2,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 1,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-2",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":2,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 2,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 2,
+        "id": "receipt-read-3",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":3,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 2,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-3",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":3,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 3,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 3,
+        "id": "receipt-read-4",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":4,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 3,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-4",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":4,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 4,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 4,
+        "id": "receipt-read-5",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":5,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 4,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-5",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":5,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 5,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 5,
+        "id": "receipt-read-6",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":6,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 5,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-6",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":6,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 6,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 6,
+        "id": "receipt-read-7",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":7,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 6,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-7",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":7,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 7,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 7,
+        "id": "receipt-read-8",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":8,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 7,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-8",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":8,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 8,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 8,
+        "id": "receipt-read-9",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":9,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 8,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-9",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":9,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 9,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 9,
+        "id": "receipt-read-10",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":10,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 9,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-10",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":10,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 10,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 10,
+        "id": "receipt-read-11",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":11,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 10,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-11",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":11,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 11,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 11,
+        "id": "receipt-read-12",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":12,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 11,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-12",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":12,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 12,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 12,
+        "id": "receipt-read-13",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":13,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 12,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-13",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":13,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 13,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 13,
+        "id": "receipt-read-14",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":14,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 13,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-14",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":14,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 14,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 14,
+        "id": "receipt-read-15",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":15,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 14,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-15",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":15,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 15,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 15,
+        "id": "receipt-read-16",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":16,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 15,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-16",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":16,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 16,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 16,
+        "id": "receipt-read-17",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":17,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 16,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-17",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":17,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 17,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 17,
+        "id": "receipt-read-18",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":18,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 17,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-18",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":18,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 18,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 18,
+        "id": "receipt-read-19",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":19,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 18,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-19",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":19,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 19,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 19,
+        "id": "receipt-read-20",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":20,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 19,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-20",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":20,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 20,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 20,
+        "id": "receipt-read-21",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":21,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 20,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-21",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":21,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 21,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 21,
+        "id": "receipt-read-22",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":22,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 21,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-22",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":22,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 22,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 22,
+        "id": "receipt-read-23",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":23,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 22,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-23",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":23,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 23,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 23,
+        "id": "receipt-read-24",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":24,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 23,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-24",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":24,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 24,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 24,
+        "id": "receipt-read-25",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":25,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 24,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-25",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":25,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 25,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 25,
+        "id": "receipt-read-26",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":26,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 25,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-26",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":26,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 26,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 26,
+        "id": "receipt-read-27",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":27,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 26,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-27",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":27,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 27,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 27,
+        "id": "receipt-read-28",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":28,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 27,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-28",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":28,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 28,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 28,
+        "id": "receipt-read-29",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":29,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 28,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-29",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":29,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 29,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 29,
+        "id": "receipt-read-30",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":30,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 29,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-30",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":30,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 30,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 30,
+        "id": "receipt-read-31",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":31,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 30,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-31",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":31,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 31,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 31,
+        "id": "receipt-read-32",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":32,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 31,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-32",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":32,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 32,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 32,
+        "id": "receipt-read-33",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":33,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 32,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-33",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":33,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 33,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 33,
+        "id": "receipt-read-34",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":34,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 33,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-34",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":34,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 34,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 34,
+        "id": "receipt-read-35",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":35,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 34,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-35",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":35,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 35,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 35,
+        "id": "receipt-read-36",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":36,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 35,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-36",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":36,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 36,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 36,
+        "id": "receipt-read-37",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":37,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 36,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-37",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":37,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 37,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 37,
+        "id": "receipt-read-38",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":38,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 37,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-38",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":38,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 38,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 38,
+        "id": "receipt-read-39",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":39,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 38,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-39",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":39,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 39,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 39,
+        "id": "receipt-read-40",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":40,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 39,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-40",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":40,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 40,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 40,
+        "id": "receipt-read-41",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":41,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 40,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-41",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":41,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 41,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 41,
+        "id": "receipt-read-42",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":42,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 41,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-42",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":42,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 42,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 42,
+        "id": "receipt-read-43",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":43,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 42,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-43",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":43,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 43,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 43,
+        "id": "receipt-read-44",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":44,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 43,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-44",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":44,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 44,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 44,
+        "id": "receipt-read-45",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":45,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 44,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-45",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":45,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 45,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 45,
+        "id": "receipt-read-46",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":46,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 45,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-46",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":46,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 46,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 46,
+        "id": "receipt-read-47",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":47,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 46,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-47",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":47,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 47,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 47,
+        "id": "receipt-read-48",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":48,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 47,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-48",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":48,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 48,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 48,
+        "id": "receipt-read-49",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":49,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 48,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-49",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":49,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 49,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 49,
+        "id": "receipt-read-50",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":50,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 49,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-50",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":50,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 50,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 50,
+        "id": "receipt-read-51",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":51,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 50,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-51",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":51,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 51,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 51,
+        "id": "receipt-read-52",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":52,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 51,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-52",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":52,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 52,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 52,
+        "id": "receipt-read-53",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":53,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 52,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-53",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":53,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 53,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 53,
+        "id": "receipt-read-54",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":54,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 53,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-54",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":54,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 54,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 54,
+        "id": "receipt-read-55",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":55,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 54,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-55",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":55,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 55,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 55,
+        "id": "receipt-read-56",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":56,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 55,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-56",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":56,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 56,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 56,
+        "id": "receipt-read-57",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":57,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 56,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-57",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":57,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 57,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 57,
+        "id": "receipt-read-58",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":58,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 57,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-58",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":58,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 58,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 58,
+        "id": "receipt-read-59",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":59,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 58,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-59",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":59,\"limit\":1}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 59,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 59,
+        "id": "receipt-read-60",
+        "name": "read",
+        "argumentsDelta": "{\"file_path\":\"receipt-source.txt\",\"offset\":60,\"limit\":1}"
+      },
+      {
+        "type": "block-end",
+        "index": 59,
+        "block": {
+          "type": "tool-call",
+          "id": "receipt-read-60",
+          "name": "read",
+          "arguments": "{\"file_path\":\"receipt-source.txt\",\"offset\":60,\"limit\":1}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 10,
+          "outputTokens": 10,
+          "cacheReadTokens": 0
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "text"
+      },
+      {
+        "type": "text-delta",
+        "index": 0,
+        "text": "RECEIPT_HISTORY_REPAIRED"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "text",
+          "text": "RECEIPT_HISTORY_REPAIRED"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 10,
+          "outputTokens": 10,
+          "cacheReadTokens": 0
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "stop"
+        }
+      }
+    ]
+  }
+]

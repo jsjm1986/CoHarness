@@ -16,8 +16,8 @@ async function fixture() {
   const env = testEnvironment(root, { HGW_STATE_ROOT: root }), cfg = testConfig(root, env), identity = { organizationId: 'org', nodeId: 'node' }
   const store = new NodeConfigurationStore(identity, cfg, env, isolatedNodeConfigurationAuthority)
   await store.initialize()
-  const current = await store.view()
-  await store.save(identity, 0, { ...current.desired, HGW_PORT: '9334' })
+  const current = await store.view(1)
+  await store.save(identity, 0, { ...current.desired, HGW_PORT: '9334' }, 1)
   await store.requestApply(identity, 1, 7)
   const host: NodeConfigurationApplyHost = {
     signal: new AbortController().signal,
@@ -33,7 +33,7 @@ it('preflights the saved revision and confirms the effective revision before com
     expect(await readNodeConfiguration(f.cfg.nodeConfigFile, f.env)).toMatchObject({ appliedRevision: 1, previous: { revision: 0 } })
   })
   expect(await f.apply()).toMatchObject({ appliedRevision: 1, operation: { status: 'completed' } })
-  expect((await f.store.view()).effective.HGW_PORT).toBe('8899')
+  expect((await f.store.view(1)).effective.HGW_PORT).toBe('8899')
   expect(await f.apply()).toBeUndefined()
 })
 

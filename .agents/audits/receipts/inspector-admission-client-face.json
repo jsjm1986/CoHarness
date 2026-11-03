@@ -1,0 +1,13 @@
+{
+  "name": "inspector-admission-client-face",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsc --noEmit -p tsconfig.client.json",
+  "startedAt": "2026-10-23T14:48:40.021541+00:00",
+  "seconds": 3.198,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5e2b6bde82c8e0619f6c8d9783601d4f27441f3b8910e62578d8244280debb95",
+  "inputsAfter": "5e2b6bde82c8e0619f6c8d9783601d4f27441f3b8910e62578d8244280debb95",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

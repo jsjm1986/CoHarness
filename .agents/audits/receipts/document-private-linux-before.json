@@ -1,0 +1,14 @@
+{
+  "name": "document-private-linux-before",
+  "cwd": ".",
+  "command": "limactl shell redroid -- sudo -n -- /tmp/coharness-document-audit.xhw1BMPE/node-v24.19.0-linux-arm64/bin/node /tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs --uid",
+  "startedAt": "2026-10-26T23:17:12.747831+00:00",
+  "seconds": 1.777,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "13606e985f6b6b0f41ba31a25eda2e282e330ef0e093361332b0e033967306f2",
+  "inputsAfter": "13606e985f6b6b0f41ba31a25eda2e282e330ef0e093361332b0e033967306f2",
+  "postgresToolDirectory": null,
+  "outputSha256": "fda2e8d5c0c60097f02ff68b2cb8dcb5a3b76cdc961874bab5de2bfc0484a274",
+  "outputTail": "{\"operation\":\"legacy-cross-uid\",\"ordinary\":\"EACCES\",\"actor\":\"EACCES\"}\nfile:///tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs:662\n\tif (process.getuid !== void 0 && (BigInt(info.uid) !== BigInt(process.getuid()) || (BigInt(info.mode) & 63n) !== 0n)) throw new Error(\"Private document storage must be accessible only to its owning process account.\");\n\t                                                                                                                            ^\n\nError: Private document storage must be accessible only to its owning process account.\n    at privateAccess (file:///tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs:662:126)\n    at directory (file:///tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs:667:20)\n    at async privateDirectory (file:///tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs:674:2)\n    at async DocumentIdentityStorage.open (file:///tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs:732:17)\n    at async file:///tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs:893:19\n\nNode.js v24.19.0\n"
+}

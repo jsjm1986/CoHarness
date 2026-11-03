@@ -122,6 +122,8 @@ export interface PluginAddActionsProps {
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
+    /** Captured Host identity and environment navigation beside the Plugins page title. */
+    'plugins.context': { kind: 'list'; scope: 'root'; owner: Record<never, never> }
     /** Additional MenuItemButton rows after installation: 72px high, with a title and a description capped at two lines. */
     'plugins.add.actions': { kind: 'list'; scope: 'root'; owner: PluginAddActionsProps }
     /**

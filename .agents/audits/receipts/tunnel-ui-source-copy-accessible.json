@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-ui-source-copy-accessible",
+  "cwd": "gateway/admin-ui",
+  "command": "node_modules/.bin/vitest run src/pages/TunnelAccessSection.spec.tsx --retry=0",
+  "startedAt": "2026-10-24T23:07:44.338163+00:00",
+  "seconds": 3.067,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7b429a5354e4eb17f424ae3b2291e31a79ae5f48ac70bea0630719729b5c7bdd",
+  "inputsAfter": "7b429a5354e4eb17f424ae3b2291e31a79ae5f48ac70bea0630719729b5c7bdd",
+  "postgresToolDirectory": null,
+  "outputSha256": "c78eeaa065688ed548c33d44c8b11da55819beb4e9fe61cf05bb8277275a44cb",
+  "outputTail": "\n RUN  v4.1.10 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/admin-ui\n\n(node:29115) Warning: `--localstorage-file` was provided without a valid path\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n Test Files  1 passed (1)\n      Tests  11 passed (11)\n   Start at  07:07:46\n   Duration  940ms (transform 74ms, setup 0ms, import 285ms, tests 348ms, environment 207ms)\n\n"
+}

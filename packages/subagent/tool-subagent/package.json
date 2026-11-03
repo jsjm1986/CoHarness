@@ -28,11 +28,11 @@
     "./model-selection-settings/locale/*.json": "./locale/model-selection-settings/*.json"
   },
   "files": [
+    "locale/*.json",
+    "locale/model-selection-settings/*.json",
     "lib/index.js",
     "lib/model-selection-settings.js",
-    "lib/types/**/*.d.ts",
-    "locale/*.json",
-    "locale/model-selection-settings/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {

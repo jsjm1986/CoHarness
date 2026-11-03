@@ -17,6 +17,9 @@
     - /url: /api/documents/content?id=2026-08-14%2Fbrief.txt
     - img
     - text: Download
+  - button "Copy to…":
+    - img
+    - text: Copy to…
   - button "Delete":
     - img
     - text: Delete

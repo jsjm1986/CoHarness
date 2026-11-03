@@ -1,0 +1,14 @@
+{
+  "name": "runtime-direct-probe-unavailable-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/instances.spec.ts tests/local-runtime-launcher.spec.ts tests/proxy.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T21:58:15.297127+00:00",
+  "seconds": 19.193,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "inputsAfter": "87055f8db520b60c9318a4e2b601194c431878f2e5b6c4b46f9a02961c0855e2",
+  "postgresToolDirectory": null,
+  "outputSha256": "8abcd5fe0f7486e79064cf2106bbb5384b7c661f05b7285699a12aba73479b0f",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  85 passed (85)\n   Start at  05:58:17\n   Duration  17.15s (transform 840ms, setup 0ms, import 1.24s, tests 31.12s, environment 0ms)\n\n"
+}

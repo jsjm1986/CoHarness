@@ -1,0 +1,14 @@
+{
+  "name": "runtime-control-final-all-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T19:39:18.292919+00:00",
+  "seconds": 7.569,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e72d7e6221fd442c4022ccb90c6125d9e90c2d94d605be3ac39fd11f32b3d38f",
+  "inputsAfter": "e72d7e6221fd442c4022ccb90c6125d9e90c2d94d605be3ac39fd11f32b3d38f",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

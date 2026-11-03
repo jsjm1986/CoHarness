@@ -245,6 +245,15 @@ declare module './types.ts' {
 declare module '@deepseek-ai/cordis' {
   interface Events {
     /**
+     * Refuse automatic Host-process release while a plugin owns background work or a future obligation.
+     * Providers retain busy until accepted work and cleanup settle; waiting timers count as obligations.
+     * This probe never authorizes manual shutdown or revocation bypasses.
+     * @returns busy while stopping the Host would interrupt plugin work.
+     * @mode bail
+     */
+    'runtime/idle-release-check'(): 'busy' | undefined
+
+    /**
      * Synchronously refuse idle disposal while a plugin owns pending work or retained resources.
      * Listeners inspect only resources owned by the exact Agent and return undefined otherwise.
      * Scope-filtered dispatch; global resource registries still match the exact payload Agent.

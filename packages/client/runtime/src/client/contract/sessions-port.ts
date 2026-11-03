@@ -11,6 +11,14 @@ import type { SessionId, WorkspaceId } from '@deepseek-ai/dsh-api-remotes/client
 import type { ISessions } from './sessions.ts'
 import type { SessionCreateOptions } from './session-create.ts'
 import type { ObservableSnapshot } from './store.ts'
+import type { SessionRuntimeTarget } from './sessions.ts'
+import type { WorkspaceListSnapshot } from '../workspaces/manager.ts'
+
+/** One connected Runtime's live Workspace projection. */
+export interface RuntimeWorkspaceSnapshot {
+  target: SessionRuntimeTarget
+  state: WorkspaceListSnapshot
+}
 
 /** Session-list row facts sibling domains read: recency, blank-reuse eligibility, and its cwd canon. */
 export interface SessionsPortSummary {
@@ -44,13 +52,20 @@ export interface SessionsPortList {
 }
 
 /** The sessions-service face injected into sibling domains. */
-export interface SessionsPort extends Pick<ISessions, 'retain' | 'keyFor' | 'runtimeTargetFor'> {
+export interface SessionsPort extends Pick<ISessions, 'retain' | 'keyFor' | 'runtimeTargetFor' | 'usingRuntime' | 'createSession'> {
+  /** Workspace frames from explicitly opened foreign Runtimes; reading starts no transport. */
+  readonly workspaceSnapshots?: ObservableSnapshot<readonly RuntimeWorkspaceSnapshot[]>
   /**
    * Begin an asynchronous navigation intent, superseding any earlier intent.
    * Selecting, clearing, scope changes, and owner disposal cancel it.
+   * @param options - Optional originating composer to hold until preparation settles.
    * @returns cancellation to check before publishing a late navigation result.
    */
-  beginNavigation(): AbortSignal
+  beginNavigation(options?: { readonly blockInputFor?: SessionId | undefined }): AbortSignal
+  /** Release only the input hold owned by the original intent.
+   * @param signal - Intent returned by beginNavigation.
+   */
+  finishNavigation(signal: AbortSignal): void
   /** Observable list snapshot (read face only; writes stay inside the sessions domain). */
   readonly list: ObservableSnapshot<SessionsPortList>
   /**

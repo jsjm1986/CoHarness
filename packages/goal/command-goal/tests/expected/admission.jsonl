@@ -1,0 +1,2 @@
+{"operation":"goal-command","admission":"cancelled","storedGoal":false,"lifecycle":["command/run","command/done"],"result":"error"}
+{"operation":"goal-command","admission":"replaced","storedGoal":false,"lifecycle":["command/run","command/done"],"result":"error"}

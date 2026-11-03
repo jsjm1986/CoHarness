@@ -51,6 +51,8 @@ export interface HelperTransport {
 /**
  * Run a helper until its channel closes or its client lease expires.
  * @param transport - private process streams, entry identity, and cancellation.
+ * @returns Completion after process cleanup, provider disposal and private-root removal.
+ * @throws On cleanup failure; unconfirmed process cleanup retains its providers and private evidence.
  */
 export async function runSshHelper(transport: HelperTransport): Promise<void> {
   if (process.platform !== 'linux' && process.platform !== 'darwin') throw new Error('SSH helper requires a POSIX host')
@@ -73,12 +75,10 @@ export async function runSshHelper(transport: HelperTransport): Promise<void> {
       for (const record of iterators.values()) record.controller.abort(lifetime.signal.reason)
       await Promise.allSettled([...iterators.values()].map(async record => record.iterator.return?.()))
       iterators.clear()
-      try { await processes.close() }
-      finally {
-        try { await runtime.close() }
-        finally { await rm(root, { recursive: true, force: true }) }
-      }
-    })()
+      await processes.close()
+      await runtime.close()
+      await rm(root, { recursive: true, force: true })
+    })().catch((error: unknown) => { cleanup = undefined; throw error })
     return cleanup
   }
   const touchLease = (): void => {
@@ -110,9 +110,10 @@ export async function runSshHelper(transport: HelperTransport): Promise<void> {
         ...(input.bootstrapPath === undefined ? {} : { bootstrapHash: createHash('sha256').update(readFileSync(input.bootstrapPath)).digest('hex') }),
       }
     }
-    if (!initialized || cleanup !== undefined) throw new Error('SSH helper is not accepting operations')
-    if (method === 'heartbeat') { object.parse(raw); touchLease(); return null }
+    if (!initialized) throw new Error('SSH helper is not accepting operations')
     if (method === 'close') { object.parse(raw); await close(); return null }
+    if (lifetime.signal.aborted) throw new Error('SSH helper is not accepting operations')
+    if (method === 'heartbeat') { object.parse(raw); touchLease(); return null }
     if (method === 'process.prepare') return processes.prepare(raw)
     if (method === 'process.start') return processes.start(processIdRequest.parse(raw).id, signal)
     if (method === 'process.done') return processes.done(processIdRequest.parse(raw).id)

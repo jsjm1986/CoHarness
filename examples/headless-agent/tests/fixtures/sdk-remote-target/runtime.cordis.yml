@@ -1,0 +1,9 @@
+- id: llm-deepseek
+  disabled: true
+
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, sdkRemoteTargetReady]
+
+- insert:
+    - id: sdk-remote-target-fixture
+      name: './plugin.mjs'

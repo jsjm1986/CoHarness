@@ -1,0 +1,14 @@
+{
+  "name": "model-policy-withdrawal-current",
+  "cwd": "plugins/dsh-model-governance",
+  "command": "../../node_modules/.bin/vitest run tests/execution-billing.spec.ts --retry=0",
+  "startedAt": "2026-10-24T06:39:10.446108+00:00",
+  "seconds": 2.818,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "89f0b3fa72d3a1f86cc0ee0d1e15e29cf13bd5540b8e1f75cf18de8abc0162e5",
+  "inputsAfter": "89f0b3fa72d3a1f86cc0ee0d1e15e29cf13bd5540b8e1f75cf18de8abc0162e5",
+  "postgresToolDirectory": null,
+  "outputSha256": "f3a2bfb3e1e54bd6321a1a1d6d295613afcaf29d70c86c95694b7a20e4778f63",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/plugins/dsh-model-governance\n\n\n Test Files  1 passed (1)\n      Tests  16 passed (16)\n   Start at  14:39:12\n   Duration  870ms (transform 454ms, setup 0ms, import 671ms, tests 114ms, environment 0ms)\n\n"
+}

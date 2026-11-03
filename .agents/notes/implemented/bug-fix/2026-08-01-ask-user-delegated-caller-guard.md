@@ -14,6 +14,8 @@ Durable session lineage cannot decide whether an answerer exists. A child sessio
 
 When `AskUserQuestionRequest.agent` is present, `UserQuestionService.ask()` authenticates the exact live agent through `ctx.agents` and admits it only when `ctx.agents.roots()` contains that instance. A missing registry or stale same-id object fails with `CALLER_NOT_LIVE`; a live agent owned by another live agent fails with `DELEGATED_CALLER`. The check runs after the existing aborted and empty-batch guards and before intent validation or provider dispatch, so an owned child never creates a UI wait.
 
+The [foreground lifetime decision](2026-11-02-foreground-question-ownership.md) keeps this identity current through answer settlement and plan application.
+
 Runtime ownership is the authority. A lineage-bearing session resumed without an owner is a runtime root and may ask; a live child remains ineligible even when its durable `delegationDepth` is zero. Agentless programmatic calls retain the existing provider path.
 
 The shared failure text is consumer-neutral and actionable: the child includes the unresolved question or decision in its final result. The parent already receives that result through the delegation contract and can decide whether to ask the human. Neither the service nor a child claims an upward messaging or answer-forwarding capability that does not exist.

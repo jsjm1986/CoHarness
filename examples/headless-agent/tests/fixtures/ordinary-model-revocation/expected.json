@@ -1,0 +1,12 @@
+{
+  "finalResponse": "",
+  "proof": {
+    "code": "MODEL_FORBIDDEN",
+    "httpRequests": 0,
+    "credentialLookups": 1,
+    "acquired": 1,
+    "released": 1,
+    "uncertain": 0,
+    "usageChunks": 0
+  }
+}

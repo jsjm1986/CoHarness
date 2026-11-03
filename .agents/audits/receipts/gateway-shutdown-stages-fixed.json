@@ -1,0 +1,14 @@
+{
+  "name": "gateway-shutdown-stages-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/shutdown.spec.ts",
+  "startedAt": "2026-10-26T11:45:09.918937+00:00",
+  "seconds": 2.855,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fb89f0374d27c7eb1a878ea8cb4a30ad440d515e6b6eb024e1e7f40c0c05fec8",
+  "inputsAfter": "fb89f0374d27c7eb1a878ea8cb4a30ad440d515e6b6eb024e1e7f40c0c05fec8",
+  "postgresToolDirectory": null,
+  "outputSha256": "1231ad78efe6fe836387bf03880f5a5d045e0d8666a680fe8fc523f5af956173",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  11 passed (11)\n   Start at  19:45:12\n   Duration  518ms (transform 136ms, setup 0ms, import 307ms, tests 115ms, environment 0ms)\n\n"
+}

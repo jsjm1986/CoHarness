@@ -18,6 +18,8 @@ import type {
   WebSearchResult,
 } from './types.ts'
 import { WebError } from './types.ts'
+export { registerModelSearch, modelSearchUsage, resolveModelSearchCredential } from './model-search.ts'
+export type { ModelSearchRoute, PreparedModelSearch, ModelSearchImplementation, ModelSearchUsageFields } from './model-search.ts'
 export {
   WebError,
 } from './types.ts'

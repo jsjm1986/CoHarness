@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-persistence-jsonl/README.md
 document:
-  en: 24fa9788abc4842efcedf8c9677365157862c879
-  zh: f3bacc8c2e7713ab9ad48efebccdee2b747010b7
+  en: 715fe40d5626c0fbd06a43e439d6c1ea85c9a6d7
+  zh: 9f1e4f20d7da460b5b17515137cda35ff2cae4ec
 /:
   en: 17400a83b991dd8a
   zh: 93b32be82272696c
@@ -21,8 +21,8 @@ document:
   en: f29032f1e22cc688
   zh: 18f34fcc0376ac88
 /deepseek-ai-dsh-session-persistence-jsonl/config:
-  en: b5402af11f396c2d
-  zh: 41a2fa6ade3285c4
+  en: b35d9d92425fd95b
+  zh: ea3f984cc109edfd
 /deepseek-ai-dsh-session-persistence-jsonl/physical-encoding:
   en: bacd530bd75886c8
   zh: 45dd1fd73912d7ab
@@ -30,8 +30,8 @@ document:
   en: cf3ca013cce79e30
   zh: e1f029d95c51009e
 /deepseek-ai-dsh-session-persistence-jsonl/write-path:
-  en: 985a2e6221fc0deb
-  zh: d53511ef41a46bae
+  en: 27ec61e5872deb1e
+  zh: 52ebb716e920934e
 /deepseek-ai-dsh-session-persistence-jsonl/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90

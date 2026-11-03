@@ -14,6 +14,10 @@ Runtime archive membership was stored only in each Workspace registry. The regul
 
 The index keeps a root record even when a personal transcript is not present in PostgreSQL, so legacy JSONL runtimes can backfill metadata without copying full logs. Each record carries an immutable runtime identity: a snapshot locks the claimed row `FOR UPDATE`, validates the declared lineage against owned sessions, and leaves a same-owner newer revision untouched while rejecting any foreign claim. Search stores only title, Session ID, and user/assistant text. Administrator reads, exports, and mutations write audit events without storing message content in the audit row.
 
+Administrative lifecycle mutations lock the active organization and authenticated administrator account and membership before archive or command rows, retaining qualification until commit. Idempotent returns require the same current qualification. This separates accepted pending commands from unaccepted requests whose administrator was revoked while waiting; runtime acknowledgements and trusted maintenance retain their existing ownership.
+
+Administrator reads retain active organization, account and membership through each database read. Personal Runtime I/O runs after releasing that client and retains the real administrator through queued startup, the purpose-scoped read principal and a generation-specific operation lease. Read completion rechecks current qualification even after Runtime failure; indexed fallback data cannot bypass withdrawal. This keeps slow or offline Runtimes from retaining database authority locks while preventing an admitted request from disclosing data after its administrator loses qualification.
+
 ## Alternatives considered
 
 **Scanning runtime `workspace.json` from Admin.** Rejected: runtimes can be offline or run under separate users and project accounts, and filesystem paths are not a stable organization API.

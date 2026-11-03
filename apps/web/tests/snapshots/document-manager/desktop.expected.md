@@ -1,10 +1,13 @@
 - dialog "Document Manager":
-  - heading "Document Manager" [level=2]
-  - button "Close":
-    - img
-  - paragraph: No per-file size limit, up to 20 per upload
+  - banner:
+    - heading "Document Manager" [level=2]
+    - button "Upload information":
+      - img
+    - button "Close":
+      - img
   - complementary "Document scopes":
-    - text: Scopes
+    - img
+    - textbox "Find a space"
     - status:
       - text: Project scopes could not be refreshed; showing the last result
       - button "Retry"
@@ -14,8 +17,15 @@
     - button "Personal documents Private to you":
       - strong: Personal documents
       - text: Private to you
+    - text: Scopes
+    - button "Trash":
+      - img
+      - text: Trash
+    - button "History"
+  - status: Open a conversation to add documents to it. Browsing, downloads and copying remain available.
+  - heading "Personal documents" [level=3]
   - navigation "Document path":
-    - button "All Documents" [disabled]
+    - button "Root folder" [disabled]
   - group "Document filters":
     - img
     - textbox "Search document name"
@@ -25,52 +35,62 @@
       - option "PDF"
       - option "Text"
       - option "Other"
-    - combobox "Sort":
-      - option "Date newest" [selected]
-      - option "Date oldest"
-      - option "Name A–Z"
-      - option "Name Z–A"
-      - option "Size large–small"
-      - option "Size small–large"
+    - button "Sort":
+      - img
+      - text: Modified · Newest first
+      - img
   - group "Document actions":
-    - button "Trash"
     - button "New Folder":
       - img
       - text: New Folder
     - button "Upload Document":
       - img
       - text: Upload Document
-    - button "Refresh":
+    - button "More actions":
       - img
-    - button "History"
   - checkbox "Select this page"
-  - text: Visible only to you 2 documents
+  - text: Visible only to you 1 folders · 2 documents
   - list "Document Manager":
     - listitem:
       - button "Open folder reports": reports
-      - button "Rename folder reports": Rename
-      - button "Delete folder reports": Delete
+      - 'button "More actions: folder reports"':
+        - img
     - group "Upload date 2026-08-16":
       - text: 2026-08-16
       - listitem:
         - checkbox "notes.txt"
-        - text: notes.txt 30.0 KB
-        - button "Add notes.txt to conversation": Add to conversation
-        - button "Preview notes.txt": Preview
-        - button "Move notes.txt": Move
-        - link "Download notes.txt":
-          - /url: /api/documents/content?id=2026-08-16%2Fnotes.txt
-          - text: Download
-        - button "Delete notes.txt": Delete
+        - button "Preview notes.txt": notes.txt Text · 2026-08-16
+        - text: 30.0 KB
+        - button "Add notes.txt to conversation" [disabled]: Add to conversation
+        - 'button "More actions: notes.txt"':
+          - img
     - group "Upload date 2026-08-14":
       - text: 2026-08-14
       - listitem:
         - checkbox "brief.txt"
-        - text: brief.txt 21 B
-        - button "Add brief.txt to conversation": Add to conversation
-        - button "Preview brief.txt": Preview
-        - button "Move brief.txt": Move
-        - link "Download brief.txt":
-          - /url: /api/documents/content?id=2026-08-14%2Fbrief.txt
-          - text: Download
-        - button "Delete brief.txt": Delete
+        - button "Preview brief.txt": brief.txt Text · 2026-08-14
+        - text: 21 B
+        - button "Add brief.txt to conversation" [disabled]: Add to conversation
+        - 'button "More actions: brief.txt"':
+          - img
+  - 'complementary "Preview: brief.txt"':
+    - heading "brief.txt" [level=3]
+    - paragraph: "Source: Personal documents"
+    - paragraph: 21 B · 2026-08-14
+    - button "Close preview":
+      - img
+    - text: Preview fixture for the document manager.
+    - paragraph: Add to the original conversation draft
+    - button "Add to conversation":
+      - img
+      - text: Add to conversation
+    - link "Download":
+      - /url: /api/documents/content?id=2026-08-14%2Fbrief.txt
+      - img
+      - text: Download
+    - button "Move":
+      - img
+    - button "Copy to…":
+      - img
+    - button "Delete":
+      - img

@@ -1,0 +1,13 @@
+{
+  "name": "browser-cleanup-host-emit-complete",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=2 ./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T17:29:35.048837+00:00",
+  "seconds": 9.858,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "894e29536be55f973177c7344eed99c774e523510c3f3f8d3a0a4134426961e6",
+  "inputsAfter": "894e29536be55f973177c7344eed99c774e523510c3f3f8d3a0a4134426961e6",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

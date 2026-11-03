@@ -5,8 +5,6 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - button "Feedback":
-    - img
   - button "Open right sidebar":
     - img
 - button "System prompt":
@@ -43,10 +41,6 @@
   - text: Thinking The user selected "Yes" and wants me to include the word "BANANA" in my final reply. Let me acknowledge their answer.
 - paragraph: Great, let's move forward. BANANA!
 - button "Copy":
-  - img
-- button "Good response":
-  - img
-- button "Bad response":
   - img
 - button "Branch into a new conversation":
   - img

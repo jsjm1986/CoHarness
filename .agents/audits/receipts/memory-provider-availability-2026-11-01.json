@@ -1,0 +1,191 @@
+{
+  "finding": "B409",
+  "title": "Settings provider attachment and composition fallback fail to cancel queued memory work",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "at": "2026-10-31T16:53:27.144234+00:00",
+  "localDate": "2026-11-01",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T160400Z",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-curation-live-availability.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-curation-live-availability.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-curation-live-availability.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-live-availability.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-live-availability.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-live-availability.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-memory-provider-availability.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-memory-provider-availability.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-memory-provider-availability.zh.md",
+    "apps/cli/tests/profiles/sdk/memory-curation-settings.expected.e2e.ts",
+    "docs/subsystems/memory.i18n.yaml",
+    "docs/subsystems/memory.md",
+    "docs/subsystems/memory.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-auxiliary-events/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-auxiliary-events/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-auxiliary-events/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/memory-curation-settings/model.mjs",
+    "examples/headless-agent/tests/fixtures/memory-curation-settings/register.mjs",
+    "examples/headless-agent/tests/fixtures/memory-curation-settings/runtime.cordis.yml",
+    "packages/extensions/tool-cordis/src/api-catalog.ts",
+    "packages/memory/memory-context/README.i18n.yaml",
+    "packages/memory/memory-context/README.md",
+    "packages/memory/memory-context/README.zh.md",
+    "packages/memory/memory-context/src/index.ts",
+    "packages/memory/memory-context/tests/memory-context.spec.ts",
+    "packages/memory/memory-curation/README.i18n.yaml",
+    "packages/memory/memory-curation/README.md",
+    "packages/memory/memory-curation/README.zh.md",
+    "packages/memory/memory-curation/src/index.ts",
+    "packages/memory/memory-curation/tests/memory-curation.spec.ts",
+    "packages/memory/memory/README.i18n.yaml",
+    "packages/memory/memory/README.md",
+    "packages/memory/memory/README.zh.md",
+    "packages/memory/memory/src/index.ts",
+    "packages/memory/memory/tests/settings.spec.ts"
+  ],
+  "matchingPrerequisites": [
+    "apps/cli/src/sdk-source.cordis.patch.yml",
+    "examples/headless-agent/tests/auxiliary-model-fixture.ts",
+    "examples/package.json",
+    "packages/bundle/sdk-minimal/cordis.patch.yml",
+    "packages/extensions/tool-cordis/package.json",
+    "packages/extensions/tool-cordis/tsconfig.json",
+    "packages/memory/memory-context/package.json",
+    "packages/memory/memory-context/tsconfig.json",
+    "packages/memory/memory-curation/package.json",
+    "packages/memory/memory-curation/tsconfig.json",
+    "packages/memory/memory/package.json",
+    "packages/memory/memory/src/client.ts",
+    "packages/memory/memory/src/search.ts",
+    "packages/memory/memory/src/storage.ts",
+    "packages/memory/memory/src/types.ts",
+    "packages/memory/memory/tests/harness.ts",
+    "packages/memory/memory/tsconfig.json",
+    "packages/settings/settings-file/src/index.ts",
+    "packages/settings/settings/src/index.ts",
+    "packages/settings/settings/tests/memory.ts",
+    "vitest.expected.config.ts",
+    "vitest.snapshot.config.ts"
+  ],
+  "cause": "Consumers listened only to settings/updated. Provider attachment/removal changes the effective source without a namespace commit, leaving queued recall/curation signals live after their switch becomes false.",
+  "implementation": "MemoryService owns a memory/switches-updated notification after effective source replacement and committed memory updates. It invokes all observers synchronously through Cordis parallel dispatch and reports independent observer failures. Recall/curation re-read their own injected service before cancelling, preserving service isolation and existing cleanup ownership. Composition fallback, feature defaults and stored data are unchanged.",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchedAt": "2026-10-31T16:51:38.803085+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T160400Z/memory-provider-origin-fetch.json",
+    "sharedChangesPreserved": true
+  },
+  "verification": {
+    "uniqueRelatedCases": 322,
+    "unitCases": 302,
+    "unitFiles": 12,
+    "assembledSdkCases": 9,
+    "existingSnapshotCases": 11,
+    "coverage": {
+      "packages/memory/memory/src/index.ts": {
+        "statements": [
+          269,
+          269
+        ],
+        "branches": [
+          178,
+          178
+        ],
+        "functions": [
+          55,
+          55
+        ],
+        "lines": [
+          234,
+          234
+        ]
+      },
+      "packages/memory/memory-context/src/index.ts": {
+        "statements": [
+          321,
+          321
+        ],
+        "branches": [
+          225,
+          225
+        ],
+        "functions": [
+          47,
+          47
+        ],
+        "lines": [
+          263,
+          263
+        ]
+      },
+      "packages/memory/memory-curation/src/index.ts": {
+        "statements": [
+          370,
+          370
+        ],
+        "branches": [
+          252,
+          252
+        ],
+        "functions": [
+          50,
+          50
+        ],
+        "lines": [
+          306,
+          306
+        ]
+      }
+    },
+    "coverageEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T160400Z/coverage-evidence.json",
+    "nodeMajors": [
+      22,
+      24
+    ],
+    "beforeFix": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T160400Z/memory-provider-before-fix.json",
+    "oldCompiledNegative": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T160400Z/memory-provider-old-sdk-negative.json",
+    "oldPackageHashes": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T160400Z/old-package-hashes.json",
+    "native": "The actual shipped sdk-minimal profile, file settings and JSON memory store cover recall/extraction/consolidation across commit, file-provider remount and provider removal. During remount the request stays active in the composition gap, then cancels when the new effective source disables it. Removal cancels when configured fallback is off. Exact request logging, original owner body, live permits and iterator cleanup are observed. Recall holds the primary reply until the observation so turn/end cannot mask a missing cancellation. Complete private old service/consumer packages fail all6 unchanged remount/removal cases with cancellation false before shutdown.",
+    "admission": "Real LlmRuntime tests hold late grants across settings commits, attachment and removal. Withdrawal cancels before disposal, no adapter runs and the late lease releases once. Non-withdrawing notifications do not cancel work.",
+    "providerLifecycle": "Real SettingsProvider tests exercise attachment, namespace commit, composition fallback, independent observer failure and removal of the namespace bridge before replacement.",
+    "normalCases": "Eleven existing memory catalog, read/owner, recall-address, curation-race, concurrent Session, cancellation and SDK request-projection scenarios pass unchanged. Runtime repetitions and repeated focused unit subsets are not extra unique cases.",
+    "types": "Four changed test files plus shared provider/SDK helpers and explicit package/type faces have zero own or transitive diagnostics.",
+    "build": "Normal scoped TypeScript and tsdown builds pass for all three memory packages plus tool-cordis. Three generated catalog sources are regenerated; the complete matching38-file runtime/type/Remote binding closure is captured.",
+    "documentation": "All20 doc-quick gates, eight bilingual pairs, export JSDoc and127-file catalog freshness pass. Full doc-sync and repository/platform matrices are not claimed.",
+    "lint": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T160400Z/memory-provider-lint-first.json"
+  },
+  "developmentCorrections": [
+    "Detach unit setup initially used a non-lifecycle settings stub that never restored its source. It was replaced by the real shared SettingsProvider subclass; all302 unit cases pass. Real file-provider removal also passes in the SDK process.",
+    "Notification carries no foreign settings snapshot: consumers re-read their own injected service. The shared Cordis event registry can dispatch to multiple consumers."
+  ],
+  "semantics": "New process-local Cordis notification; no Session event, Remote method, settings key, storage format, model authorization, attribution or quota changes. Provider absence retains configured composition semantics. This verifies feature availability, not production project authority revocation.",
+  "noteReview": {
+    "keptActive": [
+      "2026-10-31-memory-live-availability: publication/tool completion remains current; provider notification is cross-linked.",
+      "2026-10-31-memory-curation-live-availability: independent operation controllers, queues and cursor completion remain current; provider lifetime is cross-linked.",
+      "2026-10-24-memory-auxiliary-ownership: exact request records and cleanup ownership remain independent.",
+      "2026-10-28-memory-curation-scope and2026-10-31-memory-consolidation-coalescing retain review-scope and arbitration rationale."
+    ],
+    "newActive": "2026-11-01-memory-provider-availability records effective-source notification, own-service rechecks and unchanged fallback.",
+    "archived": 0,
+    "deleted": 0,
+    "classification": "Partial extensions and independent decisions; no full supersession or borderline archival."
+  },
+  "peerReports": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T160400Z/peer-project-context-read-and-r17.json"
+  ],
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T160400Z/r6-followup-root-source-union.json",
+  "mergeRequirement": "Apply35 B409 deltas and22 matching prerequisites, rebuilding memory, memory-context, memory-curation and tool-cordis with their current types and generated Remote bindings. The38 artifact inputs include rebuilt runtime entries plus unchanged matching type/binding closure. Combine B406/B407/B408/B409 only in a later backend freeze after R16/B405 and R17 Admin. Preserve peer Local/Gateway/UI, FortuneSheet patch/lock and active project-context query changes. Root does not deploy this reference capsule.",
+  "limitations": [
+    "Verify project memory execution-authority replacement/revocation across storage reads, model preparation, queued admission and subsequent curation rounds; feature-switch evidence does not prove membership isolation.",
+    "Continue remaining resource admission and cross-computer permissions outside peer-reserved files; B04/B25 remain implementation_in_progress and all12 domains remain in_progress.",
+    "Peer owns ProjectAuthorityView canManage/uiThemePolicy, PostgreSQL membership SQL and Gateway LocalRuntimeAdapter/proxy.revalidate query optimization. Preserve those active changes and investigate the reported baseline title-search expectation only outside conflicting work.",
+    "R17 remains deployed on R16/B405; B406/B407/B408/B409 require a later combined backend freeze. No root deployment or paid/official model validation.",
+    "Physical platform is macOS; local model fixtures do not validate an external paid provider or physical Windows/Linux computers.",
+    "Built tests use live shared dependencies; earlier root Local artifacts retained in the capsule are reference-only and require a complete matching combined build."
+  ],
+  "rootDeployed": false
+}

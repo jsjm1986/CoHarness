@@ -1,0 +1,78 @@
+[
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "tool-call-delta",
+        "index": 0,
+        "id": "call_memory_delete",
+        "name": "memory_delete",
+        "argumentsDelta": "{\"scope\":\"personal\",\"key\":\"release-freeze\",\"revision\":\"rev-seed-1\"}"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
+          "id": "call_memory_delete",
+          "name": "memory_delete",
+          "arguments": "{\"scope\":\"personal\",\"key\":\"release-freeze\",\"revision\":\"rev-seed-1\"}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 20,
+          "outputTokens": 4
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "text"
+      },
+      {
+        "type": "text-delta",
+        "index": 0,
+        "text": "Memory deleted."
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "text",
+          "text": "Memory deleted."
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 24,
+          "outputTokens": 3
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "stop"
+        }
+      }
+    ]
+  }
+]

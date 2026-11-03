@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md
 document:
-  en: 8f188870eebba5e7ef423949b3086ac58ad85ba9
-  zh: 9c8555a4d4f3a09a045dcab55c78340929649ba5
+  en: c6312d449f02cc135a961f93c71cc31f5bf92623
+  zh: 703aa36288a122821076801111ddd83188939d58
 /agent-note-persistent-pty-sessions:
   en: c7796dc579fe7fb3
   zh: 2126be0b08124ca5
@@ -33,8 +33,8 @@ document:
   en: 1b504ab41b47216d
   zh: 8fb3d360b3a4e6a1
 /agent-note-persistent-pty-sessions/decision/process-tree-teardown:
-  en: 77631c7872ca0b52
-  zh: 9985c5c2bc646145
+  en: b74383fcd233a913
+  zh: 8b90541c2ef379e6
 /agent-note-persistent-pty-sessions/decision/composition-and-rollout:
   en: db49b6dff73d8772
   zh: 1f2182fd2c7dc3af

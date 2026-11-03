@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-token-current-source-tests",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/tunnel-supervisor.spec.ts tests/tunnel-access.spec.ts tests/cloudflare-api.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T21:54:06.922095+00:00",
+  "seconds": 11.464,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "29574b9757bb5cc6980170648e4517bac307e2089d7b1b79f824b4449f40b449",
+  "inputsAfter": "29574b9757bb5cc6980170648e4517bac307e2089d7b1b79f824b4449f40b449",
+  "postgresToolDirectory": null,
+  "outputSha256": "9514499efebd34341f1dcb134a6ab32b70b3ee277dcc2945de41be8cce9e8c4d",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  35 passed (35)\n   Start at  05:54:09\n   Duration  9.23s (transform 73ms, setup 0ms, import 161ms, tests 9.10s, environment 0ms)\n\n"
+}

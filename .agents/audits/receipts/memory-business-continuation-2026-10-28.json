@@ -1,0 +1,346 @@
+{
+  "status": "completed_named_business_scenarios_only",
+  "recordedAt": "2026-10-27T17:35:24.647280+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "findings": [
+    "B222",
+    "B223",
+    "B224",
+    "B225",
+    "B226"
+  ],
+  "checks": [
+    {
+      "name": "memory-business-current-scope-coverage",
+      "status": "passed",
+      "startedAt": "2026-10-27T17:30:12.463494+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/memory/memory/tests",
+        "packages/memory/memory-curation/tests",
+        "packages/memory/memory-context/tests",
+        "packages/memory/tool-memory/tests",
+        "--maxWorkers=2",
+        "--coverage",
+        "--coverage.include=packages/memory/memory/src/index.ts",
+        "--coverage.include=packages/memory/memory/src/search.ts",
+        "--coverage.include=packages/memory/memory-curation/src/index.ts",
+        "--coverage.reportsDirectory=coverage/memory-business-20261028-current-scope",
+        "--coverage.reporter=json-summary",
+        "--coverage.reporter=json",
+        "--coverage.reporter=text"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T17:30:28.301644+00:00"
+    },
+    {
+      "name": "memory-business-current-build",
+      "status": "passed",
+      "startedAt": "2026-10-27T17:30:56.208451+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "pnpm",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T17:32:01.199440+00:00"
+    },
+    {
+      "name": "memory-business-current-emitted",
+      "status": "passed",
+      "startedAt": "2026-10-27T17:32:41.343630+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "DSH_SNAPSHOT=replay",
+        "node_modules/.bin/vitest",
+        "run",
+        "--config",
+        "vitest.snapshot.config.ts",
+        "examples/headless-agent/tests/memory-search.snapshot.ts",
+        "examples/headless-agent/tests/memory-cancellation.snapshot.ts",
+        "examples/headless-agent/tests/memory-curation-race.snapshot.ts",
+        "examples/headless-agent/tests/memory-execution.snapshot.ts",
+        "examples/headless-agent/tests/memory-lifecycle.snapshot.ts",
+        "examples/headless-agent/tests/gateway-memory.snapshot.ts",
+        "snapshots/sdk/memory-auxiliary.snapshot.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T17:32:44.257915+00:00"
+    },
+    {
+      "name": "memory-business-current-python",
+      "status": "passed",
+      "startedAt": "2026-10-27T17:32:41.343637+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "PYTHONPATH=python/sdk/src",
+        "python/sdk/.venv/bin/python",
+        "-m",
+        "pytest",
+        "python/sdk/tests/test_memory_model_snapshot.py",
+        "-q"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T17:32:43.752393+00:00"
+    },
+    {
+      "name": "memory-business-loader-source-current",
+      "status": "passed",
+      "startedAt": "2026-10-27T16:44:30.364939+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=src",
+        "DSH_SNAPSHOT=replay",
+        "node_modules/.bin/vitest",
+        "run",
+        "--config",
+        "vitest.snapshot.config.ts",
+        "examples/headless-agent/tests/memory-cancellation.snapshot.ts",
+        "examples/headless-agent/tests/memory-curation-race.snapshot.ts",
+        "examples/headless-agent/tests/memory-execution.snapshot.ts",
+        "examples/headless-agent/tests/memory-lifecycle.snapshot.ts",
+        "examples/headless-agent/tests/gateway-memory.snapshot.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T16:44:37.455022+00:00"
+    },
+    {
+      "name": "memory-sdk-source-current",
+      "status": "passed",
+      "startedAt": "2026-10-27T16:48:36.047872+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=src",
+        "DSH_SNAPSHOT=replay",
+        "node_modules/.bin/vitest",
+        "run",
+        "--config",
+        "vitest.snapshot.config.ts",
+        "snapshots/sdk/memory-auxiliary.snapshot.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T16:48:39.218103+00:00"
+    },
+    {
+      "name": "memory-search-loader-source",
+      "status": "passed",
+      "startedAt": "2026-10-27T17:21:23.644664+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=src",
+        "DSH_SNAPSHOT=replay",
+        "node_modules/.bin/vitest",
+        "run",
+        "--config",
+        "vitest.snapshot.config.ts",
+        "examples/headless-agent/tests/memory-search.snapshot.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T17:21:25.582030+00:00"
+    },
+    {
+      "name": "memory-business-host-types-after-reboot",
+      "status": "passed",
+      "startedAt": "2026-10-27T16:57:33.197310+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/tsc",
+        "-p",
+        "tsconfig.host.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T16:58:20.515292+00:00"
+    },
+    {
+      "name": "memory-business-doc-leaf-repairs",
+      "status": "passed",
+      "startedAt": "2026-10-27T17:08:23.730220+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-memory-catalog-repairs.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T17:08:52.143820+00:00"
+    },
+    {
+      "name": "memory-business-final-focused-docs",
+      "status": "passed",
+      "startedAt": "2026-10-27T17:27:09.153558+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-memory-search-docs.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T17:27:41.808806+00:00"
+    }
+  ],
+  "controlledNegativeReplays": [
+    {
+      "name": "memory-admission-and-scope-negative",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T16:21:56.184845+00:00"
+    },
+    {
+      "name": "memory-business-built-causal-negatives",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T16:28:05.325108+00:00"
+    },
+    {
+      "name": "memory-cancelled-cursor-negative",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T16:32:30.107199+00:00"
+    },
+    {
+      "name": "memory-sdk-resume-adapter-failure",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T16:47:01.458311+00:00"
+    },
+    {
+      "name": "memory-search-normalization-negative",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T17:11:10.763426+00:00"
+    },
+    {
+      "name": "memory-search-built-negative",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T17:20:06.920527+00:00"
+    },
+    {
+      "name": "memory-disabled-workspace-negative",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T17:30:03.278236+00:00"
+    }
+  ],
+  "sourceRegression": {
+    "testsPassed": 237,
+    "testsSkipped": 0,
+    "filesPassed": 11,
+    "measuredProductionModules": {
+      "packages/memory/memory-curation/src/index.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "packages/memory/memory/src/index.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "packages/memory/memory/src/search.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      }
+    },
+    "coverageReport": "coverage/memory-business-20261028-current-scope/coverage-final.json",
+    "limitations": "This is a three-module measurement with the repository100percent per-file thresholds; it is not whole-project coverage. No thresholds or exclusion rules were changed."
+  },
+  "compiledAcceptance": {
+    "casesPassed": 9,
+    "filesPassed": 7,
+    "mode": "plain Node package exports and built libraries with real Loader/Agent/JSON storage",
+    "realModelAPI": false
+  },
+  "sdkAcceptance": {
+    "typescriptSource": true,
+    "typescriptEmitted": true,
+    "pythonEmitted": true,
+    "freshRuntimePersistedSessionResume": true
+  },
+  "build": {
+    "gatesPassed": 8,
+    "workers": 1,
+    "note": "The first aggregate exposed one exactOptionalPropertyTypes error in a test helper. It was repaired. The final complete8-gate build passes."
+  },
+  "documentation": {
+    "aggregate": "38 passed,3 stale generated-catalog checks; all3 repaired leaves pass.",
+    "staleChanges": "Configuration and persistence catalogs changed only source line references. No persisted fields, versions or Session generations changed.",
+    "followup": "Six focused checks pass after the search README and new Agent Note: pairing, links, note format/classification, public JSDoc and budgets.",
+    "upgradedGuide": "The existing current-version Memory member-authority guide was updated; its exact triplet, two sections and229 English words were checked. The fork has no verify-upgrade-guides script; no such command is claimed."
+  },
+  "interruptedChecks": [
+    {
+      "name": "memory-business-host-types-repair",
+      "status": "interrupted",
+      "exitCode": null,
+      "reason": "Host reboot; original handle missing and no matching compiler/gate or runner process remains.",
+      "bootEvidence": "kern.boottime: { sec = 1793120105, usec = 958862 } Wed Oct 28 00:55:05 2026"
+    },
+    {
+      "name": "memory-business-docs",
+      "status": "interrupted",
+      "exitCode": null,
+      "reason": "Host reboot; original handle missing and no matching compiler/gate or runner process remains.",
+      "bootEvidence": "kern.boottime: { sec = 1793120105, usec = 958862 } Wed Oct 28 00:55:05 2026"
+    }
+  ],
+  "resources": {
+    "externalServicesCreated": false,
+    "temporaryRuntimeCleanup": "All keyless fixture processes and owned temporary JSON stores closed normally.",
+    "productionPostgresTouched": false
+  },
+  "constraints": [
+    "All12 business domains remain in progress",
+    "Directory source-leaf substitution remains open",
+    "Same-provider memory-policy revocation during idle filesystem waits remains a separate unverified scenario",
+    "Real model API remains user-deferred",
+    "No subagents, commits, pushes, PRs, resets or worktree replacement"
+  ],
+  "sourceSha256": {
+    "examples/headless-agent/memory-curation-scope.cordis.snapshot.yml": "9b4013bd758ae2ce6f2ec507a90cd2c7ee5edd9df647af135d384c2ceea8dfef",
+    "examples/headless-agent/tests/fixtures/memory-auxiliary-model.mjs": "42fac54bef95902c40dd6a4806a303bdb19399e9f6915a59b2e398b9850d766d",
+    "examples/headless-agent/tests/fixtures/memory-cancellation-model.ts": "564b7e2e894a2e5cdcdd4740fc04b9121deb5c6c6dd56d54cc21f719cb9a5937",
+    "examples/headless-agent/tests/fixtures/memory-curation-race-driver.ts": "5522aedf472518e8113a8d8b3efb7744e12ad9f52c119392058ac3e81bd1b943",
+    "examples/headless-agent/tests/fixtures/memory-curation-race-model.ts": "21c9adcbd8cd7ae83b65596849afc643e554204235d0f5dece87a5d10fa704b9",
+    "examples/headless-agent/tests/fixtures/memory-mock-llm.ts": "3d8599e92038945a2e7bbe431c532c197e9656f3822cb7fb5e79e5f80c9bdb9e",
+    "examples/headless-agent/tests/memory-cancellation.snapshot.ts": "f6c3f09813f97d219e779e7fa0236ab204fd35ed3b4b50a54ad4bebae3d09dfd",
+    "examples/headless-agent/tests/memory-curation-race.snapshot.ts": "2582b362d7f87a991fe43bb0022e65205b958f6fd9111a00be8fbe90fac31774",
+    "examples/headless-agent/tests/memory-search.snapshot.ts": "687f34c5e533d2114e5ffbfc1ac9ce71f7b36a1f0019cd0e5d6bdd562c290808",
+    "packages/memory/memory-curation/src/index.ts": "10649689891226e9550a8cbdc81039968928b65cfc86fbb87e8dd48809460fae",
+    "packages/memory/memory-curation/tests/memory-curation.spec.ts": "6d5e80fcb990f1bdae71d362e0b232b7e5fcacdbaa5dd5832d632472d12aea9a",
+    "packages/memory/memory/src/index.ts": "75b054f9e51080f1016765a85a0d898f72bc9f5637e2d67af9166fd25bab0fc6",
+    "packages/memory/memory/src/search.ts": "96a7bf2c5bfc93a27cdc188e2b17c34016d74ef66b4e7cc45d5c9a4eba37580f",
+    "packages/memory/memory/tests/cursor.spec.ts": "2040feb9a3327f3866b78f190370a2245aaf55d554e2b23b3435ca44e74d206e",
+    "packages/memory/memory/tests/search.spec.ts": "3d026b2dece9b12ba2ae4403db40ee5fad889f991157aefb546de68374af4ef6",
+    "packages/memory/memory/tests/write-admission.spec.ts": "52586ca7d8c9c82239ebebe0dd5d5f233d5adc1513cdfcc505b74bec6f26d440",
+    "python/sdk/tests/test_memory_model_snapshot.py": "5772b570b90d33f637ff2cd2ba20f4f19eb95f4833e8b023c1e3d206a8d35dc9",
+    "snapshots/sdk/memory-auxiliary.snapshot.ts": "d7fdc760058fbfad7bc9483f8585458f2eb2b5bda1ac12382f0faf28dece4275"
+  },
+  "supplementalChecks": [
+    {
+      "command": "changed TypeScript paths through scripts/run-oxlint.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "node --check examples/headless-agent/tests/fixtures/memory-auxiliary-model.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm run verify-repository-references",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "toolingLimitations": [
+    "The repository Oxlint selector does not include the .mjs fixture, including with --no-ignore. Its syntax and real source/emitted/Python SDK behavior were executed instead; no .mjs lint completion is claimed."
+  ]
+}

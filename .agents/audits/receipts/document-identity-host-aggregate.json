@@ -1,0 +1,14 @@
+{
+  "name": "document-identity-host-aggregate",
+  "cwd": ".",
+  "command": "node --max-old-space-size=8192 node_modules/typescript/bin/tsc -p tsconfig.host.json",
+  "startedAt": "2026-10-25T17:16:32.081319+00:00",
+  "seconds": 165.667,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fb79b990d383f8a82fd656de0a3e289c55983f0c40686170820f8bc2f6c0a8f4",
+  "inputsAfter": "fb79b990d383f8a82fd656de0a3e289c55983f0c40686170820f8bc2f6c0a8f4",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

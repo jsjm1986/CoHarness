@@ -1,7 +1,6 @@
 /** Lazy POSIX flock entry; importing it does not load a native addon. */
-import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
 import { getSystemErrorName } from 'node:util'
+import { loadSystemBinding } from './binding.ts'
 
 interface FlockBinding {
   tryLock(fd: number, callback: (errno: number) => void): void
@@ -11,23 +10,7 @@ let binding: FlockBinding | undefined
 
 function loadBinding(): FlockBinding {
   if (binding) return binding
-  const { platform, arch } = process
-  if (platform !== 'linux' && platform !== 'darwin') {
-    throw Object.assign(new Error(`flock is not supported on ${platform}-${arch}`), {
-      code: 'ERR_FLOCK_UNSUPPORTED_PLATFORM',
-      syscall: 'flock',
-    })
-  }
-
-  let filename = 'system.node'
-  if (platform === 'linux') {
-    // Node's report types omit the libc field supplied by Linux reports.
-    const report = process.report.getReport() as { header: { glibcVersionRuntime?: string } }
-    filename = join(report.header.glibcVersionRuntime ? 'glibc' : 'musl', filename)
-  }
-  const require = createRequire(import.meta.url)
-  const manifest = require.resolve(`@deepseek-ai/node-addon-system-${platform}-${arch}/package.json`)
-  binding = require(join(dirname(manifest), 'bin', filename)) as FlockBinding
+  binding = loadSystemBinding('flock') as FlockBinding
   return binding
 }
 

@@ -1,0 +1,14 @@
+{
+  "name": "python-session-ancestry-queue-coupling-before",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_client.py -k session_ancestry_is_independent -q",
+  "startedAt": "2026-10-24T10:57:03.038529+00:00",
+  "seconds": 2.746,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "95559a76122a1d56c9c3d4ead341bf8b9dc669c7ebb27174af6521f8c345cf9a",
+  "inputsAfter": "95559a76122a1d56c9c3d4ead341bf8b9dc669c7ebb27174af6521f8c345cf9a",
+  "postgresToolDirectory": null,
+  "outputSha256": "84585e636cfae0071429699e6259a7f80eee841016777151d5cf6a6201d312d8",
+  "outputTail": "F                                                                        [100%]\n=================================== FAILURES ===================================\n_____ test_session_ancestry_is_independent_of_one_frame_notification_queue _____\n\n    def test_session_ancestry_is_independent_of_one_frame_notification_queue() -> None:\n        client = HarnessClient(HarnessConfig(max_notification_queue=1))\n        subscription = client.subscribe_session_notifications('root')\n        try:\n            client._handle_message({'method': 'subagent.started', 'params': {'parentSessionId': 'root', 'childSessionId': 'child'}})\n            assert subscription.next().payload['childSessionId'] == 'child'\n            client._handle_message({'method': 'subagent.started', 'params': {'parentSessionId': 'child', 'childSessionId': 'grandchild'}})\n            received: list[Notification] = []\n            subscription.drain(received.append)\n>           assert [item.payload['childSessionId'] for item in received] == ['grandchild']\nE           AssertionError: assert [] == ['grandchild']\nE             \nE             Right contains one more item: 'grandchild'\nE             Use -v to get more diff\n\npython/sdk/tests/test_client.py:1411: AssertionError\n=========================== short test summary info ============================\nFAILED python/sdk/tests/test_client.py::test_session_ancestry_is_independent_of_one_frame_notification_queue\n"
+}

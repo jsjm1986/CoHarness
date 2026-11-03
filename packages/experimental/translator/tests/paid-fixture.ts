@@ -1,5 +1,7 @@
 /** Real Loader/native adapters with fixture-owned credentials and a bounded loopback wire. */
 import type { ModuleLoaderV2 } from '@deepseek-ai/cordis-plugin-loader'
+import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
+import FileSettings from '@deepseek-ai/dsh-settings-file'
 import { boot } from '@deepseek-ai/dsh-app-boot'
 import LlmRuntime from '@deepseek-ai/dsh-llm'
 import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionSeq, type Session, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
@@ -58,6 +60,8 @@ export interface FixtureOptions {
   ambientConfigured?: boolean
   signedIn?: boolean
   withSessionLog?: boolean
+  withSettings?: boolean
+  configuredRefs?: readonly string[]
   responseStatus?: number
   reply?: (response: ServerResponse, request: NativeRequest) => void | Promise<void>
 }
@@ -125,6 +129,8 @@ export async function paidFixture(cleanups: Array<() => Promise<void>>, options:
   const configPath = join(root, 'cordis.yml'), storedRoot = join(root, 'sessions')
   let translator = options.translator ?? {}, withNativeOwners = true
   const rows = () => [
+    ...options.withSettings === true ? [{ id: 'settings', name: '@deepseek-ai/dsh-settings-file',
+      config: { path: join(root, 'settings.json'), watch: false } }] : [],
     { id: 'llm', name: '@deepseek-ai/dsh-llm' },
     { id: 'session', name: '@deepseek-ai/dsh-session' },
     { id: 'storage', name: '@deepseek-ai/dsh-session-persistence-jsonl', config: { root: storedRoot, compression: 'none' } },
@@ -143,6 +149,7 @@ export async function paidFixture(cleanups: Array<() => Promise<void>>, options:
   ]
   await writeFile(configPath, JSON.stringify(rows()))
   const modules = new Map<string, unknown>([
+    ['@deepseek-ai/dsh-settings-file', FileSettings],
     ['@deepseek-ai/dsh-llm', LlmRuntime], ['@deepseek-ai/dsh-session', SessionStore],
     ['@deepseek-ai/dsh-session-persistence-jsonl', JsonlPersistence], ['@deepseek-ai/dsh-session-query-sqlite', SqliteSessionQuery],
     [options.officialName ?? '@deepseek-ai/dsh-llm-deepseek-api-key', Official],
@@ -166,8 +173,11 @@ export async function paidFixture(cleanups: Array<() => Promise<void>>, options:
     host.provide('launchEnvironment', createLaunchEnvironmentSnapshot([{ source: 'process',
       values: options.ambientConfigured === false ? {} : { PAID_TRANSLATION_FIXTURE_KEY: 'fixture-native-key' } }]))
     if (options.withCredentials !== false) host.provide('credentials', {
-      describe: async () => ({ configured, writable: true }),
-      resolve: async () => configured ? { value: 'fixture-native-key', source: 'fixture' } : undefined,
+      describe: async (ref: CredentialRef) => ({
+        configured: configured && (options.configuredRefs === undefined || options.configuredRefs.includes(ref)), writable: true,
+      }),
+      resolve: async (ref: CredentialRef) => configured && (options.configuredRefs === undefined || options.configuredRefs.includes(ref))
+        ? { value: 'fixture-native-key', source: 'fixture' } : undefined,
     } as never)
     host.provide('deepseekAccount', {
       resolveToken: async (_baseURL: string): Promise<string | undefined> => signedIn ? 'fixture-account-token' : undefined,

@@ -146,6 +146,10 @@ describe('web e2e: mobile composer model label geometry', () => {
     await page.getByRole('menuitemradio', { name: MODEL_NAME }).click()
     const settings = page.getByRole('dialog', { name: '会话设置' })
     if (await settings.count() > 0) {
+      for (let index = 0; index < 12; index += 1) {
+        await page.keyboard.press('Tab')
+        expect(await settings.evaluate(element => element.contains(document.activeElement))).toBe(true)
+      }
       await settings.getByRole('tab', { name: '思考等级' }).click()
       await settings.getByRole('menuitemradio', { name: 'High' }).click()
       await settings.getByRole('tab', { name: '权限' }).click()

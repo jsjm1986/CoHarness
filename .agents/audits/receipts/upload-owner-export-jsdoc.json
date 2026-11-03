@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-export-jsdoc",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-export-jsdoc.ts",
+  "startedAt": "2026-10-25T10:27:06.183169+00:00",
+  "seconds": 7.762,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "796b292af8022f51d6932e70b74c52ece82bbe22e2ab4fff4061a8309bd9b75d",
+  "inputsAfter": "796b292af8022f51d6932e70b74c52ece82bbe22e2ab4fff4061a8309bd9b75d",
+  "postgresToolDirectory": null,
+  "outputSha256": "a44102982eb1b0bceccea64b86e7c51bee5c5a277ee03f5b989e4bc802574393",
+  "outputTail": "verify-export-jsdoc: every exported name in each package API is documented.\n"
+}

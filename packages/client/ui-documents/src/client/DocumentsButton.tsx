@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRuntime, InjectFace, HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { IconBrowseOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { DocumentsModal } from './DocumentsModal.tsx'
@@ -9,18 +9,21 @@ import css from './DocumentsButton.module.css'
 
 /** Business callback supplied by the host composition for existing documents. */
 export interface DocumentsButtonInjected {
+  hooks: { deployment: HostObservable<import('@deepseek-ai/dsh-client-runtime/client').DeploymentContextSnapshot> }
   /** Runtime owning documents attached to one captured conversation. */
   documentScopeFor?: ((sessionId: SessionId) => UserDocScope | undefined) | undefined
   /** Bind private resource navigation to the verified account. */
   privateResourceUrl?: ((url: string) => string) | undefined
   /** Add a durable document to the current conversation composer. */
   attachDocument?: ((document: UserDocRef, sessionId?: SessionId) => boolean) | undefined
+  /** Recheck the captured composer's live admission state before any transfer. */
+  canAttachDocument?: ((sessionId: SessionId) => boolean) | undefined
 }
 
 export type DocumentsButtonProps =
   PropsRuntime<'sidebar.footer.action'>
   & PropsLocale<typeof NS>
-  & DocumentsButtonInjected
+  & InjectFace<DocumentsButtonInjected>
 
 /**
  * Render the sidebar Documents trigger and its manager modal.
@@ -29,8 +32,9 @@ export type DocumentsButtonProps =
  * @returns the footer trigger and, while open, the document manager dialog.
  */
 export function DocumentsButton({
-  t, wide, attachDocument, useSessions, privateResourceUrl, documentScopeFor,
+  t, wide, attachDocument, canAttachDocument, useSessions, useDeployment, privateResourceUrl, documentScopeFor,
 }: DocumentsButtonProps) {
+  const deployment = useDeployment(state => state)
   const currentSessionId = useSessions(snapshot => snapshot.current)
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'manage' | 'select'>('manage')
@@ -75,13 +79,17 @@ export function DocumentsButton({
       </Tooltip>
       <DocumentsModal
         open={open}
+        showComputer={deployment.showComputer}
+        allowedNodeId={deployment.aggregateComputers ? undefined : deployment.context?.entry.nodeId}
         onClose={handleClose}
         t={t}
         mode={mode}
         privateResourceUrl={privateResourceUrl}
         attachmentScope={attachmentScope}
-        {...(attachDocument === undefined ? {} : {
-          onAttachDocument: (document: UserDocRef) => targetSessionId === undefined ? false : attachDocument(document, targetSessionId),
+        attachmentTargetId={targetSessionId}
+        {...(attachDocument === undefined || targetSessionId === undefined ? {} : {
+          canAttachDocument: () => canAttachDocument?.(targetSessionId) ?? true,
+          onAttachDocument: (document: UserDocRef) => attachDocument(document, targetSessionId),
         })}
       />
     </>

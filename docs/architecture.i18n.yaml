@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/architecture.md
 document:
-  en: 16c5a866aacfb7a1bae37a01b045e15b3b8da24b
-  zh: 162a6b21cfd05292d68cb96b081f5952dd430461
+  en: 8109ac8951b678f1752965f0bdeb58b94218305d
+  zh: 788215551dbcbb40e2df59d97fbffbc83d34e677
 /deepseek-harness-architecture:
   en: 2125f3ec236bc7b2
   zh: 23d8815579592ec4
@@ -27,8 +27,8 @@ document:
   en: c902147e708950d4
   zh: 68b731ea95d17eea
 /deepseek-harness-architecture/turn-flow:
-  en: 26a9212175c63bf4
-  zh: 96ae362d9de3586b
+  en: 424e383e6aebe06a
+  zh: 6fdbe8b071517941
 /deepseek-harness-architecture/session-log:
   en: 6484bb9301849165
   zh: 49bfe8d0a5664c7a

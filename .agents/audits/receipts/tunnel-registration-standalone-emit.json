@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-registration-standalone-emit",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.build.json",
+  "startedAt": "2026-10-24T22:56:47.747432+00:00",
+  "seconds": 4.726,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "65c9935ef0ba71822f43e2e51979a665c2fc36c76a6bfcc18e9e040168926766",
+  "inputsAfter": "65c9935ef0ba71822f43e2e51979a665c2fc36c76a6bfcc18e9e040168926766",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

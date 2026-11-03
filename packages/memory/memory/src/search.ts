@@ -125,6 +125,27 @@ function cutExcerpt(text: string, leadingCut: boolean): string {
 }
 
 /**
+ * Map a known UTF-16 match in normalized text to its source grapheme's code-point index.
+ * NFKD graphemes retain canonical composition groups, including compatibility Jamo.
+ */
+function sourceMatchIndex(text: string, index: number, segmenter: Intl.Segmenter): number {
+  let normalizedOffset = 0
+  let decomposedOffset = 0
+  for (const part of segmenter.segment(text.normalize('NFKD'))) {
+    normalizedOffset += normalizeText(part.segment).length
+    if (normalizedOffset > index) { decomposedOffset = part.index; break }
+  }
+  let expandedOffset = 0
+  let originalIndex = 0
+  for (const char of text) {
+    expandedOffset += char.normalize('NFKD').length
+    if (expandedOffset > decomposedOffset) break
+    originalIndex += 1
+  }
+  return originalIndex
+}
+
+/**
  * Cut a bounded excerpt: content collapsed to single spaces, windowed around
  * the first occurrence of the first term appearing in it (up to 40 code
  * points of leading context), at most {@link EXCERPT_MAX_LENGTH} code points
@@ -132,17 +153,16 @@ function cutExcerpt(text: string, leadingCut: boolean): string {
  * collapse and cap when content holds no term.
  * @param entry - The candidate entry.
  * @param terms - Extracted terms in first-seen order.
+ * @param segmenter - Grapheme segmentation owned by the current search.
  * @returns the excerpt text.
  */
-function searchExcerpt(entry: MemoryEntry, terms: readonly string[]): string {
+function searchExcerpt(entry: MemoryEntry, terms: readonly string[], segmenter: Intl.Segmenter): string {
   const collapsed = entry.content.replaceAll(/\s+/g, ' ').trim()
   const normalizedCollapsed = normalizeText(collapsed)
   for (const term of terms) {
     const index = normalizedCollapsed.indexOf(term)
     if (index === -1) continue
-    // Map the UTF-16 hit offset onto code points, then take up to 40 of
-    // leading context so the term lands near the window's start.
-    const codePointIndex = Array.from(normalizedCollapsed.slice(0, index)).length
+    const codePointIndex = sourceMatchIndex(collapsed, index, segmenter)
     const start = Math.max(0, codePointIndex - 40)
     return cutExcerpt(Array.from(collapsed).slice(start).join(''), start > 0)
   }
@@ -160,6 +180,7 @@ function searchExcerpt(entry: MemoryEntry, terms: readonly string[]): string {
 export function rankEntries(entries: readonly MemoryEntry[], query: string, limit: number): MemorySearchHit[] {
   const normalizedQuery = normalizeText(query)
   const terms = searchTerms(normalizedQuery)
+  const segmenter = new Intl.Segmenter('und', { granularity: 'grapheme' })
   const scored: { entry: MemoryEntry; excerpt: string; score: number }[] = []
   for (const entry of entries) {
     const normalized = {
@@ -169,7 +190,7 @@ export function rankEntries(entries: readonly MemoryEntry[], query: string, limi
     }
     const score = scoreEntry(normalizedQuery, terms, normalized)
     if (score <= 0) continue
-    scored.push({ entry, excerpt: searchExcerpt(entry, terms), score })
+    scored.push({ entry, excerpt: searchExcerpt(entry, terms, segmenter), score })
   }
   scored.sort((a, b) =>
     b.score - a.score

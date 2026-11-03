@@ -20,8 +20,8 @@ export interface RecorderEnvironment {
   /** POSIX target storage when workspace paths are not Host paths. */
   execution?: PosixRecorderExecution
 
-  /** Resolves to the runner, or null when git is unavailable and no snapshot is taken. */
-  git: Promise<GitRunner | null>
+  /** @returns the runner, or null when Git is unavailable; failed initialization is retryable on a later turn. */
+  git(): Promise<GitRunner | null>
   /** Directory that receives each Session's temporary directory. */
   tempRoot: string
   /** Maximum files carried by one summary. */
@@ -221,7 +221,7 @@ export class TurnRecorder {
   settled(): Promise<void> {
     return this.chain.then(() => {
       if (this.failure?.turn === this.state.turn) {
-        throw new Error('Historical review storage failed. Resolve the storage problem before continuing; file changes were not undone.',
+        throw new Error('Historical review did not complete. Resolve the reported problem before continuing; file changes were not undone.',
           { cause: this.failure.cause })
       }
     })
@@ -342,7 +342,7 @@ export class TurnRecorder {
   /** The repository enclosing the working directory, located once; null keeps retrying each turn. */
   private async locate(paths: Paths, signal: AbortSignal): Promise<Repository | null> {
     if (this.repository !== null) return this.repository
-    const git = await this.env.git
+    const git = await this.env.git()
     if (git === null) return null
     const workspace = await locateGitWorkspace(git, paths.cwd, () => this.snapshotDir(paths.scratchRoot, signal), signal)
     if (workspace === null) return null

@@ -1,0 +1,14 @@
+{
+  "name": "document-projection-affected-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests packages/host/userdoc-http/tests --coverage --config .agents/audits/.local/document-projection-affected-coverage.config.mts",
+  "startedAt": "2026-10-25T22:26:27.418459+00:00",
+  "seconds": 122.411,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e4d097033832f21b5e567a2bfb85d08fac0f3e8d4b1b5d19d14529f6830a99c9",
+  "inputsAfter": "e4d097033832f21b5e567a2bfb85d08fac0f3e8d4b1b5d19d14529f6830a99c9",
+  "postgresToolDirectory": null,
+  "outputSha256": "6dff1b36d32f70164124a024644c17f74903fac6cfaead7b7b5b5dbaea0deb9a",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n ❯ |thread-safe| packages/attachment/userdoc-local/tests/identity-fs.spec.ts (27 tests | 1 failed) 8943ms\n   × refuses an unverified file-by-file restore whose kernel object identities changed while preserving copied bytes 124ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/attachment/userdoc-local/tests/identity-fs.spec.ts > refuses an unverified file-by-file restore whose kernel object identities changed while preserving copied bytes\nSystemError: Target already exists: cp returned EEXIST (/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/dsh-document-unverified-restore-zJV9BM already exists) /var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/dsh-document-unverified-restore-zJV9BM\n ❯ packages/attachment/userdoc-local/tests/identity-fs.spec.ts:82:3\n     80|   const copied = await mkdtemp(join(tmpdir(), 'dsh-document-unverified…\n     81|   onTestFinished(() => rm(copied, { recursive: true, force: true }))\n     82|   await cp(f.root, copied, { recursive: true, force: false, errorOnExi…\n       |   ^\n     83|   const copiedFile = join(copied, original.docId)\n     84|   expect(await readFile(copiedFile, 'utf8')).toBe('same bytes')\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 26 passed (27)\n      Tests  1 failed | 444 passed (445)\n   Start at  06:27:58\n   Duration  30.90s (transform 20.83s, setup 3.80s, import 29.11s, tests 44.29s, environment 15ms)\n\n"
+}

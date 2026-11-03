@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-26-atomic-file-acquisition.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-26-atomic-file-acquisition.md
+document:
+  en: 822670dd3602a15f5c08a4aaaf8aaf882f245179
+  zh: e5005445b589e91ba33020d5b8915cef64a903c3
+/agent-note-atomic-file-acquisition:
+  en: ca83f2b0b25db748
+  zh: c1b317aaecb11a1e
+/agent-note-atomic-file-acquisition/problem:
+  en: 84def06f0c5c0aa9
+  zh: f61cbe893893e19d
+/agent-note-atomic-file-acquisition/decision:
+  en: ed20baba6ad7cc74
+  zh: c2c436081ec4c46b
+/agent-note-atomic-file-acquisition/alternatives-considered:
+  en: b9645ca6f134342c
+  zh: a58eed4656b2b3a4
+/agent-note-atomic-file-acquisition/consequences:
+  en: f3d2d6b551db0f4f
+  zh: e3ee8364ae8afe79

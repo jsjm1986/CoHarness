@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-29-terminal-llm-stream-failures.md
 document:
-  en: d867cda610a4086db493f756bdb5a9d42dd03696
-  zh: 1fa31abffa1b0bb45deb5bf8b521e59347b35ca8
+  en: 5dd80d39fa31200c53e5095751f352ec55e2da0d
+  zh: 7b5ef7f1f2dc90cd8bff82ac92686ee8a098484f
 /agent-note-terminal-llm-stream-failures:
   en: 6195cb1d9b4dd423
   zh: 0c93d3a39e2bc1f4
@@ -12,8 +12,8 @@ document:
   en: 41363fca57ae20e6
   zh: 1d05eeeecaafa7f3
 /agent-note-terminal-llm-stream-failures/decision:
-  en: dd1dd01dda70bfb7
-  zh: 8715075a5be2f7b7
+  en: 757d69e37b454490
+  zh: e665dc710a60e09c
 /agent-note-terminal-llm-stream-failures/alternatives-considered:
   en: 46153a92b2135aae
   zh: 0b8fdaf1f7edeb77

@@ -1,0 +1,13 @@
+{
+  "name": "gateway-execution-scope-oxlint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts gateway/tests/execution-fixture-server.ts gateway/tests/run-built-resource-admission.mjs gateway/tests/fixtures/runtime-start-built.mjs packages/context/gateway-execution/tests/pg-composition.e2e.ts scripts/ci-workflow.spec.ts",
+  "startedAt": "2026-10-23T13:05:18.179935+00:00",
+  "seconds": 7.999,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8189e9d2d88d6504c4308e4c4069700c23736f1cd1872376d4d6ef8b3e6dea05",
+  "inputsAfter": "8189e9d2d88d6504c4308e4c4069700c23736f1cd1872376d4d6ef8b3e6dea05",
+  "outputSha256": "09932559e9184bd65e486f1257d7ca1d004ebae13f2cca47fe92f38ddd773b4c",
+  "outputTail": "packages/context/gateway-execution/tests/pg-composition.e2e.ts:89:50: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\n"
+}

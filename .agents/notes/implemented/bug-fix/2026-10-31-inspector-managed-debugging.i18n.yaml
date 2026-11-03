@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-inspector-managed-debugging.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-inspector-managed-debugging.md
+document:
+  en: 8e2fa478ca3418967b4be7e1675c8639326653d7
+  zh: cd48be2f73ce78a6a3e1cf0e10c0c99fd72ef823
+/agent-note-unrestricted-inspector-requires-independent-local-authority:
+  en: 15520c32b5d1a84f
+  zh: bca2cfe0633f80f4
+/agent-note-unrestricted-inspector-requires-independent-local-authority/problem:
+  en: b6538607035458e0
+  zh: 9a792f049756890a
+/agent-note-unrestricted-inspector-requires-independent-local-authority/decision:
+  en: 1ba222d7cf634128
+  zh: c931b3ec9cbe7fbb
+/agent-note-unrestricted-inspector-requires-independent-local-authority/alternatives-considered:
+  en: 41e3b68f0b141728
+  zh: e3a1a571f3ef1816
+/agent-note-unrestricted-inspector-requires-independent-local-authority/consequences:
+  en: 7a8e8c819b9a3975
+  zh: 88ef21e75e8daf3f
+/agent-note-unrestricted-inspector-requires-independent-local-authority/verification:
+  en: 9b2fd768673f83b1
+  zh: 957b246018b5e690

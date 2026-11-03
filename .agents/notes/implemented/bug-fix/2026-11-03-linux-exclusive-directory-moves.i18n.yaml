@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-03-linux-exclusive-directory-moves.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-03-linux-exclusive-directory-moves.md
+document:
+  en: e7072f4379d10bb9cdddfa86b8578bda1a3d7d3a
+  zh: d4ff91ca4a9ea525c894cd9c8c3db8d7af282ed8
+/agent-note-linux-exclusive-directory-moves-without-a-libc-wrapper:
+  en: 4088aca58a215fb6
+  zh: 1c4625fb9d230b5a
+/agent-note-linux-exclusive-directory-moves-without-a-libc-wrapper/problem:
+  en: 50648a7be854cbfb
+  zh: 9e210aa827ef5b48
+/agent-note-linux-exclusive-directory-moves-without-a-libc-wrapper/decision:
+  en: ff2ae99db382e270
+  zh: d5ae8873653132e7
+/agent-note-linux-exclusive-directory-moves-without-a-libc-wrapper/alternatives-considered:
+  en: 650aa84d5cced07d
+  zh: dde4cb6269856342
+/agent-note-linux-exclusive-directory-moves-without-a-libc-wrapper/consequences:
+  en: 27638db65256be1d
+  zh: 309e64f146d0bc77

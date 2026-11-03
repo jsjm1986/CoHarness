@@ -4,8 +4,9 @@ import type { AddressInfo } from 'node:net'
 import type { Socket } from 'node:net'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright'
+import { chromium, type Page } from 'playwright'
 import { expect, it } from 'vitest'
+import { saveFailureShot } from './support.ts'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import { launchWebScaffold, seedSession, fixtureUserPrompts, watchConsole,
@@ -23,6 +24,7 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
     const sockets = new Set<Socket>()
     const requests = new Set<ReturnType<typeof request>>()
     const browser = await chromium.launch()
+    let failurePage: Page | undefined
     let server: ReturnType<typeof createServer> | undefined
     let heldList: { baseUrl: string; arrived: () => void; release: Promise<undefined> } | undefined
     let releaseList: (() => void) | undefined
@@ -129,7 +131,9 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
         sessionCookies.set(runtime.baseUrl, setCookie.split(';', 1)[0] ?? '')
       }
       const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US' })
+      failurePage = page
       const tripwire = watchConsole(page)
+
       const listed = async (target: string): Promise<void> => {
         const response = await page.waitForResponse((response) => {
           const url = new URL(response.url())
@@ -221,7 +225,8 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       expect(tripwire.pageErrors).toEqual([])
       expect(await page.evaluate(() => localStorage.getItem('dsh.conversation.workbenches.v3.local'))).not.toBeNull()
       personalComplete = false
-      await page.evaluate((rawId) => {
+      // Seed the legacy generation before the next client owns persistence; the outgoing document may still save its live layout.
+      await page.addInitScript((rawId) => {
         localStorage.removeItem('dsh.conversation.workbenches.v3.local')
         localStorage.setItem('dsh.conversation.workbenches.v2.local', JSON.stringify({
           version: 2, mode: 'workbench', activeId: 'legacy', workbenches: [{
@@ -239,6 +244,14 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       await expect.poll(() => toolbar.getByRole('button', { name: 'Add conversation', exact: true }).isEnabled()).toBe(true)
       expect(await page.locator('[data-session-pane]').count()).toBe(0)
       expect(tripwire.pageErrors).toEqual([])
+    } catch (cause) {
+      if (failurePage !== undefined) {
+        await saveFailureShot(failurePage, `runtime-identity-${bootstrap}`)
+        const state = await Promise.allSettled([failurePage.locator('[data-workbench-toolbar]').ariaSnapshot(),
+          failurePage.evaluate(() => ({ url: location.href, keys: Object.keys(localStorage).filter(key => key.includes('workbenches')) }))])
+        console.error('Runtime restoration state:', JSON.stringify(state))
+      }
+      throw cause
     } finally {
       releaseList?.()
       await browser.close()

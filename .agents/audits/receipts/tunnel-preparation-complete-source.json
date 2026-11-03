@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-preparation-complete-source",
+  "cwd": "gateway",
+  "command": "node --import tsx/esm tests/run-local-web-assembly.mjs src",
+  "startedAt": "2026-10-24T23:34:49.344313+00:00",
+  "seconds": 0.802,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a0d86acc16e7427c0c08b6f641c0e08be8a16c49e7580a85af667fbf17ab1395",
+  "inputsAfter": "a0d86acc16e7427c0c08b6f641c0e08be8a16c49e7580a85af667fbf17ab1395",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "b865ba8ccb7328366771383fbe7e77d3f130b7fcb8c554656091dc40fd18196b",
+  "outputTail": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/local-runtime-owner.ts:6\nimport { tryLockExclusive } from '@deepseek-ai/node-addon-system/flock'\n         ^\nSyntaxError: The requested module '@deepseek-ai/node-addon-system/flock' does not provide an export named 'tryLockExclusive'\n    at #asyncInstantiate (node:internal/modules/esm/module_job:319:21)\n    at async ModuleJob.run (node:internal/modules/esm/module_job:422:5)\n    at async node:internal/modules/esm/loader:639:26\n    at async <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/run-local-web-assembly.mjs:20:36)\n\nNode.js v25.8.1\n"
+}

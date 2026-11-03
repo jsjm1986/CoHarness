@@ -2,14 +2,22 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
+import { runtimeFixture, runtimePageFixture } from '../components/runtime-fixture.ts'
 import { TerminalsPage } from './TerminalsPage.tsx'
 
-vi.mock('../api.ts', () => ({ listUsers: vi.fn(), listProjects: vi.fn(), getTerminalPolicy: vi.fn(), setTerminalPolicy: vi.fn(), listTerminals: vi.fn(), closeTerminal: vi.fn() }))
+vi.mock('../api.ts', () => ({
+  getAdminComputerContext: vi.fn(), listRuntimeEnvironments: vi.fn(), listUserRuntimes: vi.fn(),
+  getRuntimeAllocationPolicy: vi.fn(), saveRuntimeAllocationPolicy: vi.fn(), allocateUserRuntime: vi.fn(), operateRuntime: vi.fn(), listUsers: vi.fn(), listProjects: vi.fn(), getTerminalPolicy: vi.fn(), setTerminalPolicy: vi.fn(), listTerminals: vi.fn(), closeTerminal: vi.fn() }))
 afterEach(cleanup)
 const terminal: api.AdminTerminal = { ownerId: 'b0e81aa9-219c-44d6-8d42-af333c722db6', id: 'terminal-1', sessionId: 'session-1', creatorUserId: 1, state: 'running' }
-const inventory: api.AdminTerminalInventory = { nodeId: 'node-a', generation: 3, target: { kind: 'user', id: 1 }, terminals: [terminal] }
+const inventory: api.AdminTerminalInventory = { nodeId: 'node-a', generation: 3, target: { kind: 'user', id: 1, runtimeId: runtimeFixture('user', 1).id }, terminals: [terminal] }
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.mocked(api.getAdminComputerContext).mockResolvedValue({ nodeId: 'node-a' as api.RuntimeNodeId, name: 'Computer A', forwardingEnabled: true })
+  vi.mocked(api.listUserRuntimes).mockImplementation(async id => runtimePageFixture('user', id))
+  vi.mocked(api.listRuntimeEnvironments).mockResolvedValue(runtimePageFixture('project', 7))
+  vi.mocked(api.getRuntimeAllocationPolicy).mockResolvedValue({ revision: '0', maxTotal: 8, maxPerNode: 4, source: 'organization' })
+
   vi.mocked(api.listUsers).mockResolvedValue([{ id: 1, username: 'alice', displayName: 'Alice' } as api.AdminUser])
   vi.mocked(api.listProjects).mockResolvedValue([{ id: 7, name: 'Shared' } as api.Project])
   vi.mocked(api.getTerminalPolicy).mockImplementation(async (kind, id) => ({ kind, id, enabled: false, revision: '0' }))
@@ -53,7 +61,7 @@ it('keeps cleanup failures visible and reloads a stopping entry before retry', a
 it('cancels old scope reads and ignores their late inventory', async () => {
   let finish!: (value: api.AdminTerminalInventory) => void
   const old = new Promise<api.AdminTerminalInventory>(resolve => { finish = resolve })
-  vi.mocked(api.listTerminals).mockImplementation((kind, id) => kind === 'user' ? old : Promise.resolve({ nodeId: 'node-a', target: { kind, id }, generation: null, terminals: [] }))
+  vi.mocked(api.listTerminals).mockImplementation((kind, id, _signal, runtimeId) => kind === 'user' ? old : Promise.resolve({ nodeId: 'node-a', target: { kind, id, runtimeId }, generation: null, terminals: [] }))
   render(<TerminalsPage />)
   const user = await selectUser()
   const signal = vi.mocked(api.listTerminals).mock.calls[0]![2]!
@@ -65,7 +73,7 @@ it('cancels old scope reads and ignores their late inventory', async () => {
   expect(screen.queryByRole('button', { name: '关闭终端' })).toBeNull()
 })
 it('rejects an inventory for a different target and permits retry', async () => {
-  vi.mocked(api.listTerminals).mockResolvedValueOnce({ ...inventory, target: { kind: 'project', id: 7 } })
+  vi.mocked(api.listTerminals).mockResolvedValueOnce({ ...inventory, target: { kind: 'project', id: 7, runtimeId: runtimeFixture('project', 7).id } })
   render(<TerminalsPage />)
   const user = await selectUser()
   expect(await screen.findByText(/终端清单与选中范围不一致/)).toBeTruthy()

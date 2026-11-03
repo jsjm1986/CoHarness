@@ -1,0 +1,14 @@
+{
+  "name": "gateway-resource-progress-scoped-lint",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts gateway/src/node-resource-budget.ts gateway/src/node-resource-pressure.ts gateway/src/gateway-model-budget.ts gateway/src/postgres/progress-service.ts gateway/src/postgres/progress-usage.ts gateway/tests/node-resource-budget-postgres.spec.ts gateway/tests/node-resource-pressure.spec.ts gateway/tests/project-progress-postgres.spec.ts gateway/tests/progress-service.spec.ts gateway/tests/progress-material.perf.ts gateway/tests/fixtures/progress-material-perf.mjs gateway/tests/fixtures/gateway-model-owner.ts gateway/tests/fixtures/project-progress-built.mjs gateway/tests/macos-release-control.spec.ts gateway/tests/execution-fixture-server.ts gateway/tests/fixtures/runtime-start-built.mjs",
+  "startedAt": "2026-10-23T22:49:41.626460+00:00",
+  "seconds": 5.049,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5e9bf65b7295a797974aa6d484eedafe1862491c754346d5ce36a0ff2293810f",
+  "inputsAfter": "5e9bf65b7295a797974aa6d484eedafe1862491c754346d5ce36a0ff2293810f",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

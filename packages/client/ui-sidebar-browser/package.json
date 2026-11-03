@@ -70,10 +70,10 @@
     "@deepseek-ai/dsh-client-ui-layout": "workspace:*"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "dependencies": {
     "zod": "^4.4.3"

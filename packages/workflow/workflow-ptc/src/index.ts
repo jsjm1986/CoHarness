@@ -8,11 +8,14 @@ import { randomUUID } from 'node:crypto'
 import { availableParallelism } from 'node:os'
 import * as vm from 'node:vm'
 import type { Context } from '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-ptc-runtime'
 import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import z from '@deepseek-ai/schemastery'
 import WorkflowEngine, { WorkflowError, WorkflowRunId } from '@deepseek-ai/dsh-workflow'
+import type { SubagentProvider } from '@deepseek-ai/dsh-subagent'
+import { withSubagentForeground } from '@deepseek-ai/dsh-subagent/src/internal.ts'
 import type { WorkflowRun, WorkflowRunInfo, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { PtcWorkflowRun } from './host.ts'
 import { validateMeta } from './meta.ts'
@@ -65,16 +68,17 @@ function assertBodyParses(body: string, name: string): void {
 }
 
 /** Resolve one run's provider route before publishing work. */
-function resolveSubagentProvider(ctx: Context, configured: string, override: string | undefined): string {
-  const provider = override ?? configured
-  if (provider.length === 0 || provider !== provider.trim()) {
+function resolveSubagentProvider(ctx: Context, configured: string, override: string | undefined): SubagentProvider {
+  const name = override ?? configured
+  if (name.length === 0 || name !== name.trim()) {
     throw new WorkflowError(
       'workflow subagentProvider must be a non-empty normalized string',
       'INVALID_ARGUMENT',
     )
   }
-  if (ctx.subagents.getProvider(provider) === undefined) {
-    throw new WorkflowError(`no subagent provider registered for "${provider}"`, 'AGENT_START')
+  const provider = ctx.subagents.getProvider(name)
+  if (provider === undefined) {
+    throw new WorkflowError(`no subagent provider registered for "${name}"`, 'AGENT_START')
   }
   return provider
 }
@@ -121,12 +125,19 @@ class PtcWorkflowEngine extends WorkflowEngine {
     this.config = config as ResolvedConfig
   }
 
+  override withForeground<T>(parent: Agent, signal: AbortSignal, operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    return super.withForeground(parent, signal, engineSignal =>
+      withSubagentForeground(this.ctx.subagents, parent, engineSignal, operation))
+  }
+
   /**
    * Validate and execute a workflow script in a sandboxed Node process. Throws
    * {@link WorkflowError} synchronously (`META_INVALID` for a malformed meta
    * block, `SCRIPT_PARSE` for a body that does not compile) for a request
    * that cannot begin; once a run is returned, every failure resolves through
    * `result.stopReason` instead.
+   * Each child requires the provider instance selected at admission to remain
+   * registered; replacing it fails later starts without revoking owned children.
    * @param request - the script body, its meta data and `args`, the parent
    *   agent, and an optional cancel signal.
    * @returns the live run (its `result` resolves when the script settles).

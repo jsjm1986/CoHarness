@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-ui-browser-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.browser.json --noEmit",
+  "startedAt": "2026-10-24T23:12:03.979237+00:00",
+  "seconds": 3.216,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f527824fac7778a6424e81cd4524ff4e5a002a2414194ca18e0356cd1d89968d",
+  "inputsAfter": "f527824fac7778a6424e81cd4524ff4e5a002a2414194ca18e0356cd1d89968d",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

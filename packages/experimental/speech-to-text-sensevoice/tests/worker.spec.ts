@@ -57,7 +57,7 @@ it('keeps one worker warm across recordings and joins its exit on disposal', asy
   expect((await worker.transcribe({ audio, language: 'zh' }, signal())).text).toBe('zh')
   expect((await worker.transcribe({ audio, language: 'en' }, signal())).text).toBe('en')
   expect(spawn).toHaveBeenCalledOnce()
-  const handle = spawn.mock.results[0]!.value as SubprocessHandle
+  const handle = await spawn.mock.results[0]!.value as SubprocessHandle
   await worker.dispose()
   expect(await handle.waitForExit()).toBe(true)
   await expect(worker.transcribe({ audio, language: 'en' }, signal())).rejects.toThrow('disposed')
@@ -167,7 +167,7 @@ it('cancels active inference before the next recording can acquire a fresh worke
   await rejected
   expect((await next).text).toBe('en')
   expect(spawn).toHaveBeenCalledTimes(2)
-  expect(await (spawn.mock.results[0]!.value as SubprocessHandle).waitForExit()).toBe(true)
+  expect(await (await spawn.mock.results[0]!.value as SubprocessHandle).waitForExit()).toBe(true)
 })
 
 it('bounds the queue and never executes a cancelled waiting recording', async () => {
@@ -201,7 +201,7 @@ it('stops an idle worker and reloads it on demand', async () => {
   const { worker, spawn } = await fixture({ idleTimeoutMs: 25 })
   await prepare(worker)
   await worker.transcribe({ audio, language: 'en' }, signal())
-  const first = spawn.mock.results[0]!.value as SubprocessHandle
+  const first = await spawn.mock.results[0]!.value as SubprocessHandle
   await first.done
   expect((await worker.transcribe({ audio, language: 'zh' }, signal())).text).toBe('zh')
   expect(spawn).toHaveBeenCalledTimes(2)
@@ -308,7 +308,7 @@ it('joins a worker that exits before readiness and exposes retryable preparation
   vi.mocked(prepareRuntime).mockResolvedValueOnce({ tokens: root, worker: join(root, 'missing.mjs'), model: root, vad: root })
   worker.prepare()
   await vi.waitFor(() => { expect(worker.snapshot().phase).toBe('failed') }, { timeout: 10000 })
-  expect(await (spawn.mock.results[0]!.value as SubprocessHandle).waitForExit()).toBe(true)
+  expect(await (await spawn.mock.results[0]!.value as SubprocessHandle).waitForExit()).toBe(true)
   const next = await fixture()
   vi.mocked(prepareRuntime).mockRejectedValueOnce('download interrupted')
   next.worker.prepare()
@@ -319,7 +319,7 @@ it('reclaims the process range after an unexpected idle exit before replacing th
   const { worker, spawn } = await fixture()
   await prepare(worker)
   await worker.transcribe({ audio, language: 'en' }, signal())
-  const handle = spawn.mock.results[0]!.value as SubprocessHandle
+  const handle = await spawn.mock.results[0]!.value as SubprocessHandle
   handle.terminate()
   await vi.waitFor(() => { expect(worker.snapshot().phase).toBe('standby') }, { timeout: 10000 })
   expect((await worker.transcribe({ audio, language: 'zh' }, signal())).text).toBe('zh')
@@ -331,7 +331,7 @@ it('retains a worker whose idle cleanup cannot observe exit until that range is 
   const { worker, spawn, ctx } = await fixture({ idleTimeoutMs: 100 })
   await prepare(worker)
   await worker.transcribe({ audio, language: 'en' }, signal())
-  const handle = spawn.mock.results[0]!.value as SubprocessHandle
+  const handle = await spawn.mock.results[0]!.value as SubprocessHandle
   const failure = new Error('range observation failed')
   const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
   const joined = vi.spyOn(handle, 'waitForExit').mockRejectedValueOnce(failure)

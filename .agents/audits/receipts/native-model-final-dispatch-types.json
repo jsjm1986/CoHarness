@@ -1,0 +1,14 @@
+{
+  "name": "native-model-final-dispatch-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/llm/llm/tsconfig.json packages/llm/llm-pi-ai/tsconfig.json packages/llm/llm-deepseek/tsconfig.json packages/subagent/subagent-codex/tsconfig.json",
+  "startedAt": "2026-10-25T02:24:44.974616+00:00",
+  "seconds": 4.98,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c8b950a8686518e0329c16c1368ebbf5aa7ca369d827d3424d0ad9e4d472eaae",
+  "inputsAfter": "c8b950a8686518e0329c16c1368ebbf5aa7ca369d827d3424d0ad9e4d472eaae",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

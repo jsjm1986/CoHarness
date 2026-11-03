@@ -1,0 +1,30 @@
+- main:
+  - heading "审计日志" [level=1]
+  - group "审计日志":
+    - button "全部事件" [pressed]
+    - button "管理操作"
+    - button "认证"
+    - button "模型拒绝"
+    - button "维护通道"
+    - button "失败请求"
+  - button "刷新"
+  - alert: fixture-query-unavailable
+  - heading "筛选条件" [level=2]
+  - text: 用户
+  - textbox "用户":
+    - /placeholder: 用户名或显示名
+  - text: 操作
+  - textbox "操作":
+    - /placeholder: 操作名称包含…
+  - text: 结果
+  - combobox "结果":
+    - option "全部" [selected]
+    - option "成功"
+    - option "失败"
+  - text: 开始时间
+  - textbox "开始时间"
+  - text: 结束时间
+  - textbox "结束时间"
+  - button "重置" [disabled]
+  - button "应用筛选"
+  - heading "事件记录" [level=2]

@@ -1,0 +1,14 @@
+{
+  "name": "document-operation-lint-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-local packages/attachment/userdoc packages/host/userdoc-http",
+  "startedAt": "2026-10-25T20:45:15.066849+00:00",
+  "seconds": 12.121,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c88e0b053f4ae1d72b89de0df2b2279f6ec5fc41bb9456ba26a3dce22d285eee",
+  "inputsAfter": "c88e0b053f4ae1d72b89de0df2b2279f6ec5fc41bb9456ba26a3dce22d285eee",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

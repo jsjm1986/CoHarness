@@ -20,6 +20,10 @@ The [boot package group](../../packages/boot/README.md) owns launcher-provided p
 
 `PluginManagementCapability` splits operations into `read`, open to any caller reaching the service, and `manage`, which the deployment's authorization policy decides. `PluginManagementAccess` reports the caller's `manage` grant so interfaces can gate controls without probing a write.
 
+`ParsedInstallSpec` retains the submitted `spec` and discriminates registry, path, tarball, and git sources. Registry sources carry `name` and an optional `range`; path sources carry `path`; tarballs carry an optional `path` or `host`; git sources carry `host`. Installation authorization can restrict the actual fetch source before package operations begin.
+
+`PluginConfigValue` is a recursive JSON value. `PluginConfigDescription.config` contains the entry's configuration or `null` when none is declared; optional `schema` contains the plugin's Schemastery `toJSON` serialization for configuration forms.
+
 `PluginDesiredState` is the deployment's desired composition for one profile: verbatim patch `entries` whose keys stay within `id`, `name`, `disabled`, plus the ordered `bundles` selection. `PluginDesiredStateSnapshot` pairs a saved state with the store's optimistic-concurrency `revision` (`'0'` while none is saved), and `PluginDesiredStatePublish` answers `applied` with the new revision or `conflict` with the store's current snapshot.
 
 ## Profile reconciliation
@@ -119,6 +123,17 @@ Deployment-owned authority for current-profile management.
 authorize(capability?: PluginManagementCapability): Promise<void>
 
 /**
+ * Gate one installable spec by its form before pnpm runs. Present only in
+ * deployments that restrict install sources; absent means any spec form is
+ * acceptable. The parsed spec, not the raw string, reaches the policy so a
+ * URL spelled several ways cannot slip past a host rule.
+ * @param spec - the parsed install spec.
+ * @returns After the deployment permits the source; rejects with
+ * 'plugin-management/install-source' otherwise.
+ */
+authorizeInstall?(spec: ParsedInstallSpec): Promise<void>
+
+/**
  * Read the profile's saved desired state. Present only in deployments with
  * a durable state store; standalone profiles manage files directly.
  * @returns the store's current snapshot.
@@ -202,6 +217,24 @@ async authorize(capability: PluginManagementCapability = 'manage'): Promise<void
  * @returns Saved and runtime outcomes, including higher-priority overrides.
  */
 @Remote async setPluginEnabled(id: PluginEntryId, enabled: boolean): Promise<ChangeResult>
+
+/** Read one plugin row's current config and its schema, when the module declares one.
+ * The schema serializes through schemastery `toJSON` for form rendering;
+ * modules without a `Config` schema report `schema: undefined`.
+ * @param id Loader entry identity returned by listPlugins.
+ * @returns The entry's declared config and its JSON-serialized schema.
+ */
+@Remote async describePluginConfig(id: PluginEntryId): Promise<PluginConfigDescription>
+
+/** Replace one plugin row's config in the profile patch, validated against its schema.
+ * `config: null` clears all matching profile config overrides so composition defaults apply. The loader
+ * rejects a failing schema at reload as well; validating here first reports a
+ * readable error instead of a broken reload.
+ * @param id Loader entry identity returned by listPlugins.
+ * @param config JSON-serializable config object, or `null` to clear the override.
+ * @returns Saved and runtime outcomes.
+ */
+@Remote async setPluginConfig(id: PluginEntryId, config: PluginConfigValue | null): Promise<ChangeResult>
 
 /** Select or remove a bundle layer while retaining installed dependencies.
  * @param name Bundle package name.

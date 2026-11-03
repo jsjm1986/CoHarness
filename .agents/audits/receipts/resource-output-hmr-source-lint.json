@@ -1,0 +1,14 @@
+{
+  "name": "resource-output-hmr-source-lint",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/memory/memory-context/src/index.ts packages/memory/memory-curation/src/index.ts packages/memory/memory-context/tests/memory-context.spec.ts packages/memory/memory-curation/tests/memory-curation.spec.ts packages/boot/hmr/src/watch-config.ts packages/boot/hmr/tests/watch-config.spec.ts snapshots/sdk/memory-auxiliary.snapshot.ts examples/headless-agent/tests/fixtures/memory-auxiliary-model.mjs",
+  "startedAt": "2026-10-24T02:15:33.399500+00:00",
+  "seconds": 5.382,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "de917fd7b2d20801be5e2b3aaf3c005d72a2edc6b4585113d01b246767fedee6",
+  "inputsAfter": "de917fd7b2d20801be5e2b3aaf3c005d72a2edc6b4585113d01b246767fedee6",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

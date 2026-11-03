@@ -1,0 +1,230 @@
+{
+  "finding": "B355",
+  "status": "fixed_and_verified_named_provider_selection_scope",
+  "updatedAt": "2026-10-30T16:05:21.388516+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z",
+  "sourcePaths": [
+    "packages/bundle/web-app/cordis.patch.yml",
+    "packages/bundle/web-app/tests/document-provider.spec.ts",
+    "gateway/tests/fixtures/local-runtime-web-gateway.mjs",
+    "gateway/tests/run-local-web-assembly.mjs",
+    "gateway/tests/expected/managed-document-web-assembly.expected.md",
+    "gateway/package.json",
+    "packages/bundle/web-app/README.md",
+    "packages/bundle/web-app/README.zh.md",
+    "packages/bundle/web-app/README.i18n.yaml",
+    "packages/attachment/userdoc-gateway/README.md",
+    "packages/attachment/userdoc-gateway/README.zh.md",
+    "packages/attachment/userdoc-gateway/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-15-gateway-local-document-broker.md",
+    ".agents/notes/implemented/architecture/2026-10-15-gateway-local-document-broker.zh.md",
+    ".agents/notes/implemented/architecture/2026-10-15-gateway-local-document-broker.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-document-provider/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-document-provider/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-document-provider/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/bundle/web-app/cordis.patch.yml": "db660fd062903ad01f470f4ace31a6532cf33fd79823fa4d9763cf24e7e29909",
+    "packages/bundle/web-app/tests/document-provider.spec.ts": "7d045c6e8f2135ff1a4807423e6d411502073285393af7c3154faf52dfa54bae",
+    "gateway/tests/fixtures/local-runtime-web-gateway.mjs": "8da4d4fb7b5a3bc740af7c99453e1ed7f0725b5738f1d9038636d2574f9d36a1",
+    "gateway/tests/run-local-web-assembly.mjs": "38d42bd25da1018483b9b260ec03de3a292105dc8f9589d1939c96b07ef4eb41",
+    "gateway/tests/expected/managed-document-web-assembly.expected.md": "b34c899404725dd946b1ab762d7f9131becff7de2a4e54926e95a3c137902d37",
+    "gateway/package.json": "1b7db49ec5a80488e162035137dacdf331d02186a732ce894a0393c1233044f4",
+    "packages/bundle/web-app/README.md": "12a7d5e466430980fa5e4061e4ff4b93b24311d5fc45e5114d099cb4d41398b1",
+    "packages/bundle/web-app/README.zh.md": "fb16fcd8e0120a8235ee45d0a5a6f09ace889d9a7582fcdc45f4ed18c5ff44c7",
+    "packages/bundle/web-app/README.i18n.yaml": "648f1a2fa7487155a5ea309faa6a967979683e0f9d93d24c901311aae9d52ce6",
+    "packages/attachment/userdoc-gateway/README.md": "3c897f9195006895433065418423d733ee4c6a96914746524b7e0e3b6fbbf771",
+    "packages/attachment/userdoc-gateway/README.zh.md": "f9f72c97f549e16d541fe4d25f6ff626b1946b135f878e37b0e503e9a86dbd0c",
+    "packages/attachment/userdoc-gateway/README.i18n.yaml": "94553a4755946d628e5c81059746a168f5548440fab25ce58cf167422839703a",
+    ".agents/notes/implemented/architecture/2026-10-15-gateway-local-document-broker.md": "85fa36a5474d111950beb168f39581e17d972cbf4f48c97fd5a6f3310b18eebc",
+    ".agents/notes/implemented/architecture/2026-10-15-gateway-local-document-broker.zh.md": "f38b51cd232b4e5e93a2544ea48e0c573031aae2488c0d750747ce79843618ae",
+    ".agents/notes/implemented/architecture/2026-10-15-gateway-local-document-broker.i18n.yaml": "dfe5f2a66ee1fd22b62352b9d70e0baa65ec04caf51b47a58c0a8cfcde143f6e",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-document-provider/guide.md": "542104c7e902476ec084ca943361e595098121b38c1b063138df240624005c05",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-document-provider/guide.zh.md": "dd6cfa480a28da33890c59e65dbbd807bccf68138f41bcfa292e5a2f15cdd47e",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-document-provider/guide.i18n.yaml": "f11bdb87bbbf11e68b4472b41a85fc3d6331009e059615300dce8d0a7612abff"
+  },
+  "compiledArtifactHashes": {
+    "apps/cli/lib/bin.js": "9e2a6b06cb7854c572ab30a9e6737ba10838d4a4234ebce07f70def4703ada31",
+    "packages/context/gateway-runtime/lib/index.js": "b1a942c1043fa2a74e92d0e73bcac4fac6a10cef35c1848de96afa02c0eb7356",
+    "packages/attachment/userdoc-gateway/lib/index.js": "cd420f1ebdbe1d38fd46d3666cd8090cf17f6aa3c6b4070a357565ee018c5343",
+    "packages/attachment/userdoc-local/lib/index.js": "f6104f7e1e1fb9a9f3ffe905d9348a688919f148a8af5f1ce9734dc234f440d8",
+    "packages/host/userdoc-http/lib/index.js": "1359ebb52ff0a44fa739fd044a1d5b84edf63d3201a43ad77fdf8abb9c445dba"
+  },
+  "productionPayload": [
+    "packages/bundle/web-app/cordis.patch.yml"
+  ],
+  "productionRebuildRequired": false,
+  "repair": "Select the Web document provider from inherited credential-channel markers in the immutable launch snapshot before concurrent plugin activation. Managed launches never activate a local writer while Gateway dependencies are pending. Raw Loader hosts without a snapshot use their process environment; project/user environment-file markers do not change CLI selection.",
+  "causalNegative": {
+    "receipt": "web-document-selection-real-loader-negative.json",
+    "managedFailures": 4,
+    "standaloneControlsPassed": 2,
+    "realLoader": true,
+    "actualWebYaml": true,
+    "providerBodiesAreFixtureStandins": true,
+    "worktreeRollback": false
+  },
+  "verification": {
+    "selectionCases": 6,
+    "adjacentCompositionAndLaunchCases": 11,
+    "sourceCasesPassed": 17,
+    "compiledWebScopePrograms": 2,
+    "compiledExecutionsAcrossNode22And24": 4,
+    "compiledPlainNodeGatewayAndCli": true,
+    "realPostgres": true,
+    "productionLocalDocumentBroker": true,
+    "actualSignedHttpFiles": true,
+    "anonymousReadStatus": 401,
+    "localProviderFiberAbsent": true,
+    "runtimeGenerationAndAdmissionUnchanged": true,
+    "goldenLines": 6,
+    "docQuickGates": 20,
+    "cordisConfigFiles": 416,
+    "paidModelCalls": 0,
+    "physicalSecondComputerThisPhase": false,
+    "checks": {
+      "web-document-source-final": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:55:18.911936+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "packages/bundle/web-app/tests/document-provider.spec.ts",
+          "packages/bundle/web-app/tests/composition.spec.ts",
+          "packages/util/launch-environment/tests/launch-environment.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:55:21.934241+00:00"
+      },
+      "web-document-final-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T16:03:42.321693+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/bundle/web-app/tests/document-provider.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T16:03:44.071957+00:00"
+      },
+      "web-document-host-types-current": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:55:50.923402+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "./node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:56:31.942122+00:00"
+      },
+      "web-document-doc-quick-current": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:57:19.124193+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:57:50.018549+00:00"
+      },
+      "web-document-cordis-config": {
+        "status": "passed",
+        "startedAt": "2026-10-30T15:58:04.641358+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-cordis-config"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T15:58:10.515198+00:00"
+      },
+      "managed-document-web-final-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T16:02:51.297235+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/lib",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib",
+          "documents"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T16:02:56.852070+00:00"
+      },
+      "managed-document-web-final-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T16:02:52.423177+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/lib",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib",
+          "documents"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T16:02:57.331851+00:00"
+      },
+      "web-document-final-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-30T16:03:19.967172+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "--prune"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T16:03:23.653256+00:00"
+      }
+    }
+  },
+  "correctedEvidenceScope": [
+    "The initial additional import-order fixture did not establish Gateway absence. Its explicit witness observed gatewayPresent=true; the fixture and its claimed delayed-import coverage were removed.",
+    "The private old-selection full-Web control passed and is not causal evidence. Controlled causal ordering belongs to the package Loader tests; the final compiled Web replay verifies normal assembled startup and real document access.",
+    "Initial anonymous-read expectation302 was corrected to the existing authenticated API behavior401; authorization was not weakened."
+  ],
+  "documentation": {
+    "pairedStems": 4,
+    "existingDecisionUpdated": true,
+    "fullySupersededActiveNotes": [],
+    "frozenArchivesEdited": false
+  },
+  "limits": [
+    "This is provider selection and normal assembled document access, not full cross-account/computer isolation acceptance.",
+    "Gateway private artifact is the earlier fingerprinted B354 artifact; peer latest connection/topology work is not independently certified by this receipt.",
+    "The separately reproduced one-shot credential pipe remount defect B356 remains in progress and is not included in the peer YAML-only frozen release.",
+    "All12original domains and B04/B25remain in progress. Paid real-model success and public push remain human-deferred. Root performed no live deployment or production database mutation."
+  ]
+}

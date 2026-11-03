@@ -1,0 +1,260 @@
+{
+  "findings": [
+    "B434",
+    "B435"
+  ],
+  "status": "fixed_verified_named_archive_refusal_and_package_build_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T08:23:51.333496+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-origin.json",
+    "fetchCompletedAt": "2026-11-01T08:19:55.276792+00:00"
+  },
+  "problems": {
+    "B434": "A refused archive snapshot retained its unread native HTTP response until provider disposal. Acknowledgement and probe cancellation rejection replaced the actual HTTP status.",
+    "B435": "The package build targeted an inherited compatibility tsconfig without the aggregate project references, compiling dependency source under the package rootDir and failing."
+  },
+  "fixes": {
+    "B434": "Cancel every unused archive refusal body and report its HTTP status without waiting for cancellation acknowledgement or allowing cleanup rejection to replace it.",
+    "B435": "Build the aggregate with tsc -b tsconfig.json and remove the obsolete inherited config."
+  },
+  "verification": {
+    "distinctBusinessCases": 35,
+    "archivePackageCases": 33,
+    "newUnitCases": 4,
+    "typescriptSdkCases": 1,
+    "pythonSdkCases": 1,
+    "readOnlyNativeCancellationCases": 6,
+    "workspaceFixtureCorrectionCases": 2,
+    "versionRepeatsAndSubsetRerunsNotAdded": true,
+    "checks": [
+      {
+        "name": "archive-response-package-coverage",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-package-coverage.json"
+      },
+      {
+        "name": "archive-response-sdk-source",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-sdk-source.json"
+      },
+      {
+        "name": "archive-response-sdk-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-sdk-node22.json"
+      },
+      {
+        "name": "archive-response-sdk-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-sdk-node24.json"
+      },
+      {
+        "name": "archive-response-sdk-python",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-sdk-python.json"
+      },
+      {
+        "name": "archive-response-normal-source-emit",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-normal-source-emit.json"
+      },
+      {
+        "name": "archive-response-normal-bundle",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-normal-bundle.json"
+      },
+      {
+        "name": "archive-response-package-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-package-build.json"
+      },
+      {
+        "name": "archive-response-final-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-final-types.json"
+      },
+      {
+        "name": "archive-response-lint-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-lint-final.json"
+      },
+      {
+        "name": "archive-response-export-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-export-docs.json"
+      },
+      {
+        "name": "archive-response-cordis-config",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-cordis-config.json"
+      },
+      {
+        "name": "archive-response-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-python-lint.json"
+      },
+      {
+        "name": "archive-response-pairing",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-pairing.json"
+      },
+      {
+        "name": "archive-response-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-docs.json"
+      },
+      {
+        "name": "workspace-catalog-fixture-cleanup-source",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/workspace-catalog-fixture-cleanup-source.json"
+      },
+      {
+        "name": "native-gateway-cancel-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/native-gateway-cancel-node22.json"
+      },
+      {
+        "name": "native-gateway-cancel-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/native-gateway-cancel-node24.json"
+      },
+      {
+        "name": "archive-response-origin",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-origin.json"
+      },
+      {
+        "name": "archive-response-final-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-final-repository-references.json"
+      }
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 3,
+          "covered": 3,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 4,
+          "covered": 4,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/archive-gateway/src/response.ts": {
+        "lines": {
+          "total": 3,
+          "covered": 3,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 4,
+          "covered": 4,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "coverageScope": "Archive response.ts is100% in all4 default per-file metrics. Existing archive index.ts remains in the repository baseline; no whole-file or project-wide100% claim and no ignore/threshold changes.",
+    "physicalProof": "A real unfinished native503 response closes while ArchiveGateway stays loaded. Actual GatewayRuntime, WorkspaceRegistry, SQLite, JSONL persistence and the shipped SDK profile then synchronize a real durable archive. Only external Gateway and model inputs are controlled.",
+    "counterfactual": "Complete18-file original archive provider remains unchanged. Four current unit cases fail intended closure/status assertions; both original source and Node22 built SDK return ARCHIVE_RESPONSE_CLEANUP_FAILED without module failure or test timeout. Intermediate overlay registration and package dependency lookup failures are retained but excluded from proof.",
+    "packageBuildProof": "Original inherited build config lacks the aggregate project references and fails with TS6059/TS6307 under noEmit. Current npm --prefix packages/context/archive-gateway run build succeeds with tsc -b tsconfig.json; normal source emission, bundle and built SDK faces pass.",
+    "buildCommandCorrection": "An initial incorrect build invocation emitted2100 untracked source-tree compiler outputs. All were privately backed up;2072 newly generated outputs were removed,28 previously inventoried generated outputs were retained,0 tracked sources changed, and no newly derived files remain after cleanup. The failed receipts are retained. Subsequent accepted evidence uses the aggregate and normal bundle.",
+    "originalTestPreservation": {
+      "status": "passed",
+      "unchangedOriginalTestFiles": 3,
+      "newTestCases": 4,
+      "originalProviderFileCount": 18
+    },
+    "fixtureSyntax": {
+      "status": "passed",
+      "checkedAt": "2026-11-01T08:18Z",
+      "command": "NODE_DISABLE_COMPILE_CACHE=1 node --check <each fixture>",
+      "paths": [
+        "examples/headless-agent/tests/fixtures/archive-response-cleanup/model.mjs",
+        "examples/headless-agent/tests/fixtures/archive-response-cleanup/prepare.mjs",
+        "examples/headless-agent/tests/fixtures/workspace-catalog-remount/model.mjs"
+      ],
+      "evidence": "All three Node syntax subprocesses completed with exit0 in the direct private Python verification; actual source/built SDK checks exercise both new fixtures."
+    },
+    "fixtureCleanupCorrection": "The B433 loopback fixture supplies its required no-op onCleanup callback. Both source scenarios pass after that one-line correction; no B433 production code or frozen snapshot is modified.",
+    "docsQuick": "20 passed,0 failed",
+    "bilingualPairs": 2,
+    "cordisConfigs": 439,
+    "productionAcceptanceClaimed": false,
+    "officialResponsesDeferred": true
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/archive-response-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-gateway-response-cancellation.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-gateway-response-cancellation.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-gateway-response-cancellation.zh.md",
+    "apps/cli/tests/profiles/sdk/archive-response-cleanup.expected.e2e.ts",
+    "examples/headless-agent/tests/fixtures/archive-response-cleanup/expected.json",
+    "examples/headless-agent/tests/fixtures/archive-response-cleanup/model.mjs",
+    "examples/headless-agent/tests/fixtures/archive-response-cleanup/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/archive-response-cleanup/runtime.cordis.yml",
+    "examples/headless-agent/tests/fixtures/workspace-catalog-remount/model.mjs",
+    "packages/context/archive-gateway/README.i18n.yaml",
+    "packages/context/archive-gateway/README.md",
+    "packages/context/archive-gateway/README.zh.md",
+    "packages/context/archive-gateway/package.json",
+    "packages/context/archive-gateway/src/index.ts",
+    "packages/context/archive-gateway/src/response.ts",
+    "packages/context/archive-gateway/tests/response-cleanup.spec.ts",
+    "python/sdk/tests/test_archive_response_cleanup_expected.py"
+  ],
+  "removedPaths": [
+    "packages/context/archive-gateway/tsconfig.build.json"
+  ],
+  "readOnlyPrerequisiteCount": 59,
+  "artifactReferences": 15,
+  "noteReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T080524Z/note-supersession.json",
+  "remaining": [
+    "All12 domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue remaining resource admission, cold model/tool/Inspector authorization, foreground subagent/workflow cleanup recovery and account/computer ownership outside peer-reserved files.",
+    "Foreground failed cleanup retains parent occupation; confirm an exact-owner reachable retry before designing recovery. Do not remove busy protection or claim an additional unverified defect.",
+    "Six native HTTP cancellation cases on Node22/24 rule out a blanket fix for direct native Gateway cancel callers. Other transports, Host ApiProxy handler and remaining document/runtime paths retain independent ownership review; peer owns fetch/client.ts.",
+    "Trusted peer reports R25/schema103/epoch50 on both computers, excluding B416+ capsules. REAL-042/high latency and full cross-computer/production acceptance remain open; peer also owns the Admin model-view draft fix and its two compiler registrations.",
+    "Official paid Responses remains deferred. No root production deployment/restart/dependency synchronization/reset/stash/commit/push."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true
+}

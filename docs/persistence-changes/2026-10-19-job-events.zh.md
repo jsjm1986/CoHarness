@@ -44,7 +44,7 @@ changes:
 <a id="verification"></a>
 ## 验证
 
-pnpm exec vitest run packages/test-support/session-snapshot/tests/suite.spec.ts：回放的 Session 中已登记与已结算的 job 记录保持字节稳定。
+`pnpm exec vitest run packages/workflow/tool-workflow/tests/failure-loader.spec.ts` 运行真实注册表、Bash 进程、PTC 工作流与 JSONL 写入方，并比较持久化生命周期记录和实时会话。
 
 <a id="dev-note"></a>
 ## 开发备注

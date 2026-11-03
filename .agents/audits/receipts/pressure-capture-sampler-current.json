@@ -1,0 +1,14 @@
+{
+  "name": "pressure-capture-sampler-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/node-resource-pressure.spec.ts",
+  "startedAt": "2026-10-23T22:43:49.579179+00:00",
+  "seconds": 2.034,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "48dc3784fb25d77d1d01346f05fba71eeb2b23f492abb4f7d725d2f0945d328a",
+  "inputsAfter": "48dc3784fb25d77d1d01346f05fba71eeb2b23f492abb4f7d725d2f0945d328a",
+  "postgresToolDirectory": null,
+  "outputSha256": "c894ed79bf18a0921b38f19921d2b731caf9f250fbd42f007ba0b6468406d28b",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  6 passed (6)\n   Start at  06:43:51\n   Duration  285ms (transform 40ms, setup 0ms, import 61ms, tests 92ms, environment 0ms)\n\n"
+}

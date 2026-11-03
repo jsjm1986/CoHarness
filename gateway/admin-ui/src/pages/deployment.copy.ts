@@ -1,6 +1,7 @@
 /** Deployment control copy: maintenance windows, node convergence, backups, restores, and the operation ledger. */
 
 export const zh = {
+  runtimeLimits: '组织 Runtime 配额',
   operationFailed: '无法完成部署操作',
   pageTitle: '部署与迁移',
   pageDescription: '维护窗口协调全部写者收敛后再执行迁移或恢复；恢复完成会推进写纪元，使恢复前启动的进程自动停止写入。',
@@ -22,8 +23,8 @@ export const zh = {
   noticeEnteredMaintenance: '已进入维护窗口',
   exitMaintenance: '退出维护窗口',
   restoringHint: '恢复尚未完成，写入保持关闭。检查下方操作台账；失败时先处理原因，再由独立应用器重试。',
-  nodesTitle: '计算节点',
-  nodesMeta: '写者收敛要求实例已停止，且活跃节点心跳新鲜、已确认维护纪元、在途写者归零。请先处理运行会话、终端和任务，再停止实例。',
+  nodesTitle: '节点维护状态',
+  nodesMeta: '维护要求实例已停止，且活跃节点心跳新鲜、已确认维护纪元、在途写者归零；电脑连接状态见上方接入列表。请先处理运行会话、终端和任务，再停止实例。',
   nodesEmpty: '没有登记节点',
   nodesTableAria: '计算节点，可横向滚动',
   columnName: '名称',
@@ -112,6 +113,7 @@ export const zh = {
 export type DeploymentCopyKey = keyof typeof zh
 
 export const en = {
+  runtimeLimits: 'Organization Runtime limits',
   operationFailed: 'The deployment operation could not be completed',
   pageTitle: 'Deployment and migration',
   pageDescription: 'The maintenance window quiesces every writer before migrations or restores run; a completed restore advances the write epoch so processes started before it stop writing.',
@@ -133,8 +135,8 @@ export const en = {
   noticeEnteredMaintenance: 'Entered the maintenance window',
   exitMaintenance: 'Exit maintenance window',
   restoringHint: 'The restore is not complete; writes stay closed. Check the operation ledger below; on failure, resolve the cause and retry with the standalone applier.',
-  nodesTitle: 'Compute nodes',
-  nodesMeta: 'Writer quiescence requires instances to be stopped, active node heartbeats fresh, the maintenance epoch acknowledged, and in-flight writers at zero. Handle running sessions, terminals, and tasks before stopping instances.',
+  nodesTitle: 'Node maintenance',
+  nodesMeta: 'Writer quiescence requires stopped instances, fresh active-node heartbeats, acknowledged maintenance epochs, and no in-flight writers. Computer connections are listed above. Handle running sessions, terminals, and tasks before stopping instances.',
   nodesEmpty: 'No nodes registered',
   nodesTableAria: 'Compute nodes, horizontally scrollable',
   columnName: 'Name',

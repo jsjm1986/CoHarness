@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-19-model-facing-goal-tools.md
 document:
-  en: ac02c8d957a8ac01310fe08077c3d42ef8c477d0
-  zh: 1654ef0a6b98ae2040e9d4bbbe4e13c1e42b183f
+  en: 06e4e3f7fab19b3bf9ebd8c6b2c1e079d652e3be
+  zh: dc03f6ff180a6722d8cba0325654a1037f44a1c4
 /agent-note-model-facing-same-session-goal-tools:
   en: 4d9b039620654dd6
   zh: e8703b6a1723f910
@@ -21,8 +21,8 @@ document:
   en: 63a9e7e85303b9f1
   zh: d3f1d0c225103cfe
 /agent-note-model-facing-same-session-goal-tools/decision/blocking-threshold:
-  en: 398de9518db40d11
-  zh: b7f36c4061ca7e78
+  en: c57b5721546aa1e4
+  zh: 4596e8a272721887
 /agent-note-model-facing-same-session-goal-tools/testing:
   en: 92650dd6648ca455
   zh: 5b57276a6a983fea

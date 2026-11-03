@@ -25,6 +25,8 @@ import AgentPresetRegistry, { PresetNotWritableError } from '@deepseek-ai/dsh-ag
 import type { Config, PresetDefinition } from '@deepseek-ai/dsh-agent-preset-registry'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import { livePresetMounts } from '../src/mount.ts'
+import { bindScopeParent, scopeOf } from '@deepseek-ai/dsh-scope'
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 const CONTRIBUTE = pathToFileURL(join(FIXTURES, 'plugins', 'contribute.js')).href
@@ -44,7 +46,7 @@ afterEach(async () => {
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
 })
 
-async function harness(): Promise<Context> {
+async function harness(includeFilePreset = false): Promise<Context> {
   const ctx = new Context()
   ctx.baseUrl = pathToFileURL(FIXTURES).href + '/'
   await ctx.plugin(Loader)
@@ -62,7 +64,8 @@ async function harness(): Promise<Context> {
   roots.push(root)
   await ctx.plugin(AgentPresetRegistry, {
     default: 'declared',
-    roots: [{ path: join(root, 'none'), trust: 'user' }],
+    roots: [{ path: join(root, 'none'), trust: 'user' },
+      ...includeFilePreset ? [{ path: join(FIXTURES, 'system'), trust: 'system' as const }] : []],
     includeUserRoot: false,
   } satisfies Config)
   contexts.push(ctx)
@@ -156,5 +159,101 @@ describe('a plugin-declared preset', () => {
     expect(lease.key).toMatchObject({ agentPreset: 'declared' })
     await lease.dispose()
     await lease.dispose()
+  })
+
+  it('releases a retired generation after its last mounted agent leaves', async () => {
+    const ctx = await harness()
+    const unregister = await ctx.agentPresets.register(DECLARED)
+    const key = await ctx.agentPresets.standingKeyFor('declared')
+    const mount = livePresetMounts(ctx.root.fiber).find(mount => mount.key === key)!
+    const handle = await ctx.agents.create({ sessionId: SessionId('retired-generation-last-agent'),
+      setup: async (scope) => { await ctx.agentPresets.mount(scope, 'declared') } })
+    await unregister()
+    expect(mount.fiber.uid).not.toBeNull()
+    expect(toolNames(ctx, handle.agent)).toContain('declaredTool')
+    await handle.dispose()
+    expect(mount.fiber.uid).toBeNull()
+  })
+
+  it('keeps another read lease alive when a lease is released twice', async () => {
+    const ctx = await harness()
+    const unregister = await ctx.agentPresets.register(DECLARED)
+    const first = await ctx.agentPresets.acquireScope('declared')
+    const second = await ctx.agentPresets.acquireScope('declared')
+    const mount = livePresetMounts(ctx.root.fiber).find(mount => mount.key === first.key)!
+    await first.dispose()
+    await first.dispose()
+    await unregister()
+    expect(mount.fiber.uid).not.toBeNull()
+    await second.dispose()
+    expect(mount.fiber.uid).toBeNull()
+  })
+
+  it('releases the current generation after repeated recomposition and a switch', async () => {
+    const ctx = await harness()
+    const unregisterFirst = await ctx.agentPresets.register(DECLARED)
+    const unregisterSecond = await ctx.agentPresets.register({ ...DECLARED, id: 'other',
+      plugins: [{ id: 'other', name: CONTRIBUTE, config: { tool: 'otherTool' } }] })
+    const firstKey = await ctx.agentPresets.standingKeyFor('declared')
+    const secondKey = await ctx.agentPresets.standingKeyFor('other')
+    const first = livePresetMounts(ctx.root.fiber).find(mount => mount.key === firstKey)!
+    const second = livePresetMounts(ctx.root.fiber).find(mount => mount.key === secondKey)!
+    const handle = await ctx.agents.create({ sessionId: SessionId('recomposed-generation-last-agent'),
+      setup: async (scope) => { await ctx.agentPresets.mount(scope, 'declared') } })
+    await ctx.agentPresets.recompose(handle.agent.ctx, 'declared')
+    await ctx.agentPresets.recompose(handle.agent.ctx, 'other')
+    await unregisterFirst()
+    expect(first.fiber.uid).toBeNull()
+    await unregisterSecond()
+    expect(second.fiber.uid).not.toBeNull()
+    expect(toolNames(ctx, handle.agent)).toContain('otherTool')
+    await handle.dispose()
+    expect(second.fiber.uid).toBeNull()
+  })
+
+  it.each([false, true])('releases the declared generation after switching from a file preset, initially declared=%s', async (initiallyDeclared) => {
+    const ctx = await harness(true)
+    const unregister = await ctx.agentPresets.register(DECLARED)
+    const key = await ctx.agentPresets.standingKeyFor('declared')
+    const mount = livePresetMounts(ctx.root.fiber).find(mount => mount.key === key)!
+    const handle = await ctx.agents.create({ sessionId: SessionId('file-declared-switch'),
+      setup: async (scope) => { await ctx.agentPresets.mount(scope, initiallyDeclared ? 'declared' : 'minimal') } })
+    if (initiallyDeclared) await ctx.agentPresets.recompose(handle.agent.ctx, 'minimal')
+    await ctx.agentPresets.recompose(handle.agent.ctx, 'declared')
+    await unregister()
+    expect(mount.fiber.uid).not.toBeNull()
+    expect(toolNames(ctx, handle.agent)).toContain('declaredTool')
+    await handle.dispose()
+    expect(mount.fiber.uid).toBeNull()
+  })
+
+  it('keeps a retired generation until an inheriting child also leaves', async () => {
+    const ctx = await harness()
+    const unregister = await ctx.agentPresets.register(DECLARED)
+    const key = await ctx.agentPresets.standingKeyFor('declared')
+    const mount = livePresetMounts(ctx.root.fiber).find(mount => mount.key === key)!
+    const parent = await ctx.agents.create({ sessionId: SessionId('declared-inherited-parent'),
+      setup: async (scope) => { await ctx.agentPresets.mount(scope, 'declared') } })
+    const child = await ctx.agents.create({ sessionId: SessionId('declared-inherited-child'),
+      setup: (scope) => { ctx.agentPresets.composeFrom(scope, parent.agent.ctx) } })
+    await unregister()
+    await parent.dispose()
+    expect(mount.fiber.uid).not.toBeNull()
+    expect(toolNames(ctx, child.agent)).toContain('declaredTool')
+    await child.dispose()
+    expect(mount.fiber.uid).toBeNull()
+  })
+
+  it('releases a mount reservation when the agent scope cannot be joined', async () => {
+    const ctx = await harness()
+    const unregister = await ctx.agentPresets.register(DECLARED)
+    const key = await ctx.agentPresets.standingKeyFor('declared')
+    const mount = livePresetMounts(ctx.root.fiber).find(mount => mount.key === key)!
+    await expect(ctx.agents.create({ sessionId: SessionId('declared-refused-binding'), setup: async (scope) => {
+      bindScopeParent(scopeOf(scope)!, {})
+      await ctx.agentPresets.mount(scope, 'declared')
+    } })).rejects.toThrow('already bound')
+    await unregister()
+    expect(mount.fiber.uid).toBeNull()
   })
 })

@@ -1,0 +1,14 @@
+{
+  "name": "preset-lease-package-measured",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/preset/agent-preset-registry/tests --config .agents/audits/.local/preset-lease-coverage.config.mts --coverage",
+  "startedAt": "2026-10-25T14:21:39.878756+00:00",
+  "seconds": 22.412,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bb682403b9f5b7b60ed3fc7f315bde7b84477f1ef6c80cfb7cedf39aeb5e3cb3",
+  "inputsAfter": "bb682403b9f5b7b60ed3fc7f315bde7b84477f1ef6c80cfb7cedf39aeb5e3cb3",
+  "postgresToolDirectory": null,
+  "outputSha256": "81cb92a5519e7c3046fa75dd5723f121c053c548f6b4857f504205605a73a01e",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  12 passed (12)\n      Tests  196 passed (196)\n   Start at  22:21:54\n   Duration  7.90s (transform 20.69s, setup 1.98s, import 28.60s, tests 7.79s, environment 1ms)\n\n % Coverage report from v8\n----------|---------|----------|---------|---------|----------------------------\nFile      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s          \n----------|---------|----------|---------|---------|----------------------------\nAll files |   93.31 |    83.92 |   94.36 |   94.76 |                            \n index.ts |   93.31 |    83.92 |   94.36 |   94.76 | ...072-1073,1092-1093,1145 \n----------|---------|----------|---------|---------|----------------------------\n\n=============================== Coverage summary ===============================\nStatements   : 93.31% ( 377/404 )\nBranches     : 83.92% ( 188/224 )\nFunctions    : 94.36% ( 67/71 )\nLines        : 94.76% ( 344/363 )\n================================================================================\n"
+}

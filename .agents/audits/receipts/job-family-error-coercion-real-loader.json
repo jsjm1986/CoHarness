@@ -1,0 +1,14 @@
+{
+  "name": "job-family-error-coercion-real-loader",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/jobs/jobs-local/tests/failure-settlement.spec.ts packages/workflow/tool-workflow/tests/failure-loader.spec.ts",
+  "startedAt": "2026-10-26T07:20:05.458492+00:00",
+  "seconds": 5.544,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "165496a84d2bf497bdfe90cd0626abdd617575634c02b5047b1868a01108ccfb",
+  "inputsAfter": "165496a84d2bf497bdfe90cd0626abdd617575634c02b5047b1868a01108ccfb",
+  "postgresToolDirectory": null,
+  "outputSha256": "7a3b0c09342a9cc4ac4ed72c3bdfd5a6a9c5a72eb546b4a90aaec783e3fafd51",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/workflow/tool-workflow/tests/failure-loader.spec.ts (1 test | 1 failed) 957ms\n   × contains unrenderable background failures through the Loader and native workflow process 955ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/workflow/tool-workflow/tests/failure-loader.spec.ts > contains unrenderable background failures through the Loader and native workflow process\nError: Command failed: /Users/a1234/.nvm/versions/node/v25.8.1/bin/node --import file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/esm/index.mjs /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/workflow/tool-workflow/tests/fixtures/failure-driver.mjs src\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\ntrue !== false\n\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/workflow/tool-workflow/tests/fixtures/failure-driver.mjs:82:10) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: true,\n  expected: false,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v25.8.1\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 1 passed (2)\n      Tests  1 failed | 3 passed (4)\n   Start at  15:20:09\n   Duration  1.11s (transform 180ms, setup 68ms, import 159ms, tests 965ms, environment 0ms)\n\n"
+}

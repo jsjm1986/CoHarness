@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/ui-cordis/README.md
 document:
-  en: f60aec99e7d3312c585ac274de4af7a6ecc28dc9
-  zh: 0d48da214988c35cf1298a1daf9d0acf69dd5644
+  en: c2366664c97757798feace0b8c4041caccd7531f
+  zh: 8968384985b90e909ac8bc53ea3b7821da8caef6
 /:
   en: c7dd9af70877ba4e
   zh: 61495d48365178df
@@ -18,8 +18,8 @@ document:
   en: 164de71fe671767e
   zh: 93f064ee2db450b2
 /deepseek-ai-dsh-client-ui-cordis/presentation-and-ownership:
-  en: f9aa501c21fb4338
-  zh: 5a5e5ac4ad844d5e
+  en: c73893341d1109f8
+  zh: 01f10cd262aed375
 /deepseek-ai-dsh-client-ui-cordis/model-experience:
   en: dd230a84ce5fe6c8
   zh: d3012ba6248bd80f

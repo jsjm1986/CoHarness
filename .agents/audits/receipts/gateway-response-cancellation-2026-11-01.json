@@ -1,0 +1,300 @@
+{
+  "findings": [
+    "B428"
+  ],
+  "status": "fixed_verified_named_response_cancellation_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T05:25:09.934552+00:00",
+  "baseline": {
+    "remote": "origin/master",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-origin-final.json",
+    "fetchedAt": "2026-11-01T05:22:00.669253+00:00",
+    "dirtyWorkspacePreserved": true
+  },
+  "problem": "Awaiting response-body cancellation acknowledgement delayed size and cancellation errors until independent stream cleanup completed. A pre-aborted read left its supplied body uncancelled.",
+  "fix": "Request cancellation without awaiting acknowledgement, observe cleanup rejection independently, preserve the primary read failure and release the reader lock. Physical transport/execution cleanup remains its owner responsibility.",
+  "verification": {
+    "distinctRelatedCases": 462,
+    "runtimePackageCases": 123,
+    "affectedConsumerCases": 291,
+    "httpPostgresCases": 40,
+    "typescriptSdkScenarios": 4,
+    "pythonSdkScenarios": 4,
+    "newUnitCases": 7,
+    "newSdkScenarioPerLanguage": 1,
+    "repeatVersionRunsNotAddedToDistinctCount": true,
+    "passedChecks": [
+      {
+        "name": "response-source-types",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-source-types.json"
+      },
+      {
+        "name": "response-bundle",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-bundle.json"
+      },
+      {
+        "name": "response-package-related-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-package-related-final.json"
+      },
+      {
+        "name": "response-consumer-related",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-consumer-related.json"
+      },
+      {
+        "name": "response-pg-related",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-pg-related.json"
+      },
+      {
+        "name": "response-pg-related-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-pg-related-node22.json"
+      },
+      {
+        "name": "response-sdk-source-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-sdk-source-final.json"
+      },
+      {
+        "name": "response-sdk-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-sdk-node22.json"
+      },
+      {
+        "name": "response-sdk-node24",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-sdk-node24.json"
+      },
+      {
+        "name": "response-sdk-python",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-sdk-python.json"
+      },
+      {
+        "name": "response-host-types-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-host-types-final.json"
+      },
+      {
+        "name": "response-gateway-types",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-gateway-types.json"
+      },
+      {
+        "name": "response-owned-test-lint",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-owned-test-lint.json"
+      },
+      {
+        "name": "response-python-lint",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-python-lint.json"
+      },
+      {
+        "name": "response-export-docs",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-export-docs.json"
+      },
+      {
+        "name": "response-generate-catalog",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-generate-catalog.json"
+      },
+      {
+        "name": "response-pairing",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-pairing.json"
+      },
+      {
+        "name": "response-docs",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-docs.json"
+      },
+      {
+        "name": "response-helper-coverage",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-helper-coverage.json"
+      },
+      {
+        "name": "response-origin-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-origin-final.json"
+      },
+      {
+        "name": "response-references-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-references-final.json"
+      },
+      {
+        "name": "readiness-source-types",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/readiness-source-types.json"
+      },
+      {
+        "name": "readiness-bundle",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/readiness-bundle.json"
+      },
+      {
+        "name": "readiness-whole-file-lint",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/readiness-whole-file-lint.json"
+      },
+      {
+        "name": "readiness-sdk-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/readiness-sdk-node22.json"
+      }
+    ],
+    "negativeChecks": [
+      {
+        "name": "response-cancellation-negative",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-cancellation-negative.json"
+      },
+      {
+        "name": "response-sdk-old-source-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-sdk-old-source-final.json"
+      },
+      {
+        "name": "response-sdk-old-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-sdk-old-node22.json"
+      }
+    ],
+    "counterfactual": "Original fails4 controlled response-cancellation cases. Complete original38-file package in source and normal Node22 built SDK each fails only the new real HTTP scenario; all3 prior scenarios pass.",
+    "scopeLimit": "The reader accepts existing responses with cancellation separate from the transport signal. Default GatewayRuntime.request forwards its signal to native fetch; this evidence does not claim every default network request ignores its deadline.",
+    "physicalEvidence": "Actual SDK/CLI composition holds a real HTTP response and an independent cloned branch, rejects the oversized read before cleanup acknowledgement, then aborts/joins the owned transport and server response.",
+    "preservation": {
+      "prior27RuntimeTestBodiesUnchanged": true,
+      "priorThreeSdkGoldensUnchanged": true,
+      "additionalUnitCases": 7,
+      "newSdkScenarioPerLanguage": 1,
+      "completeFrozenOriginalFiles": 38
+    },
+    "coverage": {
+      "totals": {
+        "lines": {
+          "total": 261,
+          "covered": 214,
+          "skipped": 0,
+          "pct": 81.99
+        },
+        "statements": {
+          "total": 291,
+          "covered": 235,
+          "skipped": 0,
+          "pct": 80.75
+        },
+        "functions": {
+          "total": 50,
+          "covered": 40,
+          "skipped": 0,
+          "pct": 80
+        },
+        "branches": {
+          "total": 299,
+          "covered": 232,
+          "skipped": 0,
+          "pct": 77.59
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "readerFunctions": [
+        {
+          "name": "cancelResponseRead",
+          "count": 10,
+          "location": {
+            "start": {
+              "line": 152,
+              "column": 71
+            },
+            "end": {
+              "line": 156,
+              "column": null
+            }
+          }
+        },
+        {
+          "name": "readResponseChunk",
+          "count": 14,
+          "location": {
+            "start": {
+              "line": 162,
+              "column": 49
+            },
+            "end": {
+              "line": 190,
+              "column": null
+            }
+          }
+        },
+        {
+          "name": "readGatewayResponseBytes",
+          "count": 13,
+          "location": {
+            "start": {
+              "line": 206,
+              "column": 23
+            },
+            "end": {
+              "line": 245,
+              "column": null
+            }
+          }
+        },
+        {
+          "name": "readGatewayResponseJson",
+          "count": 2,
+          "location": {
+            "start": {
+              "line": 258,
+              "column": 20
+            },
+            "end": {
+              "line": 262,
+              "column": null
+            }
+          }
+        }
+      ],
+      "scope": "Additional nongating standalone Gateway configuration over the owning34 tests. Repository coverage policy, thresholds and recorded index.ts debt remain unchanged. This is not CI coverage or whole-file completion."
+    },
+    "lint": {
+      "wholeChangedFiles": "passed_after_peer_owned_readiness_correction",
+      "preexistingReadinessErrorsRemaining": 0,
+      "convergenceEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/b428-readiness-convergence.json"
+    },
+    "documentation": {
+      "quickPassed": 20,
+      "quickFailed": 0,
+      "ownedBilingualPairs": 2,
+      "catalog": "127 computed,0 written"
+    },
+    "testCorrections": "Promise marker types, rejection callback annotation and indentation corrected; runtime/golden behavior unchanged."
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T050250Z/response-cancellation-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-gateway-response-cancellation.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-gateway-response-cancellation.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-gateway-response-cancellation.zh.md",
+    "apps/cli/tests/profiles/sdk/resource-retirement.expected.e2e.ts",
+    "examples/headless-agent/tests/fixtures/resource-retirement/expected.json",
+    "examples/headless-agent/tests/fixtures/resource-retirement/model.mjs",
+    "packages/context/gateway-runtime/README.i18n.yaml",
+    "packages/context/gateway-runtime/README.md",
+    "packages/context/gateway-runtime/README.zh.md",
+    "packages/context/gateway-runtime/src/index.ts",
+    "packages/context/gateway-runtime/tests/gateway-runtime.spec.ts",
+    "python/sdk/tests/test_resource_retirement_expected.py"
+  ],
+  "readOnlyPrerequisiteCount": 68,
+  "artifactReferences": 7,
+  "mergeRequirement": "Apply the12 sourceDeltaPaths with matching normal Gateway Runtime builds. For shared src/index.ts, apply only owned-response-helper.patch and preserve peer-owned readiness/startup changes; do not overwrite that file from the snapshot. Prerequisites and7 normal artifacts are read-only references. Depends on B427 and its earlier integration requirements. No production deployment or independent B417 reader acceptance implied.",
+  "notes": {
+    "classification": "retain active substantive failure/cancellation ownership rationale",
+    "newNote": ".agents/notes/implemented/bug-fix/2026-11-01-gateway-response-cancellation.md",
+    "reviewedRelatedNotes": [
+      ".agents/notes/implemented/bug-fix/2026-11-01-uncertain-resource-cancellation.md",
+      ".agents/notes/implemented/bug-fix/2026-11-01-resource-registration-retirement.md"
+    ],
+    "decision": "Both existing notes remain active: execution cancellation and unsubmitted accounting retirement are independently useful. Response-read error does not prove physical transport or execution quiescence. No existing exact response-reader decision found, no full supersession, no archive changed.",
+    "compatibility": "No wire, configuration, public type fields, Session format/event or schema change. Clarify existing bounded response cancellation semantics; no upgrade migration required.",
+    "productionRiskScope": "The exported reader accepts a response independent of its caller signal. Default GatewayRuntime.request forwards the same signal to native fetch; this finding does not claim every default network request ignores its deadline. Counterfactual SDK proves independent response branches and physical HTTP closure."
+  },
+  "remaining": [
+    "Integrate the12 owned source deltas with matching normal Runtime builds; shared index.ts uses the owned helper patch rather than snapshot overwrite. B416-B427 and B417 reader acceptance remain independent.",
+    "Shared readiness whole-file lint now passes after peer-owned mechanical corrections; matching release integration remains independent.",
+    "Continue response-stream failures, remaining resource response validation, origin/queue limits and cleanup deadlines. The entry file remains recorded coverage debt; no whole-provider or CI completion claim.",
+    "Continue account/computer permissions, document races, model/tool/workflow and Inspector logic outside peer-owned files. All12 domains and B04/B25 remain open.",
+    "No root production deployment, restart or dependency synchronization; official paid Responses verification remains deferred by the user."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true
+}

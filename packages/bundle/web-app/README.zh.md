@@ -9,6 +9,8 @@ kind: "package-bundle"
 
 dsh 浏览器表层组合包。[`cordis.patch.yml`](cordis.patch.yml) 叠加在 [`dsh-base`](../base/README.zh.md) 之上：设置 coding persona，插入 Web 宿主行（webserver、API 网关、workspace、投影缓存、存储）、浏览器插件名录与客户端插件清单实时传输（[`dsh-client-hmr`](../../client/hmr/README.zh.md)，仅在重建 watcher 旁设置 `DSH_CLIENT_HMR=1` 时启用产物轮询），并挂载本包的 `web-runtime` 粘合插件（配置为 `{openBrowser, printUrl, surfaceContext, publicUrl}`）。该插件通过 `@deepseek-ai/dsh-web-frontend` 的 exports 解析已构建的前端 dist，持有对外公告的应用 URL，并在非 loopback bind 以明文 HTTP 服务时告警，挂载 [`frontend-static`](../../host/frontend-static/README.zh.md) 回退席位所有者，并在 `surfaceContext` 为 true 时注册 bash 可见的 `DSH_WEB_URL` 运行时变量。自身 Loader 配置树结算后，它在 `printUrl` 为 true 时打印 `dsh web:` URL 行；`openBrowser` 为 true 且继承的 `SSH_CONNECTION` 与 `SSH_TTY` 均为空或不存在时，才会用默认浏览器打开规范应用 URL（配置了 `publicUrl` 时为公告根，否则为监听器的 bind 地址 URL）。SSH 启动仍保留 URL 行，但会跳过浏览器交接，因为本地转发地址由 SSH 客户端或编辑器持有——`--public-url` 仍会改变打印的根，而在远端宿主机上打开浏览器无法到达你的屏幕。交接前，运行时会打印英文提示 `dsh web: opening the default browser; pass --no-open to disable`。短生命周期 Node helper 使用规范的脱敏子进程环境运行受维护的平台 opener。在 Windows 上，helper 会保持存活，直至短生命周期的 PowerShell launcher 退出，因为 `open` 会在 launcher 把 URL 交给 shell 之前、仅在 spawn 时返回；其他平台则在 opener 接受 spawn 后结束。helper 失败时会向 stderr 写入包含原因和手动访问 URL 的诊断，不会停止服务器，且任何路径都不会等待浏览器退出。本组合包还持有应用命令行：普通 `web-startup` 提供方（[`src/startup.ts`](src/startup.ts)）注入 `ctx.cmdlineArgs`（[`dsh-cmdline`](../../boot/cmdline/README.zh.md)），解析 `--host`、`--port`、`--public-url`、可重复的 `--trusted-host`、`--no-open` 以及应用自己的 `--help`，再提供 `webStartup`；本机启动默认会打开浏览器，`--no-open` 则只对本次调用关闭该行为。它会在发布该服务前拒绝通配 `--host`——包括 Linux 读取为 IPv4 any 的 IPv4-mapped 形式——因为绑定所有接口会把远程代码执行暴露给网络；应绑定本机接口的一个具体 IPv4 或 IPv6 地址。由 flag 配置的行会注入该服务，并在惰性配置中直接读取它，因此参数解析完成前不会有任何东西绑定端口，`dsh --profile web --help` 也不会启动服务器。[`dsh-headless`](../headless/README.zh.md) 是同一 base 之上的同级表层，不挂载本组合包。
 
+Web 组合根据启动时捕获的继承 Gateway 凭据通道选择文档存储。托管启动等待 Gateway 提供方，依赖加载期间不会打开本地提供方；独立启动使用本地存储。项目和用户环境文件不能改变此选择。未提供启动快照的原始 Loader 宿主使用其进程环境。
+
 ## 概述
 
 运行 `dsh --profile web`，打开提供聊天、模型与设置管理以及会话历史的浏览器 GUI。它使用与其他 dsh 表层相同的模型访问、工具与安全默认值。启动时会打印带认证信息的 URL，通常还会打开默认浏览器；SSH 会话和 `--no-open` 需要你手动打开。更改端口、允许额外 authority、绑定一个具体的本机 IP，并用自己提供的证书直接提供 HTTPS；通配地址会被拒绝。跨机访问使用剥离前缀代理后公告的 HTTP(S) URL、监听器 TLS，或非 loopback bind 上的明文 HTTP。一次性的命令行任务应使用 `dsh-headless`。
@@ -71,6 +73,7 @@ Web 使用共享的有界 normal 默认值，在首次请求后最多再重试�
 - **TLS 需自行启用且不代管**：只有传入 `--tls-cert` 与 `--tls-key`（完整证书链与不带口令的密钥）时监听器才提供 HTTPS；DSH 从不获取、续期或监视证书，更换文件需要重新加载监听器或重启进程。浏览器必须信任该证书，其名称必须覆盖你所访问的 authority，且证书与 `--public-url` 相互独立。
 - **未启用 TLS 时外部链路是明文 HTTP**：请用终止 TLS 的代理保护它，不要在不受信任的网络上发送启动 URL。
 - **只观测交接启动**：平台 opener 接受 spawn 后即结束观察，但 Windows 会等待其短生命周期 PowerShell launcher 退出；之后的浏览器退出不会上报，已打印 URL 仍是手动访问的回退路径。
+- **交接助手跟随连接所有者**：卸载该所有者时，会取消短生命周期 Node 助手并等待其原生关闭，助手报错后也如此。创建失败时没有可发送信号的子进程 PID。主动取消不打印浏览器失败警告。操作系统交接完成后，浏览器生命周期仍然独立。
 - **SSH 转发持有浏览器 URL**：没有公告根时，打印的 URL 指向远端宿主机的 bind 地址端点（loopback bind 时为 loopback）；自动交接会被跳过，SSH 客户端或编辑器必须暴露并打开其本地转发地址。
 - **不支持绑定所有网络接口**：通配 `--host`（包括 Linux 读取为 IPv4 any 的 IPv4-mapped 形式）在启动时因安全原因被拒绝；应绑定本机接口的一个具体 IPv4 或 IPv6 地址。
 - **浏览器命令覆盖只能来自启动环境**：被发现的 `.env` 不得设置 `BROWSER`；只有继承值可以抵达会读取该变量的 opener 路径，避免 checkout 为自动交接选择可执行文件。

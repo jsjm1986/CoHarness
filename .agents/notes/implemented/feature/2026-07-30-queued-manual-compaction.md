@@ -20,6 +20,8 @@ This note extends the [compaction capability seam](../../archived/feature/2026-0
 
 `@deepseek-ai/dsh-command-compact` registers one argument-free human command through `ctx.commands`. It calls the third abstract `CompactionEngine` operation, `compactNow(agent, signal)`, and maps the closed `ManualCompactionError` taxonomy (`busy | changed | summary | commit | persistence`) to direct UI results. `command/run` and `command/done` preserve the command lifecycle without entering model history or consuming a model-loop turn.
 
+Manual compaction is a fresh human action: historical contributors restrict its execution but do not identify its initiator. The command enters `ExecutionAuthority.runRequest()` with its exact command input before calling the engine, so authorization, resource permits and summary usage retain the current caller throughout asynchronous summarization. Required managed authority cannot be omitted. Cancellation and provider identity are rechecked after authorization, before engine entry; an independent local composition can call the engine directly.
+
 The command plugin tracks each real handler promise independently of the command executor's abort-aware wait. Its composite lifecycle effect unregisters `/compact` before asynchronously draining handlers that already started, so root teardown reaches quiescence only after backend close and flush work settles.
 
 The seam's `ManualCompactAgentContext` adds only `runMaintenance()` to the session and routing facts compaction already needs. Retention, balancing, summarization, marker ordering, replacement, and durability remain backend responsibilities.

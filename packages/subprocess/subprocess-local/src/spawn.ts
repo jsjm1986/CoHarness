@@ -111,8 +111,9 @@ export function killGroup(pid: number | undefined, sig: NodeJS.Signals): void {
  * nonzero status, or a missing taskkill binary must not break idempotent
  * teardown.
  * @param pid - root process id, when the spawn published one.
+ * @param commandTimeoutMs - owning spawn's grace period, bounding this native helper.
  */
-export function taskkillProcessTree(pid: number | undefined): void {
+export function taskkillProcessTree(pid: number | undefined, commandTimeoutMs: number): void {
   if (pid === undefined || pid <= 0) return
   // Outcome deliberately unchecked: an already-absent tree (status 128), exit
   // races, and a missing taskkill binary (spawnSync reports, never throws) are
@@ -120,6 +121,8 @@ export function taskkillProcessTree(pid: number | undefined): void {
   spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
     stdio: 'ignore',
     windowsHide: true,
+    timeout: Math.ceil(commandTimeoutMs),
+    killSignal: 'SIGKILL',
   })
 }
 
@@ -477,7 +480,7 @@ export function spawnSubprocess(spec: SubprocessSpawnSpec, internals: SpawnInter
     platform,
     pid,
     child,
-    internals.taskkill ?? taskkillProcessTree,
+    internals.taskkill ?? ((pid) => { taskkillProcessTree(pid, spec.graceMs) }),
     internals.linuxProcessGroupHasLiveMembers ?? linuxProcessGroupHasLiveMembers,
     direct,
   )

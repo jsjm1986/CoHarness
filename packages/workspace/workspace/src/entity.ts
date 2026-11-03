@@ -31,6 +31,8 @@ export class WorkspaceMoveInvalidError extends Error {
  * index backing the `sessionIds` projection, and attach-time header reads.
  */
 export interface WorkspaceEntityHost {
+  /** Publish a settled entity mutation; omitted for standalone entity consumers without catalog observers. */
+  changed?(): void
   /**
    * Resolve the open `workspaces` table.
    * @returns the table; throws while the registry has not started yet.
@@ -225,5 +227,6 @@ export class WorkspaceEntity implements Workspace {
       throw error
     }
     this.record = next
+    this.host.changed?.()
   }
 }

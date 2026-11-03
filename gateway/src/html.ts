@@ -26,11 +26,25 @@ const GATE_COPY = {
     newPassword: '新密码（至少 8 位）', saveContinue: '保存并继续',
     loginLocked: '尝试过于频繁，请 10 分钟后再试', loginInvalid: '用户名或密码错误',
     passwordTooShort: '密码至少 {min} 位',
+    passwordTooLong: '密码最多 {max} 位',
     waitingTitle: '正在启动 - COHARNESS', waitingHeading: '正在启动您的工作台…',
     waitingBody: '正在准备工作台服务，页面会自动连接。', waitingProgress: '工作台启动进度',
     waitingHint: '通常需要几秒钟，页面会自动刷新。',
     stoppedTitle: '工作台已停止 - COHARNESS', stoppedHeading: '工作台已手动停止',
     stoppedBody: '后台请求不会自动启动。您可以主动启动并打开工作台。', stoppedStart: '启动并打开',
+    startFailureTitle: '无法打开工作台 - COHARNESS', startFailureHeading: '工作台未能打开',
+    startFailureBusy: '电脑暂时繁忙，启动尚未完成。请稍后重试',
+    startFailureAccount: '此电脑的运行账号尚未就绪，请联系管理员检查配置',
+    startFailureDenied: '您当前没有此工作环境的使用权限，请联系管理员',
+    startFailureUnavailable: '当前电脑或工作环境暂时不可用，请稍后重试或联系管理员',
+    startFailureChanged: '此工作环境的状态已变化，请返回空间列表检查后再试',
+    startFailureInvalid: '启动信息无效，请返回空间列表重新选择工作环境',
+    startFailureUnknown: '启动未能完成，请返回空间列表检查状态或联系管理员',
+    startFailureRetry: '重试启动', startFailureChoose: '返回空间列表',
+    environmentsTitle: '选择工作环境 - COHARNESS', environmentsHeading: '选择工作环境',
+    environmentsBody: '每个标签页保留自己的工作环境，可在新标签页中并行打开其他环境',
+    environmentsPersonal: '个人空间', environmentsOpen: '打开工作台', environmentsMore: '更多环境',
+    environmentsEmpty: '尚未分配可用环境，请联系管理员',
   },
   en: {
     loginTitle: 'Sign in - COHARNESS', username: 'Username', password: 'Password', signIn: 'Sign in',
@@ -38,11 +52,25 @@ const GATE_COPY = {
     newPassword: 'New password (at least 8 characters)', saveContinue: 'Save and continue',
     loginLocked: 'Too many attempts; try again in 10 minutes.', loginInvalid: 'Incorrect username or password.',
     passwordTooShort: 'Password must be at least {min} characters.',
+    passwordTooLong: 'Password must be at most {max} characters.',
     waitingTitle: 'Starting - COHARNESS', waitingHeading: 'Starting your workbench…',
     waitingBody: 'Preparing the workbench service; this page connects automatically.', waitingProgress: 'Workbench startup progress',
     waitingHint: 'This usually takes a few seconds; the page refreshes itself.',
     stoppedTitle: 'Workbench stopped - COHARNESS', stoppedHeading: 'The workbench was stopped manually',
     stoppedBody: 'Background requests will not start it. Start it yourself to open the workbench.', stoppedStart: 'Start and open',
+    startFailureTitle: 'Unable to open the workbench - COHARNESS', startFailureHeading: 'The workbench could not open',
+    startFailureBusy: 'This computer is busy and startup has not completed. Try again later.',
+    startFailureAccount: 'The runtime account on this computer is not ready. Ask an administrator to check its configuration.',
+    startFailureDenied: 'You do not currently have access to this environment. Contact an administrator.',
+    startFailureUnavailable: 'This computer or environment is temporarily unavailable. Try later or contact an administrator.',
+    startFailureChanged: 'The environment state has changed. Check it in the space list before trying again.',
+    startFailureInvalid: 'The startup information is invalid. Choose the environment again from the space list.',
+    startFailureUnknown: 'Startup did not complete. Check its state in the space list or contact an administrator.',
+    startFailureRetry: 'Retry startup', startFailureChoose: 'Back to spaces',
+    environmentsTitle: 'Choose an environment - COHARNESS', environmentsHeading: 'Choose an environment',
+    environmentsBody: 'Each tab keeps its own environment. Open another environment in a new tab to work in parallel.',
+    environmentsPersonal: 'Personal space', environmentsOpen: 'Open workbench', environmentsMore: 'More environments',
+    environmentsEmpty: 'No environment is assigned. Contact your administrator.',
   },
 } as const
 
@@ -111,28 +139,50 @@ nav a{margin-right:16px;color:#0071e3;text-decoration:none}
 </style></head><body><main>${body}</main></body></html>`
 }
 
-export function loginPage(error = '', language: GatePageLanguage = 'zh'): string {
+const AUTH_STYLES = `<style>
+.auth-field{display:block;margin:16px 0}.auth-field span{display:block;margin-bottom:6px;font-size:14px}
+.auth-field input{box-sizing:border-box;width:100%;min-height:44px;margin:0}
+.auth-submit{box-sizing:border-box;width:100%;min-height:44px}
+</style>`
+
+/**
+ * Render the existing sign-in form with its browser destination.
+ * @param error - localized authentication failure, if any.
+ * @param language - gate-page language.
+ * @param returnTo - local UI address retained by the form; the HTTP handler validates it.
+ * @returns the escaped sign-in document.
+ */
+export function loginPage(error = '', language: GatePageLanguage = 'zh', returnTo = '/'): string {
   const t = gateCopy(language)
   return layout(t('loginTitle'), `<div class="card" style="max-width:380px;margin:80px auto">
 <h1 class="brand">${BRAND_LOCK}</h1>
 ${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
 <form method="post" action="/login">
-<p><input name="username" placeholder="${t('username')}" autocomplete="username" required style="width:100%"></p>
-<p><input name="password" type="password" placeholder="${t('password')}" autocomplete="current-password" required style="width:100%"></p>
-<p><button style="width:100%">${t('signIn')}</button></p>
-</form></div>`, '', language)
+<input type="hidden" name="returnTo" value="${escapeHtml(returnTo)}">
+<label class="auth-field"><span>${t('username')}</span><input name="username" autocomplete="username" required></label>
+<label class="auth-field"><span>${t('password')}</span><input name="password" type="password" autocomplete="current-password" required></label>
+<p><button class="auth-submit">${t('signIn')}</button></p>
+</form></div>`, AUTH_STYLES, language)
 }
 
-export function passwordPage(error = '', language: GatePageLanguage = 'zh'): string {
+/**
+ * Render required password setup without losing the chosen work environment.
+ * @param error - localized password validation failure, if any.
+ * @param language - gate-page language.
+ * @param returnTo - local UI address retained by the form; the HTTP handler validates it.
+ * @returns the escaped password-setup document.
+ */
+export function passwordPage(error = '', language: GatePageLanguage = 'zh', returnTo = '/'): string {
   const t = gateCopy(language)
   return layout(t('passwordTitle'), `<div class="card" style="max-width:380px;margin:80px auto">
 <div class="brand">${BRAND_LOCK}</div>
 <h1>${t('passwordHeading')}</h1>
 ${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
 <form method="post" action="/account/password">
-<p><input name="password" type="password" placeholder="${t('newPassword')}" autocomplete="new-password" required style="width:100%"></p>
-<p><button style="width:100%">${t('saveContinue')}</button></p>
-</form></div>`, '', language)
+<input type="hidden" name="returnTo" value="${escapeHtml(returnTo)}">
+<label class="auth-field"><span>${t('newPassword')}</span><input name="password" type="password" autocomplete="new-password" required></label>
+<p><button class="auth-submit">${t('saveContinue')}</button></p>
+</form></div>`, AUTH_STYLES, language)
 }
 
 /** Render the retry page shown while a personal or project runtime starts. */
@@ -163,13 +213,62 @@ export function waitingPage(language: GatePageLanguage = 'zh'): string {
  * @param target - authenticated runtime selected by the Gateway request context.
  * @returns a page whose form is reauthorized when the user submits it.
  */
-export function stoppedPage(target: { kind: 'user' | 'project'; id: number }, language: GatePageLanguage = 'zh'): string {
+export function stoppedPage(target: import('./instances.ts').RuntimeTarget, language: GatePageLanguage = 'zh'): string {
   const t = gateCopy(language)
+  const action = target.runtimeId === undefined ? '/account/runtime/start'
+    : `/account/runtime/start?dshRuntime=${encodeURIComponent(target.runtimeId)}`
   return layout(t('stoppedTitle'), `<div class="card">
 <div class="brand">${BRAND_LOCK}</div>
 <h1>${t('stoppedHeading')}</h1><p>${t('stoppedBody')}</p>
-<form method="post" action="/account/runtime/start">
+<form method="post" action="${escapeHtml(action)}">
 <input type="hidden" name="kind" value="${target.kind === 'user' ? 'personal' : 'project'}">
 ${target.kind === 'project' ? `<input type="hidden" name="projectId" value="${escapeHtml(String(target.id))}">` : ''}
 <button type="submit">${t('stoppedStart')}</button></form></div>`, '', language)
+}
+
+/** Safe browser copy for a failed or incomplete workbench start. */
+export type RuntimeStartFailureReason = 'busy' | 'account' | 'denied' | 'unavailable' | 'changed' | 'invalid' | 'unknown'
+
+/** Original validated form selection; its action retains the tab's explicit Runtime query. */
+export type RuntimeStartRetry = { action: string } & ({ kind: 'personal' } | { kind: 'project'; projectId: number })
+
+/**
+ * Render a startup failure without changing account scope or automatically retrying.
+ * @param reason - safe localized explanation; internal exception details are never rendered.
+ * @param retry - validated original form for a retryable failure, or null when the user must choose again.
+ * @param language - browser gate language; defaults to Chinese.
+ * @returns an HTML document retaining the original target in its optional POST form.
+ */
+export function runtimeStartFailurePage(reason: RuntimeStartFailureReason, retry: RuntimeStartRetry | null, language: GatePageLanguage = 'zh'): string {
+  const t = gateCopy(language)
+  const messages: Record<RuntimeStartFailureReason, GateCopyKey> = {
+    busy: 'startFailureBusy', account: 'startFailureAccount', denied: 'startFailureDenied',
+    unavailable: 'startFailureUnavailable', changed: 'startFailureChanged', invalid: 'startFailureInvalid', unknown: 'startFailureUnknown',
+  }
+  const form = retry === null ? '' : `<form method="post" action="${escapeHtml(retry.action)}">
+<input type="hidden" name="kind" value="${retry.kind}">
+${retry.kind === 'project' ? `<input type="hidden" name="projectId" value="${escapeHtml(String(retry.projectId))}">` : ''}
+<button type="submit">${t('startFailureRetry')}</button></form>`
+  return layout(t('startFailureTitle'), `<div class="card">
+<div class="brand">${BRAND_LOCK}</div>
+<h1>${t('startFailureHeading')}</h1><p role="alert">${t(messages[reason])}</p>
+${form}<p><a href="/?environments=1">${t('startFailureChoose')}</a></p></div>`, '', language)
+}
+
+/**
+ * Offer authorized assignments when an owner does not identify one Runtime.
+ * @param page - one bounded metadata page; rendering starts no processes.
+ * @param language - authenticated browser's gate-page language.
+ * @returns escaped selection forms with explicit Runtime addresses.
+ */
+export function environmentsPage(page: import('./runtime-catalog.ts').RuntimeCatalogPage, language: GatePageLanguage = 'zh', showComputer = false): string {
+  const t = gateCopy(language)
+  const rows = page.items.map(item => `<div class="card"><h2>${escapeHtml(item.owner.kind === 'personal' ? t('environmentsPersonal') : item.owner.name)}</h2>
+<p>${showComputer ? `${escapeHtml(item.node.name)} · ` : ''}Runtime ${escapeHtml(item.id.slice(0, 8))}</p>
+<form method="post" action="/account/runtime/start?dshRuntime=${encodeURIComponent(item.id)}">
+<input type="hidden" name="kind" value="${item.owner.kind}">
+${item.owner.kind === 'project' ? `<input type="hidden" name="projectId" value="${item.owner.id}">` : ''}
+<button type="submit">${t('environmentsOpen')}</button></form></div>`).join('')
+  return layout(t('environmentsTitle'), `<h1>${t('environmentsHeading')}</h1><p>${t('environmentsBody')}</p>
+${rows || `<p>${t('environmentsEmpty')}</p>`}${page.nextCursor === null ? '' : `<a href="/?environments=1&amp;cursor=${encodeURIComponent(page.nextCursor)}">${t('environmentsMore')}</a>`}`, '', language)
 }

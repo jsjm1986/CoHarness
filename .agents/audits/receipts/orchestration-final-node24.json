@@ -1,0 +1,14 @@
+{
+  "name": "orchestration-final-node24",
+  "cwd": ".",
+  "command": "env PATH=/Users/a1234/.nvm/versions/node/v24.19.0/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/a1234/.codeium/windsurf/bin:/Users/a1234/.grok/bin:/Users/a1234/.kimi-code/bin:/Users/a1234/.nvm/versions/node/v25.8.1/bin:/opt/homebrew/opt/python@3.12/libexec/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/a1234/.codex/tmp/arg0-macos/codex-arg0334r49:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/a1234/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/a1234/.codeium/windsurf/bin:/Users/a1234/.grok/bin:/Users/a1234/.kimi-code/bin:/Users/a1234/.nvm/versions/node/v25.8.1/bin:/Users/a1234/.local/bin:/Users/a1234/Library/Android/jdk-17/bin:/Users/a1234/Library/Android/sdk/platform-tools:/Users/a1234/Library/Android/sdk/emulator:/Users/a1234/.cargo/bin:/Users/a1234/.docker/bin:/Users/a1234/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS DSH_EXAMPLE_MODE=lib node_modules/.bin/vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/managed-codex-model.snapshot.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T07:11:08.622135+00:00",
+  "seconds": 6.126,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0e7fff5bb0081358171f64c27bc281c61eeeb4eaefa64ff4e451fbfe904f5da5",
+  "inputsAfter": "0e7fff5bb0081358171f64c27bc281c61eeeb4eaefa64ff4e451fbfe904f5da5",
+  "postgresToolDirectory": null,
+  "outputSha256": "126e8404981612b577a2837e214a29e9e4b71feb0518c660f739cf01616002c5",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  15:11:09\n   Duration  5.25s (transform 866ms, setup 39ms, import 1.11s, tests 4.00s, environment 0ms)\n\n"
+}

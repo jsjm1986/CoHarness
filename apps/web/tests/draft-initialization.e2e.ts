@@ -23,6 +23,7 @@ const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/draft-initialization', i
 const MODE = webSnapshotMode()
 
 interface DraftInitHandle {
+  initializations(): number
   startSession(workspaceId: string | undefined, options: { prompt?: string; clearPreviousDraft?: boolean }): void
   reusable(workspaceId: string | undefined, sessionId: string | undefined): boolean
 }
@@ -189,7 +190,12 @@ describe('web e2e: Session draft initialization', () => {
       }, [wid, sessionId] as const),
       { timeout: 90_000 },
     ).toBe(true)
+    const initialized = await page.evaluate(
+      () => (window as typeof window & { __draftInit: DraftInitHandle }).__draftInit.initializations(),
+    )
     await startSession(page, wid, { prompt: 'keep the existing reference' })
+    await expect.poll(() => page.evaluate(() => (window as typeof window & { __draftInit: DraftInitHandle }).__draftInit.initializations()))
+      .toBe(initialized + 1)
     await expect.poll(() => selected(page)).toBe(sessionId)
     await expect.poll(() => input.inputValue()).toBe('@reference target.md ')
     await input.press('End')
@@ -203,7 +209,39 @@ describe('web e2e: Session draft initialization', () => {
     expect(tripwires.at(-1)?.warnings).toEqual([])
   })
 
+  it('retains the editable draft when a submitted input fails before admission', async () => {
+    const wid = await newWorkspace('admission-failure')
+    const page = await openPage()
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-draft-init-admission-failure'))
+    await startSession(page, wid, {})
+    await expect.poll(() => selected(page), { timeout: 15_000 }).not.toBeUndefined()
+    const sessionId = await selected(page)
+    const stop = scaffold.ctx.on('agent/pre-step', ({ agent }, next) => {
+      if (agent.id === sessionId) throw new Error('The workspace is unavailable before input admission.')
+      return next()
+    }, { prepend: true })
+    try {
+      const input = page.locator('textarea:enabled').first()
+      await input.fill('Keep this draft until the Session accepts it.')
+      await page.getByRole('button', { name: 'Send message', exact: true }).click()
+      await expect.poll(async () => (await hostEvents(sessionId!)).some(event => event.type === 'turn/end'), { timeout: 30_000 }).toBe(true)
+      await expect.poll(() => input.inputValue()).toBe('Keep this draft until the Session accepts it.')
+      expect((await hostEvents(sessionId!)).some(event => event.type === 'user/message')).toBe(false)
+
+      await page.reload({ waitUntil: 'load' })
+      await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+      await expect.poll(() => input.inputValue(), { timeout: 15_000 }).toBe('Keep this draft until the Session accepts it.')
+      await input.focus()
+      const snapshot = await captureStableAria(page, '[data-composer-card] textarea', scaffold.workspaceCwd)
+      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'admission-failure.expected.md'), snapshot, MODE)
+      expect(tripwires.at(-1)?.pageErrors).toEqual([])
+    } finally {
+      stop()
+      await page.close()
+    }
+  })
+
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
-    await assertFixtureInventory(SNAPSHOT_DIR, ['reference.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['reference.expected.md', 'admission-failure.expected.md'])
   })
 })

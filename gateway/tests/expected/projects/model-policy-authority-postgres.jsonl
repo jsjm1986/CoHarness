@@ -1,0 +1,1 @@
+{"backend":"postgres","staleAdministratorRead":false,"lazyDemotion":false,"eagerDemotion":false,"promotion":true,"roleChangePreservesModelVersion":true,"explicitDeny":false,"intakeTokenRetained":true,"tokenLookupFailurePreservesProjection":true,"withdrawal":"forbidden","withdrawalPreservesProjection":true}

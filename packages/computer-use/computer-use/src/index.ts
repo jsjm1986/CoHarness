@@ -5,8 +5,8 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { DesktopConfirmation } from './types.ts'
-export type { DesktopConfirmation, DesktopOccupancy } from './types.ts'
+import type { ComputerUseUnavailableReason, DesktopConfirmation } from './types.ts'
+export type { ComputerUseUnavailableReason, DesktopStatus, DesktopConfirmation, DesktopOccupancy } from './types.ts'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-execution-authority'
 import type { ComputerUseProviderName } from './brand.ts'
@@ -16,7 +16,26 @@ declare module '@deepseek-ai/cordis' {
     computerUse: ComputerUseRegistry
     /** Deployment-owned desktop permission, confirmation and lease enforcement. */
     computerUseAuthorization: ComputerUseAuthorization
+    /** Read-only deployment environment facts; does not reserve or authorize a driver. */
+    computerUseEnvironment: ComputerUseEnvironment
   }
+}
+
+/** A known limitation used only while no desktop provider is registered. */
+export interface ComputerUseEnvironment {
+  /** Missing graphical session or no enabled desktop driver; neither grants OS access. */
+  readonly unavailableReason: ComputerUseUnavailableReason
+}
+
+/**
+ * Read desktop availability without loading or reserving a driver.
+ * A registered provider determines its own availability, including an external desktop.
+ * @param ctx - current deployment services.
+ * @returns the provider's limitation, the environment fallback, or no known limitation.
+ */
+export function computerUseUnavailableReason(ctx: Context): ComputerUseUnavailableReason | undefined {
+  const registry = ctx.get('computerUse')
+  return registry?.providerName === undefined ? ctx.get('computerUseEnvironment')?.unavailableReason : registry.unavailableReason
 }
 
 /** The desktop policy owns authorization and the lease for the complete driver call. */
@@ -53,9 +72,21 @@ export interface DesktopConfirmationController {
     confirmed: boolean, signal: AbortSignal): Promise<DesktopConfirmation>
 }
 
+/** A known environment limitation, reported before invoking a desktop driver. */
+export class ComputerUseUnavailableError extends Error {
+  /** @param reason - missing graphical session or explicit provider configuration. */
+  constructor(readonly reason: ComputerUseUnavailableReason) {
+    super(reason === 'headless'
+      ? 'This server has no detected graphical desktop. Native Computer Use is unavailable; headless browser automation is separate.'
+      : 'Native Computer Use is disabled in this provider configuration.')
+    this.name = 'ComputerUseUnavailableError'
+  }
+}
+
 /** Owns one optional provider registration in the shared computer-use service. */
 export class ComputerUseRegistry extends Service {
   private registration: ComputerUseProviderName | undefined
+  private unavailable: ComputerUseUnavailableReason | undefined
   private managed = false
 
   constructor(ctx: Context) {
@@ -71,6 +102,8 @@ export class ComputerUseRegistry extends Service {
    */
   async run<T>(execution: ToolExecution, operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
     execution.signal.throwIfAborted()
+    const unavailable = this.unavailableReason
+    if (unavailable !== undefined) throw new ComputerUseUnavailableError(unavailable)
     this.managed ||= this.ctx.get('executionAuthorityRequired') === true || this.ctx.get('executionAuthority') !== undefined
     const authorization = this.ctx.get('computerUseAuthorization')
     if (this.managed && (authorization === undefined || execution.agent === undefined)) {
@@ -91,21 +124,29 @@ export class ComputerUseRegistry extends Service {
     return this.registration
   }
 
+  /** Registered provider's limitation, or the environment fallback without a provider; never OS authorization. */
+  get unavailableReason(): ComputerUseUnavailableReason | undefined {
+    return this.registration === undefined ? this.ctx.get('computerUseEnvironment')?.unavailableReason : this.unavailable
+  }
+
   /**
    * Reserve the sole provider slot until the contribution is disposed.
    * A second registration fails even when it repeats the current name. Providers
    * must stop their tools and await owned work before releasing this registration.
    * @param name - provider-owned name used in registration diagnostics.
+   * @param options - optional environment limitation; unavailable providers publish no desktop effects.
    * @returns the effect disposer for this exact registration.
    */
-  register(name: ComputerUseProviderName): () => Promise<void> {
+  register(name: ComputerUseProviderName, options?: { unavailableReason: ComputerUseUnavailableReason }): () => Promise<void> {
     if (this.registration !== undefined) {
       throw new Error(`computer use provider "${this.registration}" is already registered`)
     }
     return this.ctx.effect(() => {
       this.registration = name
+      this.unavailable = options?.unavailableReason
       return () => {
         this.registration = undefined
+        this.unavailable = undefined
       }
     }, 'computerUse.register()')
   }

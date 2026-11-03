@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-preparation-native-unit",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/tunnel-access.spec.ts tests/tunnel-install.spec.ts tests/shutdown.spec.ts tests/tunnel-supervisor.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T23:27:22.771889+00:00",
+  "seconds": 33.984,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1cfb7b5211390d157682036b65ea8e3ad7337fbeaa8cf672daffe941c465c2a9",
+  "inputsAfter": "1cfb7b5211390d157682036b65ea8e3ad7337fbeaa8cf672daffe941c465c2a9",
+  "postgresToolDirectory": null,
+  "outputSha256": "13d14e5f254acfb5975ddaa6d2e178e6591af0c208f5493f9bcbfc1205f92344",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/tunnel-install.spec.ts (8 tests | 1 failed) 31695ms\n   × cancels an accepted download and closes its archive before removing staging 30006ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/tunnel-install.spec.ts > cancels an accepted download and closes its archive before removing staging\nError: Test timed out in 30000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/tunnel-install.spec.ts:128:1\n    126| })\n    127|\n    128| it('cancels an accepted download and closes its archive before removin…\n       | ^\n    129|   const root = await temporaryRoot(), controller = new AbortController…\n    130|   let entered!: () => void, cancelled = false\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 3 passed (4)\n      Tests  1 failed | 51 passed (52)\n   Start at  07:27:24\n   Duration  31.86s (transform 186ms, setup 0ms, import 435ms, tests 31.87s, environment 0ms)\n\n"
+}

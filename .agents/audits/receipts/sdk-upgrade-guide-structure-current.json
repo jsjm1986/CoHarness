@@ -1,0 +1,14 @@
+{
+  "name": "sdk-upgrade-guide-structure-current",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/verify-sdk-upgrade-guides.py",
+  "startedAt": "2026-10-24T11:34:38.698886+00:00",
+  "seconds": 1.635,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0aa30cf857305b653f6d091ed945647f71c47e8e748d082a6a641a4e8f7e8b42",
+  "inputsAfter": "0aa30cf857305b653f6d091ed945647f71c47e8e748d082a6a641a4e8f7e8b42",
+  "postgresToolDirectory": null,
+  "outputSha256": "77e6212af0148a25c4611db756986dac7590f3ef472882d054888a6cb93e38ac",
+  "outputTail": "sdk-subagent-process-admission: current-version triplet, headings, metadata, newline and word budget pass\nsdk-notification-capacity: current-version triplet, headings, metadata, newline and word budget pass\n"
+}

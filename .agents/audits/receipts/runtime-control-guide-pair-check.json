@@ -1,0 +1,14 @@
+{
+  "name": "runtime-control-guide-pair-check",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+  "startedAt": "2026-10-24T20:17:54.901210+00:00",
+  "seconds": 3.196,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1f8b4c1f971e09e8c17655fc3e8355498f2943569b4ea83e933e3449cdd7d912",
+  "inputsAfter": "1f8b4c1f971e09e8c17655fc3e8355498f2943569b4ea83e933e3449cdd7d912",
+  "postgresToolDirectory": null,
+  "outputSha256": "f648fd21b531eda386e17f4ce365d5cff34872447cccc4aa4cb2b2e905022290",
+  "outputTail": "verify-translation-pairing: 1 named pair(s) consistent; the corpus-wide check still runs in doc-sync.\n"
+}

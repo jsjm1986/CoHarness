@@ -1,0 +1,14 @@
+{
+  "name": "document-public-fifo-causal-negative",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/document-fifo-probe.py negative",
+  "startedAt": "2026-10-26T00:00:31.474754+00:00",
+  "seconds": 5.285,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a04b735fa1ed8aa8bc3509aa23283fc9895845011e501dc0f6dd53015a7e5a2d",
+  "inputsAfter": "a04b735fa1ed8aa8bc3509aa23283fc9895845011e501dc0f6dd53015a7e5a2d",
+  "postgresToolDirectory": null,
+  "outputSha256": "bc5d741f6c3c62809e4e104cbdddaa458ac81cecbfce8c05b45761afbe4ccc84",
+  "outputTail": "CAUSAL: existing public FIFO kept readDocFile pending; owned source child was SIGKILLed and joined before FIFO removal.\n"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "mcp-managed-contract-lint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/mcp/mcp-client/src/managed-stdio.ts packages/mcp/mcp-client/src/transport.ts packages/mcp/mcp-client/src/connection.ts packages/mcp/mcp-client/src/index.ts packages/mcp/mcp-client/tests/resource-admission.spec.ts packages/mcp/mcp-client/tests/mcp-client.spec.ts packages/mcp/mcp-client/tests/reconnect.spec.ts packages/mcp/mcp-client/tests/apply.spec.ts packages/experimental/browser-use-runtime/src/mcp.ts snapshots/session/mcp-resources/resource-admission-fixture.mjs",
+  "startedAt": "2026-10-23T16:37:18.660904+00:00",
+  "seconds": 3.684,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7f3d094e558336a769b96bcfa01a02c52282746b4f23a4f38389b458d10c88e7",
+  "inputsAfter": "7f3d094e558336a769b96bcfa01a02c52282746b4f23a4f38389b458d10c88e7",
+  "outputSha256": "e1948d37ad2225efa762b546b426f8a7c24dffc012ebab6894397d539fd8e737",
+  "outputTail": "packages/mcp/mcp-client/src/index.ts:199:87: error typescript(no-floating-promises): Promises must be awaited, add void operator to ignore. help: The promise must end with a call to .catch, or end with a call to .then with a rejection handler, or be explicitly marked as ignored with the `void` operator.\n"
+}

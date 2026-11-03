@@ -1,0 +1,36 @@
+# A local model and deterministic storage completion timing over the shipped profile.
+- id: agent-default-model
+  config:
+    provider: memory-live-settings
+    model: memory-live-settings
+- id: llm-deepseek
+  disabled: true
+- id: llm-pi-ai
+  disabled: true
+- id: session-title-llm
+  disabled: true
+- id: session-persistence-jsonl
+  config:
+    root: './.sessions'
+    compression: none
+- insert:
+    - id: storage
+      name: '@deepseek-ai/dsh-storage'
+    - id: storage-json
+      name: '@deepseek-ai/dsh-storage-json'
+      config:
+        root: './.memory-store'
+    - id: storage-domain
+      name: '@deepseek-ai/dsh-storage-domain'
+      config:
+        backend: json
+    - id: memory
+      name: '@deepseek-ai/dsh-memory'
+      config:
+        space: !!js "process.env.DSH_MEMORY_FIXTURE_SCOPE === 'project' ? 'project' : 'personal'"
+    - id: memory-context
+      name: '@deepseek-ai/dsh-memory-context'
+    - id: tool-memory
+      name: '@deepseek-ai/dsh-tool-memory'
+    - id: memory-live-settings-model
+      name: './model.mjs'

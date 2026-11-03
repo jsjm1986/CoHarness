@@ -1,0 +1,14 @@
+{
+  "name": "project-account-mutation-gateway-types",
+  "cwd": "gateway",
+  "command": "npm run typecheck",
+  "startedAt": "2026-10-24T00:05:59.892317+00:00",
+  "seconds": 7.611,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ca1dfd85b41c9dbfc8f401f23dc014e69c9fdd88f2152c4b84b1156a1d361c9c",
+  "inputsAfter": "91c95984debc9dedf69dccf85b8cef23a0cfc67cbe72877621b85f6fa5eec3f7",
+  "postgresToolDirectory": null,
+  "outputSha256": "51bdb68379357b55136b08bde889cb240e2c749e759c97264041c1212354b36b",
+  "outputTail": "\n> typecheck\n> tsc --noEmit\n\ntests/apply-grants.spec.ts(53,22): error TS2322: Type 'Database' is not assignable to type 'void | Promise<void>'.\n"
+}

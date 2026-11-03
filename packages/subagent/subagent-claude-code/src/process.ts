@@ -6,6 +6,7 @@
  */
 
 import { EventEmitter } from 'node:events'
+import { PassThrough, Writable } from 'node:stream'
 import type {
   SpawnedProcess,
   SpawnOptions,
@@ -65,32 +66,56 @@ export function claudeSpawnSpec(
  * in the official SDK; this adapter only projects streams and exit events.
  */
 export class ManagedClaudeCodeProcess implements SpawnedProcess {
-  readonly stdin
-  readonly stdout
+  readonly stdin: Writable
+  readonly stdout = new PassThrough()
+  /** Real allocation, including admission; the run cannot publish before this settles. */
+  readonly ready: Promise<SubprocessHandle>
   private readonly events = new EventEmitter()
   private outcomeValue: SubprocessOutcome | undefined
   private killRequested = false
 
   /**
-   * Project a managed process with piped stdin and stdout.
-   * @param child - shared handle that remains the managed-range authority.
+   * Adapt awaited allocation to the SDK's synchronous custom-spawn interface.
+   * @param child - allocation retaining the real managed-range authority.
+   * @param cancel - cancels admission before a process exists.
    */
-  constructor(private readonly child: SubprocessHandle) {
-    this.stdin = child.stdin as NonNullable<SubprocessHandle['stdin']>
-    this.stdout = child.stdout as NonNullable<SubprocessHandle['stdout']>
+  constructor(child: SubprocessHandle | Promise<SubprocessHandle>, private readonly cancel: () => void = () => {}) {
+    this.ready = Promise.resolve(child)
+    this.stdin = new Writable({
+      write: (chunk: Buffer, encoding, done) => {
+        void this.ready.then((handle) => {
+          const input = handle.stdin as NonNullable<SubprocessHandle['stdin']>
+          input.write(chunk, encoding, done)
+        }).catch((error: unknown) => { done(thrown(error)) })
+      },
+      final: (done) => {
+        void this.ready.then((handle) => {
+          const input = handle.stdin as NonNullable<SubprocessHandle['stdin']>
+          input.end(done)
+        }).catch((error: unknown) => { done(thrown(error)) })
+      },
+    })
     // EventEmitter gives `error` special throw semantics without a listener.
     // The SDK attaches its listener synchronously after custom spawn returns,
     // while this no-op also contains an already-rejected spawn handle.
     this.events.on('error', () => {})
-    void child.done.then(
-      (outcome) => {
+    this.stdin.on('error', (error: Error) => { this.events.emit('error', error) })
+    this.stdout.on('error', (error: Error) => { this.events.emit('error', error) })
+    void this.ready.then((handle) => {
+      const output = handle.stdout as NonNullable<SubprocessHandle['stdout']>
+      output.on('error', (error: Error) => { this.stdout.destroy(error) })
+      output.pipe(this.stdout)
+      void handle.done.then((outcome) => {
         this.outcomeValue = outcome
         this.events.emit('exit', outcome.exitCode, outcome.signal)
-      },
-      (error: unknown) => {
-        this.events.emit('error', thrown(error))
-      },
-    )
+      }, (error: unknown) => { this.failed(error) })
+    }, (error: unknown) => { this.failed(error) })
+  }
+
+  private failed(error: unknown): void {
+    this.stdin.destroy()
+    this.stdout.destroy()
+    this.events.emit('error', thrown(error))
   }
 
   /** Whether the SDK has requested managed-range termination. */
@@ -126,7 +151,10 @@ export class ManagedClaudeCodeProcess implements SpawnedProcess {
       return false
     }
     this.killRequested = true
-    this.child.terminate()
+    this.cancel()
+    void this.ready.then((child) => { child.terminate() }, () => {
+      // Failed admission or allocation created no published child for the SDK to terminate.
+    })
     return true
   }
 
