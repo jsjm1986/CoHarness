@@ -69,6 +69,7 @@
     "@deepseek-ai/dsh-session-projection": "workspace:*",
     "@deepseek-ai/dsh-system-prompt": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
+    "punycode": "2.3.1",
     "tsx": "^4.19.2",
     "@deepseek-ai/dsh-resource-budget": "workspace:*",
     "@deepseek-ai/dsh-subprocess-local": "workspace:*",

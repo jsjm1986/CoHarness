@@ -131,12 +131,10 @@ it('preserves stored values through built forms and keeps every mobile destinati
       mutate: async () => { throw new Error('This form scenario does not mutate endpoint state') },
     }
     let archive: ConversationArchiveRow = {
-      // oxlint-disable-next-line typescript/no-unsafe-assignment -- Gateway browser types use a separate compiler program.
       archiveId: '22000000-0000-4000-8000-000000000022' as ConversationArchiveRow['archiveId'],
       rootSessionId: 'archive-fixture', title: '归档清理示例', contentPreview: '需要保留的对话内容',
       creator: { id: admin.id, displayName: 'Admin fixture' }, project: null,
       runtime: { kind: 'user', id: admin.id,
-        // oxlint-disable-next-line typescript/no-unsafe-assignment -- Gateway browser types use a separate compiler program.
         runtimeId: '33000000-0000-4000-8000-000000000033' as NonNullable<ConversationArchiveRow['runtime']['runtimeId']> },
       workspace: null, state: 'trash', archivedAt: Date.UTC(2026, 8, 27), restoredAt: null, trashedAt: Date.UTC(2026, 8, 28),
       purgeAfter: null, syncState: 'synced', childCount: 0, messageCount: 1, updatedAt: Date.UTC(2026, 8, 27),

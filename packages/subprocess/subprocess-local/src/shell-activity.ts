@@ -1,8 +1,8 @@
 /** Private shell lifecycle files; ordinary output never authorizes terminal reclamation. */
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import type { SubprocessTerminalActivity, SubprocessTerminalSpawnSpec } from '@deepseek-ai/dsh-subprocess'
+import { privateTemporaryDirectory } from './tempdir.ts'
 
 function quote(value: string): string { return `'${value.replaceAll("'", "'\\''")}'` }
 
@@ -63,7 +63,7 @@ export function prepareShellActivity(
   if (spec.shellActivity !== true || platform === 'win32' || spec.argv.length !== 2 || spec.argv[1] !== '-i') return undefined
   const shell = basename(spec.argv[0] as string)
   if (shell !== 'bash' && shell !== 'zsh') return undefined
-  const directory = mkdtempSync(join(tmpdir(), 'dsh-shell-'))
+  const directory = privateTemporaryDirectory('dsh-shell-')
   const state = quote(join(directory, 'state'))
   const guards = quote(join(directory, 'guards'))
   try {

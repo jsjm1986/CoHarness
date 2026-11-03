@@ -47,7 +47,7 @@ it('retains a pending New Session and its origin draft across transport renewal'
     await page.locator('textarea[placeholder="Describe what you want to build"]').waitFor()
     expect(await page.locator('textarea').first().inputValue()).toBe('')
     expect(await page.evaluate(() => Object.entries(sessionStorage).some(([key, value]) =>
-      key.startsWith('dsh.conversation.chat.') && value.includes('Keep the original draft across transport renewal')))).toBe(true)
+      key.startsWith('dsh.conversation.chat.') && String(value).includes('Keep the original draft across transport renewal')))).toBe(true)
     acknowledgeReloadConnectionLoss(warnings, warningStart)
     expect(warnings.pageErrors).toEqual([])
   } finally {
@@ -142,7 +142,7 @@ it('browses twenty cold computers and keeps personal conversations, drafts and t
     const results = [await context.close().then(() => ({ status: 'fulfilled' as const }), (reason: unknown) => ({ status: 'rejected' as const, reason })),
       await browser.close().then(() => ({ status: 'fulfilled' as const }), (reason: unknown) => ({ status: 'rejected' as const, reason }))]
     await fixture.close()
-    const failures = results.filter(result => result.status === 'rejected').map(result => result.reason as unknown)
+    const failures = results.filter(result => result.status === 'rejected').map(result => result.reason)
     if (failures.length) throw new AggregateError(failures, 'Personal computer browser cleanup failed')
   }
 }, 120_000)

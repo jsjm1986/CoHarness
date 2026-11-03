@@ -14,13 +14,13 @@ it('preserves released history, refuses stale verification and accepts a fresh r
   try {
     const result = await promisify(execFile)(process.execPath, [
       ...(mode === 'src' ? ['--import', import.meta.resolve('tsx/esm')] : []),
-      fileURLToPath(new URL('../../packages/session/session-persistence-jsonl/tests/fixtures/migration-owner.mjs', import.meta.url)), mode,
+      fileURLToPath(new URL('./fixtures/migration-owner.mjs', import.meta.url)), mode,
       ...(process.env.DSH_JSONL_ARTIFACT_ROOT === undefined ? [] : [process.env.DSH_JSONL_ARTIFACT_ROOT]),
     ], { cwd: root, timeout: 60_000, killSignal: 'SIGKILL', env: { ...process.env,
       NODE_OPTIONS: undefined, NODE_PATH: undefined, DSH_MANAGED_DATA_MANIFEST: undefined,
       DSH_HOME: join(root, '.dsh'), DSH_AGENTS_HOME: join(root, '.agents'), DSH_TELEMETRY_DISABLED: '1', TMPDIR: root,
-      TSX_TSCONFIG_PATH: mode === 'src' ? resolve(import.meta.dirname, '../../tsconfig.json') : undefined,
+      TSX_TSCONFIG_PATH: mode === 'src' ? resolve(import.meta.dirname, '../../../../tsconfig.json') : undefined,
     } })
-    await expect(result.stdout).toMatchFileSnapshot(fileURLToPath(new URL('./jsonl-migration-owner/expected.jsonl', import.meta.url)))
+    await expect(result.stdout).toMatchFileSnapshot(fileURLToPath(new URL('./migration-owner/expected.jsonl', import.meta.url)))
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 70_000)

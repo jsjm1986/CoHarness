@@ -33,4 +33,4 @@
         consolidationMinChanges: 1
         maxOutputTokens: 32
     - id: memory-auxiliary-model
-      name: '../../../examples/headless-agent/tests/fixtures/memory-auxiliary-model.mjs'
+      name: '../memory-auxiliary-model.mjs'

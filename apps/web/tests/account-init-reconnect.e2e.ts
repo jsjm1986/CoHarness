@@ -113,7 +113,7 @@ async function accountFixture(name: string) {
     localStorage.setItem('dsh.sessions.current.v2.1.personal', JSON.stringify({ sessionId: id }))
     const probe: LayoutReadProbe = { phase: 'idle', held: 0, released: 0 }
     Object.assign(window, { __accountLayoutReads: probe })
-    const getItem = Storage.prototype.getItem
+    const getItem = Object.getOwnPropertyDescriptor(Storage.prototype, 'getItem')!.value as Storage['getItem']
     Storage.prototype.getItem = function (this: Storage, key: string): string | null {
       if (key.startsWith('dsh.sidebar-right.v1.') && probe.phase !== 'idle') probe[probe.phase]++
       return getItem.call(this, key)

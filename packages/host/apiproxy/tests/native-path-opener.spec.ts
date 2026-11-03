@@ -163,7 +163,7 @@ describe('native path opener', () => {
     expect(args).toEqual(['/tmp/default.txt'])
     expect(options.encoding).toBe('utf8')
     expect(options.windowsHide).toBe(true)
-    expect(options.signal).toBeInstanceOf(AbortSignal)
+    expect(options.signal).toBeUndefined()
 
     const commandError = Object.assign(new Error('open failed'), { code: 1 })
     execFileMock.mockImplementationOnce((_command, _args, _options, callback) => {

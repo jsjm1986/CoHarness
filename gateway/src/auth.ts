@@ -121,7 +121,7 @@ export class AuthService {
       const now = Date.now()
       const session = this.db.prepare(`SELECT * FROM auth_sessions WHERE token_hash = ?`).get(tokenHash(token)) as
         { id: number; user_id: number; expires_at: number; absolute_expires_at: number } | undefined
-      if (session === undefined || session.expires_at < now || session.absolute_expires_at < now) return null
+      if (session === undefined || session.expires_at <= now || session.absolute_expires_at <= now) return null
       this.db.prepare(`UPDATE auth_sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?`)
         .run(now, Math.min(now + this.cfg.sessionTtlMs, session.absolute_expires_at), session.id)
       const user = this.db.prepare(`SELECT * FROM users WHERE id = ?`).get(session.user_id) as DbUser | undefined

@@ -411,7 +411,9 @@ describe('gateway runtime admission', () => {
     })
     onTestFinished(async () => {
       external.closeAllConnections()
-      await new Promise<void>((resolve, reject) => { external.close(error => error === undefined ? resolve() : reject(error)) })
+      await new Promise<void>((resolve, reject) => {
+        external.close((error) => { if (error === undefined) resolve(); else reject(error) })
+      })
     })
     await new Promise<void>(resolve => external.listen(0, '127.0.0.1', resolve))
     const address = external.address()

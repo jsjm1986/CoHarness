@@ -829,7 +829,7 @@ export function ScopeControl({
             {...shareProjectSshTarget === undefined ? {} : { shareSshTarget: shareProjectSshTarget }}
             onMembers={() => {
               setProjectSettingsOpen(false)
-              openManager('current', currentProject?.canManage === true ? 'sent' : 'received')
+              openManager('current', currentProject.canManage === true ? 'sent' : 'received')
             }}
             onClose={() => { setProjectSettingsOpen(false) }}
           />

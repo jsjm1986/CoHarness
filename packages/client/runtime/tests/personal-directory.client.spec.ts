@@ -125,7 +125,7 @@ it('creates in a bootstrap Workspace before the personal directory has loaded', 
       canOpenPath: true, runtimeTarget: target(1) })
     f.api.onWorkspaceList = async () => ok({ items: [workspace] })
     f.api.onCreate = async () => ok({ sessionId: raw })
-    f.workspaces.handleConnected()
+    void f.workspaces.handleConnected()
     await Promise.all([f.workspaces.refresh(), f.base.refresh()])
     const created = await f.workspaces.createRuntimeSession(target(1), workspace.workspaceId)
     expect(created).toBe(clientSessionKey(target(1), raw))

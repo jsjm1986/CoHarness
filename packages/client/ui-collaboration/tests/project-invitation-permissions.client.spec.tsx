@@ -23,7 +23,7 @@ it('accepts an incoming invitation while viewing another read-only project witho
     listInvitations={listInvitations} listUsers={listUsers} acceptInvitation={acceptInvitation}
     onCreated={onCreated} onClose={vi.fn()} />)
   fireEvent.click(await screen.findByRole('button', { name: t('manager.accept') }))
-  await waitFor(() => expect(screen.queryByText(incoming.projectName)).toBeNull())
+  await waitFor(() => { expect(screen.queryByText(incoming.projectName)).toBeNull() })
   expect(acceptInvitation).toHaveBeenCalledExactlyOnceWith(incoming.id)
   expect(listInvitations.mock.calls).toEqual([[], []])
   expect(listUsers).not.toHaveBeenCalled()
@@ -125,5 +125,5 @@ it('retains an open project name and refuses its remote computer after this entr
   expect(screen.queryByLabelText(t('manager.computerLabel'))).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: t('manager.create') }))
   expect(createProject).toHaveBeenCalledExactlyOnceWith('本机新项目', undefined)
-  await waitFor(() => expect(props.onCreated).toHaveBeenCalledWith(19))
+  await waitFor(() => { expect(props.onCreated).toHaveBeenCalledWith(19) })
 })

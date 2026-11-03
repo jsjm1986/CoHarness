@@ -95,8 +95,8 @@ describe('connection lifecycle', () => {
     const muxOpen = deferred<() => void>()
     const hostOpen = deferred<() => void>()
     api.onDescribe = () => description.promise
-    const openMux = api.events.mux
-    const openHost = api.events.host
+    const openMux = api.events.mux.bind(api.events)
+    const openHost = api.events.host.bind(api.events)
     api.events.mux = (payload, signal, onOpen) => openMux(payload, signal, () => {
       muxOpen.resolve(() => { onOpen?.() })
     })

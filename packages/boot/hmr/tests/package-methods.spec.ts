@@ -4,17 +4,17 @@ import { createReplaceHelper } from '../src/package-methods.ts'
 
 it('preserves the receiver, arguments and return value, and restores the original method', () => {
   const target = { method(this: { base: number }, amount: number) { return this.base + amount } }
-  const original = target.method
+  const original = Object.getOwnPropertyDescriptor(target, 'method')!.value as typeof target.method
   const owner = createReplaceHelper(target)
   const dispose = owner.replaceMethod('method', function (amount) { return owner.rawImpl.method.call(this, amount) * 2 })
   expect(target.method.call({ base: 7 }, 3)).toBe(20)
   dispose(); dispose()
-  expect(target.method).toBe(original)
+  expect(Object.getOwnPropertyDescriptor(target, 'method')!.value).toBe(original)
 })
 
 it.each([false, true])('keeps another layer usable and restores the original after either disposal order (outer first: %s)', (outerFirst) => {
   const target = { method: () => 'original' }
-  const original = target.method
+  const original = Object.getOwnPropertyDescriptor(target, 'method')!.value as typeof target.method
   const inner = createReplaceHelper(target), innerCall = vi.fn(() => inner.rawImpl.method() + ':inner')
   const retireInner = inner.replaceMethod('method', innerCall)
   const outer = createReplaceHelper(target)
@@ -31,7 +31,7 @@ it.each([false, true])('keeps another layer usable and restores the original aft
     expect(innerCall).not.toHaveBeenCalled()
     retireOuter()
   }
-  expect(target.method).toBe(original)
+  expect(Object.getOwnPropertyDescriptor(target, 'method')!.value).toBe(original)
 })
 
 it('preserves a foreign replacement and makes its retained retired callback delegate without owner state', () => {

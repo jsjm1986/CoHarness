@@ -58,9 +58,9 @@ function parse(value: unknown): ClientDeploymentContext {
 export class DeploymentContextRuntime {
   private readonly store = createSnapshotStore<DeploymentContextSnapshot>({ phase: 'unknown', showComputer: false, aggregateComputers: false })
   /** Read the stable, account-scoped entry policy. */
-  readonly getSnapshot = this.store.getSnapshot
+  readonly getSnapshot = (): DeploymentContextSnapshot => this.store.getSnapshot()
   /** Observe entry policy changes without observing or replacing the current Runtime. */
-  readonly subscribe = this.store.subscribe
+  readonly subscribe = (observer: () => void): (() => void) => this.store.subscribe(observer)
   private flight: Promise<void> | undefined
   private followUp: Promise<void> | undefined
   private invalidated = false
@@ -75,7 +75,7 @@ export class DeploymentContextRuntime {
 
   private schedule(): void {
     clearTimeout(this.timer)
-    if (this.disposed || !this.managed || this.account === undefined || globalThis.document?.visibilityState === 'hidden') return
+    if (this.disposed || !this.managed || this.account === undefined || globalThis.document.visibilityState === 'hidden') return
     const interval = this.store.getSnapshot().context?.refreshAfterMs ?? this.timing.retryAfterMs
     this.timer = setTimeout(() => { void this.refresh() }, interval)
   }
@@ -156,19 +156,19 @@ export class DeploymentContextRuntime {
       }
       void this.refresh()
     }
-    const focus = (): void => { if (globalThis.document?.visibilityState !== 'hidden') void this.invalidate(); else clearTimeout(this.timer) }
+    const focus = (): void => { if (globalThis.document.visibilityState !== 'hidden') void this.invalidate(); else clearTimeout(this.timer) }
     const stopAccount = policy.subscribe(changed), stopHost = connection.hostDescription.subscribe(changed)
     const channel = typeof BroadcastChannel === 'undefined' ? undefined : new BroadcastChannel('hgw-deployment-policy')
     if (channel !== undefined) channel.onmessage = (event) => {
-      if (typeof event.data === 'object' && event.data !== null && typeof event.data.revision === 'string') void this.invalidate()
+      if (typeof event.data === 'object' && event.data !== null && typeof (event.data as { revision?: unknown }).revision === 'string') void this.invalidate()
     }
-    globalThis.addEventListener?.('focus', focus)
-    globalThis.document?.addEventListener('visibilitychange', focus)
+    globalThis.addEventListener('focus', focus)
+    globalThis.document.addEventListener('visibilitychange', focus)
     changed()
     return async () => {
       this.disposed = true; clearTimeout(this.timer); this.request?.abort(); channel?.close()
-      stopAccount(); stopHost(); globalThis.removeEventListener?.('focus', focus)
-      globalThis.document?.removeEventListener('visibilitychange', focus)
+      stopAccount(); stopHost(); globalThis.removeEventListener('focus', focus)
+      globalThis.document.removeEventListener('visibilitychange', focus)
       await Promise.all([...this.pending])
     }
   }

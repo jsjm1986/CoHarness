@@ -14,12 +14,12 @@ it('refuses stale independent search and keeps its initiating Session and origin
   try {
     const result = await promisify(execFile)(process.execPath, [
       ...(mode === 'src' ? ['--import', import.meta.resolve('tsx/esm')] : []),
-      fileURLToPath(new URL('../../packages/web/web/tests/fixtures/model-search-owner.mjs', import.meta.url)), mode,
+      fileURLToPath(new URL('./fixtures/model-search-owner.mjs', import.meta.url)), mode,
       ...(process.env.DSH_SEARCH_ARTIFACT_ROOT === undefined ? [] : [process.env.DSH_SEARCH_ARTIFACT_ROOT]),
     ], { cwd: root, timeout: 60_000, killSignal: 'SIGKILL', env: { ...process.env,
       NODE_OPTIONS: undefined, NODE_PATH: undefined, DSH_MANAGED_DATA_MANIFEST: undefined, COHARNESS_TEST_SEARCH_OWNER_KEY: undefined,
       DSH_HOME: join(root, '.dsh'), DSH_AGENTS_HOME: join(root, '.agents'), DSH_TELEMETRY_DISABLED: '1', TMPDIR: root,
-      TSX_TSCONFIG_PATH: mode === 'src' ? resolve(import.meta.dirname, '../../tsconfig.json') : undefined,
+      TSX_TSCONFIG_PATH: mode === 'src' ? resolve(import.meta.dirname, '../../../../tsconfig.json') : undefined,
     } })
     await expect(result.stdout).toMatchFileSnapshot(fileURLToPath(new URL('./model-search-owner/expected.jsonl', import.meta.url)))
   } finally { await rm(root, { recursive: true, force: true }) }

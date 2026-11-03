@@ -131,7 +131,10 @@ try {
         grant.resolve(); proceed.resolve()
       }
       const settled = await result
-      if (settled.error !== undefined) { rejected = true; resourceUnavailable = unavailable(settled.error) }
+      if (settled.error !== undefined) {
+        rejected = true; resourceUnavailable = unavailable(settled.error)
+        process.stderr.write(`startup-owner ${phase}/${change} rejected: ${settled.error?.stack ?? settled.error}\n`)
+      }
       else {
         run = settled.value
         outcome = (await run.result).stopReason
@@ -140,10 +143,10 @@ try {
       }
       const spawned = children.slice(before)
       await Promise.all(spawned.map(item => item.exited))
-      if (phase === 'unchanged') assert.equal(outcome, 'completed')
       console.log(JSON.stringify({ phase, change, rejected, resourceUnavailable, spawns: spawned.length,
         marker: markerCount() > markerBefore, closed: spawned.every(item => item.child.exitCode !== null || item.child.signalCode !== null),
         originalAcquires, originalReleases, uncertainties, replacementAcquires, starts, ends, outcome }))
+      if (phase === 'unchanged') assert.equal(outcome, 'completed')
     } finally {
       pendingControl = undefined; grant.resolve(); proceed.resolve()
       await run?.dispose(); run = undefined

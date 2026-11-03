@@ -4,6 +4,22 @@ import {
   darwinMemoryPressure, NodeResourcePressure, pressureCredits, type NodePressureConfig, type NodePressureSample, type NodePressureObservation,
 } from '../src/node-resource-pressure.ts'
 
+// Fake timers advance instantly while the sampler derives CPU utilization from
+// real os.cpus() jiffies; on fast Linux CI hosts consecutive samples can total
+// zero jiffies and the observation never completes. Pin deterministic, strictly
+// increasing jiffies so the sensor math sees a healthy advance every sample.
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>()
+  let tick = 0
+  return {
+    ...actual,
+    cpus: () => actual.cpus().map(cpu => ({
+      ...cpu,
+      times: { ...cpu.times, user: ++tick * 100, sys: tick * 50, idle: tick * 1000 },
+    })),
+  }
+})
+
 const config: NodePressureConfig = {
   sampleMs: 80, staleMs: 500, cpuTarget: 0.85, eventLoopTargetMs: 100, linuxMemoryReserveRatio: 0.1,
 }

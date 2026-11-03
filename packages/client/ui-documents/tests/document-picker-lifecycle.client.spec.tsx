@@ -82,7 +82,7 @@ async function bench() {
   function entries(slot: 'sidebar.footer.action' | 'shell.overlay') {
     return ctx.slots.entries(slot).map((entry) => {
       const Component = entry.component as ComponentType<Record<string, unknown>>
-      const injected = entry.inject?.() as Record<string, unknown> | undefined
+      const injected = entry.inject?.()
       const { hooks: _hooks, ...rest } = injected ?? {}
       return <Component
         key={`${slot}:${entry.options.id}`}

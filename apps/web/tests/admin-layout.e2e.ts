@@ -163,6 +163,7 @@ it('keeps admin controls inside their sections and navigation reachable on short
         const luminance = (rgb: number[]): number => rgb.slice(0, 3).reduce((sum, value, index) => {
           const channel = value / 255
           return sum + (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+            // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- Gateway browser types use a separate compiler program.
             * [0.2126, 0.7152, 0.0722][index]!
         }, 0)
         return elements.filter(element => element.getBoundingClientRect().height > 0).map((element) => {

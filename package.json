@@ -228,6 +228,7 @@
   "devDependencies": {
     "@agentclientprotocol/sdk": "1.4.0",
     "@deepseek-ai/dsh-agent": "workspace:*",
+    "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-browser-use": "workspace:*",
     "@deepseek-ai/dsh-computer-use": "workspace:*",
     "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp": "workspace:*",

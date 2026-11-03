@@ -66,9 +66,9 @@ export function parseWorkbenchRecord(value: unknown): WorkbenchRecord | undefine
 export function readWorkbenchRecord(principal: string): WorkbenchRecord | undefined {
   let raw: string | null
   try {
-    const runtime = new URLSearchParams(globalThis.location?.search).get('dshRuntime')
+    const runtime = new URLSearchParams(globalThis.location.search).get('dshRuntime')
     const owner = encodeURIComponent(principal)
-    raw = runtime === null ? null : globalThis.sessionStorage?.getItem(`dsh.conversation.workbenches.tab.v1.${owner}.${runtime}`) ?? null
+    raw = runtime === null ? null : globalThis.sessionStorage.getItem(`dsh.conversation.workbenches.tab.v1.${owner}.${runtime}`) ?? null
     raw ??= runtime === null ? null : globalThis.localStorage.getItem(`dsh.conversation.workbenches.runtime.v3.${owner}.${runtime}`)
     raw ??= globalThis.localStorage.getItem(`dsh.conversation.workbenches.v3.${owner}`)
       ?? globalThis.localStorage.getItem(`dsh.conversation.workbenches.v2.${owner}`)
@@ -87,11 +87,11 @@ export function readWorkbenchRecord(principal: string): WorkbenchRecord | undefi
  */
 export function writeWorkbenchRecord(principal: string, record: WorkbenchRecord): void {
   try {
-    const runtime = new URLSearchParams(globalThis.location?.search).get('dshRuntime')
+    const runtime = new URLSearchParams(globalThis.location.search).get('dshRuntime')
     const owner = encodeURIComponent(principal), encoded = JSON.stringify(record)
     if (runtime === null) globalThis.localStorage.setItem(`dsh.conversation.workbenches.v${record.version}.${owner}`, encoded)
     else {
-      globalThis.sessionStorage?.setItem(`dsh.conversation.workbenches.tab.v1.${owner}.${runtime}`, encoded)
+      globalThis.sessionStorage.setItem(`dsh.conversation.workbenches.tab.v1.${owner}.${runtime}`, encoded)
       globalThis.localStorage.setItem(`dsh.conversation.workbenches.runtime.v${record.version}.${owner}.${runtime}`, encoded)
     }
   }

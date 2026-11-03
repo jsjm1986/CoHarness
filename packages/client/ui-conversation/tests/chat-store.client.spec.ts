@@ -233,11 +233,11 @@ describe('createChatStore', () => {
       expect(shell.snapshot.draft).toBe('verified saved draft')
       shell.setDraft('edited after restoration')
       expect(store.getSnapshot().draft).toBe('edited after restoration')
-      expect(JSON.parse(sessionStorage.getItem('verified-owner.tab.v1')!).draft).toBe('edited after restoration')
+      expect((JSON.parse(sessionStorage.getItem('verified-owner.tab.v1')!) as { draft?: unknown }).draft).toBe('edited after restoration')
       key = undefined
       fixture.refresh()
       expect(shell.snapshot.draft).toBe('')
-      expect(JSON.parse(localStorage.getItem('verified-owner')!).draft).toBe('edited after restoration')
+      expect((JSON.parse(localStorage.getItem('verified-owner')!) as { draft?: unknown }).draft).toBe('edited after restoration')
     } finally {
       unmirror()
       shell.dispose()

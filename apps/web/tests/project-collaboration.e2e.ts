@@ -405,7 +405,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       const input = page.locator('textarea:enabled').last()
       await input.fill('Private draft restored after account verification')
       await expect.poll(() => page!.evaluate(() => Object.values(localStorage)
-        .some(value => value.includes('Private draft restored after account verification')))).toBe(true)
+        .some(value => String(value).includes('Private draft restored after account verification')))).toBe(true)
       blocked = true
       const warnings = tripwire.warnings.length
       await page.reload({ waitUntil: 'load' })
@@ -831,10 +831,10 @@ it.skipIf(MODE === 'record')('keeps space navigation, tab drafts and a running t
     releaseStep?.()
     stopGate?.()
     const failures: unknown[] = []
-    if (acquired.settled !== undefined) await acquired.settled.catch((error) => { failures.push(error) })
-    await acquired.context?.close().catch((error) => { failures.push(error) })
-    await acquired.browser?.close().catch((error) => { failures.push(error) })
-    await world.close().catch((error) => { failures.push(error) })
+    if (acquired.settled !== undefined) await acquired.settled.catch((error: unknown) => { failures.push(error) })
+    await acquired.context?.close().catch((error: unknown) => { failures.push(error) })
+    await acquired.browser?.close().catch((error: unknown) => { failures.push(error) })
+    await world.close().catch((error: unknown) => { failures.push(error) })
     if (failures.length > 0) throw new AggregateError(failures, 'space navigation cleanup failed')
   })
   await seedSession(world, await readFile(SEED, 'utf8'), SESSION_ID)

@@ -14,13 +14,13 @@ it('governs native Codex requests with execution authority alone through a real 
   try {
     const result = await promisify(execFile)(process.execPath, [
       ...(mode === 'src' ? ['--import', import.meta.resolve('tsx/esm')] : []),
-      fileURLToPath(new URL('../../packages/subagent/subagent-codex/tests/fixtures/execution-authority.mjs', import.meta.url)), mode,
+      fileURLToPath(new URL('./fixtures/execution-authority.mjs', import.meta.url)), mode,
       ...(mode === 'lib' && process.env.DSH_SUBAGENT_ARTIFACT_ROOT !== undefined ? [process.env.DSH_SUBAGENT_ARTIFACT_ROOT] : []),
     ], { cwd: root, timeout: 60_000, killSignal: 'SIGKILL', env: { ...process.env,
       NODE_OPTIONS: undefined, NODE_PATH: undefined, DSH_HOME: join(root, '.dsh'), DSH_AGENTS_HOME: join(root, '.agents'), TMPDIR: root,
       DSH_TELEMETRY_DISABLED: '1', DSH_MANAGED_DATA_MANIFEST: undefined,
-      TSX_TSCONFIG_PATH: mode === 'src' ? resolve(import.meta.dirname, '../../tsconfig.json') : undefined,
+      TSX_TSCONFIG_PATH: mode === 'src' ? resolve(import.meta.dirname, '../../../../tsconfig.json') : undefined,
     } })
-    await expect(result.stdout).toMatchFileSnapshot(fileURLToPath(new URL('./subagent-execution-authority/expected.jsonl', import.meta.url)))
+    await expect(result.stdout).toMatchFileSnapshot(fileURLToPath(new URL('./execution-authority/expected.jsonl', import.meta.url)))
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 70_000)

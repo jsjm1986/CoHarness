@@ -1,9 +1,9 @@
 /** Bounded output tails and private spill files shared by process providers. */
 import { randomBytes } from 'node:crypto'
-import { closeSync, mkdtempSync, openSync, rmdirSync, unlinkSync, writeSync } from 'node:fs'
+import { closeSync, openSync, rmdirSync, unlinkSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
 import type { CollectedOutput } from '@deepseek-ai/dsh-subprocess'
+import { privateTemporaryDirectory } from './tempdir.ts'
 
 /**
  * Receives one spill failure so the owner can log it through its own logger.
@@ -41,7 +41,7 @@ let defaultSpillDir: string | undefined
  */
 function privateSpillDir(): string {
   if (defaultSpillDir === undefined) {
-    const directory = mkdtempSync(join(tmpdir(), 'dsh-subprocess-'))
+    const directory = privateTemporaryDirectory('dsh-subprocess-')
     defaultSpillDir = directory
     /* v8 ignore next 3 -- Isolated Node process tests verify empty-directory removal and completed-file retention at exit. */
     process.once('exit', () => {

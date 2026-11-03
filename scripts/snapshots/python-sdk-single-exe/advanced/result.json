@@ -161,18 +161,18 @@
             "maxTokens": true
           },
           "tools": [
-            "{{tools}}",
-            "{{tools}}",
-            "{{tools}}",
-            "{{tools}}",
-            "{{tools}}",
-            "{{tools}}",
-            "{{tools}}",
-            "{{tools}}",
-            "{{tools}}",
-            "{{tools}}",
-            "{{tools}}",
-            "{{tools}}"
+            "cordis_inspect_list",
+            "cordis_inspect_query",
+            "cordis_inspect_self",
+            "job_kill",
+            "job_list",
+            "job_output",
+            "load_workspace_dependencies",
+            "present",
+            "snapshot_double",
+            "subagent",
+            "workflow",
+            "working_directory"
           ]
         },
         "reason": "initial"
@@ -1427,18 +1427,18 @@
                 "maxTokens": true
               },
               "tools": [
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}"
+                "cordis_inspect_list",
+                "cordis_inspect_query",
+                "cordis_inspect_self",
+                "job_kill",
+                "job_list",
+                "job_output",
+                "load_workspace_dependencies",
+                "present",
+                "snapshot_double",
+                "subagent",
+                "workflow",
+                "working_directory"
               ]
             },
             "reason": "initial"
@@ -2407,18 +2407,18 @@
                 "maxTokens": true
               },
               "tools": [
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}"
+                "cordis_inspect_list",
+                "cordis_inspect_query",
+                "cordis_inspect_self",
+                "job_kill",
+                "job_list",
+                "job_output",
+                "load_workspace_dependencies",
+                "present",
+                "snapshot_double",
+                "subagent",
+                "workflow",
+                "working_directory"
               ]
             },
             "reason": "initial"
@@ -3157,18 +3157,18 @@
                 "maxTokens": true
               },
               "tools": [
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}",
-                "{{tools}}"
+                "cordis_inspect_list",
+                "cordis_inspect_query",
+                "cordis_inspect_self",
+                "job_kill",
+                "job_list",
+                "job_output",
+                "load_workspace_dependencies",
+                "present",
+                "snapshot_double",
+                "subagent",
+                "workflow",
+                "working_directory"
               ]
             },
             "reason": "initial"

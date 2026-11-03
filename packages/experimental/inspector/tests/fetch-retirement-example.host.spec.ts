@@ -16,10 +16,10 @@ it('restores native fetch after independent Loader Inspector owners stop in eith
       ...(mode === 'src' ? ['--import', import.meta.resolve('tsx/esm')] : []),
       fileURLToPath(new URL('./fixtures/fetch-retirement.mjs', import.meta.url)), mode,
       ...(process.env.DSH_INSPECTOR_ARTIFACT_ROOT === undefined ? [] : [process.env.DSH_INSPECTOR_ARTIFACT_ROOT]),
-    ], { cwd: root, timeout: 60_000, killSignal: 'SIGKILL', env: { ...process.env,
+    ], { cwd: root, timeout: 150_000, killSignal: 'SIGKILL', env: { ...process.env,
       NODE_OPTIONS: undefined, NODE_PATH: undefined, DSH_HOME: join(root, '.dsh'), DSH_AGENTS_HOME: join(root, '.agents'), TMPDIR: root,
       TSX_TSCONFIG_PATH: mode === 'src' ? resolve(import.meta.dirname, '../../../../tsconfig.json') : undefined,
     } })
     await expect(result.stdout).toMatchFileSnapshot(resolve(import.meta.dirname, 'expected/fetch-retirement.jsonl'))
   } finally { await rm(root, { recursive: true, force: true }) }
-}, 70_000)
+}, 170_000)

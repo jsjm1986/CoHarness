@@ -30,6 +30,7 @@ console.log = (...args) => {
   Reflect.apply(print, console, args)
 }
 const server = createServer((request, response) => { request.resume(); response.writeHead(204).end() })
+const progress = phase => process.stderr.write(`fetch-retirement: ${phase}\n`)
 let primaryError
 try {
   const { boot } = await import(entry('boot/app-boot'))
@@ -47,6 +48,7 @@ try {
         { name: entry('client/connection') },
         { id: 'capture-owner', name: entry('experimental/inspector'), config: { port: 0, captureFetch: true } },
       ]))
+      progress(`boot order=${order.join('')} index=${index}`)
       const ctx = await boot(`inspector-fetch-owner-${index}`, config)
       contexts.push(ctx)
       const mounted = [...ctx.loader.entries()].find(row => row.options.id === 'capture-owner')
@@ -54,6 +56,7 @@ try {
       await mounted.fiber.await()
       assert.ok(ctx.get('inspector'))
       current.push({ ctx, fiber: mounted.fiber, fetch: globalThis.fetch })
+      progress(`booted order=${order.join('')} index=${index}`)
     }
     const request = async callable => {
       const response = await callable(url)
@@ -62,12 +65,15 @@ try {
       return true
     }
     await request(globalThis.fetch)
+    progress(`disposing first order=${order.join('')}`)
     await current[order[0]].fiber.dispose()
     const live = current[order[1]]
     const activeWrapperPreserved = globalThis.fetch === live.fetch
     assert.equal(activeWrapperPreserved, true)
     const activeRequestCompleted = await request(globalThis.fetch)
+    progress(`disposing second order=${order.join('')}`)
     await live.fiber.dispose()
+    progress(`awaiting workers order=${order.join('')}`)
     await Promise.all(workers.slice(before).map(record => record.completion))
     const originalFetchRestored = globalThis.fetch === descriptor.value
     const retainedRequestCompleted = await request(current[0].fetch)
