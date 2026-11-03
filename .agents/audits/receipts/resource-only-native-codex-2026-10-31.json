@@ -1,0 +1,42 @@
+{
+  "at": "2026-10-31T05:14:28.373518+00:00",
+  "status": "named_local_resource_only_compositions_verified_other_review_open",
+  "relatedFindings": [
+    "B384",
+    "B389"
+  ],
+  "newProductBugs": 0,
+  "paths": [
+    "packages/subagent/subagent-codex/tests/real-product.spec.ts",
+    "packages/subagent/subagent-codex/README.md",
+    "packages/subagent/subagent-codex/README.zh.md",
+    "packages/subagent/subagent-codex/README.i18n.yaml"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051100Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051100Z/resource-only-native-product-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051100Z/resource-only-lint.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051100Z/resource-only-host-typecheck.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051100Z/resource-only-pairing.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T051100Z/resource-only-doc-budgets.json"
+  ],
+  "verification": {
+    "nativeProductCases": 26,
+    "admissionMatrixCases": 12,
+    "resourceOnlyCases": 8,
+    "newCases": 9,
+    "covered": "Actual pinned native Codex runs against a local Responses server. One-shot and resumed-member flows cover explicit/inherited routes with model policy, resource owner alone, or required resource control alone. Each native request retains parent/member Session and execution origin; credentials stay parent-owned. Members run under one model slot; every process/model permit settles.",
+    "checks": "Focused full real-product file, Host typecheck, scoped lint, translation pairing and documentation budgets pass. Production source is unchanged, so the previous matched 8-gate build remains valid; no repeated build or whole-suite claim.",
+    "initialDiagnostic": "A new assertion incorrectly expected one release invocation per lease. Shared process handles legitimately report quiescence through multiple idempotent observations. The test now checks three distinct admissions and confirmed settlement of each; no product change or test skip was used.",
+    "limits": "This closes the named local combinations only; resource-only remote/native composition and remaining permissions remain open.",
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "noteReview": "Test coverage and its README description only; no production behavior or architecture decision changed, so no duplicate Agent Note was added.",
+  "remaining": [
+    "Reproduce suspected local preflight allocation accounting before any production fix.",
+    "Continue remaining remote pipe, resource-only remote execution and cross-computer permission cases.",
+    "All 12 domains and B04/B25 remain open. Paid Responses verification remains deferred."
+  ]
+}

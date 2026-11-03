@@ -1,0 +1,14 @@
+{
+  "name": "goal-jobs-exact-coverage-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/goal-jobs-exact-coverage.config.mts packages/goal packages/jobs --coverage",
+  "startedAt": "2026-10-26T03:35:04.452584+00:00",
+  "seconds": 28.035,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f7f47afe8cd98c77148e4f81ec365b820bfc721115a3c24ba450f8a11004f7ec",
+  "inputsAfter": "f7f47afe8cd98c77148e4f81ec365b820bfc721115a3c24ba450f8a11004f7ec",
+  "postgresToolDirectory": null,
+  "outputSha256": "30439304f728073847212c3383ecac0cd5d3802ec85f2e69e05705ffe78b14d2",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  14 passed (14)\n      Tests  334 passed (334)\n   Start at  11:35:23\n   Duration  8.61s (transform 9.02s, setup 766ms, import 12.63s, tests 6.11s, environment 1ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 397/397 )\nBranches     : 100% ( 283/283 )\nFunctions    : 100% ( 93/93 )\nLines        : 100% ( 350/350 )\n================================================================================\n"
+}

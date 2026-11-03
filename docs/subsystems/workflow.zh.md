@@ -4,7 +4,7 @@
 
 工作流 seam 允许 agent（智能体）运行由模型编写、会启动 subagent 的编排脚本。与 [subagent](subagent.zh.md) 一样，它是**一项可选能力**，不属于 agent loop，因此其类型和操作记录在此处，而非 [core.md](core.zh.md)。与 bash 一样，每个上下文只允许一个引擎实现提供 `ctx.workflowEngine`；没有命名提供方注册表（第二个引擎通过插件配置替换第一个，而不与它同时运行）。
 
-Service Definition：[dsh-workflow](../../packages/workflow/workflow)（`ctx.workflowEngine` + 下文词汇）。Service Provider 是 [dsh-workflow-ptc](../../packages/workflow/workflow-ptc)（一个 `node:worker_threads` 引擎——每个 run 一个 worker，脚本的 vm 上下文位于其中）；面向模型的 Consumer 是 [dsh-tool-workflow](../../packages/workflow/tool-workflow)。提案与设计理由见 [dynamic-workflows Agent Note](../../.agents/notes/implemented/feature/2026-07-05-dynamic-workflows.zh.md)。
+Service Definition：[dsh-workflow](../../packages/workflow/workflow)（`ctx.workflowEngine` + 下文词汇）。Service Provider 是 [dsh-workflow-ptc](../../packages/workflow/workflow-ptc)（通过共享的沙箱化 Node PTC 进程编排）；面向模型的 Consumer 是 [dsh-tool-workflow](../../packages/workflow/tool-workflow) 和 [dsh-tool-ralph](../../packages/workflow/tool-ralph)。提案与设计理由见 [dynamic-workflows Agent Note](../../.agents/notes/implemented/feature/2026-07-05-dynamic-workflows.zh.md)。
 
 源码：浏览器安全词汇位于 [`packages/workflow/workflow/src/types.ts`](../../packages/workflow/workflow/src/types.ts)，Host 请求与活跃运行句柄位于 [`runtime-types.ts`](../../packages/workflow/workflow/src/runtime-types.ts)。
 
@@ -92,12 +92,13 @@ interface WorkflowResult {
 
 ## 活跃运行：`WorkflowRun`
 
-脚本执行期间消费方持有的句柄。消费方会等待 `result`，可以在运行期间调用 `cancel`，并且必须在每条路径上调用 `dispose`（资源释放）。`result` 不会被拒绝：脚本失败会兑现为 `stopReason: 'error'`。运行被取消后，即使脚本本身永不结算，结果也会在引擎规定的有界宽限期内结算；引擎会强制将其结算为 `cancelled`，随后 worker-thread 引擎会终止脚本所在的 worker。因此，等待 `result` 的消费方不会在取消后无限期挂起。`dispose()` 会执行取消、等待有界结算并等待子 agent 完全停稳，不会因脚本卡死而挂起。
+Consumer 等待 `result`，可以取消运行，并且必须在每条路径上调用 `dispose()`。脚本失败以 `stopReason: 'error'` 兑现；结果结算并不代表资源已清理完成。并发的资源释放调用共享一次尝试，被拒绝的尝试保留未完成的清理供重试。[PTC 后端](../../packages/workflow/workflow-ptc/README.zh.md) 负责进程与子任务清理，没有隐式的放弃期限。[工具 Consumer](../../packages/workflow/tool-workflow/README.zh.md) 在清理被确认之前保持后台任务活动。
 
 ```ts type-equiv
 /**
  * Holder-owned live workflow. `result` never rejects; consumers may cancel
- * and must call idempotent `dispose()` to await script and child quiescence.
+ * and must call `dispose()` to await script and child quiescence. Concurrent
+ * disposal calls share an attempt; a failed attempt retains cleanup for retry.
  */
 interface WorkflowRun {
   readonly id: WorkflowRunId
@@ -106,8 +107,15 @@ interface WorkflowRun {
   readonly result: Promise<WorkflowResult>
   /** Cancel the run and its children. */
   cancel(reason?: string): void
-  /** Cancel if needed and await script and child cleanup. */
+  /** Cancel if needed and await script and child cleanup; reject while cleanup remains unconfirmed. */
   dispose(): Promise<void>
+  /**
+   * Hand rejected disposal to its original resource owner before discarding the
+   * run. Holder-owned background work keeps its own retry controls.
+   * Observe confirmation outside the failing foreground call.
+   * @returns fulfillment after retained cleanup confirms quiescence.
+   */
+  retainFailedCleanup(): Promise<void>
 }
 ```
 
@@ -143,6 +151,18 @@ Workflow Service Definition contract. Invalid requests throw before publication;
 
 ```ts cordis-catalog
 /**
+ * Retain a foreground Consumer through result collection, disposal and failed
+ * cleanup transfer. Withdrawal cancels and joins admitted operations; direct
+ * holder-owned starts and background Jobs retain their own control lifetime.
+ * Providers extend this method when dependencies also own admission.
+ * @param parent - exact live Agent retaining foreground occupation.
+ * @param signal - caller cancellation.
+ * @param operation - Consumer including start, collection and cleanup transfer.
+ * @returns the Consumer outcome; closed admission rejects without invoking it.
+ */
+async withForeground<T>(parent: Agent, signal: AbortSignal, operation: (signal: AbortSignal) => Promise<T>): Promise<T>
+
+/**
  * Parse and execute a workflow script.
  * @param request - the script, its `args`, the parent agent, and an
  *   optional cancel signal.
@@ -150,6 +170,8 @@ Workflow Service Definition contract. Invalid requests throw before publication;
  */
 abstract start(request: WorkflowStartRequest): WorkflowRun
 ```
+
+Types: [Agent](core.zh.md)
 
 Source: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
 

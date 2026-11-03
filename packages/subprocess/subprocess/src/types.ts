@@ -8,6 +8,8 @@
  */
 
 import type { Duplex, Readable, Writable } from 'node:stream'
+import type { Branded } from '@deepseek-ai/dsh-brand'
+import type { ResourceOriginIntent } from '@deepseek-ai/dsh-resource-budget/types'
 
 /** Namespace prefix reserved for DeepSeek Harness-managed child environment facts. */
 export const DSH_ENV_PREFIX = 'DSH_' as const
@@ -75,6 +77,10 @@ export interface SubprocessStdio {
  * request/spec split is the owning template).
  */
 export interface SubprocessSpawnSpec {
+  /** Resource owner captured before waiting for allocation; omitted only for agentless work. */
+  sessionId?: Branded<'SessionId'>
+  /** Select execution, signed interactive, or explicitly Runtime-owned admission. */
+  resourceOrigin?: ResourceOriginIntent
   /** Executable and arguments; `argv[0]` is the program. Never shell-interpreted here. */
   argv: readonly string[]
   /** Working directory for the child. */
@@ -212,6 +218,10 @@ export interface SubprocessTerminalEnvironment {
 
 /** A fully specified terminal-process spawn. */
 export interface SubprocessTerminalSpawnSpec {
+  /** Resource owner captured before waiting for allocation; omitted only for agentless work. */
+  sessionId?: Branded<'SessionId'>
+  /** Select execution, signed interactive, or explicitly Runtime-owned admission. */
+  resourceOrigin?: ResourceOriginIntent
   /** Executable and arguments; `argv[0]` is the program. */
   argv: readonly string[]
   /** Working directory in this subprocess provider's execution world. */

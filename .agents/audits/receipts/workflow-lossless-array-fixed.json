@@ -1,0 +1,14 @@
+{
+  "name": "workflow-lossless-array-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/workflow",
+  "startedAt": "2026-10-26T02:34:39.150022+00:00",
+  "seconds": 19.997,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "dae49ea8d6e04ca4f2b3f1e0a7fdf72411a070cf0df82c23b1761dac40e78fdc",
+  "inputsAfter": "dae49ea8d6e04ca4f2b3f1e0a7fdf72411a070cf0df82c23b1761dac40e78fdc",
+  "postgresToolDirectory": null,
+  "outputSha256": "0d9e529b6541a4d3dd29ff0f46f3ca8e81b3bddb014af05b3ddec18c65419057",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  13 passed (13)\n      Tests  210 passed (210)\n   Start at  10:34:45\n   Duration  13.33s (transform 28.48s, setup 1.05s, import 38.96s, tests 22.84s, environment 10ms)\n\n"
+}

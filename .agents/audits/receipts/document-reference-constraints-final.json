@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-constraints-final",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 pnpm run constraints",
+  "startedAt": "2026-10-26T22:59:45.654697+00:00",
+  "seconds": 6.299,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "inputsAfter": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "postgresToolDirectory": null,
+  "outputSha256": "018fe605fb12870f7d9d1184b775b8e471acb61e3266c7cf275d1847eb98cefe",
+  "outputTail": "$ tsx scripts/check-workspace-constraints.ts\n"
+}

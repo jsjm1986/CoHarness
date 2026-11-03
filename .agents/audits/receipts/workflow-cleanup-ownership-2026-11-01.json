@@ -1,0 +1,304 @@
+{
+  "findings": [
+    "B429",
+    "B430"
+  ],
+  "status": "fixed_verified_named_workflow_cleanup_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T06:28:28.260757+00:00",
+  "baseline": {
+    "remote": "origin/master",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-origin-final.json",
+    "fetchedAt": "2026-11-01T06:19:12.222196+00:00",
+    "dirtyWorkspacePreserved": true
+  },
+  "problem": {
+    "B429": "Child disposal failure was logged and the child handle removed; public disposal cached successful completion and could not retry the unfinished cleanup.",
+    "B430": "The background workflow consumer swallowed disposal failure and settled the job using the script result, withdrawing the owner idle veto and publishing durable completion before cleanup confirmation."
+  },
+  "fix": {
+    "B429": "Track child disposal with pending work, remove a child only after success, retain failures for retry, share concurrent disposal attempts and reset failed public attempts.",
+    "B430": "Keep the job live with an unconfirmed-cleanup notice; existing termination retries disposal. Confirmed cleanup permits one failed job/run ending and withholds the partial script value."
+  },
+  "verification": {
+    "distinctRelatedCases": 293,
+    "owningUnitAndRealNodeCases": 289,
+    "typescriptSdkScenarios": 2,
+    "pythonSdkScenarios": 2,
+    "newUnitCases": 4,
+    "repeatVersionRunsNotAddedToDistinctCount": true,
+    "passedChecks": [
+      {
+        "name": "workflow-source-types",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-source-types.json"
+      },
+      {
+        "name": "workflow-bundle",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-bundle.json"
+      },
+      {
+        "name": "workflow-coverage-joined",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-coverage-joined.json"
+      },
+      {
+        "name": "workflow-sdk-source-state",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-sdk-source-state.json"
+      },
+      {
+        "name": "workflow-sdk-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-sdk-node22.json"
+      },
+      {
+        "name": "workflow-sdk-node24",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-sdk-node24.json"
+      },
+      {
+        "name": "workflow-sdk-python",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-sdk-python.json"
+      },
+      {
+        "name": "workflow-host-types-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-host-types-final.json"
+      },
+      {
+        "name": "workflow-lint-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-lint-final.json"
+      },
+      {
+        "name": "workflow-python-lint",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-python-lint.json"
+      },
+      {
+        "name": "workflow-export-docs",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-export-docs.json"
+      },
+      {
+        "name": "workflow-cordis-config",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-cordis-config.json"
+      },
+      {
+        "name": "workflow-generate-catalog",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-generate-catalog.json"
+      },
+      {
+        "name": "workflow-pairing",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-pairing.json"
+      },
+      {
+        "name": "workflow-subsystem-pairing-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-subsystem-pairing-final.json"
+      },
+      {
+        "name": "workflow-docs-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-docs-final.json"
+      },
+      {
+        "name": "workflow-origin-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-origin-final.json"
+      }
+    ],
+    "negativeChecks": [
+      {
+        "name": "workflow-child-cleanup-negative",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-child-cleanup-negative.json"
+      },
+      {
+        "name": "workflow-background-cleanup-negative",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-background-cleanup-negative.json"
+      },
+      {
+        "name": "workflow-sdk-old-source-isolated",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-sdk-old-source-isolated.json"
+      },
+      {
+        "name": "workflow-sdk-old-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-sdk-old-node22.json"
+      }
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 254,
+          "covered": 254,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 304,
+          "covered": 304,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 66,
+          "covered": 66,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 171,
+          "covered": 171,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/workflow/tool-workflow/src/index.ts": {
+        "lines": {
+          "total": 108,
+          "covered": 108,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 24,
+          "covered": 24,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 120,
+          "covered": 120,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 64,
+          "covered": 64,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/workflow/workflow-ptc/src/host.ts": {
+        "lines": {
+          "total": 146,
+          "covered": 146,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 42,
+          "covered": 42,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 184,
+          "covered": 184,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 107,
+          "covered": 107,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "coverageScope": "Existing repository per-file100% gate over exactly the2 changed runtime source files; no threshold, ignore or baseline changes.",
+    "counterfactual": "Complete102-file frozen workflow packages. Select original workflow-ptc for holder-retry and original tool-workflow for background-retry; both source and normal Node22 built runs fail2 intended markers without timeout/module errors.",
+    "physicalEvidence": "Real Node PTC subprocess and owned HTTP child response. Failed disposal leaves transport active, job live, owner idle veto busy and run-end absent; explicit retry closes the response before one failed job/run-end.",
+    "preservation": {
+      "original27HostBodiesPreserved": true,
+      "original32UnaffectedToolBodiesPreserved": true,
+      "twoToolCleanupOraclesIntentionallyChanged": "A cleanup failure cannot prove JobHooks.done resource release. The revised cases retain the live job, retry termination and settle failed only after cleanup.",
+      "twoRealPtcCleanupOraclesIntentionallyChanged": "Child disposal errors now propagate rather than acknowledging cleanup success. Controlled release in finally prevents test resources from leaking.",
+      "originalPackageFiles": 102,
+      "newUnitCases": 4
+    },
+    "documentation": {
+      "quickPassed": 20,
+      "quickFailed": 0,
+      "ownedBilingualPairs": 5,
+      "cordisConfigs": 435,
+      "catalog": "127 computed,0 written"
+    },
+    "verificationCorrections": [
+      "Initial coverage identified missing in-flight cleanup sharing and singular completed-job count; added external behavior cases and reached100% in all4 metrics.",
+      "Aliased a new promise-based setImmediate import so it cannot shadow an existing callback-based global use.",
+      "Replaced a service-method observation wrapper with the public job wait/state API; the wrapper changed the caller context.",
+      "Initial combined-original background observation timed out; preserved that failure and proved each original role independently with intended markers.",
+      "Synchronized subsystem interface JSDoc and replaced stale worker-thread bounded-cleanup prose; final full20-leaf doc aggregate passed.",
+      "Updated obsolete success-on-disposal-failure oracles and made fixture teardown tolerate an already removed job record while awaiting owned cleanup."
+    ],
+    "repositoryReferencesAfterAuditUpdate": {
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-references-final.json"
+    }
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/workflow-cleanup-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-workflow-cleanup-ownership.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-workflow-cleanup-ownership.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-workflow-cleanup-ownership.zh.md",
+    "apps/cli/tests/profiles/sdk/workflow-cleanup.expected.e2e.ts",
+    "docs/subsystems/workflow.i18n.yaml",
+    "docs/subsystems/workflow.md",
+    "docs/subsystems/workflow.zh.md",
+    "examples/headless-agent/tests/fixtures/workflow-cleanup/expected.json",
+    "examples/headless-agent/tests/fixtures/workflow-cleanup/model.mjs",
+    "examples/headless-agent/tests/fixtures/workflow-cleanup/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/workflow-cleanup/runtime.cordis.yml",
+    "examples/headless-agent/tests/fixtures/workflow-cleanup/runtime.mjs",
+    "packages/workflow/tool-workflow/README.i18n.yaml",
+    "packages/workflow/tool-workflow/README.md",
+    "packages/workflow/tool-workflow/README.zh.md",
+    "packages/workflow/tool-workflow/src/index.ts",
+    "packages/workflow/tool-workflow/tests/expected/failure-containment.jsonl",
+    "packages/workflow/tool-workflow/tests/fixtures/failure-driver.mjs",
+    "packages/workflow/tool-workflow/tests/tool-workflow.spec.ts",
+    "packages/workflow/workflow-ptc/README.i18n.yaml",
+    "packages/workflow/workflow-ptc/README.md",
+    "packages/workflow/workflow-ptc/README.zh.md",
+    "packages/workflow/workflow-ptc/src/host.ts",
+    "packages/workflow/workflow-ptc/tests/host.spec.ts",
+    "packages/workflow/workflow-ptc/tests/workflow-ptc.spec.ts",
+    "packages/workflow/workflow/README.i18n.yaml",
+    "packages/workflow/workflow/README.md",
+    "packages/workflow/workflow/README.zh.md",
+    "packages/workflow/workflow/src/runtime-types.ts",
+    "python/sdk/tests/test_workflow_cleanup_expected.py"
+  ],
+  "readOnlyPrerequisiteCount": 62,
+  "artifactReferences": 9,
+  "mergeRequirement": "Integrate B429/B430 together: only30 owned source deltas with normal matching workflow/workflow-ptc/tool-workflow builds. Prerequisite sources and9 artifact references are read-only. Do not replace peer-owned Gateway/readiness/UI/topology files. B416-B428 and B417 matched Session reader acceptance retain independent requirements. No production deployment implied.",
+  "notes": {
+    "scope": [
+      "workflow/workflow-ptc child disposal ownership",
+      "workflow/tool-workflow JobHooks.done quiescence and idle veto"
+    ],
+    "relatedNotesRetained": [
+      ".agents/notes/implemented/feature/2026-08-10-durable-workflow-runs-in-chat.md",
+      ".agents/notes/implemented/bug-fix/2026-08-27-bounded-runtime-work-and-teardown-fences.md"
+    ],
+    "newNote": ".agents/notes/implemented/bug-fix/2026-11-01-workflow-cleanup-ownership.md",
+    "classification": "Retain all active substantive ownership decisions. New note supplies retry and pending-job rationale; durable workflow recording remains authoritative and is not superseded. No archived notes modified.",
+    "compatibility": "Existing method/type fields, JobHooks.done never-rejecting quiescence promise and Session event fields remain unchanged. Failed cleanup now retains ownership as promised; no migration, schema increment, new format/event or immutable Session rewrite.",
+    "remainingConstraint": "Persistent cleanup failure keeps job/owner/service teardown waiting until explicit termination retries can confirm release. No automatic timer or deadline abandons physical ownership.",
+    "peerReport": "Peer calls R24 deployed; B428 and later root packets remain separate, no root production verification or deployment."
+  },
+  "b428ReadinessConvergence": {
+    "status": "passed",
+    "evidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T052748Z/b428-readiness-convergence.json",
+    "peerOwnedMechanicalChangesOnly": true,
+    "previousFrozenCapsuleAndFailedReceiptsPreserved": true
+  },
+  "remaining": [
+    "Integrate B429/B430 together using only30 owned source deltas and normal matching workflow/workflow-ptc/tool-workflow builds. The62 source prerequisites and9 artifacts are read-only. B416-B428 and B417 reader acceptance remain independent.",
+    "Review remaining workflow consumers, including tool-ralph and foreground cleanup failure ownership through parent disposal. Continue model/tool/Inspector authorization, queue and resource cleanup paths outside peer-owned files.",
+    "Persistent cleanup failure intentionally keeps a background job and its owner live, including teardown; explicit termination retries after recovery. No timer or new deadline abandons unconfirmed resources.",
+    "Continue cross-account/computer permissions and filesystem/document races. All12 domains and B04/B25 remain open. Peer owns R24 physical acceptance and REAL-042 latency/state convergence.",
+    "No root production deployment, restart or dependency synchronization. Official paid Responses verification remains deferred by the user."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true
+}

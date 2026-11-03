@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-subagent-job-cleanup.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-subagent-job-cleanup.md
+document:
+  en: 022d01252a11419508967bf4439558b4d33aa666
+  zh: ed8bb9f385603c15792fd939eeca999aa310f70b
+/agent-note-background-subagent-cleanup-stays-retryable:
+  en: 4d1e94cd94e99dc2
+  zh: d9966397b66f5559
+/agent-note-background-subagent-cleanup-stays-retryable/problem:
+  en: 3c1336b0b35536a7
+  zh: 7abc7038a0002f5e
+/agent-note-background-subagent-cleanup-stays-retryable/decision:
+  en: e01890ddf9f8e2c0
+  zh: 1c78e6bc0f1afbf1
+/agent-note-background-subagent-cleanup-stays-retryable/alternatives-considered:
+  en: 571063c6397f0510
+  zh: b412387de7104f64
+/agent-note-background-subagent-cleanup-stays-retryable/consequences:
+  en: 0c424f257cefd19f
+  zh: 71d42197f690c2cf
+/agent-note-background-subagent-cleanup-stays-retryable/verification:
+  en: f3f749439112951c
+  zh: 5ad35b0fe76f4d2e

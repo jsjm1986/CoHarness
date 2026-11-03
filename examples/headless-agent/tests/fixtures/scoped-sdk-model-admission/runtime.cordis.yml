@@ -1,0 +1,24 @@
+- id: llm-deepseek
+  disabled: true
+
+- id: agent-loop
+  isolate:
+    modelAccess: sdk-owned-agent
+    resourceBudget: sdk-owned-agent
+
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, sdkProcessAdmissionReady, sdkScopedAdmissionReady]
+
+- insert:
+    - id: sdk-scope-parent-fixture
+      name: '../sdk-process-admission/plugin.mjs'
+      config:
+        mode: !!js >-
+          'scope-' + process.env.DSH_TEST_SDK_SCOPE_MODE
+    - id: sdk-scope-control-fixture
+      name: './control.mjs'
+      isolate:
+        modelAccess: sdk-owned-agent
+        resourceBudget: sdk-owned-agent
+      config:
+        mode: !!js process.env.DSH_TEST_SDK_SCOPE_MODE

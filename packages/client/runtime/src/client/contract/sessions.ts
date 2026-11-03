@@ -35,7 +35,8 @@ export interface SessionReference extends Disposable {
   readonly sessionId: SessionId
   /** Shared binding; access fails after reference release or generation disposal. */
   readonly binding: SessionBinding
-  /** This reference's cancellable wait for the shared initial `Session.open()` attempt to settle. */
+  /** Cancellable initial history settlement, following a reconnect's replacement read.
+   * A current read error remains observable in the binding. */
   readonly ready: Promise<SessionBinding>
   /** Release once; the final reference starts local scope and history teardown. */
   release(): void
@@ -59,9 +60,14 @@ export interface ISessions {
   /**
    * Begin an asynchronous navigation intent, superseding any earlier intent.
    * Selecting, clearing, scope changes, and owner disposal cancel it.
+   * @param options - Optional originating composer to hold until preparation settles.
    * @returns cancellation to check before publishing a late navigation result.
    */
-  beginNavigation(): AbortSignal
+  beginNavigation(options?: { readonly blockInputFor?: SessionId | undefined }): AbortSignal
+  /** Release this intent's composer hold; a superseding intent keeps its own hold.
+   * @param signal - Original intent returned by beginNavigation.
+   */
+  finishNavigation(signal: AbortSignal): void
   /**
    * Retain an exact Client generation and start its shared initial history opening.
    * @param target - known identity or durable direct-parent address.
@@ -243,6 +249,13 @@ export interface ISessions {
    * @returns the operation result or failure; cancellation releases the runtime hold immediately.
    */
   usingRuntime?<T>(target: SessionRuntimeTarget, signal: AbortSignal, operation: (signal: AbortSignal) => Promise<T>): Promise<T>
+  /** Prepare an explicitly selected Runtime for management without opening or creating a Session.
+   * The caller retains it through `usingRuntime` while its view remains mounted.
+   * @param target - captured account Runtime; directory browsing never calls this method.
+   * @param signal - management-view lifetime or superseding navigation.
+   * @returns completion after the exact target's initial connection and Session directory settle.
+   */
+  prepareRuntime?(target: SessionRuntimeTarget, signal: AbortSignal): Promise<void>
   /** Discover an account-visible Session in its target runtime before retaining history.
    * Concurrent verification shares a pending Workspace read; later calls repull after settlement.
    * @param target - account runtime that owns the session's workbench binding.
@@ -254,9 +267,10 @@ export interface ISessions {
   /** Create a new conversation in an explicitly selected account runtime.
    * @param target - account runtime that hosts the new session.
    * @param signal - cancels discovery and prevents late selection; an accepted Host creation is not rolled back.
+   * @param options - captured Workspace and blank-conversation creation options.
    * @returns the created session identity.
    */
-  createSession?(target: SessionRuntimeTarget, signal?: AbortSignal): Promise<SessionId>
+  createSession?(target: SessionRuntimeTarget, signal?: AbortSignal, options?: import('./session-create.ts').SessionCreateOptions): Promise<SessionId>
   /** Reconcile the bootstrap connection with the account's current scope.
    * The first declaration preserves startup navigation; later target changes supersede it.
    * Previously cancelled user navigation remains cancelled.

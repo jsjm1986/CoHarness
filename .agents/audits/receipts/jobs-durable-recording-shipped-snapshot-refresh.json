@@ -1,0 +1,14 @@
+{
+  "name": "jobs-durable-recording-shipped-snapshot-refresh",
+  "cwd": ".",
+  "command": "env DSH_SNAPSHOT=refresh pnpm run test:snapshot snapshots/session/headless.snapshot.ts -t background-job-admission",
+  "startedAt": "2026-10-26T08:03:51.862734+00:00",
+  "seconds": 10.96,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bff22eb75d3ac3a5cdcea00a6f4b852038e0a4e7f2ad2e89a500f25fd066234c",
+  "inputsAfter": "bff22eb75d3ac3a5cdcea00a6f4b852038e0a4e7f2ad2e89a500f25fd066234c",
+  "postgresToolDirectory": null,
+  "outputSha256": "622eb7b63c997f215afbb5c76d9c23be825a74d7c9de5d53c226f5f47fa3597a",
+  "outputTail": "$ vitest run --config vitest.snapshot.config.ts snapshots/session/headless.snapshot.ts -t background-job-admission\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  1 passed | 149 skipped (150)\n   Start at  16:03:57\n   Duration  5.62s (transform 1.12s, setup 31ms, import 2.71s, tests 2.75s, environment 0ms)\n\n"
+}

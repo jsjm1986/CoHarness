@@ -1,0 +1,13 @@
+{
+  "name": "gateway-resource-provider-current",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/runtime-resource-provider.spec.ts --retry=0",
+  "startedAt": "2026-10-23T13:19:33.550364+00:00",
+  "seconds": 8.27,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1251d6ad967930c8b9eb452b4a75c60f47a88d10c3a8bc9743e4cce6fec6409e",
+  "inputsAfter": "1251d6ad967930c8b9eb452b4a75c60f47a88d10c3a8bc9743e4cce6fec6409e",
+  "outputSha256": "509b4d9fe5b85de77f9728e6fc790db67082e311e1cae4d14be642ad4f6798ba",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 skipped (1)\n      Tests  17 skipped (17)\n   Start at  21:19:39\n   Duration  2.13s (transform 1.66s, setup 0ms, import 2.00s, tests 0ms, environment 0ms)\n\n"
+}

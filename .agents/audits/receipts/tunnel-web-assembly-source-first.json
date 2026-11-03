@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-web-assembly-source-first",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/tsx --tsconfig tsconfig.run.json tests/run-local-web-assembly.mjs src",
+  "startedAt": "2026-10-24T21:43:29.111529+00:00",
+  "seconds": 5.36,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "60abe11842a52f1baf0d553e2c6aa23f3c60b736e2ccfa009d0af7243885ac0a",
+  "inputsAfter": "60abe11842a52f1baf0d553e2c6aa23f3c60b736e2ccfa009d0af7243885ac0a",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "bd903d78d5d9eb05b7812d7db19b80fe81c78c7adfe34366794bfcffed733bc9",
+  "outputTail": "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n404 !== 502\n\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/run-local-web-assembly.mjs:138:16)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: 404,\n  expected: 502,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v25.8.1\n"
+}

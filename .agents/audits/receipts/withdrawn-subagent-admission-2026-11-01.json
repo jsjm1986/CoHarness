@@ -1,0 +1,217 @@
+{
+  "finding": "B443",
+  "status": "fixed_verified_named_withdrawal_admission_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T12:52:00.702414+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-origin.json",
+    "fetchCompletedAt": "2026-11-01T12:45:55.617616+00:00"
+  },
+  "problem": "An old service reference can allocate after service withdrawal; directory preparation and provider startup can outlive withdrawal and publish another child without the original lifetime owner. Caller cancellation racing provider publication also needs resource rollback before refusal.",
+  "fix": "Runtime-owned admission closes once. Each pending operation has its own cancellation controller and non-rejecting completion. Withdrawal cancels those controllers and joins completions before draining adopted failures. One-shot directory/provider startup combines caller cancellation with that operation signal; a provider publication received after cancellation is disposed and failed rollback is retained. Successful catalog commit releases runtime cancellation before synchronous lifecycle observers, keeping published holder-owned runs and caller cancellation intact.",
+  "verification": {
+    "distinctBusinessCases": 750,
+    "relatedPackageCases": 738,
+    "newUnitCases": 7,
+    "typescriptSdkCases": 8,
+    "newTypescriptSdkCases": 4,
+    "pythonSdkCases": 4,
+    "versionRepeatsAndSubsetsNotAdded": true,
+    "checks": [
+      {
+        "name": "withdrawal-final-related",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-final-related.json"
+      },
+      {
+        "name": "withdrawal-final-unit",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-final-unit.json"
+      },
+      {
+        "name": "withdrawal-final-source-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-final-source-sdk.json"
+      },
+      {
+        "name": "withdrawal-final-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-final-node22.json"
+      },
+      {
+        "name": "withdrawal-final-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-final-node24.json"
+      },
+      {
+        "name": "withdrawal-final-python-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-final-python-sdk.json"
+      },
+      {
+        "name": "withdrawal-final-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-final-build.json"
+      },
+      {
+        "name": "withdrawal-final-host-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-final-host-types.json"
+      },
+      {
+        "name": "withdrawal-export-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-export-docs.json"
+      },
+      {
+        "name": "withdrawal-config",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-config.json"
+      },
+      {
+        "name": "withdrawal-doc-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-doc-final.json"
+      },
+      {
+        "name": "withdrawal-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-python-lint.json"
+      },
+      {
+        "name": "withdrawal-lint-complete",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-lint-complete.json"
+      },
+      {
+        "name": "withdrawal-test-preservation",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-test-preservation.json"
+      },
+      {
+        "name": "withdrawal-origin",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-origin.json"
+      },
+      {
+        "name": "withdrawal-old-source",
+        "status": "expected_original_business_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-old-source.json"
+      },
+      {
+        "name": "withdrawal-old-built-node22",
+        "status": "expected_original_business_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-old-built-node22.json"
+      },
+      {
+        "name": "withdrawal-final-package-coverage",
+        "status": "failed_existing_complete_file_coverage_debt_recorded",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-final-package-coverage.json",
+        "details": "All476 Core cases pass. Private diagnostic removes only the existing index exclusion, retains100% thresholds and preserves all measured zeros. Repository coverage policy remains unchanged."
+      },
+      {
+        "name": "withdrawal-final-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-final-repository-references.json"
+      }
+    ],
+    "entryCoverageDebt": {
+      "lines": {
+        "total": 214,
+        "covered": 198,
+        "skipped": 0,
+        "pct": 92.52
+      },
+      "functions": {
+        "total": 59,
+        "covered": 57,
+        "skipped": 0,
+        "pct": 96.61
+      },
+      "statements": {
+        "total": 242,
+        "covered": 223,
+        "skipped": 0,
+        "pct": 92.14
+      },
+      "branches": {
+        "total": 114,
+        "covered": 98,
+        "skipped": 0,
+        "pct": 85.96
+      }
+    },
+    "changedEntryCoverage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/changed-entry-coverage.json",
+    "helperCoverage": "run-lease.ts100% all4 metrics:27statements/10branches/11functions/21lines.",
+    "originalGraph": "A frozen192-file carrier includes all28 original Core source files, hash-matched to the B442 capsule, and the original bundled lib/index.js matched to its B442 artifact hash. The negative probes execute those original source modules or that bundle. Ancillary unused compiled faces were captured from the candidate build and are not claimed as original release artifacts.",
+    "originalOutcome": "Original source and bundled build each produce3 exact WITHDRAWAL_ADMISSION_FAILED assertions (withdrawn, publishing, rollback-retry), while the holder-control scenario passes. No module error or timeout counts as proof.",
+    "preservedTests": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/test-preservation.json",
+    "otherUnchangedTestFiles": 14,
+    "intentionalTestMigration": "The service request equality still checks all request/cwd/descriptor values; signal object identity is replaced by a real AbortSignal assertion and unchanged caller reason checks. Other existing service tests and all existing cleanup test statements are preserved.",
+    "candidateRegression": "The first composed-signal candidate revoked a committed publication when its start observer withdrew the service. The deterministic failure receipt is retained; moving cancellation release to the catalog commit fixes it and its regression passes.",
+    "retainedIntermediateFailures": [
+      "withdrawn-admission-before",
+      "withdrawal-publication-unit",
+      "withdrawal-early-lint",
+      "withdrawal-commit-signal-before",
+      "withdrawal-doc-quick"
+    ],
+    "nativeCases": "Actual loopback response streams through normal Loader/stdio SDK profiles: stale references refuse with zero launches; pending publication is cancelled without a success event; rollback is physically joined/retried before scope completion; accepted holder responses stay live and retain caller cancellation.",
+    "limitations": "Complete entry-file coverage, all service/Consumer lifetimes, cross-computer production acceptance and official Responses remain unproven."
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/withdrawal-admission-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.zh.md",
+    "apps/cli/tests/profiles/sdk/withdrawn-subagent-admission.expected.e2e.ts",
+    "docs/subsystems/subagent.i18n.yaml",
+    "docs/subsystems/subagent.md",
+    "docs/subsystems/subagent.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/withdrawn-subagent-admission/expected.json",
+    "examples/headless-agent/tests/fixtures/withdrawn-subagent-admission/model.mjs",
+    "examples/headless-agent/tests/fixtures/withdrawn-subagent-admission/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/withdrawn-subagent-admission/runtime.cordis.yml",
+    "examples/headless-agent/tests/fixtures/withdrawn-subagent-admission/runtime.mjs",
+    "packages/subagent/subagent/README.i18n.yaml",
+    "packages/subagent/subagent/README.md",
+    "packages/subagent/subagent/README.zh.md",
+    "packages/subagent/subagent/src/index.ts",
+    "packages/subagent/subagent/src/types.ts",
+    "packages/subagent/subagent/tests/run-cleanup.spec.ts",
+    "packages/subagent/subagent/tests/service.spec.ts",
+    "python/sdk/tests/test_withdrawn_subagent_admission_expected.py"
+  ],
+  "removedPaths": [],
+  "readOnlyPrerequisiteCount": 176,
+  "artifactReferences": {
+    "packages/subagent/subagent/lib/index.js": "03676e81bbe5fb9eb29b1410f88bd19cd91e5355feb5c860353b7c77cc7a5d6b",
+    "packages/subagent/subagent/lib/types/index.js": "d25ee525b49d7039f331b1f61cdd9c89b54be9e6c30ba7248e7660d559eacc23",
+    "packages/subagent/subagent/lib/types/index.d.ts": "bb6df76ab27620250e970265f71226518dd9dc16a5e49e030c12bbafebe1895e",
+    "packages/subagent/subagent/lib/types/run-lease.js": "68a420195cd7358362a8edd97d9a4cfd4c766e836d1f32e25e467d2b9ec7fa63",
+    "packages/subagent/subagent/lib/types/run-lease.d.ts": "b4a73727a97ba0369cf20f99633cef031ba8a9b3671b7ef427021ffc91fa2037",
+    "apps/cli/lib/bin.js": "a3f373cfa7a3a84aa5fb6e25c3db5b2cb9b338afe986169c00fcc38ea0044455",
+    "packages/bundle/sdk-minimal/lib/index.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "packages/subagent/subagent/lib/types/types.js": "74c4a6ef14ae2c83292457c179e22fc44885e5d92976595089107527c160f9cd",
+    "packages/subagent/subagent/lib/types/types.d.ts": "fe23d6fbb40919d51ec2b1a65934249b074f6d3b9794847d58dfe453f6887501"
+  },
+  "noteReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/note-review.json",
+  "remaining": [
+    "All12 domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue foreground cleanup hand-back after completed service disposal and persistent failed teardown ownership. B443 closes new/queued one-shot dispatch and joins unpublished startup rollback, but does not establish complete lifetime ownership for already-returned foreground Consumers or indefinite failed cleanup.",
+    "Complete Subagent index coverage debt remains: statements92.14%, branches85.96%, functions96.61%, lines92.52% in the private measurement with unchanged100% thresholds. The post-directory abort guard has a reported zero despite cancellation behavior passing; preserve the raw result and do not claim complete changed-line coverage.",
+    "Continue remaining Workflow/Ralph failures, queued continuation/permission transitions, model/tool/Inspector authorization and resource admission, cross-account/computer isolation, documents/runtime business rules and remaining files/platforms outside peer-reserved surfaces.",
+    "B416-B443 is a per-batch verified delta index, not an assembled release or production acceptance. Preserve B417 matching required-on-read writers/readers/SDKs, header7 and immutable Session generations; no old-reader downgrade.",
+    "Latest trusted peer report remains live R26/schema103, R27 tests only and frozen R28 HTML refusal candidate not deployed. Gateway html/server and corresponding tests/browser/docs plus earlier UI reservations stay peer-owned; do not repeatedly query the peer or mutate production.",
+    "Official Responses real-interface verification remains explicitly deferred by the user."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T122435Z/B416-B443-integration-index.json"
+}

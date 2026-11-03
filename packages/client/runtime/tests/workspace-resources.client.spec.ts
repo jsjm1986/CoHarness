@@ -4,7 +4,7 @@ import {
   workspaceResourceAddress, workspacePathForResource, workspaceResourceProvider,
 } from '../src/client/workspace-resources.ts'
 import type { WorkspaceResourceOpenRequest, WorkspaceResourceValue } from '../src/client/workspace-resources.ts'
-import { ApiTransportError, type SessionId } from '@deepseek-ai/dsh-client-connection/client'
+import { ApiTransportError, type ConnectionRuntimeTarget, type SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import { FakeApiClient, err } from './fake-api.client.ts'
 
 const sessionId = 'session-1' as SessionId
@@ -45,6 +45,37 @@ describe('Workspace resource addresses', () => {
 })
 
 describe('Workspace resource lifetime', () => {
+  it('isolates personal Runtime providers, identical file addresses, observations and disconnections', async () => {
+    const registry = new WorkspaceResourceRegistry()
+    const first: ConnectionRuntimeTarget = { kind: 'personal', runtimeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' as never }
+    const second: ConnectionRuntimeTarget = { kind: 'personal', runtimeId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' as never }
+    const statA = vi.fn(async () => value('a1')), statB = vi.fn(async () => value('b1'))
+    const removeA = registry.register(first, { stat: statA }, 10)
+    const removeB = registry.register(second, { stat: statB }, 10)
+    const a = registry.source({ ...resource(), runtimeTarget: first })
+    const b = registry.source({ ...resource(), runtimeTarget: second })
+    const stopA = a.subscribe(() => {}), stopB = b.subscribe(() => {})
+    try {
+      await vi.waitFor(() => {
+        expect(a.getSnapshot().value?.version).toBe('a1')
+        expect(b.getSnapshot().value?.version).toBe('b1')
+      })
+      const before = a.getSnapshot()
+      registry.handleChange(second, { sessionId, path: resource().path, version: 'b2' })
+      expect(b.getSnapshot().value?.changed).toBe(true)
+      expect(a.getSnapshot()).toBe(before)
+      registry.disconnect(second, new WorkspaceResourceError('access-revoked', 'B grant revoked'))
+      expect(b.getSnapshot()).toMatchObject({ status: 'failed', error: { code: 'access-revoked' } })
+      expect(b.getSnapshot().value).toBeUndefined()
+      expect(a.getSnapshot()).toBe(before)
+      expect(statA).toHaveBeenCalledOnce()
+      expect(statB).toHaveBeenCalledOnce()
+      removeB()
+      expect(registry.hasProvider(first)).toBe(true)
+      expect(registry.hasProvider(second)).toBe(false)
+    } finally { stopA(); stopB(); removeA(); removeB() }
+  })
+
   it('coalesces loads and preserves observations arriving before stat', async () => {
     const pending = deferred<WorkspaceResourceValue>()
     const stat = vi.fn(() => pending.promise)

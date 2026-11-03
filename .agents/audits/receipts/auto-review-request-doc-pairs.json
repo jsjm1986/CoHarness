@@ -1,0 +1,14 @@
+{
+  "name": "auto-review-request-doc-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-auto-review-request-records.md .agents/notes/implemented/feature/2026-08-28-auto-review.md packages/experimental/auto-review/README.md docs/subsystems/tools.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/auto-review-request-events/guide.md docs/event-producer-consumer.md",
+  "startedAt": "2026-10-24T03:05:26.834563+00:00",
+  "seconds": 4.836,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "85826958f8fa9b7265efc5bb650688451123e26661c46ea3126117a654eaa632",
+  "inputsAfter": "a70398d648d57c9fb5278debab17b7375e28ad6f2687daea2c468f095545e09e",
+  "postgresToolDirectory": null,
+  "outputSha256": "287d1f6bd9709665d243b3cfd46a70f3e09e5083bb3e72811c90269a2498b209",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/bug-fix/2026-10-24-auto-review-request-records.md .agents/notes/implemented/feature/2026-08-28-auto-review.md packages/experimental/auto-review/README.md docs/subsystems/tools.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/auto-review-request-events/guide.md docs/event-producer-consumer.md\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-24-auto-review-request-records.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-08-28-auto-review.i18n.yaml\nverify-translation-pairing: recorded docs/subsystems/tools.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/auto-review-request-events/guide.i18n.yaml\nverify-translation-pairing: recorded packages/experimental/auto-review/README.i18n.yaml\nverify-translation-pairing: 5 record(s) written; run the check to validate the pairs.\n"
+}

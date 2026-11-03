@@ -145,7 +145,7 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
     signal.throwIfAborted()
     await subprocessCtx.plugin(LocalSubprocessRuntime)
     signal.throwIfAborted()
-    host = subprocessCtx.subprocess.spawn(spawnSpec(
+    host = await subprocessCtx.subprocess.spawn(spawnSpec(
       [process.execPath, binPath, '--profile', 'web', '--port', '0', '--no-open'],
       world,
       {

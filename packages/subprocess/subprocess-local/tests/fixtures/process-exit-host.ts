@@ -35,7 +35,7 @@ const ownedListeners = process.listeners('exit').filter(listener => !listenersBe
 const unrelatedListener = (): void => {}
 if (trigger === 'dispose') process.once('exit', unrelatedListener)
 if (kind === 'ordinary') {
-  ctx.subprocess.spawn({
+  await ctx.subprocess.spawn({
     argv: [process.execPath, managedTree, treeState],
     cwd: process.cwd(),
     stdio: {

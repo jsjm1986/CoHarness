@@ -58,6 +58,9 @@
     },
     {
       "path": "../../settings/settings-file"
+    },
+    {
+      "path": "../../web/web-search-deepseek"
     }
   ]
 }

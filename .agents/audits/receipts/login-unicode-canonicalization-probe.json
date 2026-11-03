@@ -1,0 +1,13 @@
+{
+  "name": "login-unicode-canonicalization-probe",
+  "cwd": "gateway",
+  "command": "env TSX_TSCONFIG_PATH=tsconfig.run.json node --import tsx/esm --input-type=module -",
+  "startedAt": "2026-10-23T19:11:48.356030+00:00",
+  "seconds": 0.533,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c5d2fd22fd7230a49fa49b4a7844579f34638cb0b5b2f2091b7ac85bb3f81291",
+  "inputsAfter": "c5d2fd22fd7230a49fa49b4a7844579f34638cb0b5b2f2091b7ac85bb3f81291",
+  "outputSha256": "d4a9e387143dddbc004e4f69eadbed6f6610662db4eb8169a8af62627cd157cc",
+  "outputTail": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/node_modules/.pnpm/pg-pool@3.14.0_pg@8.16.3/node_modules/pg-pool/index.js:45\n    Error.captureStackTrace(err)\n          ^\n\nerror: unrecognized configuration parameter \"lc_ctype\"\n    at /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/node_modules/.pnpm/pg-pool@3.14.0_pg@8.16.3/node_modules/pg-pool/index.js:45:11\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/[eval1]:4:19 {\n  length: 101,\n  severity: 'ERROR',\n  code: '42704',\n  detail: undefined,\n  hint: undefined,\n  position: undefined,\n  internalPosition: undefined,\n  internalQuery: undefined,\n  where: undefined,\n  schema: undefined,\n  table: undefined,\n  column: undefined,\n  dataType: undefined,\n  constraint: undefined,\n  file: 'guc.c',\n  line: '1278',\n  routine: 'find_option'\n}\n\nNode.js v25.8.1\n"
+}

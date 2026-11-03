@@ -13,6 +13,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionActivity } from '@deepseek-ai/dsh-workspace'
 import type { JobRegistry } from './index.ts'
 import type { JobView } from './view.ts'
+import { renderJobFailure } from './failure.ts'
 
 /**
  * Answer `workspace/session-activity` with the running or stopping jobs the
@@ -35,7 +36,7 @@ export function installJobArchiveAdmission(ctx: Context, registry: JobRegistry):
         registry.kill(job.id, sessionId, 'session archived')
       } catch (error: unknown) {
         // A producer throwing on cancel must not keep the Session's other jobs running once it is archived.
-        ctx.logger.warn(`jobs: killing "${job.id}" for an archived Session failed: ${String(error)}`)
+        ctx.logger.warn(`jobs: killing "${job.id}" for an archived Session failed: ${renderJobFailure(error)}`)
       }
     }
   })

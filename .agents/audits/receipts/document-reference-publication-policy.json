@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-publication-policy",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 pnpm exec vitest run scripts/check-workspace-constraints.spec.ts scripts/client-bundle-purity.spec.ts packages/client/ui-documents/tests/userdoc-client.client.spec.ts",
+  "startedAt": "2026-10-26T22:58:40.481257+00:00",
+  "seconds": 9.727,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "inputsAfter": "df89c88707e8271aa8068896b2044d22059e3c65be6b0d5881b59862a19c8879",
+  "postgresToolDirectory": null,
+  "outputSha256": "3947acd3984602c6afc9bb2caa6bb0adde598e53d914ff699b397a94bb156970",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  3 passed (3)\n      Tests  146 passed (146)\n   Start at  06:58:45\n   Duration  4.95s (transform 847ms, setup 178ms, import 1.18s, tests 3.96s, environment 723ms)\n\n"
+}

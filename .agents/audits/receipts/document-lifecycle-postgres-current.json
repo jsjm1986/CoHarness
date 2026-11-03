@@ -1,0 +1,14 @@
+{
+  "name": "document-lifecycle-postgres-current",
+  "cwd": "gateway",
+  "command": "npx vitest run tests/admin-business-postgres.spec.ts --retry=0",
+  "startedAt": "2026-10-24T02:48:38.729779+00:00",
+  "seconds": 7.231,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "699457317d7501cfef2d5573318f457923bd7b4210a11945e53b36b22c96882d",
+  "inputsAfter": "699457317d7501cfef2d5573318f457923bd7b4210a11945e53b36b22c96882d",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "9c75bb4c336ab7da8eb8509164d14a6a040eb4188096f37f17c7f1f1b1028db3",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n  Snapshots  1 written\n Test Files  1 passed (1)\n      Tests  45 passed (45)\n   Start at  10:48:39\n   Duration  6.05s (transform 740ms, setup 0ms, import 963ms, tests 4.99s, environment 0ms)\n\n"
+}

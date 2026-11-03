@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-default-spill-lifetime.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-default-spill-lifetime.md
+document:
+  en: 07f189f308115e039679d934d8c2d9058aab49c4
+  zh: 0b086c598f37a48ea736c6d6d777e74c68e900be
+/agent-note-default-spill-storage-owns-its-exit-cleanup:
+  en: 6c43753f9645980f
+  zh: 401eb9c065852c28
+/agent-note-default-spill-storage-owns-its-exit-cleanup/problem:
+  en: 706afc441a03fca4
+  zh: bb7ee67586c6b062
+/agent-note-default-spill-storage-owns-its-exit-cleanup/decision:
+  en: ebc5a297614c842b
+  zh: 591a88216df06503
+/agent-note-default-spill-storage-owns-its-exit-cleanup/alternatives-considered:
+  en: 41da232ae47af6be
+  zh: 900941167248a839
+/agent-note-default-spill-storage-owns-its-exit-cleanup/consequences:
+  en: 79fb2269a3555876
+  zh: dac4fc0a6fa6a506
+/agent-note-default-spill-storage-owns-its-exit-cleanup/verification:
+  en: cf1329555908f8fe
+  zh: 411708de31b2a864

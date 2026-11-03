@@ -36,6 +36,7 @@ async function setup(options: { pause?: 'prepare' | 'connect' | 'start'; failPre
     if (stage === options.pause) { entered.resolve(undefined); await gate.promise }
   }
   const connection = {
+    retainConsumer: (cleanup: () => Promise<void>) => cleanup,
     dispose: vi.fn(async () => {}),
     request: async <T>(method: string, params: unknown, schema: z.ZodType<T>): Promise<T> => {
       calls.push({ method, params })
@@ -106,9 +107,50 @@ async function setup(options: { pause?: 'prepare' | 'connect' | 'start'; failPre
     peer.remote.destroy()
     await closed
   }
-  return { runtime: ctx.subprocess, fiber, calls, connection, disposalErrors, finished, entered: entered.promise, started: started.promise,
+  return { ctx, runtime: ctx.subprocess, fiber, calls, connection, disposalErrors, finished,
+    entered: entered.promise, started: started.promise,
     release: () => { gate.resolve(undefined) }, stream, closeStream, snapshots, close }
 }
+
+it.each((['prepare', 'connect'] as const).flatMap(pause => (['withdrawn', 'replaced'] as const).map(change => ({ pause, change }))))(
+  'refuses remote process start when its resource owner is $change during $pause', async ({ pause, change }) => {
+    const test = await setup({ pause })
+    const released = Promise.withResolvers<undefined>(), release = vi.fn(async () => { released.resolve(undefined) })
+    const uncertain = vi.fn(async () => {}), replacement = vi.fn(async () => { throw new Error('No replacement capacity may be borrowed.') })
+    test.ctx.provide('resourceBudgetRequired', true)
+    const withdraw = test.ctx.provide('resourceBudget', { acquire: async () => ({ signal: new AbortController().signal, release, uncertain }) })
+    const handle = await test.runtime.spawn(spec)
+    const outcome = handle.done.then(() => undefined, (error: unknown) => error)
+    try {
+      await test.entered
+      withdraw()
+      if (change === 'replaced') test.ctx.provide('resourceBudget', { acquire: replacement })
+      test.release()
+      await Promise.race([test.started, outcome])
+      expect(test.calls.filter(call => call.method === 'process.start')).toEqual([])
+      expect(await outcome).toMatchObject({ reason: 'unavailable' })
+      await released.promise
+      await expect.poll(() => (test.runtime as unknown as { live: Set<unknown> }).live.size).toBe(0)
+      expect(release).toHaveBeenCalledOnce()
+      expect(uncertain).not.toHaveBeenCalled()
+      expect(replacement).not.toHaveBeenCalled()
+    } finally { test.release(); await test.close() }
+  },
+)
+
+it('retains a completed command whose remote process range is not confirmed empty', async () => {
+  const test = await setup({ wait: false })
+  const handle = await test.runtime.spawn({ ...spec,
+    stdio: { stdin: 'ignore', stdout: { maxBytes: 32 }, stderr: { maxBytes: 32 } },
+  })
+  await test.started
+  test.finished.resolve({ ...emptyResult, collected: {
+    stdout: { tail: '', totalBytes: 0 }, stderr: { tail: '', totalBytes: 0 },
+  } })
+  await handle.done
+  await expect.poll(() => test.calls.filter(call => call.method === 'process.wait').length).toBe(1)
+  expect((test.runtime as unknown as { live: Set<unknown> }).live.size).toBe(1)
+})
 
 /** Read incoming bytes without closing a duplex's outgoing half. */
 async function readAll(stream: Readable): Promise<string> {
@@ -116,6 +158,20 @@ async function readAll(stream: Readable): Promise<string> {
   for await (const value of stream.iterator({ destroyOnReturn: false })) chunks.push(Buffer.from(value as Uint8Array))
   return Buffer.concat(chunks).toString()
 }
+
+it('keeps host Session and resource attribution out of remote process JSON', async () => {
+  const test = await setup()
+  const handle = await test.runtime.spawn({
+    ...spec, sessionId: 'host-session' as NonNullable<SubprocessSpawnSpec['sessionId']>, resourceOrigin: 'infrastructure',
+  })
+  void handle.done.catch(() => {})
+  await test.started
+  const request = test.calls.find(call => call.method === 'process.prepare')?.params
+  expect(request).toMatchObject({ argv: spec.argv, cwd: spec.cwd, stdio: spec.stdio, graceMs: spec.graceMs })
+  expect(request).not.toHaveProperty('sessionId')
+  expect(request).not.toHaveProperty('resourceOrigin')
+  expect(request).not.toHaveProperty('signal')
+})
 
 describe('SSH ordinary process behavior', () => {
   it('forwards inherited output without ending the host standard streams', async () => {
@@ -125,7 +181,7 @@ describe('SSH ordinary process behavior', () => {
     const out = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => { stdout.push(chunk); return true })
     const err = vi.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => { stderr.push(chunk); return true })
     try {
-      const handle = test.runtime.spawn({ ...spec, stdio: { stdin: 'ignore', stdout: 'inherit', stderr: 'inherit' } })
+      const handle = await test.runtime.spawn({ ...spec, stdio: { stdin: 'ignore', stdout: 'inherit', stderr: 'inherit' } })
       await test.started
       test.stream('stdout').end('inherited output')
       test.stream('stderr').end('inherited diagnostics')
@@ -142,7 +198,7 @@ describe('SSH ordinary process behavior', () => {
 
   it('bounds output draining after process completion even when the output peer remains open', async () => {
     const test = await setup()
-    const handle = test.runtime.spawn(spec)
+    const handle = await test.runtime.spawn(spec)
     await test.started
     test.finished.resolve(emptyResult)
     expect(await handle.done).toEqual({ exitCode: 0, signal: null })
@@ -152,7 +208,7 @@ describe('SSH ordinary process behavior', () => {
 
   it('observes output transports that closed before the start acknowledgement arrives', async () => {
     const test = await setup({ pause: 'start' })
-    const handle = test.runtime.spawn(spec)
+    const handle = await test.runtime.spawn(spec)
     await test.entered
     await test.closeStream('stdout')
     await test.closeStream('stderr')
@@ -167,7 +223,7 @@ describe('SSH ordinary process behavior', () => {
   it('keeps stdin, stdout, stderr and control independent and forwards explicit environment removals', async () => {
     const test = await setup()
     expect(await test.runtime.resolveExecutable('node', { PATH: '/remote/bin' })).toBe('/remote/bin/node')
-    const handle = test.runtime.spawn({ ...spec, env: { REMOVE: undefined, KEEP: 'value' },
+    const handle = await test.runtime.spawn({ ...spec, env: { REMOVE: undefined, KEEP: 'value' },
       stdio: { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe', control: 'pipe' } })
     const stdout = readAll(handle.stdout!)
     const stderr = readAll(handle.stderr!)
@@ -193,7 +249,7 @@ describe('SSH ordinary process behavior', () => {
 
   it('retains authoritative collected byte offsets when older stream snapshots arrive after completion', async () => {
     const test = await setup()
-    const handle = test.runtime.spawn({ ...spec, stdio: { stdin: 'ignore', stdout: { maxBytes: 4 }, stderr: { maxBytes: 4 } } })
+    const handle = await test.runtime.spawn({ ...spec, stdio: { stdin: 'ignore', stdout: { maxBytes: 4 }, stderr: { maxBytes: 4 } } })
     await test.started
     const snapshot = test.snapshots('stdout', 4)
     await snapshot('cdef', 6)
@@ -212,7 +268,7 @@ describe('SSH ordinary process behavior', () => {
     { tail: 'a', total: 1, error: 'rewound collected output' },
   ])('rejects a remote snapshot with $error', async ({ tail, total, error }) => {
     const test = await setup()
-    const handle = test.runtime.spawn({ ...spec, stdio: { stdin: 'ignore', stdout: { maxBytes: 4 }, stderr: { maxBytes: 4 } } })
+    const handle = await test.runtime.spawn({ ...spec, stdio: { stdin: 'ignore', stdout: { maxBytes: 4 }, stderr: { maxBytes: 4 } } })
     await test.started
     const snapshot = test.snapshots('stdout', 4)
     await snapshot('abcd', 4)
@@ -225,7 +281,7 @@ describe('SSH ordinary process behavior', () => {
 
   it('rejects a final output mode mismatch and terminates its remote process', async () => {
     const test = await setup()
-    const handle = test.runtime.spawn({ ...spec, stdio: { stdin: 'ignore', stdout: { maxBytes: 4 }, stderr: { maxBytes: 4 } } })
+    const handle = await test.runtime.spawn({ ...spec, stdio: { stdin: 'ignore', stdout: { maxBytes: 4 }, stderr: { maxBytes: 4 } } })
     await test.started
     test.finished.resolve(emptyResult)
     await expect(handle.done).rejects.toThrow('mismatched output collection modes')
@@ -236,7 +292,7 @@ describe('SSH ordinary process behavior', () => {
   it.each(['prepare', 'connect', 'start'] as const)('joins cancellation during %s and sends at most one termination', async (pause) => {
     const test = await setup({ pause })
     const controller = new AbortController()
-    const handle = test.runtime.spawn({ ...spec, signal: controller.signal })
+    const handle = await test.runtime.spawn({ ...spec, signal: controller.signal })
     await test.entered
     controller.abort(new Error('caller stopped'))
     handle.terminate()
@@ -252,7 +308,7 @@ describe('SSH ordinary process behavior', () => {
 
   it('reports range completion when preparation fails before any process can start', async () => {
     const test = await setup({ failPrepare: new Error('prepare refused') })
-    const handle = test.runtime.spawn(spec)
+    const handle = await test.runtime.spawn(spec)
     const quiescent = handle.waitForExit()
     await expect(handle.done).rejects.toThrow('prepare refused')
     expect(await quiescent).toBe(true)
@@ -262,7 +318,7 @@ describe('SSH ordinary process behavior', () => {
   it('reports an unconfirmed cleanup and closes the SSH connection', async () => {
     const test = await setup({ failStart: new Error('start lost'), failTerminate: new Error('cleanup lost') })
     test.connection.dispose.mockRejectedValue(new Error('connection cleanup failed'))
-    const handle = test.runtime.spawn(spec)
+    const handle = await test.runtime.spawn(spec)
     await expect(handle.done).rejects.toThrow('start lost')
     await expect(handle.waitForExit()).rejects.toThrow('cleanup lost')
     await test.close()
@@ -272,7 +328,7 @@ describe('SSH ordinary process behavior', () => {
 
   it('normalizes a non-Error transport rejection for stream consumers', async () => {
     const test = await setup()
-    const handle = test.runtime.spawn(spec)
+    const handle = await test.runtime.spawn(spec)
     const error = new Promise<Error>(resolve => handle.stdout!.once('error', resolve))
     await test.started
     test.finished.reject('connection lost')
@@ -283,13 +339,13 @@ describe('SSH ordinary process behavior', () => {
 
   it('reports a live range until termination and rejects new work after disposal', async () => {
     const test = await setup({ wait: false })
-    const handle = test.runtime.spawn(spec)
+    const handle = await test.runtime.spawn(spec)
     await test.started
     expect(await handle.waitForExit()).toBe(false)
     handle.terminate()
     expect(await handle.waitForExit()).toBe(true)
     await test.close()
-    expect(() => test.runtime.spawn(spec)).toThrow('disposed')
-    expect(() => test.runtime.spawn({ ...spec, signal: AbortSignal.abort() })).toThrow()
+    await expect(test.runtime.spawn(spec)).rejects.toThrow('disposed')
+    await expect(test.runtime.spawn({ ...spec, signal: AbortSignal.abort() })).rejects.toThrow()
   })
 })

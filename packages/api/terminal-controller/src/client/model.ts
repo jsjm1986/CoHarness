@@ -50,14 +50,6 @@ export interface TerminalRenderFrame {
   readonly frame: Extract<TerminalFrame, { type: 'snapshot' | 'output' }>
 }
 
-/** Adjacent input waiting for one ordered request under the same terminal attachment. */
-interface PendingTerminalInput {
-  readonly id: WebTerminalId
-  readonly attachmentId: TerminalAttachmentId
-  data: string
-  bytes: number
-}
-
 /** Observable state of one sidebar occurrence. */
 export interface TerminalViewState {
   readonly phase: 'idle' | 'loading' | 'creating' | 'connecting' | 'connected' | 'disconnected' | 'closing' | 'closed' | 'failed'
@@ -84,8 +76,8 @@ export class TerminalView {
   private loading: Promise<void> | undefined
   private closing: Promise<void> | undefined
   private writes: Promise<void> = Promise.resolve()
-  private pendingInput: PendingTerminalInput | undefined
   private queuedInput = 0
+  private pendingInput: { attachmentId: TerminalAttachmentId; data: string; bytes: number } | undefined
   private readonly detaching = new Set<Promise<void>>()
 
   /**
@@ -215,8 +207,8 @@ export class TerminalView {
   }
 
   /**
-   * Coalesce adjacent pending input without delaying the first ordered request.
-   * Resize requests and attachment changes separate batches; the pending-byte limit covers all input.
+   * Serialize raw input and coalesce adjacent queued keystrokes for one attachment.
+   * A resize or attachment change ends the batch; UTF-8 limits include in-flight input.
    * @param data - input from the terminal emulator.
    */
   write(data: string): void {
@@ -226,21 +218,20 @@ export class TerminalView {
     const bytes = new TextEncoder().encode(data).byteLength
     if (this.queuedInput + bytes > (state.environment?.maxInputBytes ?? 0)) { this.fail(new TerminalViewError('inputFull')); return }
     this.queuedInput += bytes
-    const id = state.info.id
-    const pending = this.pendingInput
-    if (pending?.id === id && pending.attachmentId === attachmentId) {
-      pending.data += data
-      pending.bytes += bytes
+    if (this.pendingInput?.attachmentId === attachmentId) {
+      this.pendingInput.data += data
+      this.pendingInput.bytes += bytes
       return
     }
-    const batch: PendingTerminalInput = { id, attachmentId, data, bytes }
-    this.pendingInput = batch
+    const input = { attachmentId, data, bytes }
+    this.pendingInput = input
+    const id = state.info.id
     this.writes = this.writes.then(async () => {
-      if (this.pendingInput === batch) this.pendingInput = undefined
+      if (this.pendingInput === input) this.pendingInput = undefined
       if (this.attachmentId !== attachmentId || !this.state.getSnapshot().writable) return
-      valueOf(await this.remote.write(this.sessionId, id, attachmentId, batch.data))
+      valueOf(await this.remote.write(this.sessionId, id, attachmentId, input.data))
     }).catch((error: unknown) => { if (this.attachmentId === attachmentId) this.fail(error) })
-      .finally(() => { this.queuedInput -= batch.bytes })
+      .finally(() => { this.queuedInput -= input.bytes })
   }
 
   /**

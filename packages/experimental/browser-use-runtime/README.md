@@ -27,7 +27,7 @@ Browser providers use this library to reuse a browser across one Session's turns
 
 This public experimental library is a dependency of the browser providers. It has no plugin entry or mount configuration. The [browser-use service](../../browser-use/browser-use/README.md) remains independent of the library.
 
-Native providers construct `SessionResources` from the package root, supplying resource acquisition and cleanup callbacks. Calls pass the exact live Agent to `run()`; stale owners and a second owner of an exclusive attachment fail before acquisition. Canceling an acquisition wait leaves initialization available to other callers in the same Session; Session disposal aborts and awaits that initialization. Providers keep their registration until `dispose()` finishes.
+Native providers construct `SessionResources` from the package root, supplying resource acquisition and cleanup callbacks. Calls pass the exact live Agent to `run()`; stale owners and a second owner of an exclusive attachment fail before acquisition. Canceling an acquisition wait leaves initialization available to other callers in the same Session; Session disposal aborts and awaits that initialization. Providers keep their registration until `dispose()` finishes. An acquisition callback whose rollback fails throws `ResourceAcquisitionCleanupError` with its remaining cleanup; the manager retains the reservation and invokes that cleanup during owner or provider disposal. Ordinary acquisition errors confirm rollback and allow a later acquisition.
 
 MCP providers use `mountSessionMcp` from `@deepseek-ai/dsh-experimental-browser-use-runtime/mcp`, supplying their fixed server name, executable, arguments, and ownership policy. The helper awaits one scoped client startup and discovery attempt within each future Agent's `agent/created` event. Agent creation or resume completes after discovery, before queued input runs; a successful client remains owned by that Session across turns. The MCP server process starts in the Session's current working directory resolved through `workingDirectory`.
 
@@ -48,7 +48,7 @@ Browser tools and resource requests targeting this server use the same queue and
 
 The [resource manager](src/index.ts) keys ownership by live Agent identity and joins operation cancellation with owner disposal. Each resource has one acquisition promise and one operation queue. Failed acquisition releases its reservation only after the provider callback rolls back acquired resources.
 
-Disposed-cause cancellation starts resource cleanup before AgentHandle waits for idle. Cleanup closes resources before waiting for running operations, allowing connection teardown to interrupt upstream APIs without abort support. A failed close rejects disposal and retains ownership. Agent-scoped cleanup prevents a resumed Session with the same durable id from inheriting a previous browser.
+Disposed-cause cancellation starts resource cleanup before AgentHandle waits for idle. Cleanup closes resources before waiting for running operations, allowing connection teardown to interrupt upstream APIs without abort support. A failed close rejects disposal and retains ownership. Concurrent cleanup calls share one attempt; later calls can retry a failed attempt. Starting provider disposal permanently stops new acquisition even when cleanup fails. Actual cleanup callbacks remain available after a failed Agent-scope effect so provider disposal can confirm shutdown and detach the old effect. Agent-scoped cleanup prevents a resumed Session with the same durable id from inheriting a previous browser.
 
 The [MCP helper](src/mcp.ts) connects within serial `agent/created`; [AgentLoop](../../core/agent-loop/README.md#loop-lifecycle-agentts) holds queued input and owns creation rollback. Prompt assembly reads the initialized catalog. The helper retains the provider registration through resource cleanup and uses the [MCP client](../../mcp/mcp-client/README.md) for transport, schema discovery, result conversion, and durable image admission.
 
@@ -84,7 +84,7 @@ Providers remain responsible for the browser operations they supply.
 - **MCP activation** — providers do not adopt existing live Agents; a busy attachment is not retried within that activation.
 - **Attachment scope** — exclusive ownership applies to one resource manager, not separate providers, processes, or external browser clients.
 - **Cancellation** — abort signals and connection closure cannot undo browser actions already delivered. An upstream operation that ignores both can delay cleanup.
-- **Recovery** — a failed close retains ownership; this manager does not retry disposal or restore browser state from the Session log.
+- **Recovery** — a failed close retains ownership until an explicit cleanup retry succeeds. The manager does not retry automatically or restore browser state from the Session log.
 
 <a id="dev-note"></a>
 ### Dev Note

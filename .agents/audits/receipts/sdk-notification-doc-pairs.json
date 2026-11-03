@@ -1,0 +1,14 @@
+{
+  "name": "sdk-notification-doc-pairs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write packages/sdk/client/README.md python/sdk/README.md .agents/notes/implemented/architecture/2026-10-24-sdk-notification-lifetime.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-notification-capacity/guide.md",
+  "startedAt": "2026-10-24T11:25:13.869430+00:00",
+  "seconds": 1.2,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2ea1d6a8b382cb39cf8cf1f3e6d90861c0603b24153dee24557d962d9f37d9c7",
+  "inputsAfter": "0aa30cf857305b653f6d091ed945647f71c47e8e748d082a6a641a4e8f7e8b42",
+  "postgresToolDirectory": null,
+  "outputSha256": "8b0a36a9267d30219b69ca088f3c984f051920f1fea88a8adfe49a5e4e394428",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-sdk-notification-lifetime.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-notification-capacity/guide.i18n.yaml\nverify-translation-pairing: recorded packages/sdk/client/README.i18n.yaml\nverify-translation-pairing: recorded python/sdk/README.i18n.yaml\nverify-translation-pairing: 4 record(s) written; run the check to validate the pairs.\n"
+}

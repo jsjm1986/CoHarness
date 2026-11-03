@@ -1,0 +1,13 @@
+{
+  "name": "organization-auth-gateway-types-and-build",
+  "cwd": "gateway",
+  "command": "python3 -",
+  "startedAt": "2026-10-23T19:29:22.067285+00:00",
+  "seconds": 6.745,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "060d33a894e47ae15e3c636c11a5c8ce3ca3947a485cae7f6aa8cb17355c5a3b",
+  "inputsAfter": "060d33a894e47ae15e3c636c11a5c8ce3ca3947a485cae7f6aa8cb17355c5a3b",
+  "outputSha256": "e6aab132b9ca86d57fa2ce1e150b050760002cc87eae8087335e353c63d6e5d9",
+  "outputTail": "\n> build\n> tsc -p tsconfig.build.json\n\n\n> typecheck\n> tsc --noEmit\n\ntests/postgres.spec.ts(2070,30): error TS2550: Property 'withResolvers' does not exist on type 'PromiseConstructor'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2024' or later.\ntests/postgres.spec.ts(2070,87): error TS2550: Property 'withResolvers' does not exist on type 'PromiseConstructor'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2024' or later.\nTraceback (most recent call last):\n  File \"<stdin>\", line 3, in <module>\n  File \"/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/lib/python3.12/subprocess.py\", line 571, in run\n    raise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['npm', 'run', 'typecheck']' returned non-zero exit status 2.\n"
+}

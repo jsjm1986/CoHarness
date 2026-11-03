@@ -42,14 +42,15 @@
   - button "跟随系统" [pressed]:
     - img
     - text: 跟随系统
-  - text: 字号大小 仅影响会话内容的字号 14
-  - button "增大字号":
-    - img
-  - button "减小字号":
-    - img
-  - text: px
-  - button "更多字体设置":
-    - img
+  - group "更多字体设置":
+    - text: 字号大小 仅影响会话内容的字号 14
+    - button "减小字号":
+      - img
+    - button "增大字号":
+      - img
+    - text: px
+    - button "更多字体设置":
+      - img
   - text: 工作步骤展示 选择希望看到多少工具调用细节
   - button "详细":
     - text: 详细
@@ -71,14 +72,11 @@
   - button "排队发送":
     - text: 排队发送
     - img
-  - text: 对话显示 调整对话内容宽度和文字大小 内容宽度
+  - text: 对话显示 调整对话内容宽度 内容宽度
   - slider "内容宽度": "748"
   - status: 748px
   - checkbox "占满"
-  - text: 占满 文字大小
-  - slider "文字大小": "14"
-  - status: 14px
-  - text: 性能统计 选择会话性能与用量信息的详细程度
+  - text: 占满 性能统计 选择会话性能与用量信息的详细程度
   - button "详细":
     - text: 详细
     - img

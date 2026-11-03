@@ -11,6 +11,13 @@ index c4486a2b38bec4eff10cdfda4d3748d40bfb71ba..c5a6ee9adf10cdf8ad8dd7fde39d56aa
        setContext(function (ctx) {
          var flowdata = getFlowdata(ctx);
          if (!_.isNil(flowdata) && ctx.forceFormulaRef) {
+@@ -1103,5 +1103,5 @@ var InputBox = function InputBox() {
+   var rowReadOnly = cfg.rowReadOnly || {};
+   var colReadOnly = cfg.colReadOnly || {};
+-  var edit = !((colReadOnly[col_index] || rowReadOnly[row_index]) && context.allowEdit === true);
++  var edit = context.allowEdit !== false && !((colReadOnly[col_index] || rowReadOnly[row_index]) && context.allowEdit === true);
+   return /*#__PURE__*/React.createElement("div", {
+     className: "luckysheet-input-box",
 @@ -6733,12 +6733,16 @@ var FxEditor = function FxEditor() {
          if (isInlineStringCell(cell)) {
            value = getInlineStringNoStyle(r, c, d);
@@ -80,6 +87,13 @@ index e4045518773578e3faaa3a58985a5585f9683088..2b217b8dde18934a020ef8ba1f2dd5c1
        setContext(function (ctx) {
          var flowdata = core.getFlowdata(ctx);
          if (!___default['default'].isNil(flowdata) && ctx.forceFormulaRef) {
+@@ -1114,5 +1114,5 @@ var InputBox = function InputBox() {
+   var rowReadOnly = cfg.rowReadOnly || {};
+   var colReadOnly = cfg.colReadOnly || {};
+-  var edit = !((colReadOnly[col_index] || rowReadOnly[row_index]) && context.allowEdit === true);
++  var edit = context.allowEdit !== false && !((colReadOnly[col_index] || rowReadOnly[row_index]) && context.allowEdit === true);
+   return /*#__PURE__*/React__default['default'].createElement("div", {
+     className: "luckysheet-input-box",
 @@ -6744,12 +6744,16 @@ var FxEditor = function FxEditor() {
          if (core.isInlineStringCell(cell)) {
            value = core.getInlineStringNoStyle(r, c, d);

@@ -1,0 +1,4 @@
+{"change":"replaced","success":false,"code":"plugin-market/fetch-failed","unavailable":true,"workers":0,"exited":true,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"change":"withdrawn","success":false,"code":"plugin-market/fetch-failed","unavailable":true,"workers":0,"exited":true,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"change":"unchanged","success":true,"total":0,"workers":1,"exited":true,"admissions":1,"releases":1,"uncertainties":0,"replacementAdmissions":0}
+{"change":"independent","success":true,"total":0,"workers":1,"exited":true,"admissions":0,"releases":0,"uncertainties":0,"replacementAdmissions":0}

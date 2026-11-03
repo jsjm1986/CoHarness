@@ -59,6 +59,7 @@ export interface GrantEntry {
 }
 
 const USERNAME_RE = /^[a-z][a-z0-9-]{1,30}$/
+const RUNTIME_KEY_RE = /^[a-z][a-z0-9_-]{1,30}$/
 
 /** Reject values that would break a systemd unit line or the `src:dst` bind grammar. */
 function assertSafePath(path: string): void {
@@ -146,10 +147,20 @@ function strictlyContainsPath(root: string, path: string): boolean {
   return root !== path && containsPath(root, path)
 }
 
-/** The per-user unit file name. */
-export function unitName(username: string): string {
-  if (!USERNAME_RE.test(username)) throw new Error(`invalid username: ${username}`)
-  return `harness-${username}.service`
+/**
+ * Name one issued Runtime or its pre-generation legacy unit.
+ * @param runtimeKey - safe supervisor key; generated personal keys use an account-independent namespace.
+ * @param generation - durable generation; absent only for a legacy unit.
+ * @param credentialHash - bearer fingerprint distinguishing restored generation numbers.
+ * @returns an exact systemd service name.
+ */
+export function unitName(runtimeKey: string, generation?: number, credentialHash?: string): string {
+  if (!RUNTIME_KEY_RE.test(runtimeKey)) throw new Error(`invalid runtime key: ${runtimeKey}`)
+  if (generation !== undefined && (!Number.isSafeInteger(generation) || generation < 1)) throw new Error('invalid runtime generation')
+  if ((generation === undefined) !== (credentialHash === undefined) || credentialHash !== undefined && !/^[a-f0-9]{64}$/.test(credentialHash)) {
+    throw new Error('invalid runtime credential fingerprint')
+  }
+  return `harness-${runtimeKey}${generation === undefined ? '' : `@${String(generation)}-${credentialHash!}`}.service`
 }
 
 /**
@@ -164,7 +175,7 @@ export function renderUserUnit(
   gatewayCredentialPath?: string,
 ): string {
   const runtimeKey = user.runtimeKey ?? user.username
-  if (!USERNAME_RE.test(runtimeKey)) throw new Error(`invalid runtime key: ${runtimeKey}`)
+  if (!RUNTIME_KEY_RE.test(runtimeKey)) throw new Error(`invalid runtime key: ${runtimeKey}`)
   const systemUser = user.systemUser ?? `harness-${user.username}`
   if (!USERNAME_RE.test(systemUser) || systemUser === 'root') throw new Error(`invalid system user: ${systemUser}`)
   for (const path of [
@@ -225,7 +236,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=simple
+Type=exec
 User=${systemUser}
 WorkingDirectory=${user.homePath}
 Environment=HOME=${user.homePath}

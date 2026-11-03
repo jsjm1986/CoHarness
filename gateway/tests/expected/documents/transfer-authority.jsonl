@@ -1,0 +1,12 @@
+{"operation":"copy-plan","foreignActor":"denied","originalActor":"copied","bytes":"shared copy bytes","expiredInitialPrincipal":true}
+{"operation":"copy-revocation","status":"denied","furtherChunks":false,"newPublication":false}
+{"operation":"disabled-actor","status":"denied","published":["report.txt"]}
+{"operation":"personal-upload-owner","formatVersion":2,"ownerId":"user:7","collaborationService":false}
+{"operation":"personal-ownerless-resume","status":404,"newSession":true,"legacyUnchanged":true}
+{"operation":"project-to-personal-copy","status":"copied","bytes":"shared copy bytes","formatVersion":2,"ownerId":"user:7"}
+{"operation":"readonly-member-personal-copy","status":"copied","bytes":"shared copy bytes","personalOwner":"user:9","projectOwner":"user:7","ownPersonalRead":200,"foreignPersonalRead":401}
+{"operation":"restricted-principal-upload","results":[{"purpose":"archive-read","upload":401},{"purpose":"document-admin","upload":401}],"newSessions":0,"originalBytes":"shared copy bytes"}
+{"operation":"personal-runtime-selection","copied":true,"exactRuntime":200,"mismatchedRuntime":401,"sharedDocuments":200,"planRuntimeMismatch":409}
+{"operation":"document-catalog-unload","listed":200,"routeRemoved":404,"committedWhenStopped":true,"actor":7}
+{"operation":"document-read-unload","listed":200,"routeRemoved":404,"documents":["report.txt"]}
+{"operation":"project-upload-no-authority","status":503,"error":"COLLABORATION_UNAVAILABLE","message":"Document authorization is temporarily unavailable.","createdSessions":0}

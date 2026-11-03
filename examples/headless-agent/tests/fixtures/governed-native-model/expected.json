@@ -1,0 +1,19 @@
+{
+  "finalResponse": "NATIVE_SEARCH_DONE",
+  "requests": [{
+    "type": "web/deepseek-search-llm-request",
+    "path": "/anthropic/v1/messages",
+    "apiVersion": "2023-06-01",
+    "model": "deepseek-v4-flash",
+    "maxTokens": 64,
+    "query": "Perform a web search for the query: native fixture query"
+  }],
+  "completion": {
+    "modelAdmissions": 3,
+    "executionAdmissions": 1,
+    "quiescent": 3,
+    "nativeRequests": 1,
+    "persistedBeforeHttp": true,
+    "usages": [{ "inputTokens": 3, "outputTokens": 2, "credentialSource": "file" }]
+  }
+}

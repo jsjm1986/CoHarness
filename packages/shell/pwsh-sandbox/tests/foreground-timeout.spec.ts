@@ -49,7 +49,7 @@ async function setup() {
   await ctx.plugin(ControlledSandbox)
   await ctx.plugin(LocalSubprocessRuntime)
   await ctx.plugin(SandboxPwshExecutor, { timeoutMs: 100, graceMs: 100 })
-  const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation((spec) => {
+  const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async (spec) => {
     spawned.resolve(spec)
     spec.signal?.addEventListener('abort', terminate, { once: true })
     listeners.push(() => { spec.signal?.removeEventListener('abort', terminate) })

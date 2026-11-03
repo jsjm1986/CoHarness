@@ -10,7 +10,15 @@ English | [中文](2026-10-12-gateway-proxy-error-listeners.zh.md)
 
 ## Decision
 
-The Gateway owns a server-level `'error'` listener that logs a bounded diagnostic (error code, method, path) and settles whatever the event carries: a usable `ServerResponse` receives `502 INSTANCE_UNREACHABLE`, an already-open response ends, and a WebSocket duplex is destroyed. A `'error'` listener is also attached to every `proxyRes` in the existing `proxyRes` hook, ending the client response after an upstream reset mid-body. Per-request callbacks stay the first-line settlement and now check `res.destroyed` before writing so a late error cannot throw inside the callback itself.
+The Gateway owns a server-level `'error'` listener that logs a bounded diagnostic (error code, method, path) and settles whatever the event carries: a usable `ServerResponse` receives `502 INSTANCE_UNREACHABLE`, an incomplete response whose headers are sent is destroyed, and a WebSocket duplex is destroyed. An `'error'` listener is also attached to every `proxyRes` in the existing `proxyRes` hook and destroys the client response after an upstream reset mid-body. Per-request callbacks stay the first-line settlement and check `res.destroyed` before writing so a late error cannot throw inside the callback itself.
+
+Incomplete bodies cannot end as successful HTTP messages. A clean end preserves the upstream success status and lets browsers or CDNs cache a truncated immutable plugin script. Destruction preserves the transport failure for downstream consumers.
+
+Remote-computer forwarding retains each `ClientRequest` error listener through transport disposal. A failed HTTP request or WebSocket handshake can receive another abort from its duplex stream after the first failure has settled; that event must remain contained in the same request.
+
+The node-local TCP connection keeps its writable half open after response EOF. Both pipelines finish before transport disposal, and a clean TCP close does not destroy pending WebSocket output. Otherwise a fast local response and a slow outbound connection can truncate a script or download after successful headers.
+
+Idle control connections send WebSocket Ping frames at their authenticated lease’s heartbeat interval. Transport liveness is independent of PostgreSQL lease renewal and cannot retain execution authority after its lease expires. Closing the channel clears its Ping timer before reconnecting.
 
 ## Alternatives considered
 
@@ -24,7 +32,11 @@ A client or upstream socket reset — WebSocket or plain HTTP, before or after h
 
 ## Verification
 
-`gateway/tests/proxy.spec.ts` resets the client socket of an admitted WebSocket with `resetAndDestroy()` and kills a runtime mid-response-body; both used to surface as `Error: read ECONNRESET` uncaught exceptions and now produce the bounded log line while the gateway keeps serving.
+`gateway/tests/proxy.spec.ts` resets the client socket of an admitted WebSocket with `resetAndDestroy()` and kills a runtime mid-response-body. Both produce the bounded log line while the Gateway keeps serving; consuming the incomplete HTTP body rejects.
+
+`gateway/tests/node-service.spec.ts` fails actual forwarded scope-change and WebSocket requests, then delivers a late transport abort to their `ClientRequest` objects and checks that the Gateway still serves account metadata.
+
+The same fixture holds an outbound response frame through the local TCP EOF and its close callbacks, then verifies the complete response after releasing the frame.
 
 ## Related
 

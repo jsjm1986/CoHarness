@@ -1,0 +1,565 @@
+{
+  "recordedAt": "2026-10-29T18:12:14.668923+00:00",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "findings": [
+    "B329"
+  ],
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z",
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-final-source-artifact-hashes.json",
+  "paths": [
+    "gateway/src/postgres/conversation-archive-service.ts",
+    "gateway/src/archive-runtime-reader.ts",
+    "gateway/src/admin-api.ts",
+    "gateway/src/index.ts",
+    "gateway/tests/archive-runtime-reader.spec.ts",
+    "gateway/tests/archive-read-administration-postgres.spec.ts",
+    "gateway/tests/archive-read-administration-transcript.spec.ts",
+    "gateway/tests/fixtures/archive-read-administration.mjs",
+    "gateway/tests/expected/archive-read-administration.jsonl",
+    "gateway/tests/conversation-archive-service.spec.ts",
+    "gateway/package.json",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/README.i18n.yaml",
+    ".agents/notes/implemented/feature/2026-08-25-admin-archive-channel.md",
+    ".agents/notes/implemented/feature/2026-08-25-admin-archive-channel.zh.md",
+    ".agents/notes/implemented/feature/2026-08-25-admin-archive-channel.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.i18n.yaml"
+  ],
+  "repair": "All authenticated archive list, status, empty-draft preview, detail and both export paths carry the server-captured administrator. Short database transactions retain current active organization/account/membership through reads. Personal Runtime work runs without retaining that database client, carries the real administrator through queued startup and the read principal, and rechecks authority after success or offline/invalid-data fallback. Runtime operation acquisition and drainage use the ready generation; read and cleanup failures remain combined. Trusted internal service reads may explicitly omit the human actor.",
+  "negativeEvidence": [
+    {
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-status-role-before.json",
+      "classification": "expected_causal_regression_failure",
+      "control": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-status-current-before.json"
+    },
+    {
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-list-compiled-negative-before.json",
+      "classification": "expected_causal_regression_failure",
+      "control": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-compiled-positive-before.json"
+    },
+    {
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-preview-compiled-negative-before.json",
+      "classification": "expected_causal_regression_failure",
+      "control": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-compiled-positive-before.json"
+    },
+    {
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-status-compiled-negative-before.json",
+      "classification": "expected_causal_regression_failure",
+      "control": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-compiled-positive-before.json"
+    },
+    {
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-detail-compiled-negative-before.json",
+      "classification": "expected_causal_regression_failure",
+      "control": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-compiled-positive-before.json"
+    },
+    {
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-export-compiled-negative-before.json",
+      "classification": "expected_causal_regression_failure",
+      "control": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-compiled-positive-before.json"
+    },
+    {
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-export-fallback-compiled-negative-before.json",
+      "classification": "expected_causal_regression_failure",
+      "control": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-compiled-positive-before.json"
+    }
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "archive-complete-read-write-and-transport-regressions",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:43:50.173832+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+          "run",
+          "tests/conversation-archive-service.spec.ts",
+          "tests/admin-business-postgres.spec.ts",
+          "tests/archive-administration-transcript.spec.ts",
+          "tests/archive-administration-postgres.spec.ts",
+          "tests/archive-read-administration-transcript.spec.ts",
+          "tests/archive-read-administration-postgres.spec.ts",
+          "tests/archive-runtime-reader.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--retry=0",
+          "--coverage",
+          "--coverage.include=src/postgres/conversation-archive-service.ts",
+          "--coverage.include=src/postgres/administrator-authority.ts",
+          "--coverage.include=src/archive-runtime-reader.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-final-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:44:52.066960+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-complete-read-write-and-transport-regressions.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-complete-read-write-and-transport-regressions.log"
+      },
+      {
+        "name": "archive-final-lock-and-transcript",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:50:43.045531+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+          "run",
+          "tests/archive-read-administration-postgres.spec.ts",
+          "tests/archive-read-administration-transcript.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:51:12.080421+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-final-lock-and-transcript.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-final-lock-and-transcript.log"
+      },
+      {
+        "name": "archive-final-held-and-empty-authority",
+        "status": "passed",
+        "startedAt": "2026-10-29T18:01:11.173706+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+          "run",
+          "tests/archive-read-administration-postgres.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T18:01:18.112012+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-final-held-and-empty-authority.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-final-held-and-empty-authority.log"
+      },
+      {
+        "name": "archive-read-final-full-http-authority",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:49:23.159582+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "tests/fixtures/archive-read-administration.mjs",
+          "src"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:49:46.485146+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-final-full-http-authority.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-final-full-http-authority.log"
+      },
+      {
+        "name": "archive-read-real-manager-queued-withdrawal",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:48:45.339709+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "tests/fixtures/archive-read-administration.mjs",
+          "src",
+          "-",
+          "detail",
+          "role",
+          "queued-start"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:48:45.971626+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-real-manager-queued-withdrawal.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-real-manager-queued-withdrawal.log"
+      },
+      {
+        "name": "archive-read-private-gateway-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:49:24.305904+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "-p",
+          "gateway/tsconfig.build.json",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/gateway-artifact/lib",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/gateway-artifact/build.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:49:27.560499+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-private-gateway-build.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-private-gateway-build.log"
+      },
+      {
+        "name": "archive-read-current-built-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:55:36.624482+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/archive-read-administration-transcript.spec.ts",
+          "tests/archive-administration-transcript.spec.ts",
+          "tests/resource-scope-isolation-transcript.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:56:11.819588+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-current-built-node22.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-current-built-node22.log"
+      },
+      {
+        "name": "archive-read-current-built-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:57:33.370552+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/archive-read-administration-transcript.spec.ts",
+          "tests/archive-administration-transcript.spec.ts",
+          "tests/resource-scope-isolation-transcript.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:58:24.912397+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-current-built-node24.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-current-built-node24.log"
+      },
+      {
+        "name": "archive-read-final-current-types",
+        "status": "passed",
+        "startedAt": "2026-10-29T18:05:42.166940+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "--noEmit",
+          "-p",
+          "gateway/tsconfig.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T18:05:47.365710+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-final-current-types.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-final-current-types.log"
+      },
+      {
+        "name": "archive-read-final-typescript-lint",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:52:29.085588+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "gateway/src/archive-runtime-reader.ts",
+          "gateway/src/postgres/conversation-archive-service.ts",
+          "gateway/src/admin-api.ts",
+          "gateway/src/index.ts",
+          "gateway/tests/archive-runtime-reader.spec.ts",
+          "gateway/tests/archive-read-administration-postgres.spec.ts",
+          "gateway/tests/archive-read-administration-transcript.spec.ts",
+          "gateway/tests/conversation-archive-service.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:52:30.713276+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-final-typescript-lint.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-final-typescript-lint.log"
+      },
+      {
+        "name": "archive-final-fixture-quality",
+        "status": "passed",
+        "startedAt": "2026-10-29T18:01:12.312584+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "gateway/tests/archive-runtime-reader.spec.ts",
+          "gateway/tests/archive-read-administration-postgres.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T18:01:14.015308+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-final-fixture-quality.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-final-fixture-quality.log"
+      },
+      {
+        "name": "archive-read-fixture-final-javascript",
+        "status": "passed",
+        "startedAt": "2026-10-29T18:07:55.988917+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "--config",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/native-fixture-lint.json",
+          "--no-ignore",
+          "-D",
+          "correctness",
+          "gateway/tests/fixtures/archive-read-administration.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T18:07:56.172787+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-fixture-final-javascript.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-fixture-final-javascript.log"
+      },
+      {
+        "name": "archive-read-doc-pairing",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:55:35.446435+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "--write",
+          "gateway/README.md",
+          ".agents/notes/implemented/feature/2026-08-25-admin-archive-channel.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:55:37.366216+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-doc-pairing.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-doc-pairing.log"
+      },
+      {
+        "name": "archive-read-doc-quick",
+        "status": "passed",
+        "startedAt": "2026-10-29T17:57:34.508620+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T17:58:11.827797+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-doc-quick.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-doc-quick.log"
+      },
+      {
+        "name": "archive-read-guide-format",
+        "status": "passed",
+        "startedAt": "2026-10-29T18:05:43.324381+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T165705Z/verify-touched-guides.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T18:05:43.353836+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-guide-format.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-guide-format.log"
+      },
+      {
+        "name": "archive-read-latest-origin-fetch",
+        "status": "passed",
+        "startedAt": "2026-10-29T18:05:43.430981+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "master",
+          "--prune"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T18:05:47.040458+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-latest-origin-fetch.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-latest-origin-fetch.log"
+      },
+      {
+        "name": "archive-read-owned-postgres-cleanup",
+        "status": "passed",
+        "startedAt": "2026-10-29T18:07:56.223048+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/close-owned-postgres.py",
+          "archive-read-owned-postgres-cleanup"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T18:07:56.678938+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-owned-postgres-cleanup.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-owned-postgres-cleanup.log"
+      }
+    ],
+    "baseSelectedCases": 248,
+    "newUniquePostgresCases": 2,
+    "finalPostgresSelection": 37,
+    "skips": 0,
+    "sourceTranscript": {
+      "entries": 90,
+      "positive": 12,
+      "refusals": 78,
+      "queuedStartsRefusedBeforeDispatch": 6
+    },
+    "compiledTranscriptSelection": {
+      "node22": 3,
+      "node24": 3,
+      "readAuthorityEntriesPerNode": 90,
+      "archiveMutationCasesPerNode": 35,
+      "resourceIsolationCompositeEntriesPerNode": 10
+    },
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 511,
+          "covered": 471,
+          "skipped": 0,
+          "pct": 92.17
+        },
+        "statements": {
+          "total": 610,
+          "covered": 527,
+          "skipped": 0,
+          "pct": 86.39
+        },
+        "functions": {
+          "total": 100,
+          "covered": 93,
+          "skipped": 0,
+          "pct": 93
+        },
+        "branches": {
+          "total": 548,
+          "covered": 421,
+          "skipped": 0,
+          "pct": 76.82
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/archive-runtime-reader.ts": {
+        "lines": {
+          "total": 53,
+          "covered": 53,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 5,
+          "covered": 5,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 64,
+          "covered": 64,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 69,
+          "covered": 69,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/administrator-authority.ts": {
+        "lines": {
+          "total": 6,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 1,
+          "covered": 1,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 7,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 8,
+          "covered": 8,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/conversation-archive-service.ts": {
+        "lines": {
+          "total": 452,
+          "covered": 412,
+          "skipped": 0,
+          "pct": 91.15
+        },
+        "functions": {
+          "total": 94,
+          "covered": 87,
+          "skipped": 0,
+          "pct": 92.55
+        },
+        "statements": {
+          "total": 539,
+          "covered": 456,
+          "skipped": 0,
+          "pct": 84.6
+        },
+        "branches": {
+          "total": 471,
+          "covered": 344,
+          "skipped": 0,
+          "pct": 73.03
+        }
+      }
+    },
+    "formatEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T171551Z/archive-read-final-format.json"
+  },
+  "intermediateEvidence": [
+    "Initial strict compilation caught a missing bound variable/import during extraction; final code and all consumers compile. No type gate was weakened.",
+    "The transport fixture now supplies the declared ProjectDetail members and captures its mutable revoker before asynchronous cleanup. A raw malformed-body assertion was corrected to the actual invalid-JSON diagnostic while retaining rejection. Original receipts remain intact.",
+    "An unused local lint directive was removed; no global rule, listener limit, coverage threshold or production database constraint was relaxed.",
+    "This checkout has no verify-upgrade-guides command.20actual documentation gates and a separately identified local touched-guide format/500-word check passed. The local check is not claimed as a repository gate."
+  ],
+  "resourceQuiescence": {
+    "status": "passed",
+    "recordedAt": "2026-10-29T18:07:56.674564+00:00",
+    "container": "hgw-archive-read-1a814aa69b",
+    "volume": "hgw-archive-read-1a814aa69b-data",
+    "port": 55112,
+    "nonObserverDatabaseClients": 0,
+    "removedOwnedContainer": true,
+    "removedOwnedVolume": true,
+    "excluded": [
+      "production5432",
+      "peer58773"
+    ],
+    "retainedFixtureRows": "Immutable execution proof and historical negative-control rows were retained until disposal of this exclusively owned test database. No production trigger or constraint was disabled."
+  },
+  "coordination": {
+    "peerThreadId": "01a1821f-1577-7472-93db-3bd83ee42345",
+    "messagesThisContinuation": 1,
+    "scope": "One concrete message reserved only archive service/Admin sections and the existing index archive-reader callback. No repeated polling/messages, node/routing/UI interface edits or shared output rebuild window."
+  },
+  "limitations": [
+    "The90-entry transcript uses real Gateway authentication, PostgreSQL, the production archive service and production Runtime reader factory. Successful Runtime replies use a fixture-owned in-process HTTP server and an explicit readiness adapter; they do not claim a production payload/native cold-start deployment. Six queued-withdrawal cases exercise the actual InstanceManager and PostgreSQL authority and prove no launcher dispatch.",
+    "Only archive-runtime-reader.ts and the shared administrator-authority.ts reach100%statements/branches/functions/lines. The larger archive service remains partial at84.6%,73.03%,92.55%,91.15%; pagination, cleanup, namespace and other inventory review remain open.",
+    "Source validation includes248cases in the complete seven-file selection, then the updated read PostgreSQL file with37cases;2new unique cases prove held qualification and an empty-preview early return. The final90-entry source transcript and three current compiled transcripts on each Node22/24 pass. This is not exhaustive repository or platform acceptance.",
+    "No root package source changed in this continuation. Gateway is a separate project and its current strict compiler, private build and compiled replays pass; the previous root8-gate build is historical evidence and is not represented as a fresh whole-tree check.",
+    "Real model API and public push remain human-deferred; all12original audit domains and B04/B25 remain open. Archive identity namespaces for equal Host Session IDs across Runtimes are a source-review candidate, not yet a confirmed finding."
+  ],
+  "realProviderApiValidation": "human_deferred"
+}

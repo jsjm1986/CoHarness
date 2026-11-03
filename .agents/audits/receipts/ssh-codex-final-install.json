@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-final-install",
+  "cwd": ".",
+  "command": "pnpm install --offline --ignore-scripts",
+  "startedAt": "2026-10-25T12:31:50.018115+00:00",
+  "seconds": 2.923,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a32e641c62a89c1784afc6b5a971612a5f7b28e15bcdc369f0e81406c5965efe",
+  "inputsAfter": "a32e641c62a89c1784afc6b5a971612a5f7b28e15bcdc369f0e81406c5965efe",
+  "postgresToolDirectory": null,
+  "outputSha256": "6e487683d620b549fdaa3faae592f16bcde2a8bdb21c83037ef362e6d8cea3ea",
+  "outputTail": "[ERROR] Failed to resolve @pnpm/exe@11.28.5 in package mirror /Users/a1234/Library/Caches/pnpm/v11/metadata/registry.npmmirror.com/@pnpm/exe.jsonl\nFor help, run: pnpm help install\n"
+}

@@ -49,6 +49,8 @@ const endpoint = launchEnvironmentOf(ctx).get('DEEPSEEK_BASE_URL')?.value
 
 `launchedThroughSsh(snapshot)` returns true only for a non-empty `SSH_CONNECTION` or `SSH_TTY` in the inherited process layer. Web browser handoff, the adaptive directory picker, and Open In share this predicate; project and user `.env` values never establish an SSH session.
 
+`launchedByGateway(snapshot)` recognizes a nonempty inherited `DSH_GATEWAY_CREDENTIAL_FD` or `DSH_GATEWAY_CREDENTIAL_FILE`. It selects managed deployment behavior before services finish mounting; it authenticates no caller. Project and user environment files cannot establish or erase this launch fact.
+
 ### How layers rank
 
 | Layer | What it is |

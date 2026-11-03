@@ -4,8 +4,6 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - button "Feedback":
-    - img
   - button "Open right sidebar":
     - img
 - text: "Assemble the link gallery: write the report and styles, inspect the sources, and summarize."
@@ -220,10 +218,6 @@
 - text: + 1 file
 - button "Show in folder"
 - button "Copy":
-  - img
-- button "Good response":
-  - img
-- button "Bad response":
   - img
 - button "Branch into a new conversation":
   - img

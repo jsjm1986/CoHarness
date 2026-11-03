@@ -1,5 +1,5 @@
 /** Named external Providers cannot share routes or persisted child bindings. */
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -84,6 +84,48 @@ it('retains the default route and isolates arbitrary instance names on case-inse
 })
 
 describe('ExternalBindingStore transitions', () => {
+  it.each([{ mode: 'native' as const }, { mode: 'managed' as const, provider: 'responses', model: 'm' }])('retains immutable $mode model authority across reloads', async (selection) => {
+    const root = await mkdtemp(join(tmpdir(), 'external-model-selection-'))
+    try {
+      const file = join(root, 'bindings.jsonl'), child = SessionId('child')
+      const store = new ExternalBindingStore(file)
+      expect(store.modelSelection(child)).toBeUndefined()
+      store.selectModel(child, selection)
+      store.selectModel(child, selection)
+      store.bind(child, 'native-thread')
+      const reloaded = new ExternalBindingStore(file)
+      expect(reloaded.modelSelection(child)).toEqual(selection)
+      expect(() => { reloaded.selectModel(child, { mode: 'managed', provider: 'another', model: 'different' }) }).toThrow('model selection changed')
+      const detached = reloaded.modelSelection(child)
+      Object.assign(detached!, { mode: 'managed', provider: 'mutated', model: 'other' })
+      expect(reloaded.modelSelection(child)).toEqual(selection)
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+
+  it('refuses to assign new model authority to a legacy native binding', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'external-model-selection-'))
+    try {
+      const file = join(root, 'bindings.jsonl'), child = SessionId('child')
+      new ExternalBindingStore(file).bind(child, 'legacy-thread')
+      expect(() => { new ExternalBindingStore(file).selectModel(child, { mode: 'managed', provider: 'responses', model: 'm' }) })
+        .toThrow('Legacy external member binding')
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+
+  it.each(['conflicting', 'late', 'empty-provider', 'unknown-mode'])('rejects %s model authority read from durable storage', async (mode) => {
+    const root = await mkdtemp(join(tmpdir(), 'external-model-selection-'))
+    try {
+      const file = join(root, 'bindings.jsonl'), child = SessionId('child')
+      const store = new ExternalBindingStore(file)
+      if (mode === 'conflicting') store.selectModel(child, { mode: 'native' })
+      if (mode === 'late') store.bind(child, 'thread')
+      const selection = mode === 'unknown-mode' ? { mode: 'arbitrary' }
+        : { mode: 'managed', provider: mode === 'empty-provider' ? '' : 'responses', model: 'm' }
+      appendFileSync(file, `${JSON.stringify({ v: 1, kind: 'model', child, selection })}\n`)
+      expect(() => new ExternalBindingStore(file).modelSelection(child)).toThrow()
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+
   it('keeps the consumed cursor and pending prompt across a rebind', async () => {
     const root = await mkdtemp(join(tmpdir(), 'external-store-'))
     try {

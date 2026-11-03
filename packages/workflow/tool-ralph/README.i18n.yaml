@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/workflow/tool-ralph/README.md
 document:
-  en: 6288137702c6c4661615e65625272340aae327e3
-  zh: db98fe358fc4b6c337c426df5d539ffe0cc6ae39
+  en: 88513de70497dd58a529ed25ae7da658c2de0802
+  zh: ef4974d91e4c4cb9a1fffc19ff20f10f373880b4
 /:
   en: e2a31cca62823561
   zh: c06ff93cf98b67e4
@@ -42,8 +42,8 @@ document:
   en: 65f90bce7ef1fe5b
   zh: 04c8d5ad08a9007c
 /deepseek-ai-dsh-tool-ralph/understand-the-implementation/lifecycle-and-cancellation:
-  en: fdd98f9e2d2ec378
-  zh: 72e3da1f3c717aa6
+  en: ee951f1da9dce6ab
+  zh: f6695682c1cb36d0
 /deepseek-ai-dsh-tool-ralph/understand-the-implementation/render-intent:
   en: 07e071bd44b1df65
   zh: 26f1cb2eab8c25b0

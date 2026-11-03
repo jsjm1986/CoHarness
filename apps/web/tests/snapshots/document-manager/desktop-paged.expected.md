@@ -1,12 +1,13 @@
 - dialog "Document Manager":
-  - heading "Document Manager" [level=2]
-  - button "Close":
-    - img
-  - button "Upload information":
-    - img
+  - banner:
+    - heading "Document Manager" [level=2]
+    - button "Upload information":
+      - img
+    - button "Close":
+      - img
   - complementary "Document scopes":
     - img
-    - textbox "Find a project space"
+    - textbox "Find a space"
     - status:
       - text: Project scopes could not be refreshed; showing the last result
       - button "Retry"
@@ -21,6 +22,7 @@
       - img
       - text: Trash
     - button "History"
+  - status: Open a conversation to add documents to it. Browsing, downloads and copying remain available.
   - heading "Personal documents" [level=3]
   - navigation "Document path":
     - button "Root folder" [disabled]
@@ -55,7 +57,7 @@
         - checkbox "f-01.txt"
         - button "Preview f-01.txt": f-01.txt Text · 2026-08-01
         - text: 21 B
-        - button "Add f-01.txt to conversation": Add to conversation
+        - button "Add f-01.txt to conversation" [disabled]: Add to conversation
         - 'button "More actions: f-01.txt"':
           - img
   - button "Previous page"

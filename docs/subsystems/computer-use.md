@@ -23,6 +23,8 @@ One registered provider does not reserve a desktop for a Session. Callers coordi
 
 The optional confirmation controller on `computerUseAuthorization` handles current-user reads and explicit gestures through the [Session API](../../packages/host/apiproxy/README.md). The [Gateway execution provider](../../packages/context/gateway-execution/README.md) owns live-root inheritance, qualification checks and root workflow leases. Browser consumers import the confirmation value from `dsh-computer-use/types` without Host service declarations.
 
+Deployments can publish a separate `computerUseEnvironment` limitation without reserving a provider. A configured provider owns its actual availability; the environment fallback is informational. The [computer-use package](../../packages/computer-use/computer-use/README.md) defines the shared lookup used by driver execution and Host metadata.
+
 ## Results and platform requirements
 
 Tools use the normal execution pipeline and Session log. Image-capable model routes with an attachment store receive durable screenshots; unsupported image routes receive the existing MCP image diagnostic. Provider READMEs own installation, permission, and platform limitations.
@@ -58,9 +60,10 @@ async run<T>(execution: ToolExecution, operation: (signal: AbortSignal) => Promi
  * A second registration fails even when it repeats the current name. Providers
  * must stop their tools and await owned work before releasing this registration.
  * @param name - provider-owned name used in registration diagnostics.
+ * @param options - optional environment limitation; unavailable providers publish no desktop effects.
  * @returns the effect disposer for this exact registration.
  */
-register(name: ComputerUseProviderName): () => Promise<void>
+register(name: ComputerUseProviderName, options?: { unavailableReason: ComputerUseUnavailableReason }): () => Promise<void>
 ```
 
 Types: [ToolExecution](tools.md)
@@ -84,6 +87,14 @@ run<T>(execution: ToolExecution, operation: (signal: AbortSignal) => Promise<T>)
 ```
 
 Types: [ToolExecution](tools.md)
+
+Source: [`packages/computer-use/computer-use/src/index.ts`](../../packages/computer-use/computer-use/src/index.ts)
+
+<a id="ctxcomputeruseenvironment--computeruseenvironment"></a>
+
+### `ctx.computerUseEnvironment` — `ComputerUseEnvironment`
+
+A known limitation used only while no desktop provider is registered.
 
 Source: [`packages/computer-use/computer-use/src/index.ts`](../../packages/computer-use/computer-use/src/index.ts)
 <!-- END GENERATED cordis-surface -->

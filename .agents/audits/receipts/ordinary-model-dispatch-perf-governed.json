@@ -1,0 +1,14 @@
+{
+  "name": "ordinary-model-dispatch-perf-governed",
+  "cwd": ".",
+  "command": "node --expose-gc .agents/audits/.local/ordinary-dispatch-perf.mjs governed",
+  "startedAt": "2026-10-25T05:27:17.222769+00:00",
+  "seconds": 0.599,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "db10f49bdffd3629ef4ade031ce127f4c5e854feaa72792220ab5fbca0f70544",
+  "inputsAfter": "db10f49bdffd3629ef4ade031ce127f4c5e854feaa72792220ab5fbca0f70544",
+  "postgresToolDirectory": null,
+  "outputSha256": "103cacabb341f473b50e25469f2e065b4004aa5359edcf14a6cc298c71a5e3f5",
+  "outputTail": "{\"mode\":\"governed\",\"node\":\"v25.8.1\",\"samples\":500,\"warmup\":50,\"elapsedMs\":167.39545800000002,\"msPerRequest\":0.33479091600000005,\"policyChecks\":1650,\"maxRssKiB\":154112,\"retainedRssBytes\":157810688,\"retainedHeapBytes\":13814008,\"scope\":\"actual Messages loopback; direct native versus complete governed runtime, not a whole-machine benchmark\"}\n"
+}

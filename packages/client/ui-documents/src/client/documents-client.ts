@@ -23,6 +23,8 @@ import type {
   UserDocCatalogMetrics,
   UserDocCatalogOverview,
   UserDocCatalogRow,
+  UserDocLocationPage,
+  UserDocScope as DocumentScope,
 } from '@deepseek-ai/dsh-userdoc'
 import {
   createUserDocClient, UserDocHttpError, UserDocServiceUnavailableError,
@@ -67,7 +69,7 @@ export interface DocumentsScopeReadResult {
 export { createUserDocClient, UserDocHttpError, UserDocServiceUnavailableError }
 
 /** Runtime scope shown in the document manager title and delete warning. */
-export type DocumentsWorkspaceScope =
+export type DocumentsWorkspaceScope = (
   | { kind: 'personal'; projects?: readonly DocumentsProjectScope[] }
   | {
     kind: 'project'
@@ -76,6 +78,7 @@ export type DocumentsWorkspaceScope =
     mode?: 'ro' | 'rw'
     projects?: readonly DocumentsProjectScope[]
   }
+) & { readonly nodeId?: DocumentScope['nodeId']; readonly nodeName?: string; readonly accountId?: number }
 
 /** Project target advertised by the Gateway account context. */
 export interface DocumentsProjectScope {
@@ -107,8 +110,17 @@ export function parseDocumentsScope(value: unknown): DocumentsWorkspaceScope {
     }).slice(0, 200)
     : []
   const scope = value.scope
+  const environment = 'environment' in value && typeof value.environment === 'object' && value.environment !== null ? value.environment : undefined
+  const nodeId = environment !== undefined && 'nodeId' in environment && typeof environment.nodeId === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(environment.nodeId)
+    ? environment.nodeId as NonNullable<DocumentScope['nodeId']> : undefined
+  const user = 'user' in value && typeof value.user === 'object' && value.user !== null ? value.user : undefined
+  const accountId = user !== undefined && 'id' in user && typeof user.id === 'number' && Number.isSafeInteger(user.id) && user.id > 0 ? user.id : undefined
+  const location = { ...(accountId === undefined ? {} : { accountId }), ...nodeId === undefined ? {} : { nodeId,
+    ...(environment !== undefined && 'nodeName' in environment && typeof environment.nodeName === 'string' ? { nodeName: environment.nodeName } : {}) },
+  }
   if (scope === null || typeof scope !== 'object') return { kind: 'personal' }
-  if (!('kind' in scope) || scope.kind !== 'project') return projects.length === 0 ? { kind: 'personal' } : { kind: 'personal', projects }
+  if (!('kind' in scope) || scope.kind !== 'project') return projects.length === 0 ? { kind: 'personal', ...location } : { kind: 'personal', projects, ...location }
   if (!('projectName' in scope) || typeof scope.projectName !== 'string' || scope.projectName === ''
     || scope.projectName.length > 200 || /[\u0000-\u001f\u007f]/u.test(scope.projectName)) {
     return projects.length === 0 ? { kind: 'personal' } : { kind: 'personal', projects }
@@ -118,11 +130,39 @@ export function parseDocumentsScope(value: unknown): DocumentsWorkspaceScope {
   const mode = 'mode' in scope && (scope.mode === 'ro' || scope.mode === 'rw') ? scope.mode : undefined
   return {
     kind: 'project',
+    ...location,
     projectName: scope.projectName,
     ...(projectId === undefined ? {} : { projectId }),
     ...(mode === undefined ? {} : { mode }),
     ...(projects.length === 0 ? {} : { projects }),
   }
+}
+
+/**
+ * Read a bounded directory of document locations without opening any Runtime.
+ * @param signal - component-owned cancellation.
+ * @param cursor - continuation from the displayed page.
+ * @returns a page, or undefined for independent Hosts without a Gateway directory.
+ */
+export async function readDocumentLocations(signal: AbortSignal, cursor?: string): Promise<UserDocLocationPage | undefined> {
+  const response = await fetch(`/account/api/document-locations${cursor === undefined ? '' : `?cursor=${encodeURIComponent(cursor)}`}`, { signal, cache: 'no-store' })
+  if ([404, 501].includes(response.status)) return undefined
+  if (!response.ok) throw new Error('Document locations are unavailable')
+  const body = await readApiResponseJson(response) as { items?: unknown; nextCursor?: unknown }
+  if (!Array.isArray(body.items) || body.nextCursor !== null && typeof body.nextCursor !== 'string') throw new Error('Invalid document locations')
+  const items: UserDocLocationPage['items'] = body.items.map((value) => {
+    if (typeof value !== 'object' || value === null) throw new Error('Invalid document location')
+    const row = value as Record<string, unknown>, scope = row.scope as Record<string, unknown> | undefined
+    if (scope === undefined || !['personal', 'project'].includes(String(scope.kind)) || typeof scope.nodeId !== 'string'
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(scope.nodeId)
+      || scope.kind === 'project' && (typeof scope.projectId !== 'number' || !Number.isSafeInteger(scope.projectId) || scope.projectId < 1)
+      || typeof row.name !== 'string' || typeof row.nodeName !== 'string' || row.mode !== 'ro' && row.mode !== 'rw') throw new Error('Invalid document location')
+    const location = { nodeId: scope.nodeId as NonNullable<DocumentScope['nodeId']>, nodeName: row.nodeName }
+    return { name: row.name, nodeName: row.nodeName, mode: row.mode,
+      scope: scope.kind === 'personal' ? { kind: 'personal' as const, ...location }
+        : { kind: 'project' as const, projectId: scope.projectId as number, ...location } }
+  })
+  return { items, nextCursor: body.nextCursor as string | null }
 }
 
 /**

@@ -1,0 +1,610 @@
+{
+  "status": "fixed_and_verified_for_named_scope",
+  "updatedAt": "2026-10-30T06:38:09.564841+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T051157Z",
+  "sourcePaths": [
+    ".agents/notes/implemented/architecture/2026-10-30-conversation-nul-search-and-query-fields.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-30-conversation-nul-search-and-query-fields.md",
+    ".agents/notes/implemented/architecture/2026-10-30-conversation-nul-search-and-query-fields.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-25-gateway-literal-conversation-search.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-25-gateway-literal-conversation-search.md",
+    ".agents/notes/implemented/bug-fix/2026-10-25-gateway-literal-conversation-search.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/conversation-nul-text/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/conversation-nul-text/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/conversation-nul-text/guide.zh.md",
+    "gateway/README.i18n.yaml",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/deploy/postgres/migrations/100_conversation_search_nul_text.sql",
+    "gateway/src/postgres/collaboration-service.ts",
+    "gateway/src/postgres/conversation-archive-service.ts",
+    "gateway/src/postgres/conversation-query-fields-v1.ts",
+    "gateway/src/postgres/conversation-query-migration-v1.ts",
+    "gateway/src/postgres/conversation-repository.ts",
+    "gateway/src/postgres/database.ts",
+    "gateway/src/postgres/progress-service.ts",
+    "gateway/src/postgres/progress-usage.ts",
+    "gateway/src/postgres/search-text.ts",
+    "gateway/tests/conversation-archive-service.spec.ts",
+    "gateway/tests/conversation-query-fields-v1.spec.ts",
+    "gateway/tests/conversation-runtime-namespace-postgres.spec.ts",
+    "gateway/tests/expected/archive-runtime-namespace.jsonl",
+    "gateway/tests/expected/progress-node-affinity.jsonl",
+    "gateway/tests/fixtures/archive-runtime-namespace.mjs",
+    "gateway/tests/fixtures/conversation-runtime-migration.mjs",
+    "gateway/tests/fixtures/progress-node-affinity.mjs",
+    "gateway/tests/postgres.spec.ts",
+    "gateway/tests/progress-service.spec.ts",
+    "gateway/tests/project-progress-postgres.spec.ts",
+    "gateway/tests/snapshots/project-activity/legacy-cursor.expected.md"
+  ],
+  "sourceArtifactHashes": "nul-final-source-artifact-hashes.json",
+  "scope": "Captured backend build and schema through migration100. Peer deployment-topology source overlays, including the shared collaboration catalog, are tracked separately and are outside this acceptance checkpoint.",
+  "baseline": {
+    "headRef": "codex/business-logic-audit-2026-10-23",
+    "upstreamRef": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchVerifiedThisContinuation": true
+  },
+  "checks": {
+    "nul-final-selected-coverage-v2": {
+      "status": "passed",
+      "startedAt": "2026-10-30T06:16:40.845763+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+        "run",
+        "tests/postgres.spec.ts",
+        "tests/conversation-runtime-namespace-postgres.spec.ts",
+        "tests/conversation-repository.spec.ts",
+        "tests/conversation-archive-service.spec.ts",
+        "tests/progress-service.spec.ts",
+        "tests/project-progress-postgres.spec.ts",
+        "tests/project-activity-postgres.spec.ts",
+        "tests/archive-administration-postgres.spec.ts",
+        "tests/archive-runtime-namespace-transcript.spec.ts",
+        "tests/progress-node-affinity-transcript.spec.ts",
+        "tests/conversation-runtime-migration-transcript.spec.ts",
+        "--maxWorkers=2",
+        "--no-file-parallelism",
+        "--coverage",
+        "--coverage.include=src/postgres/search-text.ts",
+        "--coverage.include=src/postgres/conversation-query-fields-v1.ts",
+        "--coverage.include=src/postgres/conversation-query-migration-v1.ts",
+        "--coverage.include=src/postgres/conversation-repository.ts",
+        "--coverage.include=src/postgres/conversation-archive-service.ts",
+        "--coverage.include=src/postgres/collaboration-service.ts",
+        "--coverage.include=src/postgres/progress-service.ts",
+        "--coverage.include=src/postgres/progress-usage.ts",
+        "--coverage.reporter=json-summary",
+        "--coverage.reporter=text",
+        "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T051157Z/nul-source-coverage-v2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T06:17:04.264940+00:00"
+    },
+    "nul-query-field-guard-coverage-v2": {
+      "status": "passed",
+      "startedAt": "2026-10-30T06:23:57.111461+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+        "run",
+        "tests/conversation-query-fields-v1.spec.ts",
+        "--maxWorkers=1",
+        "--coverage",
+        "--coverage.include=src/postgres/conversation-query-fields-v1.ts",
+        "--coverage.reporter=json-summary",
+        "--coverage.reporter=text",
+        "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T051157Z/nul-query-guard-coverage-v2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T06:23:57.644487+00:00"
+    },
+    "nul-final-types-with-query-guards": {
+      "status": "passed",
+      "startedAt": "2026-10-30T06:23:57.111447+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "./node_modules/.bin/tsc",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T06:24:00.861874+00:00"
+    },
+    "nul-final-lint-with-query-guards": {
+      "status": "passed",
+      "startedAt": "2026-10-30T06:23:57.110931+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T051157Z/run-nul-lint.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T06:23:58.314075+00:00"
+    },
+    "nul-private-build": {
+      "status": "passed",
+      "startedAt": "2026-10-30T06:06:00.322986+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "./node_modules/.bin/tsc",
+        "-p",
+        "tsconfig.build.json",
+        "--outDir",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T051157Z/nul-artifact/lib",
+        "--tsBuildInfoFile",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T051157Z/nul-artifact/tsconfig.tsbuildinfo"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T06:06:03.055675+00:00"
+    },
+    "nul-compiled-node22": {
+      "status": "passed",
+      "startedAt": "2026-10-30T06:12:13.512215+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "DSH_GATEWAY_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T051157Z/nul-artifact/lib",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/archive-runtime-namespace-transcript.spec.ts",
+        "tests/conversation-runtime-migration-transcript.spec.ts",
+        "tests/progress-node-affinity-transcript.spec.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T06:12:17.336474+00:00"
+    },
+    "nul-compiled-node24": {
+      "status": "passed",
+      "startedAt": "2026-10-30T06:12:13.512218+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "DSH_GATEWAY_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T051157Z/nul-artifact/lib",
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/archive-runtime-namespace-transcript.spec.ts",
+        "tests/conversation-runtime-migration-transcript.spec.ts",
+        "tests/progress-node-affinity-transcript.spec.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T06:12:17.336487+00:00"
+    },
+    "nul-built-browser": {
+      "status": "passed",
+      "startedAt": "2026-10-30T06:19:09.556515+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+        "env",
+        "DSH_ARCHIVE_BROWSER_SCREENSHOTS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T051157Z/nul-browser-screens",
+        "node",
+        "tests/run-built-archive-ui.mjs",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T051157Z/nul-artifact/lib",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/session-latest-admin-artifact",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.pnpm/playwright@1.62.1/node_modules/playwright/index.mjs",
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T06:19:17.047604+00:00"
+    },
+    "nul-final-docs": {
+      "status": "passed",
+      "startedAt": "2026-10-30T05:57:47.559097+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "pnpm",
+        "run",
+        "test:docs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T05:58:17.294335+00:00"
+    }
+  },
+  "acceptance": {
+    "sourceUniqueCases": 205,
+    "sourceFiles": 12,
+    "sourceDatabaseAndServiceCases": 187,
+    "durableProjectionGuardCases": 18,
+    "compiledNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "compiledFixturesPerVersion": 3,
+    "compiledScenariosOverlapSource": true,
+    "javascriptFiles": 159,
+    "chromeWidths": [
+      1280,
+      390,
+      320
+    ],
+    "pageErrors": 0,
+    "horizontalOverflow": false,
+    "otherRuntimePreserved": true,
+    "adminSourceArtifactMatchFiles": 136,
+    "documentationGates": 20,
+    "migration100": {
+      "legacyEventRows": 205,
+      "originalEventBytesAndRuntimeRetained": true,
+      "legacyLiveAndArchiveSearchRetained": true,
+      "legacyProgressAndRequestSessionRetained": true,
+      "secondBatchFaultRollsBackSchemaAndRows": true,
+      "retryCommits": true,
+      "invalidNulEncodingsRefused": 8,
+      "missingAndNonObjectQueryFieldsRefused": true,
+      "newUnassignedWritesRefused": true
+    }
+  },
+  "coverage": {
+    "eightFileRun": {
+      "total": {
+        "lines": {
+          "total": 1654,
+          "covered": 1461,
+          "skipped": 0,
+          "pct": 88.33
+        },
+        "statements": {
+          "total": 1944,
+          "covered": 1609,
+          "skipped": 0,
+          "pct": 82.76
+        },
+        "functions": {
+          "total": 327,
+          "covered": 299,
+          "skipped": 0,
+          "pct": 91.43
+        },
+        "branches": {
+          "total": 1815,
+          "covered": 1367,
+          "skipped": 0,
+          "pct": 75.31
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/collaboration-service.ts": {
+        "lines": {
+          "total": 113,
+          "covered": 95,
+          "skipped": 0,
+          "pct": 84.07
+        },
+        "functions": {
+          "total": 34,
+          "covered": 31,
+          "skipped": 0,
+          "pct": 91.17
+        },
+        "statements": {
+          "total": 142,
+          "covered": 109,
+          "skipped": 0,
+          "pct": 76.76
+        },
+        "branches": {
+          "total": 171,
+          "covered": 126,
+          "skipped": 0,
+          "pct": 73.68
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/conversation-archive-service.ts": {
+        "lines": {
+          "total": 460,
+          "covered": 410,
+          "skipped": 0,
+          "pct": 89.13
+        },
+        "functions": {
+          "total": 99,
+          "covered": 89,
+          "skipped": 0,
+          "pct": 89.89
+        },
+        "statements": {
+          "total": 550,
+          "covered": 453,
+          "skipped": 0,
+          "pct": 82.36
+        },
+        "branches": {
+          "total": 466,
+          "covered": 334,
+          "skipped": 0,
+          "pct": 71.67
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/conversation-query-fields-v1.ts": {
+        "lines": {
+          "total": 18,
+          "covered": 18,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 1,
+          "covered": 1,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 23,
+          "covered": 19,
+          "skipped": 0,
+          "pct": 82.6
+        },
+        "branches": {
+          "total": 48,
+          "covered": 40,
+          "skipped": 0,
+          "pct": 83.33
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/conversation-query-migration-v1.ts": {
+        "lines": {
+          "total": 14,
+          "covered": 14,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 15,
+          "covered": 15,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/conversation-repository.ts": {
+        "lines": {
+          "total": 647,
+          "covered": 550,
+          "skipped": 0,
+          "pct": 85
+        },
+        "functions": {
+          "total": 97,
+          "covered": 90,
+          "skipped": 0,
+          "pct": 92.78
+        },
+        "statements": {
+          "total": 735,
+          "covered": 592,
+          "skipped": 0,
+          "pct": 80.54
+        },
+        "branches": {
+          "total": 751,
+          "covered": 550,
+          "skipped": 0,
+          "pct": 73.23
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/progress-service.ts": {
+        "lines": {
+          "total": 369,
+          "covered": 341,
+          "skipped": 0,
+          "pct": 92.41
+        },
+        "functions": {
+          "total": 86,
+          "covered": 78,
+          "skipped": 0,
+          "pct": 90.69
+        },
+        "statements": {
+          "total": 443,
+          "covered": 386,
+          "skipped": 0,
+          "pct": 87.13
+        },
+        "branches": {
+          "total": 337,
+          "covered": 278,
+          "skipped": 0,
+          "pct": 82.49
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/progress-usage.ts": {
+        "lines": {
+          "total": 26,
+          "covered": 26,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 5,
+          "covered": 5,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 29,
+          "covered": 28,
+          "skipped": 0,
+          "pct": 96.55
+        },
+        "branches": {
+          "total": 26,
+          "covered": 23,
+          "skipped": 0,
+          "pct": 88.46
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/search-text.ts": {
+        "lines": {
+          "total": 7,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 3,
+          "covered": 3,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 7,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 6,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "projectionGuardRun": {
+      "total": {
+        "lines": {
+          "total": 18,
+          "covered": 18,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 23,
+          "covered": 23,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 1,
+          "covered": 1,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 48,
+          "covered": 48,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/conversation-query-fields-v1.ts": {
+        "lines": {
+          "total": 18,
+          "covered": 18,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 1,
+          "covered": 1,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 23,
+          "covered": 23,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 48,
+          "covered": 48,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "completeNewTypeScriptHelpers": [
+      "search-text.ts",
+      "conversation-query-migration-v1.ts",
+      "conversation-query-fields-v1.ts"
+    ],
+    "limitation": "100% applies only to those three modules in the corresponding reports. Larger services and the project remain partially covered. SQL, subprocess and browser scenarios are acceptance evidence rather than a JavaScript coverage counter."
+  },
+  "implementationCorrections": [
+    "The first activity negative had a teardown method typo; negative-v2 establishes the actual missing activity.",
+    "Expanded regressions found a stale legacy-cursor golden and progress unit records missing Runtime fields from the namespace change; current intended behavior and fixture data now agree.",
+    "The205-row migration detected a text SELECT alias conflicting with numeric keyset order. Final migration uses the underlying bigint ordering and validates every row before commit.",
+    "Long-run preview assertions retain the existing160-code-point display bound and separate320-code-point SQL extraction bound."
+  ],
+  "remaining": [
+    "B04/B25 and all12original business domains remain open.",
+    "Peer migration101 is a new unreleased deployment-topology change requiring its own integration review.",
+    "Logical computer fixtures run on one macOS host and do not establish physical multi-host or Windows/Linux deployment acceptance.",
+    "Real external model API and public push remain human-deferred.",
+    "No production migration, deployment, commit or push was performed. Owned child test databases were removed; the owned parent PostgreSQL remains available."
+  ],
+  "finding": "B335",
+  "negative": "nul-index-source-negative.json",
+  "problem": "NUL-bearing indexed text rejects append and archive synchronization with22021 inside the persistence transaction.",
+  "repair": [
+    "Optional original NUL-separated pieces retain ordinary stored values without rewriting them.",
+    "Literal matching preserves empty pieces, NUL boundaries, wildcard escapes and Unicode previews before fuzzy alternatives.",
+    "Live/archive insertion, result reconstruction, previews and generation replacement retain original text."
+  ]
+}

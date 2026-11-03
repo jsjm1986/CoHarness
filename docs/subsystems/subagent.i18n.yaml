@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/subagent.md
 document:
-  en: 4886d5a9b92d694e5d4d7cd30f41ba2a382d6d98
-  zh: 169ba51f73eb2889f91bb43bd0d0ffc8ffe797b5
+  en: b2dba68d5c5e5857f3c0883982b2ce7122de32c6
+  zh: 1c53598da94755e723410801d7b3377c18bdc903
 /subagent:
   en: 2f7537253a02c8af
   zh: 24069c7a0f54132d
@@ -15,8 +15,8 @@ document:
   en: ca7e0c9353bc6e13
   zh: 7b8ffaf58a180efd
 /subagent/continuable-children-and-activations:
-  en: 229747d016e984bf
-  zh: 2ac655217235411f
+  en: abd402ce99fdc12b
+  zh: 70fb36e2ea8c13c8
 /subagent/durable-enumeration-listchildren-listdescendants-and-their-entries:
   en: d55f97b1482f64f9
   zh: caaf4e7ddc2bcdde

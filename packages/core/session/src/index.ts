@@ -8,7 +8,7 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import { isAbsolute } from 'node:path'
-import { assertNever, deepFreeze } from '@deepseek-ai/dsh-util-values'
+import { assertNever, deepFreeze, formatThrownValue } from '@deepseek-ai/dsh-util-values'
 import { scopeOf, scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type { Message } from '@deepseek-ai/dsh-llm'
@@ -479,10 +479,10 @@ function invokeContainedSessionObservers(
     try {
       const returned: unknown = callback(...args)
       void Promise.resolve(returned).catch((error: unknown) => {
-        ctx.logger.warn(`session "${id}": ${name} listener rejected: ${String(error)}`)
+        ctx.logger.warn(`session "${id}": ${name} listener rejected: ${formatThrownValue(error)}`)
       })
     } catch (error: unknown) {
-      ctx.logger.warn(`session "${id}": ${name} listener threw: ${String(error)}`)
+      ctx.logger.warn(`session "${id}": ${name} listener threw: ${formatThrownValue(error)}`)
     }
   }
 }
@@ -1424,7 +1424,7 @@ export class SessionStore extends Service {
         // of becoming unhandled.
         const returned: unknown = callback(...callbackArgs)
         void Promise.resolve(returned).catch((error: unknown) => {
-          this.ctx.logger.warn(`session "${entry.id}": session/created listener rejected: ${String(error)}`)
+          this.ctx.logger.warn(`session "${entry.id}": session/created listener rejected: ${formatThrownValue(error)}`)
         })
       }
     } finally {
@@ -1440,7 +1440,7 @@ export class SessionStore extends Service {
       const callbacks = collectSessionCallbacks(this.ctx, [entry.carrier, 'session/disposed', entry.session])
       invokeContainedSessionObservers(this.ctx, 'session/disposed', entry.id, callbackArgs, callbacks)
     } catch (error: unknown) {
-      this.ctx.logger.warn(`session "${entry.id}": session/disposed dispatch threw: ${String(error)}`)
+      this.ctx.logger.warn(`session "${entry.id}": session/disposed dispatch threw: ${formatThrownValue(error)}`)
     }
   }
 

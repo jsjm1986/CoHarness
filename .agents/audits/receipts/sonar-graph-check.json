@@ -1,0 +1,14 @@
+{
+  "name": "sonar-graph-check",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-doc-graphs.ts --check",
+  "startedAt": "2026-10-24T09:33:24.536464+00:00",
+  "seconds": 21.384,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "inputsAfter": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "postgresToolDirectory": null,
+  "outputSha256": "23745a9abce4ed0df395b9be82c71bc5061ed11c78a02bf1652696337b1fc97a",
+  "outputTail": "gen-doc-graphs: 9 graph doc(s) are up to date.\n"
+}

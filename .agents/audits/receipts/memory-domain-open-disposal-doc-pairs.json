@@ -1,0 +1,14 @@
+{
+  "name": "memory-domain-open-disposal-doc-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-memory-domain-open-disposal.md packages/memory/memory/README.md",
+  "startedAt": "2026-10-24T01:16:49.562869+00:00",
+  "seconds": 4.67,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0fddd9ae07c9f1fa8265f02484b6a07c51456f5f44f0de9dcb5a451f93e3ed42",
+  "inputsAfter": "3de7a907728399268c2903813367413c5fbbc86a98a53471109decd78064ed47",
+  "postgresToolDirectory": null,
+  "outputSha256": "9c66c6a33123fd7b419a2828ad117cf80655fa0e212e6ce63166503e44911d23",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/bug-fix/2026-10-24-memory-domain-open-disposal.md packages/memory/memory/README.md\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-24-memory-domain-open-disposal.i18n.yaml\nverify-translation-pairing: recorded packages/memory/memory/README.i18n.yaml\nverify-translation-pairing: 2 record(s) written; run the check to validate the pairs.\n"
+}

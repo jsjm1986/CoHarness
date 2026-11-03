@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-monotonic-cleanup-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-dsh-sdk/tests/control.spec.ts -t 'wall time moves backwards' --retry=0",
+  "startedAt": "2026-10-24T16:42:51.077421+00:00",
+  "seconds": 6.338,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "899b2e336a4b8c4ab957c2217129fb3f2cf5a2a2c0ab368b4c9ae6af66b344f3",
+  "inputsAfter": "899b2e336a4b8c4ab957c2217129fb3f2cf5a2a2c0ab368b4c9ae6af66b344f3",
+  "postgresToolDirectory": null,
+  "outputSha256": "dd5cf15ff05fc3a0dc9e7a804801d8a65c97c486e5e2037bb4c5fa7b26936e69",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/subagent/subagent-dsh-sdk/tests/control.spec.ts (75 tests | 1 failed | 74 skipped) 1515ms\n   × keeps the cleanup deadline bounded when wall time moves backwards 1513ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/subagent/subagent-dsh-sdk/tests/control.spec.ts > keeps the cleanup deadline bounded when wall time moves backwards\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ packages/subagent/subagent-dsh-sdk/tests/control.spec.ts:411:23\n    409|       timer = setTimeout(() => { resolve(false) }, 1500)\n    410|     })])\n    411|     expect(completed).toBe(true)\n       |                       ^\n    412|     expect(outcomes).toEqual(['uncertain'])\n    413|   } finally {\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 74 skipped (75)\n   Start at  00:42:54\n   Duration  2.71s (transform 859ms, setup 33ms, import 1.07s, tests 1.51s, environment 0ms)\n\n"
+}

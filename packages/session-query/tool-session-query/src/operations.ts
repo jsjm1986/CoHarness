@@ -250,7 +250,7 @@ async function executeSessionHandoff(
   const title = await workspaceAccess.readTitle(ctx, caller, sessionId, exec.signal, authorized)
   const projected = projectHandoff(snapshot)
   await workspaceAccess.assertReadableSessions(ctx, caller, [sessionId], exec.signal)
-  const capsule = await extractHandoff(ctx, caller.agent, projected, config, exec.signal)
+  const capsule = await extractHandoff(ctx, caller.agent, sessionId, projected, config, exec.signal)
   await workspaceAccess.assertReadableSessions(ctx, caller, [sessionId], exec.signal)
   return presentation.formatSessionHandoff(sessionId, title, capsule ?? formatLocalHandoff(projected, config.chars), capsule !== undefined)
 }

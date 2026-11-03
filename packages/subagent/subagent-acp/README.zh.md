@@ -135,6 +135,8 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
+- **受管模型控制**：持久成员路由属于 LLM 编排；外部启动和成员轮次遵守[共享父级控制限制](../subagent/README.zh.md#delegated-policy)。
+
 - **每次运行使用全新进程**：持久进程池属于后续优化（见 [seam Agent Note](../../../.agents/notes/implemented/feature/2026-06-21-subagent-capability-seam.zh.md)）。
 - **仅支持本地工作区**：解析后的 cwd 是交给同一台机器上子进程的本地路径；远程 ACP agent 的工作区映射需要独立的后端能力，此处尚未设计这种能力。
 - **不支持可选启动时能力**：本提供方无法在远程进程内应用 `agentPreset`、`agentOptions`、`outputSchema` 或深度上限，因此不会声明这些能力；服务会拒绝需要它们的请求。

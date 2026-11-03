@@ -1,0 +1,14 @@
+{
+  "name": "archive-jobs-focused-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/jobs/jobs/src packages/jobs/jobs-local/src packages/jobs/jobs/tests/archive-admission.spec.ts packages/subagent/subagent/src/archive-admission.ts packages/subagent/subagent/src/index.ts packages/subagent/subagent/src/continuation.ts packages/subagent/subagent/tests/archive-admission.spec.ts packages/subagent/subagent/tests/service.spec.ts packages/subagent/subagent/tests/continuation.spec.ts packages/subagent/tool-subagent/src/index.ts packages/subagent/tool-subagent/tests/tool-subagent.spec.ts packages/workflow/tool-workflow/tests/fixtures/failure-driver.mjs",
+  "startedAt": "2026-10-26T09:14:22.698075+00:00",
+  "seconds": 6.005,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ceb6904e68af9d827c45d600745fd852c513ac4ab9e83b5462e9e97c3c3016f5",
+  "inputsAfter": "ceb6904e68af9d827c45d600745fd852c513ac4ab9e83b5462e9e97c3c3016f5",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -1,0 +1,14 @@
+{
+  "name": "document-private-storage-package-types-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/attachment/userdoc-local",
+  "startedAt": "2026-10-26T00:14:57.145061+00:00",
+  "seconds": 2.911,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bc070920b1e91c392a43e4cca5554d4629b5d28e96a87a9b348ede71901fd7d2",
+  "inputsAfter": "bc070920b1e91c392a43e4cca5554d4629b5d28e96a87a9b348ede71901fd7d2",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

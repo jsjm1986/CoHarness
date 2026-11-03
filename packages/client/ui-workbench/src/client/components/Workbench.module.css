@@ -195,7 +195,11 @@
 .iconAction:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
 .picker { width: min(620px, calc(100vw - 24px)); }
 .pickerFilters { display: flex; gap: var(--dsw-space-2); }
-.pickerFilters input, .workspaceTrigger { min-width: 0; padding: 8px 10px; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); corner-shape: round; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; }
+.pickerFilters input, .workspaceTrigger, .restoreRow select { min-width: 0; padding: 8px 10px; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); corner-shape: round; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; }
+.restoreRow { display: flex; flex-direction: column; gap: var(--dsw-space-1); min-width: 0; margin-block: var(--dsw-space-3); }
+.restoreRow span { overflow-wrap: anywhere; }
+.restoreRow select { width: 100%; min-height: var(--dsw-control-height-toolbar); }
+.restoreRow select:focus-visible { outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 2px; }
 .pickerFilters input { flex: 1; }
 .workspaceTrigger { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; flex: 0 0 220px; width: 220px; min-width: 220px; max-width: none; text-align: left; cursor: pointer; transition: background-color var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
 .workspaceTrigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

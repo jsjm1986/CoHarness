@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AttachmentId, ImageVariantId } from '@deepseek-ai/dsh-attachment'
+import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef, RequestImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { DeepSeekFileStore, MAX_IMAGE_BYTES } from '../src/file-store.ts'
 import { DeepSeekFileId } from '../src/file-id.ts'
@@ -67,6 +68,17 @@ function uploadFetch(now: () => number = () => NOW) {
 }
 
 describe('DeepSeekFileStore', () => {
+  it('retains the request authorization callback through file upload lookup', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'dsh-file-authorization-'))
+    roots.push(dir)
+    const remote = uploadFetch(() => NOW)
+    const store = new DeepSeekFileStore({ index: new DeepSeekUploadIndex(join(dir, 'index.json')), fetch: remote.fetchImpl, now: () => NOW })
+    const refusal = new LlmError('Model access was revoked.', 'MODEL_POLICY_UNAVAILABLE')
+    const connection = { ...CONNECTION, dispatchRequest: () => Promise.reject(refusal) }
+    await expect(store.ensureUploaded(VERSION, connection, POLICY)).rejects.toBe(refusal)
+    expect(remote.uploads()).toBe(0)
+  })
+
   it('isolates credential values and header kinds while reusing reordered headers', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'dsh-file-credentials-'))
     roots.push(dir)

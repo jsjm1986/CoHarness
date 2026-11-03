@@ -18,6 +18,7 @@ import {
 } from 'node:fs'
 import { join } from 'node:path'
 import type { UserRow } from './auth.ts'
+import type { RuntimeId } from './runtime-catalog.ts'
 
 export const PRINCIPAL_HEADER = 'x-dsh-gateway-principal'
 
@@ -52,6 +53,7 @@ export interface GatewayPrincipalClaims {
     kind: 'user' | 'project'
     id: number
     generation: number
+    runtimeId?: RuntimeId
   }
   issuedAt: number
   expiresAt: number
@@ -87,6 +89,7 @@ export interface GatewaySessionCreationClaims {
     kind: 'project'
     id: number
     generation: number
+    runtimeId?: RuntimeId
   }
   header: GatewaySessionCreationHeader
   visibility: 'project' | 'private'
@@ -121,7 +124,7 @@ function verifiedPayload(assertion: string, publicKey: KeyObject, label: string)
 type PrincipalInput = {
     user: UserRow
     scope: PrincipalScope
-    runtime: { kind: 'user' | 'project'; id: number; generation: number }
+    runtime: { kind: 'user' | 'project'; id: number; generation: number; runtimeId?: RuntimeId }
     purpose?: GatewayPrincipalPurpose
     now?: number
   }
@@ -248,6 +251,10 @@ function positiveId(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
 
+function validRuntimeId(value: unknown): boolean {
+  return value === undefined || typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(value)
+}
+
 function principalClaims(value: unknown): GatewayPrincipalClaims {
   const claims = record(value)
   const user = record(claims?.user)
@@ -260,6 +267,7 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     || (scope?.kind !== 'personal' && scope?.kind !== 'project')
     || (runtime?.kind !== 'user' && runtime?.kind !== 'project') || !positiveId(runtime.id)
     || typeof runtime.generation !== 'number' || !Number.isSafeInteger(runtime.generation) || runtime.generation < 1
+    || !validRuntimeId(runtime.runtimeId)
     || typeof claims.issuedAt !== 'number' || !Number.isSafeInteger(claims.issuedAt)
     || typeof claims.expiresAt !== 'number' || !Number.isSafeInteger(claims.expiresAt)
     || claims.expiresAt <= claims.issuedAt || typeof claims.nonce !== 'string' || claims.nonce === '') {
@@ -311,6 +319,7 @@ function sessionCreationClaims(value: unknown): GatewaySessionCreationClaims {
     || typeof claims.organization !== 'string' || claims.organization === ''
     || !positiveId(claims.creatorUserId) || runtime?.kind !== 'project'
     || !positiveId(runtime.id) || !positiveId(runtime.generation)
+    || !validRuntimeId(runtime.runtimeId)
     || (claims.visibility !== 'project' && claims.visibility !== 'private')
     || typeof claims.issuedAt !== 'number' || !Number.isSafeInteger(claims.issuedAt) || claims.issuedAt < 0
     || typeof claims.nonce !== 'string' || claims.nonce === '') {

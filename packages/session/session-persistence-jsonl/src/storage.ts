@@ -296,7 +296,7 @@ export class JsonlSessionHandle implements SessionHandle {
     try {
       release = this.retention.reserve(event)
     } catch (error: unknown) {
-      const detail = error instanceof Error ? error.message : String(error)
+      const detail = errorChain(error)
       this.admissionFailure = new Error(`${detail}; new event refused. Drain accepted events, then close and resume this session to continue.`, { cause: error })
       throw this.admissionFailure
     }

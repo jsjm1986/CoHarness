@@ -1,0 +1,345 @@
+{
+  "recordedAt": "2026-10-28T23:08:48.345039+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "findings": [
+    "B275",
+    "B276",
+    "B277",
+    "B278"
+  ],
+  "negativeReceipts": [
+    {
+      "name": "digest-model-administration-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T22:19:23.514044+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_digest_authority_test",
+        "DSH_AUDIT_DIGEST_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/digest-authority-migrations-20261029",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/digest-model-administration-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T22:19:29.651372+00:00"
+    },
+    {
+      "name": "digest-model-retired-target-compiled-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T22:27:01.630813+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_digest_authority_test",
+        "DSH_AUDIT_DIGEST_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/digest-authority-migrations-20261029",
+        "DSH_EXAMPLE_MODE=lib",
+        "DSH_GATEWAY_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/webhook-json-artifact-r2-20261029/lib",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/digest-model-administration-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T22:27:06.900733+00:00"
+    }
+  ],
+  "behavior": [
+    "Read, pin and clear retain the initiating active organization administrator in the database transaction.",
+    "Candidates and selected model rows join their owning organization; identical provider keys in another organization do not expose or accept foreign models.",
+    "Exact offered model identifiers remain selectable, including identifiers containing spaces.",
+    "The organization configuration writer is retained before administrator and catalog/provider locks; selected enabled routes are rechecked after waits. Each writer returns its accepted view inside that transaction."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "digest-model-progress-regression-source",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:34:51.439014+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_digest_authority_test",
+          "DSH_AUDIT_DIGEST_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/digest-authority-migrations-20261029",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/digest-model-administration-postgres.spec.ts",
+          "tests/digest-model-administration-transcript.spec.ts",
+          "tests/project-progress-postgres.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--coverage",
+          "--coverage.include=src/postgres/progress-service.ts",
+          "--coverage.include=src/postgres/administrator-authority.ts",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/digest-model-progress-regression-source"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:35:07.397811+00:00"
+      },
+      {
+        "name": "digest-model-private-artifact-build",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:37:47.994939+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/build-digest-model-artifact.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:37:50.345855+00:00"
+      },
+      {
+        "name": "digest-model-built-node22",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:40:24.962618+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_digest_authority_test",
+          "DSH_AUDIT_DIGEST_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/digest-authority-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-digest-model-replay.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/digest-model-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:40:31.190176+00:00"
+      },
+      {
+        "name": "digest-model-built-node24",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:42:36.350990+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_digest_authority_test",
+          "DSH_AUDIT_DIGEST_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/digest-authority-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-digest-model-replay.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/digest-model-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:42:41.725901+00:00"
+      },
+      {
+        "name": "digest-model-gateway-types",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:33:11.157717+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-preferences-typecheck.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:33:14.601608+00:00"
+      },
+      {
+        "name": "digest-model-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-28T22:40:26.090669+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/postgres/progress-service.ts",
+          "gateway/src/admin-api.ts",
+          "gateway/tests/digest-model-administration-postgres.spec.ts",
+          "gateway/tests/digest-model-administration-transcript.spec.ts",
+          "gateway/tests/project-progress-postgres.spec.ts",
+          "gateway/tests/postgres-suite.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T22:40:27.502924+00:00"
+      },
+      {
+        "name": "digest-and-postgres-current-owned-doc-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:07:54.483463+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "gateway/README.md",
+          ".agents/notes/implemented/bug-fix/2026-10-29-model-administration-authority.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-administration-authority/guide.md",
+          ".agents/notes/implemented/bug-fix/2026-09-28-gateway-fixture-state-isolation.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:07:54.740548+00:00"
+      },
+      {
+        "name": "digest-model-doc-quick",
+        "status": "failed",
+        "startedAt": "2026-10-28T22:40:27.248406+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-28T22:41:45.705817+00:00"
+      }
+    ],
+    "sourceCases": 37,
+    "sourceFiles": 4,
+    "actualPostgresOwnershipAndConcurrencyCases": 6,
+    "goldenHttpObservations": 27,
+    "compiledNodes": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 376,
+          "covered": 321,
+          "skipped": 0,
+          "pct": 85.37
+        },
+        "statements": {
+          "total": 449,
+          "covered": 351,
+          "skipped": 0,
+          "pct": 78.17
+        },
+        "functions": {
+          "total": 85,
+          "covered": 73,
+          "skipped": 0,
+          "pct": 85.88
+        },
+        "branches": {
+          "total": 342,
+          "covered": 221,
+          "skipped": 0,
+          "pct": 64.61
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/administrator-authority.ts": {
+        "lines": {
+          "total": 6,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 1,
+          "covered": 1,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 7,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 85.71
+        },
+        "branches": {
+          "total": 8,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 87.5
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/progress-service.ts": {
+        "lines": {
+          "total": 370,
+          "covered": 315,
+          "skipped": 0,
+          "pct": 85.13
+        },
+        "functions": {
+          "total": 84,
+          "covered": 72,
+          "skipped": 0,
+          "pct": 85.71
+        },
+        "statements": {
+          "total": 442,
+          "covered": 345,
+          "skipped": 0,
+          "pct": 78.05
+        },
+        "branches": {
+          "total": 334,
+          "covered": 214,
+          "skipped": 0,
+          "pct": 64.07
+        }
+      }
+    },
+    "coverageComplete": false,
+    "globalDocumentation": "19 of20 checks passed at the batch cut. The sole failure is the in-progress peer multi-computer proposal pairing; the four current owned pairs pass the scoped check."
+  },
+  "sourceHashes": {
+    "gateway/src/postgres/progress-service.ts": "5c503647e38f15e6fab5665457428a4cdcbfb47a55cd8e4a941fcee013e22f9a",
+    "gateway/src/admin-api.ts": "7aeab455eced5742f3fe9aaca492223cc4f27725c91abf3c07097db9532fb0d9",
+    "gateway/tests/digest-model-administration-postgres.spec.ts": "ee87539612033ca7aaf363c8cd22d294b903cba82bdf8d15b7f4c5552b4f6fb6",
+    "gateway/tests/digest-model-administration-transcript.spec.ts": "33d62c45f35b2feb106551547eab12a223ad2c2f41cf354a6c2b4a9c9d4c5457",
+    "gateway/tests/fixtures/digest-model-administration.mjs": "ffbe7bf20f4c82fe75ff29f71d6582a45f4c6879aa4e394f7cc662e0041455b4",
+    "gateway/tests/expected/projects/digest-model-administration.jsonl": "ebf80acdfb6357ed4685bce41d8102c10d46d73c6df724cc9afc6061486a3c96",
+    "gateway/tests/project-progress-postgres.spec.ts": "d309cf95a2a3e1b55f749cee362b4523ddddb760643ce00ba1465c1c3b365785",
+    "gateway/tests/postgres-suite.spec.ts": "d1ed28e8d65f1b0366130ac34c6dcf14ce49335b865f34edca68a5614a4a4772",
+    "gateway/package.json": "b59a560f034063b6ef5b53edf9f2b79200a1e15ef2dc8bc6863e202c42e7af05"
+  },
+  "artifact": {
+    "directory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/digest-model-artifact-20261029/lib",
+    "buildMetadata": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/digest-model-build-inputs-20261029.json",
+    "migrationSnapshot": "Immutable001–094; subsequent peer095 is not accepted by this replay."
+  },
+  "noteReview": {
+    "extendedExisting": [
+      ".agents/notes/implemented/bug-fix/2026-10-29-model-administration-authority.md"
+    ],
+    "new": [],
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false
+  },
+  "limitations": [
+    "All12 original domains and peer multi-computer feature review remain in progress.",
+    "Full-file coverage and remaining allocation, directory and native platform acceptance remain open.",
+    "Real model APIs and actual cloud push remain human-deferred."
+  ],
+  "privateDatabase": {
+    "ownerFile": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/digest-authority-postgres-owner-20261029.json",
+    "port": 58487,
+    "retainedFor": "Immediate next independent SSH administration audit, with a fresh database and immutable migration cut if needed.",
+    "productionAndPeerExcluded": [
+      5432,
+      55699
+    ]
+  },
+  "subsequentOwnedDatabaseCleanup": {
+    "receipt": "receipts/remote-desktop-authority-2026-10-29.json",
+    "commandReceipt": "digest-ssh-desktop-private-postgres-cleanup",
+    "containerAndVolumeRemoved": true,
+    "openConnectionsBeforeClose": 0
+  }
+}

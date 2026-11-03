@@ -1,0 +1,407 @@
+{
+  "findings": [
+    "B338",
+    "B339"
+  ],
+  "status": "fixed_and_verified_for_named_scope",
+  "updatedAt": "2026-10-30T08:35:08.100728+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T075654Z",
+  "sourcePaths": [
+    "gateway/src/terminal-management.ts",
+    "gateway/src/plugin-management.ts",
+    "gateway/src/postgres/user-service.ts",
+    "gateway/tests/terminal-management.spec.ts",
+    "gateway/tests/plugin-management.spec.ts",
+    "gateway/tests/server.spec.ts",
+    "gateway/tests/postgres.spec.ts",
+    "gateway/tests/administrator-rpc-withdrawal-transcript.spec.ts",
+    "gateway/tests/fixtures/administrator-rpc-withdrawal.mjs",
+    "gateway/tests/expected/administrator-rpc-withdrawal.jsonl",
+    "gateway/package.json",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-29-administrator-runtime-control.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-administrator-runtime-control.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-administrator-runtime-control.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-runtime-control/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-runtime-control/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-runtime-control/guide.i18n.yaml"
+  ],
+  "sourceArtifactHashes": "administrator-rpc-source-artifact-hashes.json",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "upstream": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetch": "administrator-rpc-latest-baseline-fetch.json",
+    "sharedWorkPreserved": true
+  },
+  "problems": {
+    "B338": "Terminal inventory and plugin unary/streaming bytes can be published after administrator withdrawal while a Runtime response is awaited. Admission-time authorization does not retain later read authority.",
+    "B339": "PostgreSQL user reads retain active status when the organization is disabled, so role/account response fences alone still publish private metadata."
+  },
+  "causalEvidence": {
+    "roleSource": "administrator-rpc-role-source-negative.json",
+    "roleSourceFailures": 3,
+    "priorCompiledHttp": "administrator-rpc-prior-compiled-negative.json",
+    "organizationSourceAfterRoleRepair": "administrator-rpc-organization-source-negative.json",
+    "oldHttpStatus": 200,
+    "oldPrivateMetadataPublished": true,
+    "expectedStatus": 403,
+    "fixtureFailuresNotProductEvidence": [
+      "A state-read fixture lacked its project Runtime directory.",
+      "The first HTTP fixture omitted the exact Runtime catalog service.",
+      "A fixture attempted the public user role instead of the durable member role.",
+      "Two route fixtures needed the current Runtime selection and project-authority fields."
+    ]
+  },
+  "repair": [
+    "Fresh administrator checks precede signed Runtime dispatch, final terminal/unary publication, each streaming chunk, and desired-state/overview/target results.",
+    "Unary plugin replies remain bounded and buffered through generation verification and operation-reference cleanup; initial withdrawal returns403, mid-stream withdrawal interrupts later bytes.",
+    "Organization, membership and account status jointly determine effective PostgreSQL user status without overwriting durable account state.",
+    "Already admitted effects are neither rolled back nor retried automatically."
+  ],
+  "verification": {
+    "sourceUniqueTests": 303,
+    "sourceFiles": 9,
+    "actualHttpScenarios": 9,
+    "actualHttpScenariosAreInsideOneSourceTest": true,
+    "runtimeAdmission": "Actual Runtime credential, signed principal and current PostgreSQL administrator admission return204before controlled role/organization withdrawal.",
+    "httpData": "Another account owns the Runtime and private terminal/plugin metadata.",
+    "midStream": "Actual authorized first chunk reaches the browser client before role withdrawal; subsequent private data is withheld and the HTTP stream is interrupted.",
+    "operationReferencesDrained": true,
+    "activeAdministratorControls": 2,
+    "organizationRecoveryPreservesDisabledAccountAndMembership": true,
+    "compiledNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "compiledTestsOverlapSource": true,
+    "compiledJavaScriptFiles": 162,
+    "privateCompiledRuntimeHasNoTypeScriptLoader": true,
+    "types": "administrator-rpc-complete-types.json",
+    "lint": "administrator-rpc-complete-lint.json",
+    "checks": {
+      "administrator-rpc-final-adjacent-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:23:03.637371+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+          "run",
+          "tests/plugin-management.spec.ts",
+          "tests/terminal-management.spec.ts",
+          "tests/plugin-state.spec.ts",
+          "tests/admin-api.spec.ts",
+          "tests/server.spec.ts",
+          "tests/runtime-api.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "tests/administrator-rpc-withdrawal-transcript.spec.ts",
+          "tests/postgres.spec.ts",
+          "--no-file-parallelism",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=src/terminal-management.ts",
+          "--coverage.include=src/plugin-management.ts",
+          "--coverage.include=src/postgres/user-service.ts",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--coverage.reporter=text",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T075654Z/administrator-rpc-final-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:23:24.389298+00:00"
+      },
+      "administrator-rpc-final-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:23:03.637349+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "./node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.build.json",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T075654Z/administrator-rpc-organization-artifact/lib",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T075654Z/administrator-rpc-organization-artifact/tsconfig.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:23:06.487050+00:00"
+      },
+      "administrator-rpc-compiled-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:24:05.771826+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "DSH_GATEWAY_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T075654Z/administrator-rpc-organization-artifact/lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/administrator-rpc-withdrawal-transcript.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:24:07.452997+00:00"
+      },
+      "administrator-rpc-compiled-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:24:05.771718+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "DSH_GATEWAY_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T075654Z/administrator-rpc-organization-artifact/lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/administrator-rpc-withdrawal-transcript.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:24:07.443182+00:00"
+      },
+      "administrator-rpc-complete-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:24:06.937610+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:24:11.099382+00:00"
+      },
+      "administrator-rpc-complete-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:24:08.089730+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "tsx",
+          "scripts/run-oxlint.ts",
+          "gateway/src/terminal-management.ts",
+          "gateway/src/plugin-management.ts",
+          "gateway/src/postgres/user-service.ts",
+          "gateway/tests/terminal-management.spec.ts",
+          "gateway/tests/plugin-management.spec.ts",
+          "gateway/tests/server.spec.ts",
+          "gateway/tests/postgres.spec.ts",
+          "gateway/tests/administrator-rpc-withdrawal-transcript.spec.ts",
+          "gateway/tests/fixtures/administrator-rpc-withdrawal.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:24:10.020378+00:00"
+      },
+      "administrator-rpc-owned-document-pairs": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:27:34.310066+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "gateway/README.md",
+          ".agents/notes/implemented/bug-fix/2026-10-29-administrator-runtime-control.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-runtime-control/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:28:58.661891+00:00"
+      },
+      "administrator-rpc-route-typing-followup": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:25:24.891427+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+          "run",
+          "tests/server.spec.ts",
+          "-t",
+          "rejects malformed encoded conversation|checks the explicit project",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:25:26.266365+00:00"
+      },
+      "administrator-rpc-latest-baseline-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-30T08:29:09.039966+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "master"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T08:29:12.716749+00:00"
+      }
+    }
+  },
+  "coverage": {
+    "measuredFiles": 3,
+    "summary": {
+      "total": {
+        "lines": {
+          "total": 333,
+          "covered": 249,
+          "skipped": 0,
+          "pct": 74.77
+        },
+        "statements": {
+          "total": 403,
+          "covered": 287,
+          "skipped": 0,
+          "pct": 71.21
+        },
+        "functions": {
+          "total": 53,
+          "covered": 40,
+          "skipped": 0,
+          "pct": 75.47
+        },
+        "branches": {
+          "total": 300,
+          "covered": 180,
+          "skipped": 0,
+          "pct": 60
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/plugin-management.ts": {
+        "lines": {
+          "total": 153,
+          "covered": 123,
+          "skipped": 0,
+          "pct": 80.39
+        },
+        "functions": {
+          "total": 19,
+          "covered": 16,
+          "skipped": 0,
+          "pct": 84.21
+        },
+        "statements": {
+          "total": 185,
+          "covered": 142,
+          "skipped": 0,
+          "pct": 76.75
+        },
+        "branches": {
+          "total": 129,
+          "covered": 84,
+          "skipped": 0,
+          "pct": 65.11
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/terminal-management.ts": {
+        "lines": {
+          "total": 54,
+          "covered": 53,
+          "skipped": 0,
+          "pct": 98.14
+        },
+        "functions": {
+          "total": 7,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 75,
+          "covered": 69,
+          "skipped": 0,
+          "pct": 92
+        },
+        "branches": {
+          "total": 49,
+          "covered": 38,
+          "skipped": 0,
+          "pct": 77.55
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/user-service.ts": {
+        "lines": {
+          "total": 126,
+          "covered": 73,
+          "skipped": 0,
+          "pct": 57.93
+        },
+        "functions": {
+          "total": 27,
+          "covered": 17,
+          "skipped": 0,
+          "pct": 62.96
+        },
+        "statements": {
+          "total": 143,
+          "covered": 76,
+          "skipped": 0,
+          "pct": 53.14
+        },
+        "branches": {
+          "total": 122,
+          "covered": 58,
+          "skipped": 0,
+          "pct": 47.54
+        }
+      }
+    },
+    "scope": "Parent-process selected coverage only; child HTTP acceptance is additional evidence. No full-file or whole-project100percent claim."
+  },
+  "documentation": {
+    "aggregate": "administrator-rpc-docs.json",
+    "aggregatePassed": false,
+    "passedGates": 19,
+    "failedGate": "translation pairing",
+    "failureScope": "Concurrent peer topology notes, deployment-mode guide, node-agent documentation and generated document pairs; no owned pair failure.",
+    "ownedNamedPairs": "administrator-rpc-owned-document-pairs.json",
+    "ownedPairsPassed": 3
+  },
+  "noteReview": {
+    "updatedActive": ".agents/notes/implemented/bug-fix/2026-10-29-administrator-runtime-control.md",
+    "fullySupersededActiveNotes": [],
+    "archivedOrDeleted": [],
+    "reason": "Lifecycle actor admission and management response publication share the current administrator decision. Current-profile management, purpose-limited Runtime admission and other independent decisions remain useful.",
+    "frozenArchivesEdited": false
+  },
+  "integrationCorrections": {
+    "serverRouteFixtures": "Two older conversation tests now select their exact authorized Runtime and project scope before testing malformed Session IDs or project mismatch. No product router changes.",
+    "postgresEntrypoint": "The management transcript and peer deployment-topology PostgreSQL spec are included in the serialized required command."
+  },
+  "limitations": [
+    "All12original domains remain in_progress; B04and B25remain open.",
+    "The fixture-owned loopback Runtime establishes response admission and publication behavior; it does not establish native process containment or physical multi-host acceptance.",
+    "Whole-document-corpus pairing remains pending for peer-owned in-flight edits.",
+    "Real provider success and public push remain human-deferred.",
+    "The owned parent PostgreSQL is intentionally retained for continuing audit; each acceptance child database is dropped."
+  ],
+  "databaseCleanup": {
+    "receipt": "administrator-rpc-child-database-cleanup.json",
+    "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T075654Z",
+    "remainingChildren": 0,
+    "ownedParentRetained": true
+  }
+}

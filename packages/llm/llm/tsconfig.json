@@ -38,6 +38,9 @@
     },
     {
       "path": "../../context/resource-budget"
+    },
+    {
+      "path": "../model-access"
     }
   ]
 }

@@ -1,0 +1,14 @@
+{
+  "name": "project-account-mutation-gateway-build",
+  "cwd": "gateway",
+  "command": "npm run build",
+  "startedAt": "2026-10-23T23:56:55.240153+00:00",
+  "seconds": 4.362,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "34d5af27e6779640541feac331ea5dad1b590797b3b09aec5491a9928ada4734",
+  "inputsAfter": "34d5af27e6779640541feac331ea5dad1b590797b3b09aec5491a9928ada4734",
+  "postgresToolDirectory": null,
+  "outputSha256": "898095a3ceeb02add8ff851ae671d7fc499316aab1c64f358d6b61663d57feb4",
+  "outputTail": "\n> build\n> tsc -p tsconfig.build.json\n\n"
+}

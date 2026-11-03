@@ -309,7 +309,7 @@ describe('organization models RPC facade', () => {
     expect(onChanged).toHaveBeenCalledTimes(1)
 
     vi.mocked(adminApi.mutateOrganizationModelSettings)
-      .mockRejectedValueOnce(new adminApi.AdminRequestError(409, 'settings-conflict'))
+      .mockRejectedValueOnce(new adminApi.AdminRequestError(409, 'Settings have changed.', 'settings-conflict'))
     vi.mocked(adminApi.describeOrganizationModelSettings).mockResolvedValueOnce(settingsView(9))
     const conflict = await facade.settings.mutate({ ns: 'llm-pi-ai', ops, expectedRevision: 4 })
     expect(conflict).toMatchObject({ result: { ok: false, error: {

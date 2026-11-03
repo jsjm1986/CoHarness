@@ -15,7 +15,7 @@ Four related defects in the client conversation path, all confirmed by upstream 
 
 ## Decision
 
-1. Port upstream `820824edd74`: track each echo's `queueTarget`/`queueIndex`/`queueSeq` receipt across `session/queue` frames, `queuedInbox` projections, and `agent/inbox/spliced` events; retire a queued-placement echo on queue acceptance, hold transcript/steering echoes until durable admission plus queue-row departure, fail a removed echo at once on a `canceled` splice, and fail a departed unadmitted echo at the next `request/context` or `turn/end` boundary whose seq follows the removal observation.
+1. Port upstream `820824edd74`: track each echo's `queueTarget`/`queueIndex`/`queueSeq` receipt across `session/queue` frames, `queuedInbox` projections, and `agent/inbox/spliced` events; retire queued and steering echoes on Host queue acceptance, hold transcript echoes until durable admission plus queue-row departure, fail a removed echo at once on a `canceled` splice, and fail a departed unadmitted echo at the next `request/context` or `turn/end` boundary whose seq follows the removal observation.
 2. Same commit: seed-time reconciliation accepts every queue-observed identity at or before `projections.asOfSeq` as observed — even when the durable admission sits outside the loaded window — and `ProjectionValueStore.seqOf` exposes the per-key watermark used for that comparison.
 3. Same commit: `BeginSubmissionInput` carries `mode` and Session derives placement from its live `running` state, matching upstream and removing the stale-snapshot race.
 4. Port upstream `08c0e8e71b6`: admitted local identities suppress their still-published queue rows (ChatView steering rows and QueueDock transcript rows keyed by `rpcId`) until the queue publication drops them; the render-side dedupe hides an echo only once a durable node owns its `rpcId`, never on queue presence.
@@ -31,6 +31,8 @@ Four related defects in the client conversation path, all confirmed by upstream 
 **Port the upstream Playwright e2e (`idle-submission-handoff.e2e.ts`).** Deferred: our wire surface differs (`session/queue` frames and `queuedInbox` projections versus upstream's `session/control`/`session/follow` streams), so the gate needs a rewrite rather than a copy; unit coverage now exercises every settlement path.
 
 ## Consequences
+
+Composer submission completion follows the same receipt for text, images and documents. The controller waits for echo retirement before committing success and releasing submitted document references. Transport acceptance without queue or durable input observation cannot clear a draft when pre-step preparation fails. When verified storage ownership arrives after the input was mounted, the store explicitly restores the live composer; initial store creation preserves an existing live draft.
 
 Queue and durable observations of one identity dedupe through the settlement latch, so neither path can retire an echo twice or out of order. A submission whose queue row vanishes without admission fails exactly once — at the owning splice or the next durable boundary — instead of flickering or leaking. Reconnect baselines accept Host-confirmed inputs instead of re-showing them as drafts. Successful Assistant answers publish the moment the model settles while preparation/tool rows complete behind them.
 

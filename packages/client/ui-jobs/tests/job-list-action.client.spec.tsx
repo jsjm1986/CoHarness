@@ -322,11 +322,12 @@ describe('JobListAction observation', () => {
 
   it('dismisses the floating menu when its conversation hides the trigger', () => {
     let checkTrigger: (() => void) | undefined
-    vi.stubGlobal('ResizeObserver', class {
+    vi.stubGlobal('ResizeObserver', class implements ResizeObserver {
       constructor(private callback: ResizeObserverCallback) {}
       observe(target: Element): void {
-        if (target.tagName === 'BUTTON') checkTrigger = () => { this.callback([], this as unknown as ResizeObserver) }
+        if (target.tagName === 'BUTTON') checkTrigger = () => { this.callback([], this) }
       }
+      unobserve(): void {}
       disconnect(): void {}
     })
     const rects = vi.spyOn(HTMLButtonElement.prototype, 'getClientRects').mockReturnValue({ length: 1 } as DOMRectList)

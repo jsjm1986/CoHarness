@@ -1,0 +1,117 @@
+{
+  "findings": [
+    "B483"
+  ],
+  "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+  "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T171052Z/B483-sdk-uncertain-cancellation.delta.tar.gz",
+  "archiveSha256": "b12c51157b6abeb5971e738660a6821c9808804abebeaf750fc6a8f37b630b12",
+  "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T171052Z/B483-sdk-uncertain-cancellation-capsule-zfce2vnl",
+  "manifestSha256": "b14beb570fbd4c2a37c1802a83c64808d1438e12e15126a1cf62a19a2a6eb7ae",
+  "ownedChanges": 11,
+  "verification": {
+    "normalFullSdkCases": 271,
+    "coverageRosterCases": 10,
+    "finalCompleteEntryCoverageCases": 165,
+    "normalWholeFileCoverage": {
+      "total": {
+        "lines": {
+          "total": 81,
+          "covered": 81,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 105,
+          "covered": 105,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 22,
+          "covered": 22,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 56,
+          "covered": 56,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent-dsh-sdk/src/managed-budget.ts": {
+        "lines": {
+          "total": 81,
+          "covered": 81,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 22,
+          "covered": 22,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 105,
+          "covered": 105,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 56,
+          "covered": 56,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "normallyBuiltNode24NativeExamples": 3,
+    "nativeRepeatedCasesNotAdded": true,
+    "acceptedOriginalCounterproofs": [
+      "sdk-uncertain-original-barrier-with-declared-dependencies: one real assertion failure on original source",
+      "sdk-uncertain-original-built-native-diagnostic: nativeStopped:false and the precise missing parent-cancellation diagnostic"
+    ],
+    "excludedExploratoryFailures": [
+      "The first global-fake-timer case did not drive timers/promises and also failed repaired source.",
+      "The first private original test lacked module dependencies and collected no tests.",
+      "The source-parent native run before rebuilding its child artifact still executed the old managed.js.",
+      "The 79-case coverage subset lacked the unowned-model and closed-provider control cases; adding the owning control.spec tests gives normal165-case100% coverage."
+    ],
+    "finalLint": "passed",
+    "fullHostTypes": "passed",
+    "normalBuild": "passed",
+    "normalRebuiltRuntimeBundlesByteIdenticalToNativeVerifiedArtifacts": true,
+    "ownedBilingualPairs": "two consistent",
+    "globalDocLeaves": {
+      "passed": 11,
+      "failedOutsideOwnedPaths": [
+        "peer-owned capability-seams/event-producer-consumer pairing in flight",
+        "packages/api/gateway/README.zh.md paragraph line62"
+      ]
+    },
+    "newDependencies": false,
+    "newConfiguration": false,
+    "wireOrSessionFormatChanged": false,
+    "all11BeforeImagesMatchR44": true,
+    "r45CurrentScope": "Frozen earlier by the peer; this is a separate subsequent delivery, not an instruction to include it now.",
+    "modelApiCalls": 0
+  },
+  "wholeProjectComplete": false,
+  "recordedAt": "2026-11-02T17:35:55.997427+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T171052Z",
+  "productionWrites": false,
+  "deliveryScope": "separate_subsequent_batch_current_peer_r45_scope_frozen",
+  "remaining": [
+    "Peer production integration and all-platform native acceptance remain open.",
+    "Two global documentation checks currently fail only outside this batch; owned pairs pass.",
+    "Whole-project business and permission review remains active.",
+    "Official Responses validation remains deferred."
+  ]
+}

@@ -29,7 +29,7 @@ The optional [custom plugin markets bundle](../../experimental/plugin-market-bun
 | Config | Default | Meaning |
 |---|---|---|
 | `indexes` | `[]` | Index URLs in display order. A usable URL is in canonical form and uses `http:` or `https:`, without credentials or fragment. The field is volatile: Discover, Settings, and `setIndexes` change it without remounting this service or `plugin-manager`. |
-| `fetchTimeoutMs` | `15000` | Deadline for one index fetch, including its body. |
+| `fetchTimeoutMs` | `15000` | Deadline for one index fetch, its body, process admission and parsing. |
 | `maxBytes` | `134217728` | Largest accepted index body. |
 | `cacheTtlMs` | `600000` | Lifetime of a successfully read document. |
 
@@ -67,6 +67,8 @@ The `plugin_market` tool lists the configured indexes, pages the plugins of one 
 ## Understand the implementation
 
 The Host fetches with the process `fetch`, so the configured outbound proxy applies, and refuses redirects. The body is read up to `maxBytes`, then a fresh Worker Thread decodes it as strict UTF-8, parses it as JSON, and validates it; relative icon references resolve against the configured URL. The body's buffer moves to the Worker, and the validated index returns to the Host by structured clone. The Worker is the self-contained `lib/worker.cjs` bundle; disposal terminates it, and a Worker failure is reported as `plugin-market/fetch-failed`.
+
+With [resource admission](../../context/resource-budget/README.md), parsing waits for a process permit before allocating the Worker. It retains the provider before waiting and checks the same original Cordis Service before transferring the body or creating the thread. Withdrawal or replacement rejects with `plugin-market/fetch-failed`, caused by `ResourceAdmissionError` reason `unavailable`, and returns the unused permit to its original owner; retry the search after admission recovers. The shared read belongs to the service and uses Runtime infrastructure attribution, independent of a tool caller that stops waiting. The fetch deadline covers admission and parsing. Worker termination must confirm before releasing the permit. Cancellation or the deadline can finish the caller while termination is pending; this retains uncertain occupation until a later exit or successful termination confirms release. Failed termination reports a fetch failure. Managed execution refuses parsing when its provider is absent.
 
 Concurrent reads of one URL share one fetch. A successful document is cached for `cacheTtlMs`; `refresh` bypasses the cache. Each fetched document gets a new `fetchedAt`, and the cached document stays answerable by its `fetchedAt` until a later fetch replaces it. A failed read records its message for `listIndexes` and keeps no document. A read that finishes after its URL left the configuration updates neither cache nor error. On `loader/volatile-update` the service drops state of removed URLs and emits `plugin-market/changed`. Disposal aborts in-flight fetches.
 

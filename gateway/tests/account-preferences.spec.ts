@@ -7,6 +7,7 @@ import { AuthService } from '../src/auth.ts'
 import type {
   AccountPreferenceMutation, AccountPreferencesView, GatewayAccountPreferencesService,
 } from '../src/account-preferences.ts'
+import { ACCOUNT_PREFERENCE_DEFAULTS } from '../src/account-preferences.ts'
 import { AuditService } from '../src/audit.ts'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
@@ -23,7 +24,7 @@ const VIEW: AccountPreferencesView = {
   migrated: true,
   values: {
     locale: { preference: 'zh' },
-    'ui-theme': { preference: 'dark' },
+    'ui-theme': { ...ACCOUNT_PREFERENCE_DEFAULTS['ui-theme'], preference: 'dark' },
     'ui-conversation': {
       busyEnter: 'steer', chatContentWidth: 840, chatFullWidth: true, chatFontSize: 15,
       transcriptView: 'standard', performanceUsage: 'compact', linkOpening: 'new-tab',

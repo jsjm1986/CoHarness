@@ -1,0 +1,14 @@
+{
+  "name": "jobs-durable-recording-restored-source",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/jobs packages/goal/goal/tests/projection.spec.ts packages/workflow/tool-workflow packages/shell/tool-bash packages/subagent/tool-subagent packages/terminal/tool-terminal",
+  "startedAt": "2026-10-26T07:43:21.042246+00:00",
+  "seconds": 8.223,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3fc438180112060500f6b31706dcc401ff266425ffbeeee681c1a7564fa85acc",
+  "inputsAfter": "3fc438180112060500f6b31706dcc401ff266425ffbeeee681c1a7564fa85acc",
+  "postgresToolDirectory": null,
+  "outputSha256": "c3abf414c5126a228ba61e07a7019f4229eb9bc775834f394d617ecbc02c7cbe",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n(node:43491) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n Test Files  30 passed (30)\n      Tests  613 passed (613)\n   Start at  15:43:24\n   Duration  4.63s (transform 11.57s, setup 711ms, import 21.40s, tests 16.56s, environment 2ms)\n\n"
+}

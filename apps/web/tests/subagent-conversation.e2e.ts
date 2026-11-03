@@ -82,6 +82,14 @@ async function openSubagentCatalog(
   ).toBe(0)
 }
 
+/** Open the root's own header after any addressed child view finishes retiring. */
+async function openParentSession(page: Page): Promise<void> {
+  await page.getByRole('tree', { name: 'Sessions' })
+    .getByRole('treeitem', { name: /Ask a research subagent to/ }).click()
+  await expect.poll(() => page.getByRole('navigation', { name: 'Session hierarchy' })
+    .getByRole('button', { name: /^Switch subagent:/ }).count()).toBe(0)
+}
+
 describe('web e2e: persisted subagent conversation and human continuation', () => {
   let scaffold: WebScaffold
   let browser: Browser
@@ -510,10 +518,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
 
   it('opens a one-shot child as permanently read-only history', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-subagent-one-shot'))
-    const parentSession = page.getByRole('tree', { name: 'Sessions' })
-      .getByRole('treeitem')
-      .last()
-    await parentSession.click()
+    await openParentSession(page)
     await openSubagentCatalog(page, '3 subagents')
     await page.getByRole('treeitem', { name: new RegExp(ONE_SHOT_LABEL) }).click()
     await page.getByText('One-shot tasks do not accept follow-ups; review the full execution record here.').waitFor()
@@ -522,9 +527,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
 
   it('places an ordinary fork from a subagent beside its workspace-owning ancestor', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-subagent-fork'))
-    await page.getByRole('tree', { name: 'Sessions' })
-      .getByRole('treeitem', { name: /Ask a research subagent to/ })
-      .click()
+    await openParentSession(page)
     await openSubagentCatalog(page, '3 subagents')
     await page.getByRole('treeitem', { name: new RegExp(LABEL) }).click()
     await page.getByRole('textbox', { name: 'Message COHARNESS' }).waitFor()
@@ -554,8 +557,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
 
   it('cold-resumes the original subagent while its ordinary fork stays active', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-subagent-post-fork-followup'))
-    const sessions = page.getByRole('tree', { name: 'Sessions' })
-    await sessions.getByRole('treeitem', { name: /Ask a research subagent to/ }).click()
+    await openParentSession(page)
     await openSubagentCatalog(page, '3 subagents')
     await page.getByRole('treeitem', { name: new RegExp(LABEL) }).click()
     await page.locator('textarea:enabled').first().waitFor()
@@ -572,7 +574,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     const forkId = sessionId(forkReceipt.result.value.sessionId)
     await expect.poll(() => scaffold.ctx.agents.get(forkId)).not.toBeUndefined()
 
-    await sessions.getByRole('treeitem', { name: /Ask a research subagent to/ }).click()
+    await openParentSession(page)
     await openSubagentCatalog(page, '3 subagents')
     await page.getByRole('treeitem', { name: new RegExp(LABEL) }).click()
     const input = page.locator('textarea:enabled').first()

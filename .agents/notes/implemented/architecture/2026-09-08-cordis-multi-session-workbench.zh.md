@@ -22,9 +22,9 @@ Web 客户端只展示一个当前 Session，但运行时已经能够接收并�
 
 conversation 根入口声明 viewport store，通过 `slots.bindStore()` 与提供方共享框架拥有的实例。提供方的受控操作也包含面板重排。
 
-Gateway 提供账户级目录，其中包含当前认证用户个人空间和按成员 ACL 可见的项目空间根会话。选择项目会按需创建带目标标记的 `ConnectionHandle`，并在运行时池中创建一个 `SessionRuntime`；池只聚合列表和 provide 查询，每个运行时仍保留自己的事件流、历史窗口和 scope 资源。Gateway 在签发 runtime principal 前重新校验成员关系，因此浏览器无法用目录中的 Session ID 访问其他项目。
+Gateway 提供账户级目录，其中包含当前认证用户个人空间和按成员 ACL 可见的项目空间根会话。 个人根会话要求其精确 Runtime 分配所属电脑的当前权限；另一台已授权电脑不能授权这些元数据，个人 Runtime 无法列出会话时也不例外。选择项目会按需创建带目标标记的 `ConnectionHandle`，并在运行时池中创建一个 `SessionRuntime`；池只聚合列表和 provide 查询，每个运行时仍保留自己的事件流、历史窗口和 scope 资源。Gateway 在签发 runtime principal 前重新校验成员关系，因此浏览器无法用目录中的 Session ID 访问其他项目。
 
-个人元数据通过已认证个人运行时现有的 `session.list` 读取，因为这些历史可能仍在 JSONL 中。按 Agent 寻址的 Typert Remote 调用也会在分发前解析同一 Session 目标，因此命令、权限变更和其他 scoped capability 会跟随面板所属运行时。
+个人 Runtime 从现有 `session.list` 向中央 Workspace 目录发布根对话摘要，包含未分组到 Workspace 的历史。发布不含 Session 正文、子会话、subagent 会话及注册表中已归档的会话。Gateway 检查账户当前电脑使用权和入口范围后，才投影这些摘要。同步未知与空历史保持区别，打开选择器不会启动未选择的 Runtime。按 Agent 寻址的 Typert Remote 调用也会在分发前解析同一 Session 目标，因此命令、权限变更和其他 scoped capability 会跟随面板所属运行时。
 
 ## Alternatives considered
 
@@ -42,7 +42,7 @@ Gateway 提供账户级目录，其中包含当前认证用户个人空间和按
 
 ## Consequences
 
-四个对话可以在同一个浏览器界面中同时流式更新并独立输入，每个操作仍然通过对应 Session 身份、目标运行时和现有权限路径。原来的单会话视图继续可用。Gateway 新增账户目录路由和经过校验的目标选择器；Host API 语义、Session JSONL、数据库 schema 和 Collaboration 授权规则保持不变。
+四个对话可以在同一个浏览器界面中同时流式更新并独立输入，每个操作仍然通过对应 Session 身份、目标运行时和现有权限路径。原来的单会话视图继续可用。Gateway 新增账户目录路由和经过校验的目标选择器；Host API 语义、Session JSONL 和 Collaboration 授权规则保留原有属主。中央 Workspace 目录中可空的会话摘要列区分尚未发布与个人历史为空。
 
 renderer 和 conversation contract 变得更宽：显式 SessionProvider 解析和 pane 子 slot 成为框架责任。四个活动历史窗口比一个窗口占用更多浏览器内存，因此继续使用现有尾页和实时保留上限，并限制面板数量而不引入无界虚拟化。
 

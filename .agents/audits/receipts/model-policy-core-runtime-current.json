@@ -1,0 +1,14 @@
+{
+  "name": "model-policy-core-runtime-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/llm/llm/tests/model-policy.spec.ts packages/llm/llm/tests/operations.spec.ts packages/llm/llm/tests/service.spec.ts packages/context/gateway-runtime/tests/gateway-runtime.spec.ts --retry=0",
+  "startedAt": "2026-10-24T06:40:32.348345+00:00",
+  "seconds": 2.936,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1d92c2634dbb9d821093e99e02afe1d51e598bdf0a97b0a5b8d39dff24260510",
+  "inputsAfter": "1d92c2634dbb9d821093e99e02afe1d51e598bdf0a97b0a5b8d39dff24260510",
+  "postgresToolDirectory": null,
+  "outputSha256": "613bf69902cb8c06033dc3c17c768e307f5c31abb60764b64735eaaf7cb131f6",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  4 passed (4)\n      Tests  132 passed (132)\n   Start at  14:40:34\n   Duration  636ms (transform 1.30s, setup 161ms, import 1.42s, tests 205ms, environment 0ms)\n\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "progress-session-units-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/progress-service.spec.ts tests/macos-release-control.spec.ts tests/postgres-suite.spec.ts",
+  "startedAt": "2026-10-23T22:55:03.253532+00:00",
+  "seconds": 13.138,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0ab0b78774fd9e7f822601272d72a2140fbb772a48b0c318830be3eb170ac3a5",
+  "inputsAfter": "0ab0b78774fd9e7f822601272d72a2140fbb772a48b0c318830be3eb170ac3a5",
+  "postgresToolDirectory": null,
+  "outputSha256": "acb666c6f60b2e5e0d93cabb446ecae54d6e0eacc4dfce48b95ab7f1fecf672b",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  53 passed (53)\n   Start at  06:55:04\n   Duration  11.81s (transform 524ms, setup 0ms, import 652ms, tests 11.78s, environment 0ms)\n\n"
+}

@@ -1,0 +1,9 @@
+.fallback {
+  display: inline-flex;
+  min-width: 0;
+}
+
+/* The collapsed sidebar already places the empty-space computer in the header. */
+:global([data-sidebar-collapsed]) .fallback {
+  display: none;
+}

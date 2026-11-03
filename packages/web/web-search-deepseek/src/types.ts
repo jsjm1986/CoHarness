@@ -5,6 +5,20 @@
  * @module @deepseek-ai/dsh-web-search-deepseek/types
  */
 
+import type { LlmOperationDefinition } from '@deepseek-ai/dsh-llm'
+import type { WebSearchResult } from '@deepseek-ai/dsh-web'
+import type { DeepSeekSearchLlmRequest } from './provider.ts'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface LlmOperationMap {
+    'deepseek-web-search': LlmOperationDefinition<{
+      readonly query: string
+      readonly apiVersion: string
+      readonly maxUses: number
+    }, DeepSeekSearchLlmRequest, WebSearchResult>
+  }
+}
+
 /** A `web_search_result` item inside a `web_search_tool_result` block. */
 export interface WebSearchResultItem {
   type: string
@@ -40,6 +54,8 @@ export type ContentBlock = WebSearchToolResultBlock | TextBlock | { type: string
 /** DeepSeek's Anthropic Messages response envelope. */
 export interface AnthropicResponse {
   content?: ContentBlock[]
+  /** Wire usage is validated before it is reported to model middleware. */
+  usage?: unknown
 }
 
 /** DeepSeek's error response envelope (best-effort; fields vary). */

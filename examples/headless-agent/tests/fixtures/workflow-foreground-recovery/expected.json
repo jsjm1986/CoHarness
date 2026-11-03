@@ -1,0 +1,5 @@
+{
+  "reply": "WORKFLOW_FOREGROUND_RECOVERY_OK",
+  "workflow": { "mode": "workflow", "firstError": true, "secondError": true, "allocationsBeforeRecovery": 1, "oldOpenWhileRefused": true, "originalEndsBeforeRecovery": 0, "thirdSucceeded": true, "allocationsAfterRecovery": 2, "oldClosedBeforeNew": true, "allClosedAfterRecovery": true, "originalEndsAfterRecovery": 1 },
+  "ralph": { "mode": "ralph", "firstError": true, "secondError": true, "allocationsBeforeRecovery": 1, "oldOpenWhileRefused": true, "originalEndsBeforeRecovery": null, "thirdSucceeded": true, "allocationsAfterRecovery": 2, "oldClosedBeforeNew": true, "allClosedAfterRecovery": true, "originalEndsAfterRecovery": null }
+}

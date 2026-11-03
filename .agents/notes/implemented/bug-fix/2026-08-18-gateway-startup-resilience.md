@@ -16,7 +16,7 @@ The [default database client](../../../../gateway/src/postgres/client.ts) observ
 
 `08006` is the SQLSTATE [connection-failure category](https://www.postgresql.org/docs/17/errcodes-appendix.html). pg can suppress `ECONNRESET` and `EPIPE` after an extended-query Sync; the connection-failure code preserves EOF through that path without inspecting driver-private state. Other socket errors keep their native handling.
 
-The local launcher registers every child runtime in a process-wide exit cleanup set. A synchronous process-exit handler sends `SIGKILL` to still-running local children, so a forced Gateway shutdown cannot leave a runtime from the previous process holding an allocated port. Managed release deployments additionally pin the Gateway and child command to one immutable release and verify the new process before activation.
+The local launcher uses [independent recoverable supervision](../architecture/2026-10-25-local-runtime-supervisor.md). [Runtime admission](../architecture/2026-10-23-gateway-runtime-admission.md) retains unconfirmed survivors across coordinator initialization. Managed release deployments additionally pin the Gateway and child command to one immutable release and verify the new process before activation.
 
 ## Verification
 
@@ -32,8 +32,8 @@ Real pg connections to isolated loopback peers cover EOF before authentication a
 
 **Let launchd perform all database retrying.** Rejected because the Gateway would still have platform-specific startup behavior and could not distinguish transient PostgreSQL failures from invalid configuration.
 
-**Rely only on graceful `stopAll()` during shutdown.** Rejected because forced exits, crashes during teardown, and supervisor deadlines can bypass the asynchronous cleanup path; the process-exit fallback is required for local child ownership.
+**Rely only on graceful `stopAll()` during shutdown.** Rejected because forced exits, crashes during teardown, and supervisor deadlines can bypass the asynchronous cleanup path; local child ownership requires an independent recoverable supervisor.
 
 ## Consequences
 
-When PostgreSQL is unavailable, the Gateway keeps its port unbound until the dependency returns, so `/healthz` is unavailable rather than falsely healthy. Operators must keep the PostgreSQL container supervised and run its readiness wait after Docker or host recovery. Local runtime children are terminated on process exit, while systemd-managed runtimes retain their existing supervisor-owned lifecycle.
+When PostgreSQL is unavailable, the Gateway keeps its port unbound until the dependency returns, so `/healthz` is unavailable rather than falsely healthy. Operators must keep the PostgreSQL container supervised and run its readiness wait after Docker or host recovery. Graceful Gateway shutdown drains local runtimes; abrupt termination retains independently recoverable owners and unconfirmed capacity. Systemd-managed runtimes retain their existing supervisor-owned lifecycle.

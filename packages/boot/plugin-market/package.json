@@ -39,6 +39,7 @@
     "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/worker.cjs",
     "lib/types/**/*.js",
@@ -46,14 +47,14 @@
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts",
-    "locale/*.json"
+    "lib/typert.remote-client.d.ts"
   ],
   "license": "Apache-2.0",
   "dependencies": {
     "@deepseek-ai/dsh-app-boot": "workspace:*",
     "@deepseek-ai/dsh-package-manifest": "workspace:*",
     "@deepseek-ai/dsh-plugin-market-index": "workspace:*",
+    "@deepseek-ai/dsh-resource-budget": "workspace:*",
     "@deepseek-ai/dsh-timeout": "workspace:*",
     "@deepseek-ai/dsh-util-values": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",

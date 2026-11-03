@@ -1,0 +1,8 @@
+{"revocation":"recipient-account","deniedStatus":409,"noInvitationCreated":true,"successfulMutationAudited":false,"restoredStatus":201,"authenticatedInviterPreserved":true}
+{"revocation":"recipient-membership","deniedStatus":409,"noInvitationCreated":true,"successfulMutationAudited":false,"restoredStatus":201,"authenticatedInviterPreserved":true}
+{"revocation":"recipient-membership-removed","deniedStatus":409,"noInvitationCreated":true,"successfulMutationAudited":false,"restoredStatus":201,"authenticatedInviterPreserved":true}
+{"revocation":"recipient-computer","deniedStatus":403,"noInvitationCreated":true,"successfulMutationAudited":false,"restoredStatus":201,"authenticatedInviterPreserved":true}
+{"operation":"accept-after-computer-revocation","deniedStatus":403,"denialReason":"invitation-computer-required","invitationPreserved":true,"noMembershipCreated":true,"successfulMutationAudited":false,"restoredStatus":204}
+{"revocation":"organization","deniedStatus":403,"noInvitationCreated":true,"successfulMutationAudited":false,"restoredStatus":201,"authenticatedInviterPreserved":true}
+{"revocation":"project","deniedStatus":403,"noInvitationCreated":true,"successfulMutationAudited":false,"restoredStatus":201,"authenticatedInviterPreserved":true}
+{"revocation":"inviter-membership","deniedStatus":403,"noInvitationCreated":true,"successfulMutationAudited":false,"restoredStatus":201,"authenticatedInviterPreserved":true}

@@ -68,7 +68,7 @@ async function setup(config: Config = {}, mode: 'read-only' | 'danger-full-acces
     writes.add(write)
   }
   const resolveExecutable = vi.spyOn(ctx.subprocess, 'resolveExecutable').mockResolvedValue(process.execPath)
-  const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue(handle)
+  const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockResolvedValue(handle)
   onTestFinished(async () => {
     peer.close()
     control.destroy()
@@ -183,7 +183,7 @@ describe('Node runtime host failures', () => {
 
   it('cleans up a provider that fails to supply its requested control pipe', async () => {
     const h = await setup()
-    h.spawn.mockReturnValue({ ...h.handle, control: undefined })
+    h.spawn.mockResolvedValue({ ...h.handle, control: undefined })
     expect((await h.start()).error?.message).toContain('did not supply the requested control')
     expect(h.terminate).toHaveBeenCalledOnce()
     expect(h.waitForExit).toHaveBeenCalledOnce()
@@ -266,7 +266,7 @@ describe('Node runtime host failures', () => {
 
   it('reports an early control EOF using the direct process result', async () => {
     const h = await setup()
-    h.spawn.mockImplementation(() => {
+    h.spawn.mockImplementation(async () => {
       queueMicrotask(() => {
         h.control.push(null)
         h.direct.resolve({ exitCode: 7, signal: null })
@@ -280,13 +280,16 @@ describe('Node runtime host failures', () => {
 
   it('reports startup transport loss when the direct process outcome rejects', async () => {
     const h = await setup()
-    h.spawn.mockImplementation(() => {
+    const listening = (event: string | symbol): void => {
+      if (event !== 'error') return
+      h.control.off('newListener', listening)
       queueMicrotask(() => {
         h.control.emit('error', new Error('control transport closed'))
         h.direct.reject(new Error('runner connection broken'))
       })
-      return h.handle
-    })
+    }
+    h.control.on('newListener', listening)
+    onTestFinished(() => { h.control.off('newListener', listening) })
     expect((await h.start(request, NO_INITIAL_FRAME)).error).toEqual({ kind: 'worker-exit', message: 'runner connection broken' })
   })
 
@@ -530,7 +533,7 @@ it('keeps failed per-call cleanup registered until process observation succeeds'
 it('unregisters a Session resource when process spawn fails', async () => {
   const h = await setup()
   const session = h.ctx.sessions.create(SessionId('failed-session-spawn'))
-  h.spawn.mockImplementation(() => { throw new Error('spawn failed') })
+  h.spawn.mockImplementation(async () => { throw new Error('spawn failed') })
   const result = await h.start({ ...request, sandboxPolicy: h.ctx.sandboxPolicy.resolve({ session }) }, NO_INITIAL_FRAME)
   expect(result.error?.message).toContain('spawn failed')
   setSandboxMode(session, 'read-only')

@@ -1,0 +1,14 @@
+{
+  "name": "core-observers-exact-coverage-complete",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/core-observer-exact.config.mts packages/core/agent/ packages/core/session/ packages/core/agent-loop/ packages/util/values/ packages/workflow/tool-workflow/ packages/jobs/tool-jobs/ --coverage",
+  "startedAt": "2026-10-26T10:19:51.037454+00:00",
+  "seconds": 33.503,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f3d669c1adc303aa5a2a24228b789170f1c08adb36c04718d2c69feea5cdb308",
+  "inputsAfter": "f3d669c1adc303aa5a2a24228b789170f1c08adb36c04718d2c69feea5cdb308",
+  "postgresToolDirectory": null,
+  "outputSha256": "1a29dc2336302899def4b62594a603b5856016f8cc80f75d20b41c825a52645d",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  56 passed (56)\n      Tests  1247 passed (1247)\n   Start at  18:20:10\n   Duration  13.85s (transform 17.53s, setup 2.41s, import 41.84s, tests 25.77s, environment 9ms)\n\n % Coverage report from v8\n------------------|---------|----------|---------|---------|-------------------\nFile              | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n------------------|---------|----------|---------|---------|-------------------\nAll files         |     100 |    99.84 |     100 |     100 |                   \n core/session/src |     100 |    99.77 |     100 |     100 |                   \n  index.ts        |     100 |    99.77 |     100 |     100 | 1323              \n------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 825/825 )\nBranches     : 99.84% ( 647/648 )\nFunctions    : 100% ( 150/150 )\nLines        : 100% ( 726/726 )\n================================================================================\nERROR: Coverage for branches (99.77%) does not meet global threshold (100%) for packages/core/session/src/index.ts\n"
+}

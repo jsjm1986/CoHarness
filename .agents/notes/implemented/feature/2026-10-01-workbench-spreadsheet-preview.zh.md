@@ -20,11 +20,11 @@ Status: implemented
 
 ## Consequences
 
-首次打开表格会下载解析/查看 chunk，并在 Worker 内以硬性超时解析；完整文件超过 `excel.maxBytes` 的读取在分配 Worker 之前失败，单元格面积上限由解析器在物化稠密网格前执行。预览只读：编辑、重算与工具栏均被禁用，不支持的工作簿特性以提示加本地打开建议呈现。公式展示依赖缓存结果，未保存计算值的文件会显示结果缺失警告。license-bundle 测试要求表格载荷不进入主 client chunk，通过直接动态导入到达。元数据订阅由框架持有：标签通过 `keyedHooks.workspaceResource` 绑定 registry 的 `getSnapshot`/`subscribe` 源，预览消费普通的 `WorkspacePreviewResource` face（JSON 元数据加绑定的 `reload`/`revoke` 回调），因此超过 `excel.maxBytes` 的完整文件读取呈现配置的 `tooLarge` 文案。
+首次打开表格会下载解析/查看 chunk，并在 Worker 内以硬性超时解析；完整文件超过 `excel.maxBytes` 的读取在分配 Worker 之前失败，单元格面积上限由解析器在物化稠密网格前执行。预览只读：单元格焦点层的浏览器 DOM 编辑、工作簿编辑、重算与工具栏均被禁用，不支持的工作簿特性以提示加本地打开建议呈现。公式展示依赖缓存结果，未保存计算值的文件会显示结果缺失警告。license-bundle 测试要求表格载荷不进入主 client chunk，仅经各自的懒加载桥到达。元数据订阅由框架持有：标签通过 `keyedHooks.workspaceResource` 绑定 registry 的 `getSnapshot`/`subscribe` 源，预览消费普通的 `WorkspacePreviewResource` face（JSON 元数据加绑定的 `reload`/`revoke` 回调），因此超过 `excel.maxBytes` 的完整文件读取呈现配置的 `tooLarge` 文案。
 
 ## Testing
 
-[`packages/client/ui-workbench/tests/`](../../../../packages/client/ui-workbench/tests/) 覆盖解析矩阵（`excel-convert`、`excel-opc-fixture`、`excel-xml-fixture`、`excel-opening-fixture`、`excel-drawing-fixture`）、正文与工作区生命周期（`excel-body`、`workspace-excel`）、路由（`workspace-file-tab`），以及产物 chunk/许可证形态（`excel-license-bundle`、`pdf-license-bundle`）。
+[`packages/client/ui-workbench/tests/`](../../../../packages/client/ui-workbench/tests/) 覆盖解析矩阵（`excel-convert`、`excel-opc-fixture`、`excel-xml-fixture`、`excel-opening-fixture`、`excel-drawing-fixture`）、正文与工作区生命周期（`excel-body`、`workspace-excel`）、路由（`workspace-file-tab`），以及产物 chunk/许可证形态（`excel-license-bundle`、`pdf-license-bundle`）。`apps/web/tests/workspace-office.e2e.ts` 中的真实 Web 宿主场景检查原生键入无法进入只读单元格焦点层或其无障碍树，同时文件字节和显示的单元格值保持不变。
 
 ## Related
 

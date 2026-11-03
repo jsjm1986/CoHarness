@@ -20,6 +20,7 @@
 | [persistence.md](persistence.zh.md) | 持久性 seam：`SessionPersistence`、JSONL + SQLite 后端、`session/flush`、崩溃恢复、`SessionHeader` |
 | [settings.md](settings.zh.md) | 用户设置 seam：`SettingsNamespace` 注册、分层解析（默认值 → 组合 `base` → 用户文档）、owner scope、热提交 |
 | [credentials.md](credentials.zh.md) | 凭据 seam：配置中的 `CredentialRef` 引用（绝不含值）、按操作解析、对 UI 安全的 `CredentialInfo`、独占只读层 |
+| [resource-budget.md](resource-budget.zh.md) | 节点范围的模型／进程许可请求及执行静止义务 |
 | [collaboration.md](collaboration.zh.md) | Gateway 签名请求 principal、个人/项目运行时 identity、根继承对话 ACL、请求捕获 authority 与共享交互抢占 |
 | [session-query.md](session-query.zh.md) | 逻辑记录、有界精确事件读取、关系追踪、语义筛选器/文档与全文检索结果页 |
 | [session-title.md](session-title.zh.md) | 持久标题快照、被引用的来源消息 seq 与异步提供方约定 |

@@ -7,11 +7,16 @@ A service can be a core spine service, a swappable capability seam, a bundle/com
 
 ```mermaid
 flowchart LR
+  pkg_client_connection["client-connection"]
+  svc_connection["ctx.connection<br/>Host RPC transport and request authentication"]
+  pkg_api_gateway["api-gateway"]
+  pkg_host_apiproxy["host-apiproxy"]
+  pkg_resource_budget["resource-budget"]
+  svc_resourceBudget["ctx.resourceBudget<br/>Node resource permit definition"]
   pkg_experimental_client_ui_cot_translation["experimental-client-ui-cot-translation"]
   svc_cotTranslation["ctx.cotTranslation<br/>Reasoning translation Remote"]
   pkg_experimental_translator["experimental-translator"]
   svc_translator["ctx.translator<br/>Anonymous text translation"]
-  pkg_host_apiproxy["host-apiproxy"]
   svc_hostSessionLifecycle["ctx.hostSessionLifecycle<br/>Host ownership and idle release of Session handles"]
   pkg_archive_gateway["archive-gateway"]
   pkg_execution_authority["execution-authority"]
@@ -54,6 +59,8 @@ flowchart LR
   pkg_experimental_browser_use_chrome_devtools_mcp["experimental-browser-use-chrome-devtools-mcp"]
   pkg_experimental_browser_use_stagehand_native["experimental-browser-use-stagehand-native"]
   pkg_computer_use["computer-use"]
+  svc_computerUseEnvironment["ctx.computerUseEnvironment<br/>Desktop environment availability"]
+  pkg_apiproxy["apiproxy"]
   svc_computerUseAuthorization["ctx.computerUseAuthorization<br/>Desktop execution authorization"]
   svc_computerUse["ctx.computerUse<br/>Computer-use provider registration"]
   pkg_experimental_computer_use_cua_driver_mcp["experimental-computer-use-cua-driver-mcp"]
@@ -82,7 +89,6 @@ flowchart LR
   pkg_plugin_package_inventory_deepseek["plugin-package-inventory-deepseek"]
   pkg_model_access["model-access"]
   svc_modelAccess["ctx.modelAccess<br/>Model-route authorization policy"]
-  pkg_apiproxy["apiproxy"]
   pkg_model_provider_config["model-provider-config"]
   svc_modelProviderConfig["ctx.modelProviderConfig<br/>Organization-managed model provider configuration"]
   pkg_token_meter["token-meter"]
@@ -99,7 +105,6 @@ flowchart LR
   pkg_typert_registry["typert-registry"]
   svc_typert["ctx.typert<br/>Runtime type registry"]
   pkg_typert_loader["typert-loader"]
-  pkg_api_gateway["api-gateway"]
   svc_typertGateway["ctx.typertGateway<br/>Typert Host invocation gateway"]
   svc_sessionPersistence["ctx.sessionPersistence<br/>Durable session persistence seam"]
   pkg_session_persistence_jsonl["session-persistence-jsonl"]
@@ -334,6 +339,7 @@ flowchart LR
   pkg_bash_local --> svc_shell
   pkg_bash_sandbox --> svc_shell
   pkg_browser_use --> svc_browserUse
+  pkg_client_connection --> svc_connection
   pkg_client_file_upload --> svc_fileUploads
   pkg_collaboration --> svc_collaboration
   pkg_collaboration_gateway --> svc_collaboration
@@ -343,6 +349,7 @@ flowchart LR
   pkg_compaction_tool_result_pruner --> svc_toolResultPruner
   pkg_computer_use --> svc_computerUse
   pkg_computer_use --> svc_computerUseAuthorization
+  pkg_computer_use --> svc_computerUseEnvironment
   pkg_cordis_host_runner --> svc_cordisInspect
   pkg_cordis_host_runner --> svc_dynamicCordisRunner
   pkg_credentials --> svc_credentials
@@ -372,6 +379,7 @@ flowchart LR
   pkg_fs_local --> svc_fs
   pkg_fs_sandbox --> svc_fs
   pkg_fs_ssh --> svc_fs
+  pkg_gateway_execution --> svc_computerUseEnvironment
   pkg_gateway_execution --> svc_executionAuthority
   pkg_gateway_execution --> svc_pluginManagementAuthorization
   pkg_gateway_execution --> svc_userTerminalAdministration
@@ -503,6 +511,10 @@ flowchart LR
   svc_computerUse --> pkg_experimental_computer_use_cua_driver_mcp
   svc_computerUse --> pkg_experimental_computer_use_cua_driver_native
   svc_computerUseAuthorization --> pkg_computer_use
+  svc_computerUseEnvironment --> pkg_apiproxy
+  svc_computerUseEnvironment --> pkg_computer_use
+  svc_connection --> pkg_api_gateway
+  svc_connection --> pkg_host_apiproxy
   svc_cordisInspect --> pkg_tool_cordis
   svc_credentials --> pkg_apiproxy
   svc_credentials --> pkg_llm_deepseek
@@ -671,6 +683,8 @@ flowchart LR
 
 | ctx key | Role | Owner | Implementations | Direct consumers | Companion plugins | Note |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.connection` | `core` | [`client-connection`](../packages/client/connection) | - | [`api-gateway`](../packages/api/gateway), [`host-apiproxy`](../packages/host/apiproxy) | - | Registers typed RPC handlers and request-context middleware on the Web listener, with deployment authentication before business dispatch. |
+| `ctx.resourceBudget` | `seam` | [`resource-budget`](../packages/context/resource-budget) | - | - | - | Declares permit requests and quiescence reporting. Provider composition and execution support are listed in the [package limitations](../packages/context/resource-budget/README.md#known-limitations-and-deferred-work). |
 | `ctx.cotTranslation` | `service` | [`experimental-client-ui-cot-translation`](../packages/experimental/client-ui-cot-translation) | - | - | - | Serves reasoning translations, reuses saved results, and joins ordinary Session activation for uncached inactive Sessions. |
 | `ctx.translator` | `service` | [`experimental-translator`](../packages/experimental/translator) | - | [`experimental-client-ui-cot-translation`](../packages/experimental/client-ui-cot-translation) | - | Resolves Google or Bing requests and retains shared experimental records through the active Session writer. |
 | `ctx.hostSessionLifecycle` | `core` | [`host-apiproxy`](../packages/host/apiproxy) | - | [`host-apiproxy`](../packages/host/apiproxy), [`archive-gateway`](../packages/context/archive-gateway) | - | The Host retains its factory handles, reserves Session identities during removal, and releases only idle resources before durable archive deletion. |
@@ -688,6 +702,7 @@ flowchart LR
 | `ctx.worktrees` | `seam` | [`experimental-worktree`](../packages/experimental/worktree) | [`experimental-worktree`](../packages/experimental/worktree) | [`experimental-tool-worktree`](../packages/experimental/tool-worktree) | - | Explicit experimental creation from a pinned local commit. Existing write permissions govern checkout and shared Git metadata; the working-directory service owns the resulting Session directory. |
 | `ctx.mcpResources` | `seam` | [`mcp-resources`](../packages/mcp/mcp-resources) | [`mcp-client`](../packages/mcp/mcp-client) | [`mcp-resources`](../packages/mcp/mcp-resources) | - | Connection-owned providers serve shared resource tools in the calling agent scope. |
 | `ctx.browserUse` | `seam` | [`browser-use`](../packages/browser-use/browser-use) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | - | One provider-owned name per service instance. Providers own their tools and browser resources per live Session; the shared service has no browser operation API. |
+| `ctx.computerUseEnvironment` | `core` | [`computer-use`](../packages/computer-use/computer-use) | [`gateway-execution`](../packages/context/gateway-execution) | [`computer-use`](../packages/computer-use/computer-use), `apiproxy` | - | Read-only environment limitations do not reserve a driver or grant desktop authority. A registered provider determines its own availability. |
 | `ctx.computerUseAuthorization` | `core` | [`computer-use`](../packages/computer-use/computer-use) | - | [`computer-use`](../packages/computer-use/computer-use) | - | Deployment policy surrounds actual native and MCP effects with authorization and cancellation; managed runtimes deny operations when the policy is absent. |
 | `ctx.computerUse` | `seam` | [`computer-use`](../packages/computer-use/computer-use) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | - | One provider-owned name per service instance. Each provider also owns its model tools; the service has no common action API, runtime selection, or Session workflow lock. |
 | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | `host-runtime`, [`llm-pi-ai`](../packages/llm/llm-pi-ai) | - | The host commits accepted images before session events; provider adapters resolve authorized durable references into provider-native content. |

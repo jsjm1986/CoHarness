@@ -1,5 +1,5 @@
 /** Deterministic Worker peer with an owned listener and drainable browser requests. */
-import { parentPort, workerData } from 'node:worker_threads'
+import { MessageChannel, parentPort, workerData } from 'node:worker_threads'
 import { createServer } from 'node:net'
 import { once } from 'node:events'
 
@@ -9,9 +9,39 @@ await once(server, 'listening')
 const scenario = new URL(workerData.cdpEndpoint).hostname
 let release
 let active
-parentPort.on('message', async ({ method, reply }) => {
+async function infer(args) {
+  const { port1, port2 } = new MessageChannel()
+  try {
+    const received = once(port1, 'message')
+    parentPort.postMessage({ method: 'model', args, reply: port2 }, [port2])
+    const [result] = await received
+    if (!result.ok) throw new Error(result.error)
+    return result.value
+  } finally { port1.close(); port2.close() }
+}
+parentPort.on('message', async ({ method, args, reply }) => {
   if (method === 'fixture-release') { release?.(); return }
   if (method === 'ready' && scenario === 'opening') return
+  if (method === 'ready' && scenario === 'early-model') {
+    try { await infer({ messages: [] }) } catch (error) {
+      reply.postMessage({ ok: false, error: error.message }); reply.close()
+    }
+    return
+  }
+  if (method === 'extract' && scenario === 'malformed-model') {
+    parentPort.postMessage({ method: 'model', args, reply: false })
+    return
+  }
+  if (scenario === 'model' && method === 'extract') {
+    try {
+      active = infer(args)
+      const first = await active
+      active = infer(args)
+      reply.postMessage({ ok: true, value: [first, await active] })
+    } catch (error) { reply.postMessage({ ok: false, error: error.message }) }
+    finally { reply.close() }
+    return
+  }
   if (method === 'close' && scenario === 'closing') return
   if (method === 'tabs' && scenario === 'error') throw new Error('Fixture worker crashed')
   if (method === 'tabs' && scenario === 'crash') { process.exit(23); return }
@@ -23,11 +53,11 @@ parentPort.on('message', async ({ method, reply }) => {
     if (method === 'act') {
       active = new Promise(resolve => { release = resolve })
       parentPort.postMessage({ event: 'operation-started' })
-      await active
+      await Promise.allSettled(active === undefined ? [] : [active])
     }
     if (method === 'close') {
       parentPort.postMessage({ event: 'close-started' })
-      await active
+      await Promise.allSettled(active === undefined ? [] : [active])
       await new Promise(resolve => server.close(resolve))
     }
     reply.postMessage({ ok: true, value: { port: server.address()?.port, model: workerData.model, env: process.env } })

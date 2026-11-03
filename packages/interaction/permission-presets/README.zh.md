@@ -55,7 +55,7 @@ kind: "package-reference"
 
 切换到 Auto 时，服务先同步执行其准入检查；每次预设切换随后只改变实际值不同的旋钮，再次选择当前已生效的预设不会产生任何变化。当前值解析顺序为：仍匹配的最近一次记录选择，其次是配置表中的第一个匹配项，否则为 `custom`。用户通过 `/permission` 命令切换：不带参数调用时报告当前预设与所有可用条目，带预设参数时切换过去。
 
-部署可提供异步 `authorizeSelection(agent, name)` 与 `authorizeDefault(name)` 策略。命令等待选择授权后才写入权限事件，取消后晚到的授权不会改变 Session。`permission` 设置写入在持久化前等待默认值授权；Gateway 的 Full access 默认值要求实时管理员检查。受管部署在执行权威不可用时拒绝写入。注册与设置恢复不执行依赖当前请求的写入授权。
+部署可提供异步 `authorizeSelection(agent, name)` 与 `authorizeDefault(name)` 策略。命令等待选择授权后才写入权限事件，取消后晚到的授权不会改变 Session。存在 Agent 注册服务时，授权后仍须由原调用者实例保持注册；关闭、替换该实例或撤下注册服务都会保留原权限状态。`permission` 设置写入在持久化前等待默认值授权；Gateway 的 Full access 默认值要求实时管理员检查。受管部署在执行权威不可用时拒绝写入。注册与设置恢复不执行依赖当前请求的写入授权。
 
 ### 用户看到什么
 

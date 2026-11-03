@@ -1,0 +1,14 @@
+{
+  "name": "native-search-web-error-coverage",
+  "cwd": ".",
+  "command": "pnpm exec vitest run packages/web/web-search-deepseek/tests scripts/coverage-baseline.spec.ts --coverage '--coverage.include=packages/web/web-search-deepseek/src/{admission,index}.ts' --coverage.reportsDirectory=.agents/audits/.local/native-search-web-error-coverage --coverage.reporter=text --coverage.reporter=json --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T03:53:41.702248+00:00",
+  "seconds": 14.089,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "158baedab76a702d7da0e30273836dba2ef3536ac3ce3e6bb0664f9c6c62ec77",
+  "inputsAfter": "158baedab76a702d7da0e30273836dba2ef3536ac3ce3e6bb0664f9c6c62ec77",
+  "postgresToolDirectory": null,
+  "outputSha256": "3f3b7e33528cf6d30b3945b382845e66a20fbcee8b6755c1a11f1cb18b77ebe1",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  6 passed (6)\n      Tests  82 passed (82)\n   Start at  11:53:54\n   Duration  1.36s (transform 765ms, setup 133ms, import 1.04s, tests 311ms, environment 0ms)\n\n % Coverage report from v8\n--------------|---------|----------|---------|---------|-------------------\nFile          | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n--------------|---------|----------|---------|---------|-------------------\n--------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 61/61 )\nBranches     : 100% ( 49/49 )\nFunctions    : 100% ( 15/15 )\nLines        : 100% ( 52/52 )\n================================================================================\n"
+}

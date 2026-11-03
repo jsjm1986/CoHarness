@@ -1,0 +1,605 @@
+{
+  "finding": "B368",
+  "status": "fixed_named_native_process_control_scope",
+  "updatedAt": "2026-10-30T21:00:46.513349+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T203952Z",
+  "sourcePaths": [
+    "packages/subprocess/subprocess-local/src/index.ts",
+    "packages/subprocess/subprocess-local/src/process-inspector.ts",
+    "packages/subprocess/subprocess-local/src/windows-inspector.ts",
+    "packages/subprocess/subprocess-local/src/spawn.ts",
+    "packages/subprocess/subprocess-local/tests/process-inspector.spec.ts",
+    "packages/subprocess/subprocess-local/tests/windows-inspector.spec.ts",
+    "packages/subprocess/subprocess-local/tests/windows-inspector-failures.spec.ts",
+    "packages/subprocess/subprocess-local/tests/terminal.spec.ts",
+    "packages/subprocess/subprocess-local/tests/spawn.spec.ts",
+    "packages/subprocess/subprocess-local/tests/process-exit.spec.ts",
+    "packages/subprocess/subprocess-local/tests/native-control-deadlines.spec.ts",
+    "packages/subprocess/subprocess-local/tests/native-control-example.spec.ts",
+    "packages/subprocess/subprocess-local/tests/fixtures/identity-observation.mjs",
+    "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+    "packages/subprocess/subprocess-local/tests/fixtures/native-control-deadlines.mjs",
+    "packages/subprocess/subprocess-local/tests/expected/native-control-deadlines.jsonl",
+    "packages/subprocess/subprocess-local/README.md",
+    "packages/subprocess/subprocess-local/README.zh.md",
+    "packages/subprocess/subprocess-local/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.i18n.yaml",
+    "gateway/tests/execution-fixture.ts",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/desktop-environment-availability/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/desktop-environment-availability/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/desktop-environment-availability/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/subprocess/subprocess-local/src/index.ts": "c88d0dd4ba4ed0d9d92cc4587c56d3eb011d367546d6071ef6dc5f19648ff2df",
+    "packages/subprocess/subprocess-local/src/process-inspector.ts": "2756113b88e406e5d32457dc07452ba7d06acad00f9c078e55174eebc1488f61",
+    "packages/subprocess/subprocess-local/src/windows-inspector.ts": "fe6f3e6441554c098c547898dee4c77d7a3d79896bd2cd0558c07eec370fe92f",
+    "packages/subprocess/subprocess-local/src/spawn.ts": "109a20c2538e26c86b1fb72ad0ae210d38949a498cff9f780953fe162be89b57",
+    "packages/subprocess/subprocess-local/tests/process-inspector.spec.ts": "a766e9ae4ad25b87dc669404cd1cc4167baab85679475b1caf89295ec71dafe0",
+    "packages/subprocess/subprocess-local/tests/windows-inspector.spec.ts": "02cb6d812ed34abf0c99ad90b50be237283e78183102920dcf391964c5be4723",
+    "packages/subprocess/subprocess-local/tests/windows-inspector-failures.spec.ts": "2dee8d1690bbd0c4b6048509b7ed361c709b71c87592b0217a8b4a1f36036e89",
+    "packages/subprocess/subprocess-local/tests/terminal.spec.ts": "fe76dcf629e81de96c9e7ddd5ca808c2a7a89dbf2725a906eba85f2184c1f612",
+    "packages/subprocess/subprocess-local/tests/spawn.spec.ts": "b8d7e037f9f7ba96f53a4a542eb6ace5483b08360de39036c35155f4069a751e",
+    "packages/subprocess/subprocess-local/tests/process-exit.spec.ts": "567c9503709edbd885313a4a9804bc4d71f5d86ba530989418392ce827be60b7",
+    "packages/subprocess/subprocess-local/tests/native-control-deadlines.spec.ts": "8b2138a450a14dadaa9390a92360fd56eecfce3a59561fc19095a32aa1a8b614",
+    "packages/subprocess/subprocess-local/tests/native-control-example.spec.ts": "d5e0e0c625d18d5c71da0c5564e8233aed2b37d14516a3eb790f5199e132478b",
+    "packages/subprocess/subprocess-local/tests/fixtures/identity-observation.mjs": "9647592be6e19d2db505ca9500d2bf3c753a62cc543e30f7b14fbf6af36a014d",
+    "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs": "5d8a5a14d7984f5c9ce0dbfa952b5ee876d06fab62ecd1c3cc02b4db35dbd0da",
+    "packages/subprocess/subprocess-local/tests/fixtures/native-control-deadlines.mjs": "6fc172a19e82599b814f25a192acb88e7f241666ec34c715c8e1e723b247178f",
+    "packages/subprocess/subprocess-local/tests/expected/native-control-deadlines.jsonl": "941102bd455b2cedab118e9facb5c27ac9e4bb8125d0d2dab4ca5a2f03b6d7d8",
+    "packages/subprocess/subprocess-local/README.md": "8c0d2e6040bb905f44e6f13df138f5b070bacd46522ec2f728a377580e4e0a31",
+    "packages/subprocess/subprocess-local/README.zh.md": "5c53d63ec679e0d913bcd1db5969733f0c972e542c0d2997b9f1ec591a4f61c8",
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "ed29b40eaf1ad1a3ad3e4f3650d6f04df89b956492f1e1cfb99aec22d69278f1",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md": "a03f896571ccf82e68f5298769747b469a15351dae04147c54cd639e8f7a9496",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.zh.md": "569e1291bf397d64e6ccb97d57ceac4bc07f1d86a57797cd04e43d39a74dd48d",
+    ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.i18n.yaml": "3e513980a029edf465c6aaf06113faa44cf0ff69bc758ef5959abb43ba08a391",
+    "gateway/tests/execution-fixture.ts": "a6b242164f806ead36eb72886ebbe86ee2093ed86c8b55ac181cd56a1515c88e",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/desktop-environment-availability/guide.md": "348f8c809f08ccb0ac479974c744cc3a3542695a94b23e962186f4141cf72a59",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/desktop-environment-availability/guide.zh.md": "dfdebbd1489320f3b1f606496144efebf6415007d0c75142924be31d54eba967",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/desktop-environment-availability/guide.i18n.yaml": "80876d568fab89748623b41c04162548e1deab8edaefaac8bc9420c309492bf6"
+  },
+  "compiledArtifactHashes": {
+    "packages/subprocess/subprocess-local/lib/index.js": "5c8f433b1e8553b18c16e42cfe8e6f9a73ba752d31e64fca1ef705a35cd8d45a",
+    "packages/subprocess/subprocess-local/lib/runner-launch-bJlLX2OS.js": "5f1fc068fa39a276588d3b113524796440c7c075dfa499716ddbeca1c105bbe5",
+    "packages/subprocess/subprocess-local/lib/types/index.js": "5935630ba09f0e3517e8115de7867f7e664f2c3225b6a736b5ea6a5d6c405634",
+    "packages/subprocess/subprocess-local/lib/types/spawn.js": "6624ac507b9dff7dd9129b2f57549134b0584345ee9cee71924ca7f178818b9d",
+    "packages/subprocess/subprocess-local/lib/types/process-inspector.js": "90334ff97bfc8a523865b6330b5aa4a8fcd6b0c57c790c51f43cfaace76adc70",
+    "packages/subprocess/subprocess-local/lib/types/windows-inspector.js": "d2e1504a075d3806060e4cfabe72e41d1d946c027b93d06b33bba970bd0af3ea"
+  },
+  "repair": "Each native macOS process query and both Windows taskkill implementations receive the owning spawn graceMs, rounded up to an integer millisecond, as their helper deadline. SIGKILL ends an uncooperative helper. Query uncertainty propagates and failed delivery never authorizes workload resource release. All repository factory and taskkill consumers supply an explicit deadline.",
+  "causalEvidence": {
+    "native-control-bounds-source-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T20:39:53.150881+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/subprocess/subprocess-local/tests/native-control-deadlines.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T20:39:54.536699+00:00"
+    },
+    "native-control-loader-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T20:41:04.726304+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/subprocess/subprocess-local/tests/native-control-example.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T20:41:21.834445+00:00"
+    }
+  },
+  "negativeWitness": "Three native-call regressions fail before the fix. The real Loader/native-command transcript has no product timeout for any of the three helper paths before repair; only each fixture helper finite five-second safety exit returns control. The workload remains live and is independently killed and joined by the fixture.",
+  "verification": {
+    "uniqueRelatedSourceCases": 324,
+    "providerCases": 257,
+    "additionalPtyAndHostExitCases": 6,
+    "resourcePolicyPostgresCases": 61,
+    "repeatedEnginesAndWindowsMeasurementAreNotNewCases": true,
+    "coverage": {
+      "packages/subprocess/subprocess-local/src/index.ts": {
+        "statements": [
+          183,
+          183
+        ],
+        "branches": [
+          118,
+          118
+        ],
+        "functions": [
+          41,
+          41
+        ],
+        "lines": [
+          151,
+          151
+        ]
+      },
+      "packages/subprocess/subprocess-local/src/process-inspector.ts": {
+        "statements": [
+          178,
+          178
+        ],
+        "branches": [
+          140,
+          140
+        ],
+        "functions": [
+          44,
+          44
+        ],
+        "lines": [
+          142,
+          142
+        ]
+      },
+      "packages/subprocess/subprocess-local/src/spawn.ts": {
+        "statements": [
+          199,
+          199
+        ],
+        "branches": [
+          112,
+          112
+        ],
+        "functions": [
+          52,
+          52
+        ],
+        "lines": [
+          170,
+          170
+        ]
+      },
+      "packages/subprocess/subprocess-local/src/windows-inspector.ts": {
+        "statements": [
+          121,
+          121
+        ],
+        "branches": [
+          51,
+          51
+        ],
+        "functions": [
+          27,
+          27
+        ],
+        "lines": [
+          107,
+          107
+        ]
+      }
+    },
+    "coverageSelection": "The default macOS policy measures index/spawn/process-inspector only. An evidence-local ESM config additionally measures the existing injectable Windows inspector without changing repository coverage policy. Both runs enforce per-file four-metric100percent.",
+    "totalMeasured": {
+      "statements": [
+        681,
+        681
+      ],
+      "branches": [
+        421,
+        421
+      ],
+      "functions": [
+        164,
+        164
+      ],
+      "lines": [
+        570,
+        570
+      ]
+    },
+    "newCoverageExemptions": 0,
+    "existingThinNativeBindingExemptionsUnchanged": true,
+    "runnableNativeControlStages": 4,
+    "nativePtyScenarios": 5,
+    "compiledMacNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "compiledLinux": {
+      "node": "22.22.1",
+      "platform": "linux/arm64",
+      "uid": 1000,
+      "network": "none",
+      "repositoryMount": "read-only",
+      "imageId": "sha256:8094c002d08262dba12645a3b4a15cd6cd627d30bc782f53229a2ec13ee22a00",
+      "nodeArguments": [
+        "--expose-internals"
+      ],
+      "loaderPrerequisite": "The minimal image lacks a Linux node-addon-require-builtin; expose-internals supplies the Loader existing documented native-internals access. The first plain-node attempt fails package resolution before any workload allocation and is retained as failed evidence.",
+      "ownedContainerRemoved": true
+    },
+    "checks": {
+      "native-control-complete-coverage-repaired": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:45:59.471415+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/local.spec.ts",
+          "packages/subprocess/subprocess-local/tests/spawn.spec.ts",
+          "packages/subprocess/subprocess-local/tests/process-inspector.spec.ts",
+          "packages/subprocess/subprocess-local/tests/windows-inspector.spec.ts",
+          "packages/subprocess/subprocess-local/tests/windows-inspector-failures.spec.ts",
+          "packages/subprocess/subprocess-local/tests/terminal.spec.ts",
+          "packages/subprocess/subprocess-local/tests/native-control-deadlines.spec.ts",
+          "packages/subprocess/subprocess-local/tests/native-control-example.spec.ts",
+          "packages/subprocess/subprocess-local/tests/identity-observation.spec.ts",
+          "packages/subprocess/subprocess-local/tests/control.spec.ts",
+          "packages/subprocess/subprocess-local/tests/shell-activity.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/subprocess/subprocess-local/src/index.ts",
+          "--coverage.include=packages/subprocess/subprocess-local/src/spawn.ts",
+          "--coverage.include=packages/subprocess/subprocess-local/src/process-inspector.ts",
+          "--coverage.include=packages/subprocess/subprocess-local/src/windows-inspector.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T203952Z/native-control-complete-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:46:18.080105+00:00"
+      },
+      "native-control-windows-logic-coverage-esm": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:51:25.046255+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/windows-inspector.spec.ts",
+          "packages/subprocess/subprocess-local/tests/windows-inspector-failures.spec.ts",
+          "packages/subprocess/subprocess-local/tests/native-control-deadlines.spec.ts",
+          "--config=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T203952Z/windows-control-coverage.config.mts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/subprocess/subprocess-local/src/windows-inspector.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T203952Z/windows-control-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:51:34.546172+00:00"
+      },
+      "native-control-scoped-lint-repaired": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:45:59.471415+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/subprocess/subprocess-local/src/index.ts",
+          "packages/subprocess/subprocess-local/src/process-inspector.ts",
+          "packages/subprocess/subprocess-local/src/windows-inspector.ts",
+          "packages/subprocess/subprocess-local/src/spawn.ts",
+          "packages/subprocess/subprocess-local/tests/native-control-deadlines.spec.ts",
+          "packages/subprocess/subprocess-local/tests/native-control-example.spec.ts",
+          "packages/subprocess/subprocess-local/tests/local.spec.ts",
+          "packages/subprocess/subprocess-local/tests/process-inspector.spec.ts",
+          "packages/subprocess/subprocess-local/tests/windows-inspector.spec.ts",
+          "packages/subprocess/subprocess-local/tests/windows-inspector-failures.spec.ts",
+          "packages/subprocess/subprocess-local/tests/spawn.spec.ts",
+          "packages/subprocess/subprocess-local/tests/terminal.spec.ts",
+          "packages/subprocess/subprocess-local/tests/process-exit.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:46:01.727426+00:00"
+      },
+      "native-control-named-pair-check": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:50:01.103711+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "packages/subprocess/subprocess-local/README.md",
+          ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:50:01.352217+00:00"
+      },
+      "native-control-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:46:51.603814+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/native-control-example.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:46:58.929120+00:00"
+      },
+      "native-control-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:48:09.634823+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/native-control-example.spec.ts",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "packages/subprocess/subprocess-local/tests/process-exit.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:48:16.774290+00:00"
+      },
+      "native-control-built-linux22-internals": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:49:59.923176+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T203952Z/native-control-linux-replay.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:50:06.395900+00:00"
+      },
+      "native-control-source-pty-exit": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:46:51.603820+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "packages/subprocess/subprocess-local/tests/process-exit.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:46:55.889283+00:00"
+      },
+      "native-control-built-node22-owner-regressions": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:52:14.623696+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "packages/subprocess/subprocess-local/tests/process-exit.spec.ts",
+          "packages/subprocess/subprocess-local/tests/identity-observation.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:52:18.757959+00:00"
+      },
+      "native-control-built-node24-identity": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:52:14.623709+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/identity-observation.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:52:15.573367+00:00"
+      },
+      "resource-policy-computer-postgres-isolated": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:54:16.163748+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "node",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/computer-access-postgres.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:54:22.103809+00:00"
+      },
+      "resource-policy-execution-postgres-repaired": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:55:29.444166+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "node",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/execution.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:55:37.688852+00:00"
+      },
+      "resource-policy-fixture-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:55:29.444195+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/tests/execution-fixture.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:55:30.614328+00:00"
+      },
+      "resource-policy-gateway-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:56:53.438916+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "node",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.ci.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:56:59.558567+00:00"
+      },
+      "native-control-host-aggregate-after-peer": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:55:29.444179+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:55:36.743015+00:00"
+      },
+      "native-control-final-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-30T20:56:53.438892+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "master"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T20:56:59.728569+00:00"
+      }
+    }
+  },
+  "build": {
+    "firstCompleteBuild": {
+      "status": "failed",
+      "startedAt": "2026-10-30T20:44:30.653919+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "--import",
+        "tsx/esm",
+        "scripts/build.ts"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T20:45:31.716233+00:00"
+    },
+    "firstResult": "7pass1fail: peer NoGUItest types",
+    "onlyFailedGateRetest": {
+      "status": "passed",
+      "startedAt": "2026-10-30T20:55:29.444179+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "tsconfig.host.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T20:55:36.743015+00:00"
+    },
+    "result": "all eight required gates pass across complete build and the failed-gate retest; no claim that the initial full invocation passed"
+  },
+  "documentation": {
+    "initialAndRepeatQuickStatus": "19pass1fail; first missing new-guide language switchers repaired mechanically, then peer in-flight bilingual content records changed",
+    "quickReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T203952Z/native-control-doc-quick-repaired.json",
+    "failedGateRetest": {
+      "status": "failed",
+      "startedAt": "2026-10-30T20:59:48.447030+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "--import",
+        "tsx/esm",
+        "scripts/verify-translation-pairing.ts"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T20:59:59.958282+00:00"
+    },
+    "result": "19quick gates passed; concurrent peer bilingual record convergence remains pending",
+    "rootNamedPairs": {
+      "status": "passed",
+      "startedAt": "2026-10-30T20:50:01.103711+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "--import",
+        "tsx/esm",
+        "scripts/verify-translation-pairing.ts",
+        "packages/subprocess/subprocess-local/README.md",
+        ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T20:50:01.352217+00:00"
+    },
+    "guideRepair": "Only the English/Chinese language switchers and pairing record are edited; no GUI behavior or architectural prose is changed by root."
+  },
+  "additionalResourcePolicyReview": {
+    "paths": [
+      "gateway/src/resource-access.ts",
+      "gateway/src/desktop-access.ts",
+      "gateway/src/terminal-access.ts"
+    ],
+    "sourceChange": "No production authority change. Shared execution fixture explicitly enables multi-computer topology only for its managed nodeConnection option. This restores the lease-expiry scenario blocked before reaching the assertion.",
+    "causalReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T203952Z/resource-policy-execution-postgres-isolated.json",
+    "repairedReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T203952Z/resource-policy-execution-postgres-repaired.json",
+    "businessControls": [
+      "per-computer capability qualifications and independent revisions across six lanes",
+      "queued administrator withdrawal",
+      "both user and project grants plus writable membership",
+      "private Session and exact Runtime creator isolation",
+      "qualification revocation/re-enable does not revive old grants",
+      "node lease expiration closes a watch even when its change hint is lost; cleanup credential survives while execution credential is refused"
+    ],
+    "disposableDatabaseOwnership": "Each spec owns a freshly created/dropped child database on the verified root-owned container. Initial combined invocation caused fixture DDL contention because it omitted the official test:postgres lane no-file-parallelism rule; corrected separate child databases are verified. No production defect or fixed database-server deadlock is claimed."
+  },
+  "admissionClassification": "Process observation and termination are provider-owned infrastructure for an already admitted workload. Cleanup does not recursively wait for another occupied workload permit; no new model/user workload admission bypass is added.",
+  "noteReview": {
+    "updatedExistingOwner": ".agents/notes/implemented/bug-fix/2026-10-29-incomplete-process-group-observation.md",
+    "newNotes": 0,
+    "archivedOrDeleted": 0,
+    "retained": "The existing observation/quiescence decision retains independent POSIX and Windows identity rules, native helper deadlines, and fallback limits. No frozen note is edited.",
+    "upgradeGuide": "Internal pre-stable factory consumers are all updated. Public subprocess capability requests, configuration, wire and persisted formats remain unchanged; no new migration guide is required for these helpers."
+  },
+  "limits": [
+    "Per-helper deadlines do not bound complete teardown or uninterruptible kernel operations. PID identity precision, observation atomicity, escaping fallback descendants and B25platform guarantees are unchanged.",
+    "Physical Windows OS acceptance remains open; Win32 logic and native-helper lifetimes run on POSIX with controlled external command inputs.",
+    "Scoped tests emit a MaxListenersExceededWarning under retained cleanup-failure cases; no production listener-leak finding or completed full lifecycle audit is claimed.",
+    "Root makes no paid model call and provider-specific real Responses acceptance stays human-deferred.",
+    "All12original domains and B04/B25remain in progress; these named scenarios do not complete the resource inventory or whole project audit."
+  ]
+}

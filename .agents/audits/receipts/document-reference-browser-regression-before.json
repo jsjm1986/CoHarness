@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-browser-regression-before",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 pnpm exec vitest run packages/client/userdoc-upload/tests/uploader.client.spec.ts -t 'rejects a completed upload with a null'",
+  "startedAt": "2026-10-26T22:18:47.924764+00:00",
+  "seconds": 9.695,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "dd03f3ba6ec481253b1bb9fc0acd1a3d5aea8f127c8aaf4aaabb6e671cad01a2",
+  "inputsAfter": "dd03f3ba6ec481253b1bb9fc0acd1a3d5aea8f127c8aaf4aaabb6e671cad01a2",
+  "postgresToolDirectory": null,
+  "outputSha256": "31b207389c8e5fc797c7778bdcc4f0a4c44f2ed0e44ea04c8de56c87dbc9d5a0",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/client/userdoc-upload/tests/uploader.client.spec.ts (6 tests | 1 failed | 5 skipped) 11ms\n     × rejects a completed upload with a null document reference 9ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/client/userdoc-upload/tests/uploader.client.spec.ts > resumableUpload > rejects a completed upload with a null document reference\nAssertionError: promise resolved \"null\" instead of rejecting\n\n- Expected:\nError {\n  \"message\": \"rejected promise\",\n}\n\n+ Received:\nnull\n\n ❯ packages/client/userdoc-upload/tests/uploader.client.spec.ts:59:8\n     57|         fingerprint: 'x', chunkBytes: 65536, receivedBytes: 5, expires…\n     58|         state: 'complete', ref: null }) as T,\n     59|     })).rejects.toThrow('Invalid upload response: 502')\n       |        ^\n     60|   })\n     61|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 5 skipped (6)\n   Start at  06:18:56\n   Duration  1.09s (transform 82ms, setup 73ms, import 35ms, tests 11ms, environment 809ms)\n\n"
+}

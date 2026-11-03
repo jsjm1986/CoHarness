@@ -1,15 +1,15 @@
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, parse } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { applyGrantsToUser } from '../src/apply-grants.ts'
 import { AuditService } from '../src/audit.ts'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { ProjectService } from '../src/projects.ts'
-import { runtimeRelay } from './runtime-relay.ts'
+import { RUNTIME_PORT_PUBLISHER, runtimeRelay } from './runtime-relay.ts'
 import { UserService } from '../src/users.ts'
 
 const WS_MODULE = createRequire(join(process.cwd(), 'noop.js')).resolve('ws')
@@ -35,15 +35,22 @@ const server = http.createServer((req, res) => {
 })
 const wss = new WebSocketServer({ server })
 wss.on('connection', (socket, req) => { socket.send(JSON.stringify({ host: req.headers.host })) })
-server.listen(0, '127.0.0.1', function () { fs.writeFileSync(process.env.DSH_HOME + '/child-port', String(this.address().port)) })
+server.listen(0, '127.0.0.1', function () { ${RUNTIME_PORT_PUBLISHER}(process.env.DSH_HOME + '/child-port', this.address().port) })
 `
 
 let cleanup: Array<() => Promise<void> | void> = []
-afterEach(async () => { for (const fn of cleanup.reverse()) await fn(); cleanup = [] })
+afterEach(async () => {
+  vi.restoreAllMocks()
+  const failures: unknown[] = []
+  for (const fn of cleanup.splice(0).reverse()) { try { await fn() } catch (error) { failures.push(error) } }
+  if (failures.length > 0) throw new AggregateError(failures, 'Grant fixture cleanup failed')
+})
 
 async function setup() {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
+  cleanup.push(() => rmSync(root, { recursive: true, force: true }))
   const db = openDb(join(root, 'g.sqlite'))
+  cleanup.push(() => { db.close() })
   const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users'), HGW_READINESS_TIMEOUT_MS: '10000', HGW_INSTANCE_PORT_BASE: '43300' })
   cfg.dshCommand = [process.execPath, '-e', ECHO_DSH]
   const deps = {
@@ -72,6 +79,35 @@ async function setup() {
 }
 
 describe('applyGrantsToUser', () => {
+  it('reports a deleted account without rewriting its grants or restarting it', async () => {
+    const { deps, alice, admin, root } = await setup()
+    await applyGrantsToUser(deps, alice.id, admin.id)
+    const path = join(root, 'users', 'alice', 'dsh', 'directory-grants.json')
+    const before = readFileSync(path, 'utf8')
+    expect(deps.users.remove(alice.id)).toBe(true)
+    await expect(applyGrantsToUser(deps, alice.id, admin.id)).resolves.toBe('deleted')
+    expect(readFileSync(path, 'utf8')).toBe(before)
+    await expect(applyGrantsToUser(deps, alice.id + 1000, admin.id)).rejects.toThrow(`no user ${String(alice.id + 1000)}`)
+  })
+
+  it('recognizes deletion between reading the account and resolving its instance', async () => {
+    const { deps, alice, admin } = await setup()
+    const stateOf = deps.instances.stateOf.bind(deps.instances)
+    vi.spyOn(deps.instances, 'stateOf').mockImplementation(async target => {
+      deps.users.remove(alice.id)
+      return stateOf(target)
+    })
+    await expect(applyGrantsToUser(deps, alice.id, admin.id)).resolves.toBe('deleted')
+  })
+
+  it('retains instance and tombstone-read failures when deletion cannot be verified', async () => {
+    const { deps, alice, admin } = await setup()
+    const instanceFailure = new Error('instance state unavailable'), lookupFailure = new Error('account state unavailable')
+    vi.spyOn(deps.instances, 'stateOf').mockRejectedValue(instanceFailure)
+    vi.spyOn(deps.users, 'isDeleted').mockImplementation(() => { throw lookupFailure })
+    await expect(applyGrantsToUser(deps, alice.id, admin.id)).rejects.toMatchObject({ errors: [instanceFailure, lookupFailure] })
+  })
+
   it('restarts a live instance and only writes when stopped', async () => {
     const { deps, alice, admin, root } = await setup()
     await deps.instances.ensureRunning(alice)

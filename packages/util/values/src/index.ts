@@ -1,7 +1,20 @@
-/** Duplicate-install-safe JSON and immutable-value helpers. @module @deepseek-ai/dsh-util-values */
+/** Duplicate-install-safe JSON, immutable-value and diagnostic text helpers. @module @deepseek-ai/dsh-util-values */
 
 /** A value that round-trips through JSON without loss. */
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }
+
+/**
+ * Render a caught failure without allowing its string conversion to throw.
+ * @param value - thrown or rejected value from an operation or observer.
+ * @returns normal string conversion, or a fixed label when conversion fails.
+ */
+export function formatThrownValue(value: unknown): string {
+  try {
+    return String(value)
+  } catch {
+    return '[unrenderable thrown value]'
+  }
+}
 
 /**
  * Mark an unreachable closed-union branch.

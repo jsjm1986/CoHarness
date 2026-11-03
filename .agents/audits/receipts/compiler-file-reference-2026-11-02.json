@@ -1,0 +1,35 @@
+{
+  "findings": [
+    "B481"
+  ],
+  "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+  "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T155437Z/B481-compiler-file-reference.delta.tar.gz",
+  "archiveSha256": "07a0b36bc88a95c4f139d3a198fa9693d03cf297c0ff8b9fa5608756d3faf5da",
+  "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T155437Z/B481-compiler-file-reference-capsule-e94f8tf3",
+  "manifestSha256": "929599105cdeecb148a439084f0f71b8429190cb5957172284ebb46c97d447c7",
+  "ownedChanges": 5,
+  "verification": {
+    "focusedCases": 12,
+    "originalExplicitFileCase": "failed_before_algorithm_repair",
+    "normalRunnableConfigs": 459,
+    "wholeHostTypes": "passed",
+    "lint": "passed",
+    "hostOrClientCompilerConfigurationChanged": false,
+    "modelApiCalls": 0
+  },
+  "wholeProjectComplete": false,
+  "recordedAt": "2026-11-02T16:13:03.351358+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T155437Z",
+  "sourcePaths": [
+    ".agents/notes/implemented/process/2026-06-17-ts-build-config.i18n.yaml",
+    ".agents/notes/implemented/process/2026-06-17-ts-build-config.md",
+    ".agents/notes/implemented/process/2026-06-17-ts-build-config.zh.md",
+    "scripts/verify-cordis-config.spec.ts",
+    "scripts/verify-cordis-config.ts"
+  ],
+  "productionWrites": false,
+  "realApiValidation": "deferred_by_user",
+  "remaining": [
+    "Other static checks and whole-project review remain in progress."
+  ]
+}

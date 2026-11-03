@@ -1,0 +1,14 @@
+{
+  "name": "progress-material-receipts-current",
+  "cwd": "gateway",
+  "command": "npm exec vitest run tests/project-progress-postgres.spec.ts -- --no-file-parallelism",
+  "startedAt": "2026-10-23T22:03:15.124031+00:00",
+  "seconds": 12.249,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b07413833c07ea3a5ed5a943d103ca25c12cd63ac9f242f8f025b336de9fdc63",
+  "inputsAfter": "b07413833c07ea3a5ed5a943d103ca25c12cd63ac9f242f8f025b336de9fdc63",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "4e056ddd725a9337a3163f35af94c79c62cf7bf480638aa56f3506753f965895",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n  Snapshots  1 written\n Test Files  1 passed (1)\n      Tests  17 passed (17)\n   Start at  06:03:17\n   Duration  9.46s (transform 875ms, setup 0ms, import 1.15s, tests 8.15s, environment 0ms)\n\n"
+}

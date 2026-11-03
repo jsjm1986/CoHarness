@@ -1,0 +1,266 @@
+{
+  "status": "completed_named_business_scenarios_only",
+  "recordedAt": "2026-10-27T18:42:08.779064+00:00",
+  "findings": [
+    "B227",
+    "B228"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "sourceRegression": {
+    "filesPassed": 23,
+    "casesPassed": 514,
+    "skipped": 0,
+    "coverageReport": "coverage/gateway-memory-preparation-current-20261028/coverage-final.json",
+    "modules": {
+      "packages/context/execution-authority/src/index.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "packages/context/gateway-execution/src/index.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "packages/memory/memory/src/index.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      }
+    },
+    "supplement": "The test wire adapter now rejects its owned Error and separately verifies exact forwarded cancellation reason. All6 affected cancellation scenarios pass after that assertion change;115 unrelated cases were filtered out of that supplemental run."
+  },
+  "wholeProjectComplete": false,
+  "checks": [
+    {
+      "name": "gateway-memory-preparation-current-coverage",
+      "status": "passed",
+      "startedAt": "2026-10-27T18:24:46.850196+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/context/gateway-execution/tests",
+        "packages/context/execution-authority/tests",
+        "packages/memory/memory/tests",
+        "packages/memory/memory-curation/tests",
+        "packages/memory/memory-context/tests",
+        "packages/memory/tool-memory/tests",
+        "--maxWorkers=2",
+        "--coverage",
+        "--coverage.include=packages/memory/memory/src/index.ts",
+        "--coverage.include=packages/context/gateway-execution/src/index.ts",
+        "--coverage.include=packages/context/execution-authority/src/index.ts",
+        "--coverage.exclude=**/node_modules/**",
+        "--coverage.reportsDirectory=coverage/gateway-memory-preparation-current-20261028",
+        "--coverage.reporter=json-summary",
+        "--coverage.reporter=json",
+        "--coverage.reporter=text"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T18:25:09.728442+00:00"
+    },
+    {
+      "name": "gateway-memory-preparation-final-acceptance",
+      "status": "passed",
+      "startedAt": "2026-10-27T18:32:03.775745+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-idle-memory-acceptance.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T18:32:18.469603+00:00"
+    },
+    {
+      "name": "gateway-memory-preparation-host-types-repair",
+      "status": "passed",
+      "startedAt": "2026-10-27T18:29:52.803693+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/tsc",
+        "-p",
+        "tsconfig.host.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T18:30:42.921802+00:00"
+    },
+    {
+      "name": "gateway-memory-preparation-artifacts-current",
+      "status": "passed",
+      "startedAt": "2026-10-27T18:31:01.814921+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "pnpm",
+        "run",
+        "build:artifacts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T18:31:19.386054+00:00"
+    },
+    {
+      "name": "gateway-memory-preparation-current-docs",
+      "status": "passed",
+      "startedAt": "2026-10-27T18:32:50.125691+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-gateway-preparation-docs.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T18:34:37.020513+00:00"
+    },
+    {
+      "name": "gateway-memory-preparation-current-final-lint",
+      "status": "passed",
+      "startedAt": "2026-10-27T18:37:10.930893+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/verify-idle-memory-final.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T18:37:34.245969+00:00"
+    },
+    {
+      "name": "gateway-preparation-final-cancellation-regression",
+      "status": "passed",
+      "startedAt": "2026-10-27T18:37:01.644832+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/context/gateway-execution/tests/authority.spec.ts",
+        "-t",
+        "shared registration|inherited execution restoration waits|already cancelled",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T18:37:05.302828+00:00"
+    },
+    {
+      "name": "gateway-memory-preparation-host-types-current",
+      "status": "passed",
+      "startedAt": "2026-10-27T18:40:20.536621+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/tsc",
+        "-p",
+        "tsconfig.host.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T18:41:09.917239+00:00"
+    }
+  ],
+  "controlledNegatives": [
+    {
+      "name": "memory-idle-revocation-negative",
+      "exitCode": 1
+    },
+    {
+      "name": "memory-idle-revocation-loader-built-negative",
+      "exitCode": 1
+    },
+    {
+      "name": "gateway-authorization-preparation-negative",
+      "exitCode": 1
+    },
+    {
+      "name": "gateway-authorization-preparation-built-causal",
+      "exitCode": 1
+    }
+  ],
+  "negativeObservations": {
+    "B227": "Source:8 failures and4 positive controls. Prior compiled replay:6 forbidden save/delete mutations after user/project revocation or watch disconnection;2 unrelated-user controls preserve functional access but miss final-check telemetry.",
+    "B228": "Five pre-fix source cases fail. Actual Loader/Agent cold-fork replay sends1 registration and1 relay request after pre-cancellation; current source and compiled replay both send0."
+  },
+  "coveragePolicy": "The standing GatewayExecution baseline exclusion is overridden only for this three-module measurement. All three production modules meet the original per-file100percent thresholds; no repository thresholds, exclusions or ignore comments changed.",
+  "compiledAcceptance": {
+    "sourceCasesPassed": 18,
+    "emittedCasesPassed": 18,
+    "filesPerMode": 7,
+    "typescriptSDK": true,
+    "pythonSDK": true,
+    "freshRuntimePersistedSessionResume": true,
+    "realModelAPI": false
+  },
+  "build": {
+    "rootAggregate": "7 passed,1 test-only AbortSignal nullability error; exact host aggregate repair passes. The earlier command remains unsuccessful.",
+    "finalArtifacts": "6/6 pass with1 worker; client build record contains266 artifacts and3 public values.",
+    "annotationRepair": "The test stores GatewayRuntimeRequestInit[signal] without narrowing away its allowed null value.",
+    "clientCatalog": "Generated data now matches3 existing UI owner-props declarations. No handwritten UI behavior changed in this phase.",
+    "finalHostAggregate": "Current exact host compiler passes after the final test-adapter assertion edit."
+  },
+  "documentation": {
+    "earlierFullAggregate": "40/41 passed; one stale generated client catalog. The exact repaired client-catalog leaf passes.",
+    "current": "20/20 quick gates plus5 config/persistence/client-catalog/public-JSDoc leaves pass after B228 docs and regeneration. This is not a fresh41-gate aggregate.",
+    "upgradeGuide": {
+      "path": "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-member-authority/guide.md",
+      "englishWords": 262,
+      "sections": [
+        "Change",
+        "Migration"
+      ],
+      "tripletComplete": true
+    },
+    "noteReview": "Updated the existing memory authority-lifetime and verified-execution notes. Both retain current ownership/security rationale; no new, archived or deleted notes and no frozen archive changes."
+  },
+  "setupFailures": [
+    {
+      "name": "memory-idle-revocation-loader-source",
+      "reason": "Initial expected refusal text did not match the existing model-facing text; corrected without changing production refusal text."
+    },
+    {
+      "name": "gateway-authorization-preparation-built-negative",
+      "reason": "Fixture selected the next sequence instead of a committed fork boundary."
+    },
+    {
+      "name": "gateway-authorization-preparation-built-negative-current",
+      "reason": "Fixture accessed a manually mounted optional service through the injection-only property; changed to ctx.get."
+    }
+  ],
+  "baseline": {
+    "remote": "origin/master",
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "fetchExitCode": 0,
+    "ahead": 139,
+    "behind": 0,
+    "existingDirtyEditsRetained": true
+  },
+  "resources": {
+    "externalServicesCreated": false,
+    "productionPostgresTouched": false,
+    "ownedTemporaryFixtures": "Loader/Agent/JSON and SDK processes complete and dispose their owned contexts; no outstanding test handle remains."
+  },
+  "constraints": [
+    "All12 business domains remain in progress",
+    "Directory source-leaf substitution remains open",
+    "Named write admission and authorization-response windows do not establish a general permission lease or undo already-admitted storage writes",
+    "No new PostgreSQL or native Linux/Windows evidence is claimed for these JavaScript authorization changes",
+    "Real model API remains user-deferred",
+    "No subagents, commits, pushes, PRs, resets or worktree replacement"
+  ],
+  "sourceSha256": {
+    "packages/context/gateway-execution/src/index.ts": "92b3d6d728bf3ce905fb1e0f2fb9e5e23246f04d61fef81c02ef67cfcb1d2237",
+    "packages/context/execution-authority/src/index.ts": "aa49d36ef7d2ad53beb4c84d0e70f4f7b7ca1ea3adf1334915273fe763f449c6",
+    "packages/memory/memory/src/index.ts": "f14a1c8097a02974935dc86dcdcc8d5ace66f322a360110320c697c95853e040",
+    "packages/context/gateway-execution/tests/authority.spec.ts": "8dabc906241e2a4e7f1d9e4d76b421e52c440d4c3d656bab30490dc04fa47fd6",
+    "packages/memory/memory/tests/harness.ts": "117b17573c55d5d5b6e46409590bdfedb402275c650bcb92ec5f697cbbad44cb",
+    "packages/memory/memory/tests/write-admission.spec.ts": "5798f3d9150f61f5354764cd129d6a3b3c5a373b63204a56bfcf13b0ae441e20",
+    "packages/memory/memory-curation/tests/memory-curation.spec.ts": "c5bb689b0d80115cda8f176d0314a260f783ad2e5eca558c7efa86b241d2a5ec",
+    "examples/headless-agent/tests/fixtures/memory-execution-model.ts": "6b8c1cf6272baaa114fc35db4b43dc76f2914aa5276d4cd8fe6915153b4e77fc",
+    "examples/headless-agent/tests/fixtures/memory-execution-driver.ts": "79182cc27c359f615d559ddf9fb9e5d0186e97f6d01f62d075519466185df983",
+    "examples/headless-agent/tests/memory-execution.snapshot.ts": "7741aa0355c20161dece508725c5b3ebb17e03d418c6ecbeb0a8d321fadd5602",
+    "packages/extensions/cordis-client-runner/src/client/slot-catalog.ts": "9bf4038fe6776fb86cfb2f5c137b73bdc03cbb5a4215065a77bd27fbf2bed76c"
+  },
+  "builtSha256": {
+    "packages/context/gateway-execution/lib/index.js": "e58bb6e408dc2a87142e95de43d69055782fce206c3f9f918ea79a7fa0a54708",
+    "packages/memory/memory/lib/index.js": "b365070d4fddc90af5f26b07759a153f87a6b458cb724291bc40f958c30c500b",
+    "packages/core/session/lib/index.js": "f6d63e165f1d32fc8cebb871b119b50af43b902c75e9c3c273f60bddae7a977e"
+  }
+}

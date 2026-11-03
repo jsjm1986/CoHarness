@@ -69,10 +69,12 @@ export class SshFileSystem extends FileSystem {
     return this.call('fs.readText', { target }, z.string(), signal)
   }
 
-  override async streamText(target: FsTarget, signal?: AbortSignal, expectedVersion?: FsVersion): Promise<AsyncIterable<string>> {
-    const id = await this.call('fs.stream', { target, ...(expectedVersion === undefined ? {} : { expectedVersion }) }, textStreamIdSchema, signal)
+  /** Reserve the remote iterator on first pull; unread iterables retain no helper handle. */
+  override streamText(target: FsTarget, signal?: AbortSignal, expectedVersion?: FsVersion): Promise<AsyncIterable<string>> {
     const call = this.call.bind(this)
-    return (async function* () {
+    return Promise.resolve((async function* () {
+      signal?.throwIfAborted()
+      const id = await call('fs.stream', { target, ...(expectedVersion === undefined ? {} : { expectedVersion }) }, textStreamIdSchema, signal)
       let ended = false
       try {
         while (!ended) {
@@ -84,7 +86,7 @@ export class SshFileSystem extends FileSystem {
       } finally {
         if (!ended) await call('fs.streamClose', { id }, z.null()).catch(() => {})
       }
-    })()
+    })())
   }
 
   override async readBytes(target: FsTarget, signal: AbortSignal | undefined, maxBytes: number): Promise<Uint8Array> {

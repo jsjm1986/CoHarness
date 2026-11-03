@@ -101,7 +101,7 @@ export function apply(ctx: ClientContext): void {
       if (section.store.getSnapshot().status !== 'idle') void section.load()
     }
     const disposers = [
-      ctx.remote.$on('settings/document-updated', (ns) => {
+      ctx.remote.$forTarget().$on('settings/document-updated', (ns) => {
         if (ns !== AGENT_PRESET_SETTINGS_NS) return
         refresh()
       }),
@@ -143,6 +143,7 @@ export function apply(ctx: ClientContext): void {
     const seat = new AgentPresetSeatController(scope.remote, (): SeatSessionSummary | undefined => {
       const state = (scope.sessions.currentScopeList ?? scope.sessions.list).getSnapshot()
       const summary = state.current === undefined ? undefined : state.byId[state.current]
+      if (summary !== undefined && scope.sessions.runtimeTargetFor?.(summary.id) !== undefined) return undefined
       return summary === undefined
         ? undefined
         : {
@@ -262,7 +263,7 @@ export function apply(ctx: ClientContext): void {
         if (!offered) return
         // The introduce cue makes the chip announce the pick the user never
         // made on this screen — the stage happened on another surface.
-        seat.stage('cordis', true)
+        seat.stage('cordis', true, { forNextSession: true })
         // The draft lands on the Conversation surface: a global main panel
         // (the Plugins page this entry lives on) would otherwise stay mounted
         // over it — the panel only yields when the session selection changes.

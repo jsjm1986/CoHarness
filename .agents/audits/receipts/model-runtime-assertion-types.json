@@ -1,0 +1,14 @@
+{
+  "name": "model-runtime-assertion-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/build.ts --scope typecheck",
+  "startedAt": "2026-10-25T05:33:31.652264+00:00",
+  "seconds": 3.482,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9700ee2d65995c9af46bcc0fa847efe5ec2df9f64ba92f0741f3538364cc2141",
+  "inputsAfter": "9700ee2d65995c9af46bcc0fa847efe5ec2df9f64ba92f0741f3538364cc2141",
+  "postgresToolDirectory": null,
+  "outputSha256": "b4c7d26667fa1ddc2c51f8b11f1fce99c7e2b655beb6380b96b502a7176ca716",
+  "outputTail": "run-gates: typecheck running 5 gate(s) with 5 worker(s) from 10 local default worker(s) of 10 CPU(s).\nrun-gates: start host compiler\n\n== FAILED host compiler (1.75s) ==\ncommand: tsc -b <tsconfig.host.json references>\noutcome: exit 2\npackages/subagent/subagent-dsh-sdk/src/control.ts(68,52): error TS2352: Conversion of type 'Record<string, unknown>' to type 'SdkControlConfig' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Type 'Record<string, unknown>' is missing the following properties from type 'SdkControlConfig': maxBytes, maxOperations, requestTimeoutMs, pollMs, cleanupTimeoutMs\npackages/subagent/subagent-dsh-sdk/src/control.ts(147,10): error TS2352: Conversion of type '{ [x: string]: unknown; }' to type 'GenerateOptions' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Type '{ [x: string]: unknown; }' is missing the following properties from type 'GenerateOptions': provider, model, messages\n\n== SKIPPED Host bundle (0.00s) ==\ncommand: pnpm exec tsdown --config-loader native --env.DSH_BUILD_FACE host\noutcome: dependency failed or skipped: host-src\n\n== SKIPPED client compiler (0.00s) ==\ncommand: tsc -b <tsconfig.client.json references>\noutcome: dependency failed or skipped: host-bundle\n\n== SKIPPED host aggregate check (0.00s) ==\ncommand: tsc -b tsconfig.host.json\noutcome: dependency failed or skipped: host-src\n\n== SKIPPED client aggregate check (0.00s) ==\ncommand: tsc -b tsconfig.client.json\noutcome: dependency failed or skipped: client-src\n\nrun-gates: 0 passed, 1 failed, 4 skipped in 1.75s.\nrun-gates: unsuccessful gates:\n  - FAILED host compiler (1.75s, exit 2)\n    tsc -b <tsconfig.host.json references>\n  - SKIPPED Host bundle (0.00s, dependency failed or skipped: host-src)\n    pnpm exec tsdown --config-loader native --env.DSH_BUILD_FACE host\n  - SKIPPED client compiler (0.00s, dependency failed or skipped: host-bundle)\n    tsc -b <tsconfig.client.json references>\n  - SKIPPED host aggregate check (0.00s, dependency failed or skipped: host-src)\n    tsc -b tsconfig.host.json\n  - SKIPPED client aggregate check (0.00s, dependency failed or skipped: client-src)\n    tsc -b tsconfig.client.json\n"
+}

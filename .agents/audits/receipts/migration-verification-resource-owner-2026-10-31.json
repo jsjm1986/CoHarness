@@ -1,0 +1,103 @@
+{
+  "at": "2026-10-31T07:06:23.915019+00:00",
+  "finding": "B393",
+  "title": "Migration verification adopts changed resource owners across local and process-admission queues",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "paths": [
+    "packages/session/session-persistence-jsonl/src/migration-verifier.ts",
+    "packages/session/session-persistence-jsonl/tests/migration-verifier.spec.ts",
+    "packages/session/session-persistence-jsonl/tests/fixtures/migration-owner.mjs",
+    "snapshots/session/jsonl-migration-owner.snapshot.ts",
+    "snapshots/session/jsonl-migration-owner/expected.jsonl",
+    "packages/session/session-persistence-jsonl/README.md",
+    "packages/session/session-persistence-jsonl/README.zh.md",
+    "packages/session/session-persistence-jsonl/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-migration-verification-resource-owner.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-migration-verification-resource-owner.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-migration-verification-resource-owner.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/migration-verification-owner/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/migration-verification-owner/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/migration-verification-owner/guide.i18n.yaml"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T065334Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T065334Z/migration-owner-coverage.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T065334Z/migration-owner-final-build.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T065334Z/migration-owner-docs.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T065334Z/migration-owner-built-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T065334Z/migration-owner-built-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T065334Z/migration-owner-source-snapshot-fixed.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T065334Z/migration-owner-built-worker-regression.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T065334Z/migration-owner-lint-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T065334Z/migration-owner-catalog.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T065334Z/migration-owner-export-jsdoc.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T065334Z/migration-owner-origin-fetch-retry.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T065334Z/migration-owner-pairing.json"
+  ],
+  "causalEvidence": "Four unit regressions fail against the original implementation. A complete private old artifact creates real Workers and publishes historical successors after provider replacement or withdrawal. Updated source and Node22/24 Loader replays create zero stale Workers and publish no rejected successor; managed and independent positive paths and fresh retries succeed with unchanged source bytes.",
+  "behavior": "Capture the initiating resource provider before local capacity and process admission. Compare original Cordis Service identities after each wait and immediately before Worker creation. Reject changed ownership as unavailable and release an unused grant through its original provider. Existing uncertain cleanup and accepted-work drainage remain intact.",
+  "verification": {
+    "uniqueRelatedCases": 169,
+    "sourceCases": 166,
+    "newSourceCases": 5,
+    "builtWorkerCases": 2,
+    "applicationSnapshots": 1,
+    "snapshotRows": 4,
+    "standardCoverage": {
+      "packages/session/session-persistence-jsonl/src/migration-verifier.ts": {
+        "statements": [
+          162,
+          162
+        ],
+        "branches": [
+          75,
+          75
+        ],
+        "functions": [
+          35,
+          35
+        ],
+        "lines": [
+          136,
+          136
+        ]
+      }
+    },
+    "coverageLimits": "All four metrics cover migration-verifier.ts only. No exclusions or thresholds changed.",
+    "buildGates": 8,
+    "quickDocumentationGates": 20,
+    "guideEnglishWords": 177,
+    "documentation": "Bilingual pairing, documentation budgets, catalog freshness and public export JSDoc pass. Full doc-sync is not claimed.",
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "noteReview": {
+    "owner": ".agents/notes/implemented/bug-fix/2026-10-31-migration-verification-resource-owner.md",
+    "decision": "One new focused ownership decision. Existing migration preparation and write-retention notes remain independently applicable; no archived note is changed."
+  },
+  "baseline": {
+    "at": "2026-10-31T07:02:34.735383+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true,
+    "transientFetchFailure": "The first fetch failed with a TLS connection error; an unchanged retry succeeded."
+  },
+  "externalSourceChangesExcluded": {
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "7a54b9e99352908283ee973e2dcd7707c9d7a7ba312ad9761311219172a47569",
+    "packages/subprocess/subprocess-local/README.md": "223b3dfcdc9732041ea508d9d131b9505e98abca53ea60dbb098851bd2c74629",
+    "packages/subprocess/subprocess-local/README.zh.md": "f13592bad150012aaa31e62226119ed4f22772b4bca5174936f988e1ae0cd407"
+  },
+  "externalArtifactChangesExcluded": {
+    "packages/subprocess/subprocess-local/lib/index.js": "5fbdc054c9a1ef7799f7da80b030e5db88ffdb3639b5e5b0f2a908d5e183e950"
+  },
+  "mergeRequirement": "Apply only the fourteen B393 source paths onto the current combined candidate and rebuild matching JSONL main/Worker artifacts. Preserve peer Local, Gateway and UI work; do not replace current artifacts with older cumulative references.",
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Review remaining direct resource consumers: plugin-market parser Worker, browser Worker, independent model search and Inspector; include authority-only SDK composition review.",
+    "Continue remote pipes, resource-only remote execution and nonconflicting business permissions.",
+    "Peer owns realtime UI projection, policy-package publication permissions and related Gateway changes. Required-plugin readiness remains open.",
+    "Real paid API verification remains deferred. No root deployment, production database acceptance or physical Linux/Windows acceptance is claimed."
+  ]
+}

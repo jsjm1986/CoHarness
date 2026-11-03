@@ -1178,7 +1178,12 @@ export class Session implements SessionFace {
   /** Seq-guarded append shared by stitching and the open-state live path. */
   private appendLive(event: SessionEvent, view?: ToolEventView): ConversationPublication {
     const tailSeq = this.windowTailSeq()
-    if (tailSeq !== null && event.seq <= tailSeq) return 'none' // replay overlap, drop
+    if (tailSeq !== null && event.seq <= tailSeq) {
+      // Input admission remains authoritative after its message leaves the
+      // installed window; replayed queue deltas must not change that window.
+      if (event.type === 'user/message') this.observeSubmissionEvent(event)
+      return 'none'
+    }
     this.events.push(event)
     this.views.push(view)
     if (hasConversationContent(event)) this.markConversationContent(event.seq)
@@ -1344,7 +1349,7 @@ export class Session implements SessionFace {
       settlement.queueIndex = start + index
       settlement.queueSeq = event.seq
       delete settlement.removedIndex
-      if (settlement.placement === 'queued' && settlement.admitted === undefined) {
+      if (settlement.placement !== 'transcript' && settlement.admitted === undefined) {
         this.scheduleObservedRetirement(source.rpcId, imageRefsIn(message.content))
       }
     }
@@ -1381,8 +1386,8 @@ export class Session implements SessionFace {
       settlement.queueIndex = found.index
       settlement.queueSeq = seq
       delete settlement.removedIndex
-      // A queue placement echo retires once the Dock row renders its identity.
-      if (settlement.placement === 'queued' && settlement.admitted === undefined) {
+      // Accepted follow-ups remain visible in the queue or pending steering projection.
+      if (settlement.placement !== 'transcript' && settlement.admitted === undefined) {
         this.scheduleObservedRetirement(requestId, imageRefsIn(found.item.message.content))
       }
     }
@@ -1574,6 +1579,9 @@ export class Session implements SessionFace {
     this.hasMore = hasMore
     this.conversation.prepend(fresh.map(conversationInput), this.hasMore)
     this.eventSource.prepend(fresh.map(entry => sessionEventLikeEntry(entry.event)), this.hasMore)
+    for (const { event } of fresh) {
+      if (event.type === 'user/message') this.observeSubmissionEvent(event)
+    }
   }
 
   /**

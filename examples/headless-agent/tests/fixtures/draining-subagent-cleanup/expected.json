@@ -1,0 +1,25 @@
+{
+  "reply": "DRAINING_CLEANUP_OK",
+  "withdrawal": {
+    "mode": "withdrawal",
+    "bothHeldAtBarrier": true,
+    "busyAtBarrier": true,
+    "secondAttemptsAfterWait": 2,
+    "closedAfterWithdrawal": true,
+    "releaseConfirmed": true,
+    "starts": 2,
+    "closedBeforeDispatch": true,
+    "allClosed": true
+  },
+  "replacement": {
+    "mode": "replacement",
+    "bothHeldAtBarrier": true,
+    "busyAtBarrier": true,
+    "secondAttemptsAfterWait": 2,
+    "closedAfterWithdrawal": true,
+    "releaseConfirmed": true,
+    "starts": 3,
+    "closedBeforeDispatch": true,
+    "allClosed": true
+  }
+}

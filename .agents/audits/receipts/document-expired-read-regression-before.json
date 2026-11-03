@@ -1,0 +1,14 @@
+{
+  "name": "document-expired-read-regression-before",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 pnpm exec vitest run packages/attachment/userdoc-local/tests/local-fs.spec.ts -t 'reports an expired upload without deleting'",
+  "startedAt": "2026-10-26T20:28:42.314393+00:00",
+  "seconds": 7.4,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "753288423112b9849a1be336c0c0d8e726248e746b21dd335726b3016c6c2a80",
+  "inputsAfter": "753288423112b9849a1be336c0c0d8e726248e746b21dd335726b3016c6c2a80",
+  "postgresToolDirectory": null,
+  "outputSha256": "32ce6d61ebed6d110b67804f5f710c8013d836ea3d9a99eee14a417ff793187f",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/attachment/userdoc-local/tests/local-fs.spec.ts (46 tests | 1 failed | 45 skipped) 25ms\n     × reports an expired upload without deleting its files during a maintenance status read 23ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/attachment/userdoc-local/tests/local-fs.spec.ts > LocalUserDocFs readiness > reports an expired upload without deleting its files during a maintenance status read\nError: ENOENT: no such file or directory, open '/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/dsh-userdoc-fs-p6sZLy/documents/.upload-sessions/v1/1a850f43-3360-45a5-974c-17c7cfafcf2a/manifest.json'\n ❯ packages/attachment/userdoc-local/tests/local-fs.spec.ts:518:12\n    516|     open = false\n    517|     await expect(engine.inspectUpload(session.uploadId)).rejects.toMat…\n    518|     expect(await readFile(path, 'utf8')).toBe(expired)\n       |            ^\n    519|   })\n    520|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 45 skipped (46)\n   Start at  04:28:48\n   Duration  684ms (transform 392ms, setup 87ms, import 404ms, tests 25ms, environment 0ms)\n\n"
+}

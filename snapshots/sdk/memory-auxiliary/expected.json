@@ -1,0 +1,38 @@
+{
+  "finalResponse": "MEMORY_DONE",
+  "requests": [
+    {
+      "type": "memory/recall-request",
+      "provider": "memory-fixture",
+      "model": "memory-model",
+      "maxTokens": 64,
+      "reasoningEffort": "off",
+      "containsSeedMemory": true
+    },
+    {
+      "type": "memory/curation-request",
+      "kind": "extraction",
+      "round": 0,
+      "provider": "memory-fixture",
+      "model": "memory-model",
+      "maxTokens": 32,
+      "reasoningEffort": "off",
+      "containsSeedMemory": true
+    },
+    {
+      "type": "memory/curation-request",
+      "kind": "consolidation",
+      "round": 0,
+      "provider": "memory-fixture",
+      "model": "memory-model",
+      "maxTokens": 32,
+      "reasoningEffort": "off",
+      "containsSeedMemory": true
+    }
+  ],
+  "completion": {
+    "modelAdmissions": 4,
+    "executionAdmissions": 3,
+    "quiescent": 4
+  }
+}

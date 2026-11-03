@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-memory-consolidation-coalescing.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-memory-consolidation-coalescing.md
+document:
+  en: fd7a4dae5107a62cafd1f5b9aa004dafff0244ce
+  zh: 92cdf83812d4928c87fa9d87098053ae8f982e2d
+/agent-note-memory-consolidation-coalesces-shared-scopes:
+  en: f08d2a921867df8d
+  zh: 50786aa8a52130a2
+/agent-note-memory-consolidation-coalesces-shared-scopes/problem:
+  en: b2504afe3a0b1700
+  zh: c240d765cf980109
+/agent-note-memory-consolidation-coalesces-shared-scopes/decision:
+  en: 8eb15712f840750c
+  zh: 3db4c56c1db29517
+/agent-note-memory-consolidation-coalesces-shared-scopes/alternatives-considered:
+  en: 56f1bb58b388a911
+  zh: b11d43f975400e59
+/agent-note-memory-consolidation-coalesces-shared-scopes/consequences:
+  en: 9912b945ca77d403
+  zh: 8b4a04d3c21a4e45
+/agent-note-memory-consolidation-coalesces-shared-scopes/verification:
+  en: 9bb15195340d8bc0
+  zh: 8fa54cf9e0bb1b43

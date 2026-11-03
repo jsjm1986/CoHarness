@@ -1,12 +1,13 @@
 /** User detail page copy: account header, qualification cards, model overrides, memberships, and quota. */
 
 export const zh = {
+  localProfile: '所选电脑的信息', localProfileUnavailable: '无法读取所选电脑的本地信息',
   backToUsers: '返回用户列表',
   notFoundTitle: '用户不存在',
   notFoundDetail: '该账号可能已被删除。',
   pageTitle: '用户详情',
   pageTitleUser: '用户 · {name}',
-  pageDescription: '@{username} · ID {id} · 端口 {port}',
+  pageDescription: '@{username} · ID {id}',
   editAccount: '编辑账号',
   resetPassword: '重置密码',
   disable: '禁用',
@@ -97,12 +98,13 @@ export const zh = {
 export type UserDetailCopyKey = keyof typeof zh
 
 export const en = {
+  localProfile: 'Selected computer', localProfileUnavailable: 'Could not read the selected computer’s local information.',
   backToUsers: 'Back to users',
   notFoundTitle: 'User not found',
   notFoundDetail: 'This account may have been deleted.',
   pageTitle: 'User details',
   pageTitleUser: 'User · {name}',
-  pageDescription: '@{username} · ID {id} · port {port}',
+  pageDescription: '@{username} · ID {id}',
   editAccount: 'Edit account',
   resetPassword: 'Reset password',
   disable: 'Disable',

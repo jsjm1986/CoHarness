@@ -1,0 +1,14 @@
+{
+  "name": "runtime-web-final-doc-pairs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write gateway/README.md .agents/notes/implemented/architecture/2026-10-25-local-runtime-supervisor.md .agents/notes/implemented/bug-fix/2026-10-25-gateway-runtime-environment.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+  "startedAt": "2026-10-24T21:27:17.747318+00:00",
+  "seconds": 0.921,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2cd6aa963da2cdcede29c713eb653185efa28253230c849c583920f48732df6d",
+  "inputsAfter": "cfd0584c6b5816a86b605ca3d6daca9e9c5ed7df3215a0e5f25e3d7f5412c949",
+  "postgresToolDirectory": null,
+  "outputSha256": "d3af7ec8b171d6a01ac1fd4e1a96c624dd0ef5e709655ca504c8496b2fa38ace",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-25-local-runtime-supervisor.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-25-gateway-runtime-environment.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 4 record(s) written; run the check to validate the pairs.\n"
+}

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-subagent-admission-cleanup.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.md
+document:
+  en: 0b876ccad54197db18dfe3812ced26259e53ba5b
+  zh: fe22c2866dcfdbab493f95482cf2d85988fce539
+/agent-note-retry-retained-one-shot-cleanup-before-another-admission:
+  en: 9744915d8edddef0
+  zh: 268d882e0b3edb08
+/agent-note-retry-retained-one-shot-cleanup-before-another-admission/problem:
+  en: 248588dea065db76
+  zh: 1c2e34549ff0abeb
+/agent-note-retry-retained-one-shot-cleanup-before-another-admission/decision:
+  en: c8971ed7ba280cc2
+  zh: 8c9046f4d898f11e
+/agent-note-retry-retained-one-shot-cleanup-before-another-admission/alternatives-considered:
+  en: 77cf024b7d6a7aa7
+  zh: ce46377bed8a1bf4
+/agent-note-retry-retained-one-shot-cleanup-before-another-admission/consequences:
+  en: e669aedcdb0bb36f
+  zh: e509236e9aca99a3
+/agent-note-retry-retained-one-shot-cleanup-before-another-admission/verification:
+  en: 72e61b9aae4524f0
+  zh: 4181e568f528a559

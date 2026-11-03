@@ -1,0 +1,14 @@
+{
+  "name": "document-io-ownership-no-unknown-casts",
+  "cwd": ".",
+  "command": "pnpm run verify-no-unknown-casts",
+  "startedAt": "2026-10-25T21:06:45.305445+00:00",
+  "seconds": 40.552,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "76fe6cc6d3248a0b4ea7fdfb17ecec9fd473d20783c87bbea862d6f8f55a0906",
+  "inputsAfter": "76fe6cc6d3248a0b4ea7fdfb17ecec9fd473d20783c87bbea862d6f8f55a0906",
+  "postgresToolDirectory": null,
+  "outputSha256": "90382bfe2f11663d80225751a76db4e9ede412f03ec3cd7bdf66a9ea7b12d0b1",
+  "outputTail": "$ tsx scripts/verify-no-unknown-casts.ts\nverify-no-unknown-casts: remove retired baseline entries with pnpm run verify-no-unknown-casts --prune.\n  packages/attachment/userdoc-local/src/upload.ts (18dbddcf0b034d45d3d9d8a0614dcc53e05da2ae1c7d1249635e79bb14b5a580)\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

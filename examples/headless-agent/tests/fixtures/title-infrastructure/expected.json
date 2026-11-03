@@ -1,0 +1,170 @@
+{
+  "prepare/same": {
+    "phase": "prepare",
+    "caller": "same",
+    "blocked": true,
+    "liveOwner": true,
+    "primary": 1,
+    "titlePhysical": 1,
+    "titleAccepted": true,
+    "titleError": null,
+    "exactRequest": true,
+    "authorizationsAfterChange": 0,
+    "admissions": [
+      {
+        "origin": "execution",
+        "sameSession": true,
+        "released": true
+      },
+      {
+        "origin": "infrastructure",
+        "sameSession": true,
+        "released": true
+      }
+    ],
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "sameSession": true,
+        "status": "succeeded"
+      },
+      {
+        "purpose": "session-title",
+        "actor": null,
+        "inputs": [],
+        "sameSession": true,
+        "status": "succeeded"
+      }
+    ]
+  },
+  "prepare/foreign": {
+    "phase": "prepare",
+    "caller": "foreign",
+    "blocked": true,
+    "liveOwner": true,
+    "primary": 1,
+    "titlePhysical": 1,
+    "titleAccepted": true,
+    "titleError": null,
+    "exactRequest": true,
+    "authorizationsAfterChange": 0,
+    "admissions": [
+      {
+        "origin": "execution",
+        "sameSession": true,
+        "released": true
+      },
+      {
+        "origin": "infrastructure",
+        "sameSession": true,
+        "released": true
+      }
+    ],
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "sameSession": true,
+        "status": "succeeded"
+      },
+      {
+        "purpose": "session-title",
+        "actor": null,
+        "inputs": [],
+        "sameSession": true,
+        "status": "succeeded"
+      }
+    ]
+  },
+  "admission/same": {
+    "phase": "admission",
+    "caller": "same",
+    "blocked": true,
+    "liveOwner": true,
+    "primary": 1,
+    "titlePhysical": 1,
+    "titleAccepted": true,
+    "titleError": null,
+    "exactRequest": true,
+    "authorizationsAfterChange": 0,
+    "admissions": [
+      {
+        "origin": "execution",
+        "sameSession": true,
+        "released": true
+      },
+      {
+        "origin": "infrastructure",
+        "sameSession": true,
+        "released": true
+      }
+    ],
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "sameSession": true,
+        "status": "succeeded"
+      },
+      {
+        "purpose": "session-title",
+        "actor": null,
+        "inputs": [],
+        "sameSession": true,
+        "status": "succeeded"
+      }
+    ]
+  },
+  "admission/foreign": {
+    "phase": "admission",
+    "caller": "foreign",
+    "blocked": true,
+    "liveOwner": true,
+    "primary": 1,
+    "titlePhysical": 1,
+    "titleAccepted": true,
+    "titleError": null,
+    "exactRequest": true,
+    "authorizationsAfterChange": 0,
+    "admissions": [
+      {
+        "origin": "execution",
+        "sameSession": true,
+        "released": true
+      },
+      {
+        "origin": "infrastructure",
+        "sameSession": true,
+        "released": true
+      }
+    ],
+    "usage": [
+      {
+        "purpose": "assistant",
+        "actor": 7,
+        "inputs": [
+          "10000000-0000-4000-8000-000000000007"
+        ],
+        "sameSession": true,
+        "status": "succeeded"
+      },
+      {
+        "purpose": "session-title",
+        "actor": null,
+        "inputs": [],
+        "sameSession": true,
+        "status": "succeeded"
+      }
+    ]
+  }
+}

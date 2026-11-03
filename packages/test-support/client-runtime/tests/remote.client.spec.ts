@@ -40,4 +40,13 @@ describe('TestRemote', () => {
     await expect(remote.$mount()).rejects.toThrow('needs the real Client Remote service')
     await ctx.fiber.dispose()
   })
+
+  it('captures its bootstrap events and refuses an alternate Runtime without a target-aware service', async () => {
+    const ctx = new Context()
+    const remote = new TestRemote(ctx)
+    try {
+      expect(remote.$forTarget()).toBe(remote)
+      expect(() => remote.$forTarget({ kind: 'personal' })).toThrow('alternate targets need the real Client Remote service')
+    } finally { await ctx.fiber.dispose() }
+  })
 })

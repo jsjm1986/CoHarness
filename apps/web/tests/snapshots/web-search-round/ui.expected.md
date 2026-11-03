@@ -5,8 +5,6 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - button "Feedback":
-    - img
   - button "Open right sidebar":
     - img
 - button "System prompt":
@@ -32,10 +30,6 @@
   - text: Web search DeepSeek Harness snapshot search, DeepSeek Harness multi-query search
 - paragraph: SEARCH_DONE
 - button "Copy":
-  - img
-- button "Good response":
-  - img
-- button "Bad response":
   - img
 - button "Branch into a new conversation":
   - img

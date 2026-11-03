@@ -1,0 +1,14 @@
+{
+  "name": "document-parent-swap-store-validation",
+  "cwd": ".",
+  "command": "pnpm exec tsc -b packages/attachment/userdoc-local",
+  "startedAt": "2026-10-26T01:26:43.288920+00:00",
+  "seconds": 4.09,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "aa527e39eee59dd79de465f10c9adf901252605f27d79f10fb27917c87a8e87e",
+  "inputsAfter": "aa527e39eee59dd79de465f10c9adf901252605f27d79f10fb27917c87a8e87e",
+  "postgresToolDirectory": null,
+  "outputSha256": "0ce74ddd765ca5da63cba82714a70fc15fcd28c0146a79e19517e188f85f8104",
+  "outputTail": "packages/attachment/userdoc-local/src/store.ts(5,63): error TS6133: 'rmdir' is declared but its value is never read.\n"
+}

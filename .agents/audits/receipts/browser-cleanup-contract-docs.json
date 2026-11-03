@@ -1,0 +1,13 @@
+{
+  "name": "browser-cleanup-contract-docs",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=2 pnpm run test:docs",
+  "startedAt": "2026-10-23T17:30:09.369501+00:00",
+  "seconds": 59.135,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "894e29536be55f973177c7344eed99c774e523510c3f3f8d3a0a4134426961e6",
+  "inputsAfter": "894e29536be55f973177c7344eed99c774e523510c3f3f8d3a0a4134426961e6",
+  "outputSha256": "27ad6d97dca3bb52f5fa1c10ff62712493a19322a330e029699f20acefaffb49",
+  "outputTail": "$ tsx scripts/run-gates.ts doc-quick\nrun-gates: doc-quick running 20 gate(s) with 2 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start markdown links\nrun-gates: start type equivalence\nrun-gates: PASS type equivalence (13.96s)\nrun-gates: start translation pairing\nrun-gates: PASS markdown links (22.99s)\nrun-gates: start markdown wrap\nrun-gates: PASS translation pairing (12.78s)\nrun-gates: start npm dependency catalog\nrun-gates: PASS npm dependency catalog (0.40s)\nrun-gates: start Session format references\nrun-gates: PASS Session format references (4.53s)\nrun-gates: start public repository links\nrun-gates: PASS markdown wrap (11.82s)\nrun-gates: start repository references\nrun-gates: PASS public repository links (5.30s)\nrun-gates: start concrete terms\nrun-gates: PASS concrete terms (1.57s)\nrun-gates: start doc refs\nrun-gates: PASS doc refs (0.77s)\nrun-gates: start package README Summaries\nrun-gates: PASS package README Summaries (0.35s)\nrun-gates: start package README model experience\nrun-gates: PASS package README model experience (3.11s)\nrun-gates: start agent note classification\nrun-gates: PASS agent note classification (0.43s)\nrun-gates: start agent note format\nrun-gates: PASS agent note format (0.53s)\nrun-gates: start archived agent notes\nrun-gates: PASS archived agent notes (0.48s)\nrun-gates: start skill invocation metadata\nrun-gates: PASS skill invocation metadata (0.38s)\nrun-gates: start translation prompt\nrun-gates: PASS translation prompt (0.34s)\nrun-gates: start doc budgets\nrun-gates: PASS doc budgets (0.37s)\nrun-gates: start documentation standard tests\nrun-gates: PASS documentation standard tests (2.17s)\nrun-gates: start package README limitations\nrun-gates: PASS package README limitations (2.93s)\nrun-gates: PASS repository references (22.56s)\n\nrun-gates: 20 passed, 0 failed, 0 skipped in 57.37s.\n"
+}

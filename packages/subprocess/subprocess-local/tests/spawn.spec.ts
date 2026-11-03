@@ -972,7 +972,7 @@ describe.skipIf(process.platform === 'win32')('tree-survivor escalation (termina
     const fiber = await ctx.plugin(LocalSubprocessRuntime)
     ;(ctx.subprocess as InstanceType<typeof LocalSubprocessRuntime>).internals = { spillDir }
     const pidFile = join(spillDir, `survivor-svc-${Date.now()}.pid`)
-    const running = ctx.subprocess.spawn(spec(
+    const running = await ctx.subprocess.spawn(spec(
       `bash -c 'trap "" TERM; echo $$ > ${pidFile}; sleep 60' >/dev/null 2>&1 & disown; exit 0`,
       { graceMs: 200 },
     ))
@@ -1155,22 +1155,22 @@ describe('coverage seams', () => {
   it('hides the taskkill helper window', () => {
     const taskkill = vi.mocked(nodeSpawnSync)
     taskkill.mockReturnValueOnce({} as never)
-    taskkillProcessTree(77)
+    taskkillProcessTree(77, 1000)
     expect(taskkill).toHaveBeenLastCalledWith(
       'taskkill',
       ['/PID', '77', '/T', '/F'],
-      { stdio: 'ignore', windowsHide: true },
+      { stdio: 'ignore', windowsHide: true, timeout: 1000, killSignal: 'SIGKILL' },
     )
   })
 
   it('taskkillProcessTree ignores unpublished or non-positive pids and contains a missing binary', () => {
-    expect(() => { taskkillProcessTree(undefined) }).not.toThrow()
-    expect(() => { taskkillProcessTree(-1) }).not.toThrow()
-    expect(() => { taskkillProcessTree(0) }).not.toThrow()
+    expect(() => { taskkillProcessTree(undefined, 1000) }).not.toThrow()
+    expect(() => { taskkillProcessTree(-1, 1000) }).not.toThrow()
+    expect(() => { taskkillProcessTree(0, 1000) }).not.toThrow()
     // On POSIX there is no taskkill; spawnSync reports the failure in its
     // result and the function stays silent — the same containment Windows
     // relies on for an already-absent tree.
-    expect(() => { taskkillProcessTree(2 ** 30) }).not.toThrow()
+    expect(() => { taskkillProcessTree(2 ** 30, 1000) }).not.toThrow()
   })
 
   it('covers the injected POSIX group paths on any host', async () => {

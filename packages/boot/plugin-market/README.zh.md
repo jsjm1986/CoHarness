@@ -29,7 +29,7 @@ kind: "package-reference"
 | 配置 | 默认值 | 含义 |
 |---|---|---|
 | `indexes` | `[]` | 按显示顺序排列的索引 URL。可用的 URL 采用规范形式，使用 `http:` 或 `https:`，不含凭据或片段。该字段是 volatile 字段：发现区、设置和 `setIndexes` 修改它时，不会重新挂载本服务或 `plugin-manager`。 |
-| `fetchTimeoutMs` | `15000` | 单次索引获取（包括响应体）的时限。 |
+| `fetchTimeoutMs` | `15000` | 单次索引获取、响应体、进程准入及解析的时限。 |
 | `maxBytes` | `134217728` | 接受的最大索引响应体。 |
 | `cacheTtlMs` | `600000` | 成功读取的文档的缓存时长。 |
 
@@ -67,6 +67,8 @@ Remote 方法如下：
 ## 理解实现
 
 Host 使用进程的 `fetch` 获取，因此配置的出站代理生效，并拒绝重定向。响应体最多读取 `maxBytes`，随后由一个新的 Worker Thread 按严格 UTF-8 解码、解析为 JSON 并校验；相对图标引用基于配置的 URL 解析。响应体的缓冲区转移给 Worker，校验后的索引通过 structured clone 返回 Host。Worker 是自包含的 `lib/worker.cjs` bundle；销毁时终止它，Worker 失败报告为 `plugin-market/fetch-failed`。
+
+启用[资源准入](../../context/resource-budget/README.zh.md)时，解析先等待进程许可，再分配 Worker。它在等待前保留提供者，并在转移响应体或创建线程前检查同一原始 Cordis Service。提供者被移除或替换时，以 `plugin-market/fetch-failed` 拒绝，其原因是 `ResourceAdmissionError` 的 `unavailable`，并将未使用的许可归还原所有者；准入恢复后应重新搜索。共享读取属于服务，采用 Runtime 基础设施归属，独立于停止等待的工具调用者。获取时限涵盖准入与解析。必须确认 Worker 终止后才释放许可。取消或时限到达时，调用者可以在终止仍待确认的情况下结束；此时保留不确定占用，直到后续退出或成功终止确认释放。终止失败会报告获取失败。托管执行在提供方缺失时拒绝解析。
 
 对同一 URL 的并发读取共享一次获取。成功的文档缓存 `cacheTtlMs`；`refresh` 绕过缓存。每份获取到的文档都有新的 `fetchedAt`，缓存的文档在被之后的获取替换前，都可以按其 `fetchedAt` 回答。失败的读取为 `listIndexes` 记录错误消息，不保留文档。读取完成时其 URL 已不在配置中的，既不更新缓存也不更新错误。收到 `loader/volatile-update` 时，服务丢弃已移除 URL 的状态并发出 `plugin-market/changed`。销毁时中止进行中的获取。
 

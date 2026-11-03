@@ -6,41 +6,34 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-collaboration'
 import type {} from '@deepseek-ai/dsh-gateway-runtime'
 import {
-  DOCUMENT_DIRECTORY_CONFLICT_CODE,
-  DOCUMENT_DIRECTORY_NOT_EMPTY_CODE,
-  DOCUMENT_DIRECTORY_NOT_FOUND_CODE,
-  DOCUMENT_DIRECTORY_WRITE_FAILED_CODE,
-  DOCUMENT_MIGRATION_FAILED_CODE,
-  DOCUMENT_MOVE_FAILED_CODE,
-  DOCUMENT_NAME_EXHAUSTED_CODE,
+  decodeUserDocIdentity,
   DOCUMENT_NOT_FOUND_CODE,
-  DOCUMENT_TARGET_CONFLICT_CODE,
-  DOCUMENT_TOO_LARGE_CODE,
-  DOCUMENT_UPLOAD_BUSY_CODE,
-  DOCUMENT_UPLOAD_EXPIRED_CODE,
+  DOCUMENT_STORE_UNAVAILABLE_CODE,
   DOCUMENT_UPLOAD_HASH_CODE,
   DOCUMENT_UPLOAD_NOT_FOUND_CODE,
   DOCUMENT_UPLOAD_PROTOCOL_CODE,
   DOCUMENT_UPLOAD_RANGE_CODE,
   DOCUMENT_UPLOAD_SIZE_CODE,
-  DOCUMENT_UPLOAD_STATE_CODE,
-  DOCUMENT_UPLOAD_STORAGE_CODE,
   DOCUMENT_LIST_QUERY_CODE,
-  DOCUMENT_RESTORE_CONFLICT_CODE,
-  DOCUMENT_TRASH_NOT_FOUND_CODE,
   DOCUMENT_TRASHED_CODE,
+  DOCUMENT_TRASH_CONFLICT_CODE,
   INVALID_DOCUMENT_DIRECTORY_CODE,
   INVALID_DOCUMENT_NAME_CODE,
   INVALID_DOCUMENT_REF_CODE,
   UserDocDirectoryId,
   UserDocError,
+  userDocErrorStatus,
   UserDocId,
+  UserDocIncarnationId,
+  UserDocTrashId,
+  UserDocUploadOwnerId,
   type BeginUserDocUpload,
   type UserDocUploadChunk,
   type UserDocUploadIdType,
   type UserDocUploadSession,
   type UserDocErrorCode,
   type UserDocRef,
+  type UserDocIdentity,
   type UserDocDirectoryRef,
   type UserDocTrashRef,
   type UserDocTrashPage,
@@ -49,11 +42,15 @@ import {
   type UserDocListSort,
   type UserDocListType,
   type UserDocStore,
+  type UserDocSelection,
+  type UserDocTrashSelection,
 } from '@deepseek-ai/dsh-userdoc'
 import type {} from '@deepseek-ai/dsh-client-connection'
 
 /** Prefix owned by the document HTTP consumer below Connection's trusted route. */
 export const USERDOC_HTTP_PATH = '/api/documents'
+/** Base64url JSON identity of the exact file object opened for a content response. */
+export const USERDOC_IDENTITY_HEADER = 'x-dsh-document-identity'
 /** Versioned cross-scope snapshot-copy endpoint below the document subtree. */
 export const USERDOC_TRANSFER_PATH = `${USERDOC_HTTP_PATH}/transfer`
 /** Metadata-only transfer planning endpoint. */
@@ -143,12 +140,23 @@ export interface UserDocResponse {
 export interface UserDocHttpHost {
   readonly userDocs: UserDocStoreApi
   readonly get?: (name: string) => unknown
+  /**
+   * Optional owner of deferred, ordered catalog delivery; absent owners deliver within the request.
+   * @param operation - advisory delivery whose original request authority must remain captured.
+   */
+  readonly deferCatalogSync?: (operation: () => Promise<void>) => void
+  /**
+   * Admit a deferred catalog write when it is queued, retaining its writer through ordered delivery.
+   * @param operation - includes the preceding delivery wait and this write; original request authority remains captured.
+   * @returns after delivery settles; refusal rejects without releasing the preceding delivery's ownership.
+   */
+  readonly admitCatalogWrite?: (operation: () => Promise<void>) => Promise<void>
 }
 
 /**
  * Adapt a Cordis context to the host surface the handlers consume.
  * @param ctx - composition context exposing `userDocs` and optional `get`.
- * @returns one stable host object; reuse it so catalog queues serialize on it.
+ * @returns the service adapter; wrap it in {@link UserDocHttpScope} to own deferred catalog delivery.
  */
 export function userDocHttpHost(ctx: Context): UserDocHttpHost {
   return {
@@ -157,6 +165,59 @@ export function userDocHttpHost(ctx: Context): UserDocHttpHost {
       const service: unknown = ctx.get(name)
       return service
     },
+  }
+}
+
+/** One document HTTP consumer's admission, accepted requests and deferred catalog delivery. */
+export class UserDocHttpScope {
+  private readonly host: UserDocHttpHost
+  private readonly operations = new Set<Promise<void>>()
+  private catalog = Promise.resolve()
+  private closing: Promise<void> | undefined
+
+  /** @param host - document store and service lookup retained until scope disposal settles. */
+  constructor(host: UserDocHttpHost) {
+    const admitCatalogWrite = host.admitCatalogWrite ?? (operation => operation())
+    this.host = {
+      ...host,
+      deferCatalogSync: (operation) => {
+        const previous = this.catalog
+        const pending = admitCatalogWrite(async () => {
+          await previous
+          await operation()
+        }).catch(() => {
+          // Catalog reconciliation is advisory; a later ownership decision rechecks its target.
+        })
+        this.catalog = Promise.all([previous, pending]).then(() => undefined)
+      },
+    }
+  }
+
+  /**
+   * Serve an admitted request while retaining its deferred catalog work.
+   * @param request - browser request or a trusted Gateway metadata request.
+   * @param response - writable response owned by this request.
+   * @returns after the HTTP handler settles; closed scopes respond with HTTP 503.
+   */
+  handle(request: UserDocRequest, response: UserDocResponse): Promise<void> {
+    if (this.closing !== undefined) {
+      failure(response, new UserDocError('The document service is stopping.', DOCUMENT_STORE_UNAVAILABLE_CODE))
+      return Promise.resolve()
+    }
+    const pending = Promise.resolve().then(() => handleUserDocHttp(this.host, request, response))
+    this.operations.add(pending)
+    return pending.finally(() => { this.operations.delete(pending) })
+  }
+
+  /**
+   * Close request admission while retaining accepted handlers and catalog delivery.
+   * @returns after accepted handlers and their queued catalog deliveries finish.
+   */
+  dispose(): Promise<void> {
+    return this.closing ??= (async () => {
+      await Promise.allSettled([...this.operations])
+      await this.catalog
+    })()
   }
 }
 
@@ -174,12 +235,12 @@ class DocumentAuthorizationError extends Error {
   }
 }
 
-/** Stable failure when a project runtime cannot obtain its membership authority. */
+/** Stable failure when a managed document request cannot obtain its authority. */
 class DocumentAuthorizationUnavailableError extends Error {
   readonly code = 'COLLABORATION_UNAVAILABLE'
 
   constructor() {
-    super('Project document authorization is temporarily unavailable.')
+    super('Document authorization is temporarily unavailable.')
     this.name = 'DocumentAuthorizationUnavailableError'
   }
 }
@@ -198,6 +259,15 @@ class DocumentCatalogAuthorizationError extends Error {
     super(message)
     this.name = 'DocumentCatalogAuthorizationError'
   }
+}
+
+function isDocumentAdminRequest(host: UserDocHttpHost): boolean {
+  const runtime = runtimeForCatalog(host)
+  const current = runtime === undefined
+    ? undefined
+    : (runtime as unknown as { current?: () => { claims?: { user?: { role?: string }; purpose?: string } } | undefined }).current
+  const claims = typeof current === 'function' ? current.call(runtime)?.claims : undefined
+  return claims?.user?.role === 'admin' && claims.purpose === 'document-admin'
 }
 
 /** Enforce project document access without changing standalone/local mode. */
@@ -234,18 +304,45 @@ function runtimeForCatalog(host: UserDocHttpHost): Context['gatewayRuntime'] | u
   return typeof get === 'function' ? get.call(host, 'gatewayRuntime') as Context['gatewayRuntime'] | undefined : undefined
 }
 
-function isDocumentAdminRequest(host: UserDocHttpHost): boolean {
-  const runtime = runtimeForCatalog(host)
-  // Lightweight Host compositions may expose only the runtime identity (for
-  // example while a request handler is unit-tested).  A production
-  // `GatewayRuntime` always provides `current`, but the optional check keeps
-  // the document ACL independent from that implementation detail.
-  const current = runtime === undefined
-    ? undefined
-    : (runtime as unknown as { current?: () => { claims?: { user?: { role?: string }; purpose?: string } } | undefined }).current
-  const principal = typeof current === 'function' ? current.call(runtime) : undefined
-  const claims = principal?.claims
-  return claims?.user?.role === 'admin' && claims.purpose === 'document-admin'
+interface DocumentCatalogSelection {
+  readonly docId: string
+  readonly incarnationId: string
+  readonly revision: number
+  readonly state: 'active' | 'trash'
+  readonly trashId?: string
+}
+
+interface DocumentCatalogTarget {
+  readonly docId: string
+  readonly incarnationId?: string
+  readonly revision?: number
+  readonly trashId?: string
+}
+
+type DocumentCatalogExpected = Omit<DocumentCatalogTarget, 'docId'>
+
+interface DocumentCatalogRemoval extends DocumentCatalogTarget {
+  readonly state?: 'trash' | 'missing' | 'purged'
+  readonly trashedAt?: number
+  readonly purgeAfter?: number
+}
+
+/** Resolve upload ownership from authenticated request context, independently of browser metadata. */
+function uploadOwnerId(host: UserDocHttpHost): UserDocUploadOwnerId | undefined {
+  try {
+    const get = host.get
+    const collaboration = typeof get === 'function' ? get.call(host, 'collaboration') as Context['collaboration'] | undefined : undefined
+    if (collaboration !== undefined) {
+      return UserDocUploadOwnerId(`user:${String(collaboration.capture().participant.userId)}`)
+    }
+    const runtime = runtimeForCatalog(host)
+    if (runtime === undefined) return undefined
+    const actor = runtime.identity.kind === 'user' ? runtime.current()?.claims.user.id : undefined
+    if (actor === undefined) throw new DocumentAuthorizationUnavailableError()
+    return UserDocUploadOwnerId(`user:${String(actor)}`)
+  } catch {
+    throw new DocumentAuthorizationUnavailableError()
+  }
 }
 
 async function syncCatalog(
@@ -253,12 +350,13 @@ async function syncCatalog(
   documents: readonly UserDocRef[],
   replace: boolean,
   source: 'upload' | 'transfer' | 'legacy' | 'admin' = 'legacy',
-  removed: readonly string[] = [],
+  removed: readonly (string | DocumentCatalogRemoval)[] = [],
+  required = false,
 ): Promise<void> {
   const runtime = runtimeForCatalog(host)
   if (runtime === undefined) return
   try {
-    await runtime.request('/internal/runtime/documents/catalog/sync', {
+    const response = await runtime.request('/internal/runtime/documents/catalog/sync', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -272,35 +370,40 @@ async function syncCatalog(
           mediaType: document.mediaType,
           modifiedAt: document.modifiedAt,
           directoryId: String(document.docId).split('/').slice(0, -1).join('/'),
+          ...(document.identity === undefined ? {} : { identity: document.identity }),
         })),
         ...(removed.length === 0 ? {} : { removed }),
       }),
       principal: true,
     })
-  } catch {
+    if (required && !response.ok) {
+      let body: unknown
+      try { body = await responseJson(response) } catch { body = undefined }
+      const value = object(body)
+      throw new DocumentCatalogAuthorizationError(response.status,
+        typeof value?.error === 'string' ? value.error : 'DOCUMENT_CATALOG_UNAVAILABLE',
+        typeof value?.message === 'string' ? value.message : 'Document metadata could not be synchronized.')
+    }
+  } catch (error) {
+    if (required) {
+      if (error instanceof DocumentCatalogAuthorizationError) throw error
+      throw new DocumentCatalogAuthorizationError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document metadata could not be synchronized.')
+    }
     // Runtime writes remain available during a temporary catalog outage; the
     // next full listing reconciles metadata before an ownership decision.
   }
 }
 
-const catalogQueues = new WeakMap<object, Promise<void>>()
-
-function queueCatalogSync(
+async function queueCatalogSync(
   host: UserDocHttpHost,
   documents: readonly UserDocRef[],
   replace: boolean,
   source: 'upload' | 'transfer' | 'legacy' | 'admin' = 'legacy',
-  removed: readonly string[] = [],
-): void {
-  const previous = catalogQueues.get(host) ?? Promise.resolve()
-  const next = previous
-    .catch(() => {})
-    .then(() => syncCatalog(host, documents, replace, source, removed))
-    .catch(() => {})
-    .finally(() => {
-      if (catalogQueues.get(host) === next) catalogQueues.delete(host)
-    })
-  catalogQueues.set(host, next)
+  removed: readonly (string | DocumentCatalogRemoval)[] = [],
+): Promise<void> {
+  const operation = () => syncCatalog(host, documents, replace, source, removed)
+  if (host.deferCatalogSync === undefined) await operation()
+  else host.deferCatalogSync(operation)
 }
 
 /** Reconcile one mutation target before the ownership check can observe a cold catalog. */
@@ -313,23 +416,64 @@ async function reconcileCatalogTarget(host: UserDocHttpHost, docId: UserDocId): 
   }
 }
 
-async function authorizeCatalogMutation(host: UserDocHttpHost, action: 'delete' | 'move' | 'ownership' | 'restore' | 'purge', docIds: readonly string[]): Promise<void> {
-  if (isDocumentAdminRequest(host)) return
+async function reconcileCatalogTrash(host: UserDocHttpHost, docId: UserDocId, trashId?: string): Promise<void> {
+  try {
+    const matches = (await host.userDocs.listTrash()).filter(item => item.docId === docId
+      && (trashId === undefined || item.trashId === trashId))
+    if (matches.length > 0) await syncCatalog(host, [], false, 'legacy', matches.map(trashRemoval))
+  } catch {
+    // Authorization below reports the catalog or provider's stable retryable error.
+  }
+}
+
+async function authorizeCatalogMutation(
+  host: UserDocHttpHost,
+  action: 'delete' | 'move' | 'ownership' | 'restore' | 'purge',
+  targets: readonly (string | DocumentCatalogTarget)[],
+): Promise<readonly DocumentCatalogSelection[]> {
   const runtime = runtimeForCatalog(host)
-  if (runtime === undefined) return
-  if (runtime.identity.kind !== 'project') return
+  if (runtime === undefined) return []
+  if (targets.length === 0 || targets.length > 2_000) {
+    throw new UserDocError('The document selection is invalid.', DOCUMENT_TRASH_CONFLICT_CODE)
+  }
   let response: Response
   try {
     response = await runtime.request('/internal/runtime/documents/catalog/authorize', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ version: 1, action, docIds }),
+      body: JSON.stringify({ version: 1, action, documents: targets.map(target =>
+        typeof target === 'string' ? { docId: target } : target) }),
       principal: true,
     })
   } catch {
     throw new DocumentCatalogAuthorizationError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document ownership could not be verified.')
   }
-  if (response.ok) return
+  if (response.ok) {
+    let value: unknown
+    try { value = await responseJson(response) } catch { value = undefined }
+    const result = object(value)
+    if (result?.version !== 1 || result.allowed !== true || !Array.isArray(result.selections)
+      || result.selections.length !== targets.length) {
+      throw new DocumentCatalogAuthorizationError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document ownership could not be verified.')
+    }
+    const selections: DocumentCatalogSelection[] = []
+    for (const [index, item] of result.selections.entries()) {
+      const row = object(item)
+      const requested = targets[index]
+      const requestedId = typeof requested === 'string' ? requested : requested?.docId
+      if (row === undefined || typeof row.docId !== 'string' || row.docId !== requestedId || typeof row.incarnationId !== 'string'
+        || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(row.incarnationId)
+        || typeof row.revision !== 'number' || !Number.isSafeInteger(row.revision) || row.revision < 1
+        || row.state !== 'active' && row.state !== 'trash'
+        || row.state === 'trash' && (typeof row.trashId !== 'string'
+          || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(row.trashId))) {
+        throw new DocumentCatalogAuthorizationError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document catalog returned an incomplete authorization.')
+      }
+      selections.push({ docId: row.docId, incarnationId: row.incarnationId, revision: row.revision,
+        state: row.state, ...(row.state === 'trash' ? { trashId: row.trashId as string } : {}) })
+    }
+    return selections
+  }
   let body: unknown
   try { body = await responseJson(response) } catch { body = undefined }
   const value = object(body)
@@ -339,24 +483,116 @@ async function authorizeCatalogMutation(host: UserDocHttpHost, action: 'delete' 
 }
 
 /** Authorize a trash request while preserving idempotence for an existing entry. */
-async function authorizeTrashRequest(host: UserDocHttpHost, docId: UserDocId): Promise<UserDocTrashRef | undefined> {
+async function authorizeTrashRequest(
+  host: UserDocHttpHost, docId: UserDocId, target: DocumentCatalogExpected = {},
+): Promise<{ readonly alreadyTrashed?: UserDocTrashRef; readonly selection?: DocumentCatalogSelection }> {
   try {
-    await authorizeCatalogMutation(host, 'delete', [docId])
-    return undefined
+    const [selection] = await authorizeCatalogMutation(host, 'delete', [{ docId, ...target }])
+    return { ...(selection === undefined ? {} : { selection }) }
   } catch (error) {
-    if (!(error instanceof DocumentCatalogAuthorizationError)) throw error
+    if (!(error instanceof DocumentCatalogAuthorizationError)
+      || error.code !== 'DOCUMENT_OWNERSHIP_UNKNOWN' && error.code !== 'DOCUMENT_IDENTITY_STALE') throw error
     let existing: UserDocTrashRef | undefined
     try {
-      existing = (await host.userDocs.listTrash()).find(item => item.docId === docId)
+      const matches = (await host.userDocs.listTrash()).filter(item => item.docId === docId
+        && (target.trashId === undefined || item.trashId === target.trashId)
+        && (target.incarnationId === undefined || item.identity?.incarnationId === target.incarnationId)
+        && (target.revision === undefined || item.identity?.revision === target.revision))
+      existing = matches.length === 1 ? matches[0] : undefined
     } catch {
       throw error
     }
     if (existing === undefined) throw error
     // A trash-state ownership check is the safe idempotent equivalent of the
     // active-state delete check; it still rejects another user's entry.
-    await authorizeCatalogMutation(host, 'restore', [docId])
-    return existing
+    const [selection] = await authorizeCatalogMutation(host, 'restore', [{ docId,
+      ...(existing.identity === undefined
+        ? target.incarnationId === undefined ? {} : { incarnationId: target.incarnationId, revision: target.revision }
+        : { incarnationId: existing.identity.incarnationId, revision: existing.identity.revision }),
+      ...(existing.trashId === undefined ? {} : { trashId: existing.trashId }) }])
+    await assertActiveDocumentAbsent(host, docId)
+    return { alreadyTrashed: existing, ...(selection === undefined ? {} : { selection }) }
   }
+}
+
+function trashRemoval(document: UserDocTrashRef): DocumentCatalogRemoval {
+  return {
+    docId: document.docId,
+    ...(document.identity === undefined ? {} : {
+      incarnationId: document.identity.incarnationId,
+      revision: document.identity.revision,
+    }),
+    ...(document.trashId === undefined ? {} : { trashId: document.trashId }),
+    state: 'trash',
+    trashedAt: document.trashedAt,
+    purgeAfter: document.purgeAfter,
+  }
+}
+
+function activeSelection(selection: DocumentCatalogSelection): UserDocSelection
+function activeSelection(selection: DocumentCatalogSelection | undefined): UserDocSelection | undefined
+function activeSelection(selection: DocumentCatalogSelection | undefined): UserDocSelection | undefined {
+  if (selection === undefined) return undefined
+  if (selection.state !== 'active') throw new DocumentAuthorizationUnavailableError()
+  return { docId: UserDocId(selection.docId), incarnationId: UserDocIncarnationId(selection.incarnationId), revision: selection.revision }
+}
+
+function retainedSelection(selection: DocumentCatalogSelection | undefined): UserDocTrashSelection | undefined {
+  if (selection === undefined) return undefined
+  if (selection.state !== 'trash' || selection.trashId === undefined) throw new DocumentAuthorizationUnavailableError()
+  return { docId: UserDocId(selection.docId), incarnationId: UserDocIncarnationId(selection.incarnationId), revision: selection.revision,
+    trashId: UserDocTrashId(selection.trashId) }
+}
+
+function missingRemoval(selection: DocumentCatalogSelection | undefined): DocumentCatalogRemoval | undefined {
+  if (selection === undefined || selection.state !== 'active') return undefined
+  return { docId: selection.docId, incarnationId: selection.incarnationId, revision: selection.revision + 1, state: 'missing' }
+}
+
+function purgeRemoval(selection: DocumentCatalogSelection | undefined): DocumentCatalogRemoval | undefined {
+  if (selection === undefined || selection.state !== 'trash' || selection.trashId === undefined) return undefined
+  return { docId: selection.docId, incarnationId: selection.incarnationId, revision: selection.revision + 1,
+    trashId: selection.trashId, state: 'purged' }
+}
+
+function optionalTrashId(url: URL): string | undefined {
+  const value = url.searchParams.get('trashId')
+  if (value === null) return undefined
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value)) {
+    throw new UserDocError('Document trash identity is invalid.', DOCUMENT_TRASH_CONFLICT_CODE)
+  }
+  return value
+}
+
+function optionalDocumentIdentity(url: URL): Pick<DocumentCatalogExpected, 'incarnationId' | 'revision'> {
+  const incarnationId = url.searchParams.get('incarnationId') ?? undefined
+  const rawRevision = url.searchParams.get('revision') ?? undefined
+  if (incarnationId === undefined && rawRevision === undefined) return {}
+  const revision = rawRevision === undefined ? NaN : Number(rawRevision)
+  if (incarnationId === undefined || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(incarnationId)
+    || !Number.isSafeInteger(revision) || revision < 1) {
+    throw new UserDocError('Document identity selection is invalid.', DOCUMENT_TRASH_CONFLICT_CODE)
+  }
+  return { incarnationId, revision }
+}
+
+async function documentsUnderDirectory(
+  host: UserDocHttpHost, directoryId: ReturnType<typeof UserDocDirectoryId>,
+): Promise<readonly UserDocRef[]> {
+  const prefix = `${String(directoryId)}/`
+  const documents = (await host.userDocs.list()).filter(document => String(document.docId).startsWith(prefix))
+  if (documents.length > 2_000) {
+    throw new UserDocError('The folder contains too many documents to authorize safely.', DOCUMENT_TRASH_CONFLICT_CODE)
+  }
+  return documents
+}
+
+async function assertActiveDocumentAbsent(host: UserDocHttpHost, docId: UserDocId): Promise<void> {
+  try { await host.userDocs.stat(docId) } catch (error) {
+    if (error instanceof UserDocError && error.code === DOCUMENT_NOT_FOUND_CODE) return
+    throw error
+  }
+  throw new UserDocError('An older item remains in trash at this path. The active item was not deleted.', DOCUMENT_TRASH_CONFLICT_CODE)
 }
 
 interface ErrorBody { error: { code: string; message: string } }
@@ -380,26 +616,7 @@ function json(res: UserDocResponse, status: number, value: unknown): void {
 }
 
 function errorStatus(code: UserDocErrorCode): number {
-  if (code === DOCUMENT_NOT_FOUND_CODE) return 404
-  if (code === DOCUMENT_DIRECTORY_NOT_FOUND_CODE) return 404
-  if (code === DOCUMENT_UPLOAD_NOT_FOUND_CODE) return 404
-  if (code === DOCUMENT_UPLOAD_EXPIRED_CODE) return 410
-  if (code === DOCUMENT_TOO_LARGE_CODE) return 413
-  if (code === DOCUMENT_UPLOAD_RANGE_CODE) return 416
-  if (code === DOCUMENT_UPLOAD_HASH_CODE || code === DOCUMENT_UPLOAD_SIZE_CODE) return 422
-  if (code === DOCUMENT_UPLOAD_BUSY_CODE) return 429
-  if (code === DOCUMENT_UPLOAD_STORAGE_CODE) return 507
-  if (code === DOCUMENT_UPLOAD_PROTOCOL_CODE) return 426
-  if (code === DOCUMENT_UPLOAD_STATE_CODE) return 409
-  if (code === DOCUMENT_TRASH_NOT_FOUND_CODE) return 404
-  if (code === DOCUMENT_TRASHED_CODE || code === DOCUMENT_RESTORE_CONFLICT_CODE) return 409
-  if (code === DOCUMENT_TARGET_CONFLICT_CODE || code === DOCUMENT_NAME_EXHAUSTED_CODE
-    || code === DOCUMENT_DIRECTORY_CONFLICT_CODE || code === DOCUMENT_DIRECTORY_NOT_EMPTY_CODE) return 409
-  if (code === INVALID_DOCUMENT_NAME_CODE || code === INVALID_DOCUMENT_REF_CODE
-    || code === INVALID_DOCUMENT_DIRECTORY_CODE || code === DOCUMENT_LIST_QUERY_CODE) return 400
-  if (code === DOCUMENT_DIRECTORY_WRITE_FAILED_CODE || code === DOCUMENT_MOVE_FAILED_CODE
-    || code === DOCUMENT_MIGRATION_FAILED_CODE) return 500
-  return 500
+  return userDocErrorStatus(code)
 }
 
 function failure(res: UserDocResponse, error: unknown): void {
@@ -601,6 +818,13 @@ function safeTransferDocId(value: unknown): value is string {
     && value.split('/').every(segment => segment !== '' && segment !== '.' && segment !== '..' && !segment.includes('\\'))
 }
 
+function safeIdentityMetadata(item: Record<string, unknown>, message: string): { readonly identity?: UserDocIdentity } {
+  if (item.identity === undefined) return {}
+  const identity = decodeUserDocIdentity(item.identity)
+  if (identity === undefined) throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', message)
+  return { identity }
+}
+
 function safeTransferResponse(value: unknown): Record<string, unknown> {
   const candidate = object(value)
   if (candidate?.version !== 1 || typeof candidate.transferId !== 'string' || candidate.transferId === ''
@@ -638,6 +862,7 @@ function safeTransferResponse(value: unknown): Record<string, unknown> {
           bytes: targetInfo.bytes,
           mediaType: targetInfo.mediaType,
           modifiedAt: targetInfo.modifiedAt,
+          ...safeIdentityMetadata(targetInfo, 'Cross-scope document transfer returned invalid file metadata.'),
         },
       }
     }
@@ -708,7 +933,8 @@ function safeTransferDocumentMeta(entry: unknown, message: string): Record<strin
     || typeof item.modifiedAt !== 'number' || !Number.isFinite(item.modifiedAt)) {
     throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', message)
   }
-  return { docId: item.docId, name: item.name, bytes: item.bytes, mediaType: item.mediaType, modifiedAt: item.modifiedAt }
+  return { docId: item.docId, name: item.name, bytes: item.bytes, mediaType: item.mediaType, modifiedAt: item.modifiedAt,
+    ...safeIdentityMetadata(item, message) }
 }
 
 function safeTransferList(value: unknown): Record<string, unknown> {
@@ -1617,6 +1843,7 @@ function abortFor(req: UserDocRequest, res: UserDocResponse): RequestAbort {
   req.once('aborted', abort)
   res.once('close', onResponseClose)
   res.once('finish', onResponseFinish)
+  if (res.destroyed) abort()
   return { signal: controller.signal, dispose }
 }
 
@@ -1658,13 +1885,13 @@ function publicDirectoryRef(ref: UserDocDirectoryRef): UserDocDirectoryRef {
 async function beginUpload(host: UserDocHttpHost, req: UserDocRequest, res: UserDocResponse): Promise<void> {
   authorizeDocumentAction(host, 'write')
   const input = parseUploadBegin(await readJsonBody(req))
-  uploadStatus(res, await host.userDocs.beginUpload(input))
+  uploadStatus(res, await host.userDocs.beginUpload(input, uploadOwnerId(host)))
 }
 
 async function inspectUpload(host: UserDocHttpHost, res: UserDocResponse, rawId: string): Promise<void> {
   authorizeDocumentAction(host, 'write')
-  const session = await host.userDocs.inspectUpload(uploadIdFrom(rawId))
-  if (session.state === 'complete' && session.ref !== undefined) await syncCatalog(host, [session.ref], false, 'upload')
+  const session = await host.userDocs.inspectUpload(uploadIdFrom(rawId), undefined, uploadOwnerId(host))
+  if (session.state === 'complete' && session.ref !== undefined) await syncCatalog(host, [session.ref], false, 'upload', [], true)
   uploadStatus(res, session)
 }
 
@@ -1678,7 +1905,8 @@ async function writeUploadChunk(
   authorizeDocumentAction(host, 'write')
   const uploadId = uploadIdFrom(rawId)
   const index = parseUploadIndex(rawIndex)
-  const session = await host.userDocs.inspectUpload(uploadId)
+  const ownerId = uploadOwnerId(host)
+  const session = await host.userDocs.inspectUpload(uploadId, undefined, ownerId)
   if (session.state !== 'uploading') {
     req.resume()
     uploadStatus(res, session)
@@ -1707,7 +1935,7 @@ async function writeUploadChunk(
       total: range.total,
       sha256: sha256.toLowerCase(),
       body: Readable.toWeb(Readable.from(req)) as ReadableStream<Uint8Array>,
-    } satisfies UserDocUploadChunk, abort.signal)
+    } satisfies UserDocUploadChunk, abort.signal, ownerId)
     if (!abort.signal.aborted) uploadStatus(res, updated)
   } catch (error) {
     req.resume()
@@ -1723,14 +1951,14 @@ async function completeUpload(host: UserDocHttpHost, req: UserDocRequest, res: U
   if (value.version !== 1 || typeof value.sha256 !== 'string') {
     throw new UserDocError('Final upload metadata is invalid.', DOCUMENT_UPLOAD_HASH_CODE)
   }
-  const session = await host.userDocs.completeUpload(uploadIdFrom(rawId), value.sha256.toLowerCase())
-  if (session.state === 'complete' && session.ref !== undefined) await syncCatalog(host, [session.ref], false, 'upload')
+  const session = await host.userDocs.completeUpload(uploadIdFrom(rawId), value.sha256.toLowerCase(), undefined, uploadOwnerId(host))
+  if (session.state === 'complete' && session.ref !== undefined) await syncCatalog(host, [session.ref], false, 'upload', [], true)
   uploadStatus(res, session)
 }
 
 async function cancelUpload(host: UserDocHttpHost, res: UserDocResponse, rawId: string): Promise<void> {
   authorizeDocumentAction(host, 'write')
-  await host.userDocs.cancelUpload(uploadIdFrom(rawId))
+  await host.userDocs.cancelUpload(uploadIdFrom(rawId), undefined, uploadOwnerId(host))
   res.writeHead(204, { 'cache-control': 'no-store' })
   res.end()
 }
@@ -1766,21 +1994,21 @@ async function createFolder(host: UserDocHttpHost, res: UserDocResponse, url: UR
 
 async function renameFolder(host: UserDocHttpHost, res: UserDocResponse, url: URL): Promise<void> {
   authorizeDocumentAction(host, 'write')
-  const renamed = await host.userDocs.renameDirectory(
-    requiredDirectoryQuery(url, 'id'),
-    folderNameQuery(url),
-  )
-  await syncCatalog(host, await host.userDocs.list(), true, 'legacy')
+  const directoryId = requiredDirectoryQuery(url, 'id')
+  const descendants = await documentsUnderDirectory(host, directoryId)
+  const selections = descendants.length === 0 ? [] : await authorizeCatalogMutation(host, 'move', descendants.map(document => document.docId))
+  const expected = runtimeForCatalog(host) === undefined ? undefined : selections.map(selection => activeSelection(selection))
+  const renamed = expected === undefined ? await host.userDocs.renameDirectory(directoryId, folderNameQuery(url))
+    : await host.userDocs.renameDirectory(directoryId, folderNameQuery(url), expected)
+  await syncCatalog(host, await host.userDocs.list(), true, 'legacy', [], true)
   json(res, 200, publicDirectoryRef(renamed))
 }
 
 async function deleteFolder(host: UserDocHttpHost, res: UserDocResponse, url: URL): Promise<void> {
   authorizeDocumentAction(host, 'write')
   const directoryId = requiredDirectoryQuery(url, 'id')
-  const listing = await host.userDocs.listDirectory(directoryId)
-  if (listing.documents.length > 0) {
-    await authorizeCatalogMutation(host, 'delete', listing.documents.map(document => document.docId))
-  }
+  const descendants = await documentsUnderDirectory(host, directoryId)
+  if (descendants.length > 0) await authorizeCatalogMutation(host, 'delete', descendants.map(document => document.docId))
   await host.userDocs.removeDirectory(directoryId)
   res.writeHead(204, { 'cache-control': 'no-store' })
   res.end()
@@ -1790,9 +2018,11 @@ async function moveDocument(host: UserDocHttpHost, res: UserDocResponse, url: UR
   authorizeDocumentAction(host, 'write')
   const docId = UserDocId(requiredQuery(url, 'id'))
   await reconcileCatalogTarget(host, docId)
-  await authorizeCatalogMutation(host, 'move', [docId])
-  const moved = await host.userDocs.move(docId, directoryQuery(url))
-  await syncCatalog(host, [moved], false, 'legacy')
+  const [selection] = await authorizeCatalogMutation(host, 'move', [docId])
+  const expected = activeSelection(selection)
+  const moved = expected === undefined ? await host.userDocs.move(docId, directoryQuery(url))
+    : await host.userDocs.move(docId, directoryQuery(url), expected)
+  await syncCatalog(host, [moved], false, 'legacy', [], true)
   json(res, 200, publicRef(moved))
 }
 
@@ -1819,8 +2049,12 @@ async function download(host: UserDocHttpHost, req: UserDocRequest, res: UserDoc
     const headers = {
       'content-type': opened.ref.mediaType,
       'content-length': String(opened.ref.bytes),
+      'last-modified': new Date(opened.ref.modifiedAt).toUTCString(),
       'content-disposition': inline ? 'inline' : `attachment; filename*=UTF-8''${encodeURIComponent(opened.ref.name)}`,
       'x-content-type-options': 'nosniff',
+      ...(opened.ref.identity === undefined ? {} : {
+        [USERDOC_IDENTITY_HEADER]: Buffer.from(JSON.stringify(opened.ref.identity)).toString('base64url'),
+      }),
       ...(inline ? {
         'content-security-policy': `default-src 'none'; img-src 'self' data:; frame-ancestors ${frameAncestors}; sandbox`,
       } : {}),
@@ -1889,59 +2123,71 @@ async function listTrashDocuments(host: UserDocHttpHost, req: UserDocRequest, re
 async function trashDocument(host: UserDocHttpHost, res: UserDocResponse, url: URL): Promise<void> {
   authorizeDocumentAction(host, 'write', true)
   const docId = UserDocId(requiredQuery(url, 'id'))
+  const identity = optionalDocumentIdentity(url)
+  const trashId = optionalTrashId(url)
+  const target = { ...identity, ...(trashId === undefined ? {} : { trashId }) }
   await reconcileCatalogTarget(host, docId)
-  const alreadyTrashed = await authorizeTrashRequest(host, docId)
-  if (alreadyTrashed !== undefined) {
-    json(res, 200, { version: 1, document: alreadyTrashed })
+  await reconcileCatalogTrash(host, docId, trashId)
+  const authorization = await authorizeTrashRequest(host, docId, target)
+  if (authorization.alreadyTrashed !== undefined) {
+    json(res, 200, { version: 1, document: authorization.alreadyTrashed })
     return
   }
   let trashed: UserDocTrashRef
   try {
-    trashed = await host.userDocs.trash(docId)
+    const expected = activeSelection(authorization.selection)
+    trashed = expected === undefined ? await host.userDocs.trash(docId) : await host.userDocs.trash(docId, undefined, expected)
   } catch (error) {
     if (!(error instanceof UserDocError) || error.code !== DOCUMENT_TRASHED_CODE) throw error
-    const existing = (await host.userDocs.listTrash()).find(item => item.docId === docId)
+    const matches = (await host.userDocs.listTrash()).filter(item => item.docId === docId)
+    const existing = matches.length === 1 ? matches[0] : undefined
     if (existing === undefined) throw error
+    await assertActiveDocumentAbsent(host, docId)
     trashed = existing
   }
-  queueCatalogSync(host, [], false, 'legacy', [docId])
+  await syncCatalog(host, [], false, 'legacy', [trashRemoval(trashed)], true)
   json(res, 200, { version: 1, document: trashed })
 }
 
 async function restoreDocument(host: UserDocHttpHost, res: UserDocResponse, url: URL): Promise<void> {
   authorizeDocumentAction(host, 'write', true)
   const docId = UserDocId(requiredQuery(url, 'id'))
-  await authorizeCatalogMutation(host, 'restore', [docId])
+  const identity = optionalDocumentIdentity(url)
+  const trashId = optionalTrashId(url)
+  await reconcileCatalogTrash(host, docId, trashId)
+  const [selection] = await authorizeCatalogMutation(host, 'restore', [{ docId, ...identity, ...(trashId === undefined ? {} : { trashId }) }])
   const directory = url.searchParams.get('directory') ?? undefined
   const name = url.searchParams.get('name') ?? undefined
-  const restored = await host.userDocs.restore(
+  const expected = retainedSelection(selection)
+  const restored = expected === undefined ? await host.userDocs.restore(
     docId,
     directory === undefined ? undefined : UserDocDirectoryId(directory),
     name,
-  )
-  queueCatalogSync(host, [restored], false, 'legacy')
+  ) : await host.userDocs.restore(docId, directory === undefined ? undefined : UserDocDirectoryId(directory), name, undefined, expected)
+  await syncCatalog(host, [restored], false, 'legacy', [], true)
   json(res, 200, { version: 1, document: publicRef(restored) })
 }
 
 async function purgeDocument(host: UserDocHttpHost, res: UserDocResponse, url: URL): Promise<void> {
   authorizeDocumentAction(host, 'write', true)
   const docId = UserDocId(requiredQuery(url, 'id'))
-  await authorizeCatalogMutation(host, 'purge', [docId])
-  await host.userDocs.purge(docId)
+  const identity = optionalDocumentIdentity(url)
+  const trashId = optionalTrashId(url)
+  await reconcileCatalogTrash(host, docId, trashId)
+  const [selection] = await authorizeCatalogMutation(host, 'purge', [{ docId, ...identity, ...(trashId === undefined ? {} : { trashId }) }])
+  const removal = purgeRemoval(selection)
+  if (runtimeForCatalog(host) !== undefined && removal === undefined) {
+    throw new DocumentAuthorizationUnavailableError()
+  }
+  const expected = retainedSelection(selection)
+  if (expected === undefined) await host.userDocs.purge(docId)
+  else await host.userDocs.purge(docId, undefined, expected)
   const runtime = runtimeForCatalog(host)
   if (runtime?.request !== undefined) {
-    try {
-      await runtime.request('/internal/runtime/documents/catalog/purge', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ version: 1, docIds: [docId] }),
-        principal: true,
-      })
-    } catch {
-      // A later full reconciliation keeps the catalog from blocking the file purge.
-    }
+    // oxlint-disable-next-line typescript/no-non-null-assertion -- runtime catalog admission above requires the selected purge removal.
+    await syncCatalog(host, [], false, 'legacy', [removal!], true)
   } else {
-    queueCatalogSync(host, [], false, 'legacy', [docId])
+    await queueCatalogSync(host, [], false, 'legacy', [docId])
   }
   res.writeHead(204, { 'cache-control': 'no-store' })
   res.end()
@@ -2038,7 +2284,7 @@ export async function handleUserDocHttp(host: UserDocHttpHost, req: UserDocReque
             })
             // Catalog reconciliation is metadata maintenance and must not delay
             // the document page that the user is waiting to see.
-            queueCatalogSync(host, providerListing.documents, false)
+            await queueCatalogSync(host, providerListing.documents, false)
           }
         } else {
           const documents = listOptions === undefined ? await host.userDocs.list(abort.signal) : undefined
@@ -2063,7 +2309,7 @@ export async function handleUserDocHttp(host: UserDocHttpHost, req: UserDocReque
             json(res, 200, { limits: host.userDocs.limits, ...response, documents: response.documents.map(publicRef) })
             // A full reconciliation runs after the response; mutation
             // authorization remains synchronous on its dedicated path.
-            queueCatalogSync(host, documents ?? response.documents, listOptions === undefined)
+            await queueCatalogSync(host, documents ?? response.documents, listOptions === undefined)
           }
         }
       } finally {
@@ -2136,31 +2382,47 @@ export async function handleUserDocHttp(host: UserDocHttpHost, req: UserDocReque
     if (url.pathname === USERDOC_HTTP_PATH && req.method === 'DELETE') {
       authorizeDocumentAction(host, 'write')
       const docId = UserDocId(requiredQuery(url, 'id'))
+      const identity = optionalDocumentIdentity(url)
+      const trashId = optionalTrashId(url)
       await reconcileCatalogTarget(host, docId)
-      const alreadyTrashed = await authorizeTrashRequest(host, docId)
-      if (alreadyTrashed !== undefined) {
+      await reconcileCatalogTrash(host, docId, trashId)
+      const authorization = await authorizeTrashRequest(host, docId, {
+        ...identity, ...(trashId === undefined ? {} : { trashId }),
+      })
+      if (authorization.alreadyTrashed !== undefined) {
         res.writeHead(204, { 'cache-control': 'no-store' })
         res.end()
         return
       }
+      let removal: DocumentCatalogRemoval | undefined
       try {
-        await host.userDocs.trash(docId)
+        const expected = activeSelection(authorization.selection)
+        removal = trashRemoval(expected === undefined ? await host.userDocs.trash(docId)
+          : await host.userDocs.trash(docId, undefined, expected))
       } catch (error) {
         if (!(error instanceof UserDocError)
           || (error.code !== DOCUMENT_NOT_FOUND_CODE && error.code !== DOCUMENT_TRASHED_CODE
             && error.code !== DOCUMENT_UPLOAD_PROTOCOL_CODE)) throw error
-        if (error.code === DOCUMENT_UPLOAD_PROTOCOL_CODE) await host.userDocs.remove(docId)
+        if (error.code === DOCUMENT_TRASHED_CODE) {
+          await assertActiveDocumentAbsent(host, docId)
+          const matches = (await host.userDocs.listTrash()).filter(item => item.docId === docId)
+          const existing = matches.length === 1 ? matches[0] : undefined
+          if (existing === undefined) throw error
+          await authorizeCatalogMutation(host, 'restore', [{ docId,
+            ...(existing.identity === undefined ? {} : {
+              incarnationId: existing.identity.incarnationId, revision: existing.identity.revision,
+            }),
+            ...(existing.trashId === undefined ? {} : { trashId: existing.trashId }) }])
+          removal = trashRemoval(existing)
+        }
+        if (error.code === DOCUMENT_UPLOAD_PROTOCOL_CODE) {
+          const expected = activeSelection(authorization.selection)
+          if (expected === undefined) await host.userDocs.remove(docId)
+          else await host.userDocs.remove(docId, undefined, expected)
+          removal = missingRemoval(authorization.selection)
+        }
       }
-      const runtime = runtimeForCatalog(host)
-      if (runtime !== undefined) {
-        try {
-          const response = await runtime.request('/internal/runtime/documents/catalog/sync', {
-            method: 'POST', headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ version: 1, source: 'legacy', documents: [], removed: [docId] }), principal: true,
-          })
-          void response
-        } catch { /* the next full listing reconciles a deletion after an outage */ }
-      }
+      if (removal !== undefined) await syncCatalog(host, [], false, 'legacy', [removal], true)
       res.writeHead(204, { 'cache-control': 'no-store' })
       res.end()
       return
@@ -2190,7 +2452,6 @@ export async function handleUserDocHttp(host: UserDocHttpHost, req: UserDocReque
 
 /** Register the streaming document subtree in the current Connection transport. */
 export function apply(ctx: Context): void {
-  // One host object per composition so catalog sync queues serialize on it.
   const host = userDocHttpHost(ctx)
   const warm = host.userDocs.warm
   if (typeof warm === 'function') {
@@ -2202,9 +2463,13 @@ export function apply(ctx: Context): void {
       return () => {}
     }, 'host-userdoc-http: prewarm document store')
   }
-  ctx.connection.http.handlePrefix(
-    USERDOC_HTTP_PATH,
-    (req, res) => handleUserDocHttp(host, req, res),
-    { authority: 'trusted-host' },
-  )
+  ctx.effect(function* () {
+    const scope = new UserDocHttpScope(host)
+    yield ctx.effect(() => () => scope.dispose(), 'host-userdoc-http: drain requests and catalog')
+    yield ctx.connection.http.handlePrefix(
+      USERDOC_HTTP_PATH,
+      (req, res) => scope.handle(req, res),
+      { authority: 'trusted-host' },
+    )
+  })
 }

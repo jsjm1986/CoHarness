@@ -1,6 +1,7 @@
 /** Shared browser resumable uploader for the user-document HTTP protocol. */
 
 import { sha256 } from '@noble/hashes/sha2.js'
+import { decodeUserDocIdentity } from '@deepseek-ai/dsh-userdoc/identity'
 import type {
   UserDocDirectoryIdType,
   UserDocRef,
@@ -358,7 +359,7 @@ function checkedSession(
   responseError: (status: number, body: unknown) => Error,
   expectedDirectoryId?: UserDocDirectoryIdType,
 ): UserDocUploadSession {
-  const invalid = (): never => {
+  const invalid: () => never = () => {
     throw responseError(502, {
       error: { code: 'DOCUMENT_UPLOAD_RESPONSE_INVALID', message: 'The document upload service returned invalid session metadata.' },
     })
@@ -378,7 +379,22 @@ function checkedSession(
     || !Number.isSafeInteger(candidate.expiresAt) || (candidate.expiresAt as number) <= 0
     || (candidate.state !== 'uploading' && candidate.state !== 'verifying' && candidate.state !== 'complete' && candidate.state !== 'failed')
     || (candidate.state === 'complete' && candidate.ref === undefined)) invalid()
-  return value as UserDocUploadSession
+  let reference: UserDocRef | undefined
+  if (candidate.ref !== undefined) {
+    if (candidate.ref === null || typeof candidate.ref !== 'object' || Array.isArray(candidate.ref)) invalid()
+    const ref = candidate.ref as Record<string, unknown>
+    if (typeof ref.docId !== 'string' || ref.docId === '' || typeof ref.path !== 'string'
+      || typeof ref.name !== 'string' || ref.name === ''
+      || typeof ref.bytes !== 'number' || !Number.isSafeInteger(ref.bytes) || ref.bytes < 0 || ref.bytes !== file.size
+      || typeof ref.mediaType !== 'string' || ref.mediaType === ''
+      || typeof ref.modifiedAt !== 'number' || !Number.isFinite(ref.modifiedAt)) invalid()
+    const identity = ref.identity === undefined ? undefined : decodeUserDocIdentity(ref.identity)
+    if (ref.identity !== undefined && identity === undefined) invalid()
+    reference = { docId: ref.docId as UserDocRef['docId'], path: ref.path, name: ref.name, bytes: ref.bytes,
+      mediaType: ref.mediaType, modifiedAt: ref.modifiedAt, ...(identity === undefined ? {} : { identity }) }
+  }
+  if (candidate.state === 'complete' && candidate.receivedBytes !== file.size) invalid()
+  return { ...value as UserDocUploadSession, ...(reference === undefined ? {} : { ref: reference }) }
 }
 
 function retryable(error: unknown): boolean {
@@ -525,7 +541,7 @@ export async function resumableUpload(
   let firstVerificationRead = true
   while (current.state === 'verifying') {
     const remaining = verifyDeadline - Date.now()
-    if (remaining <= 0) {
+    if (!firstVerificationRead && remaining <= 0) {
       await deleteResumeRecord(key)
       throw Object.assign(new Error('Document upload verification timed out.'), {
         status: 504,

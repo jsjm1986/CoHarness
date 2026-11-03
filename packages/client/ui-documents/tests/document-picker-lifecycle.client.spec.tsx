@@ -65,6 +65,10 @@ async function bench() {
   })
   ctx.provide('conversation', { attachDocument })
   ctx.provide('connection', { privateResourceUrl: (url: string) => url } as never)
+  ctx.provide('deploymentContext', {
+    getSnapshot: () => ({ phase: 'ready', showComputer: false, aggregateComputers: false }),
+    subscribe: () => () => {},
+  } as never)
   ctx.slots.register({
     name: 'root',
     children: {
@@ -78,14 +82,18 @@ async function bench() {
   function entries(slot: 'sidebar.footer.action' | 'shell.overlay') {
     return ctx.slots.entries(slot).map((entry) => {
       const Component = entry.component as ComponentType<Record<string, unknown>>
+      const injected = entry.inject?.() as Record<string, unknown> | undefined
+      const { hooks: _hooks, ...rest } = injected ?? {}
       return <Component
         key={`${slot}:${entry.options.id}`}
-        {...entry.inject?.()}
+        {...rest}
         t={t}
         wide={false}
         useSessions={(select: (snapshot: { current: SessionId | undefined }) => unknown) => select({ current })}
         useWorkspaces={() => undefined}
         usePanelInfo={() => undefined}
+        useDeployment={(select: (snapshot: { phase: string; showComputer: boolean; aggregateComputers: boolean }) => unknown) =>
+          select({ phase: 'ready', showComputer: false, aggregateComputers: false })}
       />
     })
   }

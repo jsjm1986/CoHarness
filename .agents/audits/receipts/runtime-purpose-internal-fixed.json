@@ -1,0 +1,14 @@
+{
+  "name": "runtime-purpose-internal-fixed",
+  "cwd": "gateway",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 ../node_modules/.bin/vitest run tests/runtime-api.spec.ts tests/document-catalog.spec.ts tests/runtime-resource-api.spec.ts",
+  "startedAt": "2026-10-26T14:41:20.731621+00:00",
+  "seconds": 4.639,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "dd03c4e24d873510f9c2d05c728e206e623bc14162586e13dac91af9a9a6ad04",
+  "inputsAfter": "dd03c4e24d873510f9c2d05c728e206e623bc14162586e13dac91af9a9a6ad04",
+  "postgresToolDirectory": null,
+  "outputSha256": "5a6f7344a8018176bfd9e763d2568a9909af75f72d54383bda7946dac72cb29d",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed | 1 skipped (3)\n      Tests  83 passed | 13 skipped (96)\n   Start at  22:41:23\n   Duration  1.80s (transform 2.61s, setup 0ms, import 3.35s, tests 81ms, environment 0ms)\n\n"
+}

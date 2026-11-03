@@ -118,7 +118,7 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
     const abort = new AbortController()
     lifetimeRef.current = abort
     const read = ++stateRead.current
-    void pluginManagementState(kind, id, abort.signal).then((next) => {
+    void pluginManagementState(kind, id, abort.signal, target.target.runtimeId).then((next) => {
       if (!abort.signal.aborted && read === stateRead.current) setView(next)
     }).catch((cause: unknown) => {
       // Deployments without the PostgreSQL store still manage live instances; degrade instead of failing the page.
@@ -251,7 +251,7 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
     if (view === null || lifetime === null || lifetime.signal.aborted) return
     setBusy(true)
     try {
-      const next = await pluginManagementSaveState({ target: { kind, id }, revision: view.revision, state })
+      const next = await pluginManagementSaveState({ target: { kind, id, runtimeId: target.target.runtimeId }, revision: view.revision, state })
       if (lifetime !== lifetimeRef.current || lifetime.signal.aborted) return
       stateRead.current++
       setView(next); setDraft(null); setError('')

@@ -2,7 +2,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  Button, IconClockOutline16, IconCloseOutline16, IconPlusOutline16, IconSearchOutline16, Input,
+  Button, IconClockOutline16, IconCloseOutline16, IconPlusOutline16, IconSearchOutline16,
+  IconChevronDownOutline14, Input, Menu, ComputerBadge,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -13,17 +14,28 @@ import { TaskDetail, useTaskDetail, type TaskDetailInjected } from './TaskDetail
 import { useRelativeClock } from './relative-clock.ts'
 import { formatScheduleFrequency, nextRunParts, taskName, zoneLabel } from './schedule-format.ts'
 import type { FrequencyZone } from './schedule-format.ts'
+import type { TaskEnvironment,TaskEnvironments } from './task-environments.ts'
 import css from './TaskManagerPage.module.css'
 
 /** Injected catalog and task actions for the management page. */
-export interface TaskManagerInjected extends TaskDetailInjected {
+export interface TaskPageActions extends TaskDetailInjected {
+  /** Create a conversation in this action set's captured Runtime. */
+  readonly onNewTask: (signal?: AbortSignal) => void | Promise<void>
+}
+
+/** Catalogs and explicit Runtime choices, without changing conversation selection. */
+export interface TaskManagerInjected extends TaskPageActions {
   /** Host task catalog with its query and deletion state. */
-  readonly hooks: { readonly catalog: HostObservable<CatalogSnapshot<ScheduleCatalogEntry>> }
-  /**
-   * Start a new Session, where a reminder is created by asking the model to
-   * schedule it. The page deliberately has no creation form of its own.
-   */
-  readonly onNewTask: () => void
+  readonly hooks: {
+    readonly catalog: HostObservable<CatalogSnapshot<ScheduleCatalogEntry>>
+    readonly taskEnvironments: HostObservable<TaskEnvironments>
+  }
+  /** Stable Runtime source resolvers bound by the renderer. */
+  readonly keyedHooks: { readonly taskCatalog:(key:string)=>HostObservable<CatalogSnapshot<ScheduleCatalogEntry>> }
+  /** Read, mutation and creation actions captured for the selected Runtime. */
+  readonly taskActionsForRuntime:(key:string)=>TaskPageActions
+  /** Refresh authorized directory metadata without starting a Runtime. */
+  readonly refreshTaskEnvironments:()=>Promise<void>
 }
 
 /** Root-scoped task catalog props derived from the framework and injected actions. */
@@ -33,14 +45,36 @@ export type TaskManagerPageProps = PropsRuntime<'main'>
 
 type StatusFilter = 'all' | ScheduleCatalogEntry['status']
 
+const UNAVAILABLE_CATALOG:CatalogSnapshot<ScheduleCatalogEntry>={ records:[],status:'error',deleting:[],settled:false,readRequest:0,readSettled:0 }
+
 /**
  * Render retained tasks with authoritative deletion and timing-only edits.
  * @param props - framework catalog snapshot, localized copy, and action callbacks.
  * @returns the searchable task list beside the selected task's detail.
  */
 export function TaskManagerPage(props: TaskManagerPageProps) {
-  const { useCatalog, onNewTask, onRetry, t } = props
-  const catalog = useCatalog(snapshot => snapshot)
+  const { useTaskCatalog, useTaskEnvironments, taskActionsForRuntime, refreshTaskEnvironments, t } = props
+  const environments=useTaskEnvironments(snapshot=>snapshot)
+  const [environmentKey,setEnvironmentKey]=useState<TaskEnvironment['key']>('base')
+  const [chosenEnvironment,setChosenEnvironment]=useState<TaskEnvironment>()
+  const [environmentMenu,setEnvironmentMenu]=useState(false)
+  const [environmentSearch,setEnvironmentSearch]=useState('')
+  const [creating,setCreating]=useState(false)
+  const [creationFailed,setCreationFailed]=useState(false)
+  const viewLifetime=useRef<AbortController|null>(null)
+  if(viewLifetime.current===null)viewLifetime.current=new AbortController()
+  useEffect(()=>{
+    if(viewLifetime.current?.signal.aborted)viewLifetime.current=new AbortController()
+    const active=viewLifetime.current
+    return()=>{active?.abort()}
+  },[])
+  const selectedActions=taskActionsForRuntime(environmentKey)
+  const { onNewTask,onRetry }=selectedActions
+  const activeEnvironment=environments.choices.find(item=>item.key===environmentKey)
+  const shownEnvironment=activeEnvironment??chosenEnvironment
+  const unavailable=activeEnvironment===undefined||!activeEnvironment.available
+  const answer=useTaskCatalog(environmentKey,snapshot=>snapshot)??UNAVAILABLE_CATALOG
+  const catalog=unavailable?{ ...answer,status:'error' as const }:answer
   const { records, status } = catalog
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
@@ -49,7 +83,7 @@ export function TaskManagerPage(props: TaskManagerPageProps) {
   // rather than a value sampled at mount: a catalog refresh can move the target
   // this text describes.
   const now = useRelativeClock()
-  const detail = useTaskDetail(props, catalog, selectedId ?? undefined)
+  const detail = useTaskDetail({ ...props,...selectedActions }, catalog, selectedId ?? undefined)
   const { record: catalogRecord, task: selected, id: detailId, confirmId, setConfirmId, setTab } = detail
   const rowRef = useRef<HTMLButtonElement | null>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
@@ -95,6 +129,34 @@ export function TaskManagerPage(props: TaskManagerPageProps) {
   const closeDetails = (): void => {
     setSelectedId(null)
   }
+  const createTask=():void=>{
+    if(creating||unavailable||answer.unsupported===true)return
+    const lifetime = viewLifetime.current
+    if (lifetime === null || lifetime.signal.aborted) return
+    setCreating(true);setCreationFailed(false)
+    const signal = lifetime.signal
+    try{
+      const pending=onNewTask(signal)
+      if(pending===undefined){setCreating(false);return}
+      void pending.catch(()=>{if(!signal.aborted)setCreationFailed(true)})
+        .finally(()=>{if(!signal.aborted)setCreating(false)})
+    }catch(_error:unknown){setCreationFailed(true);setCreating(false)}
+  }
+  const switchDisabled=selectedId!==null||creating||catalog.deleting.length>0
+  const choices = environments.choices.filter((item) => {
+    const name = environments.showComputer ? item.name ?? '' : ''
+    const project = item.target?.kind === 'project' ? item.target.projectName ?? '' : ''
+    return `${name} ${project} ${item.target?.runtimeId ?? ''}`.toLowerCase().includes(environmentSearch.trim().toLowerCase())
+  })
+  const environmentLabel=(item:TaskEnvironment):string=>{
+    const owner=item.target?.kind==='project'?item.target.projectName??t('environment.project'):t('environment.personal')
+    if(!environments.showComputer)return item.target?.runtimeId===undefined?owner:`${owner} · ${item.target.runtimeId.slice(0,8)}`
+    const name=item.name??t('environment.current')
+    const duplicates = environments.choices.filter(choice => choice.target?.nodeId !== undefined
+      && choice.target.nodeId === item.target?.nodeId).length
+    if(item.target?.kind==='project')return `${owner} · ${name}`
+    return duplicates>1&&item.target?.runtimeId!==undefined?`${name} · ${item.target.runtimeId.slice(0,8)}`:name
+  }
 
   return (
     <section
@@ -117,9 +179,40 @@ export function TaskManagerPage(props: TaskManagerPageProps) {
             <div className={css.pageHeading}>
               <h1 ref={headingRef} tabIndex={-1}>{t('title')}</h1>
               <div className={css.creationActions}>
-                <Button variant="soft" size="toolbar" icon={<IconPlusOutline16 />} onClick={onNewTask}>{t('new.action')}</Button>
+                <Button variant="soft" size="toolbar" icon={<IconPlusOutline16 />} disabled={creating||unavailable||answer.unsupported===true}
+                  onClick={createTask}>{t(creating?'new.pending':'new.action')}</Button>
               </div>
             </div>
+            {(environments.showComputer||environments.choices.length>1)&&shownEnvironment!==undefined&&<div className={css.environmentRow}>
+              {environments.choices.length>1?<Menu open={environmentMenu} onClose={()=>{setEnvironmentMenu(false);setEnvironmentSearch('')}}
+                selectedId={environmentKey} portal
+                header={<Input type="search" aria-label={t(environments.showComputer?'environment.search':'environment.searchRuntime')} placeholder={t(environments.showComputer?'environment.search':'environment.searchRuntime')}
+                  value={environmentSearch} onChange={(event)=>{setEnvironmentSearch(event.target.value)}}/>}
+                items={choices.length===0?[{ id:'__empty',label:t('environment.empty'),disabled:true }]:choices.map(item=>({
+                  id:item.key,label:environmentLabel(item),disabled:!item.available,
+                }))}
+                footer={[{ id:'__refresh',label:t('environment.refresh') }]}
+                onSelect={(key)=>{
+                  if(key==='__refresh'){void refreshTaskEnvironments();return}
+                  if(switchDisabled)return
+                  const choice=environments.choices.find(item=>item.key===key)
+                  if(choice===undefined||!choice.available)return
+                  setChosenEnvironment(choice);setEnvironmentKey(choice.key);setEnvironmentMenu(false);setEnvironmentSearch('');setCreationFailed(false)
+                }}
+                anchor={<Button variant="ghost" size="toolbar" className={css.environmentTrigger}
+                  disabled={switchDisabled} aria-label={t('environment.choose')} aria-haspopup="menu" aria-expanded={environmentMenu}
+                  title={switchDisabled?t('environment.finishDetails'):environmentLabel(shownEnvironment)}
+                  onClick={()=>{setEnvironmentMenu(open=>!open)}}>
+                  <span className={css.environmentName}>{environmentLabel(shownEnvironment)}</span><IconChevronDownOutline14/>
+                </Button>}/>:<ComputerBadge name={environmentLabel(shownEnvironment)} label={t('environment.label')}/>}
+            </div>}
+            {(unavailable||answer.unsupported===true||creationFailed)&&<p className={css.environmentNotice} role="status">
+              {t(unavailable?'environment.unavailable':answer.unsupported?'environment.unsupported':'new.error')}
+              {(unavailable||answer.unsupported===true)&&<Button variant="ghost" size="sm" onClick={()=>{
+                if(unavailable)void refreshTaskEnvironments()
+                else void onRetry()
+              }}>{t('list.retry')}</Button>}
+            </p>}
             <div className={css.filters}>
               <div className={css.filterTabs} role="group" aria-label={t('statusFilter.label')}>
                 {(['all', 'active', 'inactive'] as const).map(value => (
@@ -149,11 +242,12 @@ export function TaskManagerPage(props: TaskManagerPageProps) {
               </Button>}
             </div>
             <div className={css.list}>
-              {selected === undefined && <CatalogFeedback status={status} populated={rows.length > 0} onRetry={onRetry} t={t} />}
+              {selected === undefined && !unavailable && answer.unsupported!==true
+                && <CatalogFeedback status={status} populated={rows.length > 0} onRetry={onRetry} t={t} />}
               {status === 'ready' && rows.length === 0 && <div className={css.empty} role="status">
                 <IconClockOutline16 size={24} className={css.emptyGlyph} />
                 <h2>{t(emptyTitle)}</h2>
-                <Button variant="outline" className={css.emptyAction} onClick={onNewTask}>
+                <Button variant="outline" className={css.emptyAction} disabled={creating||unavailable||answer.unsupported===true} onClick={createTask}>
                   {t('empty.action')}
                 </Button>
               </div>}
@@ -207,6 +301,7 @@ export function TaskManagerPage(props: TaskManagerPageProps) {
         authoritative={catalogRecord !== undefined}
         onDeleted={closeDetails}
         onClose={closeDetails}
+        available={!unavailable}
       />}
     </section>
   )

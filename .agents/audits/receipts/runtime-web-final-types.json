@@ -1,0 +1,14 @@
+{
+  "name": "runtime-web-final-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T21:27:03.093665+00:00",
+  "seconds": 4.234,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2cd6aa963da2cdcede29c713eb653185efa28253230c849c583920f48732df6d",
+  "inputsAfter": "2cd6aa963da2cdcede29c713eb653185efa28253230c849c583920f48732df6d",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

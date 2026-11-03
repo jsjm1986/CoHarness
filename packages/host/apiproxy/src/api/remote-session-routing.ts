@@ -44,7 +44,7 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
   'agentTeams/updateTask': { action: 'write', path: ['agentId'], execution: 'request' },
   'claudeCodeMods/watchBand': { action: 'read', path: ['agentId'] },
   'claudeCodeMods/pressBand': { action: 'write', path: ['agentId'], execution: 'operation' },
-  'userQuestions/answer': { action: 'write', path: ['agentId'], execution: 'request' },
+  'userQuestions/answer': { action: 'write', path: ['agentId'], execution: 'operation' },
   'userQuestions/attachWait': { action: 'read', path: ['agentId'] },
   // Uploads stage bytes under the receiving Session only; no execution origin.
   'fileUploads/upload': { action: 'write', path: ['agentId'], execution: 'none' },

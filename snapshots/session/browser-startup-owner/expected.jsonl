@@ -1,0 +1,16 @@
+{"browser":"attach","phase":"admission","change":"withdrawn","rejected":true,"staleWorkers":0,"originalProcesses":1,"originalCompleted":1,"retry":true,"workersStopped":true}
+{"browser":"attach","phase":"admission","change":"replaced","rejected":true,"staleWorkers":0,"originalProcesses":1,"originalCompleted":1,"retry":true,"workersStopped":true}
+{"browser":"attach","phase":"admission","change":"required","rejected":true,"staleWorkers":0,"originalProcesses":1,"originalCompleted":1,"retry":true,"workersStopped":true}
+{"browser":"attach","phase":"ready","change":"withdrawn","rejected":true,"staleWorkers":1,"originalProcesses":1,"originalCompleted":1,"retry":true,"workersStopped":true}
+{"browser":"attach","phase":"ready","change":"replaced","rejected":true,"staleWorkers":1,"originalProcesses":1,"originalCompleted":1,"retry":true,"workersStopped":true}
+{"browser":"attach","phase":"ready","change":"installed","rejected":true,"staleWorkers":1,"originalProcesses":0,"originalCompleted":0,"retry":true,"workersStopped":true}
+{"browser":"attach","phase":"ready","change":"required","rejected":true,"staleWorkers":1,"originalProcesses":1,"originalCompleted":1,"retry":true,"workersStopped":true}
+{"browser":"launch","phase":"profile","change":"replaced","rejected":true,"staleWorkers":0,"originalProcesses":0,"originalCompleted":0,"retry":true,"workersStopped":true}
+{"browser":"launch","phase":"profile","change":"installed","rejected":true,"staleWorkers":0,"originalProcesses":0,"originalCompleted":0,"retry":true,"workersStopped":true}
+{"browser":"launch","phase":"profile","change":"required","rejected":true,"staleWorkers":0,"originalProcesses":0,"originalCompleted":0,"retry":true,"workersStopped":true}
+{"browser":"attach","phase":"reconnect","previous":"independent","currentProviderUsed":true,"workersStopped":true,"allPermitsCompleted":true}
+{"browser":"attach","phase":"reconnect","previous":"managed","currentProviderUsed":true,"workersStopped":true,"allPermitsCompleted":true}
+{"browser":"attach","phase":"allocation-accounting","failedAcquisitionReported":true,"foreignReservationBlocked":true,"disposalWaitsForReport":true,"originalUncertaintyReported":true,"freshSessionAdmittedAfterReport":true,"workersStopped":true}
+{"browser":"attach","phase":"reconnect-cleanup","failure":"completion","retryBlockedUntilCleanup":true,"recovered":true,"workersStopped":true,"allPermitsCompleted":true}
+{"browser":"attach","phase":"reconnect-cleanup","failure":"termination","retryBlockedUntilCleanup":true,"recovered":true,"workersStopped":true,"allPermitsCompleted":true}
+{"browser":"attach","phase":"reconnect-cleanup","failure":"dispose","reservationRetained":true,"noNewWorker":true,"completionStillOwned":true}

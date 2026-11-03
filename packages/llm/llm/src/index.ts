@@ -9,6 +9,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
+import type { ResourceLease } from '@deepseek-ai/dsh-resource-budget'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type {
   GenerateOptions,
@@ -39,6 +40,12 @@ import {
 } from './content.ts'
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { guardTextThinkingStream } from './text-thinking-guard.ts'
+import type { LlmOperationDefinition, LlmOperationDispatch, LlmOperationFactories, LlmOperationInput, LlmOperationParameters, LlmOperationRequest, LlmOperationResult } from './operations.ts'
+import type { NativeModelStreamParameters, NativeModelStreamRequest } from './native-stream.ts'
+import { assertPreparedOperationInput, createPreparedOperation } from './operation-call.ts'
+import { assertModelPolicy, authorizeModelPolicy, captureModelPolicy, type CapturedModelPolicy } from './model-policy.ts'
+import { assertResourceOwner, captureResourceOwner, type CapturedResourceOwner } from './resource-owner.ts'
+import { assertNever } from './never.ts'
 
 export * from './attribution.ts'
 export * from './brand.ts'
@@ -51,8 +58,12 @@ export * from './content.ts'
 export * from './assistant-stream.ts'
 export * from './message.ts'
 export * from './retry-policy.ts'
+export * from './operations.ts'
+export * from './native-stream.ts'
+export { assertModelPolicy, authorizeModelPolicy, captureModelPolicy } from './model-policy.ts'
+export type { CapturedModelPolicy } from './model-policy.ts'
 export { BlockAssembler } from './assembler.ts'
-export { callConfigEquals, deepFreeze, isAgentLoopRequest, markAgentLoopRequest } from './call-config.ts'
+export { callConfigEquals, deepFreeze } from './call-config.ts'
 export type { LlmCallConfig, LlmCallConfigAdapterDefaults } from './call-config.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -62,11 +73,11 @@ declare module '@deepseek-ai/cordis' {
 
   interface Events {
     /**
-     * Waterfall around every streaming model call (retry, replay, routing).
+     * Waterfall around physical streaming model calls (retry, replay, routing).
      * Bound to the {@link LlmRuntime}; call `next()` to reach the resolved
      * adapter's stream, or yield your own chunks to short-circuit.
      * @param options - the full request. A LOOP-built request carries the
-     *   process-local {@link markAgentLoopRequest} identity and arrives deep-frozen
+     *   owning service's {@link LlmRuntime.markAgentLoopRequest} identity and arrives deep-frozen
      *   (mutation throws): its content is a pure function of the session log (the
      *   reconstructability Agent Note), so listeners read it, never rewrite it.
      *   Hand-built calls do not carry that marker; callers own their request
@@ -75,6 +86,40 @@ declare module '@deepseek-ai/cordis' {
      */
     'llm/stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
 
+    /**
+     * Meter a child runtime's model stream under the initiating parent's authority.
+     * The child owns its logged input and adapter; listeners must delegate to run that adapter.
+     * @param options - child model input with parent-owned execution metadata.
+     * @param next - child stream, including its own durable checkpoint and cleanup.
+     * @mode waterfall
+     */
+    'llm/delegated-stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
+
+    /**
+     * Drive a registered orchestration without treating its outer turn as inference.
+     * Every nested model request uses its own governed model stream.
+     * @param options - logged orchestration input and initiating Session.
+     * @param next - orchestration output and owned cleanup.
+     * @mode waterfall
+     */
+    'llm/orchestration'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
+
+    /**
+     * Guard the resolved request after resource admission and before adapter dispatch.
+     * Listeners retain the caller's execution context and must call `next()` to delegate.
+     * @param options - complete request, including model-hidden resource ownership and cancellation.
+     * @param next - remaining dispatch guards; guards must not rewrite model-visible input.
+     * @mode waterfall
+     */
+    'llm/pre-dispatch'(this: LlmRuntime, options: GenerateOptions, next: () => Promise<void>): Promise<void>
+
+    /**
+     * Authorize a resolved model request after delegating dispatch guards.
+     * Every listener must finish before adapter I/O; listeners cannot skip other authorization owners.
+     * @param options - exact model input and effective resource cancellation.
+     * @mode serial
+     */
+    'llm/authorize'(this: LlmRuntime, options: GenerateOptions): Promise<void>
   }
 }
 
@@ -113,6 +158,24 @@ export function assertUsableApiKey(raw: string, pkg: string, ref: string): strin
   )
 }
 
+/** Merge-extensible model operations contributed by Consumers and implemented by adapter generations. */
+export interface LlmOperationMap {
+  /** Exact native input with parent-owned authentication and per-request admission. */
+  'native-stream': LlmOperationDefinition<NativeModelStreamParameters, NativeModelStreamRequest, void>
+}
+
+/** Consumer-owned authorization retained by one prepared stream, outside model input. */
+export interface PreparedLlmCallGuard {
+  /**
+   * Recheck asynchronous eligibility after admission and before each provider request.
+   * @param signal - effective caller and resource-lease cancellation, when supplied.
+   * @returns settlement of the consumer's live eligibility check; rejection refuses dispatch.
+   */
+  authorize(signal?: AbortSignal): Promise<void>
+  /** Refuse a changed owner synchronously after all asynchronous authorization has settled. */
+  assertCurrent(): void
+}
+
 /** One model call whose config and adapter registration were resolved together. */
 export interface PreparedLlmCall {
   /** Detached, deep-frozen config with any adapter-owned default materialized. */
@@ -134,18 +197,42 @@ export interface PreparedLlmCall {
    * preparation. The request's call-config fields must match {@link config};
    * reuse or mismatch fails with `INVALID_PREPARED_CALL`.
    * @param options - fully assembled request carrying the prepared config.
+   * @param guard - optional consumer authorization, checked after admission and immediately before provider I/O.
    * @returns the chunk stream, including the `llm/stream` waterfall.
    */
-  stream(options: GenerateOptions): AsyncIterable<StreamChunk>
+  stream(options: GenerateOptions, guard?: PreparedLlmCallGuard): AsyncIterable<StreamChunk>
 }
 
 /** One adapter-owned model-resolution generation bound to its eventual stream call. */
 export interface PreparedAdapterCall {
   /** Exact model metadata from the same adapter generation as {@link stream}. */
   readonly model: LlmResolvedModelInfo
-  /** Dispatch through that generation without re-reading dynamic connection facts. */
-  stream(options: GenerateOptions): AsyncIterable<StreamChunk>
+  /** Native operations supported by this exact adapter generation; absent means unsupported. */
+  readonly operations?: LlmOperationFactories
+  /**
+   * Dispatch through that generation without re-reading dynamic connection facts.
+   * @param options - assembled request with effective cancellation.
+   * @param dispatchRequest - when present, rechecks authorization immediately before
+   * each provider request after asynchronous preparation; absent uses direct adapter execution.
+   * @returns the owned provider stream.
+   */
+  stream(options: GenerateOptions, dispatchRequest?: LlmOperationDispatch): AsyncIterable<StreamChunk>
 }
+
+/** One native model operation whose exact request is recorded before its once-only execution. */
+export interface PreparedLlmOperation<Name extends keyof LlmOperationMap> extends Omit<PreparedLlmCall, 'stream'> {
+  /** Detached, frozen model-visible request; the caller records it before {@link run}. */
+  readonly request: LlmOperationRequest<Name>
+  /**
+   * Execute through ordinary model middleware, resource admission and final policy checks.
+   * @param options - matching model config plus ownership and cancellation; conversation messages are not sent.
+   * @returns the adapter's result; policy refusal, cancellation and missing results reject.
+   */
+  run(options: Omit<GenerateOptions, 'messages' | 'operation'>): Promise<LlmOperationResult<Name>>
+}
+
+/** Model inference or an orchestration that owns separate nested model requests. */
+export type LlmCallKind = 'model' | 'orchestration'
 
 /**
  * Provider-wire adapter for the harness message and stream vocabulary. Register implementations
@@ -154,6 +241,8 @@ export interface PreparedAdapterCall {
  * DeepSeek and library-backed pi-ai adapters meet this contract through different internals.
  */
 export abstract class LlmAdapter {
+  /** Registration-owned execution role, model by default; orchestrations govern each nested model request separately. */
+  readonly callKind: LlmCallKind = 'model'
   /**
    * Describe one provider route owned by this adapter.
    * @param provider - a route passed to `registerAdapter()` for this instance.
@@ -224,16 +313,20 @@ export abstract class LlmAdapter {
   async prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall> {
     return {
       model: await this.resolveModel(provider, model, signal),
-      stream: options => this.stream(options),
+      stream: (options, dispatchRequest) => this.stream(options, dispatchRequest),
     }
   }
 
   /**
    * Stream one model call as raw chunks. The only required method.
+   * Iterator completion or rejection includes owned transport cleanup; early
+   * `return()` confirms quiescence only when its result has `done: true`.
    * @param options - the fully-assembled request; implementations must honor `options.signal`.
+   * @param dispatchRequest - when present, must wrap each provider request after
+   * asynchronous preparation; absent uses direct adapter execution without runtime policy.
    * @returns the chunk stream, obeying the adapter contract documented on `StreamChunk`.
    */
-  abstract stream(options: GenerateOptions): AsyncIterable<StreamChunk>
+  abstract stream(options: GenerateOptions, dispatchRequest?: LlmOperationDispatch): AsyncIterable<StreamChunk>
 }
 
 /**
@@ -303,6 +396,7 @@ export class LlmRuntime extends TypertRemoteService {
     (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>
   >()
   private readonly streamCloseTimeoutMs: number
+  private loopRequests: WeakSet<GenerateOptions> | undefined = new WeakSet()
 
   constructor(ctx: Context, config: LlmRuntimeConfig = {}) {
     super(ctx, 'llm')
@@ -311,6 +405,29 @@ export class LlmRuntime extends TypertRemoteService {
       throw new Error(`llm: streamCloseTimeoutMs must be a positive safe integer no greater than ${MAX_TIMER_DELAY_MS}`)
     }
     this.streamCloseTimeoutMs = timeout
+    ctx.effect(() => () => { this.loopRequests = undefined }, 'llm: main request identities')
+  }
+
+  /**
+   * Mark one exact, possibly frozen request as assembled by this service's AgentLoop.
+   * @param request - loop-owned request envelope before dispatch through this service.
+   * @returns the same request object; copies and other service instances do not inherit the marker.
+   * @throws LlmError when the owning service has been withdrawn.
+   */
+  markAgentLoopRequest<T extends GenerateOptions>(request: T): T {
+    const requests = this.loopRequests
+    if (requests === undefined) throw new LlmError('The LLM service for this request marker was withdrawn.', 'MODEL_REQUEST_ORIGIN_UNAVAILABLE')
+    requests.add(request)
+    return request
+  }
+
+  /**
+   * Check whether this live service recorded the exact request as AgentLoop input.
+   * @param request - envelope observed at the service-bound LLM waterfall.
+   * @returns false for foreign, copied or unmarked objects and after service withdrawal.
+   */
+  isAgentLoopRequest(request: GenerateOptions): boolean {
+    return this.loopRequests !== undefined && this.loopRequests.has(request)
   }
 
   /** Notify topology observers without letting one broken listener veto the commit. */
@@ -401,6 +518,7 @@ export class LlmRuntime extends TypertRemoteService {
         ?? resolveRetryPolicy(undefined, `llm: provider "${provider}" retryPolicy`)
       registrations.push({
         adapter,
+        callKind: adapter.callKind,
         provider: { id: info.id, name: info.name },
         retryPolicy,
       })
@@ -887,6 +1005,57 @@ export class LlmRuntime extends TypertRemoteService {
    * @returns a prepared config and its registration-bound stream entry point.
    */
   async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall> {
+    const state = await this.prepareCallState(config, signal)
+    return this.bindPreparedCall(state, (options, dispatchRequest) => state.adapterCall.stream(options, dispatchRequest))
+  }
+
+  /**
+   * Prepare an adapter-owned operation through the same model generation as ordinary calls.
+   * @param config - provider/model route and explicit request controls.
+   * @param name - operation contributed through the model-operation vocabulary.
+   * @param parameters - operation inputs, unchanged until preparation completes.
+   * @param signal - cancellation for model resolution.
+   * @returns a frozen secret-free request and once-only governed execution.
+   * @throws LlmError when the captured generation does not implement the operation.
+   */
+  async prepareOperation<Name extends keyof LlmOperationMap>(
+    config: LlmCallConfig,
+    name: Name,
+    parameters: LlmOperationParameters<Name>,
+    signal?: AbortSignal,
+  ): Promise<PreparedLlmOperation<Name>> {
+    const state = await this.prepareCallState(config, signal)
+    if (state.registration.callKind === 'orchestration') {
+      throw new LlmError('Orchestration routes do not implement physical model operations.', 'MODEL_OPERATION_UNSUPPORTED')
+    }
+    return createPreparedOperation(state.config, name, parameters, state.adapterCall.operations,
+      (dispatch, operation) => this.bindPreparedCall(state, dispatch, operation))
+  }
+
+  /**
+   * Prepare a child runtime's native request without advancing conversation replay.
+   * The Consumer records and checkpoints the returned request before execution.
+   * @param config - registered provider/model and explicit request controls.
+   * @param name - operation supported by the captured adapter generation.
+   * @param parameters - secret-free input and transport observers.
+   * @param signal - cancellation for model resolution.
+   * @returns once-only execution through delegated metering, resources and authorization.
+   */
+  async prepareDelegatedOperation<Name extends keyof LlmOperationMap>(
+    config: LlmCallConfig,
+    name: Name,
+    parameters: LlmOperationParameters<Name>,
+    signal?: AbortSignal,
+  ): Promise<PreparedLlmOperation<Name>> {
+    const state = await this.prepareCallState(config, signal)
+    if (state.registration.callKind === 'orchestration') {
+      throw new LlmError('Orchestration routes do not implement physical model operations.', 'MODEL_OPERATION_UNSUPPORTED')
+    }
+    return createPreparedOperation(state.config, name, parameters, state.adapterCall.operations,
+      (dispatch, operation) => this.bindPreparedCall(state, dispatch, operation, 'llm/delegated-stream'))
+  }
+
+  private async prepareCallState(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedCallState> {
     const registration = this.registration(config.provider)
     const adapterCall = await registration.adapter.prepareCall(config.provider, config.model, signal)
     const modelInfo = this.normalizeModelInfo(registration, config.model, adapterCall.model)
@@ -903,6 +1072,16 @@ export class LlmRuntime extends TypertRemoteService {
         ? { maxTokens: true }
         : {},
     })
+    return { registration, adapterCall, modelInfo, config: resolvedConfig, context, adapterDefaults }
+  }
+
+  private bindPreparedCall(
+    state: PreparedCallState,
+    dispatch: PreparedDispatch['dispatch'],
+    operation?: LlmOperationInput,
+    middleware: 'llm/stream' | 'llm/delegated-stream' = 'llm/stream',
+  ): PreparedLlmCall {
+    const { registration, modelInfo, config: resolvedConfig, context, adapterDefaults } = state
     let dispatched = false
     return Object.freeze({
       config: resolvedConfig,
@@ -914,7 +1093,7 @@ export class LlmRuntime extends TypertRemoteService {
         : { inputModalities: Object.freeze([...modelInfo.inputModalities]) },
       ...modelInfo.systemPromptUpdate === undefined ? {} : { systemPromptUpdate: modelInfo.systemPromptUpdate },
       ...modelInfo.toolUpdate === undefined ? {} : { toolUpdate: modelInfo.toolUpdate },
-      stream: (options: GenerateOptions): AsyncIterable<StreamChunk> => {
+      stream: (options: GenerateOptions, guard?: PreparedLlmCallGuard): AsyncIterable<StreamChunk> => {
         if (dispatched) {
           throw new LlmError('a prepared LLM call can only be dispatched once', 'INVALID_PREPARED_CALL')
         }
@@ -924,13 +1103,16 @@ export class LlmRuntime extends TypertRemoteService {
             'INVALID_PREPARED_CALL',
           )
         }
+        assertPreparedOperationInput(options.operation, operation)
         dispatched = true
         return this.streamWithRegistration(options, {
           registration,
           config: resolvedConfig,
           modelInfo,
-          dispatch: options => adapterCall.stream(options),
-        })
+          dispatch,
+          operation,
+          ...guard === undefined ? {} : { guard },
+        }, middleware)
       },
     })
   }
@@ -953,8 +1135,9 @@ export class LlmRuntime extends TypertRemoteService {
         source: { kind: 'model', provider: source.provider, model: source.model },
       })
     })
-    if (messages.every((message, index) => message === options.messages[index])) return options
+    if (messages.every((message, index) => message === options.messages[index]) && options.resourceOrigin === undefined) return options
     const filtered = { ...options, messages }
+    delete filtered.resourceOrigin
     return Object.isFrozen(options) ? deepFreeze(filtered) : filtered
   }
 
@@ -985,20 +1168,32 @@ export class LlmRuntime extends TypertRemoteService {
    */
   private async * adapterStream(
     options: GenerateOptions,
+    policy: CapturedModelPolicy,
+    resource: CapturedResourceOwner,
+    callKind: LlmCallKind,
     prepared?: PreparedDispatch,
   ): AsyncGenerator<StreamChunk> {
     let iterator: AsyncIterator<StreamChunk>
+    let lease: ResourceLease | undefined
+    let dispatched = false
+    let signal = options.signal
     try {
+      assertModelPolicy(this.ctx, policy)
+      if (callKind === 'model') assertResourceOwner(this.ctx, resource)
+      assertPreparedOperationInput(options.operation, prepared?.operation)
       const registration = prepared?.registration ?? this.registration(options.provider)
+      if (registration.callKind !== callKind) {
+        throw new LlmError('Adapter execution kind changed before dispatch; retry this call.', 'INVALID_PREPARED_CALL')
+      }
       const adapter = registration.adapter
       let modelInfo: LlmResolvedModelInfo
       let resolvedConfig: LlmCallConfig
-      let dispatch: (options: GenerateOptions) => AsyncIterable<StreamChunk>
+      let dispatch: PreparedDispatch['dispatch']
       if (prepared === undefined) {
         const adapterCall = await adapter.prepareCall(options.provider, options.model, options.signal)
         modelInfo = this.normalizeModelInfo(registration, options.model, adapterCall.model)
         resolvedConfig = this.resolveCallWithInfo(options, modelInfo).config
-        dispatch = options => adapterCall.stream(options)
+        dispatch = (options, dispatchRequest) => adapterCall.stream(options, dispatchRequest)
       } else {
         modelInfo = prepared.modelInfo
         resolvedConfig = prepared.config
@@ -1037,10 +1232,52 @@ export class LlmRuntime extends TypertRemoteService {
         }
         if (Object.isFrozen(resolvedOptions)) deepFreeze(projectedOptions)
       }
-      const stream = dispatch(this.forAdapter(projectedOptions, adapter))
+      if (callKind === 'model') assertResourceOwner(this.ctx, resource)
+      const budget = callKind === 'model' ? resource.owner : undefined
+      if (budget !== undefined) {
+        lease = await budget.acquire({ kind: 'model',
+          ...signal === undefined ? {} : { signal },
+          ...options.sessionId === undefined ? {} : { sessionId: options.sessionId },
+          ...options.resourceOrigin === undefined ? {} : { origin: options.resourceOrigin },
+        })
+        signal = signal === undefined ? lease.signal : AbortSignal.any([signal, lease.signal])
+        signal.throwIfAborted()
+        const bounded = { ...projectedOptions, signal }
+        projectedOptions = Object.isFrozen(projectedOptions) ? deepFreeze(bounded) : bounded
+      }
+      const authorize = async (): Promise<void> => {
+        assertModelPolicy(this.ctx, policy)
+        if (callKind === 'model') {
+          assertResourceOwner(this.ctx, resource)
+          await this.ctx.waterfall(this, 'llm/pre-dispatch', projectedOptions, () => Promise.resolve())
+          await this.ctx.serial(this, 'llm/authorize', projectedOptions)
+        }
+        await prepared?.guard?.authorize(projectedOptions.signal)
+        if (callKind === 'model') {
+          authorizeModelPolicy(this.ctx, policy, projectedOptions)
+          assertResourceOwner(this.ctx, resource)
+        }
+        if (lease !== undefined) signal?.throwIfAborted()
+      }
+      await authorize()
+      if (callKind === 'model') assertResourceOwner(this.ctx, resource)
+      prepared?.guard?.assertCurrent()
+      dispatched = true
+      const dispatchRequest: LlmOperationDispatch = async (request) => {
+        await authorize()
+        if (callKind === 'model') {
+          authorizeModelPolicy(this.ctx, policy, projectedOptions)
+          assertResourceOwner(this.ctx, resource)
+        }
+        if (signal?.aborted) throw abortError(signal)
+        prepared?.guard?.assertCurrent()
+        return request()
+      }
+      const stream = dispatch(this.forAdapter(projectedOptions, adapter), dispatchRequest)
       iterator = stream[Symbol.asyncIterator]()
     } catch (error: unknown) {
-      yield adapterFailureChunk(error, options.signal)
+      if (lease !== undefined) await (dispatched ? lease.uncertain() : lease.release())
+      yield adapterFailureChunk(error, signal)
       return
     }
 
@@ -1049,7 +1286,7 @@ export class LlmRuntime extends TypertRemoteService {
       while (true) {
         let item: { done: true } | { done: false; value: StreamChunk }
         try {
-          const next = await nextWithSignal(iterator, options.signal)
+          const next = await nextWithSignal(iterator, signal)
           item = next.done
             ? { done: true }
             : { done: false, value: next.value }
@@ -1058,8 +1295,8 @@ export class LlmRuntime extends TypertRemoteService {
           // read a potentially hostile `return` getter after iteration fails.
           // Caller cancellation is different — `nextWithSignal` may have won a
           // race while the adapter still owns an outstanding read, so close it.
-          completed = options.signal?.aborted !== true
-          yield adapterFailureChunk(error, options.signal)
+          completed = signal?.aborted !== true
+          yield adapterFailureChunk(error, signal)
           return
         }
         if (item.done) {
@@ -1071,9 +1308,14 @@ export class LlmRuntime extends TypertRemoteService {
         yield item.value
       }
     } finally {
-      if (!completed) {
-        const close = iterator.return?.bind(iterator)
-        if (close) await closeWithDeadline(close, this.streamCloseTimeoutMs)
+      let quiescent = completed
+      try {
+        if (!completed) {
+          const close = iterator.return?.bind(iterator)
+          if (close) quiescent = await closeWithDeadline(close, this.streamCloseTimeoutMs)
+        }
+      } finally {
+        if (lease !== undefined) await (quiescent ? lease.release() : lease.uncertain())
       }
     }
   }
@@ -1086,8 +1328,10 @@ export class LlmRuntime extends TypertRemoteService {
    * dispatch, and iteration failures become terminal `error` or `aborted`
    * finish chunks; middleware, nested-call, cleanup, and consumer failures
    * remain thrown.
+   * Physical model calls retain their resource provider before middleware;
+   * provider withdrawal or replacement refuses dispatch and returns any grant.
    * @param options - the full request; `options.provider` selects the adapter.
-   * @returns the chunk stream, possibly wrapped by `llm/stream` listeners.
+   * @returns the chunk stream wrapped by model or orchestration listeners for the captured registration.
    */
   stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     return this.streamWithRegistration(options)
@@ -1096,16 +1340,33 @@ export class LlmRuntime extends TypertRemoteService {
   private streamWithRegistration(
     options: GenerateOptions,
     prepared?: PreparedDispatch,
+    middleware: 'llm/stream' | 'llm/delegated-stream' = 'llm/stream',
   ): AsyncIterable<StreamChunk> {
+    const policy = captureModelPolicy(this.ctx)
+    const resource = captureResourceOwner(this.ctx)
+    const callKind = prepared?.registration.callKind ?? this.adapters.get(options.provider)?.callKind ?? 'model'
     return guardTextThinkingStream(
       this.ctx.waterfall(
         this,
-        'llm/stream',
+        streamEvent(callKind, middleware),
         options,
-        () => this.adapterStream(options, prepared),
+        () => this.adapterStream(options, policy, resource, callKind, prepared),
       ),
       { provider: options.provider, model: options.model },
     )
+  }
+}
+
+/** Select middleware from the adapter generation's execution role. */
+function streamEvent(
+  kind: LlmCallKind,
+  physical: 'llm/stream' | 'llm/delegated-stream',
+): 'llm/stream' | 'llm/delegated-stream' | 'llm/orchestration' {
+  switch (kind) {
+    case 'model': return physical
+    case 'orchestration': return 'llm/orchestration'
+    /* v8 ignore next -- closed-union exhaustiveness guard */
+    default: return assertNever(kind)
   }
 }
 
@@ -1181,7 +1442,9 @@ async function nextWithSignal<T>(
 }
 
 /** Await iterator cleanup without allowing a broken adapter to hang disposal. */
-async function closeWithDeadline(close: () => Promise<unknown> | void, timeoutMs: number): Promise<void> {
+async function closeWithDeadline(
+  close: () => Promise<IteratorResult<StreamChunk> | void> | void, timeoutMs: number,
+): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
@@ -1189,10 +1452,11 @@ async function closeWithDeadline(close: () => Promise<unknown> | void, timeoutMs
     }, timeoutMs)
   })
   try {
-    await Promise.race([
+    const result = await Promise.race([
       Promise.resolve().then(close),
       timeout,
     ])
+    return result?.done === true
   } finally {
     /* v8 ignore next -- setTimeout always returns a timer handle in supported runtimes. */
     if (timer !== undefined) clearTimeout(timer)
@@ -1201,6 +1465,7 @@ async function closeWithDeadline(close: () => Promise<unknown> | void, timeoutMs
 
 interface AdapterRegistration {
   readonly adapter: LlmAdapter
+  readonly callKind: LlmCallKind
   readonly provider: LlmProviderInfo
   readonly retryPolicy: ResolvedRetryPolicy
 }
@@ -1209,7 +1474,15 @@ interface PreparedDispatch {
   readonly registration: AdapterRegistration
   readonly config: LlmCallConfig
   readonly modelInfo: LlmResolvedModelInfo
-  readonly dispatch: (options: GenerateOptions) => AsyncIterable<StreamChunk>
+  readonly dispatch: (options: GenerateOptions, dispatchRequest: LlmOperationDispatch) => AsyncIterable<StreamChunk>
+  readonly operation: LlmOperationInput | undefined
+  readonly guard?: PreparedLlmCallGuard
+}
+
+interface PreparedCallState extends Omit<PreparedDispatch, 'dispatch' | 'operation'> {
+  readonly adapterCall: PreparedAdapterCall
+  readonly context: LlmModelContext | undefined
+  readonly adapterDefaults: LlmCallConfigAdapterDefaults
 }
 
 export default LlmRuntime

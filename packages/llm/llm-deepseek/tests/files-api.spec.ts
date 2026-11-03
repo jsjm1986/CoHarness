@@ -24,6 +24,22 @@ function file(overrides: Record<string, unknown> = {}) {
 }
 
 describe('DeepSeekFilesClient', () => {
+  it.each(['upload', 'list', 'retrieve', 'delete'] as const)('preserves a final model authorization refusal before Files %s I/O', async (operation) => {
+    const refusal = new LlmError('Model access was revoked.', 'MODEL_FORBIDDEN')
+    const fetchImpl = vi.fn<typeof fetch>()
+    const client = new DeepSeekFilesClient({ baseURL: 'https://files.example', headers: { 'x-api-key': 'test-key' }, fetch: fetchImpl,
+      dispatchRequest: () => Promise.reject(refusal),
+    })
+    const operations = {
+      upload: () => client.upload({ data: Uint8Array.of(1), mediaType: 'image/png', filename: 'image.png', expiresAfterSeconds: 3_600 }),
+      list: () => client.list(),
+      retrieve: () => client.retrieve(DeepSeekFileId('file-api-one')),
+      delete: () => client.delete(DeepSeekFileId('file-api-one')),
+    }
+    await expect(operations[operation]()).rejects.toBe(refusal)
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
   describe('successful response JSON', () => {
     it.each((['upload', 'list', 'retrieve', 'delete'] as const).flatMap(operation =>
       ['', '{"id":'].map(body => ({ operation, body })),

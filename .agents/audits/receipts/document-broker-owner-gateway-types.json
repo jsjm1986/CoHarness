@@ -1,0 +1,14 @@
+{
+  "name": "document-broker-owner-gateway-types",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/tsc --noEmit",
+  "startedAt": "2026-10-26T11:11:37.355647+00:00",
+  "seconds": 12.321,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f29753a37537b4a818b9c3c9eb1173b52486fe4438d8643d4d8a2e2c99bc8dc8",
+  "inputsAfter": "f29753a37537b4a818b9c3c9eb1173b52486fe4438d8643d4d8a2e2c99bc8dc8",
+  "postgresToolDirectory": null,
+  "outputSha256": "6d219e83ee3bf7817b74fc2e3d8db28cf3cb24b76ca66d40649f0b48d4383906",
+  "outputTail": "tests/documents-local.spec.ts(212,29): error TS2550: Property 'withResolvers' does not exist on type 'PromiseConstructor'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2024' or later.\ntests/documents-local.spec.ts(213,29): error TS2550: Property 'withResolvers' does not exist on type 'PromiseConstructor'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2024' or later.\ntests/documents-local.spec.ts(232,29): error TS2550: Property 'withResolvers' does not exist on type 'PromiseConstructor'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2024' or later.\ntests/documents-local.spec.ts(233,29): error TS2550: Property 'withResolvers' does not exist on type 'PromiseConstructor'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2024' or later.\ntests/documents-local.spec.ts(305,29): error TS2550: Property 'withResolvers' does not exist on type 'PromiseConstructor'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2024' or later.\ntests/documents-local.spec.ts(306,29): error TS2550: Property 'withResolvers' does not exist on type 'PromiseConstructor'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2024' or later.\n"
+}

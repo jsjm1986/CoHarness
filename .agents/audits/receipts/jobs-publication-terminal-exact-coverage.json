@@ -1,0 +1,14 @@
+{
+  "name": "jobs-publication-terminal-exact-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/jobs-publication-coverage.config.mts packages/jobs packages/workflow/tool-workflow packages/terminal/tool-terminal packages/shell/tool-bash packages/subagent/tool-subagent --coverage",
+  "startedAt": "2026-10-26T08:55:18.867907+00:00",
+  "seconds": 34.791,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "115876a02f247480d467be2db0980623bc41a3d87aed2e8c178b468f6a0af998",
+  "inputsAfter": "115876a02f247480d467be2db0980623bc41a3d87aed2e8c178b468f6a0af998",
+  "postgresToolDirectory": null,
+  "outputSha256": "b151104a9e7eb72eb92ca2f15bb50a504afb52a08783380eae757cc55412706b",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n(node:87630) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n Test Files  29 passed (29)\n      Tests  607 passed (607)\n   Start at  16:55:38\n   Duration  14.89s (transform 24.46s, setup 1.72s, import 47.59s, tests 30.75s, environment 2ms)\n\n % Coverage report from v8\n------------|---------|----------|---------|---------|-------------------\nFile        | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n------------|---------|----------|---------|---------|-------------------\n------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 345/345 )\nBranches     : 100% ( 189/189 )\nFunctions    : 100% ( 80/80 )\nLines        : 100% ( 296/296 )\n================================================================================\n"
+}

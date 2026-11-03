@@ -1,0 +1,31 @@
+{
+  "reply": "CONTROL_AUTHORITY_OK",
+  "cases": {
+    "personal": {
+      "scope": "personal",
+      "replacements": 1,
+      "authorizationCalls": 4,
+      "refusal": {
+        "code": "collaboration-forbidden",
+        "reason": "gateway-unavailable"
+      },
+      "rejectedInputAbsent": true,
+      "currentInputCount": 1,
+      "freshAccepted": true,
+      "participant": null
+    },
+    "project": {
+      "scope": "project",
+      "replacements": 1,
+      "authorizationCalls": 2,
+      "refusal": {
+        "code": "collaboration-forbidden",
+        "reason": "gateway-unavailable"
+      },
+      "rejectedInputAbsent": true,
+      "currentInputCount": 1,
+      "freshAccepted": true,
+      "participant": "alice"
+    }
+  }
+}

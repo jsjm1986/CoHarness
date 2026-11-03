@@ -1,0 +1,30 @@
+{
+  "at": "2026-11-02T17:44:24.450543+00:00",
+  "status": "named_current_resource_ownership_protocol_and_account_revocation_review_verified",
+  "sourceSha256": {
+    "packages/context/gateway-runtime/src/resource-budget.ts": "9880152c287dbd18b8674c19244e814fd5e70a5a327641e8688b31f7effa2dd2",
+    "packages/context/resource-budget/src/index.ts": "26659a0ab8dbd99f50af9cc8bbc4748dfb64aa2d6ff61e51fe5377d35969f2ff",
+    "packages/context/resource-budget/src/types.ts": "0a70195108e4b340d57dca72492aaae5c4253940ac4074c126e633cb69f6393a",
+    "packages/context/resource-budget/src/wire.ts": "9142bd68f601e10da4e80b62ddbdc4cd0d4288c4032e6e08b528f1aced1e068c",
+    "gateway/tests/runtime-resource-provider.spec.ts": "ffaa6ca95bd1ac9fc5574b1a891f22c740def6a4797c610d395569fe2ba63798",
+    "gateway/tests/runtime-resource-api.spec.ts": "1a97aa3bc379ff40dcfc4c7223a901fe14602f359403a16304e4c705f5c8885c"
+  },
+  "passedCases": 41,
+  "failedCases": 0,
+  "skippedCases": 0,
+  "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T174027Z/resource-provider-current-real-postgres.json",
+  "scope": [
+    "Captured interactive account before shared registration queues and independently revoked queued accounts.",
+    "Exact generation/node/Runtime operation ownership, status and completion requests.",
+    "Model/process/terminal admission waits, early cancellation and actual native descendant cleanup.",
+    "Acknowledged uncertainty retains occupation; later original completion can retire it.",
+    "Resource wire parsing excludes caller-selected actors and bounds status polls."
+  ],
+  "notClaimed": [
+    "Complete node-pressure/user-project fairness/platform matrix.",
+    "All direct consumers or whole-project completion.",
+    "Official model-provider validation."
+  ],
+  "productionWrites": false,
+  "sourceEditsInThisReview": false
+}

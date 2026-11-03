@@ -1,0 +1,111 @@
+{
+  "finding": "B406",
+  "title": "Web runtime disposal acknowledges an unfinished native browser-handoff helper",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "at": "2026-10-31T14:14:41.700671+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T132512Z",
+  "paths": [
+    "packages/bundle/web-app/src/index.ts",
+    "packages/bundle/web-app/tests/web-app.spec.ts",
+    "apps/cli/tests/web-browser-owner.snapshot.ts",
+    "apps/cli/tests/fixtures/web-browser-owner/register.mjs",
+    "apps/cli/tests/fixtures/web-browser-owner/open.mjs",
+    "apps/cli/tests/fixtures/web-browser-owner/controller.mjs",
+    "packages/bundle/web-app/README.md",
+    "packages/bundle/web-app/README.zh.md",
+    "packages/bundle/web-app/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-web-browser-helper-ownership.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-web-browser-helper-ownership.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-web-browser-helper-ownership.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/web-browser-helper-ownership/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/web-browser-helper-ownership/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/web-browser-helper-ownership/guide.i18n.yaml"
+  ],
+  "matchingPrerequisites": [
+    "packages/bundle/web-app/src/startup.ts",
+    "packages/bundle/web-app/src/public-url.ts",
+    "packages/bundle/web-app/package.json",
+    "packages/bundle/web-app/tsconfig.json",
+    "packages/bundle/web-app/cordis.patch.yml",
+    "apps/cli/src/bin.ts",
+    "apps/cli/package.json",
+    "apps/cli/tests/web-browser-open.snapshot.ts",
+    "apps/cli/tests/fixtures/web-browser-open/register.mjs",
+    "apps/cli/tests/fixtures/web-browser-open/open.mjs",
+    "tsdown.config.ts",
+    "vitest.snapshot.config.ts"
+  ],
+  "cause": "Readiness started a detached handoff promise; no injected-context disposer owned its child. Error handling rejected before native close.",
+  "implementation": "Connection-injection effect retains the handoff promise, aborts its helper on unload and joins native close. The helper records first failure, removes abort listeners on close and refuses pre-cancelled allocation. Intentional teardown suppresses manual browser-failure warnings.",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchedAt": "2026-10-31T14:09:40.573107+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T132512Z/web-launch-origin-fetch.json",
+    "sharedChangesPreserved": true
+  },
+  "verification": {
+    "uniqueRelatedCases": 64,
+    "unitCases": 59,
+    "unitFiles": 6,
+    "assembledCliCases": 5,
+    "coverage": {
+      "packages/bundle/web-app/src/index.ts": {
+        "statements": [
+          83,
+          83
+        ],
+        "branches": [
+          48,
+          48
+        ],
+        "functions": [
+          21,
+          21
+        ],
+        "lines": [
+          72,
+          72
+        ]
+      }
+    },
+    "nodeMajors": [
+      22,
+      24
+    ],
+    "beforeFix": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T132512Z/web-launch-before-fix.json",
+    "oldCompiledNegative": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T132512Z/web-launch-old-negative.json",
+    "native": "Shipped dsh --profile web boots with a private opener, creates an actual Node helper, unloads only web-runtime and observes helper exit before acknowledgement while the HTTP listener stays alive. Complete old bundle code observes a live helper after acknowledgement; explicit fixture cleanup then ends it. No desktop browser or model API is used.",
+    "normalCases": "The four original browser startup snapshots, including authentication, credential scrubbing, failure and SSH suppression, pass with the new owner snapshot on Node22 and Node24. Runtime repetitions are not extra unique cases.",
+    "types": "Changed unit and CLI snapshot faces have zero diagnostics; normal scoped package compile passes.",
+    "build": "Normal Web bundle emits index/startup and their shared public-url chunk; matching changed type-plane JS and declaration are captured.",
+    "documentation": "Twenty doc-quick gates, export JSDoc and complete catalog freshness checks pass.",
+    "lint": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T132512Z/web-launch-lint-final.json"
+  },
+  "rejectedCandidate": {
+    "scope": "Old URL publication after owner replacement before readiness",
+    "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T132512Z/web-owner-before-fix.json",
+    "conclusion": "The pre-existing replacement regression already passes unchanged. No separate stale-URL bug is claimed."
+  },
+  "allocationClassification": "Administrative startup UI helper, not an agent/model workload. Its Node child is owned until close; the maintained opener keeps platform delegation and the post-handoff browser lifetime.",
+  "peerReports": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T132512Z/peer-r16-report.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T132512Z/peer-r16-model-and-freeze-report.json"
+  ],
+  "noteReview": "Keep the active ready-Web-page note: application readiness, SSH URL ownership and OS delegation remain valid. New helper cleanup rationale complements it; no full supersession.",
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T132512Z/r6-followup-root-source-union.json",
+  "mergeRequirement": "Apply fifteen B406 source deltas while preserving peer Local/Gateway/UI, FortuneSheet patch and lock changes. Twelve unchanged paths are verification inputs. Rebuild the Web bundle with its matching application, including both runtime entries and the reachable public-url chunk plus its changed JS/type declaration outputs. The native test hook now requires AbortSignal. This is separate from the verified B405 backend freeze being used by the peer for R16; do not replace that in-progress candidate or deploy the reference capsule independently.",
+  "limitations": [
+    "All12 business domains stay in_progress; B04/B25 stay implementation_in_progress.",
+    "Continue remaining resource admission, native containment and cross-computer permission paths outside peer-reserved files.",
+    "Gateway index ensureStewardSpace remains peer-reserved. Browser platform handoff and physical Windows/Linux acceptance are separate from the verified Node helper.",
+    "Peer prepares R16 from the verified B405 freeze, preserves per-user model authorization and owns FortuneSheet read-only DOM and ComputerSelector fixes. B loopback host.describe latency remains open.",
+    "Root real paid API verification remains deferred; root has not deployed this batch.",
+    "Actual platform is macOS. Shipped CLI tests use a private opener; they do not prove physical Windows/Linux desktop handoff, whole native process containment or production acceptance.",
+    "Built checks use live shared workspace dependencies; the capsule retains prior root Local reference artifacts and excludes newer peer artifacts."
+  ],
+  "rootDeployed": false
+}

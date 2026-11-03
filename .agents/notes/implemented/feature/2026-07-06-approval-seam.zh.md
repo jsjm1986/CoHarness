@@ -53,6 +53,8 @@ tool/result      "escalated" — this one call ran under the wider mode; the gra
 
 经过校验并成功追加 `approval/asked` 后，服务将 `approval/request` waterfall 解析为 `allowed-once`、`rejected`、`cancelled` 或 `unavailable`。服务沿用只读的请求标识和 signal，将中止视为 `cancelled`，把应答者失败和无效返回统一转换为 `unavailable`，丢弃迟到的应答，并追加配对的 `approval/decided` 事件。提交前的审计失败会拒绝；追加后的观察者失败无法撤销权威事件。`allowed-once` 仅授权所询问的操作，而 `request()` 会拒绝进行中的轮次之外的调用，以保证审计对留在持久提交边界内。
 
+服务负责接纳请求并完成已接纳请求的审计。撤下时关闭接纳入口、取消已接纳的决定，并等待配对审计写入；排队分发和每次中间件继续都会在进入应答者前再次检查取消，包括分发观察者触发的取消。旧引用不能在服务撤下后接纳请求或写入策略。保留的服务引用不能用早先的默认值覆盖替换提供方的策略，未完成的应答也不能在服务消失后授权执行。
+
 应答者是 `approval/request` waterfall 监听器。零监听器会直接落到 `unavailable`；识别该 agent 的监听器占用先到先得的决策槽，而不识别的监听器必须调用 `next()` 委派。监听器会随其 fiber 一同 dispose（资源释放），因此卸载通道后，请求会在故障时默认被拒绝。由于兄弟插件的注册顺序不确定，部署应组合一个终端应答者，并保留 `prepend` 给「决策或委派」门禁。
 
 `ApprovalRequest` 携带发起请求的 `agent`、`toolName`、可选的精确 `callId`、人类可读的 `reason` 和可选的 `signal`。它使用 `CallId` brand 而不导入依赖本 seam 的 `dsh-tools`。通道适配器可按 `callId` 关联任何更丰富的调用状态；审批请求本身不重复携带工具参数。

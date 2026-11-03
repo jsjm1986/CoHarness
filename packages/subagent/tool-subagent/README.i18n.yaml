@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/tool-subagent/README.md
 document:
-  en: 7d705c8eb08d7ad6c8bb99bd542ceaf460da6294
-  zh: 7275aa29726765d0fd877cbd5f72eb0ac2236542
+  en: b3e242286706623f29c34cad3bee500e91f6c7fa
+  zh: 9505ee42bf2f634dcb761f7690946ab9831ac7ac
 /:
   en: 3dc0ccef49097361
   zh: 61495d48365178df
@@ -18,8 +18,8 @@ document:
   en: 8a77278a6b294e9a
   zh: 76ab3cc83669d193
 /deepseek-ai-dsh-tool-subagent/provider-selection-and-lifecycle:
-  en: 7e36b2ca4dcc3d24
-  zh: 26314572b5c6ea49
+  en: d3a70cb6c1fdf48c
+  zh: 5308dad73a08fa35
 /deepseek-ai-dsh-tool-subagent/config:
   en: 9cd8d8c1ccf4f9d4
   zh: 3028eec3b0600082
@@ -108,8 +108,8 @@ document:
   en: f5d5f97a153f7c70
   zh: afc7da8783b348c6
 /deepseek-ai-dsh-tool-subagent/known-limitations-and-deferred-work:
-  en: 8fc61a781a0dc0a8
-  zh: 50421ed0291637fa
+  en: 09cdbff533db37e1
+  zh: bee9cb718fe18fa8
 /deepseek-ai-dsh-tool-subagent/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

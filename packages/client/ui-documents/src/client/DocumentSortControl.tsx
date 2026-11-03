@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { Button, IconChevronDownOutline14, IconChevronsUpDownOutline16, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconChevronDownOutline14, IconChevronsUpDownOutline16, Menu, useMediaQuery } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DocumentSort, DocumentSortKey } from './listing.ts'
 import type { DocumentsKey } from './locales.ts'
 import css from './DocumentSortControl.module.css'
@@ -29,6 +29,7 @@ export function DocumentSortControl({ sort, onChange, t, inline = false, disable
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const touch = useMediaQuery('(pointer: coarse)')
   const valueId = useId()
   const chooseField = (key: DocumentSortKey) => { onChange(`${key}:${key === 'name' ? 'asc' : 'desc'}`) }
   const orderedDirections = sort.key === 'name' ? ['asc', 'desc'] as const : ['desc', 'asc'] as const
@@ -40,7 +41,7 @@ export function DocumentSortControl({ sort, onChange, t, inline = false, disable
       {orderedDirections.map(dir => <label key={dir}><input type="radio" name="documents-sort-direction" checked={sort.dir === dir} onChange={() => { onChange(`${sort.key}:${dir}`) }} /><span>{t(directions[sort.key][dir])}</span></label>)}
     </div></fieldset>
   </div>
-  return <Menu open={open} onClose={() => { setOpen(false) }} portal autoFocus compact align="end"
+  return <Menu open={open} onClose={() => { setOpen(false) }} portal autoFocus compact={!touch} align="end"
     anchor={<Button className={css.trigger} size="toolbar" variant="ghost" type="button" disabled={disabled} aria-label={t('modal.sort')} aria-describedby={valueId} aria-haspopup="menu" aria-expanded={open} onClick={() => { setOpen(!open) }} icon={<IconChevronsUpDownOutline16 size={16} />}><span id={valueId}>{t(fieldLabels[sort.key])} · {t(directions[sort.key][sort.dir])}</span><IconChevronDownOutline14 size={12} /></Button>}
     selectedIds={[`field:${sort.key}`, `direction:${sort.dir}`]}
     items={[

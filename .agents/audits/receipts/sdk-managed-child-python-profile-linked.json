@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-child-python-profile-linked",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest -q python/sdk/tests/test_sdk_child_process_admission.py",
+  "startedAt": "2026-10-24T14:47:25.870461+00:00",
+  "seconds": 6.121,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "03572db71f9d3b6d5130f9c17db6942f19e9b476b9b72f27489a36e10abafb7b",
+  "inputsAfter": "03572db71f9d3b6d5130f9c17db6942f19e9b476b9b72f27489a36e10abafb7b",
+  "postgresToolDirectory": null,
+  "outputSha256": "c4b808d34f4db00b333696dec1f3a43a2887d8bfe0cb7af07a3cb98ff43a7830",
+  "outputTail": "....                                                                     [100%]\n"
+}

@@ -5,6 +5,7 @@
  * expandable detail. The entry-level composition stays in the matrix view
  * the page folds below this list.
  */
+import { usePendingEdits } from '../pending-edits.tsx'
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -502,6 +503,8 @@ function EntryConfigSection({ row, t, busy, describeRowConfig, setRowConfig }: {
   const [loaded, setLoaded] = useState(false)
   const [hasSchema, setHasSchema] = useState(false)
   const [draft, setDraft] = useState('')
+  const [baseline, setBaseline] = useState('')
+  usePendingEdits(loaded && (draft !== baseline || busy))
   const [draftError, setDraftError] = useState<string | null>(null)
   useEffect(() => {
     if (entryId === undefined) return
@@ -511,7 +514,8 @@ function EntryConfigSection({ row, t, busy, describeRowConfig, setRowConfig }: {
       setLoaded(true)
       if (desc === undefined) return
       setHasSchema(desc.schema !== undefined)
-      setDraft(desc.config === null ? '' : JSON.stringify(desc.config, null, 2))
+      const text = desc.config === null ? '' : JSON.stringify(desc.config, null, 2)
+      setDraft(text); setBaseline(text)
     })
     return () => { alive = false }
   }, [entryId, describeRowConfig])

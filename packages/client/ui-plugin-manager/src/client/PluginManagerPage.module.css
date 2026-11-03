@@ -52,6 +52,14 @@
   line-height: 28px;
 }
 
+.titleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--dsw-space-2);
+  min-width: 0;
+}
+
 .pageIntro {
   display: flex;
   align-items: center;

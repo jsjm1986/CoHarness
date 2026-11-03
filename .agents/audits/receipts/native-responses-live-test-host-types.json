@@ -1,0 +1,14 @@
+{
+  "name": "native-responses-live-test-host-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-25T04:19:16.618560+00:00",
+  "seconds": 6.77,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "69d0aac1e58ab946e167776d6db6500bca8a99bfed632c9030f3703314d00b3a",
+  "inputsAfter": "69d0aac1e58ab946e167776d6db6500bca8a99bfed632c9030f3703314d00b3a",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

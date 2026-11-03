@@ -52,7 +52,8 @@ async function serveFile(req: IncomingMessage, res: ServerResponse, fs: FileSyst
   const abort = new AbortController()
   // A keep-alive socket outlives one request, so socket close is the only
   // reliable client-disconnect signal for an in-flight bounded read.
-  req.socket.once('close', () => { abort.abort() })
+  const disconnect = (): void => { abort.abort() }
+  req.socket.once('close', disconnect)
   try {
     const target = await fs.resolve(path, { signal: abort.signal })
     const mediaType = mime.lookup(target.displayPath) || 'application/octet-stream'
@@ -85,6 +86,8 @@ async function serveFile(req: IncomingMessage, res: ServerResponse, fs: FileSyst
   } catch (error: unknown) {
     if (!(error instanceof FsError)) throw error
     fail(FS_STATUSES[error.code] ?? 500, error.code)
+  } finally {
+    req.socket.removeListener('close', disconnect)
   }
 }
 

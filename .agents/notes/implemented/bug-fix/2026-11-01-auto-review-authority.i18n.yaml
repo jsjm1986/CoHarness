@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-auto-review-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-auto-review-authority.md
+document:
+  en: e24b4a04326c2e0e95d88164f3bba236e33b9231
+  zh: 6fec7ea279c6aa955263c00087eb245686a05e1e
+/agent-note-auto-reviews-retain-their-issuer-through-tool-admission:
+  en: 386375cfeecb991d
+  zh: 2f86ac19d6c34382
+/agent-note-auto-reviews-retain-their-issuer-through-tool-admission/problem:
+  en: d45e21bb8e84893a
+  zh: 7cf758072eb981a1
+/agent-note-auto-reviews-retain-their-issuer-through-tool-admission/decision:
+  en: 54f77565fccd4314
+  zh: a792e7494440752e
+/agent-note-auto-reviews-retain-their-issuer-through-tool-admission/alternatives-considered:
+  en: c78246dbb0494b45
+  zh: 1f2b0fa95b2410df
+/agent-note-auto-reviews-retain-their-issuer-through-tool-admission/consequences:
+  en: 31e645dbb03bd579
+  zh: c25c20932d9b1a7b
+/agent-note-auto-reviews-retain-their-issuer-through-tool-admission/verification:
+  en: 09a7b01db57054d1
+  zh: 91e0eced1a8d5dc7

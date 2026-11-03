@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-final-assertion-guard",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/verify-no-unknown-casts.ts",
+  "startedAt": "2026-10-26T18:16:38.134443+00:00",
+  "seconds": 13.632,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2a8d92dff78be1af880c06accb5bcae6a2c33f7be014239347b137de0cecb526",
+  "inputsAfter": "2a8d92dff78be1af880c06accb5bcae6a2c33f7be014239347b137de0cecb526",
+  "postgresToolDirectory": null,
+  "outputSha256": "6978098bd994eb5b9663b492c69a45915dc5a07f689ecfd777233b9177b588fe",
+  "outputTail": "verify-no-unknown-casts: no new assertions; 1864 existing assertions remain.\n"
+}

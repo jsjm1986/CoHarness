@@ -1,0 +1,14 @@
+{
+  "name": "sdk-child-python-projection",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_sdk_child_process_admission.py -q",
+  "startedAt": "2026-10-24T10:21:23.915215+00:00",
+  "seconds": 4.604,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b86f470b44bdd7e2292e444b8799cec9bfe3f6206e5e6845bc693e936f8fc706",
+  "inputsAfter": "b86f470b44bdd7e2292e444b8799cec9bfe3f6206e5e6845bc693e936f8fc706",
+  "postgresToolDirectory": null,
+  "outputSha256": "99db33d5c94c6f7da021687c7391181685cc33299c5435b1c861e2db3be3ec87",
+  "outputTail": "..                                                                       [100%]\n"
+}

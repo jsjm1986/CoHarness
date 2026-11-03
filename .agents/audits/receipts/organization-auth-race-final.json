@@ -1,0 +1,13 @@
+{
+  "name": "organization-auth-race-final",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/postgres.spec.ts -t 'refuses human' --no-file-parallelism --retry=0",
+  "startedAt": "2026-10-23T19:32:06.962315+00:00",
+  "seconds": 3.583,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "55d4f66fccc1d8f7962db27dae93b1170fdef836fbcd4d4d722ce31d1f34f3ad",
+  "inputsAfter": "55d4f66fccc1d8f7962db27dae93b1170fdef836fbcd4d4d722ce31d1f34f3ad",
+  "outputSha256": "ef60a381ed952b07365522a6004703483aec45e75c24a29c5c34f4e77d386f96",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  3 passed | 36 skipped (39)\n   Start at  03:32:07\n   Duration  2.73s (transform 1.50s, setup 0ms, import 1.83s, tests 826ms, environment 0ms)\n\n"
+}

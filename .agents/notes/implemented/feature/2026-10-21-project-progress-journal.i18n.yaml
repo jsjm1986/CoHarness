@@ -3,38 +3,32 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-21-project-progress-journal.md
 document:
-  en: af9e623e0b34c6d2f5302b4fc9c9e870f28c4cd8
-  zh: 650ae8bc22582271c55e53cfcc6c3ef9f23e3f94
-/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity:
-  en: 0e62f9e9949e35e7
-  zh: 19576a7e88941175
-/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/problem:
-  en: 8665b2ddf2e72edd
-  zh: bd6ccc9645b2b14b
-/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision:
-  en: bab2b1167bd3cad7
-  zh: 10011b18adbb69a0
-/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision/storage-migration-059:
-  en: 2e91aa49c3ce1457
-  zh: e9d69fed6ae2cf3e
-/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision/material-member-visible-only:
-  en: a8f0fb3b1196e2ee
-  zh: a35ed83889a62b6a
-/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision/trigger-three-gates-never-a-timer-pass:
-  en: 94ee6b9f8f4b67b2
-  zh: 9786d558d2346017
-/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision/pass-single-flight-committed-only-on-success:
-  en: d991c77ec36cad7d
-  zh: b49ea6e05ce042cd
-/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/decision/client-progress-as-the-default-mode:
-  en: 29c74cd06d3baa91
-  zh: fef567159e26ce32
-/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/alternatives-considered:
-  en: 74b03ff932f46613
-  zh: f619da31f57c69da
-/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/consequences:
-  en: 0cdd94dfea26cb20
-  zh: 4799d35a3a670f67
-/agent-note-project-progress-journal-a-human-facing-ai-digest-of-shared-activity/testing:
-  en: 6b083f9f852d713b
-  zh: 6d907bbde29ef314
+  en: 54a7a81fb6f05c0478d4b3956d241413138b67bc
+  zh: d8d070fe119b0187c9f0161c07a3d014a3c0a2c7
+/agent-note-project-progress-journal:
+  en: 4d7ef63300ca8e0d
+  zh: 5c6ea11af38ed88f
+/agent-note-project-progress-journal/problem:
+  en: e9183a9a97e4bffa
+  zh: 05316040b1d5b5b0
+/agent-note-project-progress-journal/decision:
+  en: dfd461e09c297812
+  zh: 5ed701d12168124d
+/agent-note-project-progress-journal/decision/request-ownership-and-evidence:
+  en: 77b3acdff3af4d81
+  zh: b9c33f35c446ed41
+/agent-note-project-progress-journal/decision/publication-and-source-privacy:
+  en: d05251eaf1ba74ff
+  zh: 42adf23eb7d4cbcf
+/agent-note-project-progress-journal/decision/product-surface:
+  en: 3a1fe3d4f7a36e3b
+  zh: 79aee8b339c57cc1
+/agent-note-project-progress-journal/alternatives-considered:
+  en: 914d52a4b5415752
+  zh: 35a63fbfb45b60fa
+/agent-note-project-progress-journal/consequences:
+  en: 771c463f6f3b54c5
+  zh: 440e093c6197bea8
+/agent-note-project-progress-journal/verification:
+  en: 02ce969273d9516c
+  zh: 43ab3cb0376f3b71

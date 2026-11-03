@@ -55,6 +55,16 @@ export function settingsControlState<T>(snapshot: SettingsScopeSnapshot<T>): Set
   }
 }
 
+/**
+ * Resolve the write state of the source storing one settings field.
+ * @param scope - namespace scope, optionally combining several persistence sources.
+ * @param field - scalar field whose controls or writes need an authority answer.
+ * @returns field-specific availability, or the namespace state for a single-source scope.
+ */
+export function settingsFieldControlState<T>(scope: SettingsScope<T>, field: string): SettingsControlState {
+  return scope.getFieldControlState?.(field) ?? settingsControlState(scope.getSnapshot())
+}
+
 /** Client-side sync state of one settings namespace. */
 export interface SettingsScopeSnapshot<T> {
   /**
@@ -110,6 +120,13 @@ export interface SettingsScopeSpec<T> {
  * and observe the snapshot and route explicit user choices through `set`.
  */
 export interface SettingsScope<T> {
+  /**
+   * Resolve a field's source when a namespace combines persistence sources.
+   * Single-source scopes omit this method and use their snapshot state.
+   * @param field - scalar field stored by the namespace.
+   * @returns the selected source's current availability and write state.
+   */
+  getFieldControlState?(field: string): SettingsControlState
   /** @returns the current sync snapshot (stable reference until the next change). */
   getSnapshot(): SettingsScopeSnapshot<T>
   /**

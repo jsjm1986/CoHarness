@@ -1,0 +1,13 @@
+{
+  "name": "gateway-postgres-collection-before",
+  "cwd": "gateway",
+  "command": "npm exec vitest run tests/postgres-suite.spec.ts",
+  "startedAt": "2026-10-23T21:22:09.418476+00:00",
+  "seconds": 1.881,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ebe4e62144f426ec026db7c60655317ce72bc4bd21b44a114959b9e52823df38",
+  "inputsAfter": "ebe4e62144f426ec026db7c60655317ce72bc4bd21b44a114959b9e52823df38",
+  "outputSha256": "af831a422194a1400dd4620dd90cefe9eab9ad87967ac0ba4f53b5e38b5eb963",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/postgres-suite.spec.ts (1 test | 1 failed) 14ms\n   × includes every directly PostgreSQL-gated suite in test:postgres 12ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/postgres-suite.spec.ts > includes every directly PostgreSQL-gated suite in test:postgres\nAssertionError: expected [ …(4) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"node-resource-budget-postgres.spec.ts\",\n+   \"project-progress-postgres.spec.ts\",\n+   \"runtime-resource-api.spec.ts\",\n+   \"runtime-resource-provider.spec.ts\",\n+ ]\n\n ❯ tests/postgres-suite.spec.ts:11:90\n      9|   const databaseSuites = readdirSync(import.meta.dirname).filter(file …\n     10|     && /\\bprocess\\.env\\.HGW_TEST_DATABASE_URL\\b/.test(readFileSync(joi…\n     11|   expect(databaseSuites.filter(file => !command.split(/\\s+/).includes(…\n       |                                                                                          ^\n     12|   expect(command.split(/\\s+/)).toContain('--no-file-parallelism')\n     13| })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  05:22:11\n   Duration  150ms (transform 16ms, setup 0ms, import 27ms, tests 14ms, environment 0ms)\n\n"
+}

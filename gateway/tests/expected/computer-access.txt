@@ -1,0 +1,4 @@
+Existing personal-space access stays on its original computer; project membership alone does not grant another computer.
+The center grants an offline computer without forwarding or creating a personal Runtime.
+Project access requires both current membership and the hosting computer permission.
+Revoking computer B hides its project while the same login retains computer A.

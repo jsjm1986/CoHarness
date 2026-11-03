@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, onTestFinished, vi } from 'vitest'
 import * as api from '../api.ts'
+import { runtimeFixture, runtimePageFixture } from '../components/runtime-fixture.ts'
 import { pluginManagementRemote } from '../plugins/transport.ts'
 import type { PluginManagementRemote } from '../plugins/transport.ts'
 import type { PluginInfo, PluginManagementCatalog } from '../../../../packages/boot/plugin-manager/src/types.ts'
@@ -10,13 +11,15 @@ import { StrictMode } from 'react'
 import { PluginsPage } from './PluginsPage.tsx'
 
 vi.mock('../api.ts', () => ({
+  getAdminComputerContext: vi.fn(), listRuntimeEnvironments: vi.fn(), listUserRuntimes: vi.fn(),
+  getRuntimeAllocationPolicy: vi.fn(), saveRuntimeAllocationPolicy: vi.fn(), allocateUserRuntime: vi.fn(), operateRuntime: vi.fn(),
   listUsers: vi.fn(), listProjects: vi.fn(), pluginManagementTarget: vi.fn(),
   getPluginPolicy: vi.fn(), setPluginPolicy: vi.fn(),
   pluginManagementState: vi.fn(), pluginManagementSaveState: vi.fn(), pluginManagementOverview: vi.fn(async () => []),
 }))
 vi.mock('../plugins/transport.ts', () => ({ pluginManagementRemote: vi.fn() }))
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
-const target: api.PluginManagementTarget = { nodeId: 'node-a', target: { kind: 'user', id: 1 }, generation: 3 }
+const target: api.PluginManagementTarget = { nodeId: 'node-a', target: { kind: 'user', id: 1, runtimeId: runtimeFixture('user', 1).id }, generation: 3 }
 let remoteFixture: PluginManagementRemote
 const stateView: api.PluginManagementState = {
   revision: '2',
@@ -33,9 +36,14 @@ beforeEach(() => {
     setItem: (key: string, value: string) => { storage.set(key, value) },
     removeItem: (key: string) => { storage.delete(key) },
   })
+  vi.mocked(api.getAdminComputerContext).mockResolvedValue({ nodeId: 'node-a' as api.RuntimeNodeId, name: 'Computer A', forwardingEnabled: true })
+  vi.mocked(api.listUserRuntimes).mockImplementation(async id => runtimePageFixture('user', id))
+  vi.mocked(api.listRuntimeEnvironments).mockResolvedValue(runtimePageFixture('project', 7))
+  vi.mocked(api.getRuntimeAllocationPolicy).mockResolvedValue({ revision: '0', maxTotal: 8, maxPerNode: 4, source: 'organization' })
+
   vi.mocked(api.listUsers).mockResolvedValue([{ id: 1, displayName: 'Alice' } as api.AdminUser])
   vi.mocked(api.listProjects).mockResolvedValue([{ id: 7, name: 'Shared' } as api.Project])
-  vi.mocked(api.pluginManagementTarget).mockImplementation(async (kind, id) => ({ ...target, target: { kind, id } }))
+  vi.mocked(api.pluginManagementTarget).mockImplementation(async (kind, id, _signal, runtimeId) => ({ ...target, target: { kind, id, runtimeId } }))
   vi.mocked(api.pluginManagementState).mockResolvedValue(stateView)
   vi.mocked(api.getPluginPolicy).mockImplementation(async (kind, id) => ({ kind, id, enabled: true, revision: '2' }))
   const unused = vi.fn(async () => { throw new Error('unexpected mutation') })
@@ -64,7 +72,7 @@ async function chooseUser() {
 }
 it('ignores a late old target and never mounts a stopped runtime', async () => {
   const pending = Promise.withResolvers<api.PluginManagementTarget>()
-  vi.mocked(api.pluginManagementTarget).mockImplementation((kind, id) => kind === 'user' ? pending.promise : Promise.resolve({ ...target, target: { kind, id }, generation: null }))
+  vi.mocked(api.pluginManagementTarget).mockImplementation((kind, id, _signal, runtimeId) => kind === 'user' ? pending.promise : Promise.resolve({ ...target, target: { kind, id, runtimeId }, generation: null }))
   render(<PluginsPage />)
   const user = await chooseUser()
   const signal = vi.mocked(api.pluginManagementTarget).mock.calls[0]![2]!
@@ -103,7 +111,7 @@ it('aborts the previous workflow on a scope switch and aborts the next on unmoun
   await waitFor(() => expect(vi.mocked(pluginManagementRemote).mock.calls.length).toBeGreaterThan(firstSignals.length))
   expect(firstSignals.every(signal => signal.aborted)).toBe(true)
   const last = vi.mocked(pluginManagementRemote).mock.calls.at(-1)!
-  expect(last[0].target).toEqual({ kind: 'project', id: 7 })
+  expect(last[0].target).toEqual({ kind: 'project', id: 7, runtimeId: runtimeFixture('project', 7).id })
   view.unmount()
   expect(vi.mocked(pluginManagementRemote).mock.calls.every(call => call[1].aborted)).toBe(true)
 })
@@ -124,7 +132,7 @@ it('shares one startup draft between the folded matrix and the save bar', async 
   await waitFor(() => expect(screen.getByText('启动时 · 1 项变更待保存')).toBeTruthy())
   fireEvent.click(screen.getByRole('button', { name: '保存插件组成' }))
   await waitFor(() => expect(api.pluginManagementSaveState).toHaveBeenCalledWith(
-    { target: { kind: 'user', id: 1 }, revision: '2', state: { entries: [], bundles: [] } }))
+    { target: { kind: 'user', id: 1, runtimeId: runtimeFixture('user', 1).id }, revision: '2', state: { entries: [], bundles: [] } }))
   await waitFor(() => expect(screen.queryByText(/项变更待保存/)).toBeNull())
 })
 it('rejects a different target before exposing any management action', async () => {

@@ -1,0 +1,14 @@
+{"method":"GET","change":"disabled-account","status":403,"error":"forbidden","initialRows":0,"revision":null,"successfulAudit":0,"recoveredTheme":null}
+{"method":"GET","change":"deleted-account","status":403,"error":"forbidden","initialRows":0,"revision":null,"successfulAudit":0,"recoveredTheme":null}
+{"method":"GET","change":"disabled-membership","status":403,"error":"forbidden","initialRows":0,"revision":null,"successfulAudit":0,"recoveredTheme":null}
+{"method":"GET","change":"missing-membership","status":403,"error":"forbidden","initialRows":0,"revision":null,"successfulAudit":0,"recoveredTheme":null}
+{"method":"GET","change":"disabled-organization","status":403,"error":"forbidden","initialRows":0,"revision":null,"successfulAudit":0,"recoveredTheme":null}
+{"method":"GET","change":"current","status":200,"error":null,"initialRows":1,"revision":0,"successfulAudit":0,"recoveredTheme":null}
+{"method":"PATCH","change":"disabled-account","status":403,"error":"forbidden","initialRows":0,"revision":null,"successfulAudit":0,"recoveredTheme":null}
+{"method":"PATCH","change":"deleted-account","status":403,"error":"forbidden","initialRows":0,"revision":null,"successfulAudit":0,"recoveredTheme":null}
+{"method":"PATCH","change":"disabled-membership","status":403,"error":"forbidden","initialRows":0,"revision":null,"successfulAudit":0,"recoveredTheme":null}
+{"method":"PATCH","change":"missing-membership","status":403,"error":"forbidden","initialRows":0,"revision":null,"successfulAudit":0,"recoveredTheme":null}
+{"method":"PATCH","change":"disabled-organization","status":403,"error":"forbidden","initialRows":0,"revision":null,"successfulAudit":0,"recoveredTheme":null}
+{"method":"PATCH","change":"current","status":200,"error":null,"initialRows":1,"revision":1,"successfulAudit":1,"recoveredTheme":null}
+{"method":"GET","change":"legacy-io","status":503,"error":"account-preferences-unavailable","initialRows":0,"revision":null,"successfulAudit":0,"recoveredTheme":"dark"}
+{"method":"GET","change":"legacy-fifo","status":503,"error":"account-preferences-unavailable","initialRows":0,"revision":null,"successfulAudit":0,"recoveredTheme":"dark"}

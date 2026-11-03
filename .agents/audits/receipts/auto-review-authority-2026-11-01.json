@@ -1,0 +1,217 @@
+{
+  "finding": "B412",
+  "title": "Auto reviewer issuer replacement, delayed authorization and managed fallback can authorize stale work",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "at": "2026-10-31T19:20:38.529605+00:00",
+  "localDate": "2026-11-01",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T182903Z",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.md",
+    ".agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-auto-review-authority.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-auto-review-authority.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-auto-review-authority.zh.md",
+    ".agents/notes/implemented/feature/2026-08-28-auto-review.i18n.yaml",
+    ".agents/notes/implemented/feature/2026-08-28-auto-review.md",
+    ".agents/notes/implemented/feature/2026-08-28-auto-review.zh.md",
+    "apps/cli/tests/profiles/sdk/auto-review-authority.expected.e2e.ts",
+    "apps/cli/tests/profiles/sdk/auto-review-model.expected.e2e.ts",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/auto-review-request-events/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/auto-review-request-events/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/auto-review-request-events/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/auto-review-authority/expected.json",
+    "examples/headless-agent/tests/fixtures/auto-review-authority/model.mjs",
+    "examples/headless-agent/tests/fixtures/auto-review-authority/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/auto-review-authority/register.mjs",
+    "examples/headless-agent/tests/fixtures/auto-review-authority/runtime.cordis.yml",
+    "examples/headless-agent/tests/fixtures/auto-review-model/expected.json",
+    "examples/headless-agent/tests/fixtures/auto-review-model/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/auto-review-model/runtime.cordis.yml",
+    "packages/experimental/auto-review/README.i18n.yaml",
+    "packages/experimental/auto-review/README.md",
+    "packages/experimental/auto-review/README.zh.md",
+    "packages/experimental/auto-review/src/index.ts",
+    "packages/experimental/auto-review/tests/managed-execution.spec.ts",
+    "python/sdk/tests/test_auto_review_authority_expected.py",
+    "python/sdk/tests/test_auto_review_model_expected.py"
+  ],
+  "matchingPrerequisites": [
+    "apps/cli/package.json",
+    "apps/cli/tsconfig.json",
+    "examples/headless-agent/tests/auxiliary-model-fixture.ts",
+    "examples/headless-agent/tests/fixtures/auto-review-model.mjs",
+    "examples/package.json",
+    "packages/context/agent-instructions/package.json",
+    "packages/context/agent-instructions/src/index.ts",
+    "packages/context/agent-instructions/tsconfig.json",
+    "packages/context/execution-authority/package.json",
+    "packages/context/execution-authority/src/index.ts",
+    "packages/context/execution-authority/src/types.ts",
+    "packages/context/execution-authority/tsconfig.json",
+    "packages/core/agent/package.json",
+    "packages/core/agent/src/index.ts",
+    "packages/core/agent/tsconfig.json",
+    "packages/core/session/package.json",
+    "packages/core/session/src/index.ts",
+    "packages/core/session/tsconfig.json",
+    "packages/core/tools/package.json",
+    "packages/core/tools/src/index.ts",
+    "packages/core/tools/tsconfig.json",
+    "packages/experimental/auto-review/cordis.patch.yml",
+    "packages/experimental/auto-review/package.json",
+    "packages/experimental/auto-review/tests/auto-review.e2e.ts",
+    "packages/experimental/auto-review/tests/auto-review.spec.ts",
+    "packages/experimental/auto-review/tests/fixtures/managed.cordis.yml",
+    "packages/experimental/auto-review/tsconfig.json",
+    "packages/fs/fs-local/package.json",
+    "packages/fs/fs-local/src/index.ts",
+    "packages/fs/fs-local/tsconfig.json",
+    "packages/interaction/permission-presets/package.json",
+    "packages/interaction/permission-presets/src/index.ts",
+    "packages/interaction/permission-presets/tsconfig.json",
+    "packages/llm/llm/package.json",
+    "packages/llm/llm/src/index.ts",
+    "packages/llm/llm/src/operations.ts",
+    "packages/llm/llm/tsconfig.json",
+    "packages/sdk/client/package.json",
+    "packages/sdk/client/src/index.ts",
+    "packages/sdk/client/tsconfig.json",
+    "packages/session/session-projection/package.json",
+    "packages/session/session-projection/src/index.ts",
+    "packages/session/session-projection/tsconfig.json",
+    "packages/session/working-directory/package.json",
+    "packages/session/working-directory/src/index.ts",
+    "packages/session/working-directory/tsconfig.json",
+    "packages/test-support/loader-smoke/package.json",
+    "packages/test-support/loader-smoke/src/index.ts",
+    "packages/test-support/loader-smoke/tsconfig.json",
+    "packages/test-support/session-snapshot/package.json",
+    "packages/test-support/session-snapshot/src/index.ts",
+    "packages/test-support/session-snapshot/tsconfig.json",
+    "packages/util/values/package.json",
+    "packages/util/values/src/index.ts",
+    "packages/util/values/tsconfig.json",
+    "pnpm-lock.yaml",
+    "vendor/cordis/package.json",
+    "vendor/cordis/src/index.ts",
+    "vendor/cordis/tsconfig.json",
+    "vendor/include/package.json",
+    "vendor/include/src/index.ts",
+    "vendor/include/tsconfig.json",
+    "vendor/loader/package.json",
+    "vendor/loader/src/index.ts",
+    "vendor/loader/tsconfig.json",
+    "vitest.expected.config.ts"
+  ],
+  "removedPaths": [
+    "snapshots/sdk/auto-review-model/expected.json",
+    "snapshots/sdk/auto-review-model/prepare.mjs",
+    "snapshots/sdk/auto-review-model/runtime.cordis.yml",
+    "snapshots/sdk/auto-review-model.snapshot.ts",
+    "python/sdk/tests/test_auto_review_model_snapshot.py"
+  ],
+  "cause": "Review authorization did not retain the issuing service or enter its captured tool scope. Qualification could be revoked while directory/model work waited, and an equal-state replacement could authorize the tool. Final async authorization handed off after its last issuer check. Optional-authority presence did not establish or retain managed behavior before a reviewed call, including for already-pending local work.",
+  "implementation": "Each review retains its original authority, verified tool participants and shared deployment classification. It enters runCaptured with the attested tool scope, uses instance-owned AsyncLocalStorage to reauthorize after capacity and at physical dispatch, and confirms the original issuer after downstream tool policies and the final asynchronous handoff. Caller/lifecycle cancellation wins. Optional authority presence remains managed after withdrawal; old local work is refused and unload uses Workspace write. Disposal joins active reviews before disabling the context.",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchedAt": "2026-10-31T19:14:32.414373+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T182903Z/auto-origin-final.json",
+    "sharedChangesPreserved": true
+  },
+  "verification": {
+    "uniqueRelatedCases": 93,
+    "unitCases": 71,
+    "unitFiles": 2,
+    "typescriptSdkCases": 11,
+    "pythonSdkCases": 11,
+    "newManagedCasesPerSdk": 10,
+    "coverage": {
+      "statements": {
+        "pct": 100.0,
+        "covered": 361,
+        "total": 361
+      },
+      "branches": {
+        "pct": 100.0,
+        "covered": 287,
+        "total": 287
+      },
+      "functions": {
+        "pct": 100.0,
+        "covered": 50,
+        "total": 50
+      },
+      "lines": {
+        "pct": 100.0,
+        "covered": 320,
+        "total": 320
+      }
+    },
+    "coverageReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T182903Z/auto-unit-final-complete.json",
+    "unitNodeMajor": 22,
+    "sdkModes": [
+      "source",
+      "built Node22",
+      "built Node24"
+    ],
+    "negativeReceipts": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T182903Z/auto-issuer-before-fix.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T182903Z/auto-handoff-and-fallback-negative.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T182903Z/auto-optional-pending-negative.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T182903Z/auto-old-source-complete.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T182903Z/auto-old-lib-complete.json"
+    ],
+    "negativeInterpretation": "Complete predecessor src/lib each fail10 current SDK assertions. Eight cases show unnecessary physical requests, stale-provider tool writes or unsafe managed fallback. Response revocation and the ordinary allow already preserve their terminal behavior on the predecessor, but fail the new captured-scope assertion. Original unit negatives also reproduce the final issuer handoff and optional-provider unload gaps. No private predecessor byte was rewritten.",
+    "observations": "Actual shipped sdk-minimal processes, LlmRuntime and ToolRuntime observe exact logged reviewer input, original primary42 and tool witnesses, no replacement authorization, physical request counts, real owned-file writes or their absence, completed permits, persisted Session continuation, optional-provider adoption and unload fallback. Concurrent package Sessions prove revoking account7 does not borrow account8 while both await capacity. Authorization and adapters are controlled fixtures; no production Gateway or paid-provider claim.",
+    "build": "Scoped normal tsc and tsdown Auto build; strict changed test compilation has zero own/transitive diagnostics. Current lint, Python ruff, exported JSDoc,127 Cordis catalog artifacts and3 module graph artifacts pass.",
+    "documentation": "Five bilingual pairs and20 current quick documentation gates pass. Five non-recorded Auto fixture/test paths move to owner-local expected-output tests, including the Python fixture reference; no recorded Session generation is altered.",
+    "fixtureCorrections": [
+      "An initial observation reader expected nested ToolExecutionResult fields instead of the durable tool/result error envelope; corrected before the source/Node22/Node24/Python evidence.",
+      "Readiness uses rename after completing its private JSON file, so observing the marker cannot race a partial write.",
+      "Strict checking of the moved legacy SDK test found its opaque plugin record compared against SessionEventMap; it now uses the existing pluginRecordOf reader."
+    ],
+    "notClaimed": [
+      "whole-repository suite",
+      "full doc-sync",
+      "PostgreSQL or Docker acceptance",
+      "root production deployment",
+      "physical computer acceptance",
+      "paid official Responses"
+    ]
+  },
+  "notes": {
+    "newNote": "2026-11-01-auto-review-authority",
+    "partialSupersessionsRetained": [
+      "2026-09-22-auto-review-execution-attribution: preset selection, settings writes and historical billing remain active; linked new issuer decision",
+      "2026-08-28-auto-review: risk policy, PTC action sources, inherited presets and local lifecycle remain active; current-directory fact updated"
+    ],
+    "independentNotesRetained": [
+      "2026-09-22-admin-auto-review-eligibility: durable administrator grants and invalidation",
+      "2026-10-24-auto-review-request-records: exact durable reviewer inputs",
+      "2026-09-20-auto-review-denial-presentation: client error identity and generic tool rendering"
+    ],
+    "archived": [],
+    "deleted": []
+  },
+  "remaining": [
+    "Continue auxiliary model consumers, especially compaction and remaining extensions: original authorization issuer, scoped participants, resource ownership, and durable publication after asynchronous work. B412 closes only the named Auto scenarios.",
+    "Continue remaining account, Session, project and computer revocation through model/tool/workflow/Inspector consumers; all12 business domains remain in progress.",
+    "Preserve peer Gateway/Local/UI/lease-admission ownership. Last peer report says R20 candidate incorporates B409/B410/B411 over live R19; root B412 is not deployed and requires a matching combined freeze.",
+    "Remaining native platform containment, full175 multi-computer acceptance, reported REAL-001 latency and database maintenance argument privacy remain open. Local deterministic SDK tests do not establish production Gateway or physical host acceptance.",
+    "Paid official Responses verification remains deferred by the user. B04/B25 remain implementation_in_progress."
+  ],
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T182903Z/r6-followup-root-source-union.json",
+  "mergeRequirement": "Last peer report: R19 live; R20 candidate includes root B409/B410/B411 and preserves R19 workspace-changes recovery. Apply the29 B412 source/test/doc deltas and5 explicit removals with66 matching inputs. Cumulative capsule retains16 removals. Rebuild Auto and matching consumers with normal compiler/bundler outputs;5 new Auto artifacts are references, prior root artifacts remain references. Preserve peer R20 lease-admission, Local/Gateway/UI/FortuneSheet changes. Root does not deploy this capsule.",
+  "globalReviewComplete": false,
+  "peerReport": {
+    "source": "Trusted peer message already received; no routine polling",
+    "live": "R19 per last report",
+    "candidate": "R20 pending final combined checks and deployment; contains B409/B410/B411",
+    "reservedWork": "InstanceRepository.admitLease, PostgreSQL/SQLite implementation, InstanceManager shared leases, operationRef, corresponding tests/docs"
+  }
+}

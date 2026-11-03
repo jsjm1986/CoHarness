@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/deploy/postgres/README.md
 document:
-  en: 4da05b69a4136d2088f5776b78c00cbe738c7f0d
-  zh: 07b0a003d14af7fde482c39d17036b53d6da6991
+  en: 5bc0b59a7f2f0a4e8ad894ed1f5f4f45f145870f
+  zh: 92d62abd570c9f914a3f23afe10b30f56aa9dca0
 /local-postgresql-control-plane:
   en: 1b46bc3e1b1e3377
   zh: 1f273d4682df985f
@@ -12,11 +12,11 @@ document:
   en: 16ad764891a907f6
   zh: e3d3fae91d94dbb8
 /local-postgresql-control-plane/schema-and-conversation-data:
-  en: 4bf295f621f9a67e
-  zh: 5b2a5c075263b577
+  en: e4d3d91aa7367fe1
+  zh: 03afa52432846fce
 /local-postgresql-control-plane/import-a-gateway-sqlite-snapshot:
-  en: 1c5481628c2419c5
-  zh: 7dab5169b783e5a8
+  en: 9e9a63ac79f1f090
+  zh: 28c99d535171faae
 /local-postgresql-control-plane/gateway-runtime-and-cutover:
   en: 4ce6d44f158508f9
   zh: 3fd109f6af42f9d7

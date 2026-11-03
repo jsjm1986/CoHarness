@@ -1,0 +1,13 @@
+{
+  "name": "mcp-managed-stdlib-gates",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/verify-export-jsdoc.ts",
+  "startedAt": "2026-10-23T16:32:43.713555+00:00",
+  "seconds": 4.44,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fa5d29ecc3f41ae60d874d278677365f0c945940cdf58c5982a2e01b4b9b7c58",
+  "inputsAfter": "fa5d29ecc3f41ae60d874d278677365f0c945940cdf58c5982a2e01b4b9b7c58",
+  "outputSha256": "90a755da83bc69f309b2de7fe82e037fe3b4102a89e42d817b85f3d469f603be",
+  "outputTail": "verify-export-jsdoc: 2 JSDoc completeness violation(s) (see AGENTS.md):\n  exported function 'resolveInspectorOptions' (packages/experimental/inspector/src/host/bridge/controller.ts:157): @param admission does not match any parameter (stale tag?).\n  exported function 'startInspector' (packages/experimental/inspector/src/host/bridge/controller.ts:207) is missing @param admission.\n"
+}

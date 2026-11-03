@@ -1,5 +1,5 @@
 ---
-description: "Execution resource admission and quiescent-release obligations for model requests and managed processes."
+description: "Resource permit obligations for node-wide execution admission providers and consumers."
 kind: "package-reference"
 ---
 
@@ -9,71 +9,59 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Use this definition when an execution consumer must reserve model or process capacity before starting work. A concrete provider supplies admission and scheduling; this package supplies no scheduler or deployment quotas. Consumers keep a reservation until execution has stopped, including when cancellation or transport failure leaves cleanup uncertain.
+Request a permit before starting a model request or process, and retain its accounting until execution has stopped. This package declares the service interface; a composed provider must supply admission. The managed Gateway composition supplies the provider; LLM adapter dispatch, registered native Messages search and subprocess allocation consume its permits.
 
 ## Table of Contents
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
+- [Permit ownership](#permit-ownership)
+- [Remote coordination](#remote-coordination)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
------
+<a id="permit-ownership"></a>
+## Permit ownership
 
-<a id="use-this-package"></a>
-## Use this package
+The abstract `ResourceBudget` service exposes `acquire(request)`. A request identifies `model` or `process`, with optional cancellation and an executing Session id. Providers resolve the verified actor and project rather than accepting those identities from consumers.
 
-Consumers import the Service Definition from the package root and request types from `@deepseek-ai/dsh-resource-budget/types`. A composition needs a concrete `ResourceBudget` provider; mounting this abstract definition does not implement admission. The definition has no configuration fields.
+Compositions mount a concrete provider; mounting this abstract definition fails during construction.
 
-Reserve capacity before starting the resource. Successful cancellation alone does not prove that a process, model request, or its cleanup has stopped. Release only after proving quiescence; report uncertain cleanup while the reservation remains occupied. Provider acknowledgement owns the final accounting decision.
+Providers allocate a separate `ResourceOperationId` for each operation and retain it across retries. An ordered registration sequence alone cannot distinguish a retry from a different operation after provider replacement.
 
------
+A consumer awaits admission, observes the lease cancellation `signal`, and awaits `release()` after proven quiescence or `uncertain()` after unconfirmed cleanup. Uncertainty retains accounting and the lease’s caller/provider cancellation links, allowing a later exact completion. Requests select captured execution, a signed interactive caller, or Runtime infrastructure through `origin`; this metadata never enters model input. Deployment limits and scheduling belong to the provider.
 
-<a id="understand-the-implementation"></a>
-## Understand the implementation
+<a id="remote-coordination"></a>
+## Remote coordination
 
-<details>
-<summary>Implementation internals — click to expand</summary>
+The `./wire` entry validates operation references, origins, resource states, completion reports, and the committed node policy. UUIDs are canonicalized before comparison. Requests contain a Session/scope reference, a signed principal, or an explicit Runtime infrastructure origin; actor and project numbers are forbidden. Polls contain at most 512 exact operation references, and HTTP messages fit 64 KiB.
 
-[`src/index.ts`](src/index.ts) declares `ctx.resourceBudget`; [`src/types.ts`](src/types.ts) declares caller metadata and release obligations. Verified actor and project attribution belongs to the concrete provider, rather than caller-supplied identity fields. The [subsystem reference](../../../docs/subsystems/resource-budget.md) owns the types and generated service API.
-
-</details>
-
------
-
-<a id="further-exploration"></a>
-## Further Exploration
-
-- [Resource admission reference](../../../docs/subsystems/resource-budget.md) — resource kinds and reservation lifetime.
-- [Execution Authority](../execution-authority/README.md) — verified execution identities and permissions.
-- [Gateway](../../../gateway/README.md) — managed deployment and node configuration.
-
------
+The Gateway implements authenticated registration, request, status-batch, and completion endpoints under `/internal/runtime/resources/`. Registration returns the committed policy without clearing earlier work. Only the exact completion endpoint accepts the current bearer after account revocation or while its Runtime stops; other endpoints retain ordinary Runtime authentication. A supervisor-confirmed process-range stop reclaims only the handle's captured generation, even when the instance row has advanced. Status reads recheck the stored origin against current permissions before queued dispatch; scoped Sessions cannot omit their execution scope. The [Gateway provider](../gateway-runtime/README.md#resource-admission) owns Runtime registration and transport.
 
 <a id="model-experience"></a>
 ## Model Experience
 
-None, as the definition contributes no prompt, tool schema, or model-visible result.
+### Resource permits
+
+#### What the model sees
+
+None. The `ResourceBudget` interface declares no prompt section, tool schema, or model-visible result.
+
+#### Token effect
+
+None. Permit requests contain execution metadata rather than model input.
 
 #### KV Cache effect
 
-None; resource admission does not construct model request content.
+None. Service calls do not alter model request content.
 
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- A concrete provider and execution consumers must implement scheduling and reservation ownership; importing this package does not enforce capacity limits.
-- The declared resource kinds cover models and processes. Worker threads have no separate resource kind.
+- Admission covers actual LLM dispatch and the subprocess service. Direct worker or process allocation outside those services requires its own consumer; importing this definition cannot govern it.
+- Managed Runtime process limits are a separate implemented mechanism; see [Runtime admission](../../../gateway/README.md#performance-and-runtime-admission).
 
 <a id="dev-note"></a>
 ### Dev Note
 
-<details>
-<summary>Working context for maintainers — click to expand</summary>
-
 None.
-
-</details>

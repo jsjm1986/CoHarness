@@ -1,0 +1,14 @@
+{
+  "name": "sdk-notification-wire-regression",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/sdk/client/tests/sdk-client.spec.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T05:41:01.518471+00:00",
+  "seconds": 6.385,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "15b9df0a370011f3704f506218753391c7937b547d7115efc608ce5d7b7d44c7",
+  "inputsAfter": "15b9df0a370011f3704f506218753391c7937b547d7115efc608ce5d7b7d44c7",
+  "postgresToolDirectory": null,
+  "outputSha256": "716d4ae2e876684a05bb67c45e0180485f2ecb6938a88d08d3b52c1bdfb85063",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  57 passed (57)\n   Start at  13:41:03\n   Duration  4.80s (transform 55ms, setup 26ms, import 49ms, tests 4.66s, environment 0ms)\n\n"
+}

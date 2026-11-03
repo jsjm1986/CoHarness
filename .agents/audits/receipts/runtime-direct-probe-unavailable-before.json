@@ -1,0 +1,14 @@
+{
+  "name": "runtime-direct-probe-unavailable-before",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/instances.spec.ts -t 'refuses direct survivor reuse' --retry=0",
+  "startedAt": "2026-10-24T21:57:42.505345+00:00",
+  "seconds": 2.664,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2a54d6972fbf38213dc33441bb6b6f117f1a44faf2e7d9dc0a3f3a9d11475005",
+  "inputsAfter": "2a54d6972fbf38213dc33441bb6b6f117f1a44faf2e7d9dc0a3f3a9d11475005",
+  "postgresToolDirectory": null,
+  "outputSha256": "71c54497fad33acd3ab8f7ae123504d0e5303f18806aba1865e3e04436b2fa8a",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\nstderr | tests/instances.spec.ts > InstanceManager > refuses direct survivor reuse when its liveness query fails without terminating it\n[gateway] survivor liveness probe failed for project:41: Error: control endpoint unavailable\n    at Object.isAlive (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/instances.spec.ts:520:77)\n    at /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/instances.ts:733:61\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n\n ❯ tests/instances.spec.ts (50 tests | 1 failed | 49 skipped) 58ms\n     × refuses direct survivor reuse when its liveness query fails without terminating it 57ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/instances.spec.ts > InstanceManager > refuses direct survivor reuse when its liveness query fails without terminating it\nAssertionError: expected Error: survivor should be reattached, not… to match object { code: 'INSTANCE_UNAVAILABLE', …(1) }\n\n- Expected\n+ Received\n\n- {\n-   \"code\": \"INSTANCE_UNAVAILABLE\",\n-   \"reason\": \"unavailable\",\n+ Error {\n+   \"message\": \"survivor should be reattached, not started\",\n  }\n\n ❯ tests/instances.spec.ts:523:106\n    521|     })\n    522|     try {\n    523|       await expect(local.ensureRunning({ kind: 'project', id: 41, name…\n       |                                                                                                          ^\n    524|         .rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE', reason:…\n    525|       expect(terminate).not.toHaveBeenCalled(); expect(start).not.toHa…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 49 skipped (50)\n   Start at  05:57:44\n   Duration  621ms (transform 383ms, setup 0ms, import 491ms, tests 58ms, environment 0ms)\n\n"
+}

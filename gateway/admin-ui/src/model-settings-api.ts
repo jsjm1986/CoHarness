@@ -92,20 +92,21 @@ function modelRows(profile: Record<string, unknown>): Array<{ id: string; name: 
 async function settingsFailure(
   error: unknown,
   expectedRevision: number | undefined,
-  readSettings: () => Promise<OrganizationModelSettingsView>,
-): Promise<RpcEnvelope<never>> {
-  if (error instanceof AdminRequestError && error.status === 409 && error.message === 'settings-conflict') {
-    let actual = expectedRevision ?? 0
-    try {
-      actual = namespaceOf(await readSettings()).revision
-    } catch {
-      // Failed or cancelled recovery cannot supply a newer revision.
-    }
-    return rejected<never>(
+): Promise<RpcEnvelope<never>> | RpcEnvelope<never> {
+  if (error instanceof AdminRequestError && error.status === 409 && error.code === 'settings-conflict') {
+    return describeOrganizationModelSettings().then((current) => rejected<never>(
       'settings-conflict',
       error.message,
-      { ns: 'llm-pi-ai', expected: expectedRevision ?? 0, actual },
-    )
+      {
+        ns: 'llm-pi-ai',
+        expected: expectedRevision ?? 0,
+        actual: namespaceOf(current).revision,
+      },
+    )).catch(() => rejected<never>(
+      'settings-conflict',
+      error.message,
+      { ns: 'llm-pi-ai', expected: expectedRevision ?? 0, actual: expectedRevision ?? 0 },
+    ))
   }
   return rejected<never>('settings-rejected', messageOf(error), { ns: 'llm-pi-ai' })
 }

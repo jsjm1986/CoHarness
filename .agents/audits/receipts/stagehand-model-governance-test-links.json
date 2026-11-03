@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-governance-test-links",
+  "cwd": ".",
+  "command": "pnpm install --ignore-scripts --prefer-offline",
+  "startedAt": "2026-10-23T18:32:16.713992+00:00",
+  "seconds": 3.215,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "778f82865854e868d0c4535b9e1d454c5d9a51259d440c94202dc2e4f76b2959",
+  "inputsAfter": "778f82865854e868d0c4535b9e1d454c5d9a51259d440c94202dc2e4f76b2959",
+  "outputSha256": "b667e3901edd073604333d25c103890e7de62d31f0330640e007effcacf4b4d2",
+  "outputTail": "native/system/packages/darwin-x64        | [WARN] Unsupported platform: wanted: {\"cpu\":[\"x64\"],\"os\":[\"darwin\"],\"libc\":[\"any\"]} (current: {\"os\":\"darwin\",\"cpu\":\"arm64\",\"libc\":\"unknown\"})\nnative/system/packages/linux-arm64       | [WARN] Unsupported platform: wanted: {\"cpu\":[\"arm64\"],\"os\":[\"linux\"],\"libc\":[\"any\"]} (current: {\"os\":\"darwin\",\"cpu\":\"arm64\",\"libc\":\"unknown\"})\nnative/system/packages/linux-x64         | [WARN] Unsupported platform: wanted: {\"cpu\":[\"x64\"],\"os\":[\"linux\"],\"libc\":[\"any\"]} (current: {\"os\":\"darwin\",\"cpu\":\"arm64\",\"libc\":\"unknown\"})\nScope: all 378 workspace projects\nAlready up to date\nDone in 796ms using pnpm v11.28.5\n"
+}

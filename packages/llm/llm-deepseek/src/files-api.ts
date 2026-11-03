@@ -1,6 +1,6 @@
 /** DeepSeek Files API transport. @module dsh-llm-deepseek/files-api */
 
-import { attributionHeaders, LlmError } from '@deepseek-ai/dsh-llm'
+import { attributionHeaders, LlmError, type LlmOperationDispatch } from '@deepseek-ai/dsh-llm'
 import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import { DeepSeekFileId } from './file-id.ts'
 import type { DeepSeekFileId as DeepSeekFileIdType } from './file-id.ts'
@@ -73,6 +73,7 @@ interface FilesApiOptions {
   /** Provider-resolved authentication headers for this endpoint. */
   headers: Readonly<Record<string, string>>
   fetch?: typeof fetch
+  dispatchRequest?: LlmOperationDispatch
 }
 
 function invalidResponse(operation: string): LlmError {
@@ -132,6 +133,7 @@ export class DeepSeekFilesClient {
   private readonly baseURL: string
   private readonly authHeaders: Readonly<Record<string, string>>
   private readonly fetchImpl: typeof fetch
+  private readonly dispatchRequest: LlmOperationDispatch
 
   /**
    * @param options - endpoint, authentication headers, and optional test transport.
@@ -139,6 +141,7 @@ export class DeepSeekFilesClient {
   constructor(options: FilesApiOptions) {
     this.authHeaders = options.headers
     this.fetchImpl = options.fetch ?? globalThis.fetch
+    this.dispatchRequest = options.dispatchRequest ?? (request => request())
     this.baseURL = messagesApiRoot(options.baseURL)
   }
 
@@ -149,14 +152,15 @@ export class DeepSeekFilesClient {
       for (const [name, value] of Object.entries(this.authHeaders)) headers.set(name, value)
       headers.set('anthropic-version', '2023-06-01')
       headers.set('anthropic-beta', MESSAGES_FILES_BETA)
-      response = await this.fetchImpl(`${this.baseURL}${path}`, {
+      response = await this.dispatchRequest(() => this.fetchImpl(`${this.baseURL}${path}`, {
         ...init,
         redirect: 'error',
         headers,
         ...signal === undefined ? {} : { signal },
-      })
+      }))
     } catch (error: unknown) {
       if (signal?.aborted) throw error
+      if (error instanceof LlmError) throw error
       throw new LlmError(`DeepSeek Files API request to ${this.baseURL} failed`, 'TRANSPORT', { cause: error })
     }
     if (response.ok) return response

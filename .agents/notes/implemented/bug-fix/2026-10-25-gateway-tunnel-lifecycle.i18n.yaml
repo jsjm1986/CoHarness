@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-25-gateway-tunnel-lifecycle.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-25-gateway-tunnel-lifecycle.md
+document:
+  en: 865a9bd536696e9b026d63a4ad5c2a6791f91733
+  zh: 880edf392b079c7aa28866fb51d511c39a48a1c3
+/agent-note-gateway-tunnel-lifecycle-and-durable-provisioning:
+  en: 30fc1d1fdaf5f45e
+  zh: a6452404b4b24398
+/agent-note-gateway-tunnel-lifecycle-and-durable-provisioning/problem:
+  en: 16b4857b3da2ea78
+  zh: 42e83d1f61a2333c
+/agent-note-gateway-tunnel-lifecycle-and-durable-provisioning/decision:
+  en: 996e2a2e2828f2b2
+  zh: a5fc659ea3d6180e
+/agent-note-gateway-tunnel-lifecycle-and-durable-provisioning/alternatives-considered:
+  en: 475b43d3d29898f4
+  zh: 54360e63f898890d
+/agent-note-gateway-tunnel-lifecycle-and-durable-provisioning/consequences:
+  en: 19f09dd88230611a
+  zh: c0cb44e7b53e2c05
+/agent-note-gateway-tunnel-lifecycle-and-durable-provisioning/verification:
+  en: 7d0c49fc4cd8f988
+  zh: b7b8006a70a909ab

@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-cordis-catalog",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-cordis-catalog.ts",
+  "startedAt": "2026-10-24T14:37:59.815062+00:00",
+  "seconds": 7.046,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "54f8712ec5ea7baa0b2286a0478d0c6b1f6d09aee69f2adb8653f7fcc51ebd46",
+  "inputsAfter": "76ba49588cffdfa348790afede85d62f34312129a9bb34491f2fd0c9c5f11796",
+  "postgresToolDirectory": null,
+  "outputSha256": "3c3a3eeac5f1918a410c66e3fc83d983b730175847d883a74b2bbbce879ac347",
+  "outputTail": "gen-cordis-catalog: 127 artifact(s) computed, 3 written.\n"
+}

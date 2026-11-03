@@ -13,7 +13,7 @@
 
 import { createHash, randomBytes } from 'node:crypto'
 import { rmSync } from 'node:fs'
-import { lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, open, readFile, rename, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 const WINDOWS_TRANSIENT_RENAME_ERRORS: ReadonlySet<string> = new Set(['EACCES', 'EBUSY', 'EPERM'])
@@ -28,9 +28,10 @@ function isTransientWindowsRenameError(error: unknown): boolean {
 }
 
 /** Replace the target after bounded retries for transient Windows interference. */
-async function renameAtomicTemp(temp: string, filename: string): Promise<void> {
+async function renameAtomicTemp(temp: string, filename: string, signal: AbortSignal | undefined): Promise<void> {
   let delay = WINDOWS_RENAME_RETRY_INITIAL_MS
   for (let retries = 0;; retries += 1) {
+    signal?.throwIfAborted()
     try {
       await rename(temp, filename)
       return
@@ -48,6 +49,10 @@ async function renameAtomicTemp(temp: string, filename: string): Promise<void> {
  * permission decision stays visible at every call site.
  */
 export interface WriteFileAtomicOptions {
+  /** Cancellation checked before preparation and each publication attempt; an issued rename may already commit. */
+  signal?: AbortSignal | undefined
+  /** Explicit operating-system owner assigned to the replacement before publication. */
+  owner?: FileOwner | undefined
   /**
    * Permission bits stamped on the fresh temp inode and carried through the
    * rename (subject to the process umask, like every fresh inode).
@@ -61,6 +66,29 @@ export interface WriteFileAtomicOptions {
   dirMode?: number
 }
 
+/** Operating-system account owning a newly created file. */
+export interface FileOwner {
+  /** Numeric account identifier. */
+  readonly uid: number
+  /** Numeric primary group identifier. */
+  readonly gid: number
+}
+
+/** Exclusively create an inode and assign its owner; failures remove only the inode this call created. */
+async function createOwnedFile(filename: string, content: string, mode: number, owner?: FileOwner): Promise<void> {
+  const handle = await open(filename, 'wx', mode)
+  const failures: unknown[] = []
+  try {
+    if (owner !== undefined) await handle.chown(owner.uid, owner.gid)
+    await handle.writeFile(content)
+  } catch (error) { failures.push(error) }
+  try { await handle.close() } catch (error) { failures.push(error) }
+  if (failures.length === 0) return
+  try { await rm(filename, { force: true }) } catch (error) { failures.push(error) }
+  if (failures.length === 1) throw failures[0]
+  throw new AggregateError(failures, 'File creation and cleanup failed.')
+}
+
 /**
  * Replace `filename` with `content` in one atomic step, creating parent
  * directories. The content is first written to a random-suffix sibling opened
@@ -71,13 +99,15 @@ export interface WriteFileAtomicOptions {
  * through to its referent, and the same-directory sibling keeps the rename on
  * one filesystem. Windows replacement retries transient `EACCES`, `EBUSY`,
  * and `EPERM` failures for a bounded interval while the complete temp file
- * remains the rename source. On any remaining failure the temp file is
- * removed and the failure rethrown. Crash durability (fsync) is out of scope.
+ * remains the rename source. A failed acquisition preserves the occupying
+ * entry. Later failures remove the acquired temp file and retain independent
+ * cleanup failures together. Crash durability (fsync) is out of scope.
  * @param filename - final path receiving the content.
  * @param content - complete next file content.
- * @param options - permission bits for the replacement inode.
+ * @param options - permission bits and optional operating-system owner for the replacement inode.
  */
 export async function writeFileAtomic(filename: string, content: string, options: WriteFileAtomicOptions): Promise<void> {
+  options.signal?.throwIfAborted()
   await mkdir(dirname(filename), {
     recursive: true,
     ...options.dirMode === undefined ? {} : { mode: options.dirMode },
@@ -85,11 +115,18 @@ export async function writeFileAtomic(filename: string, content: string, options
   // TODO(settings-atomic-durability): Use a replacement that fsyncs the file
   // and parent directory and preserves owner-only permissions on Windows.
   const temp = `${filename}.${randomBytes(6).toString('hex')}.tmp`
+  let created = false
   try {
-    await writeFile(temp, content, { mode: options.mode, flag: 'wx' })
-    await renameAtomicTemp(temp, filename)
+    options.signal?.throwIfAborted()
+    await createOwnedFile(temp, content, options.mode, options.owner)
+    created = true
+    await renameAtomicTemp(temp, filename, options.signal)
   } catch (error) {
-    await rm(temp, { force: true })
+    if (created) {
+      try { await rm(temp, { force: true }) } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], 'Atomic replacement and temporary-file cleanup failed.')
+      }
+    }
     throw error
   }
 }
@@ -150,18 +187,18 @@ async function readLockRecord(lockPath: string): Promise<string | undefined> {
  * retried. Live or incomplete claims remain owned.
  * @returns Whether this call removed the dead holder's lock.
  */
-async function takeOverExitedLock(lockPath: string): Promise<boolean> {
+async function takeOverExitedLock(lockPath: string, owner?: FileOwner): Promise<boolean> {
   const record = await readLockRecord(lockPath)
   if (record === undefined || !holderExited(record)) return false
   const claim = `${lockPath}.takeover-${createHash('sha256').update(record).digest('hex').slice(0, 16)}`
   for (;;) {
     try {
-      await writeFile(claim, `${process.pid}\n`, { mode: 0o600, flag: 'wx' })
+      await createOwnedFile(claim, `${process.pid}\n`, 0o600, owner)
       break
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code
       if (code !== 'EEXIST' && code !== 'EPERM') throw error
-      if (!await takeOverExitedLock(claim)) return false
+      if (!await takeOverExitedLock(claim, owner)) return false
     }
   }
   try {
@@ -203,6 +240,8 @@ const DEFAULT_LOCK_WAIT_MS = 2_000
 
 /** Options for one {@link withFileLock} acquisition. */
 export interface FileLockOptions {
+  /** Account owning the lock and any recovery claims, so another process of that account can recover them. */
+  owner?: FileOwner | undefined
   /**
    * Maximum time to wait for the lock, in milliseconds. State one when the
    * holder's operation legitimately runs longer than file work — a credential
@@ -249,7 +288,7 @@ export async function withFileLock<T>(
   let retriedUnconfirmedPermissionError = false
   for (;;) {
     try {
-      await writeFile(lockPath, `${process.pid}\n`, { mode: 0o600, flag: 'wx' })
+      await createOwnedFile(lockPath, `${process.pid}\n`, 0o600, options?.owner)
       break
     } catch (error) {
       if (!await isLockContention(error, lockPath)) {
@@ -258,7 +297,7 @@ export async function withFileLock<T>(
           || (error as NodeJS.ErrnoException | null)?.code !== 'EPERM'
           || retriedUnconfirmedPermissionError) throw error
         retriedUnconfirmedPermissionError = true
-      } else if (await takeOverExitedLock(lockPath)) continue
+      } else if (await takeOverExitedLock(lockPath, options?.owner)) continue
     }
     if (Date.now() >= deadline) {
       throw new Error(`atomic-write: timed out waiting for the writer lock at ${lockPath}`)

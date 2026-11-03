@@ -200,7 +200,7 @@ interface ToolExecutionInput {
    */
   readonly rootCallId?: ToolCallId
   readonly name: string
-  /** Binding-time tool schema for a PTC inner call; frozen by its producer and never logged. */
+  /** Frozen binding-time PTC schema; auxiliary model consumers log their own request input. */
   readonly schema?: ToolSchema
   /** Losslessly JSON-serializable parsed arguments (tools validate their own schema). */
   readonly arguments: unknown

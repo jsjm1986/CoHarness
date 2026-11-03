@@ -2,7 +2,8 @@
  * Main-thread driver for the Win32 folder dialog: spawns the dialog child
  * process (which blocks inside the modal `Show`), maps its message protocol
  * onto a promise, and services aborts by posting `WM_CLOSE` to the dialog
- * thread's windows until the child reports back. The real process/window
+ * thread's windows until the child exits. Outcomes remain pending through
+ * process closure and outstanding window-close calls. The real process/window
  * surface is injectable so every driver path is testable on any platform.
  */
 
@@ -13,21 +14,29 @@ import type { Win32DialogWorkerData, Win32DialogWorkerMessage } from './win32-di
 export interface Win32DialogWorkerLike {
   /**
    * Subscribe to a child-process event.
-   * @param event - `message`, `error`, or `exit`.
+   * @param event - `message`, `error`, `exit`, or `close`.
    * @param listener - the event consumer.
    */
   on(event: 'message', listener: (message: Win32DialogWorkerMessage) => void): unknown
   on(event: 'error', listener: (error: Error) => void): unknown
-  on(event: 'exit', listener: (code: number) => void): unknown
+  on(event: 'exit' | 'close', listener: () => void): unknown
+  /**
+   * Remove an owned child-process event subscription.
+   * @param event - the subscribed event.
+   * @param listener - the previously registered consumer.
+   */
+  off(event: 'message', listener: (message: Win32DialogWorkerMessage) => void): unknown
+  off(event: 'error', listener: (error: Error) => void): unknown
+  off(event: 'exit' | 'close', listener: () => void): unknown
   /**
    * Force-stop the child; the abort path's last resort when `WM_CLOSE`
    * never lands (e.g. the dialog window was never created).
-   * @returns whether a kill signal was delivered.
+   * @param signal - force-termination signal; the driver uses `SIGKILL`.
+   * @returns whether the termination request was delivered; closure remains separate.
    */
-  kill(): boolean
+  kill(signal: 'SIGKILL'): boolean
   /**
-   * Release the event-loop reference. Called once the pick settles so a
-   * child stuck in the native modal call never blocks process exit.
+   * Release the event-loop reference after process closure and close-call drainage.
    */
   unref?(): void
 }
@@ -37,7 +46,7 @@ export interface Win32DialogInternals {
   /** Replaces the real child spawn (`win32-dialog-host.ts`). */
   spawnWorker?: (data: Win32DialogWorkerData) => Win32DialogWorkerLike
   /** Replaces the real `WM_CLOSE` poster (`win32-dialog-host.ts`). */
-  closeThreadWindows?: (threadId: number) => Promise<void>
+  closeThreadWindows?: (threadId: number, lifetime: AbortSignal) => Promise<void>
   /** Abort-service cadence override so tests never wait wall-clock time. */
   closeRetryMs?: number
 }
@@ -59,9 +68,9 @@ function assertNever(value: never): never {
 
 /**
  * Open the modern Win32 folder picker off the event loop.
- * @param signal - caller lifetime; abort closes the dialog and rejects.
+ * @param signal - caller lifetime; abort requests dialog closure and force-terminates an unresponsive child.
  * @param internals - Worker/window hooks for deterministic tests.
- * @returns the selected path, or null when the user cancels.
+ * @returns the selected path or null on dialog cancel, after child closure and window-close calls finish.
  */
 export async function pickWin32Directory(
   signal: AbortSignal,
@@ -73,31 +82,25 @@ export async function pickWin32Directory(
   const closeRetryMs = internals.closeRetryMs ?? CLOSE_RETRY_MS
 
   const worker: Win32DialogWorkerLike = spawnWorker({ title: DIALOG_TITLE })
+  const workerLifetime = new AbortController()
   let dialogThreadId: number | undefined
   let closeTimer: NodeJS.Timeout | undefined
-  let settled = false
+  let attempts = 0
+  let outcome: { kind: 'done'; path: string | null } | { kind: 'error'; error: Error } | undefined
+  const closing = new Set<Promise<void>>()
 
   return await new Promise<string | null>((resolve, reject) => {
-    const settle = (outcome: () => void): void => {
-      if (settled) return
-      settled = true
-      if (closeTimer !== undefined) clearInterval(closeTimer)
-      signal.removeEventListener('abort', onAbort)
-      worker.unref?.()
-      outcome()
-    }
-
     const postClose = (): void => {
-      // Before `showing` there is no window to close; the budget below still
-      // runs so a child that never reports cannot dangle the pick. A
-      // rejected close attempt (EnumThreadWindows/PostMessageW refusing) is
-      // discarded: the interval retries it and kill is the backstop.
-      if (dialogThreadId !== undefined) void closeWindows(dialogThreadId).catch(() => undefined)
+      if (workerLifetime.signal.aborted || dialogThreadId === undefined || closing.size !== 0) return
+      // Window refusal retries until force termination; exited-worker cancellation needs no further message.
+      const operation = closeWindows(dialogThreadId, workerLifetime.signal).catch(() => undefined)
+      closing.add(operation)
+      void operation.then(() => { closing.delete(operation) })
     }
 
     // Sole caller: the once-registered abort listener, so no re-entry guard.
     const serviceAbort = (): void => {
-      let attempts = 0
+      if (workerLifetime.signal.aborted) return
       // The `showing` notice precedes the blocking `Show`, so the very first
       // WM_CLOSE can race the window's creation; re-post until the child
       // reports back, then force-kill as a last resort. The budget is
@@ -106,11 +109,14 @@ export async function pickWin32Directory(
       closeTimer = setInterval(() => {
         attempts += 1
         if (attempts > CLOSE_MAX_ATTEMPTS) {
-          settle(() => {
-            worker.kill()
-            reject(new Error('native directory picker aborted (dialog unresponsive; worker killed)'))
-          })
-          return
+          // A refused or failed request retains ownership until `close`.
+          let delivered = false
+          try {
+            delivered = worker.kill('SIGKILL')
+          } catch (error: unknown) {
+            outcome ??= { kind: 'error', error: new Error('win32 folder dialog termination failed', { cause: error }) }
+          }
+          if (delivered) return
         }
         postClose()
       }, closeRetryMs)
@@ -122,7 +128,8 @@ export async function pickWin32Directory(
     }
     signal.addEventListener('abort', onAbort, { once: true })
 
-    worker.on('message', (message: Win32DialogWorkerMessage) => {
+    const onMessage = (message: Win32DialogWorkerMessage): void => {
+      if (message.kind !== 'showing' && outcome !== undefined) return
       switch (message.kind) {
         case 'showing':
           dialogThreadId = message.threadId
@@ -130,30 +137,43 @@ export async function pickWin32Directory(
           if (signal.aborted) postClose()
           return
         case 'done':
-          settle(() => {
-            if (signal.aborted) reject(new Error('native directory picker aborted'))
-            else resolve(message.path)
-          })
+          dialogThreadId = undefined
+          outcome = message
           return
         case 'error':
-          settle(() => {
-            reject(new Error(`win32 folder dialog failed: ${message.message}`))
-          })
+          dialogThreadId = undefined
+          outcome = { kind: 'error', error: new Error(`win32 folder dialog failed: ${message.message}`) }
           return
         /* v8 ignore next 2 -- closed worker-owned union; a fourth kind becomes a compile error */
         default:
           assertNever(message)
       }
-    })
-    worker.on('error', (error: Error) => {
-      settle(() => {
-        reject(error)
+    }
+    const onError = (error: Error): void => { outcome ??= { kind: 'error', error } }
+    const onExit = (): void => {
+      workerLifetime.abort()
+      if (closeTimer !== undefined) clearInterval(closeTimer)
+    }
+    const onClose = (): void => {
+      onExit()
+      signal.removeEventListener('abort', onAbort)
+      worker.off('message', onMessage)
+      worker.off('error', onError)
+      worker.off('exit', onExit)
+      worker.off('close', onClose)
+      void Promise.all(closing).then(() => {
+        worker.unref?.()
+        if (signal.aborted) {
+          reject(new Error(attempts > CLOSE_MAX_ATTEMPTS
+            ? 'native directory picker aborted (dialog unresponsive)'
+            : 'native directory picker aborted', { cause: outcome?.kind === 'error' ? outcome.error : undefined }))
+        } else if (outcome?.kind === 'done') resolve(outcome.path)
+        else reject(outcome?.error ?? new Error('win32 folder dialog worker exited before reporting a result'))
       })
-    })
-    worker.on('exit', () => {
-      settle(() => {
-        reject(new Error('win32 folder dialog worker exited before reporting a result'))
-      })
-    })
+    }
+    worker.on('message', onMessage)
+    worker.on('error', onError)
+    worker.on('exit', onExit)
+    worker.on('close', onClose)
   })
 }

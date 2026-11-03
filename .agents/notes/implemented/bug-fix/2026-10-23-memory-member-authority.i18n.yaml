@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-memory-member-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-memory-member-authority.md
+document:
+  en: dba2fa60688b6367e84164ab5f52a3a2f411966f
+  zh: 6916c48d1efb54385603fa2100f6715da8413dcb
+/agent-note-memory-write-authority-lifetime:
+  en: 5c17abf933afdbbd
+  zh: 5fe913c3f1641eb7
+/agent-note-memory-write-authority-lifetime/problem:
+  en: ed9fdfea5ac755d6
+  zh: 88b615663155b1c6
+/agent-note-memory-write-authority-lifetime/decision:
+  en: 400043694760f8d9
+  zh: 0addeaa6db5941ec
+/agent-note-memory-write-authority-lifetime/alternatives-considered:
+  en: 9296b4f5cc9602e1
+  zh: 12afc3cb27b0b975
+/agent-note-memory-write-authority-lifetime/consequences:
+  en: f2a66af3bad1d188
+  zh: 894cfdca8ab9dfdf
+/agent-note-memory-write-authority-lifetime/verification:
+  en: 63b7ad725670b115
+  zh: 9b874a6c3187c59b

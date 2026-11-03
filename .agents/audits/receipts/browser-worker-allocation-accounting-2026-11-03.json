@@ -1,0 +1,215 @@
+{
+  "finding": "B494",
+  "title": "Browser Worker construction retains failed original uncertainty reporting",
+  "status": "fixed_named_scenarios_verified_global_review_open",
+  "updatedAt": "2026-11-03T00:46:13.860881+00:00",
+  "sourceFixed": true,
+  "delivery": {
+    "findings": [
+      "B494",
+      "B495"
+    ],
+    "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+    "at": "2026-11-03T00:45:18.837621+00:00",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T234814Z/B494-B495-browser-allocation-accounting.delta.tar.gz",
+    "archiveSha256": "8551d1b0dee362ef3b6584fdc0350dbb58c5eff639ed57cba1fc83770e0cb18e",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T234814Z/B494-B495-browser-allocation-accounting",
+    "manifestSha256": "2e36d8c772e3ce27f77b88e6225d80ef28d2532d9c654b2e95250b6c892f5585",
+    "ownedChanges": 16,
+    "normalPassedRegisteredInstances": 208,
+    "normalDistinctFileAndDisplayTitleKeys": 206,
+    "keylessDifferentScenarios": 3,
+    "wholeProjectComplete": false
+  },
+  "normalPassedRegisteredInstances": 208,
+  "normalDistinctFileAndDisplayTitleKeys": 206,
+  "normalSkippedCases": 0,
+  "coverage": {
+    "total": {
+      "lines": {
+        "total": 110,
+        "covered": 110,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 146,
+        "covered": 146,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 35,
+        "covered": 35,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 30,
+        "covered": 30,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/experimental/browser-use-stagehand-native/src/worker-client.ts": {
+      "lines": {
+        "total": 110,
+        "covered": 110,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 35,
+        "covered": 35,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 146,
+        "covered": 146,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 30,
+        "covered": 30,
+        "skipped": 0,
+        "pct": 100
+      }
+    }
+  },
+  "checks": [
+    "browser-final-normal-tests-with-coverage",
+    "browser-final-declarations",
+    "browser-normal-bundles",
+    "browser-whole-host-strict-types",
+    "browser-typescript-lint-final",
+    "browser-doc-pairs-final",
+    "browser-doc-targeted-final",
+    "browser-headless-sdk-declared-codec-node22",
+    "browser-startup-final-lib-node22",
+    "browser-startup-final-src-node24",
+    "browser-headless-sdk-final-lib-node24",
+    "browser-startup-final-lib-node25",
+    "native-browser-worker-constructor-fixed",
+    "native-witness-current-source-match",
+    "scoped-codec-manifest-and-lock",
+    "scoped-codec-link",
+    "browser-doc-verify-agent-note-format",
+    "browser-doc-verify-agent-note-classification",
+    "browser-doc-verify-concrete-terms",
+    "browser-doc-verify-md-wrap",
+    "browser-doc-verify-doc-refs",
+    "browser-doc-verify-doc-budgets",
+    "browser-doc-verify-export-jsdoc",
+    "browser-doc-verify-md-links"
+  ],
+  "counterproofs": {
+    "normalUnit": "browser-worker-constructor-accounting-before.json",
+    "realLoaderSessionReservation": "browser-allocation-ownership-node24-before-scoped.json",
+    "nativeLinuxWorkerExhaustion": "native-browser-worker-constructor-original.json"
+  },
+  "fixedNative": "native-browser-worker-constructor-fixed.json",
+  "nativeWitnessCurrentRuntimeLogicIdentical": true,
+  "nativeWitnessDocumentationDifference": "one throws documentation line",
+  "sourceSha256": {
+    ".agents/notes/implemented/bug-fix/2026-10-31-browser-startup-resource-ownership.i18n.yaml": "023502850b25486bc582a3e2183f51cd4b7ad687393ec1f12dabc99d624d5a78",
+    ".agents/notes/implemented/bug-fix/2026-10-31-browser-startup-resource-ownership.md": "c4d875f3eddfa5d1a8178cab536b969b26d549fcb827200f73c1922dbf852491",
+    ".agents/notes/implemented/bug-fix/2026-10-31-browser-startup-resource-ownership.zh.md": "f39883c5d21dfb9dfb8d49806b38a103bb141e038370e6d5a49e9a2ecb3219ba",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-startup-owner/guide.i18n.yaml": "08a5ddb71606e7924177cd9f64c08915501524f179dd48f162e8642f7b30affd",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-startup-owner/guide.md": "2776eaae6e548607b93377a57626f5bd34fce53822e40cf370b5f0134294cbd0",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-startup-owner/guide.zh.md": "30a37eb4a4a7a84d0a6044b8cf87ace1e87a0bcfd8a09c154bfce50e01e07d44",
+    "package.json": "a011e6a7a3e967ef54dcfbcffa02b0efddcc7431f150eab8f8c4b0d78fa59e1d",
+    "packages/experimental/browser-use-stagehand-native/README.i18n.yaml": "765bfdaf27c14ce07790466f4cb92e61c721f36cb849330a5b90c8201d4705aa",
+    "packages/experimental/browser-use-stagehand-native/README.md": "d3b1a890f9f0684e836eb6f19fa5bc94f4f507d6105614b732a5eb787ca3aff3",
+    "packages/experimental/browser-use-stagehand-native/README.zh.md": "d6f43b617ab0e6a5ddcd0f73bc3348840796179ec077705ad541b8b5e4066490",
+    "packages/experimental/browser-use-stagehand-native/src/worker-client.ts": "527af0e0c9aa70f88f072915be108a5277fd6cca7b78531b8056099a4f8a1864",
+    "packages/experimental/browser-use-stagehand-native/tests/fixtures/startup-owner.mjs": "6226b48497af233f5a4749f5d6b688ace32c9038a7568ce8ee9ebe8d01b95a56",
+    "packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts": "032991c374c2514663a77842ee7b8205616480d1c3e355724024ca9991634add",
+    "pnpm-lock.yaml": "6cb41ccb6159695365f91a5a29029cb9b59a453798ff610a7622792aaecd2793",
+    "snapshots/session/browser-startup-owner/expected.jsonl": "c38fd83799e5220f4d06b7ef310d1f658840b1a428352c2eed65b4410be8af1e",
+    "snapshots/session/browser-use-stagehand-native/native-fixture.mjs": "93df15be47010a728114494515f4c1d48634f2d645f8fc5d56990f9256467612"
+  },
+  "artifactSha256": {
+    "packages/experimental/browser-use-stagehand-native/lib/index.js": "2e28f23deee3314eb40119cd7564901b989153a365fff5856d0148303e92caa8",
+    "packages/experimental/browser-use-stagehand-native/lib/tsconfig.tsbuildinfo": "837a16bb3d8342c2cafc091ddbe196325da2c9c613f592b1b26120830397b312",
+    "packages/experimental/browser-use-stagehand-native/lib/types/extension.d.ts": "59f2a7b5bc1cc9aef2b0b97a19c9fbb9922aeccf4ab559ceba025444c696513d",
+    "packages/experimental/browser-use-stagehand-native/lib/types/extension.d.ts.map": "4606ff39a2e960cbbb0eb0e674e03ab950c3be90bc1fea2affe8f34a55a722d6",
+    "packages/experimental/browser-use-stagehand-native/lib/types/extension.js": "4bfe7f14f499ece3f8ce67cd27bf5878109d44c002136cfba121a93fb9a90d3d",
+    "packages/experimental/browser-use-stagehand-native/lib/types/extension.js.map": "81671b901b8a01199098cf41b1711211b2786779fc91ca406615b51eb558d6b0",
+    "packages/experimental/browser-use-stagehand-native/lib/types/index.d.ts": "d1e543b9d2cf5a392b9d365891e2eeb9a63d7c422b7425ef90377ba0d6b2cf89",
+    "packages/experimental/browser-use-stagehand-native/lib/types/index.d.ts.map": "88f89c625f69092e2d2512eb540da7d0e2a271336a485beb0124be4e3744ca63",
+    "packages/experimental/browser-use-stagehand-native/lib/types/index.js": "8bc5e8b753d9eb761ad3020af63b64ae25ede632beac9d4c74f54e01f6920bc4",
+    "packages/experimental/browser-use-stagehand-native/lib/types/index.js.map": "ca34b10a9c45caf92e9f9e6046569f063766844c0d83cb57e58e2eb53c6809ec",
+    "packages/experimental/browser-use-stagehand-native/lib/types/launch.d.ts": "f867b82b6c9a397c24d014366d6c72bc1b6124c1ab183ef7615c5eed9f1c016a",
+    "packages/experimental/browser-use-stagehand-native/lib/types/launch.d.ts.map": "10182585b0e063b27f6c5282d9b2b6b4991fd52a9fc4d3572f6b108d7258331b",
+    "packages/experimental/browser-use-stagehand-native/lib/types/launch.js": "e42daf6b6fbce4a49bab01825b78d0d85cceee8993107d0a5f0c26e556350041",
+    "packages/experimental/browser-use-stagehand-native/lib/types/launch.js.map": "12903261ad0ea5bd7a86c43c96918173542973f225dc2f9d133efffc9b9385de",
+    "packages/experimental/browser-use-stagehand-native/lib/types/model.d.ts": "66258e257e652818aded3877e500fc6eb27a7f2cfaedd623fc87be4ed22cde67",
+    "packages/experimental/browser-use-stagehand-native/lib/types/model.d.ts.map": "ae7ac58e3916651a576ddbe761b5f13dcfdf6362b6b7b84e425c43f9d0464ca2",
+    "packages/experimental/browser-use-stagehand-native/lib/types/model.js": "b05624f6802fc5782461286bd8e49831643b3062ac3365320014a487f6292272",
+    "packages/experimental/browser-use-stagehand-native/lib/types/model.js.map": "9949b47f9fb89eae83381e4e5a950b5338fdb5ca5f686575f85a4c914c959e26",
+    "packages/experimental/browser-use-stagehand-native/lib/types/native.d.ts": "eb58b3116bf5b60693b3f9500fc0e8fdf52f2817955bb05028aa72201a5d6c8d",
+    "packages/experimental/browser-use-stagehand-native/lib/types/native.d.ts.map": "f4761a402ad35ba0a8065c120113b2f25346b40d61ce3e5656b92e8bcc1a665b",
+    "packages/experimental/browser-use-stagehand-native/lib/types/native.js": "25f3e6a79f9debd7de5cf5c4410d6797fd9c32128dd1a5165c3673fe3e404a53",
+    "packages/experimental/browser-use-stagehand-native/lib/types/native.js.map": "1fc418d1bebdca6b3a2f5a6c10a7651ab7f9f1672188cbf087a8065dfcb12186",
+    "packages/experimental/browser-use-stagehand-native/lib/types/worker-client.d.ts": "11cf10b8ed5267a1f248d93331177d99d53c0b32ec5787f0f7c285587e1b5c79",
+    "packages/experimental/browser-use-stagehand-native/lib/types/worker-client.d.ts.map": "247603df1d467ef3bdf4903368ced89d3b02330c20b563288dec42efc91fddf9",
+    "packages/experimental/browser-use-stagehand-native/lib/types/worker-client.js": "d687b0320b82ae1083276103be90ebbd4fcc07952bfc0bb2359f49b51f1b1f34",
+    "packages/experimental/browser-use-stagehand-native/lib/types/worker-client.js.map": "5118833fa45c04298e5e8266b92cb6ebddbf6a9cb4a65d84c1a12bb00de1e5e6",
+    "packages/experimental/browser-use-stagehand-native/lib/types/worker-rpc.d.ts": "eb0baa95c11463a3e5b963a2689d716eb686a2ecccca625259783a67450e8254",
+    "packages/experimental/browser-use-stagehand-native/lib/types/worker-rpc.d.ts.map": "d05841b676d5438e7998322d11ef7b1d089f4be69c20be74bfc7822497807411",
+    "packages/experimental/browser-use-stagehand-native/lib/types/worker-rpc.js": "8b3250b0fc47305421283c3f8e2cf768bbe7c24054c96c292740c28e36544aab",
+    "packages/experimental/browser-use-stagehand-native/lib/types/worker-rpc.js.map": "717420a5010c1c5de69070b3b7cf96d609d16d3738e32f0336479900bb8d2cf6",
+    "packages/experimental/browser-use-stagehand-native/lib/types/worker.d.ts": "cdd781e8b50dde35d50c92d35a56dbfe65e8caf215828c8936ecd0c7b9e9c213",
+    "packages/experimental/browser-use-stagehand-native/lib/types/worker.d.ts.map": "a4b2c4ead29f5eb2029b39a56c6ebfdfa2a077d8bddd33060507b4bde1097204",
+    "packages/experimental/browser-use-stagehand-native/lib/types/worker.js": "7f43341c65304a9a5a1300ec1514676ffc6636a82b0992d5713db97facb731ed",
+    "packages/experimental/browser-use-stagehand-native/lib/types/worker.js.map": "89c5d10d0af9ff8e31cf3b286df56fd35eac255962924d13a0085a27620df545",
+    "packages/experimental/browser-use-stagehand-native/lib/worker.js": "6e8b087f0bc2f92b01acc572ff3c4bbf4c6cecd72db004bbd695363271c99e2a"
+  },
+  "keylessApplicationMatrix": [
+    {
+      "check": "browser-headless-sdk-declared-codec-node22",
+      "passedRegisteredTests": 2
+    },
+    {
+      "check": "browser-startup-final-lib-node22",
+      "passedRegisteredTests": 1
+    },
+    {
+      "check": "browser-startup-final-src-node24",
+      "passedRegisteredTests": 1
+    },
+    {
+      "check": "browser-headless-sdk-final-lib-node24",
+      "passedRegisteredTests": 2
+    },
+    {
+      "check": "browser-startup-final-lib-node25",
+      "passedRegisteredTests": 1
+    }
+  ],
+  "keylessDifferentScenarios": 3,
+  "startupSnapshotSteps": 16,
+  "uncertaintyAcknowledgementDoesNotReleasePermit": true,
+  "productionWrites": false,
+  "realProviderCalls": false,
+  "sourceOrArtifactExclusionsAdded": false,
+  "thresholdsLowered": false,
+  "newRuntimeDependencies": 0,
+  "limitations": [
+    "Native allocation witness uses actual LinuxARM64/Node22 thread exhaustion; accounting transport failure is controlled.",
+    "Snapshot replays use real Loader/Agents/Budget/Tools/Workers with external Stagehand and CDP fixtures; no physical browser or paid model execution.",
+    "Native witness runtime source matches final source; one @throws documentation line differs.",
+    "Keyless engine/artifact repeats are not counted as additional distinct business cases.",
+    "Other browser/resource paths and all 12 project review domains remain open; official Responses verification remains deferred."
+  ],
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T234814Z",
+  "wholeProjectComplete": false
+}

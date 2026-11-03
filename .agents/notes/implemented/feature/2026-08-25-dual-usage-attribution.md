@@ -12,7 +12,7 @@ Shared project model calls are billed to the project runtime, while the administ
 
 Usage keeps exactly one billing subject: `user_id` for personal runtimes or `project_id` for shared runtimes. New records may also carry a verified `actor_user_id` extracted from authenticated participant metadata in the model request; the participant's project id is checked against the project intake subject before the actor is stored. Actor data is used only for contributor activity reports and never for quotas or billing totals. Requests without a reliable participant remain unattributed.
 
-Existing project records are not backfilled. They remain project-owned historical records and are shown separately from confirmed contributor activity. If a new actor claim cannot be verified at intake, the runtime retries the same billing event without actor fields, preserving project totals while leaving the activity unattributed. Price coverage is recorded independently so a missing price is not presented as a free call.
+Existing project records are not backfilled. They remain project-owned historical records and are shown separately from confirmed contributor activity. Proof-free legacy actor reports retain their unattributed retry. Reports carrying immutable execution witnesses follow the [execution attribution rules](../bug-fix/2026-09-22-auto-review-execution-attribution.md). Price coverage is recorded independently so a missing price is not presented as a free call.
 
 ## Alternatives considered
 

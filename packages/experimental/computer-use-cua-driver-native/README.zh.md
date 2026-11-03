@@ -34,7 +34,9 @@ kind: "package-reference"
 - name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native'
 ```
 
-此提供者没有配置字段。它加载 [package.json](package.json) 声明的确切 Cua Driver npm 版本，并采用其进程内默认配置。原生模块导入、运行时初始化、目录格式、工具重名或电脑操作注册冲突会使激活失败，并回滚所拥有的资源。注册的提供者名称为 `cua-driver-native`。
+`desktopMode` 默认为 `auto`：提供方在加载 SDK 前读取本机桌面会话信息。未检测到图形会话时，只发布明确的不可用状态与模型说明，不创建原生运行时或桌面工具。`disabled` 同样不提供桌面工具。`enabled` 适用于已明确配置、但无法从会话记录发现的桌面；它不授予系统权限，也不绕过受管授权。文件、终端和另行配置的无头浏览器能力保持独立。
+
+提供方加载 [package.json](package.json) 声明的确切 Cua Driver npm 版本，并采用其进程内默认配置。原生模块导入、运行时初始化、目录格式、工具重名或电脑操作注册冲突会使激活失败，并回滚所拥有的资源。注册的提供者名称为 `cua-driver-native`。
 
 挂载附件存储并使用明确声明支持图像输入的模型路由，才能接收截图。[MCP 结果适配器](../../mcp/mcp-client/README.zh.md) 负责图像接纳和诊断行为；模型无法接收图像时，程序调用方仍保留规范原始结果。调用采用 Cua Driver 上游的工具参数和结果。
 

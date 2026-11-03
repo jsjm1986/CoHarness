@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-checkpoint-references",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm exec tsx .agents/audits/.local/native-model-reference-final.mts",
+  "startedAt": "2026-10-25T04:34:11.830977+00:00",
+  "seconds": 31.319,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1ca8bef0159526097c6e2e90a13c55c3488ed4e638cba080ae328b4a4f738fe0",
+  "inputsAfter": "1ca8bef0159526097c6e2e90a13c55c3488ed4e638cba080ae328b4a4f738fe0",
+  "postgresToolDirectory": null,
+  "outputSha256": "6f9c62c78f602859cc32ca518d43161bba5de03f3054c5ca7c822c9dfdc104b5",
+  "outputTail": "run-gates: native-model-final-references running 3 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start translation pairing\nrun-gates: PASS translation pairing (10.85s)\nrun-gates: start markdown wrap\nrun-gates: PASS markdown wrap (8.70s)\nrun-gates: start repository references\nrun-gates: PASS repository references (10.47s)\n\nrun-gates: 3 passed, 0 failed, 0 skipped in 30.03s.\n"
+}

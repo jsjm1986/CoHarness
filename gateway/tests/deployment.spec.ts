@@ -61,7 +61,7 @@ async function setup() {
     method: 'POST', headers: { cookie: auth, origin: base, 'content-type': 'application/json' },
     body: JSON.stringify(body),
   })
-  return { deps, base, cookie, post }
+  return { deps, base, cookie, post, boss }
 }
 
 const state = (over: Partial<ClusterState> = {}): ClusterState => ({
@@ -80,6 +80,7 @@ const nodeView = (over: Partial<ClusterNodeView> = {}): ClusterNodeView => ({
 })
 const maintenanceStub = (over: Partial<MaintenanceStub> = {}): MaintenanceStub => ({
   state: async () => state(),
+  administration: async () => ({ ...state(), operations: [] }),
   listOperations: async () => [],
   enterMaintenance: async () => state({ mode: 'maintenance', maintenanceEpoch: '4' }),
   exitMaintenance: async () => state(),
@@ -128,22 +129,19 @@ describe('deployment admin API', () => {
     expect((await post('/admin/api/deployment/maintenance', { action: 'exit' })).status).toBe(409)
   })
 
-  it('requests a restore only for a verified backup and rejects duplicates', async () => {
+  it('forwards the authenticated restore actor and propagates admission refusals', async () => {
     const { deps, post } = await setup()
     const requestRestore = vi.fn(async (): Promise<DeploymentOperationView> => ({
       id: 'op-1', kind: 'restore', status: 'pending', nodeName: null, detail: { backupId: 'b1' },
       createdBy: 1, createdAt: 'now', startedAt: null, finishedAt: null, error: null,
     }))
     deps.maintenance = maintenanceStub({ requestRestore })
-    const get = vi.fn(async (id: string): Promise<BackupRecordView> => ({
-      id, path: '/tmp/d.dump', format: 'pg-dump-custom', migrationVersion: 41, writeEpoch: '1',
-      sizeBytes: 1, sha256: 'f'.repeat(64), managedSnapshot: { version: 1, roots: [], directories: [], absent: [], files: [] }, status: id === 'b1' ? 'verified' : 'recording',
-      createdBy: 1, createdAt: 'now', verifiedAt: null, restoredAt: null, error: null,
-    }))
-    deps.backups = { list: vi.fn(async () => []), get, record: vi.fn(), setVerified: vi.fn() }
     expect((await post('/admin/api/deployment/restore', { backupId: 'b1' })).status).toBe(200)
     expect(requestRestore).toHaveBeenCalledWith(expect.any(Number), 'b1')
+    requestRestore.mockRejectedValueOnce(new MaintenanceError(409, 'backup-not-verified'))
     expect((await post('/admin/api/deployment/restore', { backupId: 'b2' })).status).toBe(409)
+    requestRestore.mockRejectedValueOnce(new MaintenanceError(409, 'restore-already-pending'))
+    expect((await post('/admin/api/deployment/restore', { backupId: 'b1' })).status).toBe(409)
     expect((await post('/admin/api/deployment/restore', {})).status).toBe(400)
   })
 
@@ -177,7 +175,7 @@ describe('deployment admin API', () => {
 
 describe('maintenance write gate', () => {
   it('rejects mutating requests during maintenance while reads and control stay open', async () => {
-    const { deps, base, cookie, post } = await setup()
+    const { deps, base, cookie, post, boss } = await setup()
     const gate = vi.fn(async (): Promise<'maintenance' | 'stale-epoch'> => 'maintenance')
     deps.maintenanceGate = gate
     deps.maintenance = maintenanceStub({
@@ -199,9 +197,16 @@ describe('maintenance write gate', () => {
     const user = (await deps.users.list())[0]!
     const stop = vi.spyOn(deps.instances, 'stop').mockResolvedValue(undefined)
     expect((await post(`/admin/api/users/${user.id}/instance/stop`, {})).status).toBe(204)
-    expect(stop).toHaveBeenCalledExactlyOnceWith(user.id)
+    expect(stop).toHaveBeenCalledExactlyOnceWith(user.id, 'manual', boss.id)
     expect((await post(`/admin/api/users/${user.id}/instance/start`, {})).status).toBe(503)
+    const runtimePath = '/admin/api/runtimes/00000000-0000-4000-8000-000000000001'
+    expect(await (await post(`${runtimePath}/stop`, { generation: 1 })).json())
+      .toMatchObject({ error: 'runtime-management/unavailable' })
+    for (const action of ['start', 'restart', 'retire']) {
+      expect(await (await post(`${runtimePath}/${action}`, { generation: 1 })).json()).toEqual({ error: 'maintenance' })
+    }
     gate.mockResolvedValue('stale-epoch')
+    expect(await (await post(`${runtimePath}/stop`, { generation: 1 })).json()).toEqual({ error: 'stale-epoch' })
     expect((await post(`/admin/api/users/${user.id}/instance/stop`, {})).status).toBe(503)
     expect(stop).toHaveBeenCalledOnce()
     const stale = await post('/admin/api/users/create', { username: 'y', password: 'pw-12345678' })

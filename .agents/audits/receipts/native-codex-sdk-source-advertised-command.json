@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-sdk-source-advertised-command",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=src DSH_SNAPSHOT_MAX_CONCURRENCY=1 node_modules/.bin/vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/managed-codex-model.snapshot.ts --retry=0",
+  "startedAt": "2026-10-25T02:43:40.479933+00:00",
+  "seconds": 5.125,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0670752fbfcf411d8647e9ce013be3f4a0ed22026df021575bb3eed7bb132a15",
+  "inputsAfter": "0670752fbfcf411d8647e9ce013be3f4a0ed22026df021575bb3eed7bb132a15",
+  "postgresToolDirectory": null,
+  "outputSha256": "dd52c7ae53d51db8e7b1e70a211110f8bfd79e5ed3b1e9c1e156609929c0a3e7",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  10:43:42\n   Duration  3.09s (transform 515ms, setup 23ms, import 708ms, tests 2.28s, environment 0ms)\n\n"
+}

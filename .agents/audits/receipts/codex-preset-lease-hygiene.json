@@ -1,0 +1,14 @@
+{
+  "name": "codex-preset-lease-hygiene",
+  "cwd": ".",
+  "command": "pnpm run hygiene",
+  "startedAt": "2026-10-25T14:26:31.219494+00:00",
+  "seconds": 316.759,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "91dbac748cebb307091633f1618121c05f6d35df0bf9a9bc724316635577b040",
+  "inputsAfter": "91dbac748cebb307091633f1618121c05f6d35df0bf9a9bc724316635577b040",
+  "postgresToolDirectory": null,
+  "outputSha256": "e8b1200bfdd630dfcad511d56abec1c7ee5cc7fe0b714d6cd67bf994d0165ee8",
+  "outputTail": "$ tsx scripts/run-gates.ts hygiene\nrun-gates: hygiene running 21 gate(s) with 8 worker(s) from 10 local default worker(s) of 10 CPU(s), hygiene cap 8.\nrun-gates: start vendored links\nrun-gates: start vendor rescope\nrun-gates: start knip\nrun-gates: start publint\nrun-gates: start constraints\nrun-gates: start default product isolation\nrun-gates: start package dependencies\nrun-gates: start application entrypoints\nrun-gates: PASS vendored links (6.93s)\nrun-gates: start DSH package licenses\nrun-gates: PASS DSH package licenses (4.49s)\nrun-gates: start node-next types\nrun-gates: PASS application entrypoints (13.47s)\nrun-gates: start optional dependency imports\nrun-gates: PASS constraints (14.93s)\nrun-gates: start client packages\nrun-gates: PASS node-next types (46.40s)\nrun-gates: start client UI i18n\nrun-gates: PASS publint (58.57s)\nrun-gates: start menu surface backdrop\nrun-gates: PASS menu surface backdrop (1.45s)\nrun-gates: start client route resolution\nrun-gates: PASS default product isolation (60.47s)\nrun-gates: start plugin surfaces\nrun-gates: PASS client UI i18n (4.07s)\nrun-gates: start proxy-aware dispatchers\nrun-gates: PASS plugin surfaces (1.39s)\nrun-gates: start plugin record callers\nrun-gates: PASS vendor rescope (64.67s)\nrun-gates: start no new unknown casts\nrun-gates: PASS proxy-aware dispatchers (3.28s)\nrun-gates: start Cordis config\nrun-gates: PASS client route resolution (10.25s)\nrun-gates: start runtime closure\nrun-gates: PASS runtime closure (5.55s)\nrun-gates: PASS client packages (61.93s)\nrun-gates: PASS Cordis config (12.87s)\nrun-gates: PASS no new unknown casts (35.81s)\nrun-gates: PASS optional dependency imports (96.05s)\nrun-gates: PASS plugin record callers (48.73s)\nrun-gates: PASS knip (155.07s)\nrun-gates: PASS package dependencies (308.54s)\n\nrun-gates: 21 passed, 0 failed, 0 skipped in 308.66s.\n"
+}

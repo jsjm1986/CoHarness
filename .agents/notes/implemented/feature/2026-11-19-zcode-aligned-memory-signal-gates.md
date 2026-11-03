@@ -20,7 +20,7 @@ Port all four, adapted to the typed memory service:
 - `memorySignalWordCount` in `dsh-memory` is the shared word proxy: whitespace-separated tokens plus one unit per Han ideograph. ZCode's Latin-only `split(/\s+/)` would count a whole Chinese sentence as one word; the per-character rule preserves the same admission bar for CJK prose.
 - `memory-context` skips the selector under two signal words and folds `memory_read` `tool/call` events into a `read` set — an entry the agent already fetched needs no summary re-injection. The fold keys by name, conservatively excluding same-named entries in other scopes.
 - `memory-curation` sets `sawHuman` only on a message of at least three signal words.
-- Every auxiliary request — the recall selector and both curation loops — resolves the model's lowest advertised reasoning effort via `llm.resolveModelInfo` and caps output at `AUXILIARY_MAX_TOKENS` (5,000). A failed metadata lookup only drops the effort hint.
+- Every auxiliary request — the recall selector and both curation loops — resolves the model's lowest advertised reasoning effort via `llm.resolveModelInfo` and caps output at its plugin’s `maxOutputTokens` configuration (default 5,000). A failed metadata lookup only drops the effort hint.
 - `renderRecallEntry` prefixes entries updated more than a day ago with the same "N days old" point-in-time caution ZCode's content renderer emits.
 
 ## Alternatives considered

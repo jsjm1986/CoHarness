@@ -1,0 +1,14 @@
+{
+  "name": "document-rooted-fs-current-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/rooted-fs.ts packages/attachment/userdoc-local/src/store.ts packages/attachment/userdoc-local/tests/private-upload-paths.spec.ts",
+  "startedAt": "2026-10-26T02:11:06.665187+00:00",
+  "seconds": 5.243,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6aec206465dd891f26070a0b9540bb22c66582f2cc0e54c9d2601a553d06c77f",
+  "inputsAfter": "6aec206465dd891f26070a0b9540bb22c66582f2cc0e54c9d2601a553d06c77f",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

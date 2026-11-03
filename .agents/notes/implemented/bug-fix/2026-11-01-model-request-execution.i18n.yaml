@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-model-request-execution.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-model-request-execution.md
+document:
+  en: c57bc87c7cee774953fd02415c9dc7672674ebf7
+  zh: a92f4908e27194d624f88f43dce5c1128fee3a9f
+/agent-note-model-streams-retain-execution-and-billing-owners:
+  en: df7371acd2b251fc
+  zh: dc4ec5b7d4e0fb7e
+/agent-note-model-streams-retain-execution-and-billing-owners/problem:
+  en: 60a35ce368983aa7
+  zh: c707563373e51861
+/agent-note-model-streams-retain-execution-and-billing-owners/decision:
+  en: bfbae45b0b9ce0ac
+  zh: da6f0f46cfeadedd
+/agent-note-model-streams-retain-execution-and-billing-owners/alternatives-considered:
+  en: d331bd24bcaacfbf
+  zh: 0d9cbc10548b7005
+/agent-note-model-streams-retain-execution-and-billing-owners/consequences:
+  en: 60ef36f2ead9a662
+  zh: 0ff0f35ca5568714
+/agent-note-model-streams-retain-execution-and-billing-owners/verification:
+  en: 3ce55cb7029b5309
+  zh: 00cafc98518eebbe

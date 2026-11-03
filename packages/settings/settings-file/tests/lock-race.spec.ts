@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
@@ -21,6 +21,21 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
     ...actual,
+    open: async (...args: Parameters<typeof actual.open>) => {
+      const handle = await actual.open(...args)
+      if (String(args[0]).endsWith('.tmp')) {
+        const write = handle.writeFile.bind(handle)
+        vi.spyOn(handle, 'writeFile').mockImplementation(async (...input) => {
+          if (state.failTempWrite) {
+            state.failTempWrite = false
+            await write('partial')
+            throw Object.assign(new Error('ENOSPC: injected partial write failure'), { code: 'ENOSPC' })
+          }
+          await write(...input)
+        })
+      }
+      return handle
+    },
     writeFile: (async (path: unknown, ...rest: never[]) => {
       if (state.holdDocumentCreate && String(path).endsWith('settings.yaml')) {
         state.holdDocumentCreate = false
@@ -30,10 +45,6 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       if (state.failDocumentCreate && String(path).endsWith('settings.yaml')) {
         state.failDocumentCreate = false
         throw Object.assign(new Error('ENOSPC: injected document create failure'), { code: 'ENOSPC' })
-      }
-      if (state.failTempWrite && String(path).endsWith('.tmp')) {
-        state.failTempWrite = false
-        throw Object.assign(new Error('ENOSPC: injected writeFile failure'), { code: 'ENOSPC' })
       }
       return (actual.writeFile as (path: unknown, ...args: never[]) => Promise<void>)(path, ...rest)
     }) as typeof actual.writeFile,
@@ -51,6 +62,7 @@ afterEach(async () => {
   state.documentCreateStarted = undefined
   state.continueDocumentCreate = undefined
   while (cleanups.length > 0) await cleanups.pop()!()
+  vi.restoreAllMocks()
 })
 
 async function tempDir(): Promise<string> {
@@ -122,5 +134,8 @@ describe('writer-lock failure cleanup', () => {
     // The document is untouched and the writer lock was released on the way out.
     expect(await readFile(path, 'utf8')).toContain('value: 1')
     await expect(access(`${path}.lock`)).rejects.toThrow()
+    expect((await readdir(dir)).filter(name => name.endsWith('.tmp'))).toEqual([])
+    await scope.update({ value: 7 })
+    expect(await readFile(path, 'utf8')).toContain('value: 7')
   })
 })

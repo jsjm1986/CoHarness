@@ -724,6 +724,28 @@ describe('installLlmReplay (through the real LlmRuntime)', () => {
     expect(await drain(ctx.llm.stream({ provider: 'm', model: 'm', messages: [] }))).toEqual(TEXT_CHUNKS)
   })
 
+  it.each(['model', 'orchestration'] as const)('replays %s output without executing its adapter and releases interception on disposal', async (kind) => {
+    writeLog(TEXT_CHUNKS)
+    const ctx = new Context()
+    try {
+      await ctx.plugin(LlmRuntime)
+      let executed = 0
+      class Native extends LlmAdapter {
+        override readonly callKind = kind
+        async *stream(): AsyncIterable<StreamChunk> { executed += 1; yield { type: 'finish', reason: { kind: 'stop' } } }
+      }
+      ctx.llm.registerAdapter(['m'], new Native())
+      const replay = installLlmReplay(ctx, { file })
+      expect(await drain(ctx.llm.stream({ provider: 'm', model: 'm', messages: [] }))).toEqual(TEXT_CHUNKS)
+      expect(executed).toBe(0)
+      replay.assertConsumed()
+      replay.dispose()
+      expect(await drain(ctx.llm.stream({ provider: 'm', model: 'm', messages: [] })))
+        .toEqual([{ type: 'finish', reason: { kind: 'stop' } }])
+      expect(executed).toBe(1)
+    } finally { await ctx.fiber.dispose() }
+  })
+
   describe('{{fromRequest:...}} substitution', () => {
     const requestMessages = [createUserMessage({
       content: [{ type: 'text' as const, text: 'stale {"goal":{"id":"goal-old"}} then {"goal":{"id":"goal-42ab"}}' }],

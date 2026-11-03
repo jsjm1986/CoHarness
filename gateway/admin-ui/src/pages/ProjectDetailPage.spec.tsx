@@ -180,6 +180,7 @@ describe('ProjectDetailPage', () => {
   })
 
   beforeEach(() => {
+    window.history.replaceState({}, '', '/admin/')
     vi.clearAllMocks()
     vi.mocked(api.getProject).mockResolvedValue(project)
     vi.mocked(api.getMemoryPolicy).mockImplementation(async (kind, id) => ({ kind, id, enabled: false, revision: '0' }))
@@ -199,6 +200,21 @@ describe('ProjectDetailPage', () => {
     vi.mocked(api.setProjectModelAccess).mockResolvedValue(undefined)
     vi.mocked(api.setAllProjectModelAccess).mockResolvedValue(undefined)
     vi.mocked(api.setQuota).mockResolvedValue(undefined)
+  })
+
+  it('keeps the existing local project-settings shortcut', async () => {
+    renderPage()
+    await screen.findByRole('heading', { name: 'People' })
+    expect(screen.getByRole('link', { name: '打开项目设置' }).getAttribute('href')).toBe('/admin/projects/7/settings')
+  })
+
+  it('opens remote project settings through the assigned environment resolver', async () => {
+    window.history.replaceState({}, '', '/admin/computers/61f22202-1c02-4a3c-8d34-f11222333444/projects/7')
+    try {
+      renderPage()
+      await screen.findByRole('heading', { name: 'People' })
+      expect(screen.getByRole('link', { name: '打开项目设置' }).getAttribute('href')).toBe('/admin/projects/7/settings')
+    } finally { window.history.replaceState({}, '', '/admin/') }
   })
 
   it('keeps rename failures and the submitted name in the dialog, then permits correction', async () => {

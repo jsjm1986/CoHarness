@@ -1,0 +1,11 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, preflightReady]
+- insert:
+    - id: preflight-job-tools
+      name: '@deepseek-ai/dsh-tool-jobs'
+    - id: preflight-runtime
+      name: './runtime.mjs'
+    - id: preflight-model
+      name: './model.mjs'

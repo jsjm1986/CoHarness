@@ -1,0 +1,13 @@
+{
+  "name": "gateway-auth-config-types",
+  "cwd": "gateway",
+  "command": "npm run typecheck",
+  "startedAt": "2026-10-23T20:07:00.665195+00:00",
+  "seconds": 10.98,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bd358c6afbc177c191100dc81be24458a9c7e73d3e8ac513ce286a3ac46c2901",
+  "inputsAfter": "bd358c6afbc177c191100dc81be24458a9c7e73d3e8ac513ce286a3ac46c2901",
+  "outputSha256": "cbe2688c059845705d69d8b7131a914cc679b42828397af541008e9fce7f99a5",
+  "outputTail": "\n> typecheck\n> tsc --noEmit\n\ntests/progress-service.spec.ts(29,10): error TS2352: Conversion of type '{ query: Mock<(sql: string) => Promise<{ rows: unknown[]; rowCount?: number; }>>; connect: () => Promise<{ query: Mock<(sql: string) => Promise<{ rows: unknown[]; rowCount?: number; }>>; release: Mock<...>; }>; }' to type 'Pool & { query: Mock<Procedure | Constructable>; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Type '{ query: Mock<(sql: string) => Promise<{ rows: unknown[]; rowCount?: number | undefined; }>>; connect: () => Promise<{ query: Mock<(sql: string) => Promise<{ rows: unknown[]; rowCount?: number | undefined; }>>; release: Mock<...>; }>; }' is missing the following properties from type 'Pool': totalCount, idleCount, waitingCount, expiredCount, and 19 more.\n"
+}

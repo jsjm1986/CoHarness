@@ -189,6 +189,121 @@ async function benchFiber(
 }
 
 describe('Client Typert API', () => {
+  it('keeps distinct lookup scopes in captured facades sharing one fiber and Runtime', async () => {
+    const call = vi.fn<ConnectionHandle['rpc']['call']>().mockResolvedValue({ ok: true, value: { ref: 'result' } })
+    const ctx = await bench(call)
+    const first = ctx.extend({ fixtureId: 'a' }), second = ctx.extend({ fixtureId: 'b' })
+    ctx.typert.contexts.registerClient('fixture', {
+      identity: candidate => (candidate as Context & { fixtureId?: string }).fixtureId,
+      resolve: () => undefined,
+    })
+    try {
+      await ctx.remote.$mount({ package: '@fixture/probe', descriptors: [directDescriptor()] })
+      const a = first.remote.$forTarget() as FixtureContext['remote']
+      const b = second.remote.$forTarget() as FixtureContext['remote']
+      expect(a.$forTarget()).toBe(a)
+      await a.probe.create({ objective: 'first scope' })
+      await b.probe.create({ objective: 'second scope' })
+      expect(call.mock.calls.map(args => args[2])).toEqual([
+        { args: { agentId: 'a', request: { objective: 'first scope' } } },
+        { args: { agentId: 'b', request: { objective: 'second scope' } } },
+      ])
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('captures a Runtime for address-free calls without starting or changing the root transport', async () => {
+    const rootCall = vi.fn<ConnectionHandle['rpc']['call']>().mockResolvedValue({ ok: true, value: 'primary' })
+    const otherCall = vi.fn<ConnectionHandle['rpc']['call']>().mockResolvedValue({ ok: true, value: 'secondary' })
+    const other = { rpc: { call: otherCall } } as unknown as ConnectionHandle
+    const ctx = new Context()
+    await ctx.plugin(TypertRegistry)
+    const forTarget = vi.fn(() => other)
+    ctx.provide('connection', { rpc: { call: rootCall }, forTarget } as unknown as ConnectionHandle)
+    await ctx.plugin({ inject, apply })
+    try {
+      await ctx.remote.$mount({ package: '@fixture/probe', descriptors: [maybeDescriptor()] })
+      const selected = ctx.remote.$forTarget({ kind: 'project', projectId: 7 })
+      expect(rootCall).not.toHaveBeenCalled()
+      expect(otherCall).not.toHaveBeenCalled()
+      await expect(selected.probe.maybe('read')).resolves.toEqual({ ok: true, value: 'secondary' })
+      await expect(ctx.remote.probe.maybe('read')).resolves.toEqual({ ok: true, value: 'primary' })
+      expect(forTarget).toHaveBeenCalledWith({ kind: 'project', projectId: 7 })
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('delivers Runtime events to matching bound listeners and preserves global subscriptions', async () => {
+    const call = vi.fn<ConnectionHandle['rpc']['call']>()
+    const other = { rpc: { call } } as unknown as ConnectionHandle
+    const ctx = new Context()
+    await ctx.plugin(TypertRegistry)
+    const primary = { rpc: { call }, forTarget: (target: { kind: string }) => target.kind === 'personal' ? primary : other } as unknown as ConnectionHandle
+    ctx.provide('connection', primary)
+    await ctx.plugin({ inject, apply })
+    try {
+      const rootListener = vi.fn(), primaryListener = vi.fn(), secondaryListener = vi.fn()
+      ctx.remote.$on('fixture/changed', rootListener)
+      const a = ctx.remote.$forTarget(), b = ctx.remote.$forTarget({ kind: 'project', projectId: 7 })
+      expect(b.$forTarget()).toBe(b)
+      a.$on('fixture/changed', primaryListener)
+      const stop = b.$on('fixture/changed', secondaryListener)
+      b.$dispatch('fixture/changed', ['secondary'])
+      expect(secondaryListener).toHaveBeenCalledExactlyOnceWith('secondary')
+      expect(primaryListener).not.toHaveBeenCalled()
+      a.$dispatch('fixture/changed', ['primary'])
+      expect(primaryListener).toHaveBeenCalledExactlyOnceWith('primary')
+      expect(rootListener).toHaveBeenCalledTimes(2)
+      stop()
+      b.$dispatch('fixture/changed', ['later'])
+      expect(secondaryListener).toHaveBeenCalledTimes(1)
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('refuses a captured Runtime call naming a Session owned by another transport', async () => {
+    const call = vi.fn<ConnectionHandle['rpc']['call']>().mockResolvedValue({ ok: true, value: { ref: 'ok' } })
+    const other = { rpc: { call } } as unknown as ConnectionHandle
+    const ctx = new Context()
+    await ctx.plugin(TypertRegistry)
+    const primary = { rpc: { call }, forTarget: () => other,
+      forSession: (id: string) => id === 'on-primary' ? primary : other,
+      sessionForRemote: (_endpoint: string, args: { agentId?: string }) => args.agentId,
+    } as unknown as ConnectionHandle
+    ctx.provide('connection', primary)
+    await ctx.plugin({ inject, apply })
+    try {
+      await ctx.remote.$mount({ package: '@fixture/probe', descriptors: [directDescriptor()] })
+      const selected = ctx.remote.$forTarget({ kind: 'project', projectId: 7 })
+      await expect(selected.probe.create('on-primary', { objective: 'wrong owner' })).rejects.toThrow('another Runtime')
+      expect(call).not.toHaveBeenCalled()
+      await expect(selected.probe.create('on-secondary', { objective: 'same owner' })).resolves.toEqual({ ok: true, value: { ref: 'ok' } })
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('checks the captured Runtime interaction mode and releases its listeners with the calling fiber', async () => {
+    const call = vi.fn<ConnectionHandle['rpc']['call']>()
+    const ctx = new Context()
+    await ctx.plugin(TypertRegistry)
+    const other = { interactions: 'answer', rpc: { call } } as unknown as ConnectionHandle
+    const primary = { interactions: 'none', rpc: { call }, forTarget: () => other } as unknown as ConnectionHandle
+    ctx.provide('connection', primary)
+    await ctx.plugin({ inject, apply })
+    const listener = vi.fn()
+    let selected: ClientRemote | undefined
+    try {
+      const reader = ctx.plugin({ inject: ['remote'], apply: (own) => {
+        selected = own.remote.$forTarget({ kind: 'project', projectId: 7 })
+        selected.$on('fixture/changed', listener)
+      } })
+      await reader
+      selected!.$dispatch('fixture/changed', ['before'])
+      expect(listener).toHaveBeenCalledExactlyOnceWith('before')
+      await reader.dispose()
+      selected!.$dispatch('fixture/changed', ['after'])
+      expect(listener).toHaveBeenCalledOnce()
+      Object.assign(other, { interactions: 'none' })
+      expect(() => selected!.$on('fixture/changed', listener)).toThrow(/'none' connection/)
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('routes typed read streams to their Session transport and refuses results after withdrawal', async () => {
     const call = vi.fn<ConnectionHandle['rpc']['call']>()
     const stream = vi.fn<NonNullable<ConnectionHandle['rpc']['stream']>>(async function* () {

@@ -1,0 +1,13 @@
+{
+  "name": "python-managed-fault-lint-final",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/experimental/ptc-runtime-python/src/index.ts packages/experimental/ptc-runtime-python/src/launch.ts packages/experimental/ptc-runtime-python/tests/boot-write-failure.spec.ts packages/experimental/ptc-runtime-python/tests/resource-admission.spec.ts packages/experimental/ptc-runtime-python/tests/runtime.spec.ts packages/experimental/ptc-runtime-python/tests/sandbox.spec.ts snapshots/session/ptc-python-turn/resource-admission-fixture.mjs",
+  "startedAt": "2026-10-23T16:06:15.477886+00:00",
+  "seconds": 2.602,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d090cb02165998aeb73aca36d26874ce985ad4a3ace5b3444559ef7021e61dbe",
+  "inputsAfter": "d090cb02165998aeb73aca36d26874ce985ad4a3ace5b3444559ef7021e61dbe",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

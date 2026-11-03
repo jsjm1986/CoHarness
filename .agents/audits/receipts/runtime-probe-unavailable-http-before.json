@@ -1,0 +1,14 @@
+{
+  "name": "runtime-probe-unavailable-http-before",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/proxy.spec.ts -t 'unavailable supervision' --retry=0",
+  "startedAt": "2026-10-24T21:14:50.975252+00:00",
+  "seconds": 3.935,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6bf40cb29905dfa98f18a63dcee23ac587725665e0ed41ca2db35b07a34907e6",
+  "inputsAfter": "6bf40cb29905dfa98f18a63dcee23ac587725665e0ed41ca2db35b07a34907e6",
+  "postgresToolDirectory": null,
+  "outputSha256": "6d7df5409564b9e9c543de5c4b339765e447378f37962eaa30e5177268aebf1c",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\nstderr | tests/proxy.spec.ts > proxy handlers > reports unavailable supervision without restarting or releasing the live Runtime\n[gateway] request failed: Error: connect ECONNREFUSED 127.0.0.1:80\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16) {\n  errno: -61,\n  code: 'ECONNREFUSED',\n  syscall: 'connect',\n  address: '127.0.0.1',\n  port: 80\n}\n\n ❯ tests/proxy.spec.ts (19 tests | 1 failed | 18 skipped) 674ms\n     × reports unavailable supervision without restarting or releasing the live Runtime 673ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/proxy.spec.ts > proxy handlers > reports unavailable supervision without restarting or releasing the live Runtime\nAssertionError: expected 500 to be 503 // Object.is equality\n\n- Expected\n+ Received\n\n- 503\n+ 500\n\n ❯ tests/proxy.spec.ts:143:31\n    141|     try {\n    142|       const response = await fetch(`${base}/api/echo`, { headers: { co…\n    143|       expect(response.status).toBe(503)\n       |                               ^\n    144|       expect(await response.json()).toMatchObject({ error: { code: 'IN…\n    145|       expect(starts).not.toHaveBeenCalled()\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 18 skipped (19)\n   Start at  05:14:53\n   Duration  1.54s (transform 513ms, setup 0ms, import 696ms, tests 674ms, environment 0ms)\n\n"
+}

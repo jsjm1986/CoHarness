@@ -1,0 +1,13 @@
+{
+  "name": "ssh-enclosing-owner-fixed",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/ssh/ssh/tests/startup-behavior.spec.ts -t 'retains the transport through enclosing-owner cleanup' --retry=0",
+  "startedAt": "2026-10-23T15:12:40.930765+00:00",
+  "seconds": 3.603,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5874201415dada4d02dc4d2b1381480daacacffd34800d7913b0ea5302a28635",
+  "inputsAfter": "5874201415dada4d02dc4d2b1381480daacacffd34800d7913b0ea5302a28635",
+  "outputSha256": "3925378ba57d4d3b0eb71fbfd7c5db6fe72854bcf2f7c8191c1d9a910e5492d0",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  1 passed | 33 skipped (34)\n   Start at  23:12:44\n   Duration  479ms (transform 189ms, setup 54ms, import 224ms, tests 14ms, environment 0ms)\n\n"
+}

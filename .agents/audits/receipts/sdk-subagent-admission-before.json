@@ -1,0 +1,14 @@
+{
+  "name": "sdk-subagent-admission-before",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/reproduce-sdk-subagent-admission.mjs",
+  "startedAt": "2026-10-24T09:32:38.715835+00:00",
+  "seconds": 1.501,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "inputsAfter": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "postgresToolDirectory": null,
+  "outputSha256": "7bbe2589d9f17b63e9ef2d277527a79292142201328641a6546ccd7ac22fd02d",
+  "outputTail": "{\"actualChildProcess\":true,\"childExecutedModel\":true,\"parentModelPolicyAllows\":false,\"requiredResourceAcquisitions\":0,\"result\":\"completed\"}\n"
+}

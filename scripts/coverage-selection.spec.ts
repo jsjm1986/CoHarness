@@ -9,6 +9,56 @@ const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
 describe('coverage measurement selection', () => {
+  it('measures execution admission on every platform with either PowerShell capability', () => {
+    const sources = [
+      'packages/interaction/commands/src/index.ts', 'packages/interaction/user-questions/src/index.ts',
+      'packages/subagent/subagent/src/index.ts',
+    ]
+    for (const platform of ['linux', 'darwin', 'win32'] as const) {
+      for (const pwshAvailable of [false, true]) {
+        expect(selectCoverageSources(sources, resolveCoveragePolicy(platform, pwshAvailable))).toEqual(sources)
+      }
+    }
+  })
+
+  it('measures project participant parsing on every platform with either PowerShell capability', () => {
+    const sources = ['packages/context/collaboration-context/src/participant.ts']
+    for (const platform of ['linux', 'darwin', 'win32'] as const) {
+      for (const pwshAvailable of [false, true]) {
+        expect(selectCoverageSources(sources, resolveCoveragePolicy(platform, pwshAvailable))).toEqual(sources)
+      }
+    }
+  })
+
+  it('measures SSH cleanup on supported POSIX hosts and excludes unsupported Windows carriers', () => {
+    const sources = ['packages/ssh/ssh/src/helper-processes.ts', 'packages/ssh/ssh/src/helper.ts']
+    for (const platform of ['linux', 'darwin'] as const) {
+      expect(selectCoverageSources(sources, resolveCoveragePolicy(platform, false))).toEqual(sources)
+    }
+    expect(selectCoverageSources(sources, resolveCoveragePolicy('win32', false))).toEqual([])
+  })
+
+  it('gates activity requests and ownership while retaining its view and store exemptions', () => {
+    const sources = [
+      'packages/client/ui-project-activity/src/client/index.ts',
+      'packages/client/ui-project-activity/src/client/feed.ts',
+      'packages/client/ui-project-activity/src/client/store.ts',
+      'packages/client/ui-project-activity/src/client/ActivityBody.tsx',
+    ]
+    for (const platform of ['linux', 'darwin', 'win32'] as const) {
+      expect(selectCoverageSources(sources, resolveCoveragePolicy(platform, false))).toEqual(sources.slice(0, 2).sort())
+    }
+  })
+
+  it('measures private Session presentation ownership and chat persistence outside GUI composition debt', () => {
+    const sources = [
+      'packages/client/runtime/src/client/session-persistence.ts',
+      'packages/client/ui-conversation/src/client/stores.ts',
+      'packages/client/ui-conversation/src/client/apply.ts',
+      'packages/client/ui-conversation/src/client/ConversationRoot.tsx',
+    ]
+    expect(selectCoverageSources(sources, resolveCoveragePolicy('linux', false))).toEqual(sources.slice(0, 2))
+  })
   it('keeps native PowerShell measured on Windows while excluding unsupported POSIX providers', () => {
     const pwsh = 'packages/shell/pwsh-local/src/index.ts'
     const bash = 'packages/shell/bash-local/src/index.ts'

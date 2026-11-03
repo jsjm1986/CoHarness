@@ -41,12 +41,15 @@ kind: "package-reference"
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
+| `desktopMode` | `auto` | 启动前检测本机桌面；`disabled` 不启动驱动，`enabled` 选择已明确准备的桌面或远端命令包装器 |
 | `command` | `cua-driver` | 已安装的可执行程序路径或 PATH 命令 |
 | `args` | `[mcp]` | 不经过 shell、直接传入的参数 |
 | `toolCallTimeoutMs` | MCP 客户端默认值 | 单次调用的超时覆盖值，单位为毫秒 |
 | `reconnect` | MCP 客户端策略 | 可选的重连覆盖配置 |
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-computer-use-cua-driver-mcp)列出了接受的字段。超时和重连默认值由 [MCP 客户端](../../mcp/mcp-client/README.zh.md)定义。
+
+`desktopMode: auto` 在未检测到图形会话时发布明确的不可用状态，并在 system-prompt 服务存在时提供说明，不启动可执行程序。文件、终端和另行配置的无头浏览器能力保持独立。检测到桌面不代表已经具备系统权限或用户授权。如果命令包装器从无 GUI 主机连接已准备好的远端桌面，需明确设置 `desktopMode: enabled`；`disabled` 保持提供方不可用。
 
 ### 激活与所有权
 

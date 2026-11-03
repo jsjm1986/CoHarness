@@ -1,0 +1,14 @@
+{
+  "name": "runtime-control-handoff-built-node22",
+  "cwd": "gateway",
+  "command": "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node tests/run-built-local-supervision.mjs",
+  "startedAt": "2026-10-24T19:56:58.461708+00:00",
+  "seconds": 2.941,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "19eba6a5ef00556143f7eda8dd1b81e947b4bfe787ad269d79ae007e1cb0e1d7",
+  "inputsAfter": "19eba6a5ef00556143f7eda8dd1b81e947b4bfe787ad269d79ae007e1cb0e1d7",
+  "postgresToolDirectory": null,
+  "outputSha256": "058998aa3c3e0a71fd7aa6bbb45ef5a239bd14d326538f04312ca5ec2ed86fa7",
+  "outputTail": "Compiled Runtime starts with its private credential.\nApplication backups refuse roots that overlap node execution control.\nGateway SIGKILL leaves the independently owned Runtime available.\nA replacement Gateway authenticates the exact runtime generation.\nA different credential cannot stop the active generation.\nConfirmed stop joins the owned process range and retained runtime output.\nA stopped credential generation cannot allocate again.\nA fresh credential survives a repeated stop from the older handle.\nCancellation after preparation prevents independent runtime allocation.\n"
+}

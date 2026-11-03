@@ -1,0 +1,153 @@
+{
+  "at": "2026-10-31T09:05:05.161084+00:00",
+  "finding": "B398",
+  "title": "Native browser startup publishes stale resource ownership and reconnects reuse the original accountant",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "paths": [
+    "packages/experimental/browser-use-stagehand-native/src/index.ts",
+    "packages/experimental/browser-use-stagehand-native/src/launch.ts",
+    "packages/experimental/browser-use-stagehand-native/src/worker-client.ts",
+    "packages/experimental/browser-use-stagehand-native/tests/provider.spec.ts",
+    "packages/experimental/browser-use-stagehand-native/tests/model.spec.ts",
+    "packages/experimental/browser-use-stagehand-native/tests/launch.spec.ts",
+    "packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts",
+    "packages/experimental/browser-use-stagehand-native/tests/fixtures/startup-owner.mjs",
+    "packages/experimental/browser-use-stagehand-native/README.md",
+    "packages/experimental/browser-use-stagehand-native/README.zh.md",
+    "packages/experimental/browser-use-stagehand-native/README.i18n.yaml",
+    "snapshots/session/browser-startup-owner.snapshot.ts",
+    "snapshots/session/browser-startup-owner/expected.jsonl",
+    ".agents/notes/implemented/bug-fix/2026-10-31-browser-startup-resource-ownership.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-browser-startup-resource-ownership.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-browser-startup-resource-ownership.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-startup-owner/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-startup-owner/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-startup-owner/guide.zh.md"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T084816Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T084816Z/browser-owner-final-coverage.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T084816Z/browser-owner-source-snapshot-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T084816Z/browser-owner-build-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T084816Z/browser-owner-docs.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T084816Z/browser-owner-built-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T084816Z/browser-owner-built-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T084816Z/browser-owner-lint-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T084816Z/browser-owner-catalog.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T084816Z/browser-owner-export-jsdoc.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T084816Z/browser-owner-origin-fetch.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T084816Z/browser-owner-pairing.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T084816Z/browser-owner-private-old-probe.json"
+  ],
+  "causalEvidence": "Two original-source Worker regressions publish obsolete runtimes. The unchanged application replay rejects the complete old package. A separate private observation script around that same old graph finds nine stale published live Workers and two reconnects bypassing current admission. The existing Local provider already refuses the profile/required case; this is retained as a positive protection check, not counted as a newly discovered failure.",
+  "behavior": "Capture the initiating Agent and original resource Service before browser startup waits. Recheck across local activation, profile preparation, subprocess dispatch, Worker admission and readiness; return unused original grants and retain retryable completion errors. Fresh reconnects capture current admission while existing Chromium ranges keep their original permits.",
+  "verification": {
+    "uniqueRelatedCases": 164,
+    "sourceCases": 162,
+    "applicationSnapshots": 2,
+    "startupSnapshotRows": 12,
+    "standardCoverage": {
+      "packages/experimental/browser-use-stagehand-native/src/index.ts": {
+        "statements": [
+          106,
+          106
+        ],
+        "branches": [
+          60,
+          60
+        ],
+        "functions": [
+          24,
+          24
+        ],
+        "lines": [
+          94,
+          94
+        ]
+      },
+      "packages/experimental/browser-use-stagehand-native/src/launch.ts": {
+        "statements": [
+          73,
+          73
+        ],
+        "branches": [
+          14,
+          14
+        ],
+        "functions": [
+          13,
+          13
+        ],
+        "lines": [
+          63,
+          63
+        ]
+      },
+      "packages/experimental/browser-use-stagehand-native/src/worker-client.ts": {
+        "statements": [
+          139,
+          139
+        ],
+        "branches": [
+          30,
+          30
+        ],
+        "functions": [
+          32,
+          32
+        ],
+        "lines": [
+          107,
+          107
+        ]
+      }
+    },
+    "coverageLimits": "Three named source modules at all four 100% metrics, with no coverage-policy or exclusion changes. Existing built-entry exclusion is exercised through actual plain-Node Workers on Node22/24.",
+    "runtimes": "Source and built Node24 replay both the new startup owner application and existing native-browser SDK transcript; built Node22 replays the new application.",
+    "buildGates": 8,
+    "quickDocumentationGates": 20,
+    "guideEnglishWords": 183,
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "evidenceSetupCorrection": "The first application fixture installed external browser module hooks before boot and hung during Loader initialization. Installing those hooks after the base tree boots matches the existing native-browser example and passes. Failed setup and timeout receipts are preserved. A source Service identity access needed the existing typed Cordis-original helper with a plain-provider fallback; final build, source replay and coverage validate the corrected code. One pre-existing browser-model assertion was aligned with the current LLM unavailable-provider diagnostic.",
+  "noteReview": {
+    "owner": ".agents/notes/implemented/bug-fix/2026-10-31-browser-startup-resource-ownership.md",
+    "decision": "Focused startup-versus-reconnect admission ownership; existing browser runtime architecture and frozen archived notes remain unchanged."
+  },
+  "baseline": {
+    "at": "2026-10-31T09:01:50.575502+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "merge": "Merge nineteen B398 delta paths. Six unchanged native-browser source/manifest prerequisites are included from the pre-change package so matching artifacts can be rebuilt; these prerequisite copies do not claim new audit completion. Rebuild and deploy the matching main/Worker pair only if using this opt-in experimental provider. Preserve newer peer Local/Gateway/UI sources and artifacts; older cumulative artifacts are reference evidence, not deployment replacements.",
+    "scope": "Independent experimental browser provider; none of the peer reserved files edited."
+  },
+  "matchingSourcePrerequisites": [
+    "packages/experimental/browser-use-stagehand-native/src/extension.ts",
+    "packages/experimental/browser-use-stagehand-native/src/model.ts",
+    "packages/experimental/browser-use-stagehand-native/src/native.ts",
+    "packages/experimental/browser-use-stagehand-native/src/worker-rpc.ts",
+    "packages/experimental/browser-use-stagehand-native/src/worker.ts",
+    "packages/experimental/browser-use-stagehand-native/package.json"
+  ],
+  "externalSourceChangesExcluded": {
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "7a54b9e99352908283ee973e2dcd7707c9d7a7ba312ad9761311219172a47569",
+    "packages/subprocess/subprocess-local/README.md": "223b3dfcdc9732041ea508d9d131b9505e98abca53ea60dbb098851bd2c74629",
+    "packages/subprocess/subprocess-local/README.zh.md": "f13592bad150012aaa31e62226119ed4f22772b4bca5174936f988e1ae0cd407"
+  },
+  "externalArtifactChangesExcluded": {
+    "packages/subprocess/subprocess-local/lib/index.js": "5fbdc054c9a1ef7799f7da80b030e5db88ffdb3639b5e5b0f2a908d5e183e950"
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Review reconnect acquisition rollback retention, shared-runtime debug authority and authority-only SDK composition.",
+    "Continue remote pipes, resource-only remote execution and nonconflicting business permissions.",
+    "Peer owns multi-computer operational acceptance and reserved Local/Gateway/UI changes. Preserve per-user model authorization and default-model denial.",
+    "Paid API validation stays deferred. No root deployment, production database or physical Linux/Windows acceptance is claimed."
+  ]
+}

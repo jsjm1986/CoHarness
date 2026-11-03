@@ -1,0 +1,14 @@
+{
+  "name": "document-root-account-source-audit",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/verify-document-root-account-source.py",
+  "startedAt": "2026-10-25T23:20:20.835062+00:00",
+  "seconds": 1.928,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7a1300b448aa7fba28cbc11ca1dac646c8d1f2f231083650bd915be1728f2cf1",
+  "inputsAfter": "7a1300b448aa7fba28cbc11ca1dac646c8d1f2f231083650bd915be1728f2cf1",
+  "postgresToolDirectory": null,
+  "outputSha256": "62cedaec1657dfe7d8a378fbcc5f74f0b1a8c044334210d04266c31caaa36a8b",
+  "outputTail": "Static evidence only: root broker and separate runtime accounts share0600 payloads and0700 upload controls; unsafe UID propagation is absent. B157 remains open; no cross-UID Linux execution claimed.\n"
+}

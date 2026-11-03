@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-preparation-web-stream-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T23:30:49.038906+00:00",
+  "seconds": 5.117,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "72549ee23c76b6d3bb936ea2b3dca833d36b6d4825cce78da7caaeb540938bfb",
+  "inputsAfter": "72549ee23c76b6d3bb936ea2b3dca833d36b6d4825cce78da7caaeb540938bfb",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

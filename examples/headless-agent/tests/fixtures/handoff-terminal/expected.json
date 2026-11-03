@@ -1,0 +1,9 @@
+{
+  "error": "Session handoff handoff-terminal — KEEP_LOCAL_HISTORY\nSource: local tail\n\n[user] KEEP_LOCAL_HISTORY",
+  "aborted": "Session handoff handoff-terminal — KEEP_LOCAL_HISTORY\nSource: local tail\n\n[user] KEEP_LOCAL_HISTORY",
+  "max-tokens": "Session handoff handoff-terminal — KEEP_LOCAL_HISTORY\nSource: local tail\n\n[user] KEEP_LOCAL_HISTORY",
+  "tool-calls": "Session handoff handoff-terminal — KEEP_LOCAL_HISTORY\nSource: local tail\n\n[user] KEEP_LOCAL_HISTORY",
+  "missing": "Session handoff handoff-terminal — KEEP_LOCAL_HISTORY\nSource: local tail\n\n[user] KEEP_LOCAL_HISTORY",
+  "stop": "Session handoff handoff-terminal — KEEP_LOCAL_HISTORY\nSource: model capsule\n\nCOMPLETE_CAPSULE",
+  "literal": "Session handoff handoff-terminal — KEEP_LOCAL_HISTORY $$ $& $` $'\nSource: model capsule\n\nCOMPLETE_CAPSULE"
+}

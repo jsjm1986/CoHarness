@@ -1,0 +1,13 @@
+{
+  "name": "browser-lifecycle-oxlint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/experimental/browser-use-runtime/src packages/experimental/browser-use-runtime/tests/resources.spec.ts packages/experimental/browser-use-stagehand-native/src packages/experimental/browser-use-stagehand-native/tests snapshots/session/browser-use-stagehand-native/native-fixture.mjs",
+  "startedAt": "2026-10-23T14:25:53.584223+00:00",
+  "seconds": 5.478,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "67cb465a8a3c29f425c7a0bc085ed5d3b91f542ba81109976db5d0bb123fbde4",
+  "inputsAfter": "17363c336cb7c63f63b69d29f313a83857252f5f7ad4f3a24b80479929719938",
+  "outputSha256": "dc14cd11702dd9e98a1536d40bec4d9b6aa44c3596c9df08909c968811c25e12",
+  "outputTail": "packages/experimental/browser-use-stagehand-native/tests/extension.spec.ts:59:41: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\npackages/experimental/browser-use-stagehand-native/src/extension.ts:26:38: error typescript(no-non-null-assertion): Forbidden non-null assertion. help: Consider using the optional chain operator `?.` instead. `x!.y` is equivalent to `x.y` at runtime and will throw if `x` is `null` or `undefined`, but `x?.y` will return `undefined`.\npackages/experimental/browser-use-runtime/tests/resources.spec.ts:120:43: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\npackages/experimental/browser-use-runtime/tests/resources.spec.ts:120:84: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\npackages/experimental/browser-use-stagehand-native/tests/extension.spec.ts:41:91: error typescript(no-unnecessary-type-conversion): This type conversion does not change the type or value of the expression.\npackages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts:194:37: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\n"
+}

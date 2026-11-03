@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-31-maintenance-diagnostic-byte-ceiling.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-maintenance-diagnostic-byte-ceiling.md
+document:
+  en: 5ea10ab2cf69ebe0be05dae8854c82a4e2c00c96
+  zh: c7e4dbef1b98acd54da1155adf0bb79bc4a82609
+/agent-note-maintenance-diagnostic-byte-ceiling:
+  en: cf1716fe97459ccc
+  zh: f531938ade6a2024
+/agent-note-maintenance-diagnostic-byte-ceiling/problem:
+  en: 76f2e90d1edfd345
+  zh: c5fb311c17f5b736
+/agent-note-maintenance-diagnostic-byte-ceiling/decision:
+  en: 12b28ba66311dd02
+  zh: b552e8b314c8c8e8
+/agent-note-maintenance-diagnostic-byte-ceiling/alternatives-considered:
+  en: c07ac7585d236cee
+  zh: 5a2d0f1535243b0c
+/agent-note-maintenance-diagnostic-byte-ceiling/consequences:
+  en: d023622b8e1935b8
+  zh: 754c8c9eacd43eb8

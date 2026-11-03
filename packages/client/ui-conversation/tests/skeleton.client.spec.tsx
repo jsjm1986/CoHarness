@@ -320,7 +320,7 @@ function mount(
   } as ConversationRootProps
   const view = render(<ConversationRoot {...props} />)
   return {
-    view, chat, sink, retargetWorkspace, session, slotCalls, seatOwners, open, displaySettings, workspaces,
+    view, chat, sink, retargetWorkspace, session, sessions, workspaces, stop, slotCalls, seatOwners, open, displaySettings,
     pickerOwner: () => pickerOwner,
     rerender: (overrides: Partial<ConversationRootProps> = {}) => {
       Object.assign(props, overrides)
@@ -347,6 +347,22 @@ describe('Hero chrome', () => {
 })
 
 describe('ConversationRoot resident composer', () => {
+  it('holds only the originating composer while a new conversation opens and keeps Stop available', async () => {
+    const b = mount(conversationSnapshot({ running: true }))
+    const original = b.view.getByRole('textbox') as HTMLTextAreaElement
+    const draft = original.value
+    await act(async () => { b.sessions.set({ ...b.sessions.getSnapshot(), navigationBlockedSessionId: SID }) })
+    expect(b.view.getByRole('textbox')).toBe(original)
+    expect(original.disabled).toBe(true)
+    expect(original.placeholder).toBe(zh['placeholder.openingSession'])
+    expect(original.value).toBe(draft)
+    const stop = b.view.getByRole('button', { name: zh['input.stop'] })
+    expect((stop as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(stop)
+    expect(b.stop).toHaveBeenCalledOnce()
+    await act(async () => { b.sessions.set({ ...b.sessions.getSnapshot(), navigationBlockedSessionId: sid('another-pane') }) })
+    expect(original.disabled).toBe(false)
+  })
   it('keeps Session-owned header controls mounted while shared tools change focus', () => {
     const host = document.createElement('div')
     host.id = 'selected-session-tools'

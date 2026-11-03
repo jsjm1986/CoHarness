@@ -64,6 +64,8 @@ Append, seed/restore, and event adoption/snapshot reject any `header.system` and
 
 ### Live service events
 
+Failure reporting contains exception-to-text conversion; an unrenderable observer value cannot starve later observers or replace a committed result. Synchronous `session/created` failures and pre-commit validation retain their publication veto.
+
 The store pairs announced creation with disposal, publishes post-commit append notifications with per-listener containment, and provides an awaited durability checkpoint. Exact signatures and scope behavior live in the generated region of [session.md](../../../docs/subsystems/session.md#cordis-surface); payloads live in the [persistence catalog](../../../docs/persistence-catalog.md).
 
 ### Class: `Session`

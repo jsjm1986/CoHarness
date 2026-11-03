@@ -13,6 +13,7 @@
 - [协议与结果](#protocol-and-results)
 - [资源与指令](#resources-and-instructions)
 - [资源提供方类型](#resource-provider-types)
+- [连接所有者](#connection-owner)
 - [限制](#limits)
 - [延伸阅读](#further-reading)
 
@@ -95,10 +96,27 @@ interface McpResourceProvider {
 
 -----
 
+<a id="connection-owner"></a>
+## 连接所有者
+
+编程所有者通过 `mountMcpClient(ctx, config)` 挂载并保留其清理句柄；关闭与重试语义见[客户端生命周期](../../packages/mcp/mcp-client/README.zh.md#lifecycle-and-sync)。
+
+```ts type-equiv
+/** Programmatic MCP activation with an explicit, retryable cleanup owner. */
+interface McpClientHandle {
+  /** Initial connection and catalog readiness; rejects when strict startup fails. */
+  ready: Promise<void>
+  /** Stop the connection and confirm retained local process cleanup. */
+  dispose(): Promise<void>
+}
+```
+
+-----
+
 <a id="limits"></a>
 ## 限制
 
-不支持 MCP 提示词模板、人工输入征询、基于任务的执行和资源订阅。资源工具需要调用方可见的已配置服务器；二进制资源保留为程序化数据，模型接收其文本描述。没有工具能力的服务器以空工具集连接。连接和发现超时遵循 SDK；客户端没有对应的独立设置。
+不支持 MCP 提示词模板、人工输入征询、基于任务的执行和资源订阅。资源工具需要调用方可见的已配置服务器；二进制资源保留为程序化数据，模型接收其文本描述。没有工具能力的服务器以空工具集连接。HTTP 连接与目录请求超时遵循 SDK。stdio 启动和本地进程清理使用[客户端部署限制](../../packages/mcp/mcp-client/README.zh.md#minimal-configuration)。
 
 -----
 

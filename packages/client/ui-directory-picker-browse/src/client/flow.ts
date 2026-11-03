@@ -9,14 +9,16 @@ import type { DirectoryListing } from '@deepseek-ai/dsh-client-runtime/client'
 import type { Translate } from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: the owner contract of the directory-flow holes.
 import type { DirectoryFlowOwnerProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
+import { useCallback } from 'react'
+import type { SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import { DirectoryBrowser } from './DirectoryBrowser.tsx'
 
 /** Injected face: the browse wire calls and copy the dialog drives (bound in apply's closure). */
 export interface BrowseFlowInjected {
   /** List one directory level (absent path = the Host home directory); the signal aborts a superseded scan. */
-  listDirectory: (path?: string, signal?: AbortSignal) => Promise<DirectoryListing>
+  listDirectory: (path?: string, signal?: AbortSignal, target?: SessionRuntimeTarget | null) => Promise<DirectoryListing>
   /** Create one child directory under an existing parent. */
-  createDirectory: (path: string, name: string) => Promise<string>
+  createDirectory: (path: string, name: string, target?: SessionRuntimeTarget | null) => Promise<string>
   /** Localized dialog copy (this package's namespace). */
   t: Translate
 }
@@ -31,11 +33,15 @@ export interface BrowseFlowInjected {
  * @returns the dialog element (renders nothing while closed).
  */
 export function BrowseDirectoryFlow(props: DirectoryFlowOwnerProps & BrowseFlowInjected): ReactElement {
+  const list = useCallback((path?: string, signal?: AbortSignal) =>
+    props.listDirectory(path, signal, props.runtimeTarget), [props.listDirectory, props.runtimeTarget])
+  const create = useCallback((path: string, name: string) =>
+    props.createDirectory(path, name, props.runtimeTarget), [props.createDirectory, props.runtimeTarget])
   return createElement(DirectoryBrowser, {
     open: props.open,
     busy: props.busy,
-    listDirectory: props.listDirectory,
-    createDirectory: props.createDirectory,
+    listDirectory: list,
+    createDirectory: create,
     t: props.t,
     onOpen: props.onPicked,
     onClose: props.onCancel,

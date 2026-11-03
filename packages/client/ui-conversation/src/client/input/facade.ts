@@ -40,6 +40,8 @@ export interface SessionInputDeps {
   popup?: (() => PopupDismissFace | undefined) | undefined
   /** Queue read face; overlaid onto InputState.queue (absent = empty). */
   queue?: ObservableSnapshot<readonly QueuedMessage[]> | undefined
+  /** Current navigation refusal; omission leaves submission available. */
+  submissionBlock?: (() => string | undefined) | undefined
   /**
    * Steer every still-pending queued message into the running turn, in FIFO
    * order (the empty-draft accelerated-Enter gesture); absent = unsupported.
@@ -278,6 +280,11 @@ export class SessionInputShell implements SessionInput {
    * dismisses and the menu tracks frozen.
    */
   submit(mode: InputSubmitMode = 'queue'): void {
+    const block = this.deps.submissionBlock?.()
+    if (block !== undefined) {
+      this.notify('info', block)
+      return
+    }
     if (this.snapshot.draft.trim() === '' && (this.imageIds.length > 0 || this.documentIds.length > 0)) {
       if (this.snapshot.phase === 'plain' && !this.attachmentSendInFlight) {
         const imageIds = [...this.imageIds]
@@ -504,6 +511,9 @@ export class SessionInputShell implements SessionInput {
       if (this.mirrorFn === write) this.mirrorFn = undefined
     }
   }
+
+  /** Whether current input changes reach the owning Session store synchronously. */
+  get hasDraftMirror(): boolean { return this.mirrorFn !== undefined }
 
   // ---- effect executor ----
 

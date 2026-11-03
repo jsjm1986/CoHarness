@@ -1,0 +1,15 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, workflowCleanupReady]
+- insert:
+    - id: cleanup-subagents
+      name: '@deepseek-ai/dsh-subagent'
+    - id: cleanup-ptc
+      name: '@deepseek-ai/dsh-ptc-runtime-node'
+    - id: cleanup-workflow-runtime
+      name: './runtime.mjs'
+    - id: cleanup-job-tools
+      name: '@deepseek-ai/dsh-tool-jobs'
+    - id: workflow-cleanup-model
+      name: './model.mjs'

@@ -1,0 +1,14 @@
+{
+  "name": "gateway-backup-postgres-host-tools",
+  "cwd": "gateway",
+  "command": "npm exec vitest run tests/deployment-backups.spec.ts tests/deployment-restore.spec.ts tests/startup-generation.spec.ts -- --no-file-parallelism --maxWorkers=1",
+  "startedAt": "2026-10-23T21:33:04.562420+00:00",
+  "seconds": 28.136,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cbff746d41fd1046b3e5d7c20337355ebcf6a1f80d686df03a4c498ed36223be",
+  "inputsAfter": "cbff746d41fd1046b3e5d7c20337355ebcf6a1f80d686df03a4c498ed36223be",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "1c3f3af27e8f836f862734ba177954f49a58001a25733c59d22af50256d88607",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  19 passed (19)\n   Start at  05:33:07\n   Duration  25.49s (transform 214ms, setup 0ms, import 396ms, tests 24.80s, environment 0ms)\n\n"
+}

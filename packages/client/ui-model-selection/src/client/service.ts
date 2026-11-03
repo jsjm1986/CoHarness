@@ -67,19 +67,6 @@ export class ModelDirectoryResolver extends Service {
     super(ctx, 'modelDirectories')
     this.blockReason = config.blockReason
     this.formatSelectionError = config.formatSelectionError
-    this.formatTransportError = config.formatTransportError
-    ctx.on('connection/reset', () => {
-      for (const directory of this.live.directories.values()) directory.resetConnected()
-    })
-    // Either source can change the directory: registry topology commits and
-    // settings documents that carry provider catalogs or default selection.
-    const refresh = (): void => {
-      for (const directory of this.live.directories.values()) {
-        directory.load().catch(() => undefined)
-      }
-    }
-    ctx.remote.$on('llm/adapters-updated', refresh)
-    ctx.remote.$on('settings/document-updated', refresh)
   }
 
   /**
@@ -97,10 +84,9 @@ export class ModelDirectoryResolver extends Service {
     if (actx === undefined) throw new Error(`ui-model-selection: session "${String(sessionId)}" resolved no scope`)
     const connection = this.ctx.get('connection') as ConnectionHandle
     const target = sessions.runtimeTargetFor?.(sessionId)
-    const targetConnection = target === undefined || connection.forTarget === undefined
-      ? undefined
-      : connection.forTarget(target)
-    const api = targetConnection?.api ?? connection.api
+    const transport = target === undefined ? connection : connection.forTarget?.(target)
+    if (transport === undefined) throw new Error('Model Runtime connection is unavailable')
+    const api = transport.api
     const directory = new ModelDirectory(
       api.sessions,
       sessionId,
@@ -109,6 +95,16 @@ export class ModelDirectoryResolver extends Service {
       this.formatTransportError,
     )
     live.directories.set(sessionId, directory)
+    const remote = (actx.get('remote') as Context['remote']).$forTarget(target)
+    const refresh = (): void => { void directory.load().catch(() => undefined) }
+    actx.effect(() => {
+      const disposers = [remote.$on('llm/adapters-updated', refresh), remote.$on('settings/document-updated', refresh),
+        target === undefined ? actx.on('connection/reset', () => { directory.resetConnected() })
+          : transport.state.subscribe(() => {
+            if (transport.state.getSnapshot() === 'connected') directory.resetConnected()
+          })]
+      return () => { for (const dispose of disposers) dispose() }
+    }, 'ui-model-selection: owning Runtime invalidations')
     // The composer cannot read this plugin (the dependency runs one way), so
     // the block is pushed: the Host says whether an adapter serves the
     // session's route, and only a definite `false` makes the input inert.

@@ -1,0 +1,14 @@
+{
+  "name": "document-http-owner-complete-source",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/host/userdoc-http/tests",
+  "startedAt": "2026-10-26T11:07:45.159196+00:00",
+  "seconds": 6.384,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d79b22b8ce788aac3dd26f82190e73deb6a619659cdfba7060a4889b4fd76623",
+  "inputsAfter": "d79b22b8ce788aac3dd26f82190e73deb6a619659cdfba7060a4889b4fd76623",
+  "postgresToolDirectory": null,
+  "outputSha256": "a5084446b972d6fa1793b72cb99a40c5bb93e8f6a36b774098e752e3a53e79ea",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/host/userdoc-http/tests/handler-edges.spec.ts (27 tests | 1 failed) 34ms\n     × refuses requests after an HTTP scope closes 7ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/host/userdoc-http/tests/handler-edges.spec.ts > user-document HTTP handler edges > refuses requests after an HTTP scope closes\nAssertionError: expected { error: { …(2) } } to match object { error: 'DOCUMENT_STORE_UNAVAILABLE' }\n\n- Expected\n+ Received\n\n  {\n-   \"error\": \"DOCUMENT_STORE_UNAVAILABLE\",\n+   \"error\": {\n+     \"code\": \"DOCUMENT_STORE_UNAVAILABLE\",\n+     \"message\": \"The document service is stopping.\",\n+   },\n  }\n\n ❯ packages/host/userdoc-http/tests/handler-edges.spec.ts:149:36\n    147|     await scope.handle(request('GET', USERDOC_HTTP_PATH), res)\n    148|     expect(state.status).toBe(503)\n    149|     expect(JSON.parse(state.body)).toMatchObject({ error: DOCUMENT_STO…\n       |                                    ^\n    150|     expect(reads).toBe(0)\n    151|   })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 3 passed (4)\n      Tests  1 failed | 54 passed (55)\n   Start at  19:07:48\n   Duration  2.64s (transform 2.39s, setup 169ms, import 2.96s, tests 832ms, environment 0ms)\n\n"
+}

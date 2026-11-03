@@ -1,14 +1,14 @@
 /** Root document-picker host, independent of sidebar and pane lifetimes. */
 import { useCallback, useEffect, useState } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { DocumentsButtonInjected } from './DocumentsButton.tsx'
 import { DocumentsModal } from './DocumentsModal.tsx'
 import type { UserDocRef, UserDocScope } from './documents-client.ts'
 import { NS } from './locales.ts'
 
-type DocumentsOverlayProps = PropsRuntime<'shell.overlay'> & PropsLocale<typeof NS> & DocumentsButtonInjected
+type DocumentsOverlayProps = PropsRuntime<'shell.overlay'> & PropsLocale<typeof NS> & InjectFace<DocumentsButtonInjected>
 
 /**
  * Capture each picker request's destination independently of current selection.
@@ -16,8 +16,9 @@ type DocumentsOverlayProps = PropsRuntime<'shell.overlay'> & PropsLocale<typeof 
  * @returns the document manager while open.
  */
 export function DocumentsOverlay({
-  t, attachDocument, useSessions, privateResourceUrl, documentScopeFor,
+  t, attachDocument, canAttachDocument, useSessions, useDeployment, privateResourceUrl, documentScopeFor,
 }: DocumentsOverlayProps) {
+  const deployment = useDeployment(state => state)
   const currentSessionId = useSessions(snapshot => snapshot.current)
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'manage' | 'select'>('manage')
@@ -42,13 +43,17 @@ export function DocumentsOverlay({
 
   return <DocumentsModal
     open={open}
+    showComputer={deployment.showComputer}
+    allowedNodeId={deployment.aggregateComputers ? undefined : deployment.context?.entry.nodeId}
     onClose={handleClose}
     t={t}
     mode={mode}
     privateResourceUrl={privateResourceUrl}
     attachmentScope={attachmentScope}
-    {...(attachDocument === undefined ? {} : {
-      onAttachDocument: (document: UserDocRef) => targetSessionId === undefined ? false : attachDocument(document, targetSessionId),
+    attachmentTargetId={targetSessionId}
+    {...(attachDocument === undefined || targetSessionId === undefined && mode !== 'select' ? {} : {
+      canAttachDocument: () => targetSessionId !== undefined && (canAttachDocument?.(targetSessionId) ?? true),
+      onAttachDocument: (document: UserDocRef) => targetSessionId !== undefined && attachDocument(document, targetSessionId),
     })}
   />
 }

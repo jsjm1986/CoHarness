@@ -126,8 +126,10 @@ setPolicy(agent: Agent, policy: ApprovalPolicy): void
  * audit event.
  * @param req - the pending decision (agent, tool identity, reason, signal).
  * @returns the closed outcome; `'allowed-once'` is the only grant.
- * @throws when no turn is open or either audit event fails before the session
- *   append commit point.
+ * Withdrawal cancels accepted decisions and joins their audit completion;
+ * a retired service cannot accept requests or policy writes.
+ * @throws when the service was withdrawn, no turn is open, or either audit
+ *   event fails before the session append commit point.
  */
 async request(req: ApprovalRequest): Promise<ApprovalOutcome>
 

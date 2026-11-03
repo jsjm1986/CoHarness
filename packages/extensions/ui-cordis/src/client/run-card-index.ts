@@ -7,7 +7,7 @@ import type {
 } from './events.ts'
 
 /** Stable keyed-slot identity of one Package-owned business view. */
-export type CordisToolViewKey = `${CordisDynamicPluginId}.${CordisDynamicPackageId}`
+export type CordisToolViewKey = `${string}${CordisDynamicPluginId}.${CordisDynamicPackageId}`
 
 /** One successful tool result competing to host a Package business view. */
 export interface CordisRunCardPointer {
@@ -66,11 +66,13 @@ export class CordisRunCardRegistry {
  * Build the Package business-view key shared by registrations and Run cards.
  * @param pluginId - stable Plugin identity.
  * @param packageId - immutable Package identity.
+ * @param viewPrefix - browser-only namespace of the owning Runtime.
  * @returns the shared business-view key.
  */
 export function cordisToolViewKey(
   pluginId: CordisDynamicPluginId,
   packageId: CordisDynamicPackageId,
+  viewPrefix = '',
 ): CordisToolViewKey {
-  return `${pluginId}.${packageId}`
+  return `${viewPrefix}${pluginId}.${packageId}`
 }

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-08-cordis-multi-session-workbench.md
 document:
-  en: 29efaabb8082138481288f836cf1f20a3b7ac0bf
-  zh: 40291b677c2a1be5542cdaddcbac3f804310a04d
+  en: 4079321ba6d7cec981f9f42e1fd950485363049f
+  zh: b7c5be2e45626988f74b59c33486d30a0e025ec4
 /agent-note-cordis-multi-session-workspace-workbench:
   en: 389f97c113858e0d
   zh: 9c019c608e5b862d
@@ -12,11 +12,11 @@ document:
   en: 0a3c80900f8d1b3a
   zh: ba9aa5c2e629fe00
 /agent-note-cordis-multi-session-workspace-workbench/decision:
-  en: 83dbf695d13f9b84
-  zh: a60a13675371b4b3
+  en: 886662582e91854f
+  zh: cf171253ffa01bc3
 /agent-note-cordis-multi-session-workspace-workbench/alternatives-considered:
   en: 9ec3dab9309ed3e4
   zh: ccd4bdf6c61b9032
 /agent-note-cordis-multi-session-workspace-workbench/consequences:
-  en: 8d1ae23a768e1d54
-  zh: a07bf816519b447f
+  en: b9daa5c5a0ba1fba
+  zh: 8bf1dfd45fd3e1d5

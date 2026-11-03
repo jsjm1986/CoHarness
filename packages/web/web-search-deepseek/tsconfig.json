@@ -9,6 +9,12 @@
   ],
   "references": [
     {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../context/resource-budget"
+    },
+    {
       "path": "../../core/agent"
     },
     {
@@ -34,6 +40,9 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../llm/model-access"
     }
   ]
 }

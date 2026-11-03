@@ -1,0 +1,14 @@
+{
+  "name": "jobs-publication-and-wait-races-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/jobs packages/workflow/tool-workflow packages/terminal/tool-terminal packages/shell/tool-bash packages/subagent/tool-subagent",
+  "startedAt": "2026-10-26T08:45:31.733274+00:00",
+  "seconds": 9.962,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "64102069e8561f320436c3adbfba6099b0d50037584c030022f623c74893f709",
+  "inputsAfter": "64102069e8561f320436c3adbfba6099b0d50037584c030022f623c74893f709",
+  "postgresToolDirectory": null,
+  "outputSha256": "5752f3464dec49cbe16e195bfc0a43b6d9cd1b1ecfd59ff10e4450d59da074c6",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n(node:83241) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 exit listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n Test Files  29 passed (29)\n      Tests  607 passed (607)\n   Start at  16:45:35\n   Duration  5.75s (transform 16.79s, setup 1.03s, import 29.12s, tests 19.20s, environment 9ms)\n\n"
+}

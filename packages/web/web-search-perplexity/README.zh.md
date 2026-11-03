@@ -9,7 +9,7 @@ kind: "package-reference"
 
 由 [Perplexity](https://perplexity.ai) 支持的 `WebSearchProvider`，用于 harness [web 能力 seam](../web/README.zh.md)（`ctx.web`）。它调用 Perplexity 的 OpenAI 兼容 `POST /chat/completions` 端点，把生成答案与引用映射为 seam 规范化的 `WebSearchResult`。
 
-这是一个**实现**包：它向 `ctx.web` 注册提供方，不拥有该键，也不注册面向模型的工具。与 `@deepseek-ai/dsh-llm-deepseek` 一样，它是函数／命名空间插件（`inject: ['web']`）。OpenAI 兼容协议格式（wire format）是提供方私有细节，并**不**使该提供方依赖 `ctx.llm`。
+本实现以 `inject: ['web']` 注册到 `ctx.web`。受管搜索通过选定的 `ctx.llm` 路由执行预备的 `perplexity-web-search` 操作；独立组合保留私有 chat-completions 传输。面向模型的工具属于 `dsh-tool-web`。
 
 ## 概述
 
@@ -30,7 +30,9 @@ kind: "package-reference"
 
 | 配置键 | 默认值 | 含义 |
 |---|---|---|
-| `apiKey` | `$PERPLEXITY_API_KEY` | Perplexity API 密钥。为空或缺失时提供方不可用。 |
+| `provider` | `perplexity`（受管） | 精确 LLM 路由；配置此项或安装／要求模型策略时启用受管执行。 |
+| `apiKey` | 未设置 | 独立传输的密钥；受管执行使用 LLM 路由的凭据。 |
+| `apiKeyEnv` | `PERPLEXITY_API_KEY` | 独立传输的凭据引用；优先使用 credentials 服务，否则使用启动环境。 |
 | `baseURL` | `https://api.perplexity.ai` | 端点基址；追加 `/chat/completions`。无法解析时提供方不可用。 |
 | `model` | `sonar` | 搜索模型名称。 |
 | `maxTokens` | `1024` | 生成答案 token 上限（`max_tokens`）。必须是正整数。 |
@@ -41,8 +43,12 @@ kind: "package-reference"
 - id: web-search-perplexity
   name: '@deepseek-ai/dsh-web-search-perplexity'
   config:
-    apiKey: !!js process.env.PERPLEXITY_API_KEY
+    apiKeyEnv: PERPLEXITY_API_KEY
 ```
+
+受管调用使用 LLM 路由的端点、模型和凭据，复用模型策略、资源准入、执行归属与用量中间件。支持的适配器是显式配置的 pi-ai `openai-completions` 路由；其他协议或仅依靠原生登录的目录路由会明确拒绝。独立 `baseURL` 与密钥设置不覆盖受管路由。独立传输在模型许可获批后解析凭据，并在卸载时取消、等待清理。
+
+独立请求在准入和凭据等待期间保留资源提供者，并在 HTTP 前重新检查当前归属和模型策略要求。提供者被移除、替换或新增准入时，以 `WEB_PROVIDER_ERROR` 拒绝过期派发，并把未使用的容量归还原所有者。新增必需模型策略也会拒绝独立派发。恢复授权后应重新搜索。在请求记录前拒绝时，不向发起 Session 添加原生输入。
 
 <a id="mapping"></a>
 ## 映射
@@ -56,11 +62,11 @@ kind: "package-reference"
 
 #### 模型看到的内容
 
-独立的 Perplexity 模型通过 chat-completions 端点将 `<query>` 原样作为唯一用户消息接收。该请求不属于会话模型上下文。
+独立的 Perplexity 模型通过 chat-completions 端点将 `<query>` 原样作为唯一用户消息接收。该请求不属于会话模型上下文。 精确端点与 JSON body 在派发前记入 `web/perplexity-search-llm-request`；受管执行在模型检查点前追加该事件。
 
 #### Token 影响
 
-每次搜索都会产生独立的提供方 token；`maxTokens` 限制生成答案。
+每次搜索都会产生独立的提供方 token；`maxTokens` 限制生成答案。受管执行报告实际输入／输出计数和凭据来源；缺失用量保持缺失。
 
 #### KV Cache 影响
 
@@ -86,7 +92,6 @@ kind: "package-reference"
 - **引用回退源只含 URL**：Perplexity 省略结构化 `search_results[]` 时，源不含 `title`／`snippet`／`publishedAt`，因此工具只渲染纯主机名标签。
 - **超量返回的来源仍会增加 token 消耗和延迟**：协议没有结果数量控制，`maxResults` 只能由 seam 在事后截断。
 - **只公开 `model`／`maxTokens`／`searchRecency`**：Perplexity 的其他搜索控制项（域名过滤条件、`web_search_options` 上下文大小、图片）有待提供方无关的 Service Definition 字段支持（见 [seam Agent Note](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.zh.md)）。
-- **按错误形状分类中止**：只有 `DOMException` 且名为 `AbortError` 时才映射为 `WEB_ABORTED`；携带自定义原因的中止（例如 `dsh-timeout` 的 `TimeoutReason`）会呈现为 `WEB_PROVIDER_ERROR`。
 
 <a id="dev-note"></a>
 ### 开发备注

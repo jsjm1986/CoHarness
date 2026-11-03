@@ -80,6 +80,19 @@ interface Config {
 }
 ```
 
+```ts type-equiv
+/** Remote loopback listener owned by one local service and this SSH connection. */
+interface SshLoopbackForward {
+  /** Dynamically allocated TCP port on the remote loopback interface. */
+  readonly port: number
+  /**
+   * Drain the local consumer, cancel the remote listener and confirm cancellation through the helper.
+   * @returns after consumer cleanup and forwarding removal; failure invalidates the connection.
+   */
+  close(): Promise<void>
+}
+```
+
 ```ts public-api
 /** One non-reconnecting SSH session; loss invalidates all active operations. */
 declare class SshConnection extends Service {
@@ -89,10 +102,17 @@ declare class SshConnection extends Service {
   constructor(ctx: Context, config: Config);
   /** Hold plugin readiness until the remote identity and helper digest are verified. */
   async [Service.init](): Promise<void>;
+  /**
+   * Keep admitted resource cleanup owned until it settles, including consumer-only disposal.
+   * @param cleanup - stop allocation and drain resources before the SSH transport closes.
+   * @returns the shared cleanup disposer; failed cleanup remains retained by the connection.
+   */
+  retainConsumer(cleanup: () => Promise<void>): () => Promise<void>;
   /** Verified remote PTC launch configuration; script deployments require a verified bootstrap. */
   get ptcLaunch(): { kind: 'embedded'; executable: string } | { kind: 'node-script'; executable: string; bootstrapPath: string };
   /**
-     * Send a helper operation; cancellation never replays an ambiguous mutation.
+     * Send a helper operation; admitted process termination and wait remain usable while closing.
+     * Cancellation never replays an ambiguous mutation.
      * @param method - the private helper operation.
      * @param params - JSON request fields validated by the helper.
      * @param result - response validation before returning provider-visible data.
@@ -106,9 +126,19 @@ declare class SshConnection extends Service {
      * @param endpoint - private coordinates issued by this connection's helper.
      * @param signal - cancellation of allocation and the resulting socket.
      * @returns a paused socket; attach a consumer before resuming it.
+     * @throws Failed forwarding rollback invalidates the connection and joins its native process observation.
      */
   async connectStream(endpoint: SshStreamEndpoint, signal?: AbortSignal): Promise<Socket>;
-  /** Tear down the helper's remote managed ranges before releasing the SSH master when reachable. */
+  /**
+     * Expose one local service exclusively through a remote loopback listener.
+     * @param localPort - TCP port of the caller-owned service on local 127.0.0.1.
+     * @param beforeClose - abort and join that service before its SSH transport is released.
+     * @param signal - optional cancellation; omission keeps the forward until explicit or connection cleanup.
+     * An allocation already sent to OpenSSH settles before cancellation rolls it back.
+     * @returns the requested remote loopback port and its idempotent, retained cleanup owner.
+     */
+    forwardLoopback(localPort: number, beforeClose: () => Promise<void>, signal?: AbortSignal): Promise<SshLoopbackForward>;
+  /** Drain retained consumers and the reachable helper before awaiting the local SSH process range. */
   dispose(): Promise<void>;
 }
 ```
@@ -129,7 +159,15 @@ One non-reconnecting SSH session; loss invalidates all active operations.
 
 ```ts cordis-catalog
 /**
- * Send a helper operation; cancellation never replays an ambiguous mutation.
+ * Keep admitted resource cleanup owned until it settles, including consumer-only disposal.
+ * @param cleanup - stop allocation and drain resources before the SSH transport closes.
+ * @returns the shared cleanup disposer; failed cleanup remains retained by the connection.
+ */
+retainConsumer(cleanup: () => Promise<void>): () => Promise<void>
+
+/**
+ * Send a helper operation; admitted process termination and wait remain usable while closing.
+ * Cancellation never replays an ambiguous mutation.
  * @param method - the private helper operation.
  * @param params - JSON request fields validated by the helper.
  * @param result - response validation before returning provider-visible data.
@@ -144,10 +182,21 @@ async request<T>(method: string, params: unknown, result: z.ZodType<T>, signal?:
  * @param endpoint - private coordinates issued by this connection's helper.
  * @param signal - cancellation of allocation and the resulting socket.
  * @returns a paused socket; attach a consumer before resuming it.
+ * @throws Failed forwarding rollback invalidates the connection and joins its native process observation.
  */
 async connectStream(endpoint: SshStreamEndpoint, signal?: AbortSignal): Promise<Socket>
 
-/** Tear down the helper's remote managed ranges before releasing the SSH master when reachable. */
+/**
+ * Expose one local service exclusively through a remote loopback listener.
+ * @param localPort - TCP port of the caller-owned service on local 127.0.0.1.
+ * @param beforeClose - abort and join that service before its SSH transport is released.
+ * @param signal - optional cancellation; omission keeps the forward until explicit or connection cleanup.
+ * An allocation already sent to OpenSSH settles before cancellation rolls it back.
+ * @returns the requested remote loopback port and its idempotent, retained cleanup owner.
+ */
+forwardLoopback(localPort: number, beforeClose: () => Promise<void>, signal?: AbortSignal): Promise<SshLoopbackForward>
+
+/** Drain retained consumers and the reachable helper before awaiting the local SSH process range. */
 dispose(): Promise<void>
 ```
 

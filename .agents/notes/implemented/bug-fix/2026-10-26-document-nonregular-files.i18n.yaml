@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-26-document-nonregular-files.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-26-document-nonregular-files.md
+document:
+  en: 93011ad21d1ccbeeb46491a1958034e944b2311a
+  zh: aec0bf8f179b681e109835aa2d4cecf413bab2db
+/agent-note-non-regular-document-files:
+  en: 91eba5a2d888ca6b
+  zh: 2d8684907488cf6f
+/agent-note-non-regular-document-files/problem:
+  en: 48dcb5ee9606430e
+  zh: 7541706f6b027437
+/agent-note-non-regular-document-files/decision:
+  en: 428b720eb858fb65
+  zh: 8344986de74e01f7
+/agent-note-non-regular-document-files/alternatives-considered:
+  en: d10de57930de0b26
+  zh: d354c2a0fab9d1a8
+/agent-note-non-regular-document-files/consequences:
+  en: b23f8acde56d860d
+  zh: bb6a67c9bd539efa
+/agent-note-non-regular-document-files/verification:
+  en: b2a4955b4fdfe43d
+  zh: a884c8fcf0b1acd7

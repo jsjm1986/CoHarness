@@ -108,7 +108,9 @@ The caller-facing request does not carry catalog format details or continuation 
 ```ts type-equiv
 /**
  * Provider-facing one-shot request after {@link SubagentRuntime.start} resolves
- * the durable child descriptor.
+ * the durable child descriptor. Its signal combines caller cancellation with
+ * runtime withdrawal until publication to its holder; after publication only
+ * caller cancellation remains connected.
  */
 interface ResolvedSubagentStartRequest extends SubagentStartRequest {
   /** Absolute directory selected once before provider startup. */
@@ -267,6 +269,15 @@ The descriptor (`SubagentDescriptorData` in [descriptor.ts](../../packages/subag
 
 A local one-shot provider appends the descriptor inside the child's initial turn before its first request. The continuation manager appends the descriptor after any provider-supplied lineage and before the initial prompt is admitted; `Session.inheritedEventCount` remains the fork-lineage boundary: resume-time descriptor authority reads the child's own suffix, while the list-serving identity projection folds `subagent/descriptor` last-wins so the child's own descriptor overrides a fork-seeded ancestor's. A seeded cold list skips a cache hint until an authoritative observation supplies that exact cut. The event is log-only: no `surfaceOp`, never in model history, and retained across compaction by the append-only log. Malformed current-version descriptors are corrupt; unsupported versions cannot be classified by this runtime.
 
+External member providers pin native authentication or a managed upstream in their binding store before publication. The selection survives cold resume; malformed or conflicting records refuse execution. The [Codex provider](../../packages/subagent/subagent-codex/README.md#persistent-members) uses separate model requests inside an orchestrated member turn.
+
+```ts type-equiv
+/** Model authority selected before an external member is published. */
+type ExternalModelSelection =
+  | { readonly mode: 'native' }
+  | { readonly mode: 'managed'; readonly provider: string; readonly model: string }
+```
+
 ## Durable enumeration: `listChildren()`, `listDescendants()`, and their entries
 
 `SubagentRuntime.listChildren(parentSessionId)` enumerates the parent's direct session-backed subagents from the live-preferred merge of `ctx.sessions.list()` and optional `ctx.sessionPersistence.list()` — no query service, and no Agent is loaded or resumed. Candidates are the direct children whose durable header carries `origin: 'subagent'`; the marker classifies enumeration and coarse generic-route denial but cannot establish a valid descriptor, resumability, or authorization — the projection fold owns identity, and the Activation contract owns resume. Each row's `mode`/`label` is the registered `subagent` projection unit's value, served through a three-rung ladder: the registry's watermark cache for a live child (zero log reads); the optional projection checkpoint cache for a cold one (`cachedSnapshot` — an identity passing the own-suffix seq gate is final, because an own descriptor is immutable once appended); otherwise one `persistence.inspect()` reading folded through the registry (bounded concurrency, recomputed per listing). The cache is a pure optional accelerator: absent, serving the `null` sentinel or missing the key, failing the seq gate, or faulting, it falls silently through to the authoritative refold. The fold is `subagent/descriptor` last-wins with no failure channel: the child's own descriptor overrides a fork-seeded ancestor's, and a malformed or unknown-version payload folds to a serializable `null` sentinel, treated as no value. The result is one `SubagentListEntry[]` in `createdAt`-then-id order: a served identity yields a `child` entry with `mode: 'one-shot' | 'continuable'` and `activity: 'running' | 'inactive'`; continuable entries always carry `label`, while one-shot entries carry it only when the start caller supplied presentation metadata. A settled candidate whose fold served no identity yields a `corrupt` diagnostic — missing, malformed, and unknown-version descriptors deliberately undistinguished (`unsupported` remains in the type but is never produced); a running candidate without an identity is omitted (the creation window before its descriptor lands); a failed cold inspection yields one `unavailable` diagnostic retried on the next listing, so one damaged sibling cannot hide healthy children. `hasChildren` marks a direct descendant with durable subagent origin, read from the same merged material. Activity snapshots only whether the logical record is live in `ctx.sessions`, not outcome or resumability. Absent persistence, enumeration is live-only rather than an error — a cold child cannot be resumed then either. `listChildren()` throws `SubagentError` with code `SUBAGENT_CONTROL_PROJECTIONS_UNAVAILABLE` when the `ctx.sessionProjections` registry is absent and `SUBAGENT_CONTROL_SESSION_STORE_UNAVAILABLE` when the session store is, both checked before any read so a deployment with zero children still fails deterministically; the list tool requires `ctx.subagents` and `ctx.agents` at plugin load. A service consumer such as a UI can display both modes and choose an unlabeled one-shot fallback, while the model-facing `list_agents` adapter (the separately loadable `/list-agents` plugin of [dsh-tool-subagent-control](../../packages/subagent/tool-subagent-control)) keeps only continuable entries and refines status through the live Agent registry into `running`/`inactive`; `inactive` includes loaded and storage-only children without describing task completion or outcome. Listing does not consult the continuation manager's Activation map, Agent registry, or provider availability; `send_message` remains the authoritative delivery-time operation, and a listed running continuable child may still reject delivery as an ownership conflict. The read-path rationale lives in [the list-identity-projection Agent Note](../../.agents/notes/implemented/architecture/2026-08-06-subagent-list-identity-projection.md).
@@ -384,7 +395,11 @@ interface SubagentRun {
   readonly result: Promise<SubagentResult>
   /**
    * Cancel remaining work, reach child quiescence, and release resources.
-   * Idempotent.
+   * Pending calls coalesce and successful cleanup is idempotent. A rejected
+   * cleanup retains caller ownership and may retry through the same handle.
+   * A foreground caller may hand failed cleanup back through
+   * `SubagentRuntime.retainFailedCleanup()`; the handle stays idempotent.
+   * @returns Cleanup completion; a settled child result remains unchanged by retry.
    */
   dispose(): Promise<void>
 }
@@ -631,6 +646,8 @@ listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<Subagen
  * Parent availability is a hint; {@link prompt} performs the authoritative
  * check. Named apart from the provider-name {@link list}, which owns the
  * member.
+ * The captured collaboration provider cancels the read on withdrawal; data
+ * is withheld even when a backing read finishes afterward.
  * @param parentSessionId - parent session whose direct children are listed.
  * @param signal - carrier cancellation forwarded to Session queries.
  * @returns the catalog view for that parent.
@@ -647,7 +664,9 @@ listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<Subagen
  * exact live direct parent, retaining the caller-minted request identity,
  * validated browser zone, and authenticated project participant on the
  * accepted message. Success identifies the message the child's inbox
- * accepted; later execution is independent of this call. Queue delivery
+ * accepted; later execution is independent of this call. The captured
+ * collaboration provider cancels admission and delivery until that acceptance;
+ * a replacement cannot authorize this request. Queue delivery
  * targets a later turn; steer delivery targets the nearest step and retains
  * the Agent loop's best-effort fallback semantics. Image parts are admitted
  * and persisted through the attachment store before delivery, and the
@@ -670,7 +689,8 @@ listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<Subagen
  * authorization tiers and the core primitive's lineage check together
  * authorize the address, which is what keeps a live child interruptible
  * while its parent Agent is offline. Absent, idle, and already-completed
- * targets are accepted no-ops there.
+ * targets are accepted no-ops there. Withdrawal of the captured collaboration
+ * provider before interrupt admission refuses the request.
  * @param childSessionId - durable child session id to interrupt.
  * @param parentSessionId - durable direct parent whose authority is claimed.
  * @param mode - required continuable-address discriminator.
@@ -712,11 +732,32 @@ list(): string[]
  * failures settle through the returned run.
  * A catalog append failure disposes the run and handles its result rejection;
  * the caller receives the catalog error even if disposal also fails.
+ * Another start for the same exact parent retries handed-back failed cleanup before
+ * provider admission. Unconfirmed cleanup refuses the new start; unrelated
+ * parents and holder-owned, successful or pending-only leases are not retried.
+ * Runtime withdrawal stops admission, cancels and joins pending starts, and
+ * disposes a provider publication received after cancellation. Published
+ * holder-owned runs retain caller cancellation and are not revoked by withdrawal.
  * @param name - the provider to use.
  * @param request - child label, prompt, parent, signal, and optional capabilities.
  * @returns the published holder-owned run.
  */
 async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>
+
+/**
+ * Retain failed cleanup after a foreground caller gives up its one-shot handle.
+ * Another start for the exact parent retries it before allocation; service
+ * disposal also joins retained cleanup. Holder-owned background work keeps
+ * its existing completion and cancellation controls.
+ * A live parent's recovery outlives this runtime's registration.
+ * Parent teardown retries retained cleanup and joins late transfers. A
+ * departing parent adds no effects; an unaccepted transfer retries its original lease.
+ * @param parent - exact Agent that originally started the run.
+ * @param run - handle returned by this service for that parent.
+ * @returns fulfillment after confirmed release; failed attempts keep it pending.
+ * @throws {SubagentError} `UNAUTHORIZED` for another runtime's or parent's handle.
+ */
+retainFailedCleanup(parent: Agent, run: SubagentRun): Promise<void>
 ```
 
 Types: [Agent](core.md) · [ContentBlock](llm-streaming.md) · [MessageId](llm-streaming.md) · [SessionId](core.md)
@@ -726,6 +767,53 @@ Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/suba
 <a id="subagent-events"></a>
 
 ### `subagent/*` events
+
+<a id="subagentcleanup-retain--emit"></a>
+
+#### `subagent/cleanup-retain` — emit
+
+Offer failed cleanup to an existing exact-parent recovery, including one already draining. Accepting recovery keeps the original owner's operation reachable without registering effects in a departing parent.
+
+```ts cordis-catalog
+/**
+ * Offer failed cleanup to an existing exact-parent recovery, including one
+ * already draining. Accepting recovery keeps the original owner's operation
+ * reachable without registering effects in a departing parent.
+ * @param parent - exact Agent that owns the failed child.
+ * @param retry - original owner's coalescing cleanup operation.
+ * @param released - non-rejecting confirmation of physical release.
+ * @param claim - atomically accept this offer once; false leaves it to the accepting listener.
+ * @mode emit
+ */
+'subagent/cleanup-retain'(parent: Agent, retry: () => Promise<void>, released: Promise<void>, claim: () => boolean): void
+```
+
+Types: [Agent](core.md)
+
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
+
+<a id="subagentcleanup-retry--emit"></a>
+
+#### `subagent/cleanup-retry` — emit
+
+Collect retry operations owned by the exact parent's retained cleanup. Listeners register operations synchronously without starting them; the admitting runtime joins every attempt before refusing new work. Run handles and cleanup authority remain with their original owners.
+
+```ts cordis-catalog
+/**
+ * Collect retry operations owned by the exact parent's retained cleanup.
+ * Listeners register operations synchronously without starting them; the
+ * admitting runtime joins every attempt before refusing new work.
+ * Run handles and cleanup authority remain with their original owners.
+ * @param parent - exact Agent requesting new allocation.
+ * @param register - collect one recovery operation for this admission.
+ * @mode emit
+ */
+'subagent/cleanup-retry'(parent: Agent, register: (retry: () => Promise<void>) => void): void
+```
+
+Types: [Agent](core.md)
+
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentend--emit"></a>
 

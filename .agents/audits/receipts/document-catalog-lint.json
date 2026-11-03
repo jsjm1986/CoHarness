@@ -1,0 +1,14 @@
+{
+  "name": "document-catalog-lint",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts gateway/src/documents-local.ts gateway/src/index.ts gateway/tests/documents-local.spec.ts gateway/tests/fixtures/document-background-writes.mjs packages/host/userdoc-http/src/index.ts packages/host/userdoc-http/tests/handler-edges.spec.ts",
+  "startedAt": "2026-10-26T21:01:04.053830+00:00",
+  "seconds": 6.66,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d6c0572aea96a91986873738ae43ac12ff696a9ca026f7890e19e84605b8471d",
+  "inputsAfter": "d6c0572aea96a91986873738ae43ac12ff696a9ca026f7890e19e84605b8471d",
+  "postgresToolDirectory": null,
+  "outputSha256": "f5306934c38860e81a543d9b3e4c12db9e8ac875b822b0d9614ca491f8e0d461",
+  "outputTail": "packages/host/userdoc-http/tests/handler-edges.spec.ts:188:43: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\npackages/host/userdoc-http/tests/handler-edges.spec.ts:188:84: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\n"
+}

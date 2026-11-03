@@ -1,0 +1,14 @@
+{
+  "name": "memory-domain-lifecycle-loader-source",
+  "cwd": ".",
+  "command": "pnpm exec vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/memory-lifecycle.snapshot.ts --retry=0",
+  "startedAt": "2026-10-24T01:09:35.931769+00:00",
+  "seconds": 5.887,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ec40d63ca91cc57aadbc444f4bed0ff013e1854f877e67f9cd9f5f0f1cc8f092",
+  "inputsAfter": "ec40d63ca91cc57aadbc444f4bed0ff013e1854f877e67f9cd9f5f0f1cc8f092",
+  "postgresToolDirectory": null,
+  "outputSha256": "81e5d1fd66c52ab6b0f7d7287a5431bf82539ba19962d9a3e7cde5335f9eedc9",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  09:09:40\n   Duration  1.63s (transform 383ms, setup 34ms, import 478ms, tests 1.02s, environment 0ms)\n\n"
+}

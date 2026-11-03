@@ -24,6 +24,10 @@
 
 `PluginManagementCatalog` 在权限结果上增加 `managementAvailable`、`bundles`、`plugins`，用于一次经过授权的读取。独立的 Web 目录入口在没有管理器时返回空列表和不可用状态；存在管理器时，各值来自实时读取，不保证属于一个原子 profile 修订。
 
+`ParsedInstallSpec` 保留提交的 `spec`，并区分 registry、path、tarball 和 git 来源。registry 来源包含 `name` 和可选的 `range`；path 来源包含 `path`；tarball 包含可选的 `path` 或 `host`；git 来源包含 `host`。安装授权可以在包操作开始前限制实际的获取来源。
+
+`PluginConfigValue` 是递归 JSON 值。`PluginConfigDescription.config` 包含条目配置，未声明时为 `null`；可选的 `schema` 包含插件的 Schemastery `toJSON` 序列化结果，供配置表单使用。
+
 `PluginDesiredState` 是部署对一个 profile 的期望组成：键集限于 `id`、`name`、`disabled` 的逐字 patch `entries`，加上有序的 `bundles` 选择。`PluginDesiredStateSnapshot` 将已存状态与存储的乐观并发 `revision` 配对（未保存时为 `'0'`），`PluginDesiredStatePublish` 以新 revision 应答 `applied`，或以存储当前快照应答 `conflict`。
 
 ## Profile 重新组合
@@ -228,7 +232,7 @@ async authorize(capability: PluginManagementCapability = 'manage'): Promise<void
 @Remote async describePluginConfig(id: PluginEntryId): Promise<PluginConfigDescription>
 
 /** Replace one plugin row's config in the profile patch, validated against its schema.
- * `config: null` removes the override so composition defaults apply. The loader
+ * `config: null` clears all matching profile config overrides so composition defaults apply. The loader
  * rejects a failing schema at reload as well; validating here first reports a
  * readable error instead of a broken reload.
  * @param id Loader entry identity returned by listPlugins.

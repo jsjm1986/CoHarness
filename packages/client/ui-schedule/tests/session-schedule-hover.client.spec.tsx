@@ -7,7 +7,7 @@ import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ScheduleCatalogEntry, ScheduleDeleteResult } from '@deepseek-ai/dsh-schedule/client'
 import { ScheduleId } from '@deepseek-ai/dsh-schedule'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-ui-renderer/src/client/bind.ts'
+import { keyedObservableHook } from '@deepseek-ai/dsh-client-ui-renderer/src/client/session-provider.tsx'
 import { createCatalogSource, type CatalogInjected } from '../src/client/catalog-source.ts'
 import {
   formatScheduleAbsolute, formatScheduleFrequency, formatScheduleRelative,
@@ -84,7 +84,7 @@ function renderHover(
 ) {
   const props = {
     sessionId,
-    useCatalog: bindSnapshotSelector(source.hooks.catalog),
+    useRuntimeCatalog: keyedObservableHook(() => source.hooks.catalog),
     t: makeTranslate(dictionary),
   } as SessionScheduleHoverProps
   return render(<SessionScheduleHover {...props} />)

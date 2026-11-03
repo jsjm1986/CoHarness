@@ -4,6 +4,7 @@ import { readFileSync, realpathSync } from 'node:fs'
 import { createRequire, isBuiltin } from 'node:module'
 import { basename, dirname, join, sep, toNamespacedPath } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { createReplaceHelper } from './package-methods.ts'
 
 /** Package fields Node's resolver consumes; exports and imports hold JSON values. */
 interface PackageConfig {
@@ -52,18 +53,6 @@ interface NativeAccess {
   ResolveCache: ResolveCacheClass
   cjs: CommonJsModule
   esmLoader: { resolveSync(...args: unknown[]): unknown }
-}
-
-/** Snapshot own methods; each disposer restores its method only while its replacement is still installed. */
-function createReplaceHelper<T extends { [K in keyof T]: (...args: never[]) => unknown }>(target: T) {
-  const rawImpl = { ...target }
-  return {
-    rawImpl,
-    replaceMethod<K extends keyof T>(key: K, replacement: T[K]): () => void {
-      target[key] = replacement
-      return () => { if (target[key] === replacement) target[key] = rawImpl[key] }
-    },
-  }
 }
 
 /** Same lookup as the vendored Loader's `requireInternal`: `--expose-internals` first, then the builtin addon. */

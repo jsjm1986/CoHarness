@@ -49,6 +49,7 @@ const LINK_MAP: Record<string, string> = {
   TurnEndReason: 'subsystems/session.md',
   SessionTitleEventData: 'subsystems/session-title.md',
   SessionTitleLlmRequestEventData: 'subsystems/session-title.md',
+  StagehandLlmRequestEventData: 'subsystems/browser-use.md',
   SessionTitleModelIdentity: 'subsystems/session-title.md',
   SessionTitleProviderId: 'subsystems/session-title.md',
   SessionTitleSource: 'subsystems/session-title.md',

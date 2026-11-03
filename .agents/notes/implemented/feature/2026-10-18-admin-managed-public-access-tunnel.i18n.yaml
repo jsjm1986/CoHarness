@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-admin-managed-public-access-tunnel.md
 document:
-  en: 7b37ecc64c822ab8427a2754163ab4a49c823d3d
-  zh: e3b041a1f682b22e7d37161c9e42dbcf81eaacf6
+  en: 6f9240778b60f16ffbf9de08d926aa011c608201
+  zh: d87c3be959ce72f30cc9470b7b41f10c4a0ecab5
 /agent-note-admin-managed-public-access-tunnel-on-cloudflare-tunnel:
   en: d55247101c9441f7
   zh: 6e974dd5916f60e6
@@ -12,14 +12,14 @@ document:
   en: 50ac839901325a0b
   zh: 832c24790b770046
 /agent-note-admin-managed-public-access-tunnel-on-cloudflare-tunnel/decision:
-  en: bac1f20dadbab1ab
-  zh: a1ebe49bc300c927
+  en: 58b1056819725ce7
+  zh: ef0a7fe02118e417
 /agent-note-admin-managed-public-access-tunnel-on-cloudflare-tunnel/alternatives-considered:
   en: 8c912f0e3f6bd35d
   zh: 05769df750e59c4a
 /agent-note-admin-managed-public-access-tunnel-on-cloudflare-tunnel/consequences:
-  en: 62cc028184207794
-  zh: ecb89da41f907ccd
+  en: 62029d77a3f0d3cd
+  zh: 4d4e16cae5cdbc91
 /agent-note-admin-managed-public-access-tunnel-on-cloudflare-tunnel/verification:
-  en: 4577745050bd8b46
-  zh: 935ab439bf799a0a
+  en: 05721437b979235b
+  zh: 7a870797c1a19674

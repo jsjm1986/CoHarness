@@ -1,0 +1,13 @@
+{
+  "name": "browser-session-retention-current",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/server.spec.ts -t 'active browser session|logs in, enforces csrf' --retry=0",
+  "startedAt": "2026-10-23T19:54:03.065875+00:00",
+  "seconds": 3.744,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4590888f734ad3299a5ba9f0b5ec84ad29d08edff146a8cf840c50a6e9c08669",
+  "inputsAfter": "4590888f734ad3299a5ba9f0b5ec84ad29d08edff146a8cf840c50a6e9c08669",
+  "outputSha256": "10c96eb180e1210f6e25df56e706ae859d7bd93b567b2b18a2ff9f356310c72f",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n  Snapshots  1 written\n Test Files  1 passed (1)\n      Tests  2 passed | 35 skipped (37)\n   Start at  03:54:05\n   Duration  1.33s (transform 626ms, setup 0ms, import 873ms, tests 316ms, environment 0ms)\n\n"
+}

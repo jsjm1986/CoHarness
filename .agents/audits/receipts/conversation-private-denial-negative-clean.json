@@ -1,0 +1,14 @@
+{
+  "name": "conversation-private-denial-negative-clean",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-service-postgres.spec.ts -t 'visibility.*revocation' --no-file-parallelism",
+  "startedAt": "2026-10-24T00:52:25.526545+00:00",
+  "seconds": 4.68,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "59adb112574492457874ebba5a2c39bab0e10c8eb8b303d3f52beb65d6152dad",
+  "inputsAfter": "59adb112574492457874ebba5a2c39bab0e10c8eb8b303d3f52beb65d6152dad",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "0dbd33124227d1de57d9976cbdaa23e439034e2fcc9c585307702ef1b0b36078",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\nstderr | tests/project-service-postgres.spec.ts > PostgreSQL project creation and mutations > rechecks 'visibility' revocation after waiting to 'append' a project conversation\n[gateway] request failed: Error: private conversation 6e7d4bb1-566b-4726-9fb8-dc04a36b0739 rejects another contributor\n    at /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/conversation-repository.ts:1227:17\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at transaction (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/database.ts:381:20)\n    at Object.runtime (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/runtime-api.ts:1305:24)\n    at handle (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/server.ts:754:45)\n\n ❯ tests/project-service-postgres.spec.ts (33 tests | 1 failed | 32 skipped) 313ms\n     × rechecks 'visibility' revocation after waiting to 'append' a project conversation 268ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/project-service-postgres.spec.ts > PostgreSQL project creation and mutations > rechecks 'visibility' revocation after waiting to 'append' a project conversation\nAssertionError: expected 500 to be 403 // Object.is equality\n\n- Expected\n+ Received\n\n- 403\n+ 500\n\n ❯ tests/project-service-postgres.spec.ts:225:27\n    223|     }\n    224|     expect(await revoked).toBeUndefined()\n    225|     expect(await created).toBe(403)\n       |                           ^\n    226|     const stored = await conversations.load(sessionId)\n    227|     expect(stored?.events.length ?? 0).toBe(0)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 32 skipped (33)\n   Start at  08:52:27\n   Duration  2.31s (transform 1.53s, setup 0ms, import 1.89s, tests 313ms, environment 0ms)\n\n"
+}

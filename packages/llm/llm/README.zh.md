@@ -27,7 +27,7 @@ kind: "package-reference"
 
 `listModels` 描述目录驱动界面提供的模型。核心解析与流式调用仍可接受未列出的 ID。GUI 的模型选择与提交要求模型出现在目录中；供 GUI 使用的适配器必须实现 `listModels`，公布其可用模型。基类实现返回空列表，因此不向 GUI 提供模型。
 
-任何调用模型提供方的组合——agent loop（智能体循环）、会话标题生成器、压缩（compaction）摘要器——都会通过本服务流式发起请求。与至少一个提供方适配器一起挂载它；服务本身没有任何配置，也不包含提供方协议代码。
+任何调用模型提供方的组合——agent loop（智能体循环）、会话标题生成器、压缩（compaction）摘要器——都会通过本服务流式发起请求。与至少一个提供方适配器一起挂载它。`streamCloseTimeoutMs` 限制适配器迭代器清理时长，默认为 1,000 ms；提供方协议配置由适配器插件负责。
 
 ### 何时选择
 
@@ -73,6 +73,8 @@ for await (const chunk of ctx.llm.stream({
 
 每个流都恰好以一个终止 `finish` 分片结束：失败为 `{ kind: 'error', failure }`，取消为 `{ kind: 'aborted', failure }`。失败携带稳定 code，如 `NO_ADAPTER`、`MISSING_CREDENTIAL`、`AUTH`、`RATE_LIMIT` 与 `CONTEXT_WINDOW_EXCEEDED`；消费方依据 code 路由，绝不解析消息文本。`QUOTA` 表示提供方中立的额度耗尽，`ACCOUNT_QUOTA` 专用于当前产品能够充值的第一方账号余额不足。点名未注册提供方的请求会以 `NO_ADAPTER` 失败，格式错误的凭据会以 `INVALID_CREDENTIAL` 失败，而不是表现为不透明的 fetch 错误。本服务从不自行重跑请求：重试是 `dsh-llm-retry` 在 agent 失败步骤扩展点上的职责。
 
+本地 `ResourceAdmissionError` 的原因保留不同的终止 code：`unavailable` 对应 `RESOURCE_BUDGET_UNAVAILABLE`，`cancelled` 对应携带 `ABORTED` 的 aborted 结束，`expired` 对应 `RESOURCE_ADMISSION_EXPIRED`，`refused` 对应 `RESOURCE_ADMISSION_REFUSED`。这些类别不添加提供方 HTTP 状态，也不表示上游限流或自动重试。已校验的详细失败事实优先；任意 SDK 的 `reason` 字段不会获得资源错误 code。
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -87,11 +89,17 @@ for await (const chunk of ctx.llm.stream({
 
 本服务基于一项职责分离原则：**逻辑约定是提供方无关的，适配器拥有协议。** 它一次性地定义规范消息、内容块与流式分片词汇，每个提供方适配器只把自己的协议格式翻译为该词汇。注册表是拓扑的拥有者——适配器路由、可配置提供方条目与发现 offer 都在这里注册，并随其 fiber 一起 dispose（资源释放）——而 agent loop 的请求始终是会话日志的纯函数：loop 构建的请求以深度冻结状态到达，因此监听器与适配器只能读取，绝不能改写。
 
+主请求归属由派发请求的 `LlmRuntime` 持有。循环通过 `ctx.llm.markAgentLoopRequest(request)` 记录精确的冻结对象；`ctx.llm.isAgentLoopRequest(request)` 仅在该服务存活期间识别它。副本、其他服务的对象及服务撤回后保留的请求均不带此标记。通过已退役服务标记请求会抛出 `MODEL_REQUEST_ORIGIN_UNAVAILABLE`。全局 LLM waterfall 监听器通过发出事件的 `this: LlmRuntime` 接收者检查归属，包括隔离的提供方。此标记区分循环工作与辅助调用，不授予执行或计费权限。参见[归属决策](../../../.agents/notes/implemented/bug-fix/2026-11-02-scoped-model-request-origin.zh.md)。
+
 ### 源码地图
 
 | 文件 | 职责 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | `LlmRuntime` 服务：适配器注册表、可配置提供方目录、模型发现、调用准备与流式边界 |
+| [`src/operations.ts`](src/operations.ts) | 原生操作参数、请求、结果与适配器工厂的类型 |
+| [`src/operation-call.ts`](src/operation-call.ts) | 通过普通模型中间件执行一次性原生操作并报告用量 |
+| [`src/model-policy.ts`](src/model-policy.ts) | 跨异步等待保留策略所有者并执行路由授权 |
+| [`src/resource-owner.ts`](src/resource-owner.ts) | 跨预备、排队及凭据等待的模型准入归属 |
 | [`src/types.ts`](src/types.ts) | `StreamChunk` 协议、内容块映射、结束原因与共享词汇 |
 | [`src/message.ts`](src/message.ts) | 投递、历史与请求共享的不可变消息构造函数 |
 | [`src/assembler.ts`](src/assembler.ts) | `BlockAssembler`：分片到块的增量组装 |
@@ -107,6 +115,22 @@ for await (const chunk of ctx.llm.stream({
 | [`src/never.ts`](src/never.ts) | 面向封闭联合类型的 `assertNever` 穷尽性断言 |
 
 ### 主流程
+
+实际 adapter 派发先等待模型许可；回放或自行提供流的中间件不消耗许可。`llm/pre-dispatch` waterfall 在准入后、调用已绑定代次的 adapter 前，重新检查当前授权。`resourceOrigin` 选择执行、交互或基础设施归属，并在交给 adapter 前移除。取消合并调用者与许可信号。正常完成、拒绝或成功的终结迭代器返回确认清理；缺失、失败、超时或非终结清理保留不确定占用。
+
+物理模型流在中间件开始前保留其资源提供者及受管要求。预备、准入和最终请求派发均要求同一提供者仍然有效；撤销、替换或新增必需要求后缺少提供者时，以 `RESOURCE_BUDGET_UNAVAILABLE` 失败，不发送请求。已经取得的许可归还原提供者。恢复准入后使用新的流重试。编排轮次不预留模型容量；其嵌套模型请求分别捕获当前提供者。
+
+`LlmAdapter.callKind` 默认为 `model`。若适配器的轮次驱动另外受管的模型请求，注册时捕获其 `orchestration` 类型。外层调用使用 `llm/orchestration`，保留必需的策略所有者检查及预备代次，不消耗模型许可，也不进入模型路由授权或模型计量中间件。每个嵌套请求必须使用普通或委派模型操作，分别完成授权、准入及实际用量计量。原生操作工厂拒绝编排路由；可变中间件不能跨执行类型重定向调用。
+
+`prepareOperation()` 预备由 `LlmOperationMap` 声明、由所捕获 `PreparedAdapterCall.operations` 工厂实现的原生模型操作。其冻结的 `request` 包含 Consumer 在 `run()` 前记录的精确无密钥输入。执行经过 `llm/stream`、模型准入和 `llm/pre-dispatch`；中间件从 `GenerateOptions.operation` 读取输入，对话消息为空。操作在终止结果前报告实际累计用量，包括后续失败之前已经获得的用量。中间件若没有执行出结果就结束，会拒绝调用，不会构造虚假的结果。配置不匹配、替换输入或重复执行以 `INVALID_PREPARED_CALL` 失败；捕获的代次缺少工厂时以 `MODEL_OPERATION_UNSUPPORTED` 失败。
+
+`prepareDelegatedOperation()` 经过 `llm/delegated-stream` 使用相同的预备适配器、逐请求资源和授权。Consumer 在执行前记录并持久化其精确请求。`native-stream` 操作携带无密钥的协议／请求体和支持背压的事件写入函数；适配器负责端点选择、认证、有界解析与实际用量。对话重放不会消费这些请求。 原生操作在异步解析凭据后调用观察者的一次性 `dispatch()`，它在提供方 I/O 前重新检查实时授权。
+
+普通适配器流和预备流会收到 `dispatchRequest` 回调。适配器在异步凭据、附件和请求扩展准备完成后调用它，提供方重试时再次调用。该回调保留模型策略，并在启动每个请求前重新检查授权。不携带此回调的直接适配器调用不使用运行时授权。
+
+预备流的第二个参数可接收 `PreparedLlmCallGuard`。异步 `authorize(signal?)` 在准入后、每次提供方请求前检查 Consumer 的资格，并接收调用者与资源额度的合并取消信号；同步 `assertCurrent()` 在授权完成后、进入适配器与每次请求之前检查所保留的所有者，重试也执行检查。两个回调均不进入 `GenerateOptions` 或提供方输入。
+
+模型流在运行中间件前捕获策略提供方，跨模型预备和资源准入保留它。撤下或替换所有者以 `MODEL_POLICY_UNAVAILABLE` 失败；受管运行时也拒绝缺失的策略提供方。在异步派发防护之后执行所保留策略的路由决定。 `llm/authorize` 在分派前串行执行全部授权所有者，即使 `llm/pre-dispatch` 的瀑布监听器停止委托。策略身份比较 Cordis 底层提供方，同时保留捕获的跟踪上下文。`llm/delegated-stream` 以父级执行身份计量外部子运行时流，不消费父会话的重放游标。
 
 请求会对照其精确模型的能力校验，包括上下文窗口、输出默认值、推理强度、输入模态与 `systemPromptUpdate` 模式，并填入任何适配器配置的默认值。运行时保留已冻结输入的冻结状态；手动构建请求的调用方负责保证输入不可变。`prepareCall()` 把这些事实、分离的上下文与重试策略绑定到执行最终分发的精确适配器代次，因此 HMR（热模块替换）或动态设置无法把一个代次的图片能力与另一代次的端点混用。支持图片的适配器把持久引用投影为路由专用请求版本；`resolveImageAttachmentAccess()` 会单独把附件提供方的可选宿主对象映射进当前工具执行世界，而不改变请求图片或其 `variantId`。纯文本路由接收确定性的逐图片占位符，包括 tool-role 结果图片，而不会改写仅追加会话历史。持久 `FileBlock` 引用永远不会到达任何适配器：请求组装把每个引用（包括 tool-role 结果中的出现）替换为确定性句柄文本，指出文件与其只读保存路径，路径经由挂载的附件与文件系统提供方解析。`ctx.llm.fileRequestText(ref)` 向请求计量公开相同的同步投影。派生后带有 `offloaded: true` 的图片出现位置，经 `projectOffloadedImages()` 以占位文本到达每条路由。支持图片的路由在保留的出现位置按精确字节超过其 `LlmImageRequestBudget` 时，以 `IMAGE_OFFLOAD_REQUIRED` 失败并说明还需省略多少最老的出现位置（`requiredImageOffload()`），绝不发送未记录的投影；`dsh-compaction-image-offload` 用一条 `image/offload` 事件记录所选位置并重试。对视觉 token 收费的适配器声明按路由的 `imageRequestPricing`，`ctx.llm.imageRequestPricing(provider, model)` 为 token meter 同步解析它。分发经过 `llm/stream` waterfall（瀑布式事件），随后分片以 token 级增量返回，每个适配器结果都以唯一一个终止 `finish` 分片到达消费方。`llm/stream` waterfall 由一层提供方中立的失败关闭防护包裹：普通文本块里带标签或不完整的 `<thinking>`/`<analysis>`/`<think>` 前缀会被扣留，并在任何缓冲文本到达消费方之前以 `UNSAFE_MODEL_OUTPUT` 上报。
 

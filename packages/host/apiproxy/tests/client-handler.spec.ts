@@ -158,6 +158,45 @@ function recorderInto(seen: { method: string; payload: unknown }[]) {
 }
 
 describe('unary round trip', () => {
+  it.each(['headless', 'disabled'] as const)('preserves %s desktop availability through Host discovery', async (computerUseUnavailableReason) => {
+    const api = scriptedApi({
+      host: {
+        describe: request => ok(request, {
+          version: '0-test', cwd: '/t', attachedSessions: 0, home: '/h', canOpenPath: false,
+          computerUseUnavailableReason,
+        }),
+      },
+    })
+
+    const response = await client(api).host.describe({})
+    expect(response.result).toMatchObject({ ok: true, value: { computerUseUnavailableReason } })
+  })
+
+  it('keeps absent desktop availability unknown through Host discovery', async () => {
+    const response = await client(scriptedApi()).host.describe({})
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('Host fixture failed')
+    expect(response.result.value).not.toHaveProperty('computerUseUnavailableReason')
+  })
+
+  it('rejects undeclared desktop availability received from a Host', async () => {
+    const transport = new InProcessApiClient({
+      fetch: async (_input, init) => {
+        if (typeof init?.body !== 'string') throw new Error('Host fixture requires a JSON request')
+        const request = JSON.parse(init.body) as { rpcId: string }
+        return Response.json({
+          type: 'server-response', rpcId: request.rpcId,
+          result: { ok: true, value: {
+            version: '0-test', cwd: '/t', attachedSessions: 0, home: '/h', canOpenPath: false,
+            computerUseUnavailableReason: 'permission-denied',
+          } },
+        })
+      },
+    })
+
+    await expect(transport.host.describe({})).rejects.toThrow()
+  })
+
   it('carries payload out and value back through the full wire form', async () => {
     let seen: RpcRequest<{ cursor?: string }> | undefined
     const api = scriptedApi({

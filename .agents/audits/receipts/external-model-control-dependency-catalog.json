@@ -1,0 +1,14 @@
+{
+  "name": "external-model-control-dependency-catalog",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-dependency-catalog.ts",
+  "startedAt": "2026-10-24T17:06:01.059335+00:00",
+  "seconds": 0.89,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1345ea06bc8e47a01c5e629368a55777bde7fb7415c5c4b7173b35db96d84cf9",
+  "inputsAfter": "1345ea06bc8e47a01c5e629368a55777bde7fb7415c5c4b7173b35db96d84cf9",
+  "postgresToolDirectory": null,
+  "outputSha256": "d498ad341cf4d2e4946e80a8e5705f0d1f67cf3ed0b81daf0dc5f8e82093e560",
+  "outputTail": "dependency-catalog: generated docs/dependency-catalog.json\n"
+}

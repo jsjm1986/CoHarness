@@ -1,0 +1,14 @@
+{
+  "name": "runtime-control-whole-gateway-current",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run --exclude tests/postgres.spec.ts --exclude tests/auth-postgres.spec.ts --exclude tests/project-activity-postgres.spec.ts --exclude tests/project-progress-postgres.spec.ts --exclude tests/project-service-postgres.spec.ts --exclude tests/access-invalidation.spec.ts --exclude tests/execution.spec.ts --exclude tests/ssh.spec.ts --exclude tests/webhook.spec.ts --exclude tests/maintenance.spec.ts --exclude tests/deployment-restore.spec.ts --exclude tests/deployment-backups.spec.ts --exclude tests/node-config-process.spec.ts --exclude tests/startup-generation.spec.ts --exclude tests/execution-scopes.spec.ts --exclude tests/admin-business-postgres.spec.ts --exclude tests/instance-capacity-postgres.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T20:09:49.900297+00:00",
+  "seconds": 51.725,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1f8b4c1f971e09e8c17655fc3e8355498f2943569b4ea83e933e3449cdd7d912",
+  "inputsAfter": "1f8b4c1f971e09e8c17655fc3e8355498f2943569b4ea83e933e3449cdd7d912",
+  "postgresToolDirectory": null,
+  "outputSha256": "a50c58f21792b73155406ed6e12f1c373cc8b560b008d9d8b31a472a7d303d4f",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  67 passed | 3 skipped (70)\n      Tests  787 passed | 93 skipped (880)\n   Start at  04:09:50\n   Duration  50.70s (transform 3.32s, setup 0ms, import 8.27s, tests 86.75s, environment 4ms)\n\n"
+}

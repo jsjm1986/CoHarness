@@ -1,0 +1,372 @@
+{
+  "recordedAt": "2026-10-29T15:05:40.314940+00:00",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z",
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/native-probe-final-source-artifact-hashes.json",
+  "realProviderApiValidation": "human-deferred",
+  "resourceQuiescence": {
+    "status": "passed",
+    "recordedAt": "2026-10-29T15:02:09.812723+00:00",
+    "ownedNativeFixturePids": [],
+    "ownedDatabaseCreated": false,
+    "peerAndProductionResourcesAccessed": false,
+    "nativeFailedFixtureCleanup": {
+      "status": "passed",
+      "removedOwnedRoots": [
+        "/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/nalr-fake-launcher-grL6BY"
+      ],
+      "ownership": "Exact first failed native-entry receipt creation window and exact sole generated fixture contents."
+    }
+  },
+  "limitations": [
+    "The native client scenarios run real private POSIX helpers; the Windows ACL probe call is exercised through its provider adapter on POSIX, without claiming real Windows execution.",
+    "These are host-probe and bootstrap ownership cases, not new Linux kernel/cgroup, public-network cross-computer or real model-provider acceptance.",
+    "Coverage applies only to local-runtime-protocol.ts, child-command.ts, sandbox-local/src/index.ts and native entry/src/index.ts; other files and every original audit domain remain open."
+  ],
+  "findings": [
+    "B321"
+  ],
+  "repair": "Boot UUID reads use the joined native-command owner, existing five-second deadline,1024-byte output and scrubbed environment. Startup cancellation reaches the native client and waits for close before any Runtime allocation; LocalLauncher preserves RuntimeCapacityError(cancelled). Linux reads reject unavailable/malformed UUID data and cancellation after a delayed kernel read.",
+  "paths": [
+    "gateway/src/local-runtime-protocol.ts",
+    "gateway/src/launcher.ts",
+    "gateway/tests/local-runtime-protocol.spec.ts",
+    "gateway/tests/local-boot-identity-transcript.spec.ts",
+    "gateway/tests/fixtures/local-boot-identity.mjs",
+    "gateway/tests/fixtures/local-boot-sysctl.mjs",
+    "gateway/tests/expected/local-boot-identity.expected.md"
+  ],
+  "negativeEvidence": [
+    {
+      "name": "boot-identity-credentials-valid-launch-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T14:30:08.115456+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "tests/fixtures/local-boot-identity.mjs",
+        "src",
+        "-",
+        "credentials"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T14:30:08.302995+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-credentials-valid-launch-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-credentials-valid-launch-before.log"
+    },
+    {
+      "name": "boot-identity-cancellation-valid-launch-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T14:30:08.326426+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "tests/fixtures/local-boot-identity.mjs",
+        "src",
+        "-",
+        "cancellation"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T14:30:10.513524+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-cancellation-valid-launch-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-cancellation-valid-launch-before.log"
+    },
+    {
+      "name": "boot-identity-deadline-valid-launch-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T14:30:10.551180+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "tests/fixtures/local-boot-identity.mjs",
+        "src",
+        "-",
+        "deadline"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T14:30:20.721090+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-deadline-valid-launch-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-deadline-valid-launch-before.log"
+    }
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "boot-identity-kernel-wire-complete-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:00:40.768860+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/local-runtime-protocol.spec.ts",
+          "tests/local-boot-identity-transcript.spec.ts",
+          "tests/local-runtime-launcher.spec.ts",
+          "tests/local-runtime-owner.spec.ts",
+          "tests/local-runtime-native-control.spec.ts",
+          "tests/local-runtime-linux.spec.ts",
+          "tests/launcher.spec.ts",
+          "tests/systemd-command.spec.ts",
+          "--maxWorkers=2",
+          "--retry=0",
+          "--coverage",
+          "--coverage.include=src/local-runtime-protocol.ts",
+          "--coverage.include=src/child-command.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-complete-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:00:53.976698+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-kernel-wire-complete-coverage.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-kernel-wire-complete-coverage.log"
+      },
+      {
+        "name": "boot-identity-final-private-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:56:16.778880+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/tsc",
+          "-p",
+          "gateway/tsconfig.build.json",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/gateway-artifact/lib",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/gateway-artifact/build.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:56:19.913890+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-final-private-build.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-final-private-build.log"
+      },
+      {
+        "name": "boot-identity-cancel-result-final-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:56:24.764804+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/fixtures/local-boot-identity.mjs",
+          "lib",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/gateway-artifact/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:56:30.023542+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-cancel-result-final-node22.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-cancel-result-final-node22.log"
+      },
+      {
+        "name": "boot-identity-cancel-result-final-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:56:30.059836+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "tests/fixtures/local-boot-identity.mjs",
+          "lib",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/gateway-artifact/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:56:35.333644+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-cancel-result-final-node24.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/boot-identity-cancel-result-final-node24.log"
+      }
+    ],
+    "coverage": {
+      "bootIdentityAndCommand": {
+        "total": {
+          "lines": {
+            "total": 18,
+            "covered": 18,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 22,
+            "covered": 22,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 4,
+            "covered": 4,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 7,
+            "covered": 7,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/child-command.ts": {
+          "lines": {
+            "total": 8,
+            "covered": 8,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 3,
+            "covered": 3,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 11,
+            "covered": 11,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 3,
+            "covered": 3,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/local-runtime-protocol.ts": {
+          "lines": {
+            "total": 10,
+            "covered": 10,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 1,
+            "covered": 1,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 11,
+            "covered": 11,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 4,
+            "covered": 4,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      },
+      "sandboxProviderAndNativeEntry": {
+        "total": {
+          "lines": {
+            "total": 146,
+            "covered": 146,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 164,
+            "covered": 164,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 30,
+            "covered": 30,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 100,
+            "covered": 100,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/native/system/packages/entry/src/index.ts": {
+          "lines": {
+            "total": 12,
+            "covered": 12,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 5,
+            "covered": 5,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 13,
+            "covered": 13,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 13,
+            "covered": 13,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/sandbox/sandbox-local/src/index.ts": {
+          "lines": {
+            "total": 134,
+            "covered": 134,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 25,
+            "covered": 25,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 151,
+            "covered": 151,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 87,
+            "covered": 87,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      }
+    }
+  },
+  "intermediateEvidence": {
+    "notCausal": [
+      "Initial boot commands omitted the declared runtime tsconfig; their module-resolution failures are not bug reproductions."
+    ],
+    "failedCoverage": "The first extended native-source selection lacked optional-package/default-grant cases;52behavior cases passed but the strict coverage command failed. Added source-plane native API cases without reducing thresholds; final54cases and four metrics passed.",
+    "nativeFixture": "An initial positive fake-launcher report was refused under its default budget. The native diagnostic succeeded; positive parsing uses a patient explicit budget and unconditional cleanup. Timeout regressions retain explicit deadlines and physical closure witnesses.",
+    "artifact": "Private bundle rehearsals were corrected to preserve package subpath externals and native package resolution. Only the final external-native-entry Node22/24 receipts support the final sandbox artifact claim."
+  }
+}

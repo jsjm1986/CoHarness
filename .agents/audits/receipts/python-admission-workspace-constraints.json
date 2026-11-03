@@ -1,0 +1,13 @@
+{
+  "name": "python-admission-workspace-constraints",
+  "cwd": ".",
+  "command": "pnpm run constraints",
+  "startedAt": "2026-10-23T16:05:35.068151+00:00",
+  "seconds": 2.57,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d090cb02165998aeb73aca36d26874ce985ad4a3ace5b3444559ef7021e61dbe",
+  "inputsAfter": "d090cb02165998aeb73aca36d26874ce985ad4a3ace5b3444559ef7021e61dbe",
+  "outputSha256": "018fe605fb12870f7d9d1184b775b8e471acb61e3266c7cf275d1847eb98cefe",
+  "outputTail": "$ tsx scripts/check-workspace-constraints.ts\n"
+}

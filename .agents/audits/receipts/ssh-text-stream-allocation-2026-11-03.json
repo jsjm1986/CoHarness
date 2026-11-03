@@ -1,0 +1,208 @@
+{
+  "finding": "B496",
+  "title": "Unread SSH text iterables consume no remote helper reservations",
+  "status": "fixed_named_scenarios_verified_global_review_open",
+  "at": "2026-11-03T01:00:16.313622+00:00",
+  "sourceFixed": true,
+  "delivery": {
+    "finding": "B496",
+    "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+    "at": "2026-11-03T00:58:50.091325+00:00",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261103T004929Z/B496-ssh-text-stream-allocation.delta.tar.gz",
+    "archiveSha256": "7c742682c9b718add2d50917a3b6d05bcd9a572bedbb914c3ab7d37275e5c97d",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261103T004929Z/B496-ssh-text-stream-allocation",
+    "manifestSha256": "d83ce8b2fb6a57313bd24a610263426852406ce8369136bfe52a654841871138",
+    "ownedChanges": 14,
+    "normalPassedRegisteredInstances": 296,
+    "normalDistinctFileAndDisplayTitleKeys": 287,
+    "wholeProjectComplete": false
+  },
+  "normalPassedRegisteredInstances": 296,
+  "normalDistinctFileAndDisplayTitleKeys": 287,
+  "normalSkippedCases": 0,
+  "coverage": {
+    "total": {
+      "lines": {
+        "total": 42,
+        "covered": 42,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 46,
+        "covered": 46,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 18,
+        "covered": 18,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 34,
+        "covered": 34,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/ssh/fs-ssh/src/index.ts": {
+      "lines": {
+        "total": 42,
+        "covered": 42,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 18,
+        "covered": 18,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 46,
+        "covered": 46,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 34,
+        "covered": 34,
+        "skipped": 0,
+        "pct": 100
+      }
+    }
+  },
+  "checks": [
+    "ssh-text-stream-final-unit-coverage",
+    "ssh-resource-seam-existing-behavior",
+    "ssh-text-stream-loader-fixed-source-node22",
+    "ssh-text-stream-loader-built-node22-concurrent",
+    "ssh-text-stream-loader-built-node24-concurrent",
+    "ssh-text-concurrent-isolation",
+    "ssh-text-declarations",
+    "ssh-text-normal-bundle",
+    "ssh-current-transport-normal-bundle",
+    "ssh-text-whole-host-strict-types",
+    "ssh-text-typescript-lint",
+    "ssh-text-doc-pairs-corrected-final",
+    "ssh-text-doc-targeted-final",
+    "ssh-text-linux-normal-artifact-image",
+    "ssh-text-stream-linux-normal-artifact-loader",
+    "ssh-text-doc-verify-agent-note-format",
+    "ssh-text-doc-verify-agent-note-classification",
+    "ssh-text-doc-verify-concrete-terms",
+    "ssh-text-doc-verify-md-wrap",
+    "ssh-text-doc-verify-doc-refs",
+    "ssh-text-doc-verify-doc-budgets",
+    "ssh-text-doc-verify-export-jsdoc",
+    "ssh-text-doc-verify-md-links"
+  ],
+  "counterproofs": [
+    "ssh-text-stream-unread-unit-original",
+    "ssh-text-stream-loader-original"
+  ],
+  "normalFsProviderCases": 29,
+  "existingSshSubprocessSandboxCases": 267,
+  "keylessDifferentScenarios": 1,
+  "keylessExpectedOutputSteps": 3,
+  "keylessSupportedEngineSourceAndNormalArtifacts": true,
+  "concurrentIndependentProcesses": 2,
+  "concurrentRunIntervalProof": "ssh-text-concurrent-isolation.json",
+  "linux": {
+    "image": "codex-audit-ssh:20261103t004929z-stream",
+    "imageConfigId": "sha256:5ebde23ccb3c25b4d1b3c81f9878c1b780816822e8a8a46fba55cf059350f951",
+    "architecture": "LinuxARM64",
+    "user": "10001:10001",
+    "network": "none",
+    "capabilities": "none",
+    "readOnlyRoot": true,
+    "normalArtifacts": true,
+    "sourceManifest": {
+      "files": {
+        "packages/ssh/fs-ssh/src/index.ts": "e02a883becef6846f58230e9f1d65b2d6fc4c142f5fdc03947de3a4be217002f",
+        "packages/ssh/fs-ssh/lib/index.js": "420ed0ba3597c650fb8cfc0f036f9cf521a262e6c4486adbbab9b0fd0c5c3853",
+        "packages/ssh/fs-ssh/tests/fixtures/stream-lifecycle.mjs": "4d6ffbda4fcf62d81ddc89e49df1eff36fe532c10cc3c36ef2d4a9af287a83d5",
+        "packages/ssh/ssh/tests/fixtures/local-ssh-carrier.mjs": "2e6070e6a46432f3338ede54edcf8f7c6b584a5dc1da60ada722c01ce0b62724",
+        "packages/ssh/ssh/lib/helper.js": "29bb21d6afc3ff2a755042fe7fe6f7d2024d236b8a318e141e8b3236339a0c04",
+        "packages/ssh/ssh/lib/index.js": "1f12abb7741136fb6b4993bcaaac34d6d9d9bdfd3be6c577ce5a0472f7cc31b5",
+        "packages/ssh/ssh/lib/protocol-C43fD--H.js": "6f3aaa4bae09d0872081f40839afdafc167707bb2f10a0005ab08ca595b081da",
+        "packages/ssh/ssh/lib/protocol.js": "704a1e25b238b4155b95ab1a28fce47c8b8a1f514cb4e62d9b98e347c2d65caa",
+        "packages/ssh/ssh/lib/schemas-BgLCYmEc.js": "cd517add3bfbb0da71685b80b3f0e4f1b88a7dd5c20497cfeadcd93007f5404f",
+        "packages/ssh/ssh/lib/schemas.js": "2f1d38ec5a266bd712aa23d454c4439b06c03c82df33fab3e834c759aa920560",
+        "packages/ssh/ssh/lib/stream-security-DJlQsPG-.js": "30f4d652b7db110a827682199756bfd1c58eab91c5b482f907b604dc138eb035"
+      },
+      "baseImage": "codex-audit-document:20261102t231031z-complete-examples",
+      "baseImageDigest": "sha256:15232a545bee09a3126f4dcf35681108582fc7df6f80d9c68ed273941916567a"
+    }
+  },
+  "sourceSha256": {
+    "packages/ssh/fs-ssh/README.i18n.yaml": "f1aa23db38511fb781e84e21cf24c98bd5f369efe9ec9fedc2104cef5c2f77c9",
+    "packages/ssh/fs-ssh/README.md": "5c3feb20467756ba26bda7456f3fe9b97d3d5343408ebdf126803decde915c56",
+    "packages/ssh/fs-ssh/README.zh.md": "8fbda13191bbdcd7139e18882583da047d29c00b462e3b981b9f7bf9331b667f",
+    "packages/ssh/fs-ssh/src/index.ts": "e02a883becef6846f58230e9f1d65b2d6fc4c142f5fdc03947de3a4be217002f",
+    "packages/ssh/fs-ssh/tests/provider.spec.ts": "0a4845cc5c8e6202dd75a10af988dba67cdf1c12fe364bdc7dc276b577ed714e",
+    "packages/ssh/fs-ssh/tests/fixtures/stream-lifecycle.mjs": "4d6ffbda4fcf62d81ddc89e49df1eff36fe532c10cc3c36ef2d4a9af287a83d5",
+    "packages/ssh/fs-ssh/tests/stream-lifecycle.expected.e2e.ts": "07c297a7c1a8d9754e2386d3d82236a759266c14a335d059466912034ef8a860",
+    "packages/ssh/fs-ssh/tests/expected/stream-lifecycle.jsonl": "af77528a829c04a3082e2b975046c62ad9f775fa75e54d6ef618f32ff4c2e242",
+    ".agents/notes/implemented/bug-fix/2026-11-03-ssh-text-stream-allocation.md": "d255523d1dcb2a2fc1435f06af0cacaeb5d505537c89c069137eb0a754ffeed8",
+    ".agents/notes/implemented/bug-fix/2026-11-03-ssh-text-stream-allocation.zh.md": "2ba4cfa5e5b6364909adf06a7a69828c9c47f110f6e76a3ea9d9aac391c673b1",
+    ".agents/notes/implemented/bug-fix/2026-11-03-ssh-text-stream-allocation.i18n.yaml": "937b2eabc6a47a131ab3fc9a733eeac4a96eded0d4429b037643dd601c951b53",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-text-stream-allocation/guide.md": "b2bf7f997410f17d84df35b1ff141959554854585d19d4e6d784556f53b4f711",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-text-stream-allocation/guide.zh.md": "0a6211556e9c4450650a3555bad74e32c5576c3e3161a5e93774612436e4bfb6",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-text-stream-allocation/guide.i18n.yaml": "828932d44b9e39529517778ab9277243ffbc97ca5c096a85df399830c79dacdc"
+  },
+  "artifactSha256": {
+    "packages/ssh/fs-ssh/lib/index.js": "420ed0ba3597c650fb8cfc0f036f9cf521a262e6c4486adbbab9b0fd0c5c3853",
+    "packages/ssh/fs-ssh/lib/tsconfig.tsbuildinfo": "6793caf4faf0fd333048bc78ff3124a10589de3503d2ff306b9f597686abe052",
+    "packages/ssh/fs-ssh/lib/types/index.d.ts": "f235fe24e22559dc8235a2d3777ba4d12181c7b29edc09ff8153534dd1f69766",
+    "packages/ssh/fs-ssh/lib/types/index.d.ts.map": "f2d68e874511d6c52fdef5e53d993ef045c52e4238d540bd660f20c256102972",
+    "packages/ssh/fs-ssh/lib/types/index.js": "beefb498d22a7bc819249c60a766f7bc4a78a43e5787e4dde3bcc0a34b99b6e8",
+    "packages/ssh/fs-ssh/lib/types/index.js.map": "a8695d196044906cc579ca87cb3c349ee7a86ee90d772067ee65c72123f5f8a8"
+  },
+  "productionCallsitesReviewed": 6,
+  "noConsumerChangeRequired": true,
+  "sharedFilesystemSignatureChanged": false,
+  "sessionEventsOrSdkProjectionChanged": false,
+  "capacityLimitChanged": false,
+  "sourceOrArtifactExclusionsAdded": false,
+  "thresholdsLowered": false,
+  "newRuntimeDependencies": 0,
+  "productionWrites": false,
+  "realModelCalls": false,
+  "noteClassification": {
+    "status": "reviewed_one_new_active_note_no_supersession",
+    "at": "2026-11-03T00:57:25.055383+00:00",
+    "newActiveNote": ".agents/notes/implemented/bug-fix/2026-11-03-ssh-text-stream-allocation.md",
+    "reason": "Lazy remote reservation prevents unread async-generator disposal from leaking bounded connection capacity; retaining this rejected eager-allocation alternative guides future resource ownership changes. Existing notes own transport rollback, helper shutdown and portable consumer path identity, not first-pull ownership.",
+    "relatedKeptActive": [
+      ".agents/notes/implemented/bug-fix/2026-10-31-ssh-stream-forwarding-cancellation.md",
+      ".agents/notes/implemented/bug-fix/2026-10-31-ssh-helper-cleanup-ownership.md",
+      ".agents/notes/implemented/architecture/2026-07-28-portable-execution-world-consumers.md"
+    ],
+    "newNotes": 1,
+    "archivedNotesChanged": 0,
+    "deletedNotes": 0,
+    "sourceSha256": {
+      ".agents/notes/implemented/bug-fix/2026-10-31-ssh-stream-forwarding-cancellation.md": "441a8596dfcbabb11423c9553246c77162a13b429f73ea9b0f9e4a1a875f998f",
+      ".agents/notes/implemented/bug-fix/2026-10-31-ssh-helper-cleanup-ownership.md": "b3c402a240bb8d21a5d651642bf1cf1305323cb483b0e0878eaee1f45f2a6cc8",
+      ".agents/notes/implemented/architecture/2026-07-28-portable-execution-world-consumers.md": "270525c2aa8541298d3f96d3bf229a742e31c0667f56f8c9b21a14193c7a83aa"
+    }
+  },
+  "limitations": [
+    "Carrier is a local-only OpenSSH stand-in; the helper, RPC, filesystem, Loader and process ownership are real.",
+    "No new physical remote OpenSSH host or Windows acceptance.",
+    "Real-provider verification remains deferred; all12project review domains remain open.",
+    "Engine/platform and concurrent application repeats are one distinct application scenario, not extra business cases."
+  ],
+  "preparatoryPairingFailureCorrected": "Initial new Chinese switchers linked to themselves; normal pairing rejected them. Corrected links, re-recorded pairs and passed named pairing plus final six-file link/metadata checks. Original failure receipt preserved.",
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261103T004929Z",
+  "wholeProjectComplete": false
+}

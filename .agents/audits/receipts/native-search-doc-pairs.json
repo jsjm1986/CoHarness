@@ -1,0 +1,14 @@
+{
+  "name": "native-search-doc-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-native-search-model-admission.md packages/web/web-search-deepseek/README.md packages/context/resource-budget/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+  "startedAt": "2026-10-24T03:40:55.334027+00:00",
+  "seconds": 5.178,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3be91457491ba87471ce39725681b096b2224e00588f036e3526080a8ae3042f",
+  "inputsAfter": "07224c96c922dc7dd8445eccbed9106c7f801b3360075e5d0fffc8d80fcc97a5",
+  "postgresToolDirectory": null,
+  "outputSha256": "07c879891ab3d6c720d69ab9de3ea5e0f5b8fc4c8085b1e6ca8b4cd94cf77424",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/bug-fix/2026-10-24-native-search-model-admission.md packages/web/web-search-deepseek/README.md packages/context/resource-budget/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-24-native-search-model-admission.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml\nverify-translation-pairing: recorded packages/context/resource-budget/README.i18n.yaml\nverify-translation-pairing: recorded packages/web/web-search-deepseek/README.i18n.yaml\nverify-translation-pairing: 4 record(s) written; run the check to validate the pairs.\n"
+}

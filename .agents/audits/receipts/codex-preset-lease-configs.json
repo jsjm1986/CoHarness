@@ -1,0 +1,14 @@
+{
+  "name": "codex-preset-lease-configs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-cordis-config.ts",
+  "startedAt": "2026-10-25T14:25:15.516058+00:00",
+  "seconds": 7.432,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "91dbac748cebb307091633f1618121c05f6d35df0bf9a9bc724316635577b040",
+  "inputsAfter": "91dbac748cebb307091633f1618121c05f6d35df0bf9a9bc724316635577b040",
+  "postgresToolDirectory": null,
+  "outputSha256": "ab980322c104695271106251a0661554325c1769a6fbf22f65e11df44639ad14",
+  "outputTail": "verify-cordis-config: 413 config files passed.\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "conversation-private-write-denial-before",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-service-postgres.spec.ts -t 'rechecks visibility' --no-file-parallelism",
+  "startedAt": "2026-10-24T00:50:53.687118+00:00",
+  "seconds": 4.755,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cd412a6f10ae4e5669c742f8467ef16c111c7e8194f912f6b9887b69bc58d49c",
+  "inputsAfter": "cd412a6f10ae4e5669c742f8467ef16c111c7e8194f912f6b9887b69bc58d49c",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "db712fad2df5bdf48927c877a47b31b30530034f6ff8f08d63a55cf5701381b7",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 skipped (1)\n      Tests  33 skipped (33)\n   Start at  08:50:56\n   Duration  1.97s (transform 1.51s, setup 0ms, import 1.86s, tests 0ms, environment 0ms)\n\n"
+}

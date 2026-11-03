@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-memory-auxiliary-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.md
+document:
+  en: 604227fcebb3299b87dfe4d313ee37865b6c0d4f
+  zh: 11c0cc260eac97fd72f4d425feaf19cea95f721f
+/agent-note-memory-auxiliary-request-records-and-lifetime-ownership:
+  en: 46312ff097fb437d
+  zh: 7e939f4fa13b3b69
+/agent-note-memory-auxiliary-request-records-and-lifetime-ownership/problem:
+  en: eea8c5d5d78b39aa
+  zh: 79aca7caa43f6924
+/agent-note-memory-auxiliary-request-records-and-lifetime-ownership/decision:
+  en: afe78aa952064c73
+  zh: b529c2822bc17663
+/agent-note-memory-auxiliary-request-records-and-lifetime-ownership/consequences:
+  en: 0978809417927eb8
+  zh: 20733d9c0e0c3bdd
+/agent-note-memory-auxiliary-request-records-and-lifetime-ownership/verification:
+  en: 4178fa67e26140b7
+  zh: a346c15fcd9803b3
+/agent-note-memory-auxiliary-request-records-and-lifetime-ownership/alternatives-considered:
+  en: fcb965dd57e4694c
+  zh: 641f40f1018d55e0

@@ -27,6 +27,8 @@ Use the sidebar's **Plugins** page to inspect and manage the plugins this deploy
 <a id="what-appears-here"></a>
 ## What appears here
 
+Credential and provider invalidations come from the bootstrap Runtime whose settings scopes this page binds. Opening another environment in a new tab leaves these unsaved forms mounted.
+
 The Plugins page's Built-in plugin settings group renders the intersection of two ledgers: the `plugins.item` entries composed clients registered, and the settings namespaces the Host serves. A served namespace no item claims renders nothing — another surface owns it, or this deployment ships no browser half for it — and an item whose namespace this deployment does not serve is filtered out, so an uncomposed plugin leaves no empty shell. Cards follow registration order, which is stable for the items one package installs together and not stable across plugins: apply order between packages is unconstrained.
 
 The items cover the shell executor (`shell`), tool-call parallelism (`agent-loop`), delegation depth and capacity (`subagent`), exact model routes (`subagent-model-selection`), and the DeepSeek search providers (`web`, `web-search-deepseek`, `web-deepseek-api`). Delegation controls retain the upstream integer validation, reset and explanatory help. Depth zero disables tools that inherit this setting; explicit tool depth takes precedence. Capacity counts live descendants of the same root Agent across all depths, excluding the root itself.

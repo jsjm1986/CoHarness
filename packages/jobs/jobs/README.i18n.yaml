@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/jobs/jobs/README.md
 document:
-  en: fefc165a41239fc9a5776b988f5dcff4fc1e1713
-  zh: 6f9a77164c2d9cf5fce9a0378caef85477a633f0
+  en: e1e86556756e0414ef35b4c49632d57cb67ccdba
+  zh: fc742385b8aa2ad32c1ad846f1c7704cf9aa4013
 /:
   en: 4055a3bc920e4ac2
   zh: 3bc99f3b5bc2fd71
 /deepseek-ai-dsh-jobs:
-  en: c767d73501da4cf7
-  zh: b429afbccc2fde1a
+  en: f55b084ef482a706
+  zh: 4b8d57f2fb092dab
 /deepseek-ai-dsh-jobs/summary:
   en: eea29995f4b49a6d
   zh: acdded5ddee3a974
@@ -45,8 +45,8 @@ document:
   en: 75edabaddba43364
   zh: f53e4d27ceec9a6f
 /deepseek-ai-dsh-jobs/understand-the-implementation/service-operations:
-  en: b2e4ef34ccf1e749
-  zh: 128b57b57ed09316
+  en: 3808d87b49b8d9c4
+  zh: cc87a80a58dc1d65
 /deepseek-ai-dsh-jobs/further-exploration:
   en: 14a42f5debabd3ea
   zh: 16a60585a7280ccf

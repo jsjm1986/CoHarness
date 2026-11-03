@@ -460,3 +460,13 @@ describe('subagent interrupt Remote', () => {
     })
   })
 })
+
+it.each(['', '   '])('refuses browser child input without text or attachments before delivery: %j', async (text) => {
+  const { ctx, subagents } = await bench()
+  const delivered = promptDelivery(subagents)
+  try {
+    await expect(subagents.prompt({ ...promptRequest(), content: [{ type: 'text', text }] }, signal))
+      .rejects.toMatchObject({ code: 'gateway/bad-request', message: 'prompt content must include non-whitespace text or an attachment' })
+    expect(delivered).not.toHaveBeenCalled()
+  } finally { await ctx.fiber.dispose() }
+})

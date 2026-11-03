@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/web/web-search-perplexity/README.md
 document:
-  en: 0c994e03d6ac11d025b33f0702f44f2f82700c46
-  zh: e6b9fb96ba014a3a969c0763cc4cdb42292c93b4
+  en: d97254ae94f66ec540b804638146339d37a6dc6d
+  zh: 3b7f1ff2595d2fc82dce19509681c5f73b647782
 /:
   en: adef18a007306f8b
   zh: 61495d48365178df
 /deepseek-ai-dsh-web-search-perplexity:
-  en: 23128b625e84dc3f
-  zh: d478b0d5e351317d
+  en: 3ef51792bbf9ba2a
+  zh: 1259a4f31bde6626
 /deepseek-ai-dsh-web-search-perplexity/summary:
   en: 355bf2550d1655df
   zh: c659fa3e25a02d91
@@ -18,8 +18,8 @@ document:
   en: 10020f1de3e6ebda
   zh: 3dd6e2767271917d
 /deepseek-ai-dsh-web-search-perplexity/config:
-  en: 4283e6a5f592070a
-  zh: 4130448a46cd912b
+  en: 4eae83078eb5214b
+  zh: f26b014fce95cc07
 /deepseek-ai-dsh-web-search-perplexity/mapping:
   en: e9d0a972b4b2cfb9
   zh: ce0cb708fdca4f3b
@@ -30,11 +30,11 @@ document:
   en: 9d564a5863828a46
   zh: 143112cfc85fe3f3
 /deepseek-ai-dsh-web-search-perplexity/model-experience/auxiliary-perplexity-request/what-the-model-sees:
-  en: eacb10a5e907e796
-  zh: 74fbd30db7c983a1
+  en: a3cdb5be1574060f
+  zh: eed2fe2027a63f43
 /deepseek-ai-dsh-web-search-perplexity/model-experience/auxiliary-perplexity-request/token-effect:
-  en: 5f5b2bf40168d371
-  zh: 25bc3b50bc74ff20
+  en: 2742a543676791a5
+  zh: ea83eb2d66390f6b
 /deepseek-ai-dsh-web-search-perplexity/model-experience/auxiliary-perplexity-request/kv-cache-effect:
   en: ca308291b52b8028
   zh: 12e8f89f79a2756c
@@ -51,8 +51,8 @@ document:
   en: f5d5f97a153f7c70
   zh: 003f251b4beef2b9
 /deepseek-ai-dsh-web-search-perplexity/known-limitations-and-deferred-work:
-  en: 814ae51c0de9136c
-  zh: a6fdc4b3ac55f098
+  en: 1e4860ebbb6aac40
+  zh: 858c83278c8e7ac8
 /deepseek-ai-dsh-web-search-perplexity/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

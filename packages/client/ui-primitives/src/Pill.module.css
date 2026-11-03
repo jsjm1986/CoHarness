@@ -21,8 +21,10 @@
       var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
-.interactive:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .interactive:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .active {

@@ -1,0 +1,14 @@
+{
+  "name": "native-search-publint",
+  "cwd": ".",
+  "command": "pnpm exec publint packages/web/web-search-deepseek",
+  "startedAt": "2026-10-24T03:49:28.075840+00:00",
+  "seconds": 4.297,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a63e35021964698d547d7f0ba328ef695538954de713b87a6f31dc8e27465548",
+  "inputsAfter": "a63e35021964698d547d7f0ba328ef695538954de713b87a6f31dc8e27465548",
+  "postgresToolDirectory": null,
+  "outputSha256": "63353cd517a06968566b7976f8fcc86776e193fc0b2b70d62245865d6527c14d",
+  "outputTail": "Running publint v0.3.24 for @deepseek-ai/dsh-web-search-deepseek...\nPacking files with `pnpm pack`...\nLinting...\nWarnings:\n1. pkg.exports[\"./src/*\"] is ./src/* but does not match any files.\n"
+}

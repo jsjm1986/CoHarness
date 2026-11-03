@@ -17,7 +17,7 @@ function fakeCollaboration(participant: CollaborationParticipant | undefined) {
   return {
     capture: () => {
       if (participant === undefined) throw new CollaborationError('forbidden')
-      return { participant }
+      return { participant, expiresAt: Date.now() + 30_000, signal: new AbortController().signal }
     },
   }
 }

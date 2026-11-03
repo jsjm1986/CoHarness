@@ -1,0 +1,14 @@
+{
+  "name": "sdk-ssh-host-fallback-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-dsh-sdk/tests/subagent-dsh-sdk.spec.ts -t 'refuses an SSH-bound owner' --retry=0",
+  "startedAt": "2026-10-24T17:37:03.396700+00:00",
+  "seconds": 5.216,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e0d8d9e6530c765be915bb9d52e7c05fa7ca7cffe6130a896ac75f5f8f78b244",
+  "inputsAfter": "e0d8d9e6530c765be915bb9d52e7c05fa7ca7cffe6130a896ac75f5f8f78b244",
+  "postgresToolDirectory": null,
+  "outputSha256": "dfd93c16a5abfe132a10191c4cf21d1856989b498bed865a44d90bab184582a9",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/subagent/subagent-dsh-sdk/tests/subagent-dsh-sdk.spec.ts (46 tests | 1 failed | 45 skipped) 73ms\n   × refuses an SSH-bound owner before allocating a local SDK runtime 72ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/subagent/subagent-dsh-sdk/tests/subagent-dsh-sdk.spec.ts > refuses an SSH-bound owner before allocating a local SDK runtime\nAssertionError: expected true to be false // Object.is equality\n\n- Expected\n+ Received\n\n- false\n+ true\n\n ❯ packages/subagent/subagent-dsh-sdk/tests/subagent-dsh-sdk.spec.ts:702:30\n    700|     descriptor: snapshotSubagentDescriptor({ mode: 'one-shot', provide…\n    701|   }).then(async (run) => { try { await run.result } finally { await ru…\n    702|   expect(existsSync(marker)).toBe(false)\n       |                              ^\n    703|   expect(outcome).toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })\n    704| })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 45 skipped (46)\n   Start at  01:37:06\n   Duration  1.58s (transform 1.15s, setup 34ms, import 1.39s, tests 73ms, environment 0ms)\n\n"
+}

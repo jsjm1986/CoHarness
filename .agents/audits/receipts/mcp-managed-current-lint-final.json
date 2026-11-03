@@ -1,0 +1,13 @@
+{
+  "name": "mcp-managed-current-lint-final",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/mcp/mcp-client/src/managed-stdio.ts packages/mcp/mcp-client/src/transport.ts packages/mcp/mcp-client/src/connection.ts packages/mcp/mcp-client/src/index.ts packages/mcp/mcp-client/tests/resource-admission.spec.ts packages/mcp/mcp-client/tests/managed-stdio.spec.ts packages/mcp/mcp-client/tests/reconnect.spec.ts packages/mcp/mcp-client/tests/apply.spec.ts packages/mcp/mcp-client/tests/mcp-client.spec.ts packages/experimental/browser-use-runtime/src/mcp.ts packages/experimental/browser-use-runtime/tests/mcp.spec.ts",
+  "startedAt": "2026-10-23T17:04:49.705821+00:00",
+  "seconds": 3.217,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0008efa54d18a6fd55948f676e9154857c0285fe690f369f5a4f06ee299fefa3",
+  "inputsAfter": "242b98400e9d9fb9dcf1cffe6d5decc42009d9a10195d63558fed5871da6a821",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

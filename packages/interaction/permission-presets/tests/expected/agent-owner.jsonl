@@ -1,0 +1,3 @@
+{"operation":"active-permission-owner","result":"preset auto","current":"auto"}
+{"operation":"disposed-permission-owner","result":"refused","permissionWrites":0,"commandResult":"error","message":"permission: the command's Agent is no longer active"}
+{"operation":"replaced-permission-owner","result":"refused","permissionWrites":0,"commandResult":"error","message":"permission: the command's Agent is no longer active","replacementPreset":"workspace-write"}

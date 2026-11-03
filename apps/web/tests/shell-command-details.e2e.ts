@@ -113,6 +113,12 @@ it('expands a background Bash launch to selectable arguments and its original ac
         await card.evaluate((element) => { element.style.width = '' })
       }
       await page.emulateMedia({ colorScheme: null })
+      await expect.poll(() => input.evaluate(element => ({
+        overflow: element.scrollWidth > element.clientWidth,
+        tabIndex: element.getAttribute('tabindex'),
+        role: element.getAttribute('role'),
+        label: element.getAttribute('aria-label'),
+      }))).toEqual({ overflow: true, tabIndex: '0', role: 'group', label: 'Command arguments' })
       await compareOrRefreshGolden(EXPECTED,
         await captureStableAria(page, '[data-chat-call-id="shell-command-details-background"]', scaffold.workspaceCwd), webSnapshotMode())
       expect(tripwire.pageErrors).toEqual([])

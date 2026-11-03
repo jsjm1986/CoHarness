@@ -105,6 +105,21 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
+    key: 'connection',
+    pkg: 'client-connection',
+    title: 'Host RPC transport and request authentication',
+    mode: 'core',
+    consumers: ['api-gateway', 'host-apiproxy'],
+    note: 'Registers typed RPC handlers and request-context middleware on the Web listener, with deployment authentication before business dispatch.',
+  },
+  {
+    key: 'resourceBudget',
+    pkg: 'resource-budget',
+    title: 'Node resource permit definition',
+    mode: 'seam',
+    note: 'Declares permit requests and quiescence reporting. Provider composition and execution support are listed in the [package limitations](../packages/context/resource-budget/README.md#known-limitations-and-deferred-work).',
+  },
+  {
     key: 'cotTranslation',
     pkg: 'experimental-client-ui-cot-translation',
     title: 'Reasoning translation Remote',
@@ -238,6 +253,15 @@ const SERVICE_ROLES: ServiceRole[] = [
     implementations: ['experimental-browser-use-playwright-mcp', 'experimental-browser-use-chrome-devtools-mcp', 'experimental-browser-use-stagehand-native'],
     consumers: ['experimental-browser-use-playwright-mcp', 'experimental-browser-use-chrome-devtools-mcp', 'experimental-browser-use-stagehand-native'],
     note: 'One provider-owned name per service instance. Providers own their tools and browser resources per live Session; the shared service has no browser operation API.',
+  },
+  {
+    key: 'computerUseEnvironment',
+    pkg: 'computer-use',
+    title: 'Desktop environment availability',
+    mode: 'core',
+    implementations: ['gateway-execution'],
+    consumers: ['computer-use', 'apiproxy'],
+    note: 'Read-only environment limitations do not reserve a driver or grant desktop authority. A registered provider determines its own availability.',
   },
   {
     key: 'computerUseAuthorization',

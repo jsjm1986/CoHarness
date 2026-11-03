@@ -24,6 +24,10 @@ Gateway Runtime marks the application as requiring execution authority. The requ
 
 Consumers compare underlying Cordis provider identity across asynchronous authorization. Fresh tracing proxies retain the same provider identity; a removed or replaced provider invalidates the pending operation. Calls still use their traced receiver so scope and resource ownership remain intact.
 
+Each pending permission check retains user and project invalidations until its response settles. A matching invalidation refuses an earlier response even when its Agent is idle and has no registered job or tool call. Unrelated users' invalidations do not revoke the checked execution. This per-call lifetime does not retain a permission cache across requests.
+
+Session registration belongs to the provider and is shared by callers of that Session. An operation can stop waiting without cancelling another caller's registration. Authorization and relay refuse an already-cancelled operation before registration; authorization and message entry forward their signal to inheritance restoration. Cancelled preparation cannot dispatch the following operation.
+
 ## Alternatives considered
 
 **Authorize the latest visible participant.** A later edit or child response would erase earlier restrictions. Accumulation preserves all relevant human contributors.
@@ -33,6 +37,8 @@ Consumers compare underlying Cordis provider identity across asynchronous author
 **Trust inherited references as credentials.** Serialized references can be copied. The Gateway verifies their runtime, Session lineage, immutable input facts, and current access before allowing work.
 
 **Put Gateway transport in every consumer.** It duplicates identity rules and couples local orchestration to deployment details. The lightweight definition carries restrictions while the provider owns their verification.
+
+**Cancel a shared registration with its first caller.** Another live operation may need that same registration. The provider owns the shared task; each caller owns only its wait.
 
 ## Consequences
 

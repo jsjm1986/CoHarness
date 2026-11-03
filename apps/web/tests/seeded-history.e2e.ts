@@ -14,7 +14,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
-import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFailed, onTestFinished, vi } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, Message } from '@deepseek-ai/dsh-llm'
 import { deriveEventMessage, SessionId } from '@deepseek-ai/dsh-session'
@@ -356,6 +356,10 @@ describe('web e2e: seeded history renders through cold resume', () => {
     expect(collapsedIconBox?.height).toBe(14)
 
     await disclosure.click()
+    onTestFinished(async () => {
+      if (await disclosure.getAttribute('aria-expanded') === 'true') await disclosure.click()
+      await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('false')
+    })
     await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('true')
     const body = page.locator('[data-context-injection-body]')
     await body.waitFor({ timeout: 5_000 })
@@ -396,15 +400,13 @@ describe('web e2e: seeded history renders through cold resume', () => {
     expect(style).toEqual({
       backgroundColor: 'rgb(249, 250, 251)',
       borderRadius: '8px',
-      color: 'rgb(113, 117, 124)',
+      color: 'rgb(97, 102, 107)',
       fontSize: '11px',
       lineHeight: '16px',
       padding: ['10px', '16px', '12px', '12px'],
       scrolls: true,
     })
 
-    await disclosure.click()
-    await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('false')
   })
 
   it.skipIf(MODE === 'record')('file-path tool rows rebuilt from the cold log stay details-inert', async () => {

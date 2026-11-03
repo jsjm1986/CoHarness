@@ -16,7 +16,7 @@ This decision extends [user-uploaded documents as real files](2026-08-14-user-up
 
 ### Storage and migration
 
-`LocalUserDocStore` initializes on the first storage operation. For the default root, it serializes migration with one in-process promise and an owner-recorded filesystem lock. If `<home>/uploads` is absent, initialization creates `documents`. If `documents` is absent, migration renames the complete `uploads` tree directly. If both exist, migration recursively merges them without replacing any entry; collisions receive the same bounded ` (2)` suffix as uploads. Unsupported legacy entries, overlapping roots, and symbolic legacy roots fail with `DOCUMENT_MIGRATION_FAILED`.
+`LocalUserDocFs` initializes on the first storage operation and coalesces that engine's initialization. Independent engines and processes serialize migration with the shared atomic-write owner-recorded filesystem lock. A newly created but incomplete owner record cannot be interpreted as an absent process; only a complete record with a proven-exited owner permits takeover. Acquisition is bounded and failed initialization can be retried. If `<home>/uploads` is absent, initialization creates `documents`. If `documents` is absent, migration renames the complete `uploads` tree directly. If both exist, migration recursively merges them without replacing any entry; collisions receive the same bounded ` (2)` suffix as uploads. Unsupported legacy entries, overlapping roots, and symbolic legacy roots fail with `DOCUMENT_MIGRATION_FAILED`.
 
 Successful migration removes the legacy root and leaves no compatibility symlink. Absolute paths recorded before migration may therefore stop resolving, while their files remain under the corresponding relative location in `documents`. This is an accepted pre-release on-disk change rather than a permanent two-root compatibility promise.
 
@@ -26,19 +26,31 @@ Successful migration removes the legacy root and leaves no compatibility symlink
 
 `UserDocStore` exposes immediate directory listing, recursive destination listing, folder create/rename, empty-folder deletion, and document move in addition to its existing document operations. Moves publish without replacing an occupied name, and folder deletion never recurses. Renaming a directory or moving a document changes its root-relative id and absolute path, so older references may become stale exactly as they do when ordinary files are reorganized outside the UI.
 
+Managed identity storage captures a selected directory below its protected retained-object root before publishing a new ordinary path. The journal records the selected directory object as well as the complete authorized file inventory; a moved marker alone cannot establish directory identity. Capture and publication each use an exclusive native rename between retained parents. A substituted source returns exclusively to its original path, while an occupied path preserves the private copy and both failure causes. Durable capture evidence distinguishes unpublished intent from an uncertain publication after restart. Schema 2 intents without directory-object evidence remain conservative until a known source or destination is verified.
+
+The admitted file inventory is verified in private storage. After publication, directory-object evidence identifies the completed rename while atomic saves, new files, deletions and child moves reconcile as subsequent ordinary observations. Retrying an immutable public inventory would block recovery indefinitely after a normal editor save. The rename retains its initiator and original document creators; replacement files receive independent unattributed incarnations. Legacy intents without a recorded directory object keep complete-inventory verification.
+
+Cancellation retains private marker anchors when ordinary editors have moved their public links elsewhere. Reads, scans and later directory selections reclaim only marker links matching those protected anchors; similarly named user files remain ordinary documents. Verified backup restore rebuilds these marker links from original object witnesses, retaining that proof after file copies. This preserves restart and fresh retry without granting a filename authority to delete data.
+
 The Host owns the `/api/documents` routes and stable error mapping. The browser manager owns breadcrumbs, folder commands, current-folder upload, and single or batch move. The gateway only provisions a new personal user's `documents` directory; project and standalone roots remain provider-owned so account management does not write into an external or read-only project before the runtime uses document storage.
 
 ## Verification
 
-Local-provider tests pin direct migration, collision-preserving merge, concurrent in-process reuse, overlap and symlink rejection, traversal and directory-symlink containment, empty-only deletion, and no-replace moves. Host tests cover every folder route and the new error-code statuses. Component and keyless Web tests cover folder navigation, current-folder upload, create/rename/delete, single and batch move, and compact row geometry.
+Local-provider tests pin direct migration, collision-preserving merge, concurrent engine serialization, refusal without mutation for live or incomplete lock records, proven-dead owner recovery, overlap and symlink rejection, traversal and directory-symlink containment, empty-only deletion, and no-replace moves. Host tests cover every folder route and the new error-code statuses. Component and keyless Web tests cover folder navigation, current-folder upload, create/rename/delete, single and batch move, and compact row geometry.
+
+The keyless Loader snapshot exercises refusal and retry through the composed document service with real files. Filesystem failure tests retain original bytes after failed publication, source removal, rollback, or directory rename and preserve documents when a target directory appears during migration.
 
 ## Alternatives considered
+
+**Maintain a separate migration-lock protocol and process-global promise cache.** A migration-specific implementation duplicates owner-record parsing and takeover coordination; interpreting an incomplete record as an absent owner admits concurrent writers. The shared atomic-write lock owns those rules, while each filesystem engine owns its initialization promise and releases that state with its runtime.
 
 **Keep `<home>/uploads` as the permanent root or leave a compatibility symlink.** Rejected because the product exposes a document workspace, not an upload staging area. Two names for one tree complicate containment and operator cleanup, while preserving old absolute paths would turn a pre-release implementation detail into a durable compatibility promise.
 
 **Represent folders in sidecar metadata while keeping a flat filesystem.** Rejected because the agent's ordinary tools would see a different organization from the browser and metadata could drift from files changed outside the UI. Real directories keep one source of truth.
 
 **Allow overwrite moves or recursive folder deletion.** Rejected because both operations can destroy documents through one mistaken target selection. Conflict and non-empty errors require users to resolve the affected entries explicitly.
+
+**Repeat lexical checks before direct publication.** A source leaf can change after the final observation. Retaining parent handles prevents traversal through replacement parents but cannot condition a native rename on the source leaf's inode. Protected capture permits identity verification before public publication.
 
 ## Consequences
 

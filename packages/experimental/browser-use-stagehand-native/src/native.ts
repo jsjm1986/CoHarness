@@ -1,38 +1,33 @@
 /** Native Stagehand operations run inside one isolated browser Worker. */
 
-import { StagehandClientCreateConfigSchema } from '@browserbasehq/stagehand'
-import type { ModelConfig, Page, StagehandBrowser } from '@browserbasehq/stagehand'
+import type { ClientLLM, Page, StagehandBrowser } from '@browserbasehq/stagehand'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import { z } from 'zod'
+import { installedStagehandExtension } from './extension.ts'
 
-/** Profile-owned model settings accepted by the pinned Stagehand SDK. */
+/** Registered host model route used independently of the Session's main model. */
 export interface StagehandModelConfig {
-  /** Provider-prefixed model name from Stagehand's supported model catalog. */
-  modelName: ModelConfig['modelName']
-  /** Explicit API key sent to Stagehand's browser extension. */
-  apiKey: string
-  /** Additional headers sent with the extension's model requests. */
-  headers?: Record<string, string>
+  /** Registered Harness provider; its normal credentials and authorization apply. */
+  provider: string
+  /** Exact model id exposed by that provider. */
+  model: string
+  /** Optional output cap; omission uses the registered provider's default. */
+  maxTokens?: number
 }
 
-/** Explicit credentials for one model supported by the pinned Stagehand SDK. */
+/** Explicit host model route; extension-owned credentials are rejected. */
 export const stagehandModelSchema = z.object({
-  modelName: z.string(),
-  apiKey: z.string().refine(value => value.trim().length > 0, 'Stagehand requires a nonblank model API key'),
-  headers: z.record(z.string(), z.string()).optional(),
-}).strict().transform((model): StagehandModelConfig => {
-  StagehandClientCreateConfigSchema.parse({ model })
-  // The native-only fields above exclude the SDK's callback-model alternative.
-  return {
-    modelName: model.modelName as ModelConfig['modelName'],
-    apiKey: model.apiKey,
-    ...model.headers === undefined ? {} : { headers: model.headers },
-  }
-})
+  provider: z.string().min(1).refine(value => value === value.trim(), 'Stagehand provider must have no surrounding whitespace'),
+  model: z.string().min(1).refine(value => value === value.trim(), 'Stagehand model must have no surrounding whitespace'),
+  maxTokens: z.number().int().positive().optional(),
+}).strict().transform((route): StagehandModelConfig => ({
+  provider: route.provider, model: route.model,
+  ...route.maxTokens === undefined ? {} : { maxTokens: route.maxTokens },
+}))
 
 /** Resolved browser options accepted by the native runtime and attachment worker. */
 export interface NativeBrowserConfig {
-  /** Explicit model credentials passed to Stagehand's browser extension. */
+  /** Non-secret host route; generation is delegated through the host callback. */
   model: StagehandModelConfig
   /** Whether the runtime owns Chromium or only its connection. */
   mode: 'launch' | 'attach'
@@ -87,18 +82,21 @@ export interface NativeBrowserRuntime {
 }
 
 /**
- * Open the pinned SDK using its public initialization and native model configuration.
+ * Open the pinned SDK using its public client-side model callback.
  * The host owns launched Chromium separately; this Worker owns only its CDP connection.
  * @param config - resolved profile-owned browser options.
+ * @param model - validated callback that delegates each inference to its host owner.
  * @returns the native operation runtime after initialization completes.
  */
-export async function openNativeBrowser(config: NativeBrowserConfig): Promise<NativeBrowserRuntime> {
+export async function openNativeBrowser(config: NativeBrowserConfig, model: ClientLLM): Promise<NativeBrowserRuntime> {
   const { Stagehand, localBrowser } = await import('@browserbasehq/stagehand')
+  const endpoint = z.string().parse(config.cdpEndpoint)
+  const extensionId = config.extensionId ?? await installedStagehandExtension(endpoint, config.operationTimeoutMs)
   const browser = await localBrowser.connect({
-    cdpUrl: z.string().parse(config.cdpEndpoint),
-    ...config.extensionId === undefined ? {} : { extensionId: config.extensionId },
+    cdpUrl: endpoint,
+    ...extensionId === undefined ? {} : { extensionId },
   })
-  const stagehand = await Stagehand.create({ browser, model: config.model, logging: { level: 'off' } })
+  const stagehand = await Stagehand.create({ browser, model, logging: { level: 'off' } })
   return {
     close: () => stagehand.close(),
     async execute(method, rawArgs) {

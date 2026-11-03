@@ -1,0 +1,148 @@
+{
+  "findings": [],
+  "reservedNextFindingId": "B425",
+  "status": "named_interactive_resource_business_cases_verified_no_new_runtime_bug",
+  "updatedAt": "2026-11-01T03:06:32.712780+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z",
+  "sourcePaths": [
+    "gateway/tests/runtime-resource-provider.spec.ts"
+  ],
+  "sourceHash": "888d422b7b7f46145f4094aada9564fd118673b1a7406812729d229ebf09f148",
+  "runtimeSourceChanged": false,
+  "newTestCases": 4,
+  "newTestStatus": "verified",
+  "businessRulesVerifiedBySource": [
+    "Advisory token quotas notify rather than reject by design.",
+    "Managed cold auxiliary requests without an executing Agent are explicitly unattributed by design.",
+    "Host centrally authorizes cotTranslation/translate request.sessionId for write access.",
+    "Resource status requalification returns per-operation refusal for revoked callers, rather than failing the entire mixed-account batch."
+  ],
+  "database": {
+    "ownershipReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/owned-postgres-resumed.json",
+    "freshDatabaseReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/disposable-database.json",
+    "historyObservation": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/owned-database-history-observation.json",
+    "originalDatabaseRetained": true,
+    "currentPort": 58151
+  },
+  "verification": {
+    "distinctIntegrationCases": 34,
+    "newCases": 4,
+    "providerCases": 21,
+    "apiCases": 13,
+    "nodeVersions": [
+      "22.22.1",
+      "25.8.1"
+    ],
+    "repeatedVersionRunsNotAddedToDistinctCount": true,
+    "passedChecks": [
+      {
+        "name": "interactive-resource-new-cases",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/interactive-resource-new-cases.json"
+      },
+      {
+        "name": "interactive-resource-full",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/interactive-resource-full.json"
+      },
+      {
+        "name": "interactive-resource-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/interactive-resource-node22.json"
+      },
+      {
+        "name": "interactive-resource-final-coverage",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/interactive-resource-final-coverage.json"
+      },
+      {
+        "name": "interactive-resource-final-node22",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/interactive-resource-final-node22.json"
+      },
+      {
+        "name": "interactive-resource-final-test-types-fixed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/interactive-resource-final-test-types-fixed.json"
+      },
+      {
+        "name": "interactive-resource-final-lint",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/interactive-resource-final-lint.json"
+      },
+      {
+        "name": "interactive-resource-origin-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/interactive-resource-origin-final.json"
+      },
+      {
+        "name": "interactive-resource-final-default",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/interactive-resource-final-default.json"
+      }
+    ],
+    "existing17TestBodiesUnchanged": true,
+    "privateSourcePreservation": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/existing-tests-preservation.json",
+    "runtimeCoverage": {
+      "lines": {
+        "total": 229,
+        "covered": 202,
+        "skipped": 0,
+        "pct": 88.2
+      },
+      "functions": {
+        "total": 54,
+        "covered": 46,
+        "skipped": 0,
+        "pct": 85.18
+      },
+      "statements": {
+        "total": 290,
+        "covered": 236,
+        "skipped": 0,
+        "pct": 81.37
+      },
+      "branches": {
+        "total": 177,
+        "covered": 127,
+        "skipped": 0,
+        "pct": 71.75
+      }
+    },
+    "coverageScope": "Additional nongating measurement of one provider under this real HTTP/PG selection, not aggregate CI coverage. All interactive-origin decision counters execute; whole provider remains incomplete. No threshold or exclusion changed.",
+    "branchEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/interactive-origin-branch-evidence.json",
+    "remainingCoverage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/provider-remaining-coverage.json",
+    "discardedEmptyCoverageReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/interactive-resource-coverage.json",
+    "emptyCoverageExplanation": "Relative outside-project include selected0 files. The absolute include with allowExternal measures the actual provider;0/0 is not coverage evidence.",
+    "testFixtureTypingCorrection": "Archive principal signer receives the full legitimate fixture UserRow, rather than the narrower signed claims.",
+    "knownDependencyFailuresPreserved": [
+      "interactive-resource-baseline",
+      "interactive-resource-clean-baseline"
+    ],
+    "scope": "Real Gateway resource HTTP/PG plus concrete Cordis resource provider; this is not a browser/native-production acceptance run or a new production runtime fix.",
+    "exactFinalSourcePassedOnBothVersions": true
+  },
+  "actualBaselineResult": "Initial old internal-development database refuses known B348 historical59/61 identities; fresh current-schema run has16 provider tests pass and1 missing-node-pty failure, then the next fork fails because @vitest/spy disappears. These are not complete suite passes.",
+  "dependencyObservation": {
+    "status": "restored_and_independently_verified_by_resumed_resource_tests",
+    "peerRecoveryManifest": ".artifacts/full-real-task-20261031/r24-shared-dependency-restoration.json",
+    "peerNativeResolutionManifest": ".artifacts/full-real-task-20261031/r24-restored-dependency-native-resolution.json",
+    "source": "Peer restored root dependencies from complete R23 via APFS COW; peer reports no lock/install/native-rebuild change. Root normal/Node22 resource suites and real terminal cases pass after restoration.",
+    "rootDependencyMutation": false,
+    "disappearanceCause": "not established; no causal blame inferred from cache cleanup timing."
+  },
+  "baseline": {
+    "remote": "origin/master",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/interactive-resource-origin-final.json",
+    "fetchedAt": "2026-11-01T03:03:20.811868+00:00",
+    "dirtyWorkspacePreserved": true
+  },
+  "next": "Run the three authored real HTTP/PG account-origin cases and both existing resource suites after the peer supplies a dependency recovery stable point; fix confirmed runtime defects, retain no-new-bug findings where behavior matches design.",
+  "wholeProjectReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T023510Z/interactive-resource-capsule.json",
+  "newRuntimeBugConfirmed": false,
+  "remaining": [
+    "Continue real resource-provider abnormal-response, origin-resolution, queue/metadata limits, cancellation and cleanup-deadline paths using provider-remaining-coverage.json as a scoped gap list. No whole-file or whole-domain completion follows from the34 cases.",
+    "Keep cold managed auxiliary requests explicitly unattributed unless valid executing proof exists; advisory token quotas notify by current design. Continue actual consumer authorization and user/computer revocation review without inventing browser-derived execution witnesses.",
+    "Continue project/document directory races and remaining account/computer/model/tool/workflow/Inspector business rules outside peer-owned files. All12 domains and B04/B25 remain open; next actual finding id remains B425.",
+    "Peer retains independent R24 transport/review-error release ownership; B416-B424 keep separate matching integration requirements, especially B417 required-on-read reader acceptance.",
+    "Official paid Responses verification remains deferred. No production deployment, native dependency rebuild or runtime source change in this review."
+  ],
+  "documentationDecision": "Test-only local fixture and coverage additions preserve runtime/API/Session/schema behavior; no new product snapshot, upgrade guide or duplicate Agent Note is needed."
+}

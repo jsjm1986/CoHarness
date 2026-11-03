@@ -35,7 +35,8 @@ export interface WorkflowStartRequest {
 
 /**
  * Holder-owned live workflow. `result` never rejects; consumers may cancel
- * and must call idempotent `dispose()` to await script and child quiescence.
+ * and must call `dispose()` to await script and child quiescence. Concurrent
+ * disposal calls share an attempt; a failed attempt retains cleanup for retry.
  */
 export interface WorkflowRun {
   readonly id: WorkflowRunId
@@ -44,6 +45,13 @@ export interface WorkflowRun {
   readonly result: Promise<WorkflowResult>
   /** Cancel the run and its children. */
   cancel(reason?: string): void
-  /** Cancel if needed and await script and child cleanup. */
+  /** Cancel if needed and await script and child cleanup; reject while cleanup remains unconfirmed. */
   dispose(): Promise<void>
+  /**
+   * Hand rejected disposal to its original resource owner before discarding the
+   * run. Holder-owned background work keeps its own retry controls.
+   * Observe confirmation outside the failing foreground call.
+   * @returns fulfillment after retained cleanup confirms quiescence.
+   */
+  retainFailedCleanup(): Promise<void>
 }

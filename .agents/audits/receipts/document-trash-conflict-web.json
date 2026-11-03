@@ -1,0 +1,14 @@
+{
+  "name": "document-trash-conflict-web",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config vitest.web.config.ts apps/web/tests/document-manager.e2e.ts -t 'real reused-path|snapshot inventory' --retry=0",
+  "startedAt": "2026-10-25T05:05:33.952682+00:00",
+  "seconds": 6.452,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b7a2d39e65b5d7fe462e5fe4ed1e6cc332ab1b039decbfceff0de918d44dead9",
+  "inputsAfter": "b7a2d39e65b5d7fe462e5fe4ed1e6cc332ab1b039decbfceff0de918d44dead9",
+  "postgresToolDirectory": null,
+  "outputSha256": "22c11fd6553c1602228d842d7c0119da2915ad5a015cdace6fae0d0860992659",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ apps/web/tests/document-manager.e2e.ts (11 tests | 11 skipped) 929ms\n\n⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  apps/web/tests/document-manager.e2e.ts > web e2e: document manager\nError: browserType.launch: Executable doesn't exist at /Users/a1234/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝\n ❯ apps/web/tests/document-manager.e2e.ts:86:30\n     84|   beforeAll(async () => {\n     85|     scaffold = await launchWebScaffold({})\n     86|     browser = await chromium.launch()\n       |                              ^\n     87|   }, 120_000)\n     88|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  11 skipped (11)\n   Start at  13:05:36\n   Duration  3.52s (transform 1.58s, setup 0ms, import 2.48s, tests 929ms, environment 0ms)\n\n"
+}

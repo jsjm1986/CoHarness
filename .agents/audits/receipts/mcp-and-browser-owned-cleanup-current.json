@@ -1,0 +1,13 @@
+{
+  "name": "mcp-and-browser-owned-cleanup-current",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/mcp/mcp-client/tests packages/experimental/browser-use-runtime/tests packages/experimental/browser-use-playwright-mcp/tests packages/experimental/browser-use-chrome-devtools-mcp/tests --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-23T16:26:58.290657+00:00",
+  "seconds": 7.475,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "dc8ab03377d9e1d08a802b306b931525f70412b6050515555af7643b427523c1",
+  "inputsAfter": "dc8ab03377d9e1d08a802b306b931525f70412b6050515555af7643b427523c1",
+  "outputSha256": "52acba6a545aebf2309c0fe419c9093e30d512187e979c36c66837f0aa6abd7e",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  16 passed (16)\n      Tests  173 passed (173)\n   Start at  00:27:00\n   Duration  5.32s (transform 1.53s, setup 169ms, import 3.66s, tests 5.53s, environment 1ms)\n\n"
+}

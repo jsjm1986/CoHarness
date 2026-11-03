@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-03-ssh-text-stream-allocation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-03-ssh-text-stream-allocation.md
+document:
+  en: 90976c195f2261d6e614f69187f837e2099e487d
+  zh: 10caf142d3b1c781c997910da2a0053c840fa99b
+/agent-note-ssh-text-streams-allocate-on-consumption:
+  en: da14eb9ffd9b9ac7
+  zh: 10760d6f2dac39f5
+/agent-note-ssh-text-streams-allocate-on-consumption/problem:
+  en: 7a2971508482fe22
+  zh: 8ae52d95e75bdbfd
+/agent-note-ssh-text-streams-allocate-on-consumption/decision:
+  en: decf98690688cf7c
+  zh: b42ae7473de64b02
+/agent-note-ssh-text-streams-allocate-on-consumption/alternatives-considered:
+  en: cd5d1f74b392d8ef
+  zh: 85b27305096b7b43
+/agent-note-ssh-text-streams-allocate-on-consumption/consequences:
+  en: c2fdeb2c6039f408
+  zh: c763fac8bf6c0b62
+/agent-note-ssh-text-streams-allocate-on-consumption/verification:
+  en: a184c9c70f58fdc9
+  zh: 41bf803672852996

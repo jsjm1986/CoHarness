@@ -1,0 +1,30 @@
+- group "更多字体设置":
+  - text: 字号大小 仅影响会话内容的字号 14
+  - button "减小字号" [disabled]:
+    - img
+  - button "增大字号" [disabled]:
+    - img
+  - text: px
+  - button "更多字体设置" [expanded]:
+    - img
+  - status: 项目空间设置由项目运行时管理，请切换到个人空间修改个人偏好。
+  - text: 正文字体 用于界面与会话正文。多个字体用逗号分隔，留空使用默认字体
+  - textbox "正文字体" [disabled]:
+    - /placeholder: 默认
+  - text: 代码字体 用于代码块、行内代码与工具输出。多个字体用逗号分隔，留空使用默认字体
+  - textbox "代码字体" [disabled]:
+    - /placeholder: 默认
+  - text: 代码字号 用于代码块、行内代码与工具输出 11
+  - button "减小代码字号" [disabled]:
+    - img
+  - button "增大代码字号" [disabled]:
+    - img
+  - text: px 终端字体 用于侧栏终端。多个字体用逗号分隔，留空使用默认字体
+  - textbox "终端字体" [disabled]:
+    - /placeholder: 默认
+  - text: 终端字号 用于侧栏终端 13
+  - button "减小终端字号" [disabled]:
+    - img
+  - button "增大终端字号" [disabled]:
+    - img
+  - text: px

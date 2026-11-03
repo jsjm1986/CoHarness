@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest'
 import { type SessionEvent } from '@deepseek-ai/dsh-session'
 import { runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
 
-const fixtureDir = new URL('./fixtures/loader/', import.meta.url)
+const fixtureDir = new URL('../../../../examples/jsonrpc-agent/tests/fixtures/subagent/subagent-dsh-sdk/', import.meta.url)
 const driver = fileURLToPath(new URL('driver.ts', fixtureDir))
 const configPath = fileURLToPath(new URL('dsh-sdk.patch.yml', fixtureDir))
 const childConfigPath = fileURLToPath(new URL('child.patch.yml', fixtureDir))

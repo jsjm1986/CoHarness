@@ -1,0 +1,14 @@
+{
+  "name": "governed-native-all-module-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/native-governance-coverage.config.mts --coverage --retry=0",
+  "startedAt": "2026-10-24T07:11:33.162518+00:00",
+  "seconds": 3.123,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1717521163cdb75ed6e3490c210a432bfcc770f221290774c2e56d213a4fbbe5",
+  "inputsAfter": "1717521163cdb75ed6e3490c210a432bfcc770f221290774c2e56d213a4fbbe5",
+  "postgresToolDirectory": null,
+  "outputSha256": "678c0ab506a9b6d52a5eb6613419fabe9342af61b5fbff4a8333cee4ca15ba8b",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  12 passed (12)\n      Tests  149 passed (149)\n   Start at  15:11:34\n   Duration  2.08s (transform 5.48s, setup 0ms, import 7.99s, tests 907ms, environment 1ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\nAll files          |   99.29 |    98.38 |     100 |   99.59 |                   \n ...h-deepseek/src |   99.05 |    98.02 |     100 |   99.45 |                   \n  admission.ts     |   96.29 |    92.68 |     100 |   97.91 | 65                \n  index.ts         |     100 |    96.29 |     100 |     100 | 105               \n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 99.29% ( 282/284 )\nBranches     : 98.38% ( 244/248 )\nFunctions    : 100% ( 64/64 )\nLines        : 99.59% ( 243/244 )\n================================================================================\nERROR: Coverage for branches (96.29%) does not meet global threshold (100%) for packages/web/web-search-deepseek/src/index.ts\nERROR: Coverage for lines (97.91%) does not meet global threshold (100%) for packages/web/web-search-deepseek/src/admission.ts\nERROR: Coverage for statements (96.29%) does not meet global threshold (100%) for packages/web/web-search-deepseek/src/admission.ts\nERROR: Coverage for branches (92.68%) does not meet global threshold (100%) for packages/web/web-search-deepseek/src/admission.ts\n"
+}

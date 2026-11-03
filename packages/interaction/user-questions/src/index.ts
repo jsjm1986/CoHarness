@@ -18,6 +18,7 @@ import type {} from '@deepseek-ai/dsh-session-projection'
 import z from '@deepseek-ai/schemastery'
 import { userQuestionProjectionDefinition } from './projection.ts'
 import { TimedQuestionWait } from './timed-wait.ts'
+import { executionAuthorityOf, sameExecutionAuthority } from '@deepseek-ai/dsh-execution-authority'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -73,32 +74,59 @@ function restoreUserQuestionError(reason: unknown): unknown {
   return reason
 }
 
-type QueuedReply = { messageId: MessageId; claimedTurn?: number }
+type QueuedReply = { messageId: MessageId; owner: Agent; claimedTurn?: number }
+
+/** One accepted foreground question and its logical settlement, independent of a late answerer. */
+interface ForegroundQuestion {
+  readonly agent: Agent | undefined
+  readonly controller: AbortController
+  readonly done: Promise<void>
+}
 
 /** `ctx.userQuestions`: validation plus the scoped answerer waterfall. */
 export class UserQuestionService extends TypertRemoteService {
   static Config = z.object({})
   private readonly waits = new Map<Agent, Map<ToolCallId, TimedQuestionWait>>()
   private readonly queuedReplies = new WeakMap<Session, Map<ToolCallId, QueuedReply>>()
+  private readonly foreground = new Set<ForegroundQuestion>()
+  private disposed = false
 
   constructor(ctx: Context) {
     super(ctx, 'userQuestions')
     ctx.inject(['sessionProjections'], (projectionCtx) => {
       projectionCtx.sessionProjections.register(userQuestionProjectionDefinition)
     })
-    ctx.effect(() => () => {
+    ctx.effect(() => async () => {
+      this.disposed = true
+      for (const question of this.foreground) question.controller.abort(abortedQuestion())
       for (const calls of this.waits.values()) {
         for (const wait of calls.values()) wait.close(abortedQuestion())
       }
       this.waits.clear()
+      await Promise.all([...this.foreground].map(question => question.done))
     }, 'userQuestions: foreground waits')
+    ctx.on('agent/idle-release-check', ({ agent }) => {
+      if (this.waits.has(agent) || [...this.foreground].some(question => question.agent === agent)) return 'busy'
+      const replies = this.queuedReplies.get(agent.session)
+      return replies !== undefined && [...replies.values()].some(reply => reply.owner === agent) ? 'busy' : undefined
+    }, { global: true })
+    ctx.on('agent/disposed', ({ agent }) => {
+      for (const question of this.foreground) {
+        if (question.agent === agent) question.controller.abort(new UserQuestionError(
+          'human interaction requires the exact live calling agent when an agent is supplied',
+          'CALLER_NOT_LIVE'))
+      }
+      const replies = this.queuedReplies.get(agent.session)
+      if (replies === undefined) return
+      for (const [callId, reply] of replies) if (reply.owner === agent) replies.delete(callId)
+    }, { global: true })
     ctx.on('agent/inbox/claimed', ({ agent, message, turn }) => {
       const source = message.source
       if (source.kind !== 'user-question-reply') return
       const calls = this.queuedReplies.get(agent.session) ?? new Map<ToolCallId, QueuedReply>()
       const reply = calls.get(source.callId)
       if (reply === undefined) {
-        calls.set(source.callId, { messageId: message.id, claimedTurn: turn })
+        calls.set(source.callId, { messageId: message.id, owner: agent, claimedTurn: turn })
         this.queuedReplies.set(agent.session, calls)
       } else if (reply.messageId === message.id) {
         reply.claimedTurn = turn
@@ -128,6 +156,11 @@ export class UserQuestionService extends TypertRemoteService {
     calls.delete(callId)
   }
 
+  /** Refuse new and resumed reply delivery after service withdrawal. */
+  private assertOpen(): void {
+    if (this.disposed) throw abortedQuestion()
+  }
+
   private assertLiveRoot(agent: Agent): void {
     const agents = this.ctx.get('agents')
     if (agents === undefined || agents.get(agent.id) !== agent) {
@@ -155,14 +188,17 @@ export class UserQuestionService extends TypertRemoteService {
    * @param agent - Live root agent for the owning Session.
    * @param callId - Continued question identity.
    * @param answer - Complete structured answer batch, one item per question of the call.
-   * @returns Whether the question is still continued; an accepted reply stays
+   * @param signal - Answer submission cancellation, including Client disconnect.
+   * @returns Whether the question is still continued after caller attestation; an accepted reply stays
    *   queued until the agent admits its user message.
    * @throws {UserQuestionError} `BAD_ANSWER` when the batch does not name each
    *   question of the call exactly once, or `REPLY_QUEUED` when a reply is
    *   already waiting for admission.
    */
   @Remote
-  answer(agent: Agent, callId: ToolCallId, answer: AskUserQuestionAnswer): boolean {
+  async answer(agent: Agent, callId: ToolCallId, answer: AskUserQuestionAnswer, signal: AbortSignal): Promise<boolean> {
+    signal.throwIfAborted()
+    this.assertOpen()
     this.assertLiveRoot(agent)
     const question = this.continued(agent).find(item => item.callId === callId)
     if (question === undefined) return false
@@ -183,7 +219,7 @@ export class UserQuestionService extends TypertRemoteService {
         `the answer batch for ${callId} must name each of its ${String(question.questions.length)} questions exactly once`,
         'BAD_ANSWER')
     }
-    const message = createUserMessage({
+    const proposed = createUserMessage({
       source: { kind: 'user-question-reply', callId, outcome: 'answered' },
       content: [{
         type: 'text',
@@ -194,12 +230,28 @@ export class UserQuestionService extends TypertRemoteService {
       }],
     })
     const calls = queued ?? new Map<ToolCallId, QueuedReply>()
-    calls.set(callId, { messageId: message.id })
+    calls.set(callId, { messageId: proposed.id, owner: agent })
     this.queuedReplies.set(agent.session, calls)
     try {
+      const authority = executionAuthorityOf(this.ctx)
+      const message = authority === undefined ? proposed : await authority.stamp(agent.session, proposed)
+      signal.throwIfAborted()
+      this.assertOpen()
+      this.assertLiveRoot(agent)
+      if (!sameExecutionAuthority(executionAuthorityOf(this.ctx), authority)) {
+        throw new UserQuestionError('question answer authorization changed before delivery', 'AUTHORITY_CHANGED')
+      }
+      if (this.continued(agent).find(item => item.callId === callId) !== question
+        || calls.get(callId)?.messageId !== proposed.id) {
+        this.releaseReply(agent.session, callId, proposed.id)
+        return false
+      }
+      if (agent.inbox.nextTurn.some(matches) || agent.inbox.nextStep.some(matches)) {
+        throw new UserQuestionError('a reply is already queued for this question', 'REPLY_QUEUED')
+      }
       agent.steer(message)
     } catch (error: unknown) {
-      this.releaseReply(agent.session, callId, message.id)
+      this.releaseReply(agent.session, callId, proposed.id)
       throw error
     }
     return true
@@ -214,6 +266,7 @@ export class UserQuestionService extends TypertRemoteService {
    */
   @Remote({ mode: 'stream' })
   async *attachWait(agent: Agent, callId: ToolCallId, signal: AbortSignal): AsyncIterable<{ remainingMs: number }> {
+    this.assertOpen()
     this.assertLiveRoot(agent)
     const wait = this.waits.get(agent)?.get(callId)
     if (wait !== undefined) yield* wait.attach(signal)
@@ -236,6 +289,7 @@ export class UserQuestionService extends TypertRemoteService {
     callId: ToolCallId,
     timeoutMs: number,
   ): Promise<TimedUserQuestionResult> {
+    this.assertOpen()
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647) {
       throw new UserQuestionError('timeout must fit a positive platform timer', 'BAD_TIMEOUT')
     }
@@ -276,15 +330,20 @@ export class UserQuestionService extends TypertRemoteService {
    * decides this boundary: an owned child has no human answerer and would
    * block forever, while a lineage-bearing session resumed as a new runtime
    * root may ask normally.
+   * Answerers receive a signal linked to caller cancellation, service withdrawal
+   * and disposal of that exact Agent. Pending questions prevent idle retirement.
+   * Each continuation and accepted answer rechecks the current caller; late
+   * answers cannot restore a cancelled question.
    *
    * @param request Questions, owner agent, and abort signal.
    * @returns The answer chosen or typed by the human.
    * @throws {UserQuestionError} code `ASK_ABORTED` when the supplied signal
-   *   is already or becomes aborted, `CALLER_NOT_LIVE` when a supplied agent
+   *   is already or becomes aborted, or the service is withdrawn; `CALLER_NOT_LIVE` when a supplied agent
    *   is not the registry's exact live instance, or `DELEGATED_CALLER` when
    *   that live agent is owned by another agent.
    */
   async ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer> {
+    this.assertOpen()
     if (request.signal?.aborted) {
       throw abortedQuestion()
     }
@@ -319,22 +378,62 @@ export class UserQuestionService extends TypertRemoteService {
       'no user-questions answerer accepted the request',
       'NO_PROVIDER',
     ))
+    const done = Promise.withResolvers<void>()
+    const question: ForegroundQuestion = { agent, controller: new AbortController(), done: done.promise }
+    this.foreground.add(question)
+    const signal = request.signal === undefined
+      ? question.controller.signal
+      : AbortSignal.any([request.signal, question.controller.signal])
+    const forwarded = { ...request, signal }
+    const result = Promise.withResolvers<AskUserQuestionAnswer>()
+    let cancellation: ReturnType<typeof setImmediate> | undefined
+    const onAbort = (): void => {
+      // A same-turn domain rejection retains its category, including Client dismissal.
+      cancellation = setImmediate(() => { result.reject(request.signal?.aborted === true
+        ? abortedQuestion(request.signal.reason)
+        : question.controller.signal.reason) })
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    const assertCurrent = (): void => {
+      this.assertOpen()
+      question.controller.signal.throwIfAborted()
+      if (request.signal?.aborted === true) throw abortedQuestion(request.signal.reason)
+      if (agent !== undefined) this.assertLiveRoot(agent)
+    }
+    void Promise.resolve().then(() => {
+      assertCurrent()
+      const listeners = this.ctx.events.dispatch('waterfall', agent === undefined
+        ? ['user-questions/request', forwarded]
+        : [scopeTarget(agent, agent), 'user-questions/request', forwarded]) as Array<(
+        value: AskUserQuestionRequestEvent,
+        next: () => Promise<AskUserQuestionAnswer>,
+      ) => Promise<AskUserQuestionAnswer>>
+      const next = (): Promise<AskUserQuestionAnswer> => {
+        assertCurrent()
+        const listener = listeners.shift()
+        return listener === undefined ? noAnswerer() : listener(forwarded, next)
+      }
+      return next()
+    }).then(result.resolve, result.reject)
     try {
-      return await (agent === undefined
-        ? this.ctx.waterfall('user-questions/request', request, noAnswerer)
-        : this.ctx.waterfall(
-          scopeTarget(agent, agent),
-          'user-questions/request',
-          { ...request, agent },
-          noAnswerer,
-        ))
+      const answer = await result.promise
+      assertCurrent()
+      return answer
     } catch (error) {
+      this.assertOpen()
+      question.controller.signal.throwIfAborted()
+      if (agent !== undefined) this.assertLiveRoot(agent)
       const restored = restoreUserQuestionError(error)
       if (restored instanceof UserQuestionError) throw restored
       if (request.signal?.aborted) {
         throw abortedQuestion(error)
       }
       throw restored
+    } finally {
+      signal.removeEventListener('abort', onAbort)
+      clearImmediate(cancellation)
+      this.foreground.delete(question)
+      done.resolve()
     }
   }
 }

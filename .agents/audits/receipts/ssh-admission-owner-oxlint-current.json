@@ -1,0 +1,13 @@
+{
+  "name": "ssh-admission-owner-oxlint-current",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/ssh/ssh/src/index.ts packages/ssh/subprocess-ssh/src/index.ts packages/ssh/ssh/tests/startup-behavior.spec.ts packages/ssh/ssh/tests/fixtures packages/ssh/subprocess-ssh/tests packages/host/apiproxy/src/ssh-execution.ts packages/host/apiproxy/tests/ssh-execution.spec.ts packages/ssh/ssh/tests/resource-admission.e2e.ts",
+  "startedAt": "2026-10-23T15:23:07.371328+00:00",
+  "seconds": 3.564,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "29467b0c93a7a02488641153696b84e4d5c147e9708e273c5ef6535e27a9295d",
+  "inputsAfter": "d0ae8f377dee48de3982e01279e4105bd34963ee45d4ceaea12b6ad02ec623fb",
+  "outputSha256": "8bb9d03c5be3d1d6f969a9134a08266515ce2fe6136683583e76c0c5a6bdb4ba",
+  "outputTail": "packages/ssh/ssh/tests/startup-behavior.spec.ts:153:40: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\n"
+}

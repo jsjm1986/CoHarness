@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md
 document:
-  en: fdd79d9c26fd608171d0895fcff35ef62073119f
-  zh: 67f611e2efa612b8a6cace9dae688501a3ff3344
+  en: ec732e687e75bbaf031a11b2ed89351372600343
+  zh: 46434810703e04a238252852c9e07975577a9b7d
 /agent-note-released-session-formats-migrate-through-stateful-streaming-stages:
   en: 1a1d3bd9c2311ed6
   zh: 366eded1272efd63
@@ -30,8 +30,8 @@ document:
   en: b1a62e1db4efacf4
   zh: 5b63bc206bda8da3
 /agent-note-released-session-formats-migrate-through-stateful-streaming-stages/decision/jsonl-integration:
-  en: 1416aa1acd78e1be
-  zh: a9d38f4bb50b2080
+  en: dc5eca2269d9ff7f
+  zh: 2ca17756aedd7c4d
 /agent-note-released-session-formats-migrate-through-stateful-streaming-stages/decision/durable-format-and-publication-rules:
   en: 6e2a76ae14612199
   zh: 3c90fd32d292f9d0

@@ -1,0 +1,130 @@
+{
+  "finding": "B337",
+  "status": "fixed_and_verified_for_named_scope",
+  "updatedAt": "2026-10-30T07:39:45.818875+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T064357Z",
+  "sourcePaths": [
+    ".agents/notes/implemented/architecture/2026-10-25-local-runtime-supervisor.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-25-local-runtime-supervisor.md",
+    ".agents/notes/implemented/architecture/2026-10-25-local-runtime-supervisor.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-runtime-control/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-runtime-control/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-runtime-control/guide.zh.md",
+    "gateway/package.json",
+    "gateway/src/instances.ts",
+    "gateway/tests/expected/recovered-owner-liveness.jsonl",
+    "gateway/tests/fixtures/recovered-owner-liveness.mjs",
+    "gateway/tests/fixtures/topology-fixture.d.mts",
+    "gateway/tests/instances.spec.ts",
+    "gateway/tests/postgres.spec.ts",
+    "gateway/tests/recovered-owner-liveness-transcript.spec.ts"
+  ],
+  "sourceArtifactHashes": "survivor-final-source-artifact-hashes.json",
+  "problem": "Restored-owner database lookup or controller attachment failures resolvefalse and let administrative inventory report200with no terminals. Unknown ownership is distinct from an offline Runtime.",
+  "repair": "isLive reports the existing INSTANCE_UNAVAILABLE failure for owner-read and attachment errors, retaining generation, durable state and resident reservation. Successful retry reuses the same generation.",
+  "causalEvidence": {
+    "sourceNegative": "survivor-uncertainty-source-negative.json",
+    "sourceCasesFailing": 2,
+    "existingProbeControlPasses": true,
+    "compiledHttpNegative": "survivor-http-prior-compiled-negative-v3.json",
+    "actualOldResponse": 200,
+    "expectedResponse": 503,
+    "fixtureSetupFailuresNotProductEvidence": [
+      "The first two HTTP attempts omitted the complete signer constructor arguments; they do not prove the bug.",
+      "An initial external checking-face filename collided with its run receipt, producing unrelated ES5 errors. Full configured Gateway checking passes after the topology fixture declaration is supplied."
+    ]
+  },
+  "verification": {
+    "sourceUniqueCases": 145,
+    "sourceFiles": 6,
+    "adjacentCases": 103,
+    "postgresBaselineAndRealHttpCases": 42,
+    "focused14OverlapAdjacent": true,
+    "changedBranch": {
+      "path": "gateway/src/instances.ts",
+      "changedThrowLine": 738,
+      "executionCounts": [
+        2
+      ],
+      "scope": "Focused14scenario parent-process coverage; whole InstanceManager and subprocess coverage remain incomplete."
+    },
+    "node22": "survivor-compiled-node22.json",
+    "node24": "survivor-compiled-node24.json",
+    "compiledFixtureOverlapsSource": true,
+    "compiledJavaScriptFiles": 162,
+    "terminalHttp": {
+      "scenarios": [
+        "attachment",
+        "probe"
+      ],
+      "status": 503,
+      "code": "INSTANCE_UNAVAILABLE",
+      "stateRetained": "ready",
+      "generationRetained": true,
+      "residentRetained": 1
+    },
+    "types": "survivor-full-types-after-fixture-declaration.json",
+    "lint": "survivor-scoped-lint-with-fixture-declaration.json",
+    "docs": {
+      "run": "survivor-docs.json",
+      "gatesPassedBeforeCorrection": 19,
+      "onlyFailure": "New NUL receipts used bare Git identifiers; maintained receipt metadata now uses repository refs.",
+      "correctedGate": "survivor-document-references-corrected.json",
+      "all20SatisfiedAcrossTheseRuns": true
+    },
+    "currentMigrationSequence": "The baseline reads the declared migration plan, requires at least100, verifies every applied version and current idempotence; concurrent101is included in these named scenarios.",
+    "minimalIntegrationDeclaration": "topology-fixture.d.mts supplies the missing input type without changing the peer topology implementation."
+  },
+  "coverage": {
+    "focusedInstanceManager": {
+      "lines": {
+        "total": 686,
+        "covered": 233,
+        "skipped": 0,
+        "pct": 33.96
+      },
+      "statements": {
+        "total": 820,
+        "covered": 259,
+        "skipped": 0,
+        "pct": 31.58
+      },
+      "functions": {
+        "total": 120,
+        "covered": 53,
+        "skipped": 0,
+        "pct": 44.16
+      },
+      "branches": {
+        "total": 579,
+        "covered": 146,
+        "skipped": 0,
+        "pct": 25.21
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "changedThrowExecuted": 2,
+    "limitation": "Coverage is partial for the whole InstanceManager. The actual HTTP process runs separately and is additional acceptance evidence."
+  },
+  "peerCoordination": {
+    "checkpoint": "Recorded build inputs are immutable evidence. Later peer topology overlays are fingerprinted separately.",
+    "modifiedArchitectureLogic": false,
+    "scope": "The missing test declaration and plan-aware baseline expectation are nonintrusive integration support."
+  },
+  "noteReview": {
+    "updatedActive": "architecture/2026-10-25-local-runtime-supervisor.md",
+    "fullySupersededNotes": []
+  },
+  "remaining": [
+    "B04/B25 remain implementation_in_progress and all12domains remain open.",
+    "Restored-assignment HTTP scenarios use real PostgreSQL/authentication/LocalLauncher but deliberately launch no native Runtime. They prove error classification and reservation retention, not physical containment or cold-start recovery.",
+    "Real model API and public push remain human-deferred.",
+    "Latest deployment-topology changes still require their independent full integration review.",
+    "No deployment, production database migration, commit or push was performed."
+  ]
+}

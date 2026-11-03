@@ -71,6 +71,7 @@ import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-j
 import type { SessionFormatEvent } from '@deepseek-ai/dsh-session-format'
 import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 // Empty type imports carry the webServer/agents/sessionPersistence Context merges.
+import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-agent'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
@@ -959,7 +960,7 @@ export function systemPromptTexts(events: readonly SessionEvent[]): string[] {
  * @param ordinal - the token's 1-based ordinal within that kind.
  * @returns the realized UUIDv4-shaped string.
  */
-export function realizedTokenId(kind: string, ordinal: number): string {
+function realizedTokenId(kind: string, ordinal: number): string {
   const hex = createHash('sha256').update(`${kind}:${ordinal}`).digest('hex').slice(0, 32).split('')
   hex[12] = '4'
   hex[16] = ['8', '9', 'a', 'b'][Number.parseInt(hex[16] as string, 16) % 4] as string

@@ -1,0 +1,14 @@
+{
+  "name": "codex-nested-route-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts packages/subagent/subagent-codex/tests/managed-ssh-loader.spec.ts -t 'member delegates a one-shot|composition: nested'",
+  "startedAt": "2026-10-25T14:01:36.163351+00:00",
+  "seconds": 7.405,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "53552572ceb8c722151e9229ea2046459747c96a58d87d45de879748c9c9fe3e",
+  "inputsAfter": "53552572ceb8c722151e9229ea2046459747c96a58d87d45de879748c9c9fe3e",
+  "postgresToolDirectory": null,
+  "outputSha256": "b877651e47c8082917c6313dc51a1cbe6631982010114546a520b7907496d834",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  2 passed (2)\n      Tests  3 passed | 18 skipped (21)\n   Start at  22:01:39\n   Duration  3.85s (transform 1.19s, setup 63ms, import 1.48s, tests 3.50s, environment 0ms)\n\n"
+}

@@ -82,6 +82,8 @@ Client 查询在 `clientInspectTimeoutMs` 内接受首个有效页面响应。�
 
 服务包：默认导出 `DynamicCordisRunnerService`（服务键 `dynamicCordisRunner`），`./types` 则承载 `dynamicCordisRunner` remote namespace 与其消费方共享的载荷形状。`define`／`undefine` 的形状留在包内部，因为它们从不跨 wire。
 
+会话范围的注册表控制和清单过滤遵循[应用授权要求](../../context/collaboration/README.zh.md#application-authorization)。
+
 <a id="model-experience"></a>
 ## 模型体验
 

@@ -53,7 +53,7 @@ export type OpenInAppLauncher = (
 ) => Promise<void>
 
 /** How one launch attempt ended; `missing` marks a stale resolution (ENOENT). */
-export type OpenInAppLaunchOutcome = 'launched' | 'missing' | 'failed'
+export type OpenInAppLaunchOutcome = 'launched' | 'missing' | 'failed' | 'refused'
 
 /**
  * Launch one application adapter detached from this process: the child gets a
@@ -744,15 +744,19 @@ async function runLaunch(
  * @param watchMs - early-failure watch window per launcher (a child still
  * running when it closes counts as launched and keeps running).
  * @param internals - launcher hook for deterministic tests.
+ * @param beforeLaunch - authorization check before each primary or fallback launch; false prevents that launch.
  * @returns how the attempt ended; `missing` when a tried launcher's
- *   executable is gone, which tells the caller to re-resolve once.
+ *   executable is gone, or `refused` when authorization denies a new launch.
  */
 export async function launchResolved(
   resolved: OpenInAppResolvedLaunch, path: string, watchMs: number, internals: OpenInAppInternals = {},
+  beforeLaunch?: () => boolean,
 ): Promise<OpenInAppLaunchOutcome> {
   const completed = resolveInternals(internals)
+  if (beforeLaunch?.() === false) return 'refused'
   const primary = await runLaunch(resolved.launch, path, watchMs, completed)
   if (primary === 'launched' || resolved.fallbackLaunch === undefined) return primary
+  if (beforeLaunch?.() === false) return 'refused'
   const fallback = await runLaunch(resolved.fallbackLaunch, path, watchMs, completed)
   if (fallback === 'launched') return 'launched'
   // Either tried launcher having vanished is grounds to refresh the resolution.

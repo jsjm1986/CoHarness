@@ -1,0 +1,14 @@
+{
+  "name": "sdk-final-target-doc-pairs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write packages/subagent/subagent-dsh-sdk/README.md packages/subagent/subagent/README.md .agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md .agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md .agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+  "startedAt": "2026-10-24T17:47:22.221156+00:00",
+  "seconds": 1.654,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "65bce3a2fed108d32a432926cf63828d4c05520653726359ecc51506c9852362",
+  "inputsAfter": "e53d8a23bb5e68834a920db580e7ad2e2fbd0a5da0f53d3e16f332f3735461a3",
+  "postgresToolDirectory": null,
+  "outputSha256": "8dcd6db072c0cf55e2a5a7f67e9131c5b7d96d50ec1c013b02ae172289118caf",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml\nverify-translation-pairing: recorded packages/subagent/subagent-dsh-sdk/README.i18n.yaml\nverify-translation-pairing: 4 record(s) written; run the check to validate the pairs.\n"
+}

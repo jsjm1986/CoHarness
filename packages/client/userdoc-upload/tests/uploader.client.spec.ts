@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { resumableUpload, type ResumableUploadOptions } from '../src/index.ts'
 
-const ref = { docId: 'notes.txt' as never, name: 'notes.txt', bytes: 5, mediaType: 'text/plain', modifiedAt: 1 }
+const ref = { docId: 'notes.txt' as never, path: '', name: 'notes.txt', bytes: 5, mediaType: 'text/plain', modifiedAt: 1 }
 const uploadId = '00000000-0000-4000-8000-000000000000'
 
 function urlOf(input: RequestInfo | URL): string {
@@ -184,6 +184,75 @@ describe('resumableUpload', () => {
     }
   })
 
+  it('polls an accepted verification after its session retention timestamp passes', async () => {
+    const calls: string[] = []
+    const result = await resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, {
+      requestJson: async <T>(input: RequestInfo | URL, init?: RequestInit) => {
+        const url = urlOf(input)
+        calls.push(`${init?.method ?? 'GET'} ${url}`)
+        const complete = init?.method !== 'POST'
+        return { uploadId, name: 'notes.txt', directoryId: '', bytes: 5, fingerprint: 'x', chunkBytes: 65536,
+          receivedBytes: 5, expiresAt: 1, state: complete ? 'complete' : 'verifying', ...(complete ? { ref } : {}),
+        } as T
+      },
+      networkError: () => new Error('offline'), responseError: status => new Error(`Unexpected upload status ${status}`),
+    })
+    expect(result).toEqual(ref)
+    expect(calls).toEqual(['POST /api/documents/uploads',
+      'POST /api/documents/uploads/00000000-0000-4000-8000-000000000000/complete',
+      'GET /api/documents/uploads/00000000-0000-4000-8000-000000000000'])
+  })
+
+  it('still bounds a provider that keeps an accepted upload in verification', async () => {
+    let now = 1_000_000
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    let polls = 0
+    try {
+      await expect(resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, {
+        requestJson: async <T>(_input: RequestInfo | URL, init?: RequestInit) => {
+          if (init?.method !== 'POST') { polls += 1; now += 5 * 60 * 1000 }
+          return { uploadId, name: 'notes.txt', directoryId: '', bytes: 5, fingerprint: 'x', chunkBytes: 65536,
+            receivedBytes: 5, expiresAt: 1, state: 'verifying' } as T
+        },
+        networkError: () => new Error('offline'), responseError: status => new Error(`Unexpected upload status ${status}`),
+      })).rejects.toMatchObject({ status: 504, code: 'DOCUMENT_UPLOAD_VERIFY_TIMEOUT' })
+      expect(polls).toBe(1)
+    } finally { clock.mockRestore() }
+  })
+
+  it('rejects a completed upload with a null document reference', async () => {
+    const invalid = vi.fn((status: number) => new Error(`Invalid upload response: ${status}`))
+    await expect(resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, {
+      networkError: () => new Error('offline'), responseError: invalid,
+      requestJson: async <T>() => ({ uploadId, name: 'notes.txt', directoryId: '', bytes: 5,
+        fingerprint: 'x', chunkBytes: 65536, receivedBytes: 5, expiresAt: Date.now() + 1000,
+        state: 'complete', ref: null }) as T,
+    })).rejects.toThrow('Invalid upload response: 502')
+  })
+
+  it.each([
+    { ...ref, bytes: 4 }, { ...ref, docId: '' }, { ...ref, path: null }, { ...ref, modifiedAt: '1' },
+    { ...ref, identity: { incarnationId: 'one', revision: 0, origin: 'upload' } },
+  ])('refuses malformed completed document metadata %j', async (reference) => {
+    await expect(resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, {
+      requestJson: async <T>() => ({ uploadId, name: 'notes.txt', directoryId: '', bytes: 5,
+        fingerprint: 'x', chunkBytes: 65536, receivedBytes: 5, expiresAt: Date.now() + 1000,
+        state: 'complete', ref: reference }) as T,
+      networkError: () => new Error('offline'), responseError: status => new Error(`Invalid metadata: ${status}`),
+    })).rejects.toThrow('Invalid metadata: 502')
+  })
+
+  it('returns an exact document version from a completed upload', async () => {
+    const identity = { incarnationId: 'incarnation:one', revision: 3, origin: 'upload', createdBy: 'user:7' }
+    const result = await resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, {
+      requestJson: async <T>() => ({ uploadId, name: 'notes.txt', directoryId: '', bytes: 5,
+        fingerprint: 'x', chunkBytes: 65536, receivedBytes: 5, expiresAt: Date.now() + 1000,
+        state: 'complete', ref: { ...ref, identity: { ...identity, privatePath: '/private/control' } } }) as T,
+      networkError: () => new Error('offline'), responseError: status => new Error(`Invalid metadata: ${status}`),
+    })
+    expect(result).toEqual({ ...ref, identity })
+  })
+
   it('creates a session, sends a chunk, and completes it', async () => {
     const calls: string[] = []
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -307,6 +376,7 @@ describe('resumableUpload', () => {
         return {
           ...uploading,
           state: 'complete' as const,
+          receivedBytes: 5,
           ref,
           expiresAt: Date.now() + 60_000,
         } as T
@@ -340,10 +410,10 @@ describe('resumableUpload', () => {
         bytes: 1,
         fingerprint: 'x',
         chunkBytes: 65536,
-        receivedBytes: 0,
+        receivedBytes: 1,
         expiresAt: Date.now() + 60_000,
         state: 'complete' as const,
-        ref,
+        ref: { ...ref, docId: 'new.txt' as never, name: 'new.txt', bytes: 1 },
       } as T),
       networkError: () => new Error('offline'),
       responseError: (status, body) => new Error(`${String(status)}:${String(body)}`),

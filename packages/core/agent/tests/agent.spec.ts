@@ -128,7 +128,9 @@ describe('AgentRegistry', () => {
     expect(lifecycle).toEqual(['created:vetoed', 'disposed:vetoed'])
   })
 
-  it('rolls back asynchronous creation rejection and contains every disposal-listener failure', async () => {
+  it.each(['ordinary', 'unrenderable'] as const)('rolls back asynchronous creation rejection and contains every disposal-listener failure (%s)', async (kind) => {
+    const failure = (message: string): unknown => kind === 'ordinary' ? new Error(message) : Object.create(null)
+    const failureText = (message: string): string => kind === 'ordinary' ? `Error: ${message}` : '[unrenderable thrown value]'
     const ctx = new Context()
     await ctx.plugin(AgentRegistry)
     const warnings: string[] = []
@@ -136,8 +138,9 @@ describe('AgentRegistry', () => {
     ctx.logger.warn = ((message: unknown) => { warnings.push(String(message)) }) as typeof ctx.logger.warn
     ctx.on('agent/created', () => Promise.reject(new Error('created async')))
     ctx.on('agent/created', () => { heard.push('unreachable') })
-    ctx.on('agent/disposed', () => { throw new Error('disposed sync') })
-    ctx.on('agent/disposed', () => Promise.reject(new Error('disposed async')) as never)
+    ctx.on('agent/disposed', () => { throw failure('disposed sync') })
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- plugin observers may reject arbitrary failure values
+    ctx.on('agent/disposed', () => Promise.reject(failure('disposed async')) as never)
     ctx.on('agent/disposed', ({ agent }) => void heard.push(agent.id))
 
     await expect(Promise.resolve(ctx.agents.register(stubAgent('contained')))).rejects.toThrow('created async')
@@ -146,11 +149,10 @@ describe('AgentRegistry', () => {
     expect(heard).toEqual(['contained'])
     expect(ctx.agents.list()).toEqual([])
     expect(warnings).toEqual([
-      'agent "contained": agent/disposed listener threw: Error: disposed sync',
-      'agent "contained": agent/disposed listener rejected: Error: disposed async',
+      `agent "contained": agent/disposed listener threw: ${failureText('disposed sync')}`,
+      `agent "contained": agent/disposed listener rejected: ${failureText('disposed async')}`,
     ])
   })
-
   it('awaits each creation listener before the next listener and registration completion', async () => {
     const ctx = new Context()
     await ctx.plugin(AgentRegistry)
@@ -225,25 +227,27 @@ describe('AgentRegistry', () => {
 })
 
 describe('agentEvents()', () => {
-  it('contains each synchronous throw and returned-promise rejection', async () => {
+  it.each(['ordinary', 'unrenderable'] as const)('contains each synchronous throw and returned-promise rejection (%s)', async (kind) => {
+    const failure = (message: string): unknown => kind === 'ordinary' ? new Error(message) : Object.create(null)
+    const failureText = (message: string): string => kind === 'ordinary' ? `Error: ${message}` : '[unrenderable thrown value]'
     const ctx = new Context()
     const warnings: string[] = []
     const heard: string[] = []
     ctx.logger.warn = ((message: unknown) => { warnings.push(String(message)) }) as typeof ctx.logger.warn
     const agent = stubAgent('event')
-    ctx.on('agent/status', () => { throw new Error('sync listener') })
-    ctx.on('agent/status', () => Promise.reject(new Error('async listener')) as never)
+    ctx.on('agent/status', () => { throw failure('sync listener') })
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- plugin observers may reject arbitrary failure values
+    ctx.on('agent/status', () => Promise.reject(failure('async listener')) as never)
     ctx.on('agent/status', ({ status }) => void heard.push(status))
 
     agentEvents(ctx, agent).emit('agent/status', { status: 'running' })
     await Promise.resolve()
     expect(heard).toEqual(['running'])
     expect(warnings).toEqual([
-      'agent event "agent/status" listener threw: Error: sync listener',
-      'agent event "agent/status" listener rejected: Error: async listener',
+      `agent event "agent/status" listener threw: ${failureText('sync listener')}`,
+      `agent event "agent/status" listener rejected: ${failureText('async listener')}`,
     ])
   })
-
   it('dispatches serial listeners with the fused agent subject', async () => {
     const ctx = new Context()
     const agent = stubAgent('serial-event')

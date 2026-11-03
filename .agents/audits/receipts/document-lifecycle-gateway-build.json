@@ -1,0 +1,14 @@
+{
+  "name": "document-lifecycle-gateway-build",
+  "cwd": "gateway",
+  "command": "npm run build",
+  "startedAt": "2026-10-24T02:50:36.160210+00:00",
+  "seconds": 2.898,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "636ca765b12030db43535afb2f4be798770c746ccf351c1d9454bc5183e8e53c",
+  "inputsAfter": "636ca765b12030db43535afb2f4be798770c746ccf351c1d9454bc5183e8e53c",
+  "postgresToolDirectory": null,
+  "outputSha256": "898095a3ceeb02add8ff851ae671d7fc499316aab1c64f358d6b61663d57feb4",
+  "outputTail": "\n> build\n> tsc -p tsconfig.build.json\n\n"
+}

@@ -16,6 +16,8 @@ Status: implemented
 
 传输服务不授予产品访问权。Gateway 侧的执行面落在 `gateway/src/postgres/ssh-target-service.ts`，基于迁移 038：`resolveForRuntime` 在单个 PostgreSQL 事务内完成主体授权与目标配置读取，资格与配置不会分叉；`share` 同时锁定用户行与成员行，并发的角色降级不能保留过期共享。运行时侧的 `GatewaySshAuthorization`（`packages/context/gateway-execution/src/ssh.ts`）只通过签名的 `/internal/runtime/ssh/resolve` 路由解析，在每次请求前记录失效纪元，撤权后到达的响应一律拒绝；每个已解析目标携带 AbortSignal，所属授权在失效时中止它。个人密码和密钥由凭据服务管理，不得进入模型参数、命令参数、普通环境变量或 Session 数据。
 
+目标目录读取、注册、连接配置更新、启停／移除和管理端共享，在数据库事务内保留活跃组织及当前活跃管理员账号与组织成员身份。认证参与者由 Gateway 提供，配置及状态变更仍要求已观察到的目标 revision。管理端共享始终要求管理员身份，即使该账号拥有项目。项目自助目录及共享先保留同样的活跃组织和账号资格，再要求当前组织管理员身份或锁定的活跃项目所有权。准入前失权不会修改目标或共享，也不会产生成功操作审计。
+
 文件系统适配器通过经过验证的 helper 请求传递 CoHarness 的源版本守卫和目录枚举上限。预览缓存不能替代已经变化的源文件，小列表也不应枚举所有远端条目。这些 helper 修改要求配置匹配的产物摘要。
 
 ## Alternatives considered
@@ -29,5 +31,7 @@ Status: implemented
 ## Verification
 
 协议测试覆盖无效输入、容量、取消、流认证与清理。真实验收还需要实际 SSH、已安装 helper、沙箱隔离、文件变更、终端和 PTC 通信，以及断连清理。产品验收必须覆盖凭据与资格撤销，以及远端预览、diff 和交付物卡片；这些义务在实际入口得到验证之前保持未完成。
+
+实际 Gateway HTTP 回放及 PostgreSQL 行锁屏障覆盖当前管理员和项目所有者对照、账号与组织撤权、外组织参与者及目标、revision 校验，以及等待目标行时的权限保留。这些本地配置检查不要求远端 SSH 连接。
 
 可移植消费者注记仍然有效。本次提供方接入没有完全替代任何现役注记。

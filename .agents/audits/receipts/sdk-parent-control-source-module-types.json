@@ -1,0 +1,14 @@
+{
+  "name": "sdk-parent-control-source-module-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/subagent/subagent-dsh-sdk/tsconfig.json",
+  "startedAt": "2026-10-24T12:39:36.394428+00:00",
+  "seconds": 3.203,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "12ea25c6519909c16f8eb96784149243f202b9002d85c251d45b0b5960ac5922",
+  "inputsAfter": "12ea25c6519909c16f8eb96784149243f202b9002d85c251d45b0b5960ac5922",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -1,0 +1,14 @@
+{
+  "name": "goal-resume-block-built-node24",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=lib /Users/a1234/.nvm/versions/node/v24.19.0/bin/node node_modules/vitest/vitest.mjs run packages/goal/tool-goal/tests/resume-block-loader.spec.ts",
+  "startedAt": "2026-10-26T03:24:02.741257+00:00",
+  "seconds": 5.578,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0b274497ca42aad34e542d62be6eac33db5cc35b7d01c37281f8c3e311d11ab6",
+  "inputsAfter": "0b274497ca42aad34e542d62be6eac33db5cc35b7d01c37281f8c3e311d11ab6",
+  "postgresToolDirectory": null,
+  "outputSha256": "416067ede46701c012120d717ccf3a0fe9dfceaf01d99343d64bdc2fb21a358e",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  11:24:07\n   Duration  547ms (transform 58ms, setup 61ms, import 19ms, tests 328ms, environment 0ms)\n\n"
+}

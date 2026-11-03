@@ -1,0 +1,14 @@
+{
+  "name": "model-account-translation-final",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing .agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.md .agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md gateway/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.md",
+  "startedAt": "2026-10-24T00:25:36.253823+00:00",
+  "seconds": 3.257,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "624fad0c381495b5fa1798f728e38f296835106be05ea7b8c51e55557fbf1e62",
+  "inputsAfter": "624fad0c381495b5fa1798f728e38f296835106be05ea7b8c51e55557fbf1e62",
+  "postgresToolDirectory": null,
+  "outputSha256": "edb948cc7b7bd5ff59e1a6df35554b920765c642992bec9b235dae0b8734ca48",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts .agents/notes/implemented/feature/2026-08-16-gateway-user-logical-deletion.md .agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md gateway/README.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-account-deletion/guide.md\nverify-translation-pairing: 4 named pair(s) consistent; the corpus-wide check still runs in doc-sync.\n"
+}

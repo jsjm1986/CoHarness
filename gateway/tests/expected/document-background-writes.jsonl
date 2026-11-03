@@ -1,0 +1,10 @@
+{"case":"cold-storage-maintenance","status":503,"created":false}
+{"case":"asynchronous-upload","status":202,"writersAfterResponse":1}
+{"case":"accepted-verification-expiry","status":202,"state":"verifying","writers":1}
+{"case":"maintenance-drain","writers":0,"status":503,"contents":"background publication"}
+{"case":"read-catalog-writer","status":200,"writersAfterResponse":1}
+{"case":"maintenance-catalog-read","status":200,"catalogCalls":1,"pendingWriters":1}
+{"case":"catalog-acknowledgement-interrupted","delivered":1,"writers":0}
+{"case":"catalog-acknowledged","status":200,"state":"complete"}
+{"case":"scope-removed","closed":true,"contentsPreserved":true,"writers":0}
+{"case":"catalog-drained","writers":0,"delivered":1}

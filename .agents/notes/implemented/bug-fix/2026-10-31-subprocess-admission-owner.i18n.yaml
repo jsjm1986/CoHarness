@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-subprocess-admission-owner.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-subprocess-admission-owner.md
+document:
+  en: 1cc00fdcf63475df7e022c945fdb15ae1ef76ec7
+  zh: f2fabf7ae5218b7542bbc46d65c78a3b6aabe76d
+/agent-note-subprocess-allocation-retains-its-resource-provider:
+  en: c32faf1cc6b254eb
+  zh: 92e4b698ee22d1a7
+/agent-note-subprocess-allocation-retains-its-resource-provider/problem:
+  en: dbcb09d5c79f40b7
+  zh: 0b147b0f08c45f39
+/agent-note-subprocess-allocation-retains-its-resource-provider/decision:
+  en: 3b76fc5ee8a3fc98
+  zh: dc17783569cabdf2
+/agent-note-subprocess-allocation-retains-its-resource-provider/alternatives-considered:
+  en: 5e6fce31f8a81e2c
+  zh: 6da2506a26d2df27
+/agent-note-subprocess-allocation-retains-its-resource-provider/consequences:
+  en: 04999a53884209ee
+  zh: 49f2a846ddc480d8
+/agent-note-subprocess-allocation-retains-its-resource-provider/verification:
+  en: 15d7894c7b8a65ef
+  zh: 57b58d29b2563025

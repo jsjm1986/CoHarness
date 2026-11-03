@@ -3,16 +3,12 @@
 import { spawnSync } from 'node:child_process'
 import {
   existsSync,
-  lstatSync,
-  mkdirSync,
-  readFileSync,
   readdirSync,
-  realpathSync,
   statSync,
-  symlinkSync,
 } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { pnpmInvocation } from './pnpm-invocation.ts'
+import { ensureGatewayRuntimePackages, gatewayRuntimePackageLinksValid } from './gateway-runtime-packages.ts'
 
 interface BuildStep {
   label: string
@@ -45,73 +41,6 @@ function requireAsset(directory: string, suffix: string, failures: string[]): vo
   }
 }
 
-/**
- * Workspace packages the standalone Gateway's compiled ESM graph imports at
- * runtime, each paired with a built entry file proving the package built.
- */
-const GATEWAY_RUNTIME_PACKAGES: readonly { directory: string; entry: string }[] = [
-  { directory: 'packages/util/managed-data', entry: 'lib/index.js' },
-  { directory: 'packages/util/atomic-write', entry: 'lib/index.js' },
-  { directory: 'packages/llm/llm', entry: 'lib/types/discovery.js' },
-  { directory: 'packages/session/session-format', entry: 'lib/index.js' },
-  { directory: 'packages/session/session-format-catalog', entry: 'lib/index.js' },
-  { directory: 'packages/util/home-paths', entry: 'lib/index.js' },
-  { directory: 'packages/attachment/userdoc', entry: 'lib/index.js' },
-  { directory: 'packages/attachment/userdoc-local', entry: 'lib/index.js' },
-  { directory: 'packages/host/userdoc-http', entry: 'lib/index.js' },
-  { directory: 'vendor/cordis', entry: 'lib/index.js' },
-  { directory: 'vendor/schemastery', entry: 'lib/index.mjs' },
-]
-
-/**
- * Make the standalone Gateway's compiled ESM graph resolve the workspace
- * packages it imports at runtime. The Gateway is intentionally outside the
- * pnpm workspace, so a clean git-archive release does not get pnpm's usual
- * workspace symlink automatically. The relative link keeps the release
- * self-contained and survives copying the complete release directory.
- */
-function ensureGatewayRuntimePackages(): void {
-  for (const pkg of GATEWAY_RUNTIME_PACKAGES) {
-    const packageRoot = resolve(root, pkg.directory)
-    const packageManifest = join(packageRoot, 'package.json')
-    const packageEntry = join(packageRoot, pkg.entry)
-    if (!existsSync(packageManifest) || !existsSync(packageEntry)) {
-      throw new Error(`build-production: Gateway runtime package is incomplete: ${packageRoot}`)
-    }
-    const manifest = JSON.parse(readFileSync(packageManifest, 'utf8')) as { name?: string }
-    if (typeof manifest.name !== 'string' || manifest.name === '') {
-      throw new Error(`build-production: Gateway runtime package has no name: ${packageRoot}`)
-    }
-    const link = resolve(root, 'gateway/node_modules', ...manifest.name.split('/'))
-    mkdirSync(dirname(link), { recursive: true })
-    const expected = realpathSync(packageRoot)
-    const existing = lstatSync(link, { throwIfNoEntry: false })
-    if (existing !== undefined) {
-      const actual = realpathSync(link)
-      if (actual !== expected) {
-        throw new Error(`build-production: Gateway runtime package link points to ${actual}, expected ${expected}`)
-      }
-      continue
-    }
-    symlinkSync(relative(dirname(link), packageRoot), link, 'dir')
-  }
-}
-
-/** Verify the release-local Gateway package links without mutating a verify-only run. */
-function gatewayRuntimePackageLinksValid(): boolean {
-  return GATEWAY_RUNTIME_PACKAGES.every((pkg) => {
-    const packageRoot = resolve(root, pkg.directory)
-    try {
-      const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as { name?: string }
-      if (typeof manifest.name !== 'string' || manifest.name === '') return false
-      const link = resolve(root, 'gateway/node_modules', ...manifest.name.split('/'))
-      return realpathSync(link) === realpathSync(packageRoot)
-    } catch {
-      return false
-    }
-  })
-}
-
 function verifyArtifacts(): void {
   const failures: string[] = []
   for (const path of [
@@ -140,7 +69,7 @@ function verifyArtifacts(): void {
     'native/system/packages/entry/lib/index.js',
     'native/system/packages/entry/lib/flock.js',
   ]) requireFile(resolve(root, path), failures)
-  if (!gatewayRuntimePackageLinksValid()) {
+  if (!gatewayRuntimePackageLinksValid(root)) {
     failures.push(resolve(root, 'gateway/node_modules/@deepseek-ai'))
   }
   requireAsset(resolve(root, 'apps/web/dist/assets'), '.js', failures)
@@ -173,10 +102,12 @@ if (!process.argv.includes('--verify-only')) {
     },
     { label: 'Gateway artifact', cwd: resolve(root, 'gateway'), args: ['run', 'build'] },
     { label: 'Gateway typecheck', cwd: resolve(root, 'gateway'), args: ['run', 'typecheck'] },
+    { label: 'Gateway built document authority', cwd: resolve(root, 'gateway'), args: ['run', 'test:built-document-authority'] },
+    { label: 'Gateway built document maintenance', cwd: resolve(root, 'gateway'), args: ['run', 'test:built-document-maintenance'] },
     { label: 'Admin UI', cwd: resolve(root, 'gateway/admin-ui'), args: ['run', 'build'] },
   ]
   for (const step of steps) {
-    if (step.label === 'Gateway artifact') ensureGatewayRuntimePackages()
+    if (step.label === 'Gateway artifact') ensureGatewayRuntimePackages(root)
     run(step)
   }
 }

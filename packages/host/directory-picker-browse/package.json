@@ -23,13 +23,16 @@
     "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "dependencies": {
     "@deepseek-ai/dsh-host-directory-picker": "workspace:*",
+    "@deepseek-ai/dsh-launch-environment": "workspace:*",
+    "@deepseek-ai/node-addon-system": "workspace:~",
+    "koffi": "^3.3.4",
     "@deepseek-ai/schemastery": "workspace:~"
   },
   "peerDependencies": {

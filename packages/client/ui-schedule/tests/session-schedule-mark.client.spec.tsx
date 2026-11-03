@@ -6,7 +6,7 @@ import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ScheduleCatalogEntry, ScheduleDeleteResult, ScheduleId } from '@deepseek-ai/dsh-schedule/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-ui-renderer/src/client/bind.ts'
+import { keyedObservableHook } from '@deepseek-ai/dsh-client-ui-renderer/src/client/session-provider.tsx'
 import { createCatalogSource, type CatalogInjected } from '../src/client/catalog-source.ts'
 import { SessionScheduleMark, type SessionScheduleMarkProps } from '../src/client/SessionScheduleMark.tsx'
 import { en } from '../src/client/locales.ts'
@@ -42,7 +42,7 @@ function renderMark(
 ) {
   const props = {
     sessionId,
-    useCatalog: bindSnapshotSelector(source.hooks.catalog),
+    useRuntimeCatalog: keyedObservableHook(() => source.hooks.catalog),
     t: makeTranslate(en),
   } as SessionScheduleMarkProps
   return render(<SessionScheduleMark {...props} />)
@@ -101,12 +101,12 @@ describe('Session schedule sidebar mark', () => {
       <div>
         <SessionScheduleMark {...{
           sessionId: SESSION,
-          useCatalog: bindSnapshotSelector(source.hooks.catalog),
+          useRuntimeCatalog: keyedObservableHook(() => source.hooks.catalog),
           t: makeTranslate(en),
         } as SessionScheduleMarkProps} />
         <SessionScheduleMark {...{
           sessionId: OTHER_SESSION,
-          useCatalog: bindSnapshotSelector(source.hooks.catalog),
+          useRuntimeCatalog: keyedObservableHook(() => source.hooks.catalog),
           t: makeTranslate(en),
         } as SessionScheduleMarkProps} />
       </div>,
@@ -121,7 +121,7 @@ describe('Session schedule sidebar mark', () => {
     const source = sourceFor(async () => ({ ok: true, value: [entry('mark-task', SESSION)] }))
     const props = {
       sessionId: SESSION,
-      useCatalog: bindSnapshotSelector(source.hooks.catalog),
+      useRuntimeCatalog: keyedObservableHook(() => source.hooks.catalog),
       t: makeTranslate(en),
     } as SessionScheduleMarkProps
     render(<div onClick={onOpen}><SessionScheduleMark {...props} /></div>)

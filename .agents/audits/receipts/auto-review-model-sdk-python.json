@@ -1,0 +1,14 @@
+{
+  "name": "auto-review-model-sdk-python",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_auto_review_model_snapshot.py -q",
+  "startedAt": "2026-10-24T03:08:37.751964+00:00",
+  "seconds": 3.283,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "afee19e97f5e41e4359386a3ae64852841f418f3eeb02f762990a78c29b6d284",
+  "inputsAfter": "afee19e97f5e41e4359386a3ae64852841f418f3eeb02f762990a78c29b6d284",
+  "postgresToolDirectory": null,
+  "outputSha256": "423b1d0e014eb1eab96f4420f7b344c2615be505dd574b756ac884826ca74f2d",
+  "outputTail": ".                                                                        [100%]\n"
+}

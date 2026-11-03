@@ -17,9 +17,13 @@ import type {
   UserDocUploadSession,
   UserDocTrashRef,
   UserDocTrashPage,
+  UserDocSelection,
+  UserDocTrashSelection,
 } from './types.ts'
-import type { UserDocDirectoryId, UserDocId, UserDocUploadId } from './brand.ts'
+import type { UserDocDirectoryId, UserDocId, UserDocUploadId, UserDocUploadOwnerId } from './brand.ts'
 import { DOCUMENT_LIST_QUERY_CODE, UserDocError } from './error.ts'
+
+export { decodeUserDocIdentity } from './identity.ts'
 
 function documentTypeForMediaType(mediaType: string): UserDocListType {
   return mediaType.startsWith('image/') ? 'image'
@@ -81,7 +85,45 @@ function pageDocuments<T extends UserDocListItem>(
   }
 }
 
-export { UserDocDirectoryId, UserDocId, UserDocUploadId } from './brand.ts'
+/**
+ * Apply the standard directory-page semantics to a context-free reader.
+ * @param store - reader owning the directory scan.
+ * @param directoryId - directory to inspect.
+ * @param query - filtering, ordering and cursor options; absent uses the standard page.
+ * @param signal - optional cancellation for the scan.
+ * @returns a filtered page with its compatibility cursor.
+ */
+export async function defaultUserDocDirectoryPage(
+  store: Pick<UserDocStore, 'listDirectory'>, directoryId: UserDocDirectoryId, query: UserDocListQuery = {}, signal?: AbortSignal,
+): Promise<UserDocDirectoryPage> {
+  signal?.throwIfAborted()
+  if (query.state !== undefined && query.state !== 'active') {
+    throw new UserDocError('Directory trash pages are not available from this provider.', DOCUMENT_LIST_QUERY_CODE)
+  }
+  assertListQuery(query)
+  const listing = await store.listDirectory(directoryId, signal)
+  return { ...listing, ...pageDocuments(listing.documents, query, document => document.modifiedAt) }
+}
+
+/**
+ * Apply the standard trash-page semantics to a context-free reader.
+ * @param store - reader owning the trash scan.
+ * @param query - filtering, ordering and cursor options; absent uses the standard page.
+ * @param signal - optional cancellation for the scan.
+ * @returns a filtered trash page with its compatibility cursor.
+ */
+export async function defaultUserDocTrashPage(
+  store: Pick<UserDocStore, 'listTrash'>, query: UserDocListQuery = {}, signal?: AbortSignal,
+): Promise<UserDocTrashPage> {
+  signal?.throwIfAborted()
+  if (query.state !== undefined && query.state !== 'trash') throw new UserDocError('Trash list query is invalid.', DOCUMENT_LIST_QUERY_CODE)
+  assertListQuery(query)
+  return pageDocuments(await store.listTrash(signal), query, document => document.trashedAt)
+}
+
+export {
+  UserDocDirectoryId, UserDocId, UserDocRootId, UserDocIncarnationId, UserDocTrashId, UserDocUploadId, UserDocUploadOwnerId,
+} from './brand.ts'
 export {
   DOCUMENT_DELETE_FAILED_CODE,
   DOCUMENT_DIRECTORY_CONFLICT_CODE,
@@ -95,9 +137,13 @@ export {
   DOCUMENT_READ_FAILED_CODE,
   DOCUMENT_TARGET_CONFLICT_CODE,
   DOCUMENT_STORE_UNAVAILABLE_CODE,
+  DOCUMENT_PERMISSION_DENIED_CODE,
+  DOCUMENT_TRANSPORT_PROTOCOL_CODE,
+  DOCUMENT_STORE_BUSY_CODE,
   DOCUMENT_UPLOAD_BUSY_CODE,
   DOCUMENT_LIST_QUERY_CODE,
   DOCUMENT_TRASHED_CODE,
+  DOCUMENT_TRASH_CONFLICT_CODE,
   DOCUMENT_TRASH_NOT_FOUND_CODE,
   DOCUMENT_RESTORE_CONFLICT_CODE,
   DOCUMENT_UPLOAD_EXPIRED_CODE,
@@ -115,9 +161,13 @@ export {
   INVALID_DOCUMENT_DIRECTORY_CODE,
   INVALID_DOCUMENT_REF_CODE,
   TOO_MANY_DOCUMENTS_CODE,
+  USERDOC_ERROR_CODES,
   UserDocError,
+  userDocErrorStatus,
 } from './error.ts'
 export type { UserDocErrorCode } from './error.ts'
+export { userDocLocationUrl } from './location.ts'
+
 export type {
   ResolveUserDocTarget,
   BeginUserDocUpload,
@@ -132,9 +182,15 @@ export type {
   UserDocListSort,
   UserDocListType,
   UserDocRef,
+  UserDocIdentity,
+  UserDocSelection,
+  UserDocTrashSelection,
   UserDocPromptAttachment,
   UserDocPromptRepresentation,
   UserDocScope,
+  UserDocComputerId,
+  UserDocLocation,
+  UserDocLocationPage,
   UserDocTransferCapabilities,
   UserDocTransferCapability,
   UserDocTransferListResponse,
@@ -225,29 +281,33 @@ export abstract class UserDocStore extends Service {
   /**
    * Create or reuse a resumable upload session.
    * @param input - untrusted browser metadata validated by the provider.
+   * @param ownerId - authenticated actor; bound sessions reject a missing or different owner.
    * @returns the public upload session state.
    */
-  abstract beginUpload(input: BeginUserDocUpload): Promise<UserDocUploadSession>
+  abstract beginUpload(input: BeginUserDocUpload, ownerId?: UserDocUploadOwnerId): Promise<UserDocUploadSession>
 
   /**
    * Read one upload session's public state.
    * @param uploadId - opaque provider-produced identifier.
    * @param signal - optional cancellation.
+   * @param ownerId - authenticated actor; bound sessions reject a missing or different owner.
    * @returns current upload state.
    */
-  abstract inspectUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<UserDocUploadSession>
+  abstract inspectUpload(uploadId: UserDocUploadId, signal?: AbortSignal, ownerId?: UserDocUploadOwnerId): Promise<UserDocUploadSession>
 
   /**
    * Append one sequential chunk to an upload session.
    * @param uploadId - opaque provider-produced identifier.
    * @param chunk - validated range, digest, and raw body.
    * @param signal - optional cancellation.
+   * @param ownerId - authenticated actor; bound sessions reject a missing or different owner.
    * @returns updated public upload state.
    */
   abstract writeUploadChunk(
     uploadId: UserDocUploadId,
     chunk: UserDocUploadChunk,
     signal?: AbortSignal,
+    ownerId?: UserDocUploadOwnerId,
   ): Promise<UserDocUploadSession>
 
   /**
@@ -255,21 +315,24 @@ export abstract class UserDocStore extends Service {
    * @param uploadId - opaque provider-produced identifier.
    * @param sha256 - final SHA-256 digest supplied by the browser.
    * @param signal - optional cancellation.
+   * @param ownerId - authenticated actor; bound sessions reject a missing or different owner.
    * @returns verifying, complete, or failed public state.
    */
   abstract completeUpload(
     uploadId: UserDocUploadId,
     sha256: string,
     signal?: AbortSignal,
+    ownerId?: UserDocUploadOwnerId,
   ): Promise<UserDocUploadSession>
 
   /**
    * Cancel and remove one incomplete upload session.
    * @param uploadId - opaque provider-produced identifier.
    * @param signal - optional cancellation.
+   * @param ownerId - authenticated actor; bound sessions reject a missing or different owner.
    * @returns after temporary data is removed.
    */
-  abstract cancelUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<void>
+  abstract cancelUpload(uploadId: UserDocUploadId, signal?: AbortSignal, ownerId?: UserDocUploadOwnerId): Promise<void>
 
   /**
    * List every stored document, newest modification first.
@@ -304,13 +367,7 @@ export abstract class UserDocStore extends Service {
     query: UserDocListQuery = {},
     signal?: AbortSignal,
   ): Promise<UserDocDirectoryPage> {
-    signal?.throwIfAborted()
-    if (query.state !== undefined && query.state !== 'active') {
-      throw new UserDocError('Directory trash pages are not available from this provider.', DOCUMENT_LIST_QUERY_CODE)
-    }
-    assertListQuery(query)
-    const listing = await this.listDirectory(directoryId, signal)
-    return { ...listing, ...pageDocuments(listing.documents, query, document => document.modifiedAt) }
+    return defaultUserDocDirectoryPage(this, directoryId, query, signal)
   }
 
   /**
@@ -330,22 +387,20 @@ export abstract class UserDocStore extends Service {
     query: UserDocListQuery = {},
     signal?: AbortSignal,
   ): Promise<UserDocTrashPage> {
-    signal?.throwIfAborted()
-    if (query.state !== undefined && query.state !== 'trash') {
-      throw new UserDocError('Trash list query is invalid.', DOCUMENT_LIST_QUERY_CODE)
-    }
-    assertListQuery(query)
-    const all = await this.listTrash(signal)
-    return pageDocuments(all, query, document => document.trashedAt)
+    return defaultUserDocTrashPage(this, query, signal)
   }
 
   /**
    * Move one document into recoverable trash.
+   * A retained earlier file does not establish removal of a current replacement.
    * @param docId - store-scoped document identifier.
    * @param signal - optional cancellation for the move.
+   * @param expected - optional exact active version; a mismatch refuses the mutation.
    * @returns the retained trash reference.
+   * @throws UserDocError with DOCUMENT_TRASH_CONFLICT when the provider cannot
+   * retain both an earlier trash entry and the active file at the same path.
    */
-  abstract trash(docId: UserDocId, signal?: AbortSignal): Promise<UserDocTrashRef>
+  abstract trash(docId: UserDocId, signal?: AbortSignal, expected?: UserDocSelection): Promise<UserDocTrashRef>
 
   /**
    * Restore one trashed document, optionally choosing a destination directory.
@@ -355,6 +410,7 @@ export abstract class UserDocStore extends Service {
    * @param directoryId - optional destination directory; omitted keeps the original directory.
    * @param name - optional replacement leaf name.
    * @param signal - optional cancellation for the restore.
+   * @param expected - optional exact recoverable trash action; a mismatch refuses restoration.
    * @returns the restored durable document reference.
    */
   abstract restore(
@@ -362,14 +418,16 @@ export abstract class UserDocStore extends Service {
     directoryId?: UserDocDirectoryId,
     name?: string,
     signal?: AbortSignal,
+    expected?: UserDocTrashSelection,
   ): Promise<UserDocRef>
 
   /**
    * Permanently remove one trashed document.
    * @param docId - store-scoped document identifier.
    * @param signal - optional cancellation for the purge.
+   * @param expected - optional exact recoverable trash action; a mismatch preserves its bytes.
    */
-  abstract purge(docId: UserDocId, signal?: AbortSignal): Promise<void>
+  abstract purge(docId: UserDocId, signal?: AbortSignal, expected?: UserDocTrashSelection): Promise<void>
 
   /**
    * List every directory below the document root.
@@ -394,10 +452,14 @@ export abstract class UserDocStore extends Service {
    * Rename one directory within its current parent.
    * @param directoryId - non-root directory to rename.
    * @param name - untrusted replacement leaf name.
+   * @param expected - optional complete authorized inventory checked before publication; omitted uses the provider's current selection.
+   *   Ordinary edits after that verified selection reconcile independently of the directory rename.
    * @returns the renamed directory reference.
    * @throws UserDocError when the directory is absent, the name is invalid, or the target exists.
    */
-  abstract renameDirectory(directoryId: UserDocDirectoryId, name: string): Promise<UserDocDirectoryRef>
+  abstract renameDirectory(
+    directoryId: UserDocDirectoryId, name: string, expected?: readonly UserDocSelection[],
+  ): Promise<UserDocDirectoryRef>
 
   /**
    * Delete one empty, non-root directory.
@@ -411,10 +473,11 @@ export abstract class UserDocStore extends Service {
    * Move one document into an existing directory without replacing an entry.
    * @param docId - document to move.
    * @param directoryId - destination directory; the empty identifier selects the root.
+   * @param expected - optional exact active version; a mismatch preserves both paths.
    * @returns the moved document reference.
    * @throws UserDocError when either identifier is invalid or the destination is occupied.
    */
-  abstract move(docId: UserDocId, directoryId: UserDocDirectoryId): Promise<UserDocRef>
+  abstract move(docId: UserDocId, directoryId: UserDocDirectoryId, expected?: UserDocSelection): Promise<UserDocRef>
 
   /**
    * Resolve one identifier to its current reference.
@@ -453,11 +516,12 @@ export abstract class UserDocStore extends Service {
    * a client retrying a delete it already completed is not an error.
    * @param docId - identifier from a previous `save` or `list`.
    * @param signal - optional cancellation.
+   * @param expected - optional exact active version; a mismatch refuses deletion.
    * @returns after the entry is gone.
    * @throws UserDocError when the identifier is malformed or escapes the document
    * root, or the deletion fails for any reason other than absence.
    */
-  abstract remove(docId: UserDocId, signal?: AbortSignal): Promise<void>
+  abstract remove(docId: UserDocId, signal?: AbortSignal, expected?: UserDocSelection): Promise<void>
 }
 
 export default UserDocStore

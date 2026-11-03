@@ -16,6 +16,7 @@ Use `dsh-collaboration` as the Service Definition for authenticated project coll
 ## Table of Contents
 
 - [Runtime contract](#runtime-contract)
+- [Application authorization](#application-authorization)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -30,6 +31,11 @@ Use `dsh-collaboration` as the Service Definition for authenticated project coll
 - `capabilities()` is the per-principal access snapshot: `collaborationCapabilities(participant)` derives the scope-permitted action classes without contacting the backend — `personal` yields all verbs, `ro` yields `read`, `rw` yields `read`/`write`/`approve`, and `manage` rides the scope's own grant. Session-level rules such as creator status still apply through `authorize()`.
 - `withSessionCreation()` carries a project root conversation's `project` or `private` visibility through the asynchronous create operation; `currentCreation()` exposes it only inside that operation.
 - `CollaborationError` preserves stable denial codes for RPC and HTTP Consumers. Providers fail closed when membership, visibility, or their authorization backend cannot be established.
+
+<a id="application-authorization"></a>
+## Application authorization
+
+`collaborationOf(ctx)` resolves the provider and throws `CollaborationError('gateway-unavailable')` when application policy requires one but it is unavailable. `isCollaborationRequired(ctx)` reports that policy for ACL selection and capability hints. A shared-project Gateway runtime records the requirement before provider activation, and constructing any collaboration provider retains it on the application root across provider replacement. An independent application that has no collaboration requirement keeps owner semantics; execution authorization alone does not require a collaboration provider.
 
 <a id="model-experience"></a>
 ## Model Experience

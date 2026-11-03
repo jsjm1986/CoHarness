@@ -56,7 +56,7 @@ Profile recompositions run by HMR's profile watches and by Plugin Manager also r
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-`watchConfig()` registers an awaited configuration handler. `runExclusive()` serializes configuration changes and Loader updates with automatic reloads and rejects nested transactions. Package installation and removal run outside this queue. HMR does not acquire the package writer lock; manifest notifications reload only when the ordered `dsh.profile.bundles` list changes. Profile and home patch changes also trigger recomposition. File events received during a configuration transaction are processed afterward. Include refreshes and profile reconciliation reach plugins through ordinary Loader entry updates; Loader commits volatile-only changes in place.
+`watchConfig()` registers an awaited configuration handler. Each HMR instance reserves its canonical configuration paths; the watcher helper keeps no global registration table. `runExclusive()` serializes configuration changes and Loader updates with automatic reloads and rejects nested transactions. Package installation and removal run outside this queue. HMR does not acquire the package writer lock; manifest notifications reload only when the ordered `dsh.profile.bundles` list changes. Profile and home patch changes also trigger recomposition. File events received during a configuration transaction are processed afterward. Include refreshes and profile reconciliation reach plugins through ordinary Loader entry updates; Loader commits volatile-only changes in place.
 
 `reconcileProfile()` is shared by HMR’s profile watches and Plugin Manager; callers hold `runExclusive()`. Config Editor recomposes through app-boot without replacing modules. App-boot prepares and preflights the generation before caches or running entries change.
 
@@ -74,7 +74,7 @@ Loader entries retain their raw import results. HMR retains every distinct impor
 
 Entries sharing a runtime are replaced together, with each entry receiving the implementation for its own module. Duplicate entries for one module retain their separate plugin instances. On replacement failure, HMR removes partially activated replacements and restores the previous modules and plugin implementations. A successful reload updates every matching entry record, including disabled entries; a failed replacement leaves those records unchanged. Entries that have never loaded remain uninitialized.
 
-[package-manifest.ts](src/package-manifest.ts) owns the Node internal interfaces for package reads, scope, type, and nearest-manifest lookups. Each HMR instance owns its configuration cache and restores its installed hooks on disposal. Manifest invalidation clears the ESM `ResolveCache` and CommonJS `_pathCache`: neither records every consulted manifest, and entries may point outside their package directory. CommonJS loads resolve requests with Node's default resolver before entering the native loader, bypassing old request aliases while preserving evaluated modules. Synchronous resolve hooks receive the resulting filenames. Ordinary module replacement remains HMR's separate operation.
+[package-manifest.ts](src/package-manifest.ts) owns the Node internal interfaces for package reads, scope, type, and nearest-manifest lookups. Each HMR instance owns its configuration cache and retires its installed hook layers on disposal. Overlapping instances may close in either order: retired layers delegate without consulting released state, and restoring the last layer reinstates the original Node methods. Manifest invalidation clears the ESM `ResolveCache` and CommonJS `_pathCache`: neither records every consulted manifest, and entries may point outside their package directory. CommonJS loads resolve requests with Node's default resolver before entering the native loader, bypassing old request aliases while preserving evaluated modules. Synchronous resolve hooks receive the resulting filenames. Ordinary module replacement remains HMR's separate operation.
 
 Watched module paths use Node ESM resolution's `realpathSync()` spelling, including Windows short directory names, so file events match the module cache.
 
@@ -104,7 +104,7 @@ Reloading a contributing plugin can change later request prefixes; HMR does not 
 <a id="known-limitations-and-deferred-work"></a>
 
 - Module replacement requires Node loader internals. Framework dependency changes call the host-provided `loader.exit()` hook; HMR itself does not restart the process.
-- A change confined to `package.json` is not detected. Watcher notifications for manifests below `node_modules` are still ignored. The browser Client module graph retains its separate browser-side loading mechanism.
+- Watcher notifications for manifests below `node_modules` are still ignored. The browser Client module graph retains its separate browser-side loading mechanism.
 - Replacement follows static imports. A dynamic `import()` of a stale module evaluates the new file on its next call while its importer keeps running; existing Workers and the TSX loader thread keep their module caches.
 - Every symbolic link below the profile's `node_modules` widens the comparison scope. Linking a package that the process entry point, located through the real path of a bin link, imports statically, such as `dsh-app-boot`, Cordis or the Loader from a dsh checkout, brings host modules into scope; their changes stay pending, and Plugin Manager reports `restart-required` for later operations until the process restarts. Linked dsh packages that Loader entries import are replaced like other plugins.
 - The comparison records belong to one HMR instance. A recomposition that restarts the `hmr` entry itself records the current files again, so changes pending at that point are no longer reported or retried.
@@ -123,4 +123,9 @@ Reloading a contributing plugin can change later request prefixes; HMR does not 
 
 <a id="dev-note"></a>
 
-None.
+Configuration watchers are owned before readiness. The [ownership decision](../../../.agents/notes/implemented/bug-fix/2026-10-24-hmr-pending-watch-ownership.md) describes cancellation and cleanup failures. From the repository root, verify the built provider with:
+
+```sh
+pnpm run build
+node --expose-internals packages/boot/hmr/tests/fixtures/pending-watch-owner.mjs
+```

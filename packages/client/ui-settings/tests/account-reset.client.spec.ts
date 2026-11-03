@@ -12,7 +12,8 @@ function accountView(revision: number, preference: 'light' | 'dark' = 'light'): 
     revision, migrated: true,
     values: {
       locale: { preference: 'en' },
-      'ui-theme': { preference },
+      'ui-theme': { preference, fontSize: 14, codeFontSize: 13, terminalFontSize: 13,
+        textFontFamily: 'system', codeFontFamily: 'mono', terminalFontFamily: 'mono' },
       'ui-conversation': {
         busyEnter: 'queue', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14,
         transcriptView: 'detailed', performanceUsage: 'detailed', linkOpening: 'sidebar',

@@ -1,0 +1,14 @@
+{
+  "name": "systemd-control-final-emit",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.build.json",
+  "startedAt": "2026-10-25T00:50:14.478215+00:00",
+  "seconds": 2.873,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d2d4f9f1c9681583f12fb4f216494b4e575b68f61e622651ef4e92558155b32d",
+  "inputsAfter": "d2d4f9f1c9681583f12fb4f216494b4e575b68f61e622651ef4e92558155b32d",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

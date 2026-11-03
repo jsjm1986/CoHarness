@@ -1,0 +1,496 @@
+{
+  "finding": "B470",
+  "status": "fixed_verified_command_service_withdrawal_and_cleanup_344_cases_global_review_open",
+  "updatedAt": "2026-11-02T04:55:15.704647+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "verifiedAt": "2026-11-02T04:53:43.484242+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-latest-fetch.json",
+    "workingTreePreserved": true
+  },
+  "problem": "Command service withdrawal can finish before a pending handler or attachment admission. It removes the idle-release veto while accepted cleanup remains alive, and a retained service reference can still start another handler.",
+  "fix": "Give accepted commands service-lifetime cancellation, retain their actual admission and handler completion promises, refuse work after withdrawal, and compose idle listener teardown after those completions. Preserve UI cancellation and exact Agent checks.",
+  "compatibility": {
+    "serviceSignaturesChanged": false,
+    "handlerSignalCombinesUiAndServiceCancellation": true,
+    "remoteBusinessArgumentsChanged": false,
+    "sessionEventsChanged": false,
+    "sessionFormatChanged": false,
+    "newConfiguration": false,
+    "agentLoopChanged": false,
+    "peerOwnedUiOrTransportEdited": false
+  },
+  "verification": {
+    "differentNamedCases": 344,
+    "unitAndSourceSnapshotCases": 310,
+    "unitFiles": 19,
+    "realPostgresCases": 32,
+    "typeScriptSdkCases": 1,
+    "pythonSdkCases": 1,
+    "skipped": 0,
+    "sourceBuiltRepetitionsNotAdditionalCases": true,
+    "originalCounterexamples": {
+      "unitCases": 2,
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-original.json"
+    },
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 585,
+          "covered": 585,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 667,
+          "covered": 667,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 117,
+          "covered": 117,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 491,
+          "covered": 491,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/compaction/command-compact/src/index.ts": {
+        "lines": {
+          "total": 35,
+          "covered": 35,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 8,
+          "covered": 8,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 40,
+          "covered": 40,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 18,
+          "covered": 18,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/goal/command-goal/src/index.ts": {
+        "lines": {
+          "total": 72,
+          "covered": 72,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 12,
+          "covered": 12,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 84,
+          "covered": 84,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 70,
+          "covered": 70,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/src/index.ts": {
+        "lines": {
+          "total": 184,
+          "covered": 184,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 42,
+          "covered": 42,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 200,
+          "covered": 200,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 139,
+          "covered": 139,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/user-questions/src/index.ts": {
+        "lines": {
+          "total": 143,
+          "covered": 143,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 30,
+          "covered": 30,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 175,
+          "covered": 175,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 126,
+          "covered": 126,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/plan/plan-mode/src/index.ts": {
+        "lines": {
+          "total": 151,
+          "covered": 151,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 25,
+          "covered": 25,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 168,
+          "covered": 168,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 138,
+          "covered": 138,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "coverageGateUnchanged": true,
+    "normalRunnableSnapshot": [
+      "Node22 source Loader verifies idle retention and refuses withdrawn-service admission",
+      "Node24 built Loader verifies the same four disposal/replacement/idle/withdrawal flows",
+      "Built continued-question Typert dispatch remains valid"
+    ],
+    "docs": {
+      "initialAggregateReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-doc-quick.json",
+      "initialPassingLeaves": 19,
+      "failedLeaf": "type-equivalence",
+      "correctedLeafReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-type-equivalence.json",
+      "currentTranslationReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-translation-check.json",
+      "scope": "The19 other leaves passed; the copied CommandInvocation cancellation JSDoc is corrected on both pages and the failed leaf and translation pairing pass again."
+    },
+    "allChecks": [
+      {
+        "name": "command-withdrawal-coverage-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-coverage-final.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/interaction/commands/tests",
+          "packages/plan/plan-mode/tests",
+          "packages/compaction/command-compact/tests",
+          "packages/goal/command-goal/tests",
+          "packages/interaction/user-questions/tests",
+          "packages/extensions/tool-cordis/tests",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/interaction/commands/src/index.ts",
+          "--coverage.include=packages/plan/plan-mode/src/index.ts",
+          "--coverage.include=packages/compaction/command-compact/src/index.ts",
+          "--coverage.include=packages/goal/command-goal/src/index.ts",
+          "--coverage.include=packages/interaction/user-questions/src/index.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/coverage-final",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-coverage-final-cases.json"
+        ]
+      },
+      {
+        "name": "command-withdrawal-pg",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-pg.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/run-pg-check.mjs",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.e2e.config.ts",
+          "packages/context/gateway-execution/tests/pg-composition.e2e.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-pg-cases.json"
+        ]
+      },
+      {
+        "name": "command-withdrawal-built",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-built.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/interaction/commands/tests/caller-lifetime-loader.spec.ts",
+          "packages/interaction/user-questions/tests/continued-answer-loader.spec.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-built-cases.json"
+        ]
+      },
+      {
+        "name": "command-withdrawal-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-types.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-b",
+          "packages/interaction/commands",
+          "packages/extensions/tool-cordis",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "command-withdrawal-bundles",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-bundles.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "RAYON_NUM_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/tsdown/dist/run.mjs",
+          "--filter",
+          "@deepseek-ai/dsh-commands",
+          "--filter",
+          "@deepseek-ai/dsh-tool-cordis"
+        ]
+      },
+      {
+        "name": "command-withdrawal-host-types-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-host-types-final.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/host-types.tsbuildinfo",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "command-withdrawal-lint-complete",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-lint-complete.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_OXLINT_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/interaction/commands/src/index.ts",
+          "packages/interaction/commands/tests/commands.spec.ts",
+          "packages/interaction/commands/tests/fixtures/caller-lifetime-driver.mjs",
+          "packages/interaction/commands/tests/caller-lifetime-loader.spec.ts",
+          "packages/plan/plan-mode/tests/plan-mode.spec.ts",
+          "packages/compaction/command-compact/tests/command-compact.spec.ts",
+          "packages/extensions/tool-cordis/src/api-catalog.ts"
+        ]
+      },
+      {
+        "name": "command-withdrawal-type-equivalence",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-type-equivalence.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-type-equiv.ts"
+        ]
+      },
+      {
+        "name": "command-withdrawal-translation-check",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-translation-check.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts"
+        ]
+      },
+      {
+        "name": "command-withdrawal-export-jsdoc",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-export-jsdoc.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-export-jsdoc.ts"
+        ]
+      },
+      {
+        "name": "command-withdrawal-node-next",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-node-next.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-node-next-types.ts"
+        ]
+      },
+      {
+        "name": "command-withdrawal-publint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-publint.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/publint-all.ts",
+          "--packages-root",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/publish-view"
+        ]
+      },
+      {
+        "name": "command-withdrawal-sdk-src",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-sdk-src.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=src",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.expected.config.ts",
+          "apps/cli/tests/profiles/sdk/command-registration.expected.e2e.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-sdk-src-cases.json"
+        ]
+      },
+      {
+        "name": "command-withdrawal-sdk-lib",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-sdk-lib.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.expected.config.ts",
+          "apps/cli/tests/profiles/sdk/command-registration.expected.e2e.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-sdk-lib-cases.json"
+        ]
+      },
+      {
+        "name": "command-withdrawal-python",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-python.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=lib",
+          "python/sdk/.venv/bin/python",
+          "-m",
+          "pytest",
+          "python/sdk/tests/test_command_registration_expected.py",
+          "--junitxml=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-python-cases.xml"
+        ]
+      }
+    ],
+    "ownedDisposablePostgresDatabasesDropped": 1
+  },
+  "capsule": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/command-withdrawal-capsule.json",
+  "integrationIndex": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T043335Z/B416-B470-integration-index.json",
+  "remaining": [
+    "Complete the two retained SubagentCore fallback cleanup statements under the unchanged full-entry coverage gate.",
+    "Complete B04/B25 requirement and allocation classification without treating old unsupported-backend descriptions as current evidence.",
+    "Independently accept peer migration, Runtime control and R41 topology on the assembled matching release.",
+    "Review remaining domain and feature inventory; all12 domain completion reviews remain open.",
+    "Official paid Responses validation stays deferred by the user."
+  ],
+  "wholeProjectComplete": false,
+  "productionAcceptanceClaimed": false,
+  "officialResponsesDeferredByUser": true
+}

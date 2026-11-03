@@ -1,0 +1,14 @@
+{
+  "name": "document-public-fifo-source-repaired",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/document-fifo-probe.py positive",
+  "startedAt": "2026-10-26T00:03:12.421282+00:00",
+  "seconds": 2.147,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "786620eab5aef04393ddf041ba3be5b30f4ed07ebfe9e3bde5f4f6baf6e9574a",
+  "inputsAfter": "786620eab5aef04393ddf041ba3be5b30f4ed07ebfe9e3bde5f4f6baf6e9574a",
+  "postgresToolDirectory": null,
+  "outputSha256": "e1f53432e69914008201cbd04c9c1007ba10ec990a9b7bb1397bcd6980e6be0a",
+  "outputTail": "PASS: actual public FIFO is refused as DOCUMENT_NOT_FOUND; owned source child exited without a kill.\n"
+}

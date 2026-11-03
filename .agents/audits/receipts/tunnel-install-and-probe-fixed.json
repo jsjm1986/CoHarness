@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-install-and-probe-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/tunnel-install.spec.ts tests/tunnel-supervisor.spec.ts tests/tunnel-access.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T23:18:43.955991+00:00",
+  "seconds": 1.646,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8091d26dca7f63d0ac3cf3a02031096a03ec26041ff7e7d841d8374f91f2abbb",
+  "inputsAfter": "8091d26dca7f63d0ac3cf3a02031096a03ec26041ff7e7d841d8374f91f2abbb",
+  "postgresToolDirectory": null,
+  "outputSha256": "596c5cce1fd089f5b6935a4e7318d8ff7ff0ae390781a37181fc04089184ae3a",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/tunnel-install.spec.ts (4 tests | 1 failed) 493ms\n   × closes the archive before returning an upstream read failure 6ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/tunnel-install.spec.ts > closes the archive before returning an upstream read failure\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ tests/tunnel-install.spec.ts:67:26\n     65|   try {\n     66|     await expect(installCloudflared(root, async () => new Response(bod…\n     67|     expect(sink?.closed).toBe(true)\n       |                          ^\n     68|   } finally {\n     69|     if (sink !== undefined) { sink.destroy(); await Promise.allSettled…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 2 passed (3)\n      Tests  1 failed | 43 passed (44)\n   Start at  07:18:44\n   Duration  725ms (transform 148ms, setup 0ms, import 278ms, tests 636ms, environment 0ms)\n\n"
+}

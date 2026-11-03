@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
-import { UserDocId } from '@deepseek-ai/dsh-userdoc'
+import { UserDocId, UserDocIncarnationId, UserDocUploadOwnerId } from '@deepseek-ai/dsh-userdoc'
 import type {
   StoredUserDoc,
   UserDocLimits,
@@ -139,15 +139,20 @@ describe('user-document prompt context', () => {
     expect(session.snapshotEvents().map(event => event.type)).toEqual(['user/message'])
   })
 
-  it('records an attached event after the exact user message and replays the frozen model text', async () => {
+  it.each([false, true])('replays frozen document text with optional identity metadata: %s', async (withIdentity) => {
     const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(SessionStore)
     await ctx.plugin(userDocContext)
     const session = Session.create(SessionId('userdoc-event'))
     session.append('turn/start', { turn: 1 })
     session.append('step/start', { turn: 1, step: 1 })
-    const document = attachment('report', { kind: 'inline', text: 'frozen contents' })
+    const base = attachment('report', { kind: 'inline', text: 'frozen contents' })
+    const document: UserDocPromptAttachment = { ...base, ref: { ...base.ref,
+      ...withIdentity ? { identity: { incarnationId: UserDocIncarnationId('document-incarnation'), revision: 2,
+        createdBy: UserDocUploadOwnerId('document-actor'), origin: 'upload' as const } } : {},
+    } }
     const message = createUserMessage({
       content: [{ type: 'text', text: userDocContext.renderUserDocAttachment(document) }],
       source: { kind: 'user', documents: [document] } as never,
@@ -170,8 +175,11 @@ describe('user-document prompt context', () => {
       { type: 'text', text: 'Uploaded document "report.txt" at "/uploads/report"; contents inlined verbatim:\nfrozen contents' },
     ])
 
-    const replayed = Session.create(SessionId('userdoc-replay'), session.snapshotEvents())
+    const serialized = JSON.stringify(session.snapshotEvents())
+    const replayed = Session.create(SessionId('userdoc-replay'), JSON.parse(serialized) as ReturnType<Session['snapshotEvents']>)
     expect(replayed.deriveMessages()).toEqual(session.deriveMessages())
     expect(replayed.snapshotEvents().find(event => event.type === 'userdoc/attached')?.data).toEqual(attached?.data)
+    const restored = replayed.snapshotEvents().find(event => event.type === 'userdoc/attached')
+    expect(restored?.data.ref.identity).toEqual(document.ref.identity)
   })
 })

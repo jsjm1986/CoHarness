@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-native-drain-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/tsx --tsconfig tsconfig.run.json ../.agents/audits/.local/tunnel-native-probe.mjs drain",
+  "startedAt": "2026-10-24T21:33:19.904385+00:00",
+  "seconds": 1.164,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3d796b2fb205a0aa6b1757502871eafd61a5eb3a50fdff3e63dc9646d65e5a4f",
+  "inputsAfter": "3d796b2fb205a0aa6b1757502871eafd61a5eb3a50fdff3e63dc9646d65e5a4f",
+  "postgresToolDirectory": null,
+  "outputSha256": "b8c3a25841729099ed0a6194848dd47a513822f33f7065b37c5ead0d54eb86f0",
+  "outputTail": "named tunnel drains stdout and stderr without blocking its process\n"
+}

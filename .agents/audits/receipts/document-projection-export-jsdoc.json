@@ -1,0 +1,14 @@
+{
+  "name": "document-projection-export-jsdoc",
+  "cwd": ".",
+  "command": "pnpm run verify-export-jsdoc",
+  "startedAt": "2026-10-25T22:26:27.418294+00:00",
+  "seconds": 71.578,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e4d097033832f21b5e567a2bfb85d08fac0f3e8d4b1b5d19d14529f6830a99c9",
+  "inputsAfter": "e4d097033832f21b5e567a2bfb85d08fac0f3e8d4b1b5d19d14529f6830a99c9",
+  "postgresToolDirectory": null,
+  "outputSha256": "34c3189bb05208432b51c80e9941df04ac432c6f79279e01c6008b6c09b8526f",
+  "outputTail": "$ tsx scripts/verify-export-jsdoc.ts\nverify-export-jsdoc: every exported name in each package API is documented.\n"
+}

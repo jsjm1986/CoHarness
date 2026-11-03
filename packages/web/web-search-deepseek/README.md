@@ -29,11 +29,11 @@ Mount the provider in a composition that already loads the web service; it regis
 
 ### When to choose it
 
-Choose this backend when a deployment wants DeepSeek's native server-side web search and its users either sign in to a DeepSeek account or hold a `DEEPSEEK_API_KEY` — the provider reuses those credentials as [Authentication](#authentication) describes. One search is heavier than a dedicated retrieval endpoint: DeepSeek runs the search inside a full model turn, so expect one Messages call's latency and generated tokens per search, with up to `maxUses` server-side searches per request. Avoid it when per-search cost or latency dominates.
+Choose this backend for native server-side web search on a DeepSeek-compatible Messages route. Each search performs a complete model turn and up to `maxUses` server-side searches. Governed deployments select a configured LLM provider; standalone web compositions may use the independent API-key endpoint.
 
 ### Minimal configuration
 
-Load the web service and the provider; the key resolves from `ctx.credentials` when that service is mounted, otherwise from the process environment. The auxiliary search call has its own endpoint setting and uses the Anthropic-compatible base `https://api.deepseek.com/anthropic/v1`, with `/messages` appended. It reads `$DEEPSEEK_SEARCH_BASE_URL`, independently of the conversation adapter’s `$DEEPSEEK_BASE_URL`.
+Load the web service and provider. With `provider` configured, or model authorization installed or required, search uses the selected LLM route; the default route is `deepseek-official`. Its adapter owns the endpoint and credentials. Without those conditions, the configuration below resolves its own key through `ctx.credentials` or the launch environment and reads `DEEPSEEK_SEARCH_BASE_URL` independently of conversation settings.
 
 ```yaml
 - name: '@deepseek-ai/dsh-web'
@@ -45,9 +45,10 @@ Load the web service and the provider; the key resolves from `ctx.credentials` w
 
 | Field | Default | Meaning |
 |---|---|---|
-| `apiKey` | omitted | Literal DeepSeek API key; prefer `apiKeyEnv` so no secret enters configuration. A non-empty literal wins over `apiKeyEnv`; an account token wins over both |
+| `provider` | omitted | Governed LLM route. The route must implement native Messages search; unsupported protocols or native-login authentication fail explicitly |
+| `apiKey` | omitted | Standalone API key; prefer `apiKeyEnv`. A non-empty literal wins over `apiKeyEnv`; governed searches use their LLM route credentials |
 | `apiKeyEnv` | `DEEPSEEK_API_KEY` | Credential reference resolved for each search through `ctx.credentials`, or from the process environment when that service is absent. A search that needs an API key and finds none fails as `WEB_PROVIDER_CREDENTIAL_MISSING` |
-| `baseURL` | `https://api.deepseek.com/anthropic/v1` | Anthropic-compatible endpoint base; `/messages` is appended. Falls back to `$DEEPSEEK_SEARCH_BASE_URL`; an unparseable value makes the provider unavailable |
+| `baseURL` | `https://api.deepseek.com/anthropic/v1` | Standalone Messages base; `/messages` is appended. Falls back to `$DEEPSEEK_SEARCH_BASE_URL`. Governed searches use the selected LLM route endpoint |
 | `model` | `deepseek-v4-flash` | Anthropic-format model name |
 | `apiVersion` | `2023-06-01` | `anthropic-version` header value |
 | `maxTokens` | `4096` | Positive-integer upper bound on generated tokens for the Messages request |
@@ -58,7 +59,9 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 <a id="authentication"></a>
 ### Authentication
 
-A search authenticates with the DeepSeek account when the latest `request/context` event of the initiating Session names the `deepseek-account` provider route and `ctx.deepseekAccount` resolves a token for the search endpoint. The account service resolves one only while signed in and only for its deployment-configured inference origin, `https://api.deepseek.com` by default. That search sends only `x-dsh-auth-token`, even when an API key is configured. Every other search, including a call without an initiating Session and a search whose endpoint has another origin, sends the API key as both `x-api-key` and `Authorization: Bearer`. An HTTP 401 response to an account-authenticated search fails as `WEB_PROVIDER_ERROR` with sign-in guidance instead of endpoint guidance, and leaves the account signed in.
+Governed search retains the prepared LLM route's endpoint, model, credential reference and headers. Credentials resolve only during admitted execution; independent `apiKey`, `apiKeyEnv` and `baseURL` values do not override that route. Direct DeepSeek API-key routes and explicitly configured pi-ai Messages routes implement this operation. Provider-native login and other wire protocols fail explicitly when they cannot authenticate this native request.
+
+Standalone search resolves a non-empty literal API key first, then the credential reference. It sends that key as `x-api-key` and `Authorization: Bearer`. The transport class also accepts adapter-owned `resolveHeaders`, which exclusively supplies authentication without account or key fallback.
 
 ### What a search returns
 
@@ -66,11 +69,15 @@ A search authenticates with the DeepSeek account when the latest `request/contex
 
 ### Request logging
 
-A search running under an initiating agent appends the log-only `web/deepseek-search-llm-request` session event immediately before dispatch. It carries the resolved endpoint, API version, and the exact secret-free JSON body sent to DeepSeek; headers and credentials are excluded. Credential failures and cancellations before dispatch create no event, while later HTTP or response failures leave the attempted request durable.
+Governed searches use ordinary LLM middleware, exact-route authorization, execution attribution, model admission and actual usage reporting. The initiating Session is captured before any wait. Policy or execution revocation during admission prevents HTTP dispatch, and a missing required policy never restores standalone dispatch. Each request acquires one model permit and retains it through response processing and cancellation. Unloading aborts and joins accepted searches and cleanup.
+
+Independent searches retain their resource provider across admission and credential waits, checking current ownership and model-policy requirements immediately before dispatch. Withdrawal, replacement or newly installed admission refuses stale HTTP with `WEB_PROVIDER_ERROR`; unused capacity returns to the original owner. A newly required model policy also stops independent dispatch. Restore authorization and make a fresh search rather than transferring the old grant. Requests refused before recording add no native input to the initiating Session.
+
+For an initiating Session, `web/deepseek-search-llm-request` records the exact endpoint, API version and secret-free body. Governed search appends it before model middleware, allowing the checkpoint policy to make it durable before HTTP; a refused attempt retains its recorded input. Standalone search appends after authentication and admission, immediately before HTTP. Headers and credentials are excluded. Actual provider usage is reported before result mapping; absent usage remains absent.
 
 ### Failures and recovery
 
-Failures throw `WebError` with a machine-routable code: a missing credential is `WEB_PROVIDER_CREDENTIAL_MISSING`, caller cancellation is `WEB_ABORTED`, and provider or transport failures — including a response with no `web_search_tool_result` block — are `WEB_PROVIDER_ERROR`. HTTP redirects are rejected before the `Location` target is contacted. Every failure after dispatch names the resolved search endpoint and explains that search endpoint configuration is separate from chat. If the endpoint is unintended, the message tells the conversation model to guide the user to the Messages API base URL field under Plugins > Built-in plugin settings > Web search and save the change. When that page is unavailable, it names `web-search-deepseek.baseURL` as the deployment configuration alternative. The model must not choose or change the endpoint. The model-facing `web_search` tool surfaces this text under its own error wrapper.
+Failures throw `WebError`: missing standalone credentials use `WEB_PROVIDER_CREDENTIAL_MISSING`, cancellation uses `WEB_ABORTED`, and model policy, provider or transport failures use `WEB_PROVIDER_ERROR`. The original model failure remains the cause for programmatic inspection. Redirects are rejected before contacting their target. Post-dispatch failures name the exact endpoint and direct the user to its owning model route settings for governed search, or the independent Web search settings for standalone search. The model must not choose or change an endpoint. The `web_search` Consumer owns the error wrapper.
 
 -----
 
@@ -94,12 +101,14 @@ The provider is built on two commitments:
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Config schema and per-search option capture |
+| [`src/admission.ts`](src/admission.ts) | Session capture, model admission and accepted-search cleanup |
 | [`src/provider.ts`](src/provider.ts) | The `DeepSeekSearchProvider`: Messages request dispatch, block parsing, citation joining, credential resolution |
+| [`src/usage.ts`](src/usage.ts) | Validate actual provider token counts without inventing missing usage |
 | [`src/types.ts`](src/types.ts) | Anthropic wire types for the search response |
 
 ### Request flow
 
-Each search captures the current Config values into provider options — endpoint, model, key reference, limits — then asks `ctx.deepseekAccount` for a token when the initiating Session uses the account route, otherwise resolves the credential reference through `ctx.credentials` (or the environment), appends the log-only session event, and dispatches the Messages request with the native `web_search` server tool. The response's `web_search_tool_result` blocks become `sources[]`; `cited_text` entries from text blocks are joined to their URLs as snippets; results are deduplicated by URL; and the service enforces the requested source bound on the way back.
+Governed search prepares and records a native operation on its selected LLM route. Standalone search resolves its independent options after admission. Both use the same Messages serializer and result mapper: `web_search_tool_result` supplies sources, citations supply snippets, and the web service applies deduplication and source bounds.
 
 </details>
 

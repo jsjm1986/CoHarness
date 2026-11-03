@@ -1,0 +1,49 @@
+{
+  "id": "postgres-command-argument-privacy-2026-11-03",
+  "findings": [
+    "B491"
+  ],
+  "status": "confirmed_native_process_argument_exposure_fix_design_open",
+  "observedAt": "2026-11-02T21:12:14.361405+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T210549Z",
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T210549Z/native-maintenance-argument-witness.json",
+  "source": "gateway/src/deployment-commands.ts",
+  "sourceSha256": "7a8ff0c0757d88254291396e956ed7e0838936ed5b3183e4615d1ae1a428faf6",
+  "verified": {
+    "actualNativeClient": "/opt/homebrew/Cellar/libpq/18.6_1/bin/pg_dump",
+    "actualLocalTcpConnectionOpened": true,
+    "syntheticPasswordVisibleToProcessArgumentInspection": true,
+    "rawArgumentsOrCredentialNotPrinted": true,
+    "cancellationJoinedActualNativeClient": true,
+    "realDatabaseOrCredentialsUsed": false
+  },
+  "compatibilityRequirements": [
+    "Retain documented native and configurable Docker/SSH wrapper stdin/stdout behavior.",
+    "Preserve explicit URI credential precedence relative to service files, PGPASSWORD and PGPASSFILE; prior real-client probes reject a naive environment rewrite.",
+    "Check valid credential characters and all backup/render/restore/verify invocation paths.",
+    "A replacement private-file channel must be accessible inside the actual command wrapper and removed only after its native owner settles."
+  ],
+  "remaining": [
+    "Implement and verify a compatible private credential channel; no source fix is claimed yet.",
+    "Actual signed deployment backup/restore and native/Docker/SSH success/error/cancellation regressions after implementation."
+  ],
+  "primaryReferences": [
+    "https://www.postgresql.org/docs/current/libpq-connect.html"
+  ],
+  "productionWrites": false,
+  "wholeProjectComplete": false,
+  "compatibilityEvidence": {
+    "privateWireMatrix": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T210549Z/native-private-auth-matrix-with-uri-lf-control.json",
+    "actualOwnedPostgres": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T210549Z/native-password-newline-real-postgres.json",
+    "observed": [
+      "Native pg_dump18 and an actual isolated PostgreSQL accept and export with a synthetic LF-containing password. A0600passfile with the same password fails authentication.",
+      "Native wire matrix preserves colon/backslash/Unicode and internalCR through passfile, but not LF; no secret payloads printed.",
+      "An explicit empty URI password plus environment does not supply credentials, whereas the private passfile preserves the tested service-password override.",
+      "A full URI placed in a service dbname is sent as the literal database name; it does not replace first-database connection-string expansion."
+    ],
+    "sourceFixed": false,
+    "realDataOrCredentialsUsed": false,
+    "temporaryRoleAndDatabaseRemoved": true
+  },
+  "updatedAt": "2026-11-02T21:53:53.582512+00:00"
+}

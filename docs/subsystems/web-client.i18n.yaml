@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/web-client.md
 document:
-  en: 62dc7cadc67fc344f97481b2b7ee4ebb8d9ec04e
-  zh: 9d31fd66fe425e550456111ce7999c81bb00f653
+  en: a2f9d01f6b0ebe097820c5cd9bc08e33cd69a900
+  zh: faaa1fd78eb7d6c4b13f625c776319728b9d76f1
 /web-client-architecture:
   en: 2c4d7c78beaac4ae
   zh: 57ee9d1e13488ec8
@@ -15,8 +15,8 @@ document:
   en: 5ac7d3aed7bf273a
   zh: e34869c8ad64052d
 /web-client-architecture/remote-communication:
-  en: 71cb4ae99a9e90a6
-  zh: 5b55b4424ef8f242
+  en: 1fcc0e97ba1202c2
+  zh: 71e6f23af2a4a7d5
 /web-client-architecture/client-models:
   en: 13be17c2a2790ae9
   zh: f5af715d0ae222be

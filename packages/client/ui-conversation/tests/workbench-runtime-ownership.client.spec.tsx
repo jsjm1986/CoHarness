@@ -8,7 +8,8 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { ConnectionHandle, HostDescription } from '@deepseek-ai/dsh-client-connection/client'
 import {
   clientSessionKey, ConversationEventRegistry, ConversationViewRegistry, createSnapshotStore,
-  ProjectUiPolicyRuntime, SessionRuntime, SessionRuntimePool, SlotRegistry, WorkspaceRuntime,
+  ProjectUiPolicyRuntime, sessionPersistenceKey, SessionRuntime, SessionRuntimePool, SlotRegistry,
+  WorkspaceRuntime,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId, SessionRuntimeTarget, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
@@ -39,6 +40,7 @@ class ResizeObserverStub {
 
 beforeEach(() => {
   localStorage.clear()
+  sessionStorage.clear()
   vi.stubGlobal('ResizeObserver', ResizeObserverStub)
 })
 afterEach(async () => {
@@ -68,13 +70,20 @@ function transport(api: FakeApiClient, target: SessionRuntimeTarget, stopped = v
   }
   return {
     api, isLoopback: false, interactions: 'none',
+    metadataTiming: { requestTimeoutMs: 15000, retryAfterMs: 10000 },
     hostDescription: createSnapshotStore<HostDescription | undefined>(description),
     state: { getSnapshot: () => undefined, subscribe: () => () => {} },
     rpc: { call: () => Promise.reject(new Error('unexpected rpc')) },
     reconnect: () => {},
     start: (sinks) => {
+      const ac = new AbortController()
+      void (async () => {
+        try {
+          for await (const envelope of api.events.mux({}, ac.signal)) sinks.onMuxEnvelope?.(envelope)
+        } catch { /* mux stream closed or failed during teardown */ }
+      })()
       queueMicrotask(() => { sinks.onConnected?.(description) })
-      return { stop: stopped }
+      return { stop: () => { ac.abort(); stopped() } }
     },
   }
 }
@@ -191,7 +200,9 @@ describe('logical Workbench Runtime ownership', () => {
         const conversation = h.ctx.get('conversation') as IConversation
         const input = conversation.input.for(scope)
         const text = `Accepted hidden ${focused} prompt`
-        const key = `dsh.conversation.chat.${id}`
+        const owner = sessionPersistenceKey(h.ctx.sessions, id, true, 1)
+        if (owner === undefined) throw new Error('Expected the verified persistence owner')
+        const key = `dsh.conversation.chat.scoped.v1.${encodeURIComponent(owner)}`
         act(() => {
           input.setDraft(text)
           input.submit()
@@ -202,6 +213,21 @@ describe('logical Workbench Runtime ownership', () => {
         fireEvent.click(h.view.getByRole('button', { name: /^Plugins$/ }))
         expect(h.view.container.querySelectorAll('textarea')).toHaveLength(0)
         await act(async () => { admission.resolve(ok({ accepted: true as const })); await admission.promise })
+        const requestId = h.pool.binding(id)?.session.getSnapshot().pendingSubmissions?.[0]?.requestId
+        if (requestId === undefined) throw new Error('Expected the pending submission echo')
+        const frame = {
+          type: 'session/event',
+          sessionId: DURABLE,
+          event: {
+            seq: 1, time: 1_700_000_000_001,
+            type: 'user/message', surfaceOp: 'append',
+            data: { content: [{ type: 'text', text }], source: { kind: 'user', rpcId: requestId } },
+          },
+        } as never
+        await act(async () => {
+          if (focused === 'personal') h.pool.handleMuxEnvelope({ rpcId: 'echo' as never, payload: frame })
+          else api.pushMux(frame)
+        })
         await waitFor(() => { expect(input.state.getSnapshot().draft).toBe('') })
         expect(JSON.parse(localStorage.getItem(key) ?? 'null')).toMatchObject({ draft: '' })
         fireEvent.click(h.view.getByRole('button', { name: /^Conversation$/ }))

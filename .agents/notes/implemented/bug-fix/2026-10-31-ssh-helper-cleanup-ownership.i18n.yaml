@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-ssh-helper-cleanup-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-ssh-helper-cleanup-ownership.md
+document:
+  en: bd8be5d941276bf80a94719a3ecb4a94ad8c7ac4
+  zh: 235a11849dd2d4960694f032dfd624add1d43f90
+/agent-note-ssh-helper-cleanup-remains-owned-through-failed-attempts:
+  en: 12f10ebaac2252ce
+  zh: 3253f1e49e2ceee8
+/agent-note-ssh-helper-cleanup-remains-owned-through-failed-attempts/problem:
+  en: 353e6e5ddd1770d3
+  zh: 78d2930b6560dd23
+/agent-note-ssh-helper-cleanup-remains-owned-through-failed-attempts/decision:
+  en: 9c43cbbb23222329
+  zh: e321c28dd0a6547e
+/agent-note-ssh-helper-cleanup-remains-owned-through-failed-attempts/alternatives-considered:
+  en: 64d27bd45e4febd9
+  zh: fe2290fae2248a9a
+/agent-note-ssh-helper-cleanup-remains-owned-through-failed-attempts/consequences:
+  en: 2de3359910566cb8
+  zh: b915df11ff14ee8c
+/agent-note-ssh-helper-cleanup-remains-owned-through-failed-attempts/verification:
+  en: 5d0166651ef2b88b
+  zh: 8dc137ffafd0243c

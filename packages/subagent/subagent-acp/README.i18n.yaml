@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/subagent-acp/README.md
 document:
-  en: 63ccf28023326921c11dc5484d0197d65bfc491c
-  zh: 5c4588007b2e4fdaaacec6ab4d047d9967010a16
+  en: fe44135607f7a982da34244e7f6ee3b81b32005c
+  zh: ac995b42d38f02a9e95617b7a5bd4f8c9aff398f
 /:
   en: 6bd98361309cf951
   zh: 61495d48365178df
@@ -63,8 +63,8 @@ document:
   en: f5d5f97a153f7c70
   zh: afc7da8783b348c6
 /deepseek-ai-dsh-subagent-acp/known-limitations-and-deferred-work:
-  en: bd92952b46375754
-  zh: da9698a3f018a971
+  en: d7a51c7b7e23bcff
+  zh: f08f4e87d9c2d90b
 /deepseek-ai-dsh-subagent-acp/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

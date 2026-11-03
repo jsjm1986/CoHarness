@@ -1,0 +1,14 @@
+{
+  "name": "runtime-purpose-boundary-fixed",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/vitest run packages/context/gateway-runtime/tests/gateway-admission.host.spec.ts",
+  "startedAt": "2026-10-26T14:35:41.628216+00:00",
+  "seconds": 7.462,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "dd60a803849597d58f02f8d7c297a7f6c19ed1fad0d24686516d15b7124886f0",
+  "inputsAfter": "dd60a803849597d58f02f8d7c297a7f6c19ed1fad0d24686516d15b7124886f0",
+  "postgresToolDirectory": null,
+  "outputSha256": "0e91ea0873eb1a136eff1bb3eb057a60c99694afd21e657e46a6edcc42778d17",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  7 passed (7)\n   Start at  22:35:45\n   Duration  3.43s (transform 2.34s, setup 58ms, import 2.96s, tests 213ms, environment 0ms)\n\n"
+}

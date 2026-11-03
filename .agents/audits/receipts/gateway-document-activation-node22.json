@@ -1,0 +1,14 @@
+{
+  "name": "gateway-document-activation-node22",
+  "cwd": "gateway",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 /Users/a1234/.nvm/versions/node/v22.22.1/bin/node ../node_modules/vitest/vitest.mjs run tests/macos-release-control.spec.ts -t 'validates the compiled document module graph'",
+  "startedAt": "2026-10-26T20:40:03.434523+00:00",
+  "seconds": 5.139,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "88cf2586400883147b82b40d91c20a2807796b7f4278999b87d09b71e6d2ab04",
+  "inputsAfter": "88cf2586400883147b82b40d91c20a2807796b7f4278999b87d09b71e6d2ab04",
+  "postgresToolDirectory": null,
+  "outputSha256": "0fa3031435feb5eeed016279f58b5283ca9e7f4e1566b8ee53195e9bd023ff9c",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  7 passed | 39 skipped (46)\n   Start at  04:40:06\n   Duration  1.64s (transform 62ms, setup 0ms, import 100ms, tests 1.33s, environment 0ms)\n\n"
+}

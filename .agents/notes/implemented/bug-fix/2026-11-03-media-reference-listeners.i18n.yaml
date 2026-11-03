@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-03-media-reference-listeners.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-03-media-reference-listeners.md
+document:
+  en: 5e8b691b0e50a91f5abec83ef8ac00a9f17f89ba
+  zh: 67e011909b993e0656c65e35c0320d3148984452
+/agent-note-file-preview-cancellation-listeners-end-with-each-read:
+  en: a3754064d2d4443d
+  zh: 46fa9bef04ad5a38
+/agent-note-file-preview-cancellation-listeners-end-with-each-read/problem:
+  en: e8188fc4ffa5b207
+  zh: 706b81e9eb2d546c
+/agent-note-file-preview-cancellation-listeners-end-with-each-read/decision:
+  en: f8ae036a1c430153
+  zh: 1b345f2a59e0e1c2
+/agent-note-file-preview-cancellation-listeners-end-with-each-read/alternatives-considered:
+  en: debabc68c78fb168
+  zh: 43cd2343b60b4422
+/agent-note-file-preview-cancellation-listeners-end-with-each-read/consequences:
+  en: 8829b8a914f7f15f
+  zh: 5da4fe47494a297c
+/agent-note-file-preview-cancellation-listeners-end-with-each-read/verification:
+  en: 241381efc48291b7
+  zh: 408b52446719e0e4

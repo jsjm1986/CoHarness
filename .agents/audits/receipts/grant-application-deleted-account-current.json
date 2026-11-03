@@ -1,0 +1,14 @@
+{
+  "name": "grant-application-deleted-account-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/apply-grants.spec.ts tests/users.spec.ts",
+  "startedAt": "2026-10-23T23:51:24.264149+00:00",
+  "seconds": 4.924,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "25476e7b00691b68694fcbb8ae0d0fc8d332ae96cf724765a5784bab049b1799",
+  "inputsAfter": "25476e7b00691b68694fcbb8ae0d0fc8d332ae96cf724765a5784bab049b1799",
+  "postgresToolDirectory": null,
+  "outputSha256": "af049cd47d208205c5103d743ea6fea425ccf05db04957c6f29e8567883b3bad",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  17 passed (17)\n   Start at  07:51:26\n   Duration  2.38s (transform 868ms, setup 0ms, import 1.11s, tests 2.55s, environment 0ms)\n\n"
+}

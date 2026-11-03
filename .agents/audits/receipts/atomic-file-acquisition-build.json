@@ -1,0 +1,14 @@
+{
+  "name": "atomic-file-acquisition-build",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 node_modules/.bin/tsx scripts/build.ts",
+  "startedAt": "2026-10-25T23:11:06.584239+00:00",
+  "seconds": 164.567,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "42eb89cefe643b240f73a29c06d2ab7fedcf12465e4d92544fe1028c2bdaa70a",
+  "inputsAfter": "42eb89cefe643b240f73a29c06d2ab7fedcf12465e4d92544fe1028c2bdaa70a",
+  "postgresToolDirectory": null,
+  "outputSha256": "54adbaab571996b072a491cc7177d6af6108f48926b9a7b00f53743a9bf801a7",
+  "outputTail": "run-gates: build running 8 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start native addon\nrun-gates: PASS native addon (1.26s)\nrun-gates: start host compiler\nrun-gates: PASS host compiler (5.49s)\nrun-gates: start Host bundle\nrun-gates: PASS Host bundle (10.36s)\nrun-gates: start client compiler\nrun-gates: PASS client compiler (0.79s)\nrun-gates: start Client bundle\nrun-gates: PASS Client bundle (6.55s)\nrun-gates: start Web build\nrun-gates: PASS Web build (5.68s)\nrun-gates: start host aggregate check\nrun-gates: PASS host aggregate check (126.06s)\nrun-gates: start client aggregate check\nrun-gates: PASS client aggregate check (6.07s)\n\nrun-gates: 8 passed, 0 failed, 0 skipped in 162.27s.\nbuild: recorded 266 client artifact(s) with 3 public value(s)\n"
+}

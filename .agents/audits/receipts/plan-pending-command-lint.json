@@ -1,0 +1,14 @@
+{
+  "name": "plan-pending-command-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/plan/plan-mode/src/index.ts packages/plan/plan-mode/src/types.ts packages/plan/plan-mode/tests/projection.spec.ts packages/plan/plan-mode/tests/pending-command-loader.spec.ts packages/plan/plan-mode/tests/fixtures/pending-command-driver.mjs",
+  "startedAt": "2026-10-26T02:28:40.567510+00:00",
+  "seconds": 6.62,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9a5a8aeb9873eec54be548c56acfae3f9678d9c154d9c5deb9a37862e666a5da",
+  "inputsAfter": "9a5a8aeb9873eec54be548c56acfae3f9678d9c154d9c5deb9a37862e666a5da",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

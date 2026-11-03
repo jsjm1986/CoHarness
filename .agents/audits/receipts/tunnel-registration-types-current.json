@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-registration-types-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T22:37:49.850540+00:00",
+  "seconds": 5.347,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "babbe9070fba3e3e1ae12418dcf0fe98a7b7a9b4a457cf6c3946272ef14f9754",
+  "inputsAfter": "babbe9070fba3e3e1ae12418dcf0fe98a7b7a9b4a457cf6c3946272ef14f9754",
+  "postgresToolDirectory": null,
+  "outputSha256": "4ce964060036cf1351663fe2f48ef637dfd7f8a4f3e9f7b8cddbb35a966ff6d8",
+  "outputTail": "gateway/src/tunnel-process.ts(61,41): error TS2339: Property 'TUNNEL_TOKEN' does not exist on type '{ HOME: string; }'.\n"
+}

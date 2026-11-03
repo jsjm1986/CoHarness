@@ -64,8 +64,8 @@ export class PostgresAuthService {
     private readonly cfg: GatewayConfig,
   ) {}
 
-  private serializeLogin<T>(username: string, operation: () => Promise<T>): Promise<T> {
-    const key = `${this.context.organizationId}\u0000${loginKey(username)}`
+  private serializeLogin<T>(canonicalUsername: string, operation: () => Promise<T>): Promise<T> {
+    const key = `${this.context.organizationId}\u0000${canonicalUsername}`
     const previous = this.loginTails.get(key) ?? Promise.resolve()
     const current = previous.then(operation, operation)
     const tail = current.then(() => undefined, () => undefined)
@@ -78,8 +78,13 @@ export class PostgresAuthService {
 
   async login(username: string, password: string, ip: string, userAgent: string):
   Promise<{ token: string; user: UserRow } | 'invalid' | 'locked'> {
-    return this.serializeLogin(username, async () => {
-      const now = Date.now()
+    // citext uses the database locale; JavaScript case folding can assign the
+    // same PostgreSQL identity to different queues and transaction locks.
+    const canonical = await this.context.pool.query<{ username: string }>(
+      'SELECT lower($1::text) username', [username],
+    )
+    const canonicalUsername = canonical.rows[0]!.username
+    return this.serializeLogin(canonicalUsername, async () => {
       const address = sourceIp(ip)
       const result = await this.context.pool.query<PostgresAuthUser>(`SELECT u.public_id::text,u.username::text,
         u.display_name,u.status,u.deleted_at,u.home_path,m.role,m.status membership_status,
@@ -87,7 +92,8 @@ export class PostgresAuthService {
         FROM harness.users u
         JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
         JOIN harness.password_credentials c ON c.user_id=u.id
-        WHERE u.organization_id=$1 AND u.username=$2`, [this.context.organizationId, username])
+        WHERE u.organization_id=$1 AND u.username=$2
+          AND (SELECT status FROM harness.organizations WHERE id=$1)='active'`, [this.context.organizationId, username])
       const row = result.rows[0]
       const accepted = row !== undefined && row.status === 'active' && row.membership_status === 'active'
         && row.deleted_at === null
@@ -96,20 +102,21 @@ export class PostgresAuthService {
       return await transaction(this.context.pool, async (client) => {
         // Serialize the check-and-record transition across Gateway processes,
         // not just within this Node instance.
-        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-login:${this.context.organizationId}:${username}`])
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-login:${this.context.organizationId}:${canonicalUsername}`])
         await client.query(`DELETE FROM harness.login_attempts
-          WHERE organization_id=$1 AND occurred_at <= to_timestamp($2/1000.0)`,
-        [this.context.organizationId, now - LOCK_WINDOW_MS])
+          WHERE organization_id=$1 AND occurred_at <= clock_timestamp()-($2::double precision * interval '1 millisecond')`,
+        [this.context.organizationId, LOCK_WINDOW_MS])
         const failures = await client.query<{ n: string }>(`SELECT COUNT(*)::text n
           FROM harness.login_attempts
-          WHERE organization_id=$1 AND username=$2 AND occurred_at > to_timestamp($3/1000.0) AND succeeded=false`,
-        [this.context.organizationId, username, now - LOCK_WINDOW_MS])
+          WHERE organization_id=$1 AND username=$2
+            AND occurred_at > clock_timestamp()-($3::double precision * interval '1 millisecond') AND succeeded=false`,
+        [this.context.organizationId, username, LOCK_WINDOW_MS])
         if (Number(failures.rows[0]?.n ?? 0) >= LOCK_THRESHOLD) return 'locked' as const
         if (!accepted || row === undefined || token === undefined) {
           await client.query(`INSERT INTO harness.login_attempts(
             organization_id,username,source_ip,occurred_at,succeeded
-          ) VALUES($1,$2,$3,to_timestamp($4/1000.0),false)`,
-          [this.context.organizationId, username, address, now])
+          ) VALUES($1,$2,$3,clock_timestamp(),false)`,
+          [this.context.organizationId, username, address])
           return 'invalid' as const
         }
         await client.query(`DELETE FROM harness.login_attempts
@@ -126,6 +133,7 @@ export class PostgresAuthService {
            JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
            JOIN harness.password_credentials c ON c.user_id=u.id
            WHERE u.organization_id=$1 AND u.public_id=$2
+             AND (SELECT status FROM harness.organizations WHERE id=$1)='active'
            FOR SHARE OF u,m,c`,
           [this.context.organizationId, row.public_id],
         )
@@ -134,44 +142,56 @@ export class PostgresAuthService {
           || current.deleted_at !== null || current.password_hash !== row.password_hash) {
           await client.query(`INSERT INTO harness.login_attempts(
             organization_id,username,source_ip,occurred_at,succeeded
-          ) VALUES($1,$2,$3,to_timestamp($4/1000.0),false)`,
-          [this.context.organizationId, username, address, now])
+          ) VALUES($1,$2,$3,clock_timestamp(),false)`,
+          [this.context.organizationId, username, address])
           return 'invalid' as const
         }
-        await client.query(`INSERT INTO harness.auth_sessions(
+        await client.query(`WITH issued AS MATERIALIZED (SELECT clock_timestamp() at)
+          INSERT INTO harness.auth_sessions(
           organization_id,user_id,token_hash,created_at,expires_at,absolute_expires_at,last_seen_at,source_ip,user_agent
-        ) VALUES($1,$2,$3,to_timestamp($4/1000.0),to_timestamp($5/1000.0),to_timestamp($6/1000.0),
-          to_timestamp($4/1000.0),$7,$8)`, [this.context.organizationId, current.id, tokenHash(token), now,
-          now + this.cfg.sessionTtlMs, now + this.cfg.sessionAbsoluteTtlMs, address, userAgent])
+          ) SELECT $1,$2,$3,at,at+($4::double precision * interval '1 millisecond'),
+            at+($5::double precision * interval '1 millisecond'),at,$6,$7 FROM issued`,
+        [this.context.organizationId, current.id, tokenHash(token), this.cfg.sessionTtlMs, this.cfg.sessionAbsoluteTtlMs, address, userAgent])
         return { token, user: userRow(current) }
       })
     })
   }
 
   async validate(token: string): Promise<UserRow | null> {
-    return transaction(this.context.pool, async (client) => {
-      const result = await client.query<PostgresAuthUser & {
-        session_id: string
-        absolute_expires_at: Date
-      }>(`SELECT s.id session_id,s.absolute_expires_at,u.public_id::text,u.username::text,
-        u.display_name,u.status,u.deleted_at,u.home_path,m.role,m.status membership_status,
-        c.must_change_password,c.password_hash,u.auto_review_eligible
-        FROM harness.auth_sessions s
-        JOIN harness.users u ON u.id=s.user_id AND u.organization_id=s.organization_id
+    const renewed = await this.context.pool.query<{ id: string }>(`WITH locked AS MATERIALIZED (
+        SELECT id,expires_at,absolute_expires_at FROM harness.auth_sessions
+        WHERE organization_id=$1 AND token_hash=$2 AND revoked_at IS NULL
+          AND expires_at > clock_timestamp() AND absolute_expires_at > clock_timestamp()
+        FOR UPDATE
+      ) UPDATE harness.auth_sessions s
+        SET last_seen_at=clock_timestamp(),
+          expires_at=LEAST(clock_timestamp()+($3::double precision * interval '1 millisecond'),s.absolute_expires_at)
+        FROM harness.users u
         JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
         JOIN harness.password_credentials c ON c.user_id=u.id
-        WHERE s.organization_id=$1 AND s.token_hash=$2 AND s.revoked_at IS NULL
-          AND s.expires_at >= now() AND s.absolute_expires_at >= now()
-        FOR UPDATE OF s`, [this.context.organizationId, tokenHash(token)])
-      const row = result.rows[0]
-      if (row === undefined || row.status !== 'active' || row.membership_status !== 'active' || row.deleted_at !== null) return null
-      const now = Date.now()
-      const expiresAt = Math.min(now + this.cfg.sessionTtlMs, row.absolute_expires_at.getTime())
-      await client.query(`UPDATE harness.auth_sessions
-        SET last_seen_at=to_timestamp($2/1000.0),expires_at=to_timestamp($3/1000.0)
-        WHERE id=$1`, [row.session_id, now, expiresAt])
-      return userRow(row)
-    })
+        CROSS JOIN locked
+        WHERE s.organization_id=$1 AND s.id=locked.id AND s.user_id=u.id AND u.organization_id=s.organization_id
+          AND s.revoked_at IS NULL AND locked.expires_at > clock_timestamp() AND locked.absolute_expires_at > clock_timestamp()
+          AND u.status='active' AND u.deleted_at IS NULL AND m.status='active'
+          AND (SELECT status FROM harness.organizations WHERE id=$1)='active'
+        RETURNING s.id`, [this.context.organizationId, tokenHash(token), this.cfg.sessionTtlMs])
+    const session = renewed.rows[0]
+    if (session === undefined) return null
+    // Authority comes from a fresh snapshot after renewal releases the session lock.
+    const result = await this.context.pool.query<PostgresAuthUser>(`SELECT
+        u.public_id::text,u.username::text,u.display_name,u.status,u.deleted_at,u.home_path,
+        m.role,m.status membership_status,c.must_change_password,c.password_hash,u.auto_review_eligible
+      FROM harness.auth_sessions s
+      JOIN harness.users u ON u.id=s.user_id AND u.organization_id=s.organization_id
+      JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
+      JOIN harness.password_credentials c ON c.user_id=u.id
+      WHERE s.organization_id=$1 AND s.id=$2 AND s.revoked_at IS NULL
+        AND s.expires_at > clock_timestamp() AND s.absolute_expires_at > clock_timestamp()
+        AND u.status='active' AND u.deleted_at IS NULL AND m.status='active'
+        AND (SELECT status FROM harness.organizations WHERE id=$1)='active'`,
+    [this.context.organizationId, session.id])
+    const row = result.rows[0]
+    return row === undefined ? null : userRow(row)
   }
 
   /**

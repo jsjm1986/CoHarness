@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-new-unknown-assertions",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/verify-no-unknown-casts.ts",
+  "startedAt": "2026-10-26T18:09:56.271363+00:00",
+  "seconds": 15.32,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "21a0cc27eef677a574dc8afec651d186415a5cbf7d51f5312a7f29307f557e82",
+  "inputsAfter": "21a0cc27eef677a574dc8afec651d186415a5cbf7d51f5312a7f29307f557e82",
+  "postgresToolDirectory": null,
+  "outputSha256": "e93921d067d05f9caf12686014c74c5daa8293f695482478d66bb9c96e1d9cbf",
+  "outputTail": "verify-no-unknown-casts: remove retired baseline entries with pnpm run verify-no-unknown-casts --prune.\n  packages/goal/goal/src/index.ts (09a26f55e58db3477446e73f59bd3cdf678ae76ff8f54d185ec4a0ce0dc7da2d)\n"
+}

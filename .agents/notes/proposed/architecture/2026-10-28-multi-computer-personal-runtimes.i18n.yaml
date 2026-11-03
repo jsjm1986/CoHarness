@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for 2026-10-28-multi-computer-personal-runtimes.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-10-28-multi-computer-personal-runtimes.md
+document:
+  en: a5ed2188dda04ef67feeafbebc8d68d1c7e15cf1
+  zh: ec4a6dd4278911fda773e635fd525a2cae245038
+/agent-note-multi-computer-runtime-management:
+  en: fe7bd63f5a61a3d9
+  zh: 013abe909fb39a8b
+/agent-note-multi-computer-runtime-management/problem:
+  en: fde95ef64091e375
+  zh: 93c9baa269a13985
+/agent-note-multi-computer-runtime-management/proposal:
+  en: 412e8485263cc905
+  zh: 0e2ddde451d93c08
+/agent-note-multi-computer-runtime-management/directory-foundation:
+  en: 62a119b27d07ec63
+  zh: f8438ad47a06ca48
+/agent-note-multi-computer-runtime-management/node-access-foundation:
+  en: b3f89114bf224157
+  zh: dddc553d14cc7d41
+/agent-note-multi-computer-runtime-management/local-routing-and-admin-access:
+  en: c157f96b26a30ed0
+  zh: ff652dcbc294cbb9
+/agent-note-multi-computer-runtime-management/existing-gateway-service-transport:
+  en: e978c49018005185
+  zh: 433d2f758c5a0870
+/agent-note-multi-computer-runtime-management/existing-admin-and-space-management:
+  en: 374598cbbf380e51
+  zh: abda40614d847324
+/agent-note-multi-computer-runtime-management/exact-runtime-records:
+  en: 07c0e40856197fdb
+  zh: b83162a25be90917
+/agent-note-multi-computer-runtime-management/management-model-and-implementation-inventory:
+  en: 37b488fc3a3e0e40
+  zh: 9897400dcc8b63a1
+/agent-note-multi-computer-runtime-management/implementation-sequence:
+  en: 97f3ccd997fcae32
+  zh: 4172dd246fe0d83f
+/agent-note-multi-computer-runtime-management/performance-requirements:
+  en: ec55c26404ac9ca7
+  zh: e88160b9974474e3
+/agent-note-multi-computer-runtime-management/alternatives-considered:
+  en: cd57d40da52cf697
+  zh: 16b22f82f553ccce
+/agent-note-multi-computer-runtime-management/acceptance-criteria:
+  en: e21690efefecbd33
+  zh: 11dd8f2c16de0ffa
+/agent-note-multi-computer-runtime-management/risks:
+  en: 427293987cb0979b
+  zh: 11ef4fe211a9edc7

@@ -1,0 +1,502 @@
+{
+  "recordedAt": "2026-10-29T13:28:47.335734+00:00",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z",
+  "baselineEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/baseline-current-native-review.json",
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-range-final-source-and-artifact-hashes.json",
+  "realProviderApiValidation": "human-deferred",
+  "ownedLinuxCleanup": {
+    "createdAt": "2026-10-29T11:43:28.305864+00:00",
+    "name": "dsh-audit-linux-native-112522",
+    "id": "df68626857041851a4483c4028468e15ac5a3685dfbea302a44aca80254338d6",
+    "image": "dsh-audit-linux-native:20261029-112522-aligned",
+    "hostMounts": [],
+    "cgroupNamespace": "private",
+    "network": "none",
+    "memory": "1g",
+    "cpus": 2,
+    "scope": "Owned isolated Linux validation only; no production or peer containers accessed.",
+    "dependencyAlignment": "Current worktree Koffi3.1.6 plus matching Linux binding.",
+    "status": "removed_after_confirmed_quiescence",
+    "removedAt": "2026-10-29T13:27:16.687274+00:00",
+    "removedOwnedImageTags": [
+      "dsh-audit-linux-native:20261029-112522-aligned",
+      "dsh-audit-linux-native:20261029-112522"
+    ],
+    "quiescenceReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-owned-complete-quiescence-final.json"
+  },
+  "findings": [
+    "B315"
+  ],
+  "repair": "Failed or malformed process rows make a zombie-only verdict unknown. Observing a live group member still confirms occupancy. The provider retains its exit wait and later termination responsibility.",
+  "paths": [
+    "packages/subprocess/subprocess-local/src/proc-stat.ts",
+    "packages/subprocess/subprocess-local/tests/process-inspector.spec.ts",
+    "packages/subprocess/subprocess-local/tests/fixtures/process-observation-driver.mjs",
+    "packages/subprocess/subprocess-local/tests/loader-process-observation.spec.ts"
+  ],
+  "negativeEvidence": [
+    {
+      "name": "linux-partial-process-table-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T13:13:04.139866+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/subprocess/subprocess-local/tests/process-inspector.spec.ts",
+        "-t",
+        "zombie is visible|malformed process rows",
+        "--maxWorkers=2",
+        "--retry=0"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T13:13:04.946621+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-partial-process-table-causal-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-partial-process-table-causal-before.log"
+    },
+    {
+      "name": "partial-process-table-loader-built-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T13:19:48.018550+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/subprocess/subprocess-local/tests/loader-process-observation.spec.ts",
+        "--maxWorkers=2",
+        "--retry=0"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T13:19:49.118433+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/partial-process-table-loader-built-causal-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/partial-process-table-loader-built-causal-before.log"
+    }
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "linux-range-observation-combined-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T13:23:32.083786+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/subprocess/subprocess-local/tests",
+          "--maxWorkers=2",
+          "--retry=0",
+          "--coverage",
+          "--coverage.include=packages/subprocess/subprocess-local/src/linux-scope.ts",
+          "--coverage.include=packages/subprocess/subprocess-local/src/proc-stat.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-range-observation-combined-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T13:23:51.459107+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-range-observation-combined-coverage.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-range-observation-combined-coverage.log"
+      },
+      {
+        "name": "partial-process-table-loader-source-ready",
+        "status": "passed",
+        "startedAt": "2026-10-29T13:19:32.197539+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-process-observation.spec.ts",
+          "--maxWorkers=2",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T13:19:33.583260+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/partial-process-table-loader-source-ready.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/partial-process-table-loader-source-ready.log"
+      },
+      {
+        "name": "partial-process-table-loader-built-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T13:21:45.380974+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-process-observation.spec.ts",
+          "--maxWorkers=2",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T13:21:46.978711+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/partial-process-table-loader-built-node22.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/partial-process-table-loader-built-node22.log"
+      },
+      {
+        "name": "partial-process-table-loader-built-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T13:21:45.380963+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-process-observation.spec.ts",
+          "--maxWorkers=2",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T13:21:46.989437+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/partial-process-table-loader-built-node24.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/partial-process-table-loader-built-node24.log"
+      },
+      {
+        "name": "partial-process-table-linux-loader-built",
+        "status": "passed",
+        "startedAt": "2026-10-29T13:23:02.233582+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "docker",
+          "exec",
+          "-e",
+          "DSH_PROCESS_OBSERVATION_BOOT_ENTRY=file:///opt/audit-observation-boot.mjs",
+          "-e",
+          "XDG_RUNTIME_DIR=/run/user/0",
+          "-e",
+          "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus",
+          "dsh-audit-linux-native-112522",
+          "node",
+          "/opt/audit-observation-driver.mjs",
+          "/opt/audit-worktree/gateway/tests/fixtures/local-native-supervision/cordis.yml"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T13:23:02.469625+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/partial-process-table-linux-loader-built.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/partial-process-table-linux-loader-built.log"
+      }
+    ],
+    "coverage": {
+      "linuxScopeAndProcStat": {
+        "total": {
+          "lines": {
+            "total": 272,
+            "covered": 272,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 309,
+            "covered": 309,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 56,
+            "covered": 56,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 262,
+            "covered": 262,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subprocess/subprocess-local/src/linux-scope.ts": {
+          "lines": {
+            "total": 241,
+            "covered": 241,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 54,
+            "covered": 54,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 272,
+            "covered": 272,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 238,
+            "covered": 238,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subprocess/subprocess-local/src/proc-stat.ts": {
+          "lines": {
+            "total": 31,
+            "covered": 31,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 2,
+            "covered": 2,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 37,
+            "covered": 37,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 24,
+            "covered": 24,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      },
+      "gatewayOwnershipScope": {
+        "total": {
+          "lines": {
+            "total": 237,
+            "covered": 220,
+            "skipped": 0,
+            "pct": 92.82
+          },
+          "statements": {
+            "total": 313,
+            "covered": 286,
+            "skipped": 0,
+            "pct": 91.37
+          },
+          "functions": {
+            "total": 56,
+            "covered": 53,
+            "skipped": 0,
+            "pct": 94.64
+          },
+          "branches": {
+            "total": 188,
+            "covered": 170,
+            "skipped": 0,
+            "pct": 90.42
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/child-command.ts": {
+          "lines": {
+            "total": 8,
+            "covered": 8,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 3,
+            "covered": 3,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 11,
+            "covered": 11,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 2,
+            "covered": 2,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/local-runtime-control.ts": {
+          "lines": {
+            "total": 76,
+            "covered": 72,
+            "skipped": 0,
+            "pct": 94.73
+          },
+          "functions": {
+            "total": 18,
+            "covered": 17,
+            "skipped": 0,
+            "pct": 94.44
+          },
+          "statements": {
+            "total": 107,
+            "covered": 97,
+            "skipped": 0,
+            "pct": 90.65
+          },
+          "branches": {
+            "total": 68,
+            "covered": 59,
+            "skipped": 0,
+            "pct": 86.76
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/local-runtime-linux.ts": {
+          "lines": {
+            "total": 33,
+            "covered": 33,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 5,
+            "covered": 5,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 40,
+            "covered": 40,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 28,
+            "covered": 28,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/local-runtime-owner.ts": {
+          "lines": {
+            "total": 120,
+            "covered": 107,
+            "skipped": 0,
+            "pct": 89.16
+          },
+          "functions": {
+            "total": 30,
+            "covered": 28,
+            "skipped": 0,
+            "pct": 93.33
+          },
+          "statements": {
+            "total": 155,
+            "covered": 138,
+            "skipped": 0,
+            "pct": 89.03
+          },
+          "branches": {
+            "total": 90,
+            "covered": 81,
+            "skipped": 0,
+            "pct": 90
+          }
+        }
+      },
+      "gatewayNativeHelpers": {
+        "total": {
+          "lines": {
+            "total": 41,
+            "covered": 41,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 51,
+            "covered": 51,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 8,
+            "covered": 8,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 30,
+            "covered": 30,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/child-command.ts": {
+          "lines": {
+            "total": 8,
+            "covered": 8,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 3,
+            "covered": 3,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 11,
+            "covered": 11,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 2,
+            "covered": 2,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/local-runtime-linux.ts": {
+          "lines": {
+            "total": 33,
+            "covered": 33,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 5,
+            "covered": 5,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 40,
+            "covered": 40,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 28,
+            "covered": 28,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      }
+    }
+  },
+  "limitations": [
+    "The real-process Loader scenario injects the nondeterministic process-table input. This is not a claim that process-table scans are atomic or fallback contains escaped descendants."
+  ]
+}

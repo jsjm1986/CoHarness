@@ -1,0 +1,14 @@
+{
+  "name": "document-io-ownership-final-integrity",
+  "cwd": ".",
+  "command": "python3 -",
+  "startedAt": "2026-10-25T21:17:53.310484+00:00",
+  "seconds": 2.182,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "eb440ecb52a309a89c976a2d51a1bb730fd3fc6e6ae0e4d081019d57743d9b6b",
+  "inputsAfter": "eb440ecb52a309a89c976a2d51a1bb730fd3fc6e6ae0e4d081019d57743d9b6b",
+  "postgresToolDirectory": null,
+  "outputSha256": "f30488cd708129e2ae475e4f4b65fff73be45160ef910aeab809c5111af0cd9c",
+  "outputTail": "B149–155 scoped evidence recorded; B131 remains unwired; 12 domains remain open; user live-API deferral preserved; owned PostgreSQL stopped.\n"
+}

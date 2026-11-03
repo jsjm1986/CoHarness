@@ -11,7 +11,8 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import type { HostObservable, KeyedSnapshotSelectorHook, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { ScheduleCatalogEntry } from '@deepseek-ai/dsh-schedule/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createCatalogSource, type CatalogInjected, type CatalogSnapshot } from './catalog-source.ts'
@@ -32,11 +33,19 @@ export function createSessionScheduleSource(
   ctx: ClientContext,
   sessionId: SessionId,
 ): CatalogInjected {
+  const target = ctx.sessions.runtimeTargetFor?.(sessionId)
+  const remote = ctx.remote.$forTarget(target)
+  const connection = ctx.get('connection') as ConnectionHandle | undefined
+  const transport = target === undefined ? connection : connection?.forTarget?.(target)
   return createCatalogSource({
-    list: () => ctx.remote.schedule.list({ sessionId }),
-    remove: id => ctx.remote.schedule.delete({ sessionId, id }),
-    subscribeChanged: listener => ctx.remote.$on('schedule/changed', listener),
-    subscribeReset: listener => ctx.on('connection/reset', listener),
+    list: () => remote.schedule.list({ sessionId }),
+    remove: id => remote.schedule.delete({ sessionId, id }),
+    subscribeChanged: listener => remote.$on('schedule/changed', listener),
+    subscribeReset: (listener) => {
+      if (target === undefined) return ctx.on('connection/reset', listener)
+      if (transport === undefined) throw new Error('Task Runtime connection is unavailable')
+      return transport.state.subscribe(listener)
+    },
   })
 }
 
@@ -108,4 +117,20 @@ export function useSessionScheduleFacts(
     snapshot => selectSessionScheduleFacts(snapshot, sessionId),
     sameSessionScheduleFacts,
   )
+}
+
+/**
+ * Read one row's Runtime catalog through the renderer's keyed source binding.
+ * @param useCatalog - keyed catalog selector supplied by the slot renderer.
+ * @param sessionId - row's Runtime-qualified Session identity.
+ * @returns active tasks belonging to that exact Session, without starting its Runtime.
+ */
+export function useRuntimeScheduleFacts(
+  useCatalog: KeyedSnapshotSelectorHook<CatalogSnapshot<ScheduleCatalogEntry>>,
+  sessionId: SessionId,
+): SessionScheduleFacts {
+  return useCatalog(sessionId,
+    snapshot => snapshot === undefined ? { hasActive: false, records: NO_RECORDS }
+      : selectSessionScheduleFacts(snapshot, sessionId),
+    sameSessionScheduleFacts)
 }

@@ -1079,7 +1079,7 @@ describe('the band above the prompt', () => {
     })
     // Windows does not provide the POSIX sleep executable; other subprocesses run normally.
     const spawn = h.ctx.subprocess.spawn.bind(h.ctx.subprocess)
-    const withoutSleep = vi.spyOn(h.ctx.subprocess, 'spawn').mockImplementation((spec) => {
+    const withoutSleep = vi.spyOn(h.ctx.subprocess, 'spawn').mockImplementation(async (spec) => {
       if (spec.argv[0] === 'sleep') throw new Error('spawn sleep ENOENT')
       return spawn(spec)
     })

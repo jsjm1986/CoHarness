@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-25-external-runtime-model-control.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md
+document:
+  en: f64718c334a3acef4d828b88b665be4db9be0234
+  zh: 13f619387cb6f8df2946d0a2425c6cde20045b93
+/agent-note-parent-control-for-external-model-requests:
+  en: 23427d975c90df78
+  zh: 13843e9ef3f8029f
+/agent-note-parent-control-for-external-model-requests/problem:
+  en: 3b5cd8784b1e7ad4
+  zh: 340546010dd38375
+/agent-note-parent-control-for-external-model-requests/decision:
+  en: d2d6c3e19f13dde2
+  zh: 45373840d8c00c4e
+/agent-note-parent-control-for-external-model-requests/alternatives-considered:
+  en: 4b3e83a637a6f5a1
+  zh: 78d6f157f62fb3d2
+/agent-note-parent-control-for-external-model-requests/consequences:
+  en: d4cc5adde4d76714
+  zh: 8d152431c0aeb4e5
+/agent-note-parent-control-for-external-model-requests/verification:
+  en: 9e661eed205f349e
+  zh: fe1b0f69ac2d7640

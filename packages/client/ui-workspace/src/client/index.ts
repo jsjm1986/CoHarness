@@ -21,8 +21,8 @@ import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionActivity } from '@deepseek-ai/dsh-workspace/types'
 import {
-  commitSessionNavigation, WorkspaceArchiveError,
-  type ClientContext, type SessionId, type StartSessionOptions, type WorkspaceId,
+  commitSessionNavigation, WorkspaceArchiveError, parseClientSessionKey,
+  type ClientContext, type SessionId, type SessionRuntimeTarget, type StartSessionOptions, type WorkspaceId,
 } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -40,6 +40,7 @@ import { pinOrderAccounts, pinOrderSource } from './pin-order.ts'
 import { createWorkspaceShortcutControls, installWorkspaceShortcuts } from './shortcuts.ts'
 import { createWorkspaceViewStore } from './stores.ts'
 import { derive, derivePair } from './session-actions/derived.ts'
+import { observeInputDraftSessions } from './draft-sessions.ts'
 import { ArchiveSessionMenuItem, ArchiveSessionRowButton, SessionArchiveConfirmDialog } from './session-actions/ArchiveSession.tsx'
 import { ForkSessionMenuItem } from './session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from './session-actions/PinSession.tsx'
@@ -89,6 +90,14 @@ export interface UiWorkspace {
    * `clearPreviousDraft` discards the draft text first.
    */
   startSession(workspaceId?: WorkspaceId, options?: UiStartSessionOptions): void
+  /**
+   * Create and open a conversation in an explicitly selected Runtime and Workspace.
+   * @param target - captured account Runtime; never replaced by the current conversation.
+   * @param workspaceId - optional Workspace on that Runtime; omission registers its default directory.
+   * @param signal - optional view lifetime; cancellation prevents late navigation without deleting an accepted Session.
+   * @returns completion after creation and navigation; a superseded navigation keeps any accepted Host Session.
+   */
+  startRuntimeSession(target: SessionRuntimeTarget, workspaceId?: WorkspaceId, signal?: AbortSignal): Promise<void>
   /**
    * Fork a Session and open its child.
    * @param sessionId - source Session.
@@ -154,6 +163,11 @@ export function apply(ctx: ClientContext): void {
   const hostDescription = connection.hostDescription
   const lifetime = new AbortController()
   ctx.effect(() => () => { lifetime.abort() }, 'ui-workspace: navigation lifetime')
+  const inputDraftSessions = createSnapshotStore<readonly SessionId[]>([])
+  ctx.effect(() => observeInputDraftSessions({
+    list: ctx.sessions.currentScopeList ?? ctx.sessions.list,
+    retainInfo: id => ctx.sessions.retainInfo(id),
+  }, (ids) => { inputDraftSessions.set(ids) }), 'ui-workspace: composer-owned blank rows')
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workspace: dictionaries')
 
   const searchSessions: WorkspaceBrowserInjected['searchSessions'] = async (query, signal) => {
@@ -174,6 +188,20 @@ export function apply(ctx: ClientContext): void {
     sessionId: SessionId,
     navigation = AbortSignal.any([ctx.sessions.beginNavigation(), lifetime.signal]),
   ): Promise<void> => {
+    const address = parseClientSessionKey(sessionId)
+    const ensure = ctx.sessions.ensureSession?.bind(ctx.sessions)
+    if (address !== undefined && ctx.sessions.runtimeIdentityFor?.(sessionId) === undefined
+      && ctx.sessions.usingRuntime !== undefined && ensure !== undefined) {
+      return ctx.sessions.usingRuntime(address.runtime, navigation, async (signal) => {
+        if (!await ensure(address.runtime, address.sessionId, signal)) throw new Error('Session is unavailable')
+        return commitOpen(sessionId, signal)
+      }).catch((error: unknown) => {
+        if (!navigation.aborted) throw error
+      })
+    }
+    return commitOpen(sessionId, navigation)
+  }
+  const commitOpen = async (sessionId: SessionId, navigation: AbortSignal): Promise<void> => {
     await commitSessionNavigation(ctx.sessions, sessionId, navigation, () => {
       if (ctx.sessions.list.getSnapshot().archivedById[sessionId] !== undefined
         || ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
@@ -190,11 +218,20 @@ export function apply(ctx: ClientContext): void {
       ctx.layout.selectPanel(null)
     })
   }
+  const withSessionTarget = async <T>(sessionId: SessionId, operation: () => Promise<T>): Promise<T> => {
+    const address = parseClientSessionKey(sessionId)
+    if (address === undefined || ctx.sessions.usingRuntime === undefined) return operation()
+    return ctx.sessions.usingRuntime(address.runtime, lifetime.signal, async (signal) => {
+      if (ctx.sessions.runtimeIdentityFor?.(sessionId) === undefined
+        && !await ctx.sessions.ensureSession?.(address.runtime, address.sessionId, signal)) throw new Error(ctx.locale.bind(NS)('navigation.unavailable'))
+      return operation()
+    })
+  }
   // Fork resolves only after the child opens so callers can classify the
   // host's fork refusal; the pointer menu swallows it, the command reports it.
   const forkSession = (sessionId: SessionId, onCreated?: (childId: SessionId) => void): Promise<SessionId> => {
     const navigation = AbortSignal.any([ctx.sessions.beginNavigation(), lifetime.signal])
-    return ctx.sessions.fork({ sessionId, increaseTitle: true })
+    return withSessionTarget(sessionId, () => ctx.sessions.fork({ sessionId, increaseTitle: true }))
       .then(async (childId) => {
         onCreated?.(childId)
         await openSession(childId, navigation)
@@ -224,6 +261,20 @@ export function apply(ctx: ClientContext): void {
     }
     return String(reason)
   }
+  const startRuntimeSession = async (target: SessionRuntimeTarget, workspaceId?: WorkspaceId, signal?: AbortSignal): Promise<void> => {
+    const navigation = AbortSignal.any([ctx.sessions.beginNavigation(), lifetime.signal, ...signal === undefined ? [] : [signal]])
+    const create = ctx.workspaces.createRuntimeSession?.bind(ctx.workspaces)
+    if (ctx.sessions.usingRuntime === undefined || create === undefined) throw new Error('Runtime is unavailable')
+    await ctx.sessions.usingRuntime(target, navigation, async (signal) => {
+      const id = await create(target, workspaceId, signal)
+      await commitOpen(id, signal)
+    }).catch((error: unknown) => {
+      if (!navigation.aborted) throw error
+    })
+    if (!navigation.aborted) void ctx.workspaces.refreshPersonalDirectory?.().catch((error: unknown) => {
+      console.warn('personal Workspace directory refresh failed:', error)
+    })
+  }
   const uiWorkspace: UiWorkspace = {
     openSession: (sessionId) => {
       void openSession(sessionId).catch((reason: unknown) => {
@@ -243,21 +294,24 @@ export function apply(ctx: ClientContext): void {
         },
       })
     },
+    startRuntimeSession,
     forkSession,
-    archiveSession: (sessionId, options) => ctx.workspaces.archiveSession(sessionId, options),
-    unarchiveSession: sessionId => ctx.workspaces.unarchiveSession(sessionId),
+    archiveSession: (sessionId, options) => withSessionTarget(sessionId, () => ctx.workspaces.archiveSession(sessionId, options)),
+    unarchiveSession: sessionId => withSessionTarget(sessionId, () => ctx.workspaces.unarchiveSession(sessionId)),
     pinSession: async (sessionId) => {
-      await ctx.workspaces.pinSession(sessionId)
+      await withSessionTarget(sessionId, () => ctx.workspaces.pinSession(sessionId))
       // Front the Session in the saved orders of the accounts it leads;
       // the pin-set echo partitions the rendered rows independently.
       const { items, pinnedSessionIds, archivedSessionIds } = ctx.workspaces.list.getSnapshot()
+      const runtimeId = ctx.workspaces.list.getSnapshot().computerGroups === undefined
+        ? undefined : ctx.sessions.runtimeIdentityFor?.(sessionId)?.runtimeId
       viewInstance.actions.pinSessionOrder(
         sessionId,
-        pinOrderAccounts(items, sessionId),
-        pinOrderSource(items, ctx.sessions.list.getSnapshot(), { pinnedSessionIds, archivedSessionIds }),
+        pinOrderAccounts(items, sessionId, runtimeId),
+        pinOrderSource(items, ctx.sessions.list.getSnapshot(), { pinnedSessionIds, archivedSessionIds }, runtimeId),
       )
     },
-    unpinSession: sessionId => ctx.workspaces.unpinSession(sessionId),
+    unpinSession: sessionId => withSessionTarget(sessionId, () => ctx.workspaces.unpinSession(sessionId)),
   }
   ctx.effect(() => ctx.reflect.provide('uiWorkspace', uiWorkspace), 'ui-workspace: navigation service')
   const shortcutControls = createWorkspaceShortcutControls()
@@ -283,10 +337,10 @@ export function apply(ctx: ClientContext): void {
     })
   }
   const renameSession: SessionRenameDialogInjected['renameSession'] = async (sessionId, title) => {
-    await ctx.sessions.using(sessionId, { source: 'controllerOperation' }, async (reference) => {
+    await withSessionTarget(sessionId, () => ctx.sessions.using(sessionId, { source: 'controllerOperation' }, async (reference) => {
       const result = await reference.binding.session.rename(title)
       if (!result.ok) throw new Error(result.error.message)
-    })
+    }))
   }
   const pinInjected = (): PinSessionInjected => ({
     hooks: { pinned: pinnedSet, archived: archivedSet },
@@ -380,24 +434,27 @@ export function apply(ctx: ClientContext): void {
       await ctx.workspaces.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
     },
     createWorkspace: input => ctx.workspaces.create(input),
-    listDirectory: (path, signal) => ctx.workspaces.listDirectory(path, signal),
+    listDirectory: (path, signal, target) => ctx.workspaces.listDirectory(path, signal, target),
     requestSearch: shortcutControls.search,
     requestAddWorkspace: shortcutControls.add,
     closeAddWorkspace: shortcutControls.closeAdd,
     setDirectoryBusy: shortcutControls.directoryBusy,
     dismissForkError: shortcutControls.dismissForkError,
+    refreshComputers: () => ctx.workspaces.refreshPersonalDirectory?.() ?? Promise.resolve(),
+    startRuntimeSession,
     hooks: {
       directoryFlow: browserFlowSource,
       hostDescription,
       viewport: viewport?.snapshot ?? { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }), subscribe: () => () => {} },
       currentSessions: ctx.sessions.currentScopeList ?? ctx.sessions.list,
+      inputDraftSessions,
       workspaceShortcuts: shortcutControls.state,
       shortcuts: ctx.shortcuts.catalog,
     },
   })
   const pickerInjected = (): WorkspacePickerInjected => ({
     createWorkspace: input => ctx.workspaces.create(input),
-    listDirectory: (path, signal) => ctx.workspaces.listDirectory(path, signal),
+    listDirectory: (path, signal, target) => ctx.workspaces.listDirectory(path, signal, target),
     hooks: { directoryFlow: pickerFlowSource },
   })
   // Each registration declares its directory-flow child in the same call;

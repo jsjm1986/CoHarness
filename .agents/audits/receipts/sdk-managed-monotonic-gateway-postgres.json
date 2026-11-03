@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-monotonic-gateway-postgres",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config vitest.e2e.config.ts packages/context/gateway-execution/tests/pg-composition.e2e.ts --retry=0",
+  "startedAt": "2026-10-24T16:52:21.383689+00:00",
+  "seconds": 23.492,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c4c6b105b322e28444efa5a8d13d34b83f8b01c4064ef016b4df3941d4fad376",
+  "inputsAfter": "c4c6b105b322e28444efa5a8d13d34b83f8b01c4064ef016b4df3941d4fad376",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "afe17104561904becda644d60797b4c69b3b505333009f4e80a5dca4ec00fd94",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  18 passed (18)\n   Start at  00:52:22\n   Duration  22.34s (transform 2.94s, setup 58ms, import 3.58s, tests 18.55s, environment 0ms)\n\n"
+}

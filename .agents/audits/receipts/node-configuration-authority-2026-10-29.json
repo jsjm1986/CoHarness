@@ -1,0 +1,524 @@
+{
+  "recordedAt": "2026-10-29T00:56:16.300357+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "findings": [
+    "B285",
+    "B286",
+    "B287",
+    "B288",
+    "B289",
+    "B290"
+  ],
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "causalNegatives": [
+    {
+      "name": "node-configuration-authority-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T00:11:08.991527+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+        "DSH_AUDIT_NODE_CONFIGURATION_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-node-configuration-replay.py",
+        "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+        "src",
+        "node-configuration-causal-before"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T00:11:15.422995+00:00"
+    },
+    {
+      "name": "node-configuration-filesystem-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T00:22:05.162893+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/node-config-filesystem.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T00:22:16.036961+00:00"
+    },
+    {
+      "name": "node-configuration-growing-file-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T00:25:05.050760+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/node-config-filesystem.spec.ts",
+        "--maxWorkers=2",
+        "-t",
+        "bounds actual configuration"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T00:25:05.984482+00:00"
+    }
+  ],
+  "businessCounterexamples": {
+    "actualHttp": {
+      "observations": 23,
+      "withdrawnAdministratorAcceptances": 18,
+      "successorViewMismatch": 1,
+      "nestedPoolCheckoutTimeout": 1,
+      "ordinaryCurrentControls": 3
+    },
+    "filesystem": {
+      "blockedFifoReader": 1,
+      "foreignStagingRemoval": 1,
+      "oversizedPostStatGrowthAccepted": 1
+    }
+  },
+  "behavior": [
+    "Reads, saves and apply registration retain the authenticated current active organization administrator; supplied browser actor fields grant no authority. Explicit undefined is reserved for trusted initialization.",
+    "Each successful mutation returns its own committed revision and values from inside the writer lock. The accepted apply request retains the current write epoch and initiating actor; the independent applier consumes it under existing maintenance/data/generation checks.",
+    "Write-epoch capture uses the already leased backend instead of checking out a second client. Unexpected database failures return safe503, and lease loss cancels unissued file publication. A rename already issued can commit and requires reconciliation after a failed response.",
+    "Configuration readers open without following the final link, reject nonregular files without waiting for FIFO writers, enforce private permissions and bound actual bytes even after concurrent growth.",
+    "Durable file publication flushes staging bytes and the directory. Failed exclusive acquisition preserves a foreign file; failures clean only an acquired unpublished staging file. A reused staging pathname after publication survives, and acquired descriptors dispose through independent failures."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "node-configuration-final-source-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T00:54:00.511829+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+          "DSH_AUDIT_NODE_CONFIGURATION_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/node-configuration-authority-postgres.spec.ts",
+          "tests/node-configuration-administration-transcript.spec.ts",
+          "tests/node-config-filesystem.spec.ts",
+          "tests/node-config-store.spec.ts",
+          "tests/node-config-api.spec.ts",
+          "tests/node-config-applier.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--coverage",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-final-source-coverage",
+          "--coverage.include=src/node-config-store.ts",
+          "--coverage.include=src/postgres/node-configuration-authority.ts",
+          "--coverage.include=src/postgres/deployment-lock.ts",
+          "--coverage.include=src/postgres/administrator-authority.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T00:54:09.789412+00:00"
+      },
+      {
+        "name": "node-configuration-backup-regression-command-arrays",
+        "status": "passed",
+        "startedAt": "2026-10-29T00:49:00.005596+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_regression_test",
+          "HGW_TEST_PG_DUMP_COMMAND=[\"/opt/homebrew/opt/libpq@18/bin/pg_dump\"]",
+          "HGW_TEST_PG_RESTORE_COMMAND=[\"/opt/homebrew/opt/libpq@18/bin/pg_restore\"]",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/deployment-backups.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T00:49:20.185931+00:00"
+      },
+      {
+        "name": "node-configuration-all-current-types",
+        "status": "passed",
+        "startedAt": "2026-10-29T00:40:13.234422+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-preferences-typecheck.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T00:40:14.316556+00:00"
+      },
+      {
+        "name": "node-configuration-initial-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-29T00:40:13.234407+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/node-config-store.ts",
+          "gateway/src/postgres/node-configuration-authority.ts",
+          "gateway/src/postgres/deployment-lock.ts",
+          "gateway/src/postgres/administrator-authority.ts",
+          "gateway/src/admin-api.ts",
+          "gateway/tests/node-config-fixture.ts",
+          "gateway/tests/node-config-api.spec.ts",
+          "gateway/tests/node-config-store.spec.ts",
+          "gateway/tests/node-config-applier.spec.ts",
+          "gateway/tests/node-config-process.spec.ts",
+          "gateway/tests/deployment-backups.spec.ts",
+          "gateway/tests/node-config-filesystem.spec.ts",
+          "gateway/tests/node-configuration-authority-postgres.spec.ts",
+          "gateway/tests/node-configuration-administration-transcript.spec.ts",
+          "gateway/tests/postgres-suite.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T00:40:14.560707+00:00"
+      },
+      {
+        "name": "node-configuration-private-artifact-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T00:54:14.031174+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/build-node-configuration-artifact.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T00:54:16.218516+00:00"
+      },
+      {
+        "name": "node-configuration-built-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T00:54:29.742834+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+          "DSH_AUDIT_NODE_CONFIGURATION_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-node-configuration-replay.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "lib",
+          "node-configuration-built-node22",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T00:54:35.505977+00:00"
+      },
+      {
+        "name": "node-configuration-built-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T00:54:43.332944+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+          "DSH_AUDIT_NODE_CONFIGURATION_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-node-configuration-replay.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "lib",
+          "node-configuration-built-node24",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T00:54:48.840412+00:00"
+      },
+      {
+        "name": "node-configuration-reviewed-doc-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-29T00:51:03.807207+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          ".agents/notes/implemented/architecture/2026-09-27-current-node-configuration.md",
+          ".agents/notes/implemented/bug-fix/2026-10-26-atomic-file-acquisition.md",
+          "gateway/deploy/node-configuration/README.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/current-node-configuration-authority/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T00:51:04.247781+00:00"
+      },
+      {
+        "name": "node-configuration-final-doc-quick",
+        "status": "passed",
+        "startedAt": "2026-10-29T00:54:23.066028+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T00:55:38.507856+00:00"
+      }
+    ],
+    "source": {
+      "cases": 29,
+      "files": 7,
+      "actualPostgresAuthorityCases": 4,
+      "filesystemCases": 5,
+      "actualHttpGoldenObservations": 23,
+      "coverage": {
+        "total": {
+          "lines": {
+            "total": 178,
+            "covered": 171,
+            "skipped": 0,
+            "pct": 96.06
+          },
+          "statements": {
+            "total": 228,
+            "covered": 207,
+            "skipped": 0,
+            "pct": 90.78
+          },
+          "functions": {
+            "total": 37,
+            "covered": 37,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 169,
+            "covered": 151,
+            "skipped": 0,
+            "pct": 89.34
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/node-config-store.ts": {
+          "lines": {
+            "total": 119,
+            "covered": 117,
+            "skipped": 0,
+            "pct": 98.31
+          },
+          "functions": {
+            "total": 27,
+            "covered": 27,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 157,
+            "covered": 147,
+            "skipped": 0,
+            "pct": 93.63
+          },
+          "branches": {
+            "total": 142,
+            "covered": 131,
+            "skipped": 0,
+            "pct": 92.25
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/administrator-authority.ts": {
+          "lines": {
+            "total": 6,
+            "covered": 6,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 1,
+            "covered": 1,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 7,
+            "covered": 6,
+            "skipped": 0,
+            "pct": 85.71
+          },
+          "branches": {
+            "total": 8,
+            "covered": 7,
+            "skipped": 0,
+            "pct": 87.5
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/deployment-lock.ts": {
+          "lines": {
+            "total": 28,
+            "covered": 23,
+            "skipped": 0,
+            "pct": 82.14
+          },
+          "functions": {
+            "total": 3,
+            "covered": 3,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 35,
+            "covered": 26,
+            "skipped": 0,
+            "pct": 74.28
+          },
+          "branches": {
+            "total": 10,
+            "covered": 5,
+            "skipped": 0,
+            "pct": 50
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/node-configuration-authority.ts": {
+          "lines": {
+            "total": 25,
+            "covered": 25,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 6,
+            "covered": 6,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 29,
+            "covered": 28,
+            "skipped": 0,
+            "pct": 96.55
+          },
+          "branches": {
+            "total": 9,
+            "covered": 8,
+            "skipped": 0,
+            "pct": 88.88
+          }
+        }
+      },
+      "coverageScope": "Four affected Gateway sources;96.06percent lines and89.34percent branches. This is not the root per-file100percent CI coverage gate; remaining full-file branches remain open."
+    },
+    "compiled": {
+      "nodes": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "actualGatewayHttpObservationsPerNode": 23,
+      "goldenMatched": true
+    },
+    "existingProcessRegression": {
+      "receipt": {
+        "name": "node-configuration-real-process-and-backup-regression",
+        "status": "failed",
+        "startedAt": "2026-10-29T00:45:17.567667+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_regression_test",
+          "HGW_TEST_PG_DUMP_COMMAND=/opt/homebrew/opt/libpq@18/bin/pg_dump",
+          "HGW_TEST_PG_RESTORE_COMMAND=/opt/homebrew/opt/libpq@18/bin/pg_restore",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/node-config-process.spec.ts",
+          "tests/deployment-backups.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-29T00:45:40.108223+00:00"
+      },
+      "processCasesPassed": 2,
+      "overallCommandPassed": false,
+      "reason": "The two actual Gateway process restart cases passed. All22backup cases failed setup because the audit command supplied a bare PostgreSQL tool path instead of the fixture required JSONarray. The corrected backup-only command then passed22cases; the failed command receipt is preserved."
+    },
+    "correctedBackupRegressionCases": 22,
+    "docs": "All20 quick documentation gates pass;4reviewed bilingual pairs recorded. The current-version upgrade triplet directly passes frontmatter, headings, newline and English word budget. No verify-upgrade-guides command exists in this checkout."
+  },
+  "sourceHashes": {
+    "gateway/src/node-config-store.ts": "dae469faf9c83e3beca00b99c8c2529184305c0e5f17376c53439c4a6c3cf2ac",
+    "gateway/src/postgres/node-configuration-authority.ts": "1ffa754c508eb7a2b8ec8310299951590f1af69ddfde59064ba3fa8811f9a3eb",
+    "gateway/src/postgres/deployment-lock.ts": "6175b66959bb729ccbba15cff351f7508f0b77f1a853c3bc175648a3ff01eefc",
+    "gateway/src/postgres/administrator-authority.ts": "8f1322f40edb5d2e4e473d63dbb29a358004916c4764c497bd9760d2817dee81",
+    "gateway/src/admin-api.ts": "3e03f5ced40b4c472134d16e1dc360b3b4d2440922a4581c7caf32bc8a05d0b8",
+    "gateway/tests/node-config-fixture.ts": "258bd1d7e8bd0db17f57484830cf3fd3ea53017ec6a1528f16d1eca284f23aa1",
+    "gateway/tests/node-config-api.spec.ts": "88ff0ec6bf626f37d233b0df65ef229ce3e6a1259e9d9c84c10a79c1dff529e4",
+    "gateway/tests/node-config-store.spec.ts": "76267b04de19087089ddaa01eb827d74649240824c52216a7342c7572ee6e6e2",
+    "gateway/tests/node-config-applier.spec.ts": "3008d17811ad07e047cf137de7860ebb911f9e7cd024664ccae3f65f268744fb",
+    "gateway/tests/node-config-process.spec.ts": "60d9c3694fabab9800a7e3179fa0f2548e23b2da786c1548c7d8660279e0f37f",
+    "gateway/tests/deployment-backups.spec.ts": "812830b4f66daf760638b72172ee30018e20e95b28d0300e03ace98598982bbc",
+    "gateway/tests/node-config-filesystem.spec.ts": "625938e433ef01420efca395cb5fa3764cd3c7095a797c79e216cb5e99f2c4f1",
+    "gateway/tests/node-configuration-authority-postgres.spec.ts": "35f19e870be56ab545839ebfd604a3ccf0904e11e13966761090f4ca402c958e",
+    "gateway/tests/node-configuration-administration-transcript.spec.ts": "9b310de0d59790a36ac7cbc972b6b32c432eb7a504cf6754cfbf5cb14d533af4",
+    "gateway/tests/fixtures/node-configuration-administration.mjs": "ad9c76dff8aa6387f4eb32d46db1dfeca5625456419e6fcf0df2f66a03bf9e21",
+    "gateway/tests/fixtures/node-config-fifo-reader.mjs": "5f08846c5777bd9fe2e16c171631bdd7aef48db5029037baa907672b91c788d8",
+    "gateway/tests/expected/projects/node-configuration-administration.jsonl": "205045ae3d90ceccfbc0f7a19c69a12151cb1b812dd415427de3528a65ff73d2",
+    "gateway/tests/postgres-suite.spec.ts": "80c833714d534fc565d3d507de9e1a336a7d2490cb02b209f1b57825885c6a0e",
+    "gateway/package.json": "b38c1adab83e61ddea4a82902a14ceff938b1209dc48fa2c63a120c9e5eb8b7f"
+  },
+  "artifacts": {
+    "privateGateway": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-artifact-20261029/lib",
+    "metadata": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-build-inputs-20261029.json",
+    "immutableMigrationSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029"
+  },
+  "noteReview": {
+    "extendedExisting": [
+      ".agents/notes/implemented/architecture/2026-09-27-current-node-configuration.md",
+      ".agents/notes/implemented/bug-fix/2026-10-26-atomic-file-acquisition.md"
+    ],
+    "keptIndependent": [
+      ".agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md"
+    ],
+    "new": [],
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false
+  },
+  "database": {
+    "owner": {
+      "name": "hgw-node-configuration-6dba1831",
+      "volume": "hgw-node-configuration-6dba1831-data",
+      "owned": true,
+      "threadId": "01a16450-5b0a-7661-a0d9-79e9d8d2cae0",
+      "status": "ready",
+      "createdAt": "2026-10-29T00:08:38.669087+00:00",
+      "database": "hgw_node_configuration_test",
+      "productionPortExcluded": 5432,
+      "peerPortExcluded": 55699,
+      "id": "64ce7aca8aba70d14fbe8aa65c045f7c5b1f276029497de7299088b64fa901ee",
+      "port": 61597,
+      "url": "postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+      "testMigrationSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+      "snapshotUpperVersion": 95
+    },
+    "status": "Retained for the next maintenance/backup business review; no active test clients remain at phase boundary. Final resource cleanup remains pending.",
+    "excludedPorts": [
+      5432,
+      55699
+    ]
+  },
+  "limitations": [
+    "All12original domains remain in_progress; whole-project review, B04allocations and B25nativecontainment remain open.",
+    "Full-file coverage and independent multi-computer business acceptance remain incomplete.",
+    "Real model API and actual cloud delivery remain human-deferred."
+  ],
+  "subsequentOwnedDatabaseCleanup": {
+    "receipt": "receipts/workbench-computer-permissions-2026-10-29.json",
+    "port": 61597,
+    "containerAndVolumeRemoved": true,
+    "openClientConnectionsBeforeClose": 0
+  }
+}

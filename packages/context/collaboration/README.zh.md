@@ -16,6 +16,7 @@ kind: "package-reference"
 ## 目录
 
 - [运行时约定](#runtime-contract)
+- [应用授权要求](#application-authorization)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -30,6 +31,11 @@ kind: "package-reference"
 - `capabilities()` 是每个主体的访问快照：`collaborationCapabilities(participant)` 不访问授权后端、直接从 scope 推导允许的 action 类别——`personal` 给出全部动词，`ro` 只有 `read`，`rw` 有 `read`/`write`/`approve`，`manage` 取决于 scope 自身的授权。会话级规则（如创建者身份）仍由 `authorize()` 判定。
 - `withSessionCreation()` 在异步创建操作中携带项目根对话的 `project` 或 `private` 可见性；`currentCreation()` 只在该操作内部暴露它。
 - `CollaborationError` 为 RPC 和 HTTP 消费者保留稳定拒绝码。提供方无法确认成员身份、可见性或授权后端时会失败关闭。
+
+<a id="application-authorization"></a>
+## 应用授权要求
+
+`collaborationOf(ctx)` 解析提供方；应用策略要求协作但提供方不可用时，抛出 `CollaborationError('gateway-unavailable')`。`isCollaborationRequired(ctx)` 为 ACL 选择和能力提示报告该策略。共享项目 Gateway 运行时在提供方激活前记录要求；构造任一协作提供方后，该要求会在应用根上下文中保留，跨越提供方替换。没有协作要求的独立应用保持所有者语义；仅启用执行授权不意味着必须提供协作服务。
 
 <a id="model-experience"></a>
 ## 模型体验

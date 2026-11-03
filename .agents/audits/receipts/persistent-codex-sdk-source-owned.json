@@ -1,0 +1,14 @@
+{
+  "name": "persistent-codex-sdk-source-owned",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=src node_modules/.bin/vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/managed-codex-model.snapshot.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T06:34:04.287321+00:00",
+  "seconds": 4.908,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8b3a473e5099539b07a4bcb5f98af2fb8fbeadf52024876a610045fe7e9e9af4",
+  "inputsAfter": "8b3a473e5099539b07a4bcb5f98af2fb8fbeadf52024876a610045fe7e9e9af4",
+  "postgresToolDirectory": null,
+  "outputSha256": "7af8cdaf5751e226bbff05646f0d96960f8608d135391bc030097ff2259e8dd1",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ examples/headless-agent/tests/managed-codex-model.snapshot.ts (2 tests | 1 failed) 3665ms\n   × projects every native Codex request and resumes its owner in a fresh process: managed-codex-member 2127ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  examples/headless-agent/tests/managed-codex-model.snapshot.ts > projects every native Codex request and resumes its owner in a fresh process: managed-codex-member\nAssertionError: expected 'PARENT_CODEX_DONE' to be 'MANAGED_CODEX_DONE' // Object.is equality\n\nExpected: \"MANAGED_CODEX_DONE\"\nReceived: \"PARENT_CODEX_DONE\"\n\n ❯ examples/headless-agent/tests/managed-codex-model.snapshot.ts:41:77\n     39|     try {\n     40|       const session = await resumed.resumeSession(resumedMember ?? 'ma…\n     41|       expect((await session.run('Run managed Codex again.')).finalResp…\n       |                                                                             ^\n     42|         resumedMember === undefined ? 'PARENT_CODEX_DONE' : 'MANAGED_C…\n     43|     } finally { await resumed.close() }\n ❯ withAuxiliaryModelHarness examples/headless-agent/tests/auxiliary-model-fixture.ts:44:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 1 passed (2)\n   Start at  14:34:04\n   Duration  4.34s (transform 466ms, setup 18ms, import 604ms, tests 3.67s, environment 0ms)\n\n"
+}

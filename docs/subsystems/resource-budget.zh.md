@@ -1,17 +1,20 @@
-# 执行资源准入
+# 资源准入
 
 [English](resource-budget.md) | 中文
 
-[Resource Budget 定义](../../packages/context/resource-budget/README.zh.md) 描述在执行前获取、并在清理期间保留的预留。其抽象服务不提供调度器。包参考负责提供方组合与消费者的释放义务。
+[resource-budget 包](../../packages/context/resource-budget/README.zh.md)定义节点范围的资源许可及其执行归属义务。
 
-<a id="resource-types"></a>
-## 资源类型
+## 许可记录
 
-[`ResourceKind`](../../packages/context/resource-budget/src/types.ts) 区分 `model` 与 `process` 预留。持久终端消耗进程容量；没有独立的工作线程种类。
+`ResourceKind` 选择 `model` 或 `process`；终端消耗进程许可。
 
-[`ResourceRequest`](../../packages/context/resource-budget/src/types.ts) 包含资源种类、可选取消信号以及可选的品牌化 Session id。已验证的操作者与项目事实由提供方解析。
+`ResourceOperationId` 是提供方生成的品牌化身份，标识一个排队中或已接纳的操作。
 
-[`ResourceLease`](../../packages/context/resource-budget/src/types.ts) 通过 `release()` 报告已证明的静止状态，或通过 `uncertain()` 报告未确认的清理结果。不确定性保留资源占用；传输断开不是释放证明。
+`ResourceRequest` 携带 `kind`、可选取消 `signal`、可选品牌类型 `sessionId` 和 `origin` 意图（`execution`、`interactive` 或 `infrastructure`）。提供方在排队前捕获已验证的归属，不接受调用者指定的操作者或项目身份。
+
+`ResourceLease.signal` 取消所属执行，但不释放占用。等待 `release()` 报告已确认的静止状态；等待 `uncertain()` 保留占用，直到之后的精确完成或已确认的 Runtime 停止。报告不确定状态后，来自调用方和提供方的取消仍然有效。连接断开不能证明执行已停止。
+
+`./wire` 入口定义有界远程消息和已提交的策略。[包参考](../../packages/context/resource-budget/README.zh.md#remote-coordination)说明操作归属与 Gateway 受限的完成认证。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

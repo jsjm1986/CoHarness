@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-11-bounded-background-job-admission.md
 document:
-  en: 8fa5bec07647947b730c436284da71b83deedb48
-  zh: c30e15f26d42acd93eecbc90856d1db64bacba2e
+  en: 0a969b62847ce7eb48ef94d4d04d7977a83fd911
+  zh: cc2a7ad686d86d1a9c9b6bcbae56f07a92d754ee
 /agent-note-bounded-background-job-admission:
   en: 2d484aef9befce29
   zh: 11cbcdd084db7e78
@@ -12,14 +12,14 @@ document:
   en: 4da12f89c96fee3d
   zh: a65d3859f724f80a
 /agent-note-bounded-background-job-admission/decision:
-  en: 2c51812450b4e316
-  zh: deff9a0b852cb14b
+  en: 90e4722171130f63
+  zh: a4047635caac3005
 /agent-note-bounded-background-job-admission/verification:
-  en: 3250d5fd0ed17904
-  zh: c646e40b9efc1f18
+  en: 7a89c11b409cae6c
+  zh: 7232c17cf416b59e
 /agent-note-bounded-background-job-admission/alternatives-considered:
-  en: fefb710efd1245bd
-  zh: 13808d6715cd9e92
+  en: 122fe8a361ccafaf
+  zh: 843d4610b19e81b3
 /agent-note-bounded-background-job-admission/consequences:
-  en: 605393a1415e867f
-  zh: 88738d39d6521bfe
+  en: e9d3e318563f8068
+  zh: 18c3c77241109509

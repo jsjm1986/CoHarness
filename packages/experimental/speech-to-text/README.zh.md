@@ -41,6 +41,10 @@ kind: "package-reference"
 
 `defaultProvider` 与 `language` 是 volatile Config 字段，作为组合默认值：`configure()` 通过 `settings` 服务把传入的字段合并进 `speech-to-text` 用户分区，运行中的实例读取注册 scope 的解析值即可生效，无需重挂载。没有 `settings` 时 `configure()` 失败，并在保存前拒绝所选 Provider 不支持的语言。Provider 通过 `languages` 公布支持的语言提示；`resolve()` 在转写前校验所选提示。观察者通过完整 `SpeechSnapshot` 接收 Provider 拥有的准备状态；关闭观察者不会取消准备。
 
+选择作用域随当前可选 Settings 提供方绑定。提供方撤回时恢复实时组合默认值并拒绝偏好写入；替换后绑定新提供方持久化的值与文件。就绪状态观察者会收到两次变化，语音注册表和识别器无需重启。 保存会在持久化完成后再次检查绑定；提供方变化时拒绝确认，即使原文件写入已经提交。已提交的数据仍保留在原文件中。
+
+提供方撤回会立即移除路由并取消已接纳的录音。并发注销共享同一次完成结果；注册表关闭也会等待已从路由移除的提供方。订阅清理失败会在已接纳任务结束后报告。
+
 `./wave` 辅助函数为 Remote 消费者与原生识别进程校验规范的 16 kHz 单声道 PCM16 WAV。两者均在解码采样前拒绝不一致的头部和长度。
 
 </details>

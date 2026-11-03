@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.md
 document:
-  en: a603147a9997fe364a688cdedced7520d1fa67d2
-  zh: c131ad3a4986f0d8317aadf6d9cd3c567549b90c
+  en: 337631c538ececf27e4eeee20e961a135b140e16
+  zh: ede2250c906b09571220926df9a78660dd43ab63
 /agent-note-current-request-execution-scopes:
   en: 5f02aba590ad0458
   zh: 0c88e69856c07a35
@@ -12,14 +12,14 @@ document:
   en: b503d4a74bcad021
   zh: 10a3d34e6c569042
 /agent-note-current-request-execution-scopes/decision:
-  en: 96fedec4907658d9
-  zh: 79d841a8856a95e4
+  en: e66789f6959db8a9
+  zh: 81b23d3886cbb215
 /agent-note-current-request-execution-scopes/alternatives-considered:
   en: 992c479b343b24c6
   zh: add175d6449e4a89
 /agent-note-current-request-execution-scopes/consequences:
-  en: 4b8aa74d53eefb13
-  zh: f65fbb96b8bd903b
+  en: 2da5f130a160f336
+  zh: 5962895dfcc25277
 /agent-note-current-request-execution-scopes/testing:
   en: 622af4b4f496440f
   zh: b83e8e14a1e26852

@@ -5,7 +5,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import { createAssistantMessage, createUserMessage, isAgentLoopRequest } from '@deepseek-ai/dsh-llm'
+import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, ToolSchema } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId, SessionLogOffset, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import * as llmIndex from '@deepseek-ai/dsh-llm'
@@ -85,7 +85,7 @@ describe('loop-owned request freezing', () => {
     const errors: unknown[] = []
     ctx.on('agent/error', ({ error }) => { errors.push(error) })
     ctx.on('llm/stream', (request, next) => {
-      expect(isAgentLoopRequest(request)).toBe(true)
+      expect(ctx.llm.isAgentLoopRequest(request)).toBe(true)
       expectFrozen(request)
       requests.push(request)
       return next()
@@ -182,7 +182,7 @@ describe('loop-owned request freezing', () => {
     const errors: unknown[] = []
     ctx.on('agent/error', ({ error }) => { errors.push(error) })
     ctx.on('llm/stream', (request, next) => {
-      expect(isAgentLoopRequest(request)).toBe(true)
+      expect(ctx.llm.isAgentLoopRequest(request)).toBe(true)
       expectFrozen(request)
       requests.push(request)
       return registered ? next() : (async function* () { yield* textResponse('virtual') })()

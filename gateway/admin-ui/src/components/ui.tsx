@@ -93,6 +93,7 @@ export function Button({
       {...props}
       className={`button button-${variant} ${className}`.trim()}
       disabled={disabled === true || loading}
+      aria-busy={loading || undefined}
     >
       {loading ? <LoaderCircle className="spin" aria-hidden="true" /> : Icon === undefined ? null : <Icon aria-hidden="true" />}
       {children}
@@ -133,12 +134,19 @@ export function StatusBadge({ tone = 'neutral', children }: { tone?: StatusTone;
   return <span className={`statusBadge status-${tone}`}><span className="statusDot" />{children}</span>
 }
 
+const unavailableServices = new Set([
+  'node-configuration-unavailable', 'webhook-deliveries-unavailable', 'webhook-endpoints-unavailable',
+  'tunnel-unavailable', 'document-catalog-unavailable', 'conversation-archive-unavailable',
+  'desktop-coordination-unavailable',
+])
+
 export function ErrorBanner({ message }: { message: string }) {
   if (message === '') return null
+  const t = translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn })
   return (
     <div className="errorBanner" role="alert">
       <AlertCircle aria-hidden="true" />
-      <span>{message}</span>
+      <span>{unavailableServices.has(message) ? t('serviceUnavailable') : message}</span>
     </div>
   )
 }
@@ -273,6 +281,8 @@ export function ConfirmDialog({
   description,
   confirmLabel,
   pending = false,
+  error = '',
+  confirmDisabled = false,
   onConfirm,
   onClose,
 }: {
@@ -281,6 +291,8 @@ export function ConfirmDialog({
   description: string
   confirmLabel: string
   pending?: boolean
+  error?: string
+  confirmDisabled?: boolean
   onConfirm: () => void
   onClose: () => void
 }) {
@@ -295,9 +307,11 @@ export function ConfirmDialog({
       footer={(
         <>
           <Button type="button" onClick={onClose} disabled={pending}>{t('cancel')}</Button>
-          <Button type="button" variant="danger" loading={pending} onClick={onConfirm}>{confirmLabel}</Button>
+          <Button type="button" variant="danger" loading={pending} disabled={confirmDisabled} onClick={onConfirm}>{confirmLabel}</Button>
         </>
       )}
-    />
+    >
+      {error === '' ? undefined : <ErrorBanner message={error} />}
+    </Dialog>
   )
 }

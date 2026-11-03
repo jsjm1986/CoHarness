@@ -1,9 +1,10 @@
+/* oxlint-disable typescript/no-unsafe-assignment -- Vitest asymmetric matchers are typed as any. */
 // @vitest-environment jsdom
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { clientSessionKey, createSnapshotStore, type ConversationViewportSnapshot, type ProjectUiPolicySnapshot, type SessionListState, type SessionId, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { clientSessionKey, createSnapshotStore, type ConversationViewportSnapshot, type DeploymentContextSnapshot, type ProjectUiPolicySnapshot, type SessionListState, type SessionRuntimeTarget, type SessionId, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { SessionId as brandSessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkbenchEmpty } from '../src/client/components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from '../src/client/components/WorkbenchPaneHeader.tsx'
@@ -11,8 +12,8 @@ import { WorkbenchSidebar } from '../src/client/components/WorkbenchSidebar.tsx'
 import { paneIdentity, ScopeTile } from '../src/client/components/ScopeTile.tsx'
 import { WorkbenchToolbar } from '../src/client/components/WorkbenchToolbar.tsx'
 import { createWorkbenchStore } from '../src/client/stores.ts'
-import { loadWorkbenchCatalog } from '../src/client/catalog.ts'
-import { WorkbenchCatalogReader } from '../src/client/catalog-reader.ts'
+import { parseWorkbenchCatalog } from '../src/client/catalog.ts'
+import type { LegacyWorkbenchRestore, WorkbenchRestoreOptions } from '../src/client/layout-restore.ts'
 import { zh } from '../src/client/locales.ts'
 
 const SID_A = 'a' as SessionId
@@ -39,47 +40,146 @@ function props() {
   const policy = createSnapshotStore<ProjectUiPolicySnapshot>({
     scope: 'personal', theme: 'follow-user', revision: 0, accountPermissions: 'standard',
   })
-  const catalogRestore = createSnapshotStore(true)
+  const deployment = createSnapshotStore<DeploymentContextSnapshot>({ phase: 'ready', showComputer: false, aggregateComputers: false })
   return {
-    sessionsStore: sessions, workspacesStore: workspaces, catalogRestoreStore: catalogRestore,
+    sessionsStore: sessions, workspacesStore: workspaces, deploymentStore: deployment,
     useStore: bindSnapshotSelector(store), actions: store.actions,
     useSessions: bindSnapshotSelector(sessions), useWorkspaces: bindSnapshotSelector(workspaces),
     useProjectPolicy: bindSnapshotSelector(policy),
-    useCatalogRestore: bindSnapshotSelector(catalogRestore),
-    loadCatalog: (signal: AbortSignal, _fresh: boolean) => loadWorkbenchCatalog(signal),
+    useDeployment: bindSnapshotSelector(deployment),
     usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
   }
 }
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
-describe('workbench components', () => {
-  it('shares pending catalog reads across simultaneous root controls', async () => {
-    const pending = Promise.withResolvers<undefined>()
-    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => {
-      await pending.promise
-      return new Response(JSON.stringify({
-        personalComplete: true, personal: { id: 1, name: 'Synthetic account' }, activeRuntime: { kind: 'personal' }, projects: [], items: [],
-      }))
-    })
-    vi.stubGlobal('fetch', fetcher)
-    const p = props()
-    const reader = new WorkbenchCatalogReader(() => p.catalogRestoreStore.getSnapshot())
-    const hydrateCatalog = vi.fn(async () => {})
-    const controls = { ...p, loadCatalog: (signal: AbortSignal, fresh: boolean) => reader.read(signal, fresh),
-      viewport: { mode: 'single' as const, paneIds: [], paneRatios: [], collapsedIds: [] },
-      tabbed: false, chooseSession: vi.fn(), focusSession: vi.fn(), createSession: vi.fn(), setMode: vi.fn(), hydrateCatalog, t }
-    try {
-      render(<><WorkbenchToolbar {...controls} /><WorkbenchToolbar {...controls} inline /></>)
-      await act(async () => { pending.resolve(undefined) })
-      await waitFor(() => { expect(hydrateCatalog).toHaveBeenCalledTimes(2) })
-      expect(fetcher).toHaveBeenCalledOnce()
-    } finally {
-      pending.resolve(undefined)
-      cleanup()
-      await reader.dispose()
-    }
+describe('cross-computer personal conversation picker', () => {
+  const a = { kind: 'personal' as const, runtimeId: '11111111-1111-4111-8111-111111111111',
+    nodeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', nodeName: 'Mac' } as Extract<SessionRuntimeTarget, { kind: 'personal' }>
+  const b = { kind: 'personal' as const, runtimeId: '22222222-2222-4222-8222-222222222222',
+    nodeId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', nodeName: 'Ubuntu' } as Extract<SessionRuntimeTarget, { kind: 'personal' }>
+  const row = (runtime: typeof a  ) => ({ sessionId: 'same-id', runtime,
+    title: 'Same conversation', cwd: '/home/me', visibility: 'personal', creatorUserId: 1,
+    creatorDisplayName: 'Me', updatedAt: 1, blank: false, canWrite: true })
+  const serve = (targets: readonly (typeof a  )[] = [a, b]) => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ personal: { id: 1, name: 'Me' },
+      personalComplete: false, activeRuntime: a, projects: [], items: targets.map(row),
+      personalWorkspaces: targets.map(runtime => ({ runtime, items: [], syncedAt: null })) })))
+  }
+  const toolbar = (p = props(), createSession = vi.fn(), chooseSession = vi.fn()) => {
+    p.deploymentStore.set({ phase: 'ready', aggregateComputers: true, showComputer: true })
+    render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] }}
+      tabbed={false} chooseSession={chooseSession} focusSession={vi.fn()} createSession={createSession} setMode={vi.fn()} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    return p
+  }
+  it('keeps identical raw ids on two computers selectable and filters all personal histories', async () => {
+    serve()
+    const choose = vi.fn(async () => ({ ok: true as const }))
+    toolbar(props(), vi.fn(), choose)
+    await screen.findByRole('button', { name: 'Same conversation /home/me Ubuntu' })
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /个人空间.*Me/ }))
+    expect(screen.getByRole('button', { name: 'Same conversation /home/me Mac' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '新建对话' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Same conversation /home/me Ubuntu' }))
+    expect(choose).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'same-id', runtime: b }), false, expect.any(AbortSignal))
   })
+
+  it('bounds rendered rows for a large granted catalog while searching every computer without starting work', async () => {
+    const targets = Array.from({ length: 20 }, (_, index) => ({ ...a,
+      runtimeId: `10000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+      nodeId: `20000000-0000-4000-8000-${String(index).padStart(12, '0')}`, nodeName: `Computer ${index}` }))
+    const items = targets.flatMap((runtime, computer) => Array.from({ length: 80 }, (_, index) => ({
+      ...row(runtime as typeof a), sessionId: `conversation-${index}`, title: computer === 19 && index === 79
+        ? 'Last conversation' : `Conversation ${computer}-${index}`,
+    })))
+    const fetcher = vi.fn(async () => Response.json({ personal: { id: 1, name: 'QA' }, personalComplete: true,
+      activeRuntime: targets[0], projects: [], items, personalWorkspaces: targets.map(runtime => ({ runtime, items: [] })) }))
+    vi.stubGlobal('fetch', fetcher)
+    const choose = vi.fn(), create = vi.fn()
+    toolbar(props(), create, choose)
+    await screen.findByRole('button', { name: /显示更多对话/ })
+    const rows = () => screen.getAllByRole('button').filter(button => button.textContent?.includes('Conversation '))
+    expect(rows()).toHaveLength(50)
+    fireEvent.click(screen.getByRole('button', { name: /显示更多对话/ }))
+    expect(rows()).toHaveLength(100)
+    const requests = fetcher.mock.calls.length
+    fireEvent.change(screen.getByPlaceholderText('搜索会话或路径'), { target: { value: 'Last conversation' } })
+    expect(screen.getByRole('button', { name: /Last conversation/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /显示更多对话/ })).toBeNull()
+    expect(fetcher).toHaveBeenCalledTimes(requests)
+    expect(choose).not.toHaveBeenCalled()
+    expect(create).not.toHaveBeenCalled()
+  })
+  it('creates on the explicitly selected personal computer without changing another pane', async () => {
+    serve()
+    const create = vi.fn(async () => ({ ok: true as const }))
+    toolbar(props(), create)
+    await screen.findByRole('button', { name: 'Same conversation /home/me Ubuntu' })
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Ubuntu.*个人空间/ }))
+    expect(screen.queryByRole('button', { name: 'Same conversation /home/me Mac' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
+    expect(create).toHaveBeenCalledWith(b, false, expect.any(AbortSignal))
+  })
+  it('adds newly loaded personal summaries only while their exact Runtime remains allocated', async () => {
+    serve([a])
+    const p = props(), local = clientSessionKey(a, SID_A), revoked = clientSessionKey(b, SID_B)
+    p.sessionsStore.set({ ...p.sessionsStore.getSnapshot(), ids: [local, revoked], byId: {
+      [local]: { id: local, runtime: a, displayTitle: 'New local conversation', blank: false, updatedAt: 2, running: false },
+      [revoked]: { id: revoked, runtime: b, displayTitle: 'Revoked conversation', blank: false, updatedAt: 2, running: false },
+    } })
+    toolbar(p)
+    await screen.findByRole('button', { name: 'Same conversation /home/me Mac' })
+    expect(screen.getByRole('button', { name: 'New local conversation Mac' })).toBeTruthy()
+    expect(screen.queryByText('Revoked conversation')).toBeNull()
+  })
+  it('keeps single-computer labels simple while creating on the exact local Runtime', async () => {
+    serve([a])
+    const create = vi.fn(async () => ({ ok: true as const })), p = toolbar(props(), create)
+    act(() => { p.deploymentStore.set({ phase: 'ready', aggregateComputers: false, showComputer: false }) })
+    await screen.findByRole('button', { name: 'Same conversation /home/me' })
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
+    expect(screen.queryByRole('menuitem', { name: /Mac/ })).toBeNull()
+    fireEvent.click(screen.getByRole('menuitem', { name: /个人空间.*Me/ }))
+    fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
+    expect(create).toHaveBeenCalledWith(a, false, expect.any(AbortSignal))
+  })
+  it('blocks a previously selected remote Runtime when aggregation becomes unavailable', async () => {
+    serve()
+    const create = vi.fn(), p = toolbar(props(), create)
+    await screen.findByRole('button', { name: 'Same conversation /home/me Ubuntu' })
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Ubuntu.*个人空间/ }))
+    act(() => { p.deploymentStore.set({ phase: 'ready', aggregateComputers: false, showComputer: false }) })
+    fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
+    expect(create).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '新建对话' }).hasAttribute('disabled')).toBe(true)
+  })
+  it('requires an exact personal Runtime from a single-computer project page with multiple personal allocations', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ personal: { id: 1, name: 'Me' },
+      personalComplete: false, activeRuntime: { kind: 'project', projectId: 7 }, projects: [], items: [],
+      personalWorkspaces: [a, { ...b, nodeId: a.nodeId }].map(runtime => ({ runtime, items: [] })) })))
+    const create = vi.fn(async () => ({ ok: true as const })), p = toolbar(props(), create)
+    act(() => { p.deploymentStore.set({ phase: 'ready', aggregateComputers: false, showComputer: false,
+      context: { mode: 'single', revision: '1', entry: { nodeId: a.nodeId!, name: 'Mac' }, primary: null,
+        scope: 'local', role: 'standalone', refreshAfterMs: 30000, legacyMigrationRequired: false } }) })
+    await waitFor(() => { expect(fetch).toHaveBeenCalled() })
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /个人空间.*Me/ }))
+    expect(screen.getByRole('button', { name: '新建对话' }).hasAttribute('disabled')).toBe(true)
+    expect(create).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /个人空间 · 11111111/ }))
+    expect(screen.queryByText('Mac')).toBeNull()
+    expect(screen.queryByText('Ubuntu')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
+    expect(create).toHaveBeenCalledWith(a, false, expect.any(AbortSignal))
+  })
+})
+
+describe('workbench components', () => {
 
   it('does not reinsert local sessions excluded by the account catalog', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
@@ -93,7 +193,7 @@ describe('workbench components', () => {
     await waitFor(() => { expect(screen.queryByRole('button', { name: 'Alpha /work/alpha' })).toBeNull() })
     expect(screen.getByRole('button', { name: 'Beta /work/beta' })).toBeTruthy()
   })
-  it('adds a listed session from the toolbar menu and exposes single mode', () => {
+  it('adds a listed session from the toolbar menu and exposes single mode', async () => {
     const addSession = vi.fn(async () => ({ ok: true as const }))
     const setSingle = vi.fn()
     const viewport = { mode: 'workbench' as const, paneIds: [], paneRatios: [], collapsedIds: [] }
@@ -103,7 +203,8 @@ describe('workbench components', () => {
     />)
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
     fireEvent.click(screen.getByRole('button', { name: 'Alpha /work/alpha' }))
-    expect(addSession).toHaveBeenCalledWith(expect.objectContaining({ sessionId: SID_A }), false)
+    expect(addSession).toHaveBeenCalledWith(expect.objectContaining({ sessionId: SID_A }), false, expect.any(AbortSignal))
+    await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
     fireEvent.click(screen.getByRole('button', { name: '选择工作台' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '退出工作台' }))
     expect(setSingle).toHaveBeenCalledWith('single')
@@ -187,11 +288,11 @@ describe('workbench components', () => {
     const p = props()
     render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench', paneIds: [SID_A, 'c' as SessionId, 'd' as SessionId, 'e' as SessionId], paneRatios: [1, 1, 1, 1], collapsedIds: [], activePaneId: SID_A }} tabbed={false} chooseSession={choose} focusSession={vi.fn()} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
-    expect(screen.getByRole('status').textContent).toContain('最多同时打开 4 个')
+    expect(screen.getByText(/工作台最多同时打开 4 个对话/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Beta /work/beta' }).hasAttribute('disabled')).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: '替换当前面板' }))
     fireEvent.click(screen.getByRole('button', { name: 'Beta /work/beta' }))
-    expect(choose).toHaveBeenCalledWith(expect.objectContaining({ sessionId: SID_B }), true)
+    expect(choose).toHaveBeenCalledWith(expect.objectContaining({ sessionId: SID_B }), true, expect.any(AbortSignal))
   })
 
   it('creates only in the chosen Workspace and keeps a failed create visible', async () => {
@@ -203,7 +304,7 @@ describe('workbench components', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '个人空间' }))
     fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
     await waitFor(() => { expect(screen.getByRole('alert').textContent).toBe('Workspace unavailable') })
-    expect(create).toHaveBeenCalledWith({ kind: 'personal' }, false)
+    expect(create).toHaveBeenCalledWith({ kind: 'personal' }, false, expect.any(AbortSignal))
     fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
     await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
   })
@@ -250,91 +351,40 @@ describe('workbench account targets and asynchronous chooser', () => {
     return { ...p, ...actions, view }
   }
 
-  it('opens ordinary Sessions A, B, A without reading the account catalog after layout restoration', () => {
-    const fetcher = vi.fn<typeof fetch>()
-    vi.stubGlobal('fetch', fetcher)
-    const p = props()
-    p.catalogRestoreStore.set(false)
-    for (const current of [SID_A, SID_B, SID_A]) {
-      p.sessionsStore.set({ ...p.sessionsStore.getSnapshot(), current })
-      const view = render(<WorkbenchToolbar {...p} inline t={t} tabbed={false}
-        viewport={{ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] }}
-        chooseSession={vi.fn()} focusSession={vi.fn()} createSession={vi.fn()} setMode={vi.fn()} />)
-      expect(screen.getByRole('button', { name: '选择工作台' })).toBeTruthy()
-      view.unmount()
-    }
-    expect(fetcher).not.toHaveBeenCalled()
-  })
-
-  it('reads a saved layout when its owner requests restoration and stops when that restoration completes', async () => {
-    const pending = Promise.withResolvers<Response>()
-    const fetcher = vi.fn<typeof fetch>().mockReturnValue(pending.promise)
-    vi.stubGlobal('fetch', fetcher)
-    const required = createSnapshotStore(false)
-    const hydrateCatalog = vi.fn(async () => { required.set(false) })
-    toolbar({ useCatalogRestore: bindSnapshotSelector(required), hydrateCatalog,
-      viewport: { mode: 'single', paneIds: [SID_A], paneRatios: [1], collapsedIds: [] } })
-    expect(fetcher).not.toHaveBeenCalled()
-    act(() => { required.set(true) })
-    expect(fetcher).toHaveBeenCalledOnce()
-    expect(hydrateCatalog).not.toHaveBeenCalled()
-    await act(async () => { pending.resolve(new Response(JSON.stringify(directory))); await pending.promise })
-    await waitFor(() => { expect(hydrateCatalog).toHaveBeenCalledWith(expect.any(Object), [SID_A]) })
-    expect(fetcher).toHaveBeenCalledOnce()
-  })
-
-  it('reads fresh choices on each open and does not read when the picker closes', async () => {
-    let reads = 0
-    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => new Response(JSON.stringify({
-      ...directory, items: [{ ...directory.items[0], title: `Catalog round ${String(++reads)}` }],
-    })))
-    vi.stubGlobal('fetch', fetcher)
-    toolbar({ useCatalogRestore: bindSnapshotSelector(createSnapshotStore(false)) })
-    expect(fetcher).not.toHaveBeenCalled()
-    for (const round of [1, 2]) {
-      fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
-      await screen.findByRole('button', { name: `Catalog round ${String(round)}` })
-      expect(fetcher).toHaveBeenCalledTimes(round)
-      if (round === 2) expect(screen.queryByRole('button', { name: 'Catalog round 1' })).toBeNull()
-      fireEvent.click(screen.getByRole('button', { name: '关闭选择器' }))
-      expect(screen.queryByRole('dialog')).toBeNull()
-      expect(fetcher).toHaveBeenCalledTimes(round)
-    }
-  })
-
-  it('discards a closed picker response and reads again on reopening', async () => {
-    const pending = Promise.withResolvers<Response>()
-    const fetcher = vi.fn<typeof fetch>().mockReturnValueOnce(pending.promise)
-      .mockImplementation(async () => new Response(JSON.stringify({
-        ...directory, items: [{ ...directory.items[0], title: 'Fresh choice' }],
-      })))
-    vi.stubGlobal('fetch', fetcher)
-    toolbar({ useCatalogRestore: bindSnapshotSelector(createSnapshotStore(false)) })
+  it('shows the fixed computer for an empty project and retains that target when creating its first conversation', async () => {
+    const nodeId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    serve({ ...directory, projects: [{ projectId: 9, name: 'Empty project', mode: 'rw', nodeId, nodeName: 'Ubuntu' }], items: [] })
+    const h = toolbar()
+    act(() => { h.deploymentStore.set({ phase: 'ready', showComputer: true, aggregateComputers: true }) })
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
-    expect(fetcher).toHaveBeenCalledOnce()
-    const signal = fetcher.mock.calls[0]?.[1]?.signal
-    fireEvent.click(screen.getByRole('button', { name: '关闭选择器' }))
-    expect(signal?.aborted).toBe(true)
-    await act(async () => { pending.resolve(new Response(JSON.stringify(directory))); await pending.promise })
-    expect(fetcher).toHaveBeenCalledOnce()
-    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
-    await screen.findByRole('button', { name: 'Fresh choice' })
-    expect(screen.queryByRole('button', { name: 'Project conversation' })).toBeNull()
-    expect(fetcher).toHaveBeenCalledTimes(2)
+    await screen.findByText('暂无可添加的会话')
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Empty project.*Ubuntu/ }))
+    fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
+    await waitFor(() => { expect(h.createSession).toHaveBeenCalledExactlyOnceWith({
+      kind: 'project', projectId: 9, projectName: 'Empty project', nodeId, nodeName: 'Ubuntu',
+    }, false, expect.any(AbortSignal)) })
   })
 
-  it('honors an explicit directory retry after automatic restoration demand clears', async () => {
+  it('offers an explicit legacy-owner choice without guessing or discarding the saved layout', async () => {
     serve()
-    const required = createSnapshotStore(false)
-    toolbar({ useCatalogRestore: bindSnapshotSelector(required),
+    const rows = parseWorkbenchCatalog(directory).items.map(row => ({ ...row, sessionId: SID_A }))
+    const recovery: LegacyWorkbenchRestore = { workbenchId: 'saved', issues: [{ sessionId: SID_A, candidates: rows }] }
+    let completed = false
+    const hydrateCatalog = vi.fn(async (_catalog: unknown, _panes: readonly SessionId[], options?: WorkbenchRestoreOptions) => {
+      if (options?.selection !== undefined) completed = true
+      return completed ? undefined : recovery
+    })
+    toolbar({ hydrateCatalog, currentWorkbench: () => ({ id: 'saved', name: 'Saved', paneIds: [SID_A], updatedAt: 1 }),
       viewport: { mode: 'workbench', pendingIdentity: true, paneIds: [], paneRatios: [], collapsedIds: [] } })
-    expect(fetch).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '重新读取目录' }))
-    await waitFor(() => { expect(fetch).toHaveBeenCalledOnce() })
-    act(() => { required.set(true) })
-    await waitFor(() => { expect(fetch).toHaveBeenCalledTimes(2) })
-    act(() => { required.set(false) })
-    expect(fetch).toHaveBeenCalledTimes(2)
+    fireEvent.click(await screen.findByRole('button', { name: '确认原对话环境' }))
+    expect(screen.getByRole('button', { name: '恢复工作台' }).hasAttribute('disabled')).toBe(true)
+    const target = clientSessionKey(rows[0]!.runtime, SID_A)
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: target } })
+    fireEvent.click(screen.getByRole('button', { name: '恢复工作台' }))
+    await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
+    const selection = hydrateCatalog.mock.calls.find(call => call[2]?.selection !== undefined)?.[2]
+    expect(selection?.selection).toEqual({ workbenchId: 'saved', owners: { [SID_A]: target } })
   })
 
   it('keeps the layout menu open when the same root controls move from the Hero to the session header', () => {
@@ -356,7 +406,7 @@ describe('workbench account targets and asynchronous chooser', () => {
     serve()
     const hydrateCatalog = vi.fn(async () => {})
     toolbar({ hydrateCatalog })
-    await waitFor(() => { expect(hydrateCatalog).toHaveBeenCalledWith(expect.objectContaining({ activeRuntime: { kind: 'project', projectId: 7, projectName: 'Team' } }), []) })
+    await waitFor(() => { expect(hydrateCatalog).toHaveBeenCalledWith(expect.objectContaining({ activeRuntime: { kind: 'project', projectId: 7, projectName: 'Team' } }), [], { signal: expect.any(AbortSignal) }) })
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
     await screen.findByRole('button', { name: 'Project conversation' })
     fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
@@ -383,10 +433,14 @@ describe('workbench account targets and asynchronous chooser', () => {
     }
     const view = render(<WorkbenchToolbar {...p} {...actions} t={t} tabbed={false}
       viewport={{ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] }} />)
-    await waitFor(() => { expect(actions.hydrateCatalog).toHaveBeenCalledWith(expect.any(Object), []) })
+    await waitFor(() => {
+      expect(actions.hydrateCatalog).toHaveBeenCalledWith(expect.any(Object), [], { signal: expect.any(AbortSignal) })
+    })
     view.rerender(<WorkbenchToolbar {...p} {...actions} t={t} tabbed={false}
       viewport={{ mode: 'workbench', paneIds: [SID_A, SID_B], paneRatios: [0.5, 0.5], collapsedIds: [] }} />)
-    await waitFor(() => { expect(actions.hydrateCatalog).toHaveBeenLastCalledWith(expect.any(Object), [SID_A, SID_B]) })
+    await waitFor(() => {
+      expect(actions.hydrateCatalog).toHaveBeenLastCalledWith(expect.any(Object), [SID_A, SID_B], { signal: expect.any(AbortSignal) })
+    })
     expect(fetch).toHaveBeenCalledOnce()
   })
 
@@ -416,7 +470,7 @@ describe('workbench account targets and asynchronous chooser', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /Team/ }))
     fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
     await waitFor(() => { expect(screen.getByRole('alert').textContent).toBe('无法创建对话，请重试') })
-    expect(createSession).toHaveBeenCalledWith({ kind: 'project', projectId: 7, projectName: 'Team' }, false)
+    expect(createSession).toHaveBeenCalledWith({ kind: 'project', projectId: 7, projectName: 'Team' }, false, expect.any(AbortSignal))
     fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
     await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
   })
@@ -438,7 +492,7 @@ describe('workbench account targets and asynchronous chooser', () => {
     await screen.findByRole('button', { name: '新建对话' })
     fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
     await waitFor(() => {
-      expect(createSession).toHaveBeenCalledWith({ kind: 'project', projectId: 7 }, false)
+      expect(createSession).toHaveBeenCalledWith({ kind: 'project', projectId: 7 }, false, expect.any(AbortSignal))
     })
   })
 
@@ -687,7 +741,7 @@ describe('workbench toolbar edge paths', () => {
       chooseSession={choose} focusSession={vi.fn()} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
     fireEvent.click(screen.getByRole('button', { name: 'Prefixed raw ID' }))
-    expect(choose).toHaveBeenCalledWith(expect.objectContaining({ sessionId: raw, runtime: { kind: 'personal' } }), false)
+    expect(choose).toHaveBeenCalledWith(expect.objectContaining({ sessionId: raw, runtime: { kind: 'personal' } }), false, expect.any(AbortSignal))
     await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
     view.unmount()
 
@@ -913,9 +967,9 @@ describe('workbench toolbar edge paths', () => {
     expect(screen.getByRole('button', { name: /未命名对话 ·/ })).toBeTruthy()
   })
 
-  it('keeps the picker open while a create is in flight', async () => {
+  it('cancels waiting on Escape without a late create result closing a reopened picker', async () => {
     const pendingCreate = Promise.withResolvers<{ ok: true }>()
-    const createSession = vi.fn(() => pendingCreate.promise)
+    const createSession = vi.fn((_target: SessionRuntimeTarget, _replace: boolean, _signal?: AbortSignal) => pendingCreate.promise)
     const p = props()
     const closePicker = vi.spyOn(p.actions, 'closePicker')
     renderToolbar(p, { createSession })
@@ -923,10 +977,15 @@ describe('workbench toolbar edge paths', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '个人空间' }))
     fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
+    const signal = createSession.mock.calls[0]![2]!
+    expect(signal.aborted).toBe(false)
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(closePicker).not.toHaveBeenCalled()
-    pendingCreate.resolve({ ok: true })
-    await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
+    expect(closePicker).toHaveBeenCalledOnce()
+    expect(signal.aborted).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    await act(async () => { pendingCreate.resolve({ ok: true }) })
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(closePicker).toHaveBeenCalledOnce()
   })
 })
 
@@ -1015,6 +1074,24 @@ describe('pane identity and chrome branches', () => {
   const stubs = () => ({
     useSession: (() => undefined) as never, useProjection: () => undefined,
     useInput: (() => undefined) as never, inputActions: {} as never, t,
+  })
+
+  it('follows entry display policy without replacing the pane’s Runtime identity', () => {
+    const p = props()
+    p.sessionsStore.update((draft) => {
+      draft.byId[SID_A]!.runtime = { kind: 'personal', nodeName: 'Office computer',
+        nodeId: '10000000-0000-4000-8000-000000000001' as never,
+        runtimeId: '10000000-0000-4000-8000-000000000002' as never }
+    })
+    render(<WorkbenchPaneHeader {...p} {...stubs()} sessionId={SID_A} active maximized={false}
+      onFocus={vi.fn()} onClose={vi.fn()} onMaximize={vi.fn()} replacePane={vi.fn()} movePane={vi.fn()} />)
+    expect(screen.queryByText('Office computer')).toBeNull()
+    act(() => { p.deploymentStore.set({ phase: 'ready', showComputer: true, aggregateComputers: true }) })
+    expect(screen.getByText('Office computer')).toBeTruthy()
+    act(() => { p.deploymentStore.set({ phase: 'ready', showComputer: false, aggregateComputers: false }) })
+    expect(screen.queryByText('Office computer')).toBeNull()
+    expect(screen.getByText('Alpha')).toBeTruthy()
+    expect(p.sessionsStore.getSnapshot().current).toBe(SID_A)
   })
 
   it('resolves steward, project, and personal tones with their scope fallbacks', () => {

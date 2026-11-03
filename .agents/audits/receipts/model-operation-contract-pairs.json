@@ -1,0 +1,14 @@
+{
+  "name": "model-operation-contract-pairs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write packages/llm/llm/README.md docs/subsystems/llm-streaming.md .agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.md",
+  "startedAt": "2026-10-24T05:58:48.985395+00:00",
+  "seconds": 1.285,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ebfdd9a6bb2f2a1072df8e5a0ffbbc8aecef8fb60dc6000b28b441ddc27e5a1f",
+  "inputsAfter": "6497141ad81261e1bb4fa80119e860a33d64c87fa2f65b1fd54201997be1308b",
+  "postgresToolDirectory": null,
+  "outputSha256": "dcf1f8545df8adcfe161e0ef623419cf72955cd882cab7c8b36a7d5467912090",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.i18n.yaml\nverify-translation-pairing: recorded docs/subsystems/llm-streaming.i18n.yaml\nverify-translation-pairing: recorded packages/llm/llm/README.i18n.yaml\nverify-translation-pairing: 3 record(s) written; run the check to validate the pairs.\n"
+}

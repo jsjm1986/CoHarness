@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { expect, it, onTestFinished } from 'vitest'
 import { applyEntryPatches } from '@deepseek-ai/cordis-plugin-include'
 import { loadOptionalPatches } from '@deepseek-ai/dsh-app-boot'
-import { writePluginEnabled } from '../src/patch.ts'
+import { writePluginConfig, writePluginEnabled } from '../src/patch.ts'
 
 async function fixture(text?: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'manager-patch-'))
@@ -81,4 +81,72 @@ it('updates the last matching named override and leaves mismatched names untouch
   expect(await readFile(file, 'utf8')).toBe(text)
   expect(await writePluginEnabled(file, 'tool', 'package', false)).toBe(true)
   expect(loadOptionalPatches('test', file)).toHaveLength(3)
+})
+
+it('replaces the effective config without merging old fields or changing other profile settings', async () => {
+  const file = await fixture('# personal configuration\n- id: other\n  config:\n    value: !!js process.platform\n- id: tool\n  config:\n    stale: true\n- id: tool\n  name: package\n  config:\n    previous: true\n  disabled: true # availability\n- id: tool\n  name: another-package\n  config:\n    untouched: true\n')
+  expect(await writePluginConfig(file, 'tool', 'package', { current: 'saved' })).toBe(true)
+  const text = await readFile(file, 'utf8')
+  expect(text).toContain('# personal configuration')
+  expect(text).toContain('!!js process.platform')
+  expect(text).toContain('# availability')
+  const patches = loadOptionalPatches('test', file)
+  expect(patches?.at(-1)).toEqual({ id: 'tool', name: 'another-package', config: { untouched: true } })
+  expect(applyEntryPatches([{ id: 'tool', name: 'package', config: { default: true } }], patches, () => {}))
+    .toEqual([{ id: 'tool', name: 'package', config: { current: 'saved' }, disabled: true }])
+})
+
+it('creates and clears a named config override while retaining composition defaults', async () => {
+  const file = await fixture()
+  expect(await writePluginConfig(file, 'tool', 'package', null)).toBe(false)
+  await expect(readFile(file)).rejects.toMatchObject({ code: 'ENOENT' })
+  expect(await writePluginConfig(file, 'tool', 'package', { custom: true })).toBe(true)
+  expect(loadOptionalPatches('test', file)).toEqual([{ id: 'tool', name: 'package', config: { custom: true } }])
+  expect(await writePluginConfig(file, 'tool', 'package', null)).toBe(true)
+  const text = await readFile(file, 'utf8')
+  expect(applyEntryPatches([{ id: 'tool', name: 'package', config: { default: true } }], loadOptionalPatches('test', file), () => {}))
+    .toEqual([{ id: 'tool', name: 'package', config: { default: true } }])
+  expect(await writePluginConfig(file, 'tool', 'package', null)).toBe(false)
+  expect(await readFile(file, 'utf8')).toBe(text)
+})
+
+it('clears all applicable overrides instead of restoring an older override after a reset', async () => {
+  const file = await fixture('- insert:\n    - id: tool\n      name: package\n      config:\n        default: true\n- id: tool\n  config:\n    stale: true\n  disabled: true # availability\n- id: tool\n  name: package\n  config:\n    current: true\n- id: tool\n  name: another-package\n  config:\n    untouched: true\n')
+  expect(await writePluginConfig(file, 'tool', 'package', null)).toBe(true)
+  const patches = loadOptionalPatches('test', file)
+  expect(patches).toEqual([
+    { insert: [{ id: 'tool', name: 'package', config: { default: true } }] },
+    { id: 'tool', disabled: true },
+    { id: 'tool', name: 'another-package', config: { untouched: true } },
+  ])
+  expect(applyEntryPatches([], patches, () => {})).toEqual([
+    { id: 'tool', name: 'package', config: { default: true }, disabled: true },
+  ])
+  expect(await readFile(file, 'utf8')).toContain('# availability')
+})
+
+it('leaves a config-free matching row untouched when no override needs clearing', async () => {
+  const original = '- id: tool\n  name: package\n  disabled: true # availability\n'
+  const file = await fixture(original)
+  expect(await writePluginConfig(file, 'tool', 'package', null)).toBe(false)
+  expect(await readFile(file, 'utf8')).toBe(original)
+})
+
+it('appends a config override after insertions and mismatched names', async () => {
+  const file = await fixture('- insert:\n    - id: tool\n      name: package\n- id: tool\n  name: another-package\n  config:\n    untouched: true\n')
+  expect(await writePluginConfig(file, 'tool', 'package', { current: true })).toBe(true)
+  expect(applyEntryPatches([], loadOptionalPatches('test', file), () => {}))
+    .toEqual([{ id: 'tool', name: 'package', config: { current: true } }])
+})
+
+it.each(['- id: [broken', 'mapping: true\n'])('refuses a malformed config patch without overwriting %s', async (text) => {
+  const file = await fixture(text)
+  await expect(writePluginConfig(file, 'tool', 'package', {})).rejects.toThrow()
+  expect(await readFile(file, 'utf8')).toBe(text)
+})
+
+it('reports config read failures without replacing a directory', async () => {
+  const file = await fixture()
+  await mkdir(file)
+  await expect(writePluginConfig(file, 'tool', 'package', {})).rejects.toThrow()
 })

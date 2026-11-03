@@ -1,4 +1,5 @@
 /** Schema-owned profile settings with explicit defaults, revision conflicts and write-only secrets. */
+import { usePendingEdits } from '../pending-edits.tsx'
 import { useEffect, useMemo, useState } from 'react'
 import { Context } from '@deepseek-ai/cordis'
 import { SettingsSchemaService, type SchemaNode } from '../../../../packages/client/ui-settings/src/client/schema.ts'
@@ -77,6 +78,7 @@ export function PluginConfiguration({ view, controller }: { view: SettingsNamesp
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')
   const dirty = Object.keys(draft).length > 0
+  usePendingEdits(dirty || saving)
   const conflict = dirty && base.revision !== view.revision
   useEffect(() => { if (!dirty) setBase(view) }, [dirty, view])
   const form = useMemo(() => {

@@ -1,0 +1,14 @@
+{
+  "name": "managed-copy-gateway-emit",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/tsc -p tsconfig.build.json",
+  "startedAt": "2026-10-25T11:12:40.390105+00:00",
+  "seconds": 22.248,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f228954b1842b443f207e7162d90835ebf91682da826eafc97713819e126d7c2",
+  "inputsAfter": "f228954b1842b443f207e7162d90835ebf91682da826eafc97713819e126d7c2",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

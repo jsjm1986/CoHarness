@@ -5,6 +5,19 @@ afterEach(() => { vi.useRealTimers() })
 const signal = (): AbortSignal => new AbortController().signal
 
 describe('Runtime process admission', () => {
+  it('keeps cold starts bounded when the emergency resident ceiling is disabled', async () => {
+    const capacity = new RuntimeCapacity({ maxStarting: 1, maxResident: 0, maxQueued: 1, maxQueueWaitMs: 1000 })
+    const first = await capacity.acquire('user:1', signal())
+    const second = capacity.acquire('project:2', signal())
+    expect(capacity.snapshot()).toMatchObject({ starting: 1, resident: 1, queued: 1 })
+    first.ready()
+    const next = await second
+    next.ready()
+    expect(capacity.snapshot()).toMatchObject({ starting: 0, resident: 2, queued: 0 })
+    first.release(); next.release()
+    capacity.close()
+  })
+
   it('admits FIFO targets within both cold-start and resident limits', async () => {
     const capacity = new RuntimeCapacity({ maxStarting: 1, maxResident: 2, maxQueued: 3, maxQueueWaitMs: 1000 })
     const first = await capacity.acquire('user:1', signal())

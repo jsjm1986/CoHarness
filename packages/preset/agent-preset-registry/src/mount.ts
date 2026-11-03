@@ -124,6 +124,8 @@ export interface PresetMount {
   readonly presetId: string
   /** The mounted subtree's fiber. */
   readonly fiber: Fiber
+  /** Standing scope fiber that owns services installed by the realm hook. */
+  readonly environment: Fiber
   /** Entry tree used to resolve the mounted preset's active package rows. */
   readonly tree?: EntryTree
   /** The standing scope key agents are parented to (undefined only in torn-down records). */
@@ -287,9 +289,9 @@ export function serviceForAgent<K extends string & keyof Context>(
  * The environment implementation a realm hook installed on the agent's
  * standing scope — what the preset composition resolves that service name to.
  *
- * Realm providers live on the standing scope's own fiber, ONE level above the
- * mounted subtree, so the membership scan in {@link serviceForAgent} cannot
- * reach them; the scope fiber is the environment's registration boundary.
+ * The mount records the standing scope fiber that owns realm providers. File
+ * compositions create a child fiber; declared compositions share the scope
+ * fiber. Provider lookup uses that recorded owner for both composition kinds.
  *
  * Absent means the realm overrode nothing for `name` and the composition
  * resolves the host's. A caller routing through this for isolation — an
@@ -308,10 +310,8 @@ export function environmentForAgent<K extends string & keyof Context>(
 ): Context[K] | undefined {
   const mount = standingMountFor(agent.ctx)
   if (mount === undefined) return undefined
-  // The realm hook registers on the standing scope — the mounted tree's
-  // parent context. A mount sitting directly on the root context has no
-  // scope environment at all, so root-owned services must never match.
-  const environment = mount.fiber.parent.fiber
+  // Root-owned services cannot substitute for a standing realm environment.
+  const environment = mount.environment
   if (environment === ctx.root.fiber) return undefined
   const store = ctx.reflect.store
   for (const key of Object.getOwnPropertySymbols(store)) {
@@ -543,7 +543,7 @@ export async function mountDefinition(
   const leaked = leakedServices(ctx, ctx.fiber)
   if (audit.failed.length > 0) throw new Error(audit.failed.join('\n'))
   if (leaked.length > 0) throw new Error(`Preset services require isolate realms: ${leaked.join(', ')}`)
-  const mount = { presetId: id, fiber: ctx.fiber, tree, key: scopeOf(ctx) }
+  const mount = { presetId: id, fiber: ctx.fiber, environment: ctx.fiber, tree, key: scopeOf(ctx) }
   pruneDisposedMounts()
   mounts.add(mount)
   return mount
@@ -595,7 +595,7 @@ export async function mountPreset(agentCtx: Context, preset: FileAgentPreset): P
         + 'a preset service must sit behind an `isolate` realm or move to the host composition',
       )
     }
-    mounts.add({ presetId: preset.id, fiber, key: scopeOf(agentCtx), tree })
+    mounts.add({ presetId: preset.id, fiber, environment: agentCtx.fiber, key: scopeOf(agentCtx), tree })
   } catch (error) {
     try {
       await handle.dispose()

@@ -99,13 +99,14 @@ validate_release() {
     # The compiled ESM graph resolves workspace packages through release-local
     # links that `build:production` creates under gateway/node_modules. A
     # release assembled without them boots into an unresolved-import crash, so
-    # require every scoped link here; the names mirror GATEWAY_RUNTIME_PACKAGES
-    # in scripts/build-production.ts.
+    # require the base links here and each newer module's additions below.
+    # The full build list lives in scripts/gateway-runtime-packages.ts.
     local -a runtime_links=(
       cordis
       schemastery
       dsh-managed-data
       dsh-atomic-write
+      dsh-native-command
       dsh-llm
       dsh-session-format
       dsh-session-format-catalog
@@ -118,6 +119,79 @@ validate_release() {
       [[ -s "$release/gateway/node_modules/@deepseek-ai/$required/package.json" ]] \
         || fail "release Gateway runtime link is missing or broken: $release/gateway/node_modules/@deepseek-ai/$required"
     done
+    if grep -qF './gateway-model-budget.js' "$release/gateway/lib/index.js"; then
+      for required in \
+        gateway/lib/gateway-model-budget.js \
+        gateway/lib/postgres/progress-usage.js \
+        gateway/lib/postgres/progress-service.js \
+        native/system/packages/entry/lib/flock.js \
+        gateway/node_modules/@deepseek-ai/node-addon-system/package.json \
+        gateway/deploy/postgres/migrations/065_gateway_model_ownership.sql \
+        gateway/deploy/postgres/migrations/066_project_journal_generation.sql \
+        gateway/deploy/postgres/migrations/067_project_journal_requests.sql \
+        gateway/deploy/postgres/migrations/068_project_journal_visibility.sql
+      do
+        [[ -s "$release/$required" ]] || fail "release Gateway model admission payload is missing or empty: $release/$required"
+      done
+    fi
+    if [[ -f "$release/gateway/lib/postgres/progress-service.js" ]] \
+      && grep -qF 'project_journal_materials' "$release/gateway/lib/postgres/progress-service.js"; then
+      [[ -s "$release/gateway/deploy/postgres/migrations/069_project_journal_materials.sql" ]] \
+        || fail "release Gateway model admission payload is missing or empty: $release/gateway/deploy/postgres/migrations/069_project_journal_materials.sql"
+    fi
+    if [[ -f "$release/gateway/lib/postgres/progress-usage.js" ]] \
+      && grep -qF 'request_session' "$release/gateway/lib/postgres/progress-usage.js"; then
+      for required in \
+        gateway/deploy/postgres/migrations/070_project_journal_request_sessions.sql \
+        gateway/deploy/postgres/migrations/071_project_journal_request_deletion.sql \
+        packages/core/session/lib/index.js \
+        gateway/node_modules/@deepseek-ai/dsh-session/package.json
+      do
+        [[ -s "$release/$required" ]] || fail "release Gateway model admission payload is missing or empty: $release/$required"
+      done
+    fi
+    if [[ -f "$release/gateway/lib/node-resource-budget.js" ]] \
+      && grep -qF 'sampled_before' "$release/gateway/lib/node-resource-budget.js"; then
+      [[ -s "$release/gateway/deploy/postgres/migrations/072_node_pressure_capture_bounds.sql" ]] \
+        || fail "release resource admission payload is missing or empty: $release/gateway/deploy/postgres/migrations/072_node_pressure_capture_bounds.sql"
+    fi
+    if [[ -f "$release/gateway/lib/postgres/project-service.js" ]] \
+      && grep -qF 'mutationUser' "$release/gateway/lib/postgres/project-service.js"; then
+      [[ -s "$release/gateway/deploy/postgres/migrations/073_deleted_project_relationships.sql" ]] \
+        || fail "release project account deletion payload is missing or empty: $release/gateway/deploy/postgres/migrations/073_deleted_project_relationships.sql"
+    fi
+    if [[ -f "$release/gateway/lib/postgres/model-governance-service.js" ]] \
+      && grep -qF 'mutationUser' "$release/gateway/lib/postgres/model-governance-service.js"; then
+      [[ -s "$release/gateway/deploy/postgres/migrations/074_deleted_model_relationships.sql" ]] \
+        || fail "release model account deletion payload is missing or empty: $release/gateway/deploy/postgres/migrations/074_deleted_model_relationships.sql"
+    fi
+    if grep -qF './runtime-resource-api.js' "$release/gateway/lib/runtime-api.js"; then
+      for required in \
+        gateway/lib/runtime-resource-api.js \
+        gateway/lib/node-resource-budget.js \
+        gateway/lib/node-resource-pressure.js \
+        packages/context/resource-budget/lib/wire.js \
+        gateway/node_modules/@deepseek-ai/dsh-resource-budget/package.json
+      do
+        [[ -s "$release/$required" ]] || fail "release resource admission payload is missing or empty: $release/$required"
+      done
+    fi
+    if grep -qF './runtime-document-store.js' "$release/gateway/lib/runtime-api.js"; then
+      for required in \
+        gateway/lib/runtime-document-store.js \
+        packages/attachment/userdoc-gateway/lib/protocol.js \
+        packages/util/values/lib/index.js \
+        gateway/node_modules/@deepseek-ai/dsh-userdoc-gateway/package.json \
+        gateway/node_modules/@deepseek-ai/dsh-util-values/package.json
+      do
+        [[ -f "$release/$required" && -s "$release/$required" ]] \
+          || fail "release document payload is missing or empty: $release/$required"
+      done
+      "$NODE" --input-type=module -e \
+        'import { pathToFileURL } from "node:url"; await import(pathToFileURL(process.argv[1]).href)' \
+        "$release/gateway/lib/runtime-api.js" \
+        || fail "release document module graph is incomplete: $release/gateway/lib/runtime-api.js"
+    fi
     return 0
   fi
   if [[ "$allow_legacy" == true \

@@ -1,0 +1,2 @@
+- id: subprocess
+  name: '@deepseek-ai/dsh-subprocess-local'

@@ -8,12 +8,14 @@
  * synthesized Alt press so the dialog activates as foreground even when a
  * background host spawned the child). Only viable when
  * the operator sits at the host's screen; remote deployments compose the
- * browse backend instead.
+ * browse backend instead. Provider withdrawal cancels accepted picks, awaits
+ * their promises, and refuses calls through retained capability objects.
  * @module @deepseek-ai/dsh-host-directory-picker-native
  */
 
 import { DirectoryPicker } from '@deepseek-ai/dsh-host-directory-picker'
 import type { DirectoryPickerCapability } from '@deepseek-ai/dsh-host-directory-picker'
+import type { Context } from '@deepseek-ai/cordis'
 import { pickNativeDirectory } from './native-picker.ts'
 
 export type { DirectoryPickerInternals, DirectoryPickerRunner } from './native-picker.ts'
@@ -21,10 +23,31 @@ export { pickNativeDirectory } from './native-picker.ts'
 
 /** The `ctx.directoryPicker` native implementation (stable capability object per service life). */
 export default class NativeDirectoryPicker extends DirectoryPicker {
+  private readonly lifetime = new AbortController()
+  private readonly pending = new Set<Promise<string | null>>()
   private readonly nativeCapability: DirectoryPickerCapability = {
     kind: 'native',
-    /* v8 ignore next -- pure forward to pickNativeDirectory (its spec owns behavior); invoking here opens a real chooser. */
-    pick: signal => pickNativeDirectory(signal),
+    pick: signal => this.pick(signal),
+  }
+
+  constructor(ctx: Context) {
+    super(ctx)
+    ctx.effect(() => async () => {
+      this.lifetime.abort(new Error('native directory picker disposed'))
+      await Promise.allSettled(this.pending)
+    }, 'native directory picker: accepted operations')
+  }
+
+  private async pick(signal: AbortSignal): Promise<string | null> {
+    const lifetime = AbortSignal.any([signal, this.lifetime.signal])
+    lifetime.throwIfAborted()
+    const operation = pickNativeDirectory(lifetime)
+    this.pending.add(operation)
+    try {
+      return await operation
+    } finally {
+      this.pending.delete(operation)
+    }
   }
 
   /**

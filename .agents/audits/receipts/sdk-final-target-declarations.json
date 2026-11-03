@@ -1,0 +1,14 @@
+{
+  "name": "sdk-final-target-declarations",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/subagent/subagent-dsh-sdk/tsconfig.json",
+  "startedAt": "2026-10-24T17:44:07.690824+00:00",
+  "seconds": 3.023,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "65bce3a2fed108d32a432926cf63828d4c05520653726359ecc51506c9852362",
+  "inputsAfter": "65bce3a2fed108d32a432926cf63828d4c05520653726359ecc51506c9852362",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

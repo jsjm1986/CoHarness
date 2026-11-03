@@ -1,15 +1,17 @@
 - dialog "Document Manager":
-  - heading "Document Manager" [level=2]
-  - button "Close":
-    - img
-  - button "Upload information":
-    - img
+  - banner:
+    - heading "Document Manager" [level=2]
+    - button "Upload information":
+      - img
+    - button "Close":
+      - img
   - button "Personal documents":
     - strong: Personal documents
     - img
   - status:
     - text: Project scopes could not be refreshed; showing the last result
     - button "Retry"
+  - status: Open a conversation to add documents to it. Browsing, downloads and copying remain available.
   - navigation "Document path":
     - button "Root folder" [disabled]
   - group "Document filters":
@@ -34,7 +36,7 @@
       - listitem:
         - checkbox "notes.txt"
         - button "Preview notes.txt": notes.txt 30.0 KB · 2026-08-16
-        - button "Add notes.txt to conversation": Add to conversation
+        - button "Add notes.txt to conversation" [disabled]: Add to conversation
         - 'button "More actions: notes.txt"':
           - img
     - group "Upload date 2026-08-14":
@@ -42,6 +44,6 @@
       - listitem:
         - checkbox "brief.txt"
         - button "Preview brief.txt": brief.txt 21 B · 2026-08-14
-        - button "Add brief.txt to conversation": Add to conversation
+        - button "Add brief.txt to conversation" [disabled]: Add to conversation
         - 'button "More actions: brief.txt"':
           - img

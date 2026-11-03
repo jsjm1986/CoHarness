@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-native-missing-before",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/tsx --tsconfig tsconfig.run.json ../.agents/audits/.local/tunnel-native-probe.mjs missing",
+  "startedAt": "2026-10-24T21:29:42.985770+00:00",
+  "seconds": 30.47,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cfd0584c6b5816a86b605ca3d6daca9e9c5ed7df3215a0e5f25e3d7f5412c949",
+  "inputsAfter": "cfd0584c6b5816a86b605ca3d6daca9e9c5ed7df3215a0e5f25e3d7f5412c949",
+  "postgresToolDirectory": null,
+  "outputSha256": "52f00b1a358588b7fbbf5e9be9de7534f6c5aa4e34648c2ae3e84f029d1268c1",
+  "outputTail": "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: The validation function is expected to return \"true\". Received false\n\nCaught error:\n\nError: cloudflared did not report a quick-tunnel URL in time\n    at async <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/tunnel-native-probe.mjs:11:3) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: TunnelSupervisorError: cloudflared did not report a quick-tunnel URL in time\n      at Timeout._onTimeout (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/tunnel-supervisor.ts:287:14)\n      at listOnTimeout (node:internal/timers:605:17)\n      at process.processTimers (node:internal/timers:541:7) {\n    code: 'url-timeout'\n  },\n  expected: [Function (anonymous)],\n  operator: 'rejects',\n  diff: 'simple'\n}\n\nNode.js v25.8.1\n"
+}

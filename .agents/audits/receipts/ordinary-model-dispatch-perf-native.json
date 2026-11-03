@@ -1,0 +1,14 @@
+{
+  "name": "ordinary-model-dispatch-perf-native",
+  "cwd": ".",
+  "command": "node --expose-gc .agents/audits/.local/ordinary-dispatch-perf.mjs native",
+  "startedAt": "2026-10-25T05:26:14.635188+00:00",
+  "seconds": 0.334,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "db10f49bdffd3629ef4ade031ce127f4c5e854feaa72792220ab5fbca0f70544",
+  "inputsAfter": "db10f49bdffd3629ef4ade031ce127f4c5e854feaa72792220ab5fbca0f70544",
+  "postgresToolDirectory": null,
+  "outputSha256": "abe3f313d1cf89134bf5e2ee25cfaa09543ccec346dd001e8adcff998466b4ae",
+  "outputTail": "node:internal/modules/package_json_reader:301\n  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);\n        ^\n\nError [ERR_MODULE_NOT_FOUND]: Cannot find package '@deepseek-ai/cordis' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/ordinary-dispatch-perf.mjs\n    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:301:9)\n    at packageResolve (node:internal/modules/esm/resolve:764:81)\n    at moduleResolve (node:internal/modules/esm/resolve:855:18)\n    at defaultResolve (node:internal/modules/esm/resolve:988:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:697:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:714:38)\n    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:746:52)\n    at #resolve (node:internal/modules/esm/loader:679:17)\n    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:599:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:160:33) {\n  code: 'ERR_MODULE_NOT_FOUND'\n}\n\nNode.js v25.8.1\n"
+}

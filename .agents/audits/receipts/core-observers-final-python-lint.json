@@ -1,0 +1,14 @@
+{
+  "name": "core-observers-final-python-lint",
+  "cwd": ".",
+  "command": "python/sdk/.venv/bin/ruff check --config python/sdk/pyproject.toml python/sdk/tests/test_job_lifecycle_snapshot.py",
+  "startedAt": "2026-10-26T10:27:34.542839+00:00",
+  "seconds": 1.916,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f3d669c1adc303aa5a2a24228b789170f1c08adb36c04718d2c69feea5cdb308",
+  "inputsAfter": "f3d669c1adc303aa5a2a24228b789170f1c08adb36c04718d2c69feea5cdb308",
+  "postgresToolDirectory": null,
+  "outputSha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+  "outputTail": "All checks passed!\n"
+}

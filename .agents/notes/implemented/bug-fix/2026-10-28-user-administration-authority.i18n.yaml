@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-28-user-administration-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-28-user-administration-authority.md
+document:
+  en: 6c92af8f99a776b93f6da1a314ef0240c744b6b0
+  zh: 20b2daa837807ec06ad12337f58c4ed50ac1ac21
+/agent-note-account-administration-retains-current-actor-authority:
+  en: 30845856bde68708
+  zh: 73b50a1bdf5d59da
+/agent-note-account-administration-retains-current-actor-authority/problem:
+  en: 0e48e7a7585fc4d0
+  zh: 80ed18e60ebe6bbd
+/agent-note-account-administration-retains-current-actor-authority/decision:
+  en: 1decca8c53af19c0
+  zh: e56980387483115d
+/agent-note-account-administration-retains-current-actor-authority/alternatives-considered:
+  en: 461307a16b0682ee
+  zh: e20f8967976e205a
+/agent-note-account-administration-retains-current-actor-authority/consequences:
+  en: 5261ab7666d0f181
+  zh: 211aab558d851083
+/agent-note-account-administration-retains-current-actor-authority/verification:
+  en: 0eef3c309570464e
+  zh: 61dfc14608a290cb

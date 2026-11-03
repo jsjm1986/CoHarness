@@ -1,4 +1,5 @@
 /** Remote-desktop administration: endpoint configuration, user grants, audit. */
+import { usePendingEdits } from '../pending-edits.tsx'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, RefreshCw, Trash2 } from 'lucide-react'
 import {
@@ -13,6 +14,7 @@ import {
 } from '../components/ui.tsx'
 import { adminLanguage, translateCopy } from '../language.ts'
 import { zh, en } from './remote-desktop.copy.ts'
+import { DesktopEnvironmentNotice } from '../components/DesktopEnvironmentNotice.tsx'
 
 const rdCopy = () => translateCopy(adminLanguage(), { zh, en })
 const messageOf = (error: unknown): string => error instanceof Error ? error.message : rdCopy()('operationFailed')
@@ -39,6 +41,7 @@ export function RemoteDesktopPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<{ kind: 'revoke' | 'endpoint'; id: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  usePendingEdits(busy || endpointDraft !== null || grantDraft !== null)
   const t = rdCopy()
 
   const reload = useCallback(async () => {
@@ -137,6 +140,7 @@ export function RemoteDesktopPage() {
         actions={<Button onClick={() => void reload()} icon={RefreshCw}>{t('refresh')}</Button>} />
       {error !== null && <ErrorBanner message={error} />}
       {notice !== null && <p role="status">{notice}</p>}
+      <DesktopEnvironmentNotice />
 
       <Section title={t('sectionEndpoints')} flush
         actions={<Button variant="secondary" icon={Plus} onClick={() => setEndpointDraft(EMPTY_ENDPOINT)}>{t('addEndpoint')}</Button>}>

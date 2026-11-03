@@ -1,0 +1,14 @@
+{
+  "name": "model-operation-core-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/llm/llm --retry=0 --coverage.enabled --coverage.provider=v8 --coverage.include=packages/llm/llm/src/index.ts --coverage.reporter=json --coverage.reporter=text --coverage.reportsDirectory=.agents/audits/.local/model-operation-core-coverage",
+  "startedAt": "2026-10-24T05:58:47.822875+00:00",
+  "seconds": 19.414,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ebfdd9a6bb2f2a1072df8e5a0ffbbc8aecef8fb60dc6000b28b441ddc27e5a1f",
+  "inputsAfter": "6497141ad81261e1bb4fa80119e860a33d64c87fa2f65b1fd54201997be1308b",
+  "postgresToolDirectory": null,
+  "outputSha256": "c887eaba7eb9493649afe436b5636a515bd2631db4dbfd310d28faa63181e93e",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  56 passed (56)\n      Tests  1392 passed (1392)\n   Start at  13:59:00\n   Duration  6.54s (transform 12.66s, setup 2.02s, import 23.71s, tests 17.39s, environment 3ms)\n\n % Coverage report from v8\n----------|---------|----------|---------|---------|-------------------\nFile      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n----------|---------|----------|---------|---------|-------------------\nAll files |       0 |        0 |       0 |       0 |                   \n----------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : Unknown% ( 0/0 )\nBranches     : Unknown% ( 0/0 )\nFunctions    : Unknown% ( 0/0 )\nLines        : Unknown% ( 0/0 )\n================================================================================\n"
+}

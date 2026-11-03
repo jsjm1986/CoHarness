@@ -92,7 +92,7 @@ it('clears a registered live REPL through the file-policy setter before starting
   const started = spawn.mock.results[0]
   if (started?.type !== 'return') throw new Error('the retained process did not start')
   setSandboxMode(session, 'read-only')
-  await started.value.done
+  await (await started.value).done
   expect((await run('typeof retained')).value).toBe('undefined')
   const denied = await run('await (await import("node:fs/promises")).writeFile("denied-after-switch.txt", "denied")')
   expect(denied.sandbox).toMatchObject({ mode: 'read-only', denied: true })

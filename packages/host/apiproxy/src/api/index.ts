@@ -61,7 +61,7 @@ export type {
   SessionDraftId, SessionHistoryIndex, SessionHistoryIndexItem, SessionListMetadata, SessionProjectionsBlock,
   SessionSearchItem, SessionsApi, SessionSummary,
 } from './sessions.ts'
-export type { DesktopApi, DesktopConfirmation } from './desktop.ts'
+export type { DesktopApi, DesktopConfirmation, DesktopStatus } from './desktop.ts'
 export type { DirectoryEntry, DirectoryListing, HostApi } from './host.ts'
 export type {
   SubagentAddress, SubagentCatalog, SubagentInterruptReceipt, SubagentListEntry,
@@ -124,7 +124,8 @@ export {
 // ---- Method registry and derived generics ----
 export type { RequestPayload, ResponseValue, RpcMethodMap } from './rpc-map.ts'
 
-export { clientSessionKey, parseClientSessionKey, runtimeTargetKey } from './client-session.ts'
+export { clientSessionKey, parseClientSessionKey, runtimeTargetKey, addressRuntimeUrl } from './client-session.ts'
+export type { ClientComputerId, ClientRuntimeId, ClientRuntimeLocation } from './client-session.ts'
 export type { ClientSessionAddress, ClientSessionKey, ClientRuntimeTarget } from './client-session.ts'
 
 // ---- Connection interaction-participation mode (install option + wire declaration) ----

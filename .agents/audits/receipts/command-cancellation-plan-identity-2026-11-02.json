@@ -1,0 +1,414 @@
+{
+  "findings": [
+    "B461",
+    "B462"
+  ],
+  "status": "fixed_verified_203_cases_command_and_plan_entries_100_percent_npm_layout_and_global_review_open",
+  "updatedAt": "2026-11-02T01:21:41.730255+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "verifiedAt": "2026-11-02T00:53:53.392877+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-latest-origin-fetch.json",
+    "workingTreePreserved": true
+  },
+  "problems": {
+    "B461": "Plain commands rechecked cancellation only after handler execution. A run-event listener can cancel before entry, yet the handler mutates state; simultaneous registration removal can also replace the cancellation with a normal error result.",
+    "B462": "Managed /plan content is steered as an unstamped user message. The actual PostgreSQL execution provider treats it as unverified history, losing the interactive input identity; missing required authority is not refused before mode selection."
+  },
+  "fixes": {
+    "B461": "The cancellation cutoff applies after Session publication for every accepted command, before registration revalidation and handler entry.",
+    "B462": "New text and attachment input is stamped by the captured execution provider before mode selection and delivery. Cancellation, provider replacement, service disposal and loss of the original Agent during the wait prevent both operations. Required managed authority cannot fall back to local execution."
+  },
+  "compatibility": {
+    "serviceSignaturesChanged": false,
+    "newSessionEvents": false,
+    "sessionFormatChanged": false,
+    "newRuntimeConfiguration": false,
+    "newRequiredApiPackage": "@deepseek-ai/dsh-execution-authority for PlanMode",
+    "providerOptionalInIndependentCompositions": true,
+    "barePlanAndOffRemainStateOnly": true,
+    "accountAclBypassClaimed": false
+  },
+  "verification": {
+    "differentNamedCases": 203,
+    "unit": {
+      "cases": 176,
+      "files": 7
+    },
+    "realPostgres": {
+      "cases": 25,
+      "skipped": 0,
+      "disposableDatabasesDropped": 5
+    },
+    "sdk": {
+      "differentTypeScriptCases": 1,
+      "differentPythonCases": 1,
+      "sourceNode22": "passed",
+      "builtNode24": "passed"
+    },
+    "planLoaderSnapshot": "A real Loader/AgentLoop subprocess records input receipt, unchanged state at attestation, logged input, model delivery and active plan state; source and normally built variants pass. The keyless issuer is a fixture; actual caller authorization is verified separately against PostgreSQL.",
+    "originalCounterproofs": "Two cancellation cases and two Plan identity cases fail on original source. A matching frozen B459 normal build increments the cancelled handler once. Original Plan source against the corrected real Gateway fixture publishes no input receipt; the fixed source preserves the actual caller.",
+    "completeEntries": {
+      "commands": {
+        "lines": {
+          "total": 154,
+          "covered": 154,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 37,
+          "covered": 37,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 167,
+          "covered": 167,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 126,
+          "covered": 126,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "planMode": {
+        "lines": {
+          "total": 151,
+          "covered": 151,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 25,
+          "covered": 25,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 168,
+          "covered": 168,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 138,
+          "covered": 138,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "normalCoveragePolicyChanged": false,
+    "allChecksGreen": false,
+    "npmInstallLayoutAccepted": false,
+    "publint": "Exactly two normal package copies pass the standard gate; existing source-export wildcard notices are informational, not a warning-free claim.",
+    "nodeNext": "A private external consumer uses normal package exports without source paths and the repository NodeNext policy.",
+    "checks": [
+      {
+        "name": "command-plan-final-unit-coverage",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-final-unit-coverage.json"
+      },
+      {
+        "name": "plan-identity-postgres-full",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/plan-identity-postgres-full.json"
+      },
+      {
+        "name": "cancellation-source-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/cancellation-source-sdk.json"
+      },
+      {
+        "name": "cancellation-built-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/cancellation-built-sdk.json"
+      },
+      {
+        "name": "cancellation-python-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/cancellation-python-sdk.json"
+      },
+      {
+        "name": "plan-identity-loader-built",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/plan-identity-loader-built.json"
+      },
+      {
+        "name": "command-plan-final-build-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-final-build-types.json"
+      },
+      {
+        "name": "command-cancellation-final-bundle",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-cancellation-final-bundle.json"
+      },
+      {
+        "name": "plan-identity-normal-bundle",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/plan-identity-normal-bundle.json"
+      },
+      {
+        "name": "command-plan-host-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-host-types.json"
+      },
+      {
+        "name": "command-plan-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-lint.json"
+      },
+      {
+        "name": "command-plan-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-doc-quick.json"
+      },
+      {
+        "name": "command-plan-export-jsdoc",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-export-jsdoc.json"
+      },
+      {
+        "name": "command-plan-workspace-constraints",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-workspace-constraints.json"
+      },
+      {
+        "name": "command-plan-dependency-cohorts",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-dependency-cohorts.json"
+      },
+      {
+        "name": "command-plan-module-graph",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-module-graph.json"
+      },
+      {
+        "name": "command-plan-node-next-consumer",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-node-next-consumer.json"
+      },
+      {
+        "name": "command-plan-publint-real",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-publint-real.json"
+      },
+      {
+        "name": "command-plan-latest-origin-fetch",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-latest-origin-fetch.json"
+      },
+      {
+        "name": "cancellation-original",
+        "status": "expected_original_behavior_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/cancellation-original.json"
+      },
+      {
+        "name": "plan-identity-original",
+        "status": "expected_original_behavior_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/plan-identity-original.json"
+      },
+      {
+        "name": "cancellation-original-native",
+        "status": "expected_original_behavior_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/cancellation-original-native.json"
+      },
+      {
+        "name": "plan-identity-postgres-original-matched",
+        "status": "expected_original_behavior_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/plan-identity-postgres-original-matched.json"
+      },
+      {
+        "name": "command-plan-npm-install-layout",
+        "status": "failed_synthetic_registry_fflate_resolution_pending_B465",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-npm-install-layout.json"
+      },
+      {
+        "name": "command-plan-maintained-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/command-plan-maintained-references.json"
+      }
+    ]
+  },
+  "intermediateSetup": [
+    "The owned test PostgreSQL container was stopped after reboot. Its exact recorded identity was verified before resuming it; only loopback test bindings were accepted.",
+    "The first database helper used the Gateway working directory for a root package suite; this startup failure is separate from the original business failure.",
+    "The execution fixture credential and terminal-admin assertion omitted RuntimeId while ordinary assertions included it. The test fixture now supplies the exact same Runtime identity; production principal verification was not weakened.",
+    "The first scoped publint view used directory symlinks and selected zero packages. It is not accepted as package validation; the final view copies exactly two normal packages and verifies the selection count.",
+    "The separate metadata-only npm layout gate failed on an incomplete fflate version set. It remains an open verification failure;203 business cases and other passed checks do not hide it."
+  ],
+  "coordination": {
+    "status": "root_command_and_plan_core_peer_client_directory_and_transport",
+    "rootScope": "interaction/commands cancellation; plan-mode verified input; Gateway execution Loader tests and their RuntimeId fixture; declared dependencies and documentation",
+    "peerScope": "R40 pool queueing and R41 client/ui-commands; prior R39 UI/Admin and cross-boot recovery",
+    "communications": "One concrete test-fixture ownership handoff; no routine progress pings.",
+    "rootPeerUiEdits": 0,
+    "rootRuntimeOwnerEdits": 0,
+    "rootPoolQueueEdits": 0,
+    "rootProductionMutation": false,
+    "rootChangesIncludedInPeerRelease": false
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/cancellation-plan-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/feature/2026-08-17-command-image-attachment-envelope.i18n.yaml",
+    ".agents/notes/implemented/feature/2026-08-17-command-image-attachment-envelope.md",
+    ".agents/notes/implemented/feature/2026-08-17-command-image-attachment-envelope.zh.md",
+    "docs/module-graph.i18n.yaml",
+    "docs/module-graph.md",
+    "docs/module-graph.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/command-registration/expected.json",
+    "examples/headless-agent/tests/fixtures/command-registration/model.mjs",
+    "gateway/tests/execution-fixture-server.ts",
+    "packages/context/gateway-execution/package.json",
+    "packages/context/gateway-execution/tests/pg-composition.e2e.ts",
+    "packages/interaction/commands/README.i18n.yaml",
+    "packages/interaction/commands/README.md",
+    "packages/interaction/commands/README.zh.md",
+    "packages/interaction/commands/src/index.ts",
+    "packages/interaction/commands/tests/commands.spec.ts",
+    "packages/plan/plan-mode/README.i18n.yaml",
+    "packages/plan/plan-mode/README.md",
+    "packages/plan/plan-mode/README.zh.md",
+    "packages/plan/plan-mode/package.json",
+    "packages/plan/plan-mode/src/index.ts",
+    "packages/plan/plan-mode/tests/expected/pending-command.jsonl",
+    "packages/plan/plan-mode/tests/fixtures/pending-command-driver.mjs",
+    "packages/plan/plan-mode/tests/plan-mode.spec.ts",
+    "packages/plan/plan-mode/tsconfig.json",
+    "pnpm-lock.yaml"
+  ],
+  "readOnlyPrerequisiteCount": 513,
+  "readonlyCurrentDrift": [],
+  "artifactReferences": {
+    "apps/cli/lib/bin.js": "a3f373cfa7a3a84aa5fb6e25c3db5b2cb9b338afe986169c00fcc38ea0044455",
+    "packages/boot/app-boot/lib/index.js": "e7527dacdd9bc28e1a95536f3930f042ebbac186b16393059469ac7f3a537b80",
+    "packages/bundle/sdk-minimal/lib/index.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "packages/context/collaboration-gateway/lib/index.js": "0f9959205ed5dcc40ee9558d04c575fbf5fe3aa643e42430ec471ca3cc975b65",
+    "packages/core/agent-loop/lib/index.js": "4d9e306e15bd8a750ff97bd48c6253a45f2faa49edf5b41ac88b37c2b0f0e882",
+    "packages/core/agent/lib/index.js": "4ffa8768f1ed50640eaba1ef6cddd9183c824a5a183208e3012a4f86ed27fa18",
+    "packages/extensions/tool-cordis/lib/index.js": "a8db112aaa38e65f1c4a25ff4215d876df687c4f079ad38faaa8c83a9bd01cb8",
+    "packages/extensions/tool-cordis/lib/types/api-catalog.d.ts": "751ebac54d1c2d0a694d18973b2d1a95f901b8dda3ed49eb6303795a30c8dc4e",
+    "packages/extensions/tool-cordis/lib/types/api-catalog.js": "1601d1a9a14d2788d68534f88c96ea7d66fc5eceea45427abb5e14e7c2e6167a",
+    "packages/extensions/tool-cordis/lib/types/index.d.ts": "af71d264ee9c5c04b991eeb6c75c7b02137bc0281cd576b6db3f8e7f8d49ae57",
+    "packages/extensions/tool-cordis/lib/types/index.js": "a96b33268cd03e577cdfc62f32c55ebc380e98d7ba3006789feb65cd2480dfc6",
+    "packages/jobs/jobs-local/lib/index.js": "9d7ef77f5119202345aafddd4ac2a1dead773db0a70e887bc852f50f4fa2cf3b",
+    "packages/jobs/jobs-local/lib/types/index.d.ts": "ee46e954b695a13ede2d19a07028517e0389a79ed73a4c4b86d687296a9f84e6",
+    "packages/jobs/jobs-local/lib/types/index.js": "7a7872b40f897a044e630c19ad7b42a637687556467e548ea7aaecdbb42b9523",
+    "packages/jobs/jobs/lib/index.js": "0e7659e20c3ab0cdef78aeadc08d14baa23cc05412f28daf21e5ecc7b71b3821",
+    "packages/jobs/tool-jobs/lib/index.js": "d09749a36d2b6247ac32a476fb2947c1fe32fe95ea4444bbd768901c6b838c0b",
+    "packages/ptc-runtime/ptc-runtime-node/lib/index.js": "9b01e82609461ca27c7353386722a523bed4ebbed0f326d6ccc803c620032fa6",
+    "packages/sdk/client/lib/index.js": "7099941321aa5a129caed823ac18c4749ac269dba7705c5ce6274b0276f51aad",
+    "packages/sdk/server/lib/index.js": "c94739bc12898d337ca362ef657464e2aa06d117cec7c90395fc37a03abd4196",
+    "packages/subagent/subagent/lib/index.js": "d1d5a046de6fb2a67dc15d682bdb7c0b8ef6966a3b918a1ca48b62f66180b007",
+    "packages/subagent/subagent/lib/types/index.d.ts": "0fda33152b96a3ab06f65d8d2f3009554e7e51c330c1b2f193ad7c6254285dea",
+    "packages/subagent/subagent/lib/types/index.js": "367eeafbfccd4d538ce6d26b6733e7f8208b0fb056215b25ac0c9d1cfb992e6b",
+    "packages/subagent/subagent/lib/types/internal.d.ts": "910db97a43b6dd599126d6c7cf9057b2c007120bcf9dd761bcf1439aa2e45291",
+    "packages/subagent/subagent/lib/types/internal.js": "9e629487ae14104c2d46269197692279bf5c1a5209af0b2a56ee0865ac477afb",
+    "packages/subagent/subagent/lib/types/retained-cleanup.d.ts": "612a42281e3890f569f17ff5a8a34cbd14b62efde68bf7b4578bfce7bf0bebf3",
+    "packages/subagent/subagent/lib/types/retained-cleanup.js": "f3faf639884fea1af4ddcf84386170e8e41926d229b7fd131425b7bba71924a1",
+    "packages/subagent/subagent/lib/types/run-lease.d.ts": "b4a73727a97ba0369cf20f99633cef031ba8a9b3671b7ef427021ffc91fa2037",
+    "packages/subagent/subagent/lib/types/run-lease.js": "68a420195cd7358362a8edd97d9a4cfd4c766e836d1f32e25e467d2b9ec7fa63",
+    "packages/subagent/subagent/lib/types/types.d.ts": "fe23d6fbb40919d51ec2b1a65934249b074f6d3b9794847d58dfe453f6887501",
+    "packages/subagent/subagent/lib/types/types.js": "74c4a6ef14ae2c83292457c179e22fc44885e5d92976595089107527c160f9cd",
+    "packages/subagent/tool-subagent/lib/index.js": "d9de7ae8a530685125fa1cca13d988bde53ab75c30e9846188c2efe264e0cf46",
+    "packages/subagent/tool-subagent/lib/types/index.d.ts": "8b09f71db58a223e7e965f4f5775d97941851d5d6dd8d92b3e6a83d54b6eea5c",
+    "packages/subagent/tool-subagent/lib/types/index.js": "4d8643492ed30c70d067d7d0e5f91115371318e890e35da11380847c7b9041c5",
+    "packages/workflow/tool-ralph/lib/index.js": "657f8d26e9bba0ed6a953351c3133c0042e3e5d33e145a265988e58308b50c47",
+    "packages/workflow/tool-ralph/lib/types/index.d.ts": "aca7d199ca84ddfa327b1f198767482d647cadab731176dbfc66466eb2064d1a",
+    "packages/workflow/tool-ralph/lib/types/index.js": "5eb5bd99e37fbefec07703d7b6d28e0e98e90f0bdf07ca2e5d8f09e1fbad4736",
+    "packages/workflow/tool-workflow/lib/index.js": "b67d1ca2c2f20b0ae0162ab79977cacac34358ec0dbdbf72329da00d5dcba466",
+    "packages/workflow/tool-workflow/lib/types/index.d.ts": "580add4796ea967c51f79558608ef6472780a393c046e20673751437d41df549",
+    "packages/workflow/tool-workflow/lib/types/index.js": "63ba6b1738032618f6894e342b488ff9a6ddd24a27f58c7f12a3ba303095411b",
+    "packages/workflow/tool-workflow/lib/types/record.d.ts": "b76ec5244084c6bc7a23bf099fab530280c818b7c4b87866d0d675960fa521a6",
+    "packages/workflow/tool-workflow/lib/types/record.js": "a796561d1ce5a65fcaeb4c62f20694dfade02a92102534306ed0c6c7ccbfa8f6",
+    "packages/workflow/workflow-ptc/lib/index.js": "c3d9578dcdaa08430018fc72848d587d98f457d695b2200dd5a385d758a4b373",
+    "packages/workflow/workflow-ptc/lib/types/index.d.ts": "7fb2a61124763eed3629d93eb1d0e95de4de7a2e68697961b740f959eda81c54",
+    "packages/workflow/workflow-ptc/lib/types/index.js": "4faffdf81ad5a92ec4b99070ec2775362af9ce7711da3f0e2ff3f0e63e0a70e5",
+    "packages/workflow/workflow/lib/index.js": "fa7c0ac38c714b7230c41fa38d22524923c1237940fbfa416f63d3e1b37fde8b",
+    "packages/workflow/workflow/lib/types/index.d.ts": "91b595cdbb6d70e398d68b7529e4980f74f4651cea24a65f286201926dee1b15",
+    "packages/workflow/workflow/lib/types/index.js": "889279d97ad94551d2dcc2e945f0d4363e6056d3d175ae3dabd6cc889d1cd54d",
+    "packages/interaction/commands/lib/typert.remote-client.d.ts": "a18ac5b1d29dafd4726dff183726b7806ef64cc15d14e1a1d8343f5438a0a58c",
+    "packages/interaction/commands/lib/typert.host.js": "12ab04cc8f058e97554e55c3c2d95ee0bb7660961cc7947c0574f1de3c1b5150",
+    "packages/interaction/commands/lib/index.js": "64f5541bb4279bcb9efbe15ae0cf130f6664c005aef1f38112c5880ee3ebcacf",
+    "packages/interaction/commands/lib/typert.remote-client.js": "4c10166ca1dd5de2bd6e48b0dee4fccff3a8e647d78e76f25e85cf00307449cf",
+    "packages/interaction/commands/lib/invariant.js": "e6dcb52cba426f2cebe18d351ecb968233d41f7e3cf292be192618d0f52774fc",
+    "packages/interaction/commands/lib/typert.host.d.ts": "5e2d26ee86d0fe170dac8cd3f5854e67bdea334c57f40a5766ace57b8304c17d",
+    "packages/interaction/commands/lib/types/brand.d.ts": "a989ddb680b956c79e5077ba69336fd60728e40c4121a101f8912b2f07a563a1",
+    "packages/interaction/commands/lib/types/types.js": "06f43511aa44249a435d74bf2b168bc767460930d874764c69add444510579b3",
+    "packages/interaction/commands/lib/types/types.d.ts": "aac98b93d3326f4dbd4e94f87cf3320746916b9f4fbdf8567ac25ff77f73609c",
+    "packages/interaction/commands/lib/types/index.js": "491b0bc94e8c5d6419fdc57d0486f88b1c1cfed3e07ea08e8db5999bcd2a5969",
+    "packages/interaction/commands/lib/types/invariant.js": "e4bdb34890eb5b917fb26e5d8987929ef61be4e0587f8975c6cb7692e22be996",
+    "packages/interaction/commands/lib/types/invariant.d.ts": "5fceda9bc0f6d86d681035185e71e95417a990dcbbdb564f22ebd421cc641f37",
+    "packages/interaction/commands/lib/types/brand.js": "50808fed83c5cfe09b80df4165108abba0188645b9b9d39d0426b293e8f188dd",
+    "packages/interaction/commands/lib/types/index.d.ts": "25eb837e469bdee9561e3c4890fd0a15eab6f85e78fd8bb646bcb65d4112300b",
+    "packages/plan/plan-mode/lib/index.js": "da1f2b34397a5db20da43120681d2ef56fe6c43aac0d420aaba61a2d52b1df72",
+    "packages/plan/plan-mode/lib/invariant.js": "1c0490593a498653a8fedd299210ad4e5d25f1bae1783e309c4532fb381391c0",
+    "packages/plan/plan-mode/lib/types/client.js": "d35e43b7aad9a2f1a7e4d9e1b4ef1eb7e80a98efc8eae0addc2d01019b5a06a2",
+    "packages/plan/plan-mode/lib/types/types.js": "c1aebcb1adb4e99015c75674b57b3c8773a738dd249177383f4da5ec8ac06f17",
+    "packages/plan/plan-mode/lib/types/types.d.ts": "69eef27a478527549726dc0b17c87951cea482b0d5850657a7f25b4ca4efea02",
+    "packages/plan/plan-mode/lib/types/index.js": "6f979de52ecf6e5a645d7fec14d63683cd6b00c8fb993d22beaa9f809762bc4b",
+    "packages/plan/plan-mode/lib/types/invariant.js": "6179bfeffafbe18638da3c896942e9f750a7ccb8913e02f1266f390c99380b23",
+    "packages/plan/plan-mode/lib/types/invariant.d.ts": "6784f113ba0afe52ceed7f59b42de1b7d5f04edeeec11023f213f0e0d73d1230",
+    "packages/plan/plan-mode/lib/types/index.d.ts": "3f415fb16ee2ecce2e28c9622de096209e704bbf1e321e5641d80254a9d1325a",
+    "packages/plan/plan-mode/lib/types/client.d.ts": "0c2e24f8f4a429a2bf5f618d4a4cbb1d317fa2a1ec7af692032346c40540370e"
+  },
+  "noteReview": {
+    "action": "Updated the owning command-envelope note, Commands/PlanMode READMEs and existing managed-resource upgrade guide; regenerated the paired dependency graph.",
+    "newNotes": 0,
+    "archivedNotesChanged": false
+  },
+  "remaining": [
+    "All12 business domains remain in_progress; B04/B25 remain implementation_in_progress. Two complete modules and203 passing named cases do not prove full-project completion.",
+    "B465: the dual-release npm install-layout gate fails. Its isolated metadata registry contains fflate0.8.3, while installed LibreOffice0.1.1/0.1.5 metadata requires exact0.8.2. The pnpm override and the synthetic npm model must be reviewed without weakening a real package requirement. No public registry missing-version claim is made.",
+    "Peer reports R40 deployed,78 service/config cases and a32-parallel dual-Gateway snapshot passed. It did not complete operational acceptance: one page retained153 waiters and14 same-Runtime commands/list calls among16 active connections. B463/B464 remain subject to independent and operational acceptance.",
+    "Peer reports R41 freezes per-Session directory single-flight with merged invalidation,144 client cases and a regression reducing81 concurrent requests to one in flight plus one follow-up. It is not yet activated in the latest report. Root does not edit client/ui-commands, RuntimeOwner, pool queueing, Admin or its release whitelist.",
+    "B457/B458/B460 UI and cross-boot recovery have peer implementation/deployment reports, but Root has not independently accepted the complete multi-computer workflow. B451 exact Admin Runtime control integration and an assembled Root/peer release remain incomplete.",
+    "Continue remaining command producers, generic command caller lifetime, compaction initiator/resource attribution, queued human-question/answer ownership, remaining model/Inspector and account/computer/document scenarios. Confirm hypotheses through public lifecycle operations before changing code.",
+    "B456 Core entry still has two uncovered statements; its control helper remains100%. Historical Tool and JobsLocal complete-entry measurements keep their original scopes. Thresholds are not lowered.",
+    "Official paid Responses remains deferred. No Root production deployment, restart, dependency synchronization, reset, stash, commit or push."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": {
+    "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/B416-B462-integration-index.json",
+    "findings": 44,
+    "capsules": 36,
+    "frozenDeltaVersions": 769,
+    "presentPaths": 453,
+    "currentSourceDriftPaths": [
+      "gateway/README.i18n.yaml",
+      "gateway/README.md",
+      "gateway/README.zh.md",
+      "packages/context/gateway-runtime/src/index.ts"
+    ]
+  },
+  "inventoryObservation": {
+    "at": "2026-11-02T01:21:41.730255+00:00",
+    "findings": [
+      "B461",
+      "B462"
+    ],
+    "receipt": "receipts/command-cancellation-plan-identity-2026-11-02.json",
+    "currentGitPaths": 22073,
+    "inventoryRows": 22090,
+    "historicalAbsentPaths": 17,
+    "unrecordedCurrentPaths": 0,
+    "newCurrentPaths": [
+      ".agents/audits/receipts/command-cancellation-plan-identity-2026-11-02.json",
+      "packages/client/ui-commands/tests/directory-concurrency.client.spec.ts"
+    ],
+    "scope": "29 exact owned deltas receive scoped evidence;513 readonly references, new peer paths, npm layout and full domains remain unclaimed."
+  },
+  "postflight": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T000013Z/cancellation-plan-postflight.json"
+}

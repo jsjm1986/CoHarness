@@ -1,0 +1,13 @@
+{
+  "name": "mcp-final-scoped-coverage",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/mcp/mcp-client/tests packages/experimental/browser-use-runtime/tests --coverage --coverage.include=packages/mcp/mcp-client/src/managed-stdio.ts --coverage.include=packages/mcp/mcp-client/src/transport.ts --coverage.include=packages/mcp/mcp-client/src/connection.ts --coverage.include=packages/mcp/mcp-client/src/index.ts --coverage.include=packages/experimental/browser-use-runtime/src/mcp.ts --coverage.reportsDirectory=.agents/audits/.local/mcp-coverage-final --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-23T17:04:32.668151+00:00",
+  "seconds": 19.087,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0008efa54d18a6fd55948f676e9154857c0285fe690f369f5a4f06ee299fefa3",
+  "inputsAfter": "242b98400e9d9fb9dcf1cffe6d5decc42009d9a10195d63558fed5871da6a821",
+  "outputSha256": "c90807ac35b032563f1cdf778172b59f4d1a7cca7c244373957d510bae04da13",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  15 passed (15)\n      Tests  186 passed (186)\n   Start at  01:04:43\n   Duration  8.05s (transform 1.19s, setup 160ms, import 2.61s, tests 6.00s, environment 1ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 491/491 )\nBranches     : 100% ( 265/265 )\nFunctions    : 100% ( 101/101 )\nLines        : 100% ( 414/414 )\n================================================================================\n"
+}

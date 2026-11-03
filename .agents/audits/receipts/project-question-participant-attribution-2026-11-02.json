@@ -1,0 +1,537 @@
+{
+  "finding": "B471",
+  "status": "fixed_verified_project_question_participant_and_model_attribution_439_cases_global_review_open",
+  "updatedAt": "2026-11-02T06:49:28.135486+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "verifiedAt": "2026-11-02T06:37:47.221649+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-latest-fetch.json",
+    "workingTreePreserved": true
+  },
+  "problem": "Managed continued-question replies retain execution origin but omit the signed project participant snapshot. The model attribution consumer accepts only ordinary user messages, so the contribution record and model cannot identify the late answerer through the standard participant mechanism.",
+  "fix": "Gateway input admission replaces human project attribution with the signed caller snapshot for ordinary messages and continued-question replies. Declare the optional reply participant field and recognize both human source kinds in collaboration context. Preserve immutable execution input references, personal-scope behavior and current permission checks.",
+  "compatibility": {
+    "publicServiceSignaturesChanged": false,
+    "optionalReplyParticipantMetadataAdded": true,
+    "remoteBusinessArgumentCount": 3,
+    "sessionEventTypesChanged": false,
+    "sessionFormatChanged": false,
+    "historicalSessionDataRewritten": false,
+    "newConfiguration": false,
+    "agentLoopChanged": false,
+    "peerOwnedUiOrTopologyEdited": false,
+    "productionDeploymentPerformed": false
+  },
+  "verification": {
+    "differentNamedCases": 439,
+    "unitAndSourceSnapshotCases": 403,
+    "realPostgresCases": 34,
+    "typeScriptSdkCases": 1,
+    "pythonSdkCases": 1,
+    "skipped": 0,
+    "sourceBuiltRepetitionsNotAdditionalCases": true,
+    "originalRealPostgresCounterexamples": 2,
+    "originalReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/continued-question-display-attribution-original.json",
+    "realPersistenceCoverage": "A fresh Loader and Session store reopen the same PostgreSQL conversation after the original runtime context closes. The exact answer, input receipt and answerer survive; revoking that answerer denies execution after restoration. The assembled question profile includes the real collaboration attribution plugin.",
+    "runnableSnapshot": "Independent and project timed-question scenarios run through real Loader/AgentLoop source on Node22 and matching built Typert RPC on Node24. The project reply logs its participant and adjacent attribution notice, which reaches the model.",
+    "spoofedDisplayParticipantReplaced": true,
+    "nonHumanFixtureSourceNotNewlyAttributed": true,
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 198,
+          "covered": 198,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 240,
+          "covered": 240,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 47,
+          "covered": 47,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 239,
+          "covered": 239,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/collaboration-context/src/index.ts": {
+        "lines": {
+          "total": 11,
+          "covered": 11,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 3,
+          "covered": 3,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 13,
+          "covered": 13,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 6,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/collaboration-context/src/participant.ts": {
+        "lines": {
+          "total": 18,
+          "covered": 18,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 6,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 18,
+          "covered": 18,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 35,
+          "covered": 35,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/gateway-execution/src/input.ts": {
+        "lines": {
+          "total": 26,
+          "covered": 26,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 8,
+          "covered": 8,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 34,
+          "covered": 34,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 72,
+          "covered": 72,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/user-questions/src/index.ts": {
+        "lines": {
+          "total": 143,
+          "covered": 143,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 30,
+          "covered": 30,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 175,
+          "covered": 175,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 126,
+          "covered": 126,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "gatewayExecutionWholeEntryCoverageClaimed": false,
+    "participantParserDefaultCoverageExemptionRemoved": true,
+    "coverageThresholdWeakened": false,
+    "checks": [
+      {
+        "name": "question-author-normal-complete",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-normal-complete.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/context/gateway-execution/tests",
+          "packages/context/collaboration-context/tests",
+          "packages/interaction/user-questions/tests",
+          "scripts/coverage-selection.spec.ts",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/context/collaboration-context/src/participant.ts",
+          "--coverage.include=packages/context/collaboration-context/src/index.ts",
+          "--coverage.include=packages/interaction/user-questions/src/index.ts",
+          "--coverage.include=packages/context/gateway-execution/src/input.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/normal-complete-coverage",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-normal-complete-cases.json"
+        ]
+      },
+      {
+        "name": "question-author-parser-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-parser-lint.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_OXLINT_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/context/collaboration-context/tests/participant.spec.ts",
+          "scripts/coverage-baseline.ts",
+          "scripts/coverage-selection.spec.ts"
+        ]
+      },
+      {
+        "name": "question-author-postgres-assembled",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-postgres-assembled.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/run-pg-check.mjs",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.e2e.config.ts",
+          "packages/context/gateway-execution/tests/pg-composition.e2e.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-postgres-assembled-cases.json"
+        ]
+      },
+      {
+        "name": "question-author-built",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-built.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/interaction/user-questions/tests/continued-answer-loader.spec.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-built-cases.json"
+        ]
+      },
+      {
+        "name": "question-author-types-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-types-final.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-b",
+          "packages/interaction/user-questions",
+          "packages/context/gateway-execution",
+          "packages/context/collaboration-context",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "question-author-bundles",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-bundles.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "RAYON_NUM_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/tsdown/dist/run.mjs",
+          "--filter",
+          "@deepseek-ai/dsh-user-questions",
+          "--filter",
+          "@deepseek-ai/dsh-gateway-execution",
+          "--filter",
+          "@deepseek-ai/dsh-collaboration-context"
+        ]
+      },
+      {
+        "name": "question-author-host-types-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-host-types-final.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/host-types.tsbuildinfo",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "question-author-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-lint.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_OXLINT_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/context/gateway-execution/src/index.ts",
+          "packages/context/gateway-execution/tests/authority.spec.ts",
+          "packages/context/gateway-execution/tests/pg-composition.e2e.ts",
+          "packages/context/collaboration-context/src/participant.ts",
+          "packages/context/collaboration-context/tests/collaboration-context.spec.ts",
+          "packages/interaction/user-questions/src/types.ts",
+          "packages/interaction/user-questions/tests/continued-answer-loader.spec.ts",
+          "packages/interaction/user-questions/tests/fixtures/continued-answer-driver.mjs"
+        ]
+      },
+      {
+        "name": "question-author-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-doc-quick.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_GATE_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/run-docs.mjs"
+        ]
+      },
+      {
+        "name": "question-author-constraints",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-constraints.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/check-workspace-constraints.ts"
+        ]
+      },
+      {
+        "name": "question-author-cohorts",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-cohorts.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-dependency-cohorts.ts"
+        ]
+      },
+      {
+        "name": "question-author-catalog",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-catalog.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/gen-cordis-catalog.ts",
+          "--check"
+        ]
+      },
+      {
+        "name": "question-author-export-jsdoc",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-export-jsdoc.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-export-jsdoc.ts"
+        ]
+      },
+      {
+        "name": "question-author-node-next",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-node-next.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-node-next-types.ts"
+        ]
+      },
+      {
+        "name": "question-author-publint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-publint.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/publint-all.ts",
+          "--packages-root",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/publish-view"
+        ]
+      },
+      {
+        "name": "question-author-sdk-src",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-sdk-src.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=src",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.expected.config.ts",
+          "apps/cli/tests/profiles/sdk/command-registration.expected.e2e.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-sdk-src-cases.json"
+        ]
+      },
+      {
+        "name": "question-author-sdk-lib",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-sdk-lib.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.expected.config.ts",
+          "apps/cli/tests/profiles/sdk/command-registration.expected.e2e.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-sdk-lib-cases.json"
+        ]
+      },
+      {
+        "name": "question-author-python",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-python.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=lib",
+          "python/sdk/.venv/bin/python",
+          "-m",
+          "pytest",
+          "python/sdk/tests/test_command_registration_expected.py",
+          "--junitxml=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-python-cases.xml"
+        ]
+      },
+      {
+        "name": "question-author-layout-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-layout-node22.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-npm-install-layout.ts"
+        ]
+      },
+      {
+        "name": "question-author-layout-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-author-layout-node24.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-npm-install-layout.ts"
+        ]
+      }
+    ],
+    "ownedDisposableDatabasesDropped": 6,
+    "cancelledUnscopedBenchmarkReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/working-tree-benchmark-cancellation.json",
+    "benchmarkScopeCorrection": "The unscoped working-tree npm benchmark was stopped by signalling only its owned npm children. It is not a passing check; the formal npm install-layout checks pass on both Node22 and24."
+  },
+  "capsule": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/question-participant-capsule.json",
+  "integrationIndex": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T053538Z/B416-B471-integration-index.json",
+  "remaining": [
+    "Complete B04/B25 requirement and remaining production allocation classifications; refresh stale unsupported-backend descriptions using actual receipts.",
+    "Independently accept exact Runtime management control and matching topology; REAL-050/B451 is still open.",
+    "Continue the full remaining feature and business-logic inventory; scoped tests and frozen prerequisites do not establish entire-domain completion.",
+    "Peer owns workbench add-conversation cross-computer personal-session catalog and chooser; do not edit those files or confuse unshipped changes with R41 production.",
+    "Official paid Responses validation stays deferred by the user."
+  ],
+  "wholeProjectComplete": false,
+  "productionAcceptanceClaimed": false,
+  "officialResponsesDeferredByUser": true
+}

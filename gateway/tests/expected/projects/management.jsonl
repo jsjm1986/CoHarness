@@ -1,0 +1,7 @@
+{"operation":"route-authority","ownerCanManage":true,"readonlyMemberMode":"ro","readonlyMemberCanManage":false,"currentTheme":"dark","formerOwnerCanManage":false,"withdrawnMemberStatus":403,"projectDetailReads":0}
+{"operation":"name","formerOwnerStatus":403,"originalStatePreserved":true,"successfulMutationAuditAfterDenial":false,"unauthorizedDiscoveryCalls":0,"currentOwnerStatus":204,"currentOwnerActionApplied":true}
+{"operation":"theme","formerOwnerStatus":403,"originalStatePreserved":true,"successfulMutationAuditAfterDenial":false,"unauthorizedDiscoveryCalls":0,"currentOwnerStatus":200,"currentOwnerActionApplied":true}
+{"operation":"models","formerOwnerStatus":403,"originalStatePreserved":true,"successfulMutationAuditAfterDenial":false,"unauthorizedDiscoveryCalls":0,"currentOwnerStatus":200,"currentOwnerActionApplied":true}
+{"operation":"credential-set","formerOwnerStatus":403,"originalStatePreserved":true,"successfulMutationAuditAfterDenial":false,"unauthorizedDiscoveryCalls":0,"currentOwnerStatus":204,"currentOwnerActionApplied":true}
+{"operation":"credential-unset","formerOwnerStatus":403,"originalStatePreserved":true,"successfulMutationAuditAfterDenial":false,"unauthorizedDiscoveryCalls":0,"currentOwnerStatus":204,"currentOwnerActionApplied":true}
+{"operation":"discover","formerOwnerStatus":403,"originalStatePreserved":true,"successfulMutationAuditAfterDenial":false,"unauthorizedDiscoveryCalls":0,"currentOwnerStatus":200,"currentOwnerActionApplied":true}

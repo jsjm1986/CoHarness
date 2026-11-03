@@ -7,3 +7,14 @@
 .retry:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover-danger);
 }
+
+@media (max-width: 767px) {
+  .retry {
+    max-width: 100%;
+    min-height: var(--dsw-touch-target);
+    height: auto;
+    padding: var(--dsw-space-2);
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+}

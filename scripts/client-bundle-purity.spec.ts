@@ -88,6 +88,13 @@ describe('client bundle purity gate', () => {
     expect(() => resolveId('@deepseek-ai/dsh-session-format/catalog')).toThrow(/purity/)
   })
 
+  it('admits the pure document identity entry while rejecting the document service', () => {
+    expect(resolveId('@deepseek-ai/dsh-userdoc/identity')).toBeNull()
+    expect(() => resolveId('@deepseek-ai/dsh-userdoc')).toThrow(/purity/)
+    expect(() => resolveId('@deepseek-ai/dsh-userdoc/identity/nested')).toThrow(/purity/)
+    expect(() => resolveId('@deepseek-ai/dsh-userdoc/src/identity.ts')).toThrow(/purity/)
+  })
+
   it('lets exact generated Remote contributions inline without admitting their package implementation', () => {
     expect(resolveId('@deepseek-ai/dsh-goal/remote')).toBeNull()
     expect(() => resolveId('@deepseek-ai/dsh-goal')).toThrow(/purity/)

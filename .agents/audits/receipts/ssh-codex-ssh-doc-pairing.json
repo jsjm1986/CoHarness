@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-ssh-doc-pairing",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write docs/subsystems/ssh.md",
+  "startedAt": "2026-10-25T13:06:01.542003+00:00",
+  "seconds": 0.65,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "inputsAfter": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "postgresToolDirectory": null,
+  "outputSha256": "5b9642d41a2788ebe36e6be3ff215e778bf7f357badd9036471c41f96b1e2f28",
+  "outputTail": "verify-translation-pairing: recorded docs/subsystems/ssh.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

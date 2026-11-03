@@ -1,0 +1,18 @@
+{
+  "finalResponse": "REVIEW_DONE",
+  "requests": [{
+    "type": "auto-review/request",
+    "callId": "reviewed-probe",
+    "provider": "review-fixture",
+    "model": "review-model",
+    "temperature": 0,
+    "reasoningEffort": "off",
+    "containsPendingAction": true
+  }],
+  "completion": {
+    "modelAdmissions": 3,
+    "executionAdmissions": 1,
+    "quiescent": 3,
+    "toolExecutions": 1
+  }
+}

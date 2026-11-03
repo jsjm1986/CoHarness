@@ -1,0 +1,13 @@
+{
+  "name": "unknown-cast-retired-baseline-prune",
+  "cwd": ".",
+  "command": "pnpm run verify-no-unknown-casts --prune",
+  "startedAt": "2026-10-23T20:12:19.731769+00:00",
+  "seconds": 9.732,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8cacdadaeafccbb973b5cb2975ccb73f9d8a5b627ba72aaae1c7a9178ad9a688",
+  "inputsAfter": "200f0aff5440021d09e89a0432937be2ed9452e22ad909d19d320158eeb04b45",
+  "outputSha256": "99003985608e3af030976eaac0d84a9e9ab31aa09163a8f45f00df8ab05d6d92",
+  "outputTail": "$ tsx scripts/verify-no-unknown-casts.ts --prune\nverify-no-unknown-casts: no new assertions; 1876 existing assertions remain.\n"
+}

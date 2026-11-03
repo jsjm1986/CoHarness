@@ -1,0 +1,14 @@
+{
+  "name": "cancel-agent-unrenderable-observer-fixed",
+  "cwd": ".",
+  "command": "node --import tsx/esm .agents/audits/.local/cancel-unrenderable-observer-probe.mjs agent",
+  "startedAt": "2026-10-26T10:04:32.821160+00:00",
+  "seconds": 2.602,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "489dbd4268f54bfcdea70038f1c4e8db7b8be18b1f9d1698c9efa0d7f8302957",
+  "inputsAfter": "489dbd4268f54bfcdea70038f1c4e8db7b8be18b1f9d1698c9efa0d7f8302957",
+  "postgresToolDirectory": null,
+  "outputSha256": "465fb3e453fe7607ba7e2c6070cb5edc5aab949b5474c7934163f4413eb9924a",
+  "outputTail": "{\"stage\":\"agent\",\"observerFailureContained\":true,\"activeRequestAborted\":true,\"laterObserverCalls\":1,\"pendingInput\":0}\n"
+}

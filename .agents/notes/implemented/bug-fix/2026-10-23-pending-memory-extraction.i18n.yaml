@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-pending-memory-extraction.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-pending-memory-extraction.md
+document:
+  en: 51d49f18ebd8264f810c1114cc0c04d73024f261
+  zh: 9f9abc3f1f70ff58bd1227c60113a85d109242d8
+/agent-note-pending-memory-extraction-eligibility:
+  en: 9734f5cf83109c22
+  zh: b5acabb2cfa632be
+/agent-note-pending-memory-extraction-eligibility/problem:
+  en: f8f45d0ef56c8e8c
+  zh: af456967bf9bcc1a
+/agent-note-pending-memory-extraction-eligibility/decision:
+  en: 38ebe673b7f8a468
+  zh: 836fc8c25a85d223
+/agent-note-pending-memory-extraction-eligibility/alternatives-considered:
+  en: bb9985f6e8094812
+  zh: 595437cb6ce6f92b
+/agent-note-pending-memory-extraction-eligibility/consequences:
+  en: e56df7dcea51a094
+  zh: 7b1dc668a5590d3e
+/agent-note-pending-memory-extraction-eligibility/verification:
+  en: 4285164806f3721f
+  zh: 1629bcf24b17cf7d

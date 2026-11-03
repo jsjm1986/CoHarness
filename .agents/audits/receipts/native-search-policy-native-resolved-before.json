@@ -1,0 +1,14 @@
+{
+  "name": "native-search-policy-native-resolved-before",
+  "cwd": ".",
+  "command": "node --import ./.agents/audits/.local/native-policy-built-peers.mjs .agents/audits/.local/reproduce-native-search-policy.mjs",
+  "startedAt": "2026-10-24T04:59:08.432309+00:00",
+  "seconds": 0.45,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "42e975e44e43487d08fe1f4f79af06dcd01fcd09ff44cac50b7239b634c8e962",
+  "inputsAfter": "42e975e44e43487d08fe1f4f79af06dcd01fcd09ff44cac50b7239b634c8e962",
+  "postgresToolDirectory": null,
+  "outputSha256": "fd4faec0a7c7b1258fe3e6380ab8ac468d301011a62aa2ded3b177d8e1106b4b",
+  "outputTail": "{\"policyAllowsNativeRoute\":false,\"modelRequests\":1,\"admitted\":1,\"released\":1,\"usageRecords\":0,\"succeeded\":true,\"sources\":1}\n"
+}

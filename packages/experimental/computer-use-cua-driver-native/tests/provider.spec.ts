@@ -37,7 +37,7 @@ function execute(rawName: string, args: Record<string, unknown> = {}) {
 
 describe('Cua Driver native provider', () => {
   it('registers the upstream catalog and calls its raw names', async () => {
-    const fiber = ctx.plugin(NativeProvider)
+    const fiber = ctx.plugin(NativeProvider, { desktopMode: 'enabled' })
     await fiber
     expect(ctx.computerUse.providerName).toBe('cua-driver-native')
     expect(ctx.tools.schemas().map(tool => tool.name)).toEqual(catalog.tools.map(tool => `cua_driver_native__${tool.name}`))
@@ -52,7 +52,7 @@ describe('Cua Driver native provider', () => {
   })
 
   it('rejects an unmanaged authorization fallback before entering the native SDK', async () => {
-    await ctx.plugin(NativeProvider)
+    await ctx.plugin(NativeProvider, { desktopMode: 'enabled' })
     ctx.provide('executionAuthorityRequired', true)
     const result = await execute('click', { pid: 9, window_id: 7 })
     expect(result.isError).toBe(true)
@@ -61,7 +61,7 @@ describe('Cua Driver native provider', () => {
 
   it('rejects another provider before importing or creating a native runtime', async () => {
     const release = ctx.computerUse.register(ComputerUseProviderName('another-driver'))
-    await expect(ctx.plugin(NativeProvider)).rejects.toThrow('already registered')
+    await expect(ctx.plugin(NativeProvider, { desktopMode: 'enabled' })).rejects.toThrow('already registered')
     expect(fixture.creates).toBe(0)
     expect(ctx.computerUse.providerName).toBe('another-driver')
     await release()
@@ -69,7 +69,7 @@ describe('Cua Driver native provider', () => {
 
   it('rolls back a failed native constructor', async () => {
     fixture.createError = new Error('native library initialization failed')
-    await expect(ctx.plugin(NativeProvider)).rejects.toThrow('native library initialization failed')
+    await expect(ctx.plugin(NativeProvider, { desktopMode: 'enabled' })).rejects.toThrow('native library initialization failed')
     expect(ctx.computerUse.providerName).toBeUndefined()
     expect(ctx.tools.schemas()).toEqual([])
     expect(fixture.shutdowns).toBe(0)
@@ -77,7 +77,7 @@ describe('Cua Driver native provider', () => {
 
   it('accepts upstream tools whose optional description is absent', async () => {
     fixture.list = async () => JSON.stringify({ tools: [{ name: 'check_permissions', inputSchema: { type: 'object', properties: {} } }] })
-    await ctx.plugin(NativeProvider)
+    await ctx.plugin(NativeProvider, { desktopMode: 'enabled' })
     expect(ctx.tools.schemas()[0]?.description).toBe('')
   })
 
@@ -88,7 +88,7 @@ describe('Cua Driver native provider', () => {
     ['invalid function name', JSON.stringify({ tools: [{ ...catalog.tools[0], name: 'x'.repeat(70) }] })],
   ])('rolls back the native runtime after %s', async (_label, response) => {
     fixture.list = async () => response
-    await expect(ctx.plugin(NativeProvider)).rejects.toThrow()
+    await expect(ctx.plugin(NativeProvider, { desktopMode: 'enabled' })).rejects.toThrow()
     expect(ctx.computerUse.providerName).toBeUndefined()
     expect(ctx.tools.schemas()).toEqual([])
     expect(fixture.shutdowns).toBe(1)
@@ -97,7 +97,7 @@ describe('Cua Driver native provider', () => {
 
   it('preserves native tool refusals as model-visible errors', async () => {
     fixture.call = async () => ({ isError: true, content: [{ type: 'text', text: 'background_unavailable' }] })
-    await ctx.plugin(NativeProvider)
+    await ctx.plugin(NativeProvider, { desktopMode: 'enabled' })
     const result = await execute('click', { pid: 9, window_id: 7 })
     expect(result.isError).toBe(true)
     expect(result.content).toEqual([{ type: 'text', text: 'Error: background_unavailable' }])
@@ -107,7 +107,7 @@ describe('Cua Driver native provider', () => {
     const started = Promise.withResolvers<AbortSignal>()
     const settled = Promise.withResolvers<boolean>()
     const controller = new AbortController()
-    const fiber = ctx.plugin(NativeProvider)
+    const fiber = ctx.plugin(NativeProvider, { desktopMode: 'enabled' })
     await fiber
     ctx.tools.register({
       name: 'unrelated', description: 'Independent tool.', parameters: { type: 'object' },
@@ -148,7 +148,7 @@ describe('Cua Driver native provider', () => {
       shutdownStarted.resolve(undefined)
       await shutdownSettled.promise
     }
-    const fiber = ctx.plugin(NativeProvider)
+    const fiber = ctx.plugin(NativeProvider, { desktopMode: 'enabled' })
     await fiber
     const result = execute('click', { pid: 9, window_id: 7 })
     await called.promise
@@ -181,7 +181,7 @@ describe('Cua Driver native provider', () => {
       shutdownStarted.resolve(undefined)
       await shutdownSettled.promise
     }
-    const fiber = ctx.plugin(NativeProvider)
+    const fiber = ctx.plugin(NativeProvider, { desktopMode: 'enabled' })
     await fiber
     const dependency = [...ctx.registry.get(service)!.fibers][0]!
     const restart = dependency.restart()
@@ -210,7 +210,7 @@ describe('Cua Driver native provider', () => {
       started.resolve(undefined)
       signal?.addEventListener('abort', () => { reject(new Error('Native discovery aborted')) }, { once: true })
     })
-    const fiber = ctx.plugin(NativeProvider)
+    const fiber = ctx.plugin(NativeProvider, { desktopMode: 'enabled' })
     const readiness = Promise.resolve(fiber).catch(() => undefined)
     await started.promise
     await fiber.dispose()
@@ -223,7 +223,7 @@ describe('Cua Driver native provider', () => {
 
   it('keeps the reservation when native shutdown cannot prove completion', async () => {
     fixture.shutdown = async () => { throw new Error('Native shutdown failed') }
-    const fiber = ctx.plugin(NativeProvider)
+    const fiber = ctx.plugin(NativeProvider, { desktopMode: 'enabled' })
     await fiber
     await fiber.dispose()
     expect(ctx.tools.schemas()).toEqual([])

@@ -1,0 +1,14 @@
+{
+  "name": "jobs-starting-slot-and-timer-build",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm run build",
+  "startedAt": "2026-10-26T02:47:38.067864+00:00",
+  "seconds": 127.723,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2b2b4267ff3f0a3754d516d02a1a95737d5275a4f7eac42959b9ee82e9eb280a",
+  "inputsAfter": "2b2b4267ff3f0a3754d516d02a1a95737d5275a4f7eac42959b9ee82e9eb280a",
+  "postgresToolDirectory": null,
+  "outputSha256": "f090928c5a008e8ca658a2272a7729c174dc520ba416b45ab8b71808339f24aa",
+  "outputTail": "$ tsx scripts/build.ts\nrun-gates: build running 8 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start native addon\nrun-gates: PASS native addon (1.00s)\nrun-gates: start host compiler\nrun-gates: PASS host compiler (1.93s)\nrun-gates: start Host bundle\nrun-gates: PASS Host bundle (12.77s)\nrun-gates: start client compiler\nrun-gates: PASS client compiler (0.72s)\nrun-gates: start Client bundle\nrun-gates: PASS Client bundle (7.06s)\nrun-gates: start Web build\nrun-gates: PASS Web build (4.31s)\nrun-gates: start host aggregate check\n\n== FAILED host aggregate check (88.09s) ==\ncommand: tsc -p tsconfig.host.json\noutcome: exit 2\npackages/jobs/jobs-local/tests/jobs.spec.ts(326,28): error TS2379: Argument of type '{ owner: Agent | undefined; }' is not assignable to parameter of type 'ProducerOverrides' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.\n  Type '{ owner: Agent | undefined; }' is not assignable to type '{ owner?: Agent; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.\n    Types of property 'owner' are incompatible.\n      Type 'Agent | undefined' is not assignable to type 'Agent'.\n        Type 'undefined' is not assignable to type 'Agent'.\npackages/jobs/jobs-local/tests/jobs.spec.ts(326,57): error TS2379: Argument of type '{ owner: Agent | undefined; }' is not assignable to parameter of type 'ProducerOverrides' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.\n  Type '{ owner: Agent | undefined; }' is not assignable to type '{ owner?: Agent; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.\n    Types of property 'owner' are incompatible.\n      Type 'Agent | undefined' is not assignable to type 'Agent'.\n        Type 'undefined' is not assignable to type 'Agent'.\nrun-gates: start client aggregate check\nrun-gates: PASS client aggregate check (4.72s)\n\nrun-gates: 7 passed, 1 failed, 0 skipped in 120.60s.\nrun-gates: unsuccessful gates:\n  - FAILED host aggregate check (88.09s, exit 2)\n    tsc -p tsconfig.host.json\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

@@ -259,14 +259,20 @@ export class SenseVoiceWorker {
     this.publish({ phase: cached ? 'waking' : 'loading', step: 'load', startedAt: Date.now() })
     await mkdir(this.config.dataRoot, { recursive: true })
     const token = randomBytes(32).toString('hex')
-    const handle = this.ctx.subprocess.spawn({
-      argv: [process.execPath, ...runtime.worker.endsWith('.ts') ? ['--import', import.meta.resolve('tsx/esm')] : [], runtime.worker, JSON.stringify(Object.assign({}, this.config, runtime))],
-      cwd: this.config.dataRoot, graceMs: this.config.graceMs,
-      env: { DSH_SPEECH_TOKEN: token, ELECTRON_RUN_AS_NODE: '1' },
-      stdio: { stdin: 'ignore', stdout: 'pipe', stderr: { maxBytes: this.config.maxLogBytes } },
-    })
+    const allocation = new AbortController()
+    const cancelAllocation = (): void => { allocation.abort(setup.signal.reason) }
+    setup.signal.addEventListener('abort', cancelAllocation, { once: true })
+    let handle: SubprocessHandle | undefined
     try {
+      setup.signal.throwIfAborted()
+      handle = await this.ctx.subprocess.spawn({
+        argv: [process.execPath, ...runtime.worker.endsWith('.ts') ? ['--import', import.meta.resolve('tsx/esm')] : [], runtime.worker, JSON.stringify(Object.assign({}, this.config, runtime))],
+        cwd: this.config.dataRoot, graceMs: this.config.graceMs, signal: allocation.signal, resourceOrigin: 'infrastructure',
+        env: { DSH_SPEECH_TOKEN: token, ELECTRON_RUN_AS_NODE: '1' },
+        stdio: { stdin: 'ignore', stdout: 'pipe', stderr: { maxBytes: this.config.maxLogBytes } },
+      })
       const port = await readReady(handle, this.config.maxLogBytes, setup.signal)
+      setup.signal.throwIfAborted()
       const worker = { handle, url: `http://127.0.0.1:${port}`, token, closed: false }
       this.worker = worker
       this.publish({ phase: 'ready' })
@@ -276,10 +282,10 @@ export class SenseVoiceWorker {
       void handle.done.then(exited, exited)
       return worker
     } catch (error) {
-      handle.terminate()
-      await handle.waitForExit()
+      handle?.terminate()
+      await handle?.waitForExit()
       throw error
-    }
+    } finally { setup.signal.removeEventListener('abort', cancelAllocation) }
   }
 
   private async execute(input: SpeechInput, signal: AbortSignal): Promise<Transcript> {

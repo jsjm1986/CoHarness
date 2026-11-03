@@ -1,0 +1,82 @@
+{
+  "finding": "B475",
+  "status": "fixed_verified_approval_withdrawal_282_cases_full_entry_100_percent_frozen_global_review_open",
+  "updatedAt": "2026-11-02T12:34:31.921002+00:00",
+  "sourceCausalEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T121204Z/approval-lifecycle-before-clean.json",
+  "causalFailures": 3,
+  "initialFixtureFailure": "The first probe had a ctx.dispose fixture cleanup typo; corrected to ctx.fiber.dispose before the clean causal run.",
+  "currentEvidence": "Cancelled queued requests never enter answerers; retired references reject requests and policy writes; accepted decisions cancel and append their sole paired audit before withdrawal completes. The actual tool executor refuses late grants and replacement never policy remains effective.",
+  "differentNamedCases": 282,
+  "unitAndConsumerCases": 281,
+  "loaderTranscriptCases": 1,
+  "wholeEntryFourMetricCoverage": {
+    "lines": {
+      "total": 68,
+      "covered": 68,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 79,
+      "covered": 79,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 20,
+      "covered": 20,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 37,
+      "covered": 37,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branchesTrue": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": "Unknown"
+    }
+  },
+  "sourceNode22": "passed",
+  "normalBuiltNode24": "passed",
+  "sourceChanges": 12,
+  "publicSignaturesChanged": false,
+  "sessionEventMapChanged": false,
+  "sessionFormatChanged": false,
+  "rootProductionWrites": false,
+  "frozenDelivery": {
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T121204Z/B475-approval-lifecycle.delta.tar.gz",
+    "archiveSha256": "8f69b66d1f7701a93722a123b58428dc2d1f5e308b82a8e58256d50def32a2f0",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T121204Z/B475-approval-lifecycle-aw1xgy80",
+    "changes": 12,
+    "archiveBytes": 108252,
+    "manifestSha256": "829a9e76b97222261c8c67b00a6f8e162e70bc760c0bb73f00978cda32b8b131"
+  },
+  "checks": {
+    "approval-lifecycle-after": "passed",
+    "approval-unit-final": "passed",
+    "approval-coverage": "passed",
+    "approval-loader-source": "passed",
+    "approval-loader-built": "passed",
+    "approval-type-build": "passed",
+    "approval-normal-build": "passed",
+    "approval-lint-final": "passed",
+    "approval-final-pairs": "passed",
+    "approval-agent-note-format": "passed",
+    "approval-md-links": "passed",
+    "approval-md-wrap": "passed",
+    "approval-cordis-config-owned-wiring": "failed",
+    "approval-export-jsdoc": "failed"
+  },
+  "globalCheckLimitations": {
+    "cordisConfig": "One peer-owned connection Host compiler aggregate reference remains; own GatewayRuntime dependency role fixed in separate B474 addendum.",
+    "exportJsdoc": "Six current peer-owned ClientCordisInspectRegistry/ui-cordis JSDoc errors; no owned approval file violation.",
+    "production": "Peer release owner keeps B475 for a later independent candidate after R44.",
+    "officialResponses": "Deferred at user request"
+  },
+  "fullProjectAuditComplete": false
+}

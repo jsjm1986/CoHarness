@@ -1,0 +1,14 @@
+{
+  "name": "native-model-operation-doc-pairs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write packages/llm/llm/README.md packages/llm/model-access/README.md packages/context/gateway-runtime/README.md packages/web/web-search-deepseek/README.md packages/llm/llm-deepseek/README.md packages/llm/llm-deepseek-api-key/README.md packages/llm/llm-pi-ai/README.md plugins/dsh-model-governance/README.md docs/subsystems/llm-streaming.md .agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.md .agents/notes/implemented/architecture/2026-10-24-model-policy-owner-lifetime.md .agents/notes/implemented/feature/2026-08-14-gateway-model-governance-and-usage.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/governed-native-search/guide.md",
+  "startedAt": "2026-10-24T07:19:57.014111+00:00",
+  "seconds": 1.94,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6309e4be7142e47d47c15386c8fb023d090853a59f6fe0378120a3c5a6ca856d",
+  "inputsAfter": "d8c3a8463d30117df1947a08e9512da8701c20cc9692dc0ba3af33685bb2ae8b",
+  "postgresToolDirectory": null,
+  "outputSha256": "df94a24888116442c210efd2eba97be9c37610bd680cd9c4076b3dc7ae846ebb",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-model-policy-owner-lifetime.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-prepared-model-operations.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-08-14-gateway-model-governance-and-usage.i18n.yaml\nverify-translation-pairing: recorded docs/subsystems/llm-streaming.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/governed-native-search/guide.i18n.yaml\nverify-translation-pairing: recorded packages/context/gateway-runtime/README.i18n.yaml\nverify-translation-pairing: recorded packages/llm/llm-deepseek-api-key/README.i18n.yaml\nverify-translation-pairing: recorded packages/llm/llm-deepseek/README.i18n.yaml\nverify-translation-pairing: recorded packages/llm/llm-pi-ai/README.i18n.yaml\nverify-translation-pairing: recorded packages/llm/llm/README.i18n.yaml\nverify-translation-pairing: recorded packages/llm/model-access/README.i18n.yaml\nverify-translation-pairing: recorded packages/web/web-search-deepseek/README.i18n.yaml\nverify-translation-pairing: recorded plugins/dsh-model-governance/README.i18n.yaml\nverify-translation-pairing: 13 record(s) written; run the check to validate the pairs.\n"
+}

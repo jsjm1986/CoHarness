@@ -895,6 +895,11 @@
     },
     {
       "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "PreparedLlmCallGuard",
+      "source": "packages/llm/llm/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
       "symbol": "PreparedLlmCall",
       "source": "packages/llm/llm/src/index.ts"
     },
@@ -972,6 +977,11 @@
       "doc": "docs/subsystems/lsp.md",
       "symbol": "LspService",
       "source": "packages/lsp/lsp/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "McpClientHandle",
+      "source": "packages/mcp/mcp-client/src/index.ts"
     },
     {
       "doc": "docs/subsystems/mcp.md",
@@ -1912,6 +1922,11 @@
     },
     {
       "doc": "docs/subsystems/ssh.md",
+      "symbol": "SshLoopbackForward",
+      "source": "packages/ssh/ssh/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/ssh.md",
       "symbol": "SshConnection",
       "source": "packages/ssh/ssh/src/index.ts",
       "projection": "public-api"
@@ -2640,6 +2655,51 @@
       "doc": "docs/subsystems/remote-desktop.md",
       "symbol": "RemoteDesktopGrantInput",
       "source": "packages/remote-desktop/remote-desktop/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "LlmCallKind",
+      "source": "packages/llm/llm/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/subagent.md",
+      "symbol": "ExternalModelSelection",
+      "source": "packages/subagent/subagent/src/external.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocUploadOwnerId",
+      "source": "packages/attachment/userdoc/src/brand.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocRootId",
+      "source": "packages/attachment/userdoc/src/brand.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocIncarnationId",
+      "source": "packages/attachment/userdoc/src/brand.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocTrashId",
+      "source": "packages/attachment/userdoc/src/brand.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocIdentity",
+      "source": "packages/attachment/userdoc/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocSelection",
+      "source": "packages/attachment/userdoc/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "UserDocTrashSelection",
+      "source": "packages/attachment/userdoc/src/types.ts"
     }
   ]
 }

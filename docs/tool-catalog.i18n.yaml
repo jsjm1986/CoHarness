@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/tool-catalog.md
 document:
-  en: dc8d4470c5b0274ee671418c740edda0fcacd4f1
-  zh: 0e3031a1b4142d498c5e715489847d405002ac26
+  en: f45310ea6707b618aac9cc15074eeb9fbb10fcee
+  zh: 35854fe3d41a4288d89978af9a69f9a214922e67
 /:
   en: 0be8ffbf23193557
   zh: ce2c69aa86875171
@@ -12,8 +12,8 @@ document:
   en: ddbe8316ec6b1363
   zh: b2d705c03641df84
 /tool-schema-catalog/tool-package-map:
-  en: 429a9d58908b69fa
-  zh: 62342d257e0774ba
+  en: 8b08e4a1e83b4d81
+  zh: 2a3763d9e9cf5cb5
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
   zh: e0143916bb634762

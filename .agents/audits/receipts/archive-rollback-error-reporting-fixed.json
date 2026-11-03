@@ -1,0 +1,14 @@
+{
+  "name": "archive-rollback-error-reporting-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/jobs/jobs/tests/archive-admission.spec.ts packages/subagent/subagent/tests/archive-admission.spec.ts packages/subagent/subagent/tests/service.spec.ts packages/subagent/subagent/tests/continuation.spec.ts packages/subagent/tool-subagent/tests/tool-subagent.spec.ts",
+  "startedAt": "2026-10-26T09:03:47.637516+00:00",
+  "seconds": 21.427,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "72fc3c5ab791ad431ebd689a66b95e0671328641ca442fe0eec3285a8d2a0cc6",
+  "inputsAfter": "72fc3c5ab791ad431ebd689a66b95e0671328641ca442fe0eec3285a8d2a0cc6",
+  "postgresToolDirectory": null,
+  "outputSha256": "5e33bde5929da0ad2d9b61509c14f22e904091bba4d2df03f4497ab9ab111a42",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  5 passed (5)\n      Tests  278 passed (278)\n   Start at  17:03:51\n   Duration  17.77s (transform 5.61s, setup 232ms, import 7.25s, tests 16.44s, environment 0ms)\n\n"
+}

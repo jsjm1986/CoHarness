@@ -134,6 +134,11 @@ declare module '@deepseek-ai/cordis' {
 
   interface Events {
     /**
+     * The durable Workspace catalog has settled and its ordered entities are readable.
+     * @mode emit
+     */
+    'workspace/catalog-changed'(): void
+    /**
      * Complete archive snapshot after a durable archive or restore mutation.
      * @param snapshot - committed registry archive snapshot.
      * @mode emit
@@ -210,6 +215,7 @@ export class WorkspaceRegistry extends Service {
   private operationTail: Promise<void> = Promise.resolve()
 
   private readonly host: WorkspaceEntityHost = {
+    changed: () => { this.ctx.emit('workspace/catalog-changed') },
     table: () => this.requireTable(),
     resolvePath: path => resolveWorkspacePath(path, this.ctx.fs),
     sessionPath: id => this.sessionPaths.get(id),
@@ -990,7 +996,9 @@ export class WorkspaceRegistry extends Service {
       // A committed delete may leave only its marker cleanup pending. Retry
       // recovery before another create/delete can overwrite that pending operation record.
       await this.recoverPendingMutation()
-      return await operation()
+      const value = await operation()
+      this.ctx.emit('workspace/catalog-changed')
+      return value
     })
     this.operationTail = result.then(() => {}, () => {})
     return result

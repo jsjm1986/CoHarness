@@ -8,8 +8,8 @@ import { Context } from '@deepseek-ai/cordis'
 import type { Fiber } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { collaborationRefusal } from '@deepseek-ai/dsh-collaboration'
-import type { CollaborationAction } from '@deepseek-ai/dsh-collaboration'
+import { collaborationOf, collaborationRefusal } from '@deepseek-ai/dsh-collaboration'
+import type { CollaborationAction, CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { JsonValue } from '@deepseek-ai/dsh-session/types'
@@ -284,20 +284,19 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
    * Authorize a registry-resolved Session for project collaboration. Used by
    * Remote methods whose wire arguments carry no Session identity because only
    * this registry knows it; the apiproxy table authorizes every
-   * `agentId`-carrying method instead. Personal and collaboration-free
-   * compositions pass without checks.
+   * `agentId`-carrying method instead. Personal principals and independent
+   * applications without collaboration pass without checks.
    * @param sessionId - Session owning the targeted Plugin or run request.
    * @param action - operation class to authorize.
    */
   private async authorizeRegistrySession(sessionId: SessionId, action: CollaborationAction): Promise<void> {
-    const collaboration = this.ctx.get('collaboration')
-    if (collaboration === undefined) return
-    let authority
+    let authority: CollaborationAuthority | undefined
     try {
-      authority = collaboration.capture()
+      authority = collaborationOf(this.ctx)?.capture()
     } catch (error: unknown) {
       throw new TypertLookupFailure(collaborationRefusal(error, action, sessionId))
     }
+    if (authority === undefined) return
     if (authority.participant.scope.kind === 'personal') return
     try {
       await authority.authorize(sessionId, action)
@@ -760,14 +759,13 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
       ...plugin.latestRun === undefined ? {} : { latestRun: cloneAttempt(plugin.latestRun) },
     }))
     /* jscpd:ignore-end */
-    const collaboration = this.ctx.get('collaboration')
-    if (collaboration === undefined) return rows
-    let authority
+    let authority: CollaborationAuthority | undefined
     try {
-      authority = collaboration.capture()
+      authority = collaborationOf(this.ctx)?.capture()
     } catch (error: unknown) {
       throw new TypertLookupFailure(collaborationRefusal(error, 'read'))
     }
+    if (authority === undefined) return rows
     if (authority.participant.scope.kind === 'personal') return rows
     const readable = await authority.readableSessionIds(rows.map(row => row.agentId))
     return rows.filter(row => readable.has(row.agentId))

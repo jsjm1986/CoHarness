@@ -23,10 +23,10 @@
     "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/worker.cjs",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {
@@ -37,6 +37,7 @@
   },
   "dependencies": {
     "@deepseek-ai/dsh-llm": "workspace:*",
+    "@deepseek-ai/dsh-resource-budget": "workspace:*",
     "@deepseek-ai/dsh-session-format": "workspace:*",
     "@deepseek-ai/dsh-session-format-catalog": "workspace:*",
     "@deepseek-ai/dsh-session-format-v2-to-v3": "workspace:*",

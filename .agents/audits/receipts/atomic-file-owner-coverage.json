@@ -1,0 +1,14 @@
+{
+  "name": "atomic-file-owner-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/atomic-file-owner-coverage.config.mts --coverage packages/util/atomic-write/tests",
+  "startedAt": "2026-10-25T23:06:25.259415+00:00",
+  "seconds": 21.038,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "316822a84e8db23e075bf978ddb5b1e79d6aa5fb0bb1a22fd73ea06dc7a9e6e5",
+  "inputsAfter": "316822a84e8db23e075bf978ddb5b1e79d6aa5fb0bb1a22fd73ea06dc7a9e6e5",
+  "postgresToolDirectory": null,
+  "outputSha256": "792536ffcbf66633ba472769cc3ed3695c2c91c4d7aa2cbbfc74667a8a136290",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  2 passed (2)\n      Tests  46 passed (46)\n   Start at  07:06:42\n   Duration  3.66s (transform 135ms, setup 97ms, import 91ms, tests 3.28s, environment 0ms)\n\n % Coverage report from v8\n----------|---------|----------|---------|---------|-------------------\nFile      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n----------|---------|----------|---------|---------|-------------------\nAll files |   96.85 |    98.24 |     100 |   98.05 |                   \n index.ts |   96.85 |    98.24 |     100 |   98.05 | 86,121            \n----------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 96.85% ( 123/127 )\nBranches     : 98.24% ( 56/57 )\nFunctions    : 100% ( 13/13 )\nLines        : 98.05% ( 101/103 )\n================================================================================\nERROR: Coverage for lines (98.05%) does not meet global threshold (100%) for packages/util/atomic-write/src/index.ts\nERROR: Coverage for statements (96.85%) does not meet global threshold (100%) for packages/util/atomic-write/src/index.ts\nERROR: Coverage for branches (98.24%) does not meet global threshold (100%) for packages/util/atomic-write/src/index.ts\n"
+}

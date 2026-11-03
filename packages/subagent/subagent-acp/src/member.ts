@@ -178,9 +178,9 @@ interface MemberConnection {
  */
 export class AcpMemberTransport implements ExternalMemberTransport {
   private readonly config: AcpMemberConfig
-  private readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle
+  private readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle | Promise<SubprocessHandle>
 
-  constructor(config: AcpMemberConfig, spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle) {
+  constructor(config: AcpMemberConfig, spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle | Promise<SubprocessHandle>) {
     this.config = config
     this.spawn = spawn
   }
@@ -248,7 +248,7 @@ export class AcpMemberTransport implements ExternalMemberTransport {
     if (signal.aborted) {
       throw new Error('subagent-acp member: open aborted before the child spawned')
     }
-    const child = this.spawn({
+    const child = await this.spawn({
       argv: [this.config.command, ...this.config.args],
       cwd: this.config.cwd,
       stdio: { stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' },
@@ -321,11 +321,12 @@ export class AcpMemberTransport implements ExternalMemberTransport {
 }
 
 /**
- * The `LlmAdapter` serving member children's model calls. Every call resolves
- * through the shared external-member turn driver: durable binding, pending
- * recovery, prompt window, and consumed cursor all live in the store.
+ * Orchestration adapter for persistent ACP members. The shared external-member
+ * turn driver owns durable binding, pending recovery, the prompt window and
+ * the consumed cursor.
  */
 export class AcpMemberAdapter extends LlmAdapter {
+  override readonly callKind = 'orchestration' as const
   private readonly transport: ExternalMemberTransportSource
   private readonly store: ExternalBindingStore
 

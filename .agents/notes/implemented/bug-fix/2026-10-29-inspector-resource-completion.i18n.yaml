@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-29-inspector-resource-completion.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-29-inspector-resource-completion.md
+document:
+  en: 33a6beb3eda143de5c969f57f74089c97d07cee4
+  zh: af9d4862840cfacb8d6069c1132efdbc50f12657
+/agent-note-inspector-cleanup-retains-unacknowledged-resource-completion:
+  en: 19bdac1a2f25ee3f
+  zh: 2bf292707fc9e01a
+/agent-note-inspector-cleanup-retains-unacknowledged-resource-completion/problem:
+  en: d46bc46fb681e7c0
+  zh: 7ee2068a291e85c7
+/agent-note-inspector-cleanup-retains-unacknowledged-resource-completion/decision:
+  en: 0b674d481a83e040
+  zh: 51700fc120066cce
+/agent-note-inspector-cleanup-retains-unacknowledged-resource-completion/alternatives-considered:
+  en: 2652244077fdb45c
+  zh: 1733035611ac6d03
+/agent-note-inspector-cleanup-retains-unacknowledged-resource-completion/consequences:
+  en: 23194b940b3c1a76
+  zh: ae01fe26b4977e48
+/agent-note-inspector-cleanup-retains-unacknowledged-resource-completion/verification:
+  en: f68e9fab9842e234
+  zh: a501b84b0f5e92d4

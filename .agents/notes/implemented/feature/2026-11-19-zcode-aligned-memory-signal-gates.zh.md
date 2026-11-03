@@ -20,7 +20,7 @@ Status: implemented
 - `dsh-memory` 的 `memorySignalWordCount` 是共享词代理：空白分隔词元加每个汉字各计一个单位。ZCode 仅按 `split(/\s+/)` 计拉丁词元，会把整句中文当一个词；逐字规则让 CJK 正文维持同等准入线。
 - `memory-context` 在不足两个信号词时跳过选择器，并把 `memory_read` `tool/call` 事件折叠进 `read` 集合——代理已取过的条目无需再注入摘要。折叠按键名记，保守地连其他作用域的同名条目一并排除。
 - `memory-curation` 仅在消息达到三个信号词时置 `sawHuman`。
-- 每次辅助请求——召回选择器与两个整理循环——经 `llm.resolveModelInfo` 解析模型公开的最低推理档位，并把输出封顶到 `AUXILIARY_MAX_TOKENS`（5,000）。元数据查询失败只丢档位提示。
+- 每次辅助请求——召回选择器与两个整理循环——经 `llm.resolveModelInfo` 解析模型公开的最低推理档位，并按各插件的 `maxOutputTokens` 配置限制输出（默认 5,000）。元数据查询失败只丢档位提示。
 - `renderRecallEntry` 对更新超过一天的条目前置与 ZCode 内容渲染器一致的"N 天前"时点提示。
 
 ## 已考虑的替代方案

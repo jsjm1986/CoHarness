@@ -34,6 +34,8 @@ Mount the package before a consumer that injects `fileUpload`, then call `ctx.fi
 
 The package has no Cordis configuration fields. A `Blob` uses XMLHttpRequest inside a dedicated Worker so the service can report browser upload progress, including the total when the browser provides it. A `ReadableStream` transfers to that Worker and feeds Fetch incrementally; progress reports consumed bytes without a total. An `AbortSignal` terminates the dedicated Worker or reaches a page-owned carrier. Exact bytes use the generated Remote.
 
+Managed uploads capture the original collaboration participant and require Session write permission before cold resolution and storage, then recheck it before issuing a receipt. Private conversations and read-only access follow the same rule for raw HTTP and encoded Remote uploads. Losing required authorization, the exact Agent, the upload service or caller cancellation prevents receipt publication; already committed immutable bytes may remain. Active storage prevents automatic Agent idle disposal and permanent removal. Service disposal cancels Node HTTP inputs and joins accepted storage before removing its idle protection ([ownership decision](../../../.agents/notes/implemented/bug-fix/2026-11-03-file-upload-authorization.md)).
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -85,6 +87,7 @@ None; this package neither assembles nor sends a provider request.
 These limits apply to the transport operation itself.
 
 - **Uploads are not resumable** — a failed or cancelled retry starts from the first byte.
+- **Programmatic source reads have their own owner** — producers of custom async iterables must settle their pending reads; disposal joins accepted storage. Node HTTP inputs are actively closed on upload cancellation.
 - **Stream bodies are one-shot** — transferring a `ReadableStream` locks the caller's object, so retry requires a newly created stream.
 - **Stream progress has no total** — callers receive consumed-byte counts because the stream API carries no byte length.
 - **The browser Worker is self-contained** — its source is emitted from a function string. Adding runtime imports requires moving it to a standalone Worker entry bundled by tsdown.

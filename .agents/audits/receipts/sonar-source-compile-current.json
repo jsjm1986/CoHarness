@@ -1,0 +1,14 @@
+{
+  "name": "sonar-source-compile-current",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/llm/llm-pi-ai/tsconfig.json",
+  "startedAt": "2026-10-24T08:41:54.631351+00:00",
+  "seconds": 3.454,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3fd570b288a87914b846cf29b1be4d1eca7e5224ceb4ff3cf9ac8a9a68869fd2",
+  "inputsAfter": "3fd570b288a87914b846cf29b1be4d1eca7e5224ceb4ff3cf9ac8a9a68869fd2",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

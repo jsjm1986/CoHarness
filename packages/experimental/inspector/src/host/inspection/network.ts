@@ -23,6 +23,24 @@ export interface FetchCaptureOptions {
  */
 const requestsByBody = new WeakMap<ReadableStream<Uint8Array>, Request>()
 
+const FETCH_OBSERVER = Symbol('Inspector fetch observation owner')
+type ObservedFetch = typeof fetch & {
+  readonly [FETCH_OBSERVER]?: {
+    readonly lifetime: AbortSignal
+    readonly previous: PropertyDescriptor | undefined
+  }
+}
+
+/** Skip retired wrappers without replacing an active observer or an unrelated fetch implementation. */
+function liveFetchDescriptor(descriptor: PropertyDescriptor | undefined): PropertyDescriptor | undefined {
+  let previous = descriptor
+  for (;;) {
+    const owner = (previous?.value as ObservedFetch | undefined)?.[FETCH_OBSERVER]
+    if (owner?.lifetime.aborted !== true) return previous
+    previous = owner.previous
+  }
+}
+
 interface CaptureOutcome {
   readonly capturedBytes: number
   readonly truncated: boolean
@@ -31,7 +49,7 @@ interface CaptureOutcome {
 
 /** Active global fetch wrapper. */
 export interface FetchObserver {
-  /** Restore the prior fetch implementation, cancel clone readers, and await their settlement. */
+  /** Restore the nearest live prior fetch, stop new capture, and join owned clone readers. Retained calls delegate without observation. */
   stop(): Promise<void>
 }
 
@@ -65,6 +83,7 @@ export function installFetchObserver(
   }
 
   const observedFetch: typeof fetch = async (input, init) => {
+    if (controller.signal.aborted) return Reflect.apply(original, globalThis, [input, init])
     const request = new Request(input, init)
     const requestId = `fetch-${++nextRequestId}`
     publisher.publish('fetch/start', {
@@ -103,14 +122,22 @@ export function installFetchObserver(
     try {
       response = await Reflect.apply(original, globalThis, [request])
     } catch (error) {
-      publisher.publish('fetch/error', {
-        requestId,
-        message: renderError(error),
-        canceled: request.signal.aborted || isAbortError(error),
-      })
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- Native rejection can arrive after stop() retires capture.
+      if (!controller.signal.aborted) {
+        publisher.publish('fetch/error', {
+          requestId,
+          message: renderError(error),
+          canceled: request.signal.aborted || isAbortError(error),
+        })
+      }
       throw error
     }
 
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- Native headers can arrive after stop() retires capture.
+    if (controller.signal.aborted) {
+      if (response.body !== null) requestsByBody.set(response.body, request)
+      return response
+    }
     publisher.publish('fetch/response', {
       requestId,
       url: response.url || request.url,
@@ -150,6 +177,7 @@ export function installFetchObserver(
 
   Object.defineProperty(observedFetch, 'name', { value: original.name, configurable: true })
   Object.defineProperty(observedFetch, 'length', { value: original.length, configurable: true })
+  Object.defineProperty(observedFetch, FETCH_OBSERVER, { value: { lifetime: controller.signal, previous: descriptor } })
   Object.defineProperty(globalThis, 'fetch', descriptor === undefined
     ? { value: observedFetch, writable: true, configurable: true }
     : { ...descriptor, value: observedFetch })
@@ -158,15 +186,18 @@ export function installFetchObserver(
   return {
     stop(): Promise<void> {
       if (stopped !== undefined) return stopped
-      stopped = (async () => {
+      const finished = Promise.withResolvers<void>()
+      stopped = finished.promise
+      void (async () => {
+        controller.abort()
         const current = Object.getOwnPropertyDescriptor(globalThis, 'fetch')
         if (current !== undefined && 'value' in current && current.value === observedFetch) {
-          if (descriptor === undefined) Reflect.deleteProperty(globalThis, 'fetch')
-          else Object.defineProperty(globalThis, 'fetch', descriptor)
+          const previous = liveFetchDescriptor(descriptor)
+          if (previous === undefined) Reflect.deleteProperty(globalThis, 'fetch')
+          else Object.defineProperty(globalThis, 'fetch', previous)
         }
-        controller.abort()
         await Promise.allSettled([...pending])
-      })()
+      })().then(finished.resolve, finished.reject)
       return stopped
     },
   }

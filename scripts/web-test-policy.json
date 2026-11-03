@@ -48,6 +48,7 @@
     "details-session-lifecycle.e2e.ts": "lifecycle",
     "diff-context.e2e.ts": "conversation",
     "document-manager.e2e.ts": "documents",
+    "documents-interaction-audit.e2e.ts": "documents",
     "draft-initialization.e2e.ts": "lifecycle",
     "file-upload-round.e2e.ts": "conversation",
     "frontend-responsiveness.e2e.ts": "workbench",
@@ -128,6 +129,7 @@
     "todo-row.snapshot.ts": "conversation",
     "tool-details.e2e.ts": "conversation",
     "trajectory-virtualization.e2e.ts": "conversation",
+    "toolbar-buttons.e2e.ts": "shell",
     "turn-tail-actions.e2e.ts": "conversation",
     "user-terminal.e2e.ts": "conversation",
     "vite-entry.e2e.ts": "shell",
@@ -148,6 +150,9 @@
     "apps/web/tests/default-model.overlay.yml": [
       "default-model.e2e.ts",
       "model-transport-recovery.e2e.ts"
+    "apps/web/tests/admin-computer-fixture.ts": [
+      "admin-form-values.e2e.ts",
+      "admin-layout.e2e.ts"
     ],
     "examples/acp-agent/tests/snapshots/cancel-tool-calls/session.v6.jsonl": [
       "bash-abort-row.e2e.ts"

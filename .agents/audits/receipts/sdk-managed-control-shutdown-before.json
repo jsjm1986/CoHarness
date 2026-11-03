@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-control-shutdown-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-dsh-sdk/tests/control.spec.ts -t 'bounds parent shutdown' --retry=0",
+  "startedAt": "2026-10-24T14:51:06.371512+00:00",
+  "seconds": 10.896,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a13738fd23d808494c5fc86ad4002b4f07dd5fdc3125840f1af9c23314bf97b3",
+  "inputsAfter": "a13738fd23d808494c5fc86ad4002b4f07dd5fdc3125840f1af9c23314bf97b3",
+  "postgresToolDirectory": null,
+  "outputSha256": "25a8b87e46afa93766662699c51158dfadc04e0b2cb4a80b0a5b4d21bafb0ca4",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/subagent/subagent-dsh-sdk/tests/control.spec.ts (55 tests | 1 failed | 54 skipped) 5042ms\n   × bounds parent shutdown while an HTTP cleanup report waits for an uncooperative resource provider 5041ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/subagent/subagent-dsh-sdk/tests/control.spec.ts > bounds parent shutdown while an HTTP cleanup report waits for an uncooperative resource provider\nAssertionError: expected [Function] to throw error including 'SDK parent control cleanup did not se…' but got 'Test watchdog waited for parent shutd…'\n\nExpected: \"SDK parent control cleanup did not settle.\"\nReceived: \"Test watchdog waited for parent shutdown.\"\n\n ❯ packages/subagent/subagent-dsh-sdk/tests/control.spec.ts:168:60\n    166|     await vi.waitFor(async () => { expect(await client.post('/resource…\n    167|     const watchdog = new Promise<never>((_resolve, reject) => { timer …\n    168|     await expect(Promise.race([control.close(), watchdog])).rejects.to…\n       |                                                            ^\n    169|   } finally {\n    170|     clearTimeout(timer)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 54 skipped (55)\n   Start at  22:51:10\n   Duration  6.72s (transform 1.24s, setup 47ms, import 1.52s, tests 5.04s, environment 0ms)\n\n"
+}

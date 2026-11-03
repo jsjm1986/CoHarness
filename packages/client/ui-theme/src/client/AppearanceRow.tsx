@@ -14,6 +14,7 @@ import type { ThemePreference } from '../theme-settings.ts'
 import type { ThemeKey } from './locales.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { createAppearanceRowStore } from './settings-store.ts'
+import { settingsFeedback } from './settings-feedback.ts'
 import css from './AppearanceRow.module.css'
 
 /** Injected business face: the preference write (t rides the standard locale seat). */
@@ -43,34 +44,15 @@ export function AppearanceRow({ t, setTheme, useStore }: AppearanceRowComponentP
   const preference = useStore(s => s.preference)
   const settings = useStore(s => s.settings)
   const projectOverride = useStore(s => s.projectOverride)
-  const disabled = settings.status !== 'ready' || !settings.writable || settings.write.status === 'saving'
-  const blocked = settings.write.status === 'blocked' ? settings.write.reason : undefined
+  const { disabled, notice: noticeKey, role } = settingsFeedback(settings)
   const notice = projectOverride !== undefined
     ? t(projectOverride === 'light' ? 'appearance.projectForcedLight' : 'appearance.projectForcedDark')
-    : settings.write.status === 'error'
-      ? t('appearance.saveFailed')
-      : settings.write.status === 'saving'
-        ? t('appearance.saving')
-        : blocked === 'loading' || settings.status === 'loading'
-          ? t('appearance.loading')
-          : blocked === 'unavailable' || settings.status === 'unavailable'
-            ? t('appearance.unavailable')
-            : blocked === 'project' || settings.writableReason === 'project'
-              ? t('appearance.projectReadOnly')
-              : blocked === 'provider' || settings.writableReason === 'provider'
-                ? t('appearance.providerReadOnly')
-                : settings.writableReason === 'account'
-                  ? t('appearance.accountReadOnly')
-                  : settings.writableReason === 'organization'
-                    ? t('appearance.organizationReadOnly')
-                    : settings.writableReason === 'deployment'
-                      ? t('appearance.deploymentReadOnly')
-                      : undefined
+    : noticeKey === undefined ? undefined : t(noticeKey)
   return (
     <div className={css.group}>
       <div className={css.title}>{t('appearance.title')}</div>
       {notice === undefined ? null : (
-        <div className={css.notice} role={settings.write.status === 'error' ? 'alert' : 'status'}>
+        <div className={css.notice} role={role}>
           {notice}
         </div>
       )}

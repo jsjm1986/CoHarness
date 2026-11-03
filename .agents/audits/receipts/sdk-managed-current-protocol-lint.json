@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-current-protocol-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/subagent/subagent-dsh-sdk packages/context/gateway-execution/tests/pg-composition.e2e.ts gateway/tests/execution-fixture-server.ts examples/headless-agent/tests/sdk-process-admission.snapshot.ts",
+  "startedAt": "2026-10-24T15:45:13.896414+00:00",
+  "seconds": 6.077,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "82bffa9a9e259dcb964347985f0eafe2e9a2bbcdd4495377b8504c4ddc924b8f",
+  "inputsAfter": "82bffa9a9e259dcb964347985f0eafe2e9a2bbcdd4495377b8504c4ddc924b8f",
+  "postgresToolDirectory": null,
+  "outputSha256": "d6fc56049e0d04c9e5137aee8cf3ae6e1be0a77998100ee909792c55643b4e5b",
+  "outputTail": "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts:44:1: error @stylistic(max-len): This line has a length of 147. Maximum allowed is 140.\n"
+}

@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-documents/README.md
 document:
-  en: e473fce2425f7d80015e91781c9591a94b0804a4
-  zh: e70f8133c976141eeb6300c359d6902d84067675
+  en: 7de45c9a7133ab6769babf33066e102e59d4d766
+  zh: e3b0d94baa61da924be70dda932430fb13db241a
 /:
   en: e9b5d4d3522ce3c6
   zh: 29b41ae2369ee528
 /deepseek-ai-dsh-client-ui-documents:
-  en: 8bd30bb2abdbdb0e
-  zh: f0d15c5e76f54441
+  en: f55f74cb34b14c26
+  zh: 7b0fd7b5de4c84cb
 /deepseek-ai-dsh-client-ui-documents/summary:
   en: dfa0a66110fb8623
   zh: 6a9a8a6ece5daeec
@@ -21,11 +21,11 @@ document:
   en: c79b7b7593073e4d
   zh: d8fd37a18d22f8ef
 /deepseek-ai-dsh-client-ui-documents/usage:
-  en: 70060e42251a8868
-  zh: a2d6e11c0ef608cf
+  en: fdec5046b8507371
+  zh: 60a2728ff26b9e30
 /deepseek-ai-dsh-client-ui-documents/scope-isolation:
-  en: 644e5004b5aa0ea9
-  zh: 5f71d76df3159d50
+  en: b5bea7889ea7261c
+  zh: eeecba44d97069fc
 /deepseek-ai-dsh-client-ui-documents/license:
   en: 11f3a795f4476219
   zh: 82d78e13f566aaad

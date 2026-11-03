@@ -16,17 +16,18 @@ The process-local job registry already owns the exact job owner and the authorit
 
 The [generic job runtime decision](../architecture/2026-06-20-generic-long-running-tool-runtime.md) owns the shared Task lifecycle and control API; this note owns the process-local admission policy.
 
-`start()` performs admission after the existing task-controller, task-field, and live-owner checks and before `JobStart.run()`. It derives the active count from the registry's current records instead of storing another counter:
+`start()` performs admission after the existing task-controller, task-field, and live-owner checks and before `JobStart.run()`. It derives committed occupancy from the registry's current records and adds synchronous starts from execution-identity capture through the producer returning its hooks. Capture failure releases the reservation without executing a producer:
 
 | Record | Occupies capacity | Release fact |
 |---|---:|---|
+| identity capture and synchronous `run()` | yes | capture or callback throws; registration takes over on success |
 | `running` | yes | producer `done` settles |
 | `stopping` | yes | producer `done` settles |
 | `completed`, `killed`, or `failed` | no | already terminal |
 
 Owned tasks are bucketed by exact `Agent` object identity, matching owner cleanup. Replacement agents that reuse a session id receive an independent bucket. Jobs without an owner share one service-level bucket, so omitting ownership is not an unlimited bypass.
 
-When the bucket is full, `start()` throws before producer execution and task-id allocation. The diagnostic includes the current limit and tells the model to use `job_kill`, wait until the task finishes stopping, and retry. Rejection creates no execution resource, queue entry, reservation, or public job record; a later successful start receives the next ordinary per-kind id.
+When the bucket is full, `start()` throws before producer execution and task-id allocation. The diagnostic includes the current limit and tells the model to use `job_kill`, wait until the task finishes stopping, and retry. Rejection creates no execution resource, queue entry, reservation, or public job record; a later successful start receives its own registry-issued identity.
 
 Owner and service disposal keep their existing order: request cancellation, retain `stopping` occupancy while producers release resources, await settlement, then remove records. The admission policy therefore follows the same lifecycle fact used by reads, notices, and cleanup rather than treating a cancellation request as resource release.
 
@@ -34,7 +35,9 @@ Continuable background subagents remain outside this budget. They own durable ch
 
 ## Verification
 
-The task-provider suite covers the default and explicit limits, producer-before rejection, unchanged id counters, `stopping` occupancy, every terminal release state, exact-owner isolation, same-session replacement objects, the shared unowned bucket, invalid configuration, owner cleanup, and service teardown. Spine and ACP composition tests pin typed forwarding. A keyless ACP replay boots the real Loader composition with a limit of one, starts one real background Bash process, observes the second start's actionable error, stops the first task by its returned id, and verifies that the rejected producer's marker file was never created.
+Synchronous starts reserve in their exact-owner bucket until the callback returns or throws, so startup observers cannot re-enter `start()` to bypass capacity. This reservation is not published as a job, and a failed starter leaves it available for a retry.
+
+The task-provider suite covers reentrant owned and unowned starts, failed-starter release, and the default and explicit limits, producer-before rejection, unchanged id counters, `stopping` occupancy, every terminal release state, exact-owner isolation, same-session replacement objects, the shared unowned bucket, invalid configuration, owner cleanup, and service teardown. Spine and ACP composition tests pin typed forwarding. A keyless ACP replay boots the real Loader composition with a limit of one, starts one real background Bash process, observes the second start's actionable error, stops the first task by its returned id, and verifies that the rejected producer's marker file was never created.
 
 ## Alternatives considered
 
@@ -46,10 +49,12 @@ The task-provider suite covers the default and explicit limits, producer-before 
 
 **Queue, preempt, or terminate the oldest task.** Rejected because each policy adds ordering, ownership, and cancellation behavior beyond the requested fail-closed limit. An explicit rejection lets the model decide which work is no longer needed through the existing `job_kill` control.
 
-**Maintain a mutable active-count map.** Rejected because the registry already holds the authoritative records and statuses. A second count would require rollback and settlement synchronization while providing no user result that a direct derivation lacks.
+**Maintain a mutable active-count map.** Rejected because the registry already holds the authoritative records and statuses. A second committed count would require rollback and settlement synchronization while providing no user result that a direct derivation lacks. The temporary synchronous-start reservation instead represents work with no committed record and is released in `finally`.
 
 ## Consequences
 
 One exact owner cannot keep creating Task-backed live resources indefinitely, and unrelated owners retain independent allowances. A slow stop keeps a bucket full until `done` settles, which is deliberate: the configured number bounds work that may still own resources, not cancellation requests. A producer whose `cancel` returns but whose `done` never settles holds one slot for the rest of the service lifetime and can stall teardown because the registry cannot safely infer resource release.
 
 Admission scans the process-local registry on each start. The cost grows with retained Task history, accepted in exchange for one state authority and a default limit small enough to bound the common live set. Terminal history remains available to existing reads and listings without consuming capacity.
+
+The runnable SDK example loads the real job registry with a limit of one and an execution provider whose capture callback starts another job for the same owner. One producer reaches an owned loopback HTTP response; the nested producer is refused before connection allocation. Both SDKs verify physical response closure and no active jobs after cleanup.

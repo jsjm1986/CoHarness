@@ -1,0 +1,13 @@
+{
+  "name": "ssh-private-transport-native",
+  "cwd": ".",
+  "command": "pnpm run test:e2e packages/ssh/ssh/tests/resource-admission.e2e.ts --retry=0",
+  "startedAt": "2026-10-23T15:01:15.474915+00:00",
+  "seconds": 5.81,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8e83001e280a9fbc75b04ae095f604e9b5c6ba9c1cdcc6593b96da7673408dfa",
+  "inputsAfter": "8e83001e280a9fbc75b04ae095f604e9b5c6ba9c1cdcc6593b96da7673408dfa",
+  "outputSha256": "f2e0b56dc6a79867ee59bd25d0ff5be2d297a01fdaf87a160370198d380f83a4",
+  "outputTail": "$ vitest run --config vitest.e2e.config.ts packages/ssh/ssh/tests/resource-admission.e2e.ts --retry=0\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ packages/ssh/ssh/tests/resource-admission.e2e.ts (1 test | 1 failed) 3430ms\n   × admits the actual local carrier before starting its shipped helper and awaits process completion 3430ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  packages/ssh/ssh/tests/resource-admission.e2e.ts > admits the actual local carrier before starting its shipped helper and awaits process completion\nAssertionError: expected { protocol: 2, …(7) } to match object { protocol: 2, …(2) }\n(5 matching properties omitted from actual)\n\n- Expected\n+ Received\n\n  {\n    \"kind\": \"node-script\",\n    \"protocol\": 2,\n-   \"workspace\": \"/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/dsh-ssh-admission-WkQwHx\",\n+   \"workspace\": \"/private/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/dsh-ssh-admission-WkQwHx\",\n  }\n\n ❯ packages/ssh/ssh/tests/resource-admission.e2e.ts:52:25\n     50|   await expect(access(started)).rejects.toThrow()\n     51|   grant.resolve({ signal: permit.signal, release, uncertain })\n     52|   expect(await opening).toMatchObject({ protocol: 2, kind: 'node-scrip…\n       |                         ^\n     53|   await expect(access(started)).resolves.toBeUndefined()\n     54|   expect(release).not.toHaveBeenCalled()\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  23:01:17\n   Duration  3.77s (transform 195ms, setup 22ms, import 247ms, tests 3.43s, environment 0ms)\n\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

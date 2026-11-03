@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { transaction } from './database.ts'
 import type { PoolClient } from 'pg'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
+import { lockAdministrator } from './administrator-authority.ts'
+import { lockActiveAccount } from './account-authority.ts'
 
 /** Public target view for administrators; carries no secret material because targets reference OpenSSH aliases. */
 export interface SshTargetView {
@@ -144,12 +146,19 @@ export class PostgresSshTargetService {
     }
   }
 
-  /** @returns every registered target with its project shares, ordered by name. */
-  async list(): Promise<SshTargetView[]> {
-    const rows = await this.context.pool.query<TargetRow>(
-      `SELECT ${columns} FROM harness.ssh_targets t WHERE t.organization_id=$1 ORDER BY t.name,t.public_id`,
-      [this.context.organizationId])
-    return rows.rows.map(view)
+  /**
+   * Read the organization catalog while retaining current administrator eligibility.
+   * @param actorPublicId - server-authenticated administrator's public id.
+   * @returns every registered target with its project shares, ordered by name.
+   */
+  async list(actorPublicId: number): Promise<SshTargetView[]> {
+    return this.run(async client => {
+      await lockAdministrator(client, this.context, actorPublicId)
+      const rows = await client.query<TargetRow>(
+        `SELECT ${columns} FROM harness.ssh_targets t WHERE t.organization_id=$1 ORDER BY t.name,t.public_id`,
+        [this.context.organizationId])
+      return rows.rows.map(view)
+    })
   }
 
   /**
@@ -165,6 +174,7 @@ export class PostgresSshTargetService {
    */
   async listForProject(actorPublicId: number, projectPublicId: number): Promise<ProjectSshTargetView[]> {
     return this.run(async client => {
+      await lockActiveAccount(client, this.context, actorPublicId)
       const actor = await client.query<{ id: string; administrator: boolean }>(`SELECT u.id,
         m.role='admin' administrator FROM harness.users u
         JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
@@ -208,6 +218,7 @@ export class PostgresSshTargetService {
     if (!parsed.success) throw new SshTargetError(400, 'invalid ssh target')
     const value = parsed.data
     return this.run(async client => {
+      await lockAdministrator(client, this.context, adminPublicId)
       const creator = await client.query<{ id: string }>(
         'SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2',
         [this.context.organizationId, adminPublicId])
@@ -221,7 +232,7 @@ export class PostgresSshTargetService {
       [this.context.organizationId, value.name, value.host, value.node, value.helper, value.helperHash,
         value.workspace, value.bootstrapPath ?? null, value.bootstrapHash ?? null,
         value.passwordRef ?? null, value.requestTimeoutMs ?? null, value.maxFrameBytes ?? null,
-        value.maxPending ?? null, value.leaseMs ?? null, creator.rows[0]?.id ?? null])
+        value.maxPending ?? null, value.leaseMs ?? null, creator.rows[0]!.id])
       const created = await client.query<TargetRow>(
         `SELECT ${columns} FROM harness.ssh_targets t WHERE t.organization_id=$1 AND t.public_id=$2`,
         [this.context.organizationId, inserted.rows[0]!.public_id])
@@ -233,13 +244,15 @@ export class PostgresSshTargetService {
    * Replace one target's coordinates only when the submitted revision is current.
    * An omitted password reference preserves the stored value; explicit null clears it.
    * @param input - public target id, observed revision, and new connection fields.
+   * @param actorPublicId - server-authenticated administrator retained until commit.
    * @returns the updated target.
    */
-  async update(input: unknown): Promise<SshTargetView> {
+  async update(input: unknown, actorPublicId: number): Promise<SshTargetView> {
     const parsed = identity.extend({ fields }).safeParse(input)
     if (!parsed.success) throw new SshTargetError(400, 'invalid ssh target update')
     const { targetId, revision, fields: value } = parsed.data
     return this.run(async client => {
+      await lockAdministrator(client, this.context, actorPublicId)
       const current = await client.query<{ revision: string; password_ref: string | null }>(
         `SELECT revision::text,password_ref FROM harness.ssh_targets WHERE organization_id=$1 AND public_id=$2 FOR UPDATE`,
         [this.context.organizationId, targetId])
@@ -269,15 +282,17 @@ export class PostgresSshTargetService {
   /**
    * Enable, disable, or remove one target under its observed revision.
    * @param input - public target id, observed revision, and the requested mutation.
+   * @param actorPublicId - server-authenticated administrator retained until commit.
    * @returns the updated target, or null after removal.
    */
-  async mutate(input: unknown): Promise<SshTargetView | null> {
+  async mutate(input: unknown, actorPublicId: number): Promise<SshTargetView | null> {
     const parsed = identity.extend({
       action: z.enum(['enable', 'disable', 'remove']),
     }).strict().safeParse(input)
     if (!parsed.success) throw new SshTargetError(400, 'invalid ssh target mutation')
     const { targetId, revision, action } = parsed.data
     return this.run(async client => {
+      await lockAdministrator(client, this.context, actorPublicId)
       const current = await client.query<{ revision: string }>(
         'SELECT revision::text FROM harness.ssh_targets WHERE organization_id=$1 AND public_id=$2 FOR UPDATE',
         [this.context.organizationId, targetId])
@@ -311,10 +326,26 @@ export class PostgresSshTargetService {
    * @returns the updated target.
    */
   async share(actorPublicId: number, input: unknown): Promise<SshTargetView> {
+    return this.shareTarget(actorPublicId, input, false)
+  }
+
+  /**
+   * Change project sharing while retaining current organization administrator eligibility.
+   * @param actorPublicId - server-authenticated administrator's public id.
+   * @param input - public target and project ids plus the share direction.
+   * @returns the updated target and its project shares.
+   */
+  async shareAsAdministrator(actorPublicId: number, input: unknown): Promise<SshTargetView> {
+    return this.shareTarget(actorPublicId, input, true)
+  }
+
+  private async shareTarget(actorPublicId: number, input: unknown, administratorOnly: boolean): Promise<SshTargetView> {
     const parsed = shareInput.extend({ shared: z.boolean() }).strict().safeParse(input)
     if (!parsed.success) throw new SshTargetError(400, 'invalid ssh share request')
     const { targetId, projectId, shared } = parsed.data
     return this.run(async client => {
+      if (administratorOnly) await lockAdministrator(client, this.context, actorPublicId)
+      else await lockActiveAccount(client, this.context, actorPublicId)
       const actor = await client.query<{ id: string; administrator: boolean }>(`SELECT u.id,
         m.role='admin' administrator FROM harness.users u
         JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
@@ -398,8 +429,8 @@ export class PostgresSshTargetService {
         }
       }
       const policies = await client.query<{ user_id: string | null }>(`SELECT user_id FROM harness.ssh_access_policies
-        WHERE organization_id=$1 AND (user_id=$2 OR project_id=$3) AND enabled FOR SHARE`,
-      [this.context.organizationId, actorRow.id, input.projectInternalId ?? null])
+        WHERE organization_id=$1 AND (user_id=$2 OR project_id=$3) AND node_id=$4 AND enabled FOR SHARE`,
+      [this.context.organizationId, actorRow.id, input.projectInternalId ?? null, this.context.nodeId])
       if (!policies.rows.some(policy => policy.user_id === actorRow.id)) {
         throw new SshTargetError(403, 'an execution actor lacks ssh qualification')
       }

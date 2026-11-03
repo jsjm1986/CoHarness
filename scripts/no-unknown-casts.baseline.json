@@ -139,21 +139,12 @@
     "ee3e9284cdc2eef83487aa9024142070911dc92735c9415bd1330b7be29f0129": 1,
     "fed6797b00536408923904cb6e64941ad2949f0a6c8e086c6aff1a614cb54d69": 1
   },
-  "gateway/tests/document-catalog-service.spec.ts": {
-    "451aa1dd0f69b12b65be061a625c82cd979379bb1507a8e019f33c31ce1e6b13": 1,
-    "5886aaf4f84dae6d41ecf9f220236989d033c21d7d08983eb62c41661e3fee58": 1,
-    "64e4af7a373b1983067dad8abf647b6a8b37dbc3cf540c6b8342bb9df6bc9d2e": 1,
-    "7fe58280287ff63d40e979e72329f975e11015a95e9a8eec207a5a78748d3c89": 1,
-    "8f8c250f497d541e1439ad1844499a8ca2c9edb5cdedf6b067f91af10ac237ab": 3,
-    "c073d04e1d669960f37c21af8bf92e54d071f1196cbe4de321f5c70e566339a5": 1
-  },
   "gateway/tests/document-transfer.spec.ts": {
     "4c92186f39b083cdc90584a63b5ec389a125d96a555fb746a2c0f25983110cdc": 1,
     "8bc675ff72c8d4566c585affd6dfacd49ce8f767260777f9f227d655caef5d91": 3,
     "fd1aa5ff5861ad4fbc96e487395cd1fcfea24b0907f2436004124700891fc20e": 1
   },
   "gateway/tests/instances.spec.ts": {
-    "a1eb21bcac51f92aecd6e6c9f668b426433838eb8132c9b556943e99316e1685": 1,
     "fb8dcd9484b92f48fb1e80331d4ab76d7dc418d725057f28bfd440c7e18b9592": 1
   },
   "gateway/tests/plugin-management.spec.ts": {
@@ -161,9 +152,6 @@
   },
   "gateway/tests/port-allocation.spec.ts": {
     "1e1b7628047614ed41d5cb4b05c630ba7c3e66625c4fabe99995d40a27026cc8": 5
-  },
-  "gateway/tests/postgres.spec.ts": {
-    "65091cc990f8ab1dd7d7044075b7c435f60a2e36414ce25bc15973f0bf1c7ba0": 1
   },
   "gateway/tests/project-model-settings.spec.ts": {
     "f82a4f6b409fadf03fb568e1333ead8ffb919763ce08cc47eea330b21441ed1d": 1
@@ -179,8 +167,7 @@
   },
   "gateway/tests/runtime-api.spec.ts": {
     "1e1b7628047614ed41d5cb4b05c630ba7c3e66625c4fabe99995d40a27026cc8": 1,
-    "2c9bff7cffde5d444cbbf61a547bf3c592e1ee623f38f140c410a207235f503a": 1,
-    "b5cd624901227ee73deaebe7103f67b16acb564b7ea8ad1cd3499e8a903355d9": 1
+    "2c9bff7cffde5d444cbbf61a547bf3c592e1ee623f38f140c410a207235f503a": 1
   },
   "gateway/tests/terminal-management.spec.ts": {
     "674c2fdfe24c9e09fc2224592aa3a9dc8195c7fb517130a01714d5481e6eefbe": 1
@@ -294,12 +281,6 @@
   "packages/attachment/tool-userdoc/tests/tool-userdoc.spec.ts": {
     "1915a0bf622ebb9879062b9e8ee7768be808a67e5679429a189ac37ce993369f": 1,
     "a66cea6887fa5e33f4d504a7899fcb4b99d79958f6aed01288af1ad6ff557298": 1
-  },
-  "packages/attachment/userdoc-local/src/trash.ts": {
-    "b946512c8d96eb1420e1d8c843648d1e3a7578c60de47d21b62ed2f9d25a09bd": 1
-  },
-  "packages/attachment/userdoc-local/src/upload.ts": {
-    "18dbddcf0b034d45d3d9d8a0614dcc53e05da2ae1c7d1249635e79bb14b5a580": 1
   },
   "packages/attachment/userdoc-local/tests/index.spec.ts": {
     "654a05ce6f8a384331abf1ccf5c5af6a93bc1db02c1d39e33869d49f4b0adfb4": 1
@@ -1383,9 +1364,6 @@
   "packages/goal/command-goal/tests/command-goal.spec.ts": {
     "ee6a69cb8786aef3fa36838ba724c3dfe6eb49d8fb82aaae51b520ba6b6beae3": 5
   },
-  "packages/goal/goal/src/index.ts": {
-    "09a26f55e58db3477446e73f59bd3cdf678ae76ff8f54d185ec4a0ce0dc7da2d": 1
-  },
   "packages/hooks/hook-protocol/tests/events.spec.ts": {
     "a59fe57e5f3994018a6bd25208b9c2f56a7bcf7353d6ec2d453564f3f5c225f2": 1
   },
@@ -1721,9 +1699,6 @@
   },
   "packages/lsp/lsp-stdio/tests/lifecycle.spec.ts": {
     "4838a45bc1e86140e95281beb95c102c71f1e007a2bf9152a86769f05525f8ef": 3
-  },
-  "packages/mcp/mcp-client/src/index.ts": {
-    "7645893de19dc823102dda3637173db751bab4a62ab087a1f2081ead752e7749": 1
   },
   "packages/mcp/mcp-client/src/tools.ts": {
     "063e3ecccec43fb70cf70f0265b19eb2ce3b6faa0efd8701433905a7b275cbc5": 1,

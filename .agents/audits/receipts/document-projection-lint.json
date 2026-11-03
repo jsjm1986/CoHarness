@@ -1,0 +1,14 @@
+{
+  "name": "document-projection-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/projection.ts packages/attachment/userdoc-local/src/identity.ts packages/attachment/userdoc-local/src/identity-fs.ts packages/attachment/userdoc-local/src/mutation.ts packages/attachment/userdoc-local/tests/projection.spec.ts",
+  "startedAt": "2026-10-25T21:44:44.772482+00:00",
+  "seconds": 6.1,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9552e79e098b31feb8618163265e93a3d9adecfe1339ae9c80f286ff9d1fa286",
+  "inputsAfter": "9552e79e098b31feb8618163265e93a3d9adecfe1339ae9c80f286ff9d1fa286",
+  "postgresToolDirectory": null,
+  "outputSha256": "f29d4b3413ca42570eaa518f075c64cb734395b593a663bd719f8762bcb6d293",
+  "outputTail": "packages/attachment/userdoc-local/src/projection.ts:132:1: error @stylistic(max-len): This line has a length of 149. Maximum allowed is 140.\npackages/attachment/userdoc-local/tests/projection.spec.ts:203:3: error @stylistic(quotes): Strings must use singlequote.\npackages/attachment/userdoc-local/tests/projection.spec.ts:51:5: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\npackages/attachment/userdoc-local/tests/projection.spec.ts:135:16: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\npackages/attachment/userdoc-local/tests/projection.spec.ts:136:16: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\n"
+}

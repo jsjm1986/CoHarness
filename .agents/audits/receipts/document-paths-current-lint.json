@@ -1,0 +1,14 @@
+{
+  "name": "document-paths-current-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc packages/attachment/userdoc-local",
+  "startedAt": "2026-10-25T18:23:06.630930+00:00",
+  "seconds": 13.0,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9c1c77c7620137c4a2041c98e438bda52ec3bde39af8e43922f0ec7bf025afb8",
+  "inputsAfter": "9c1c77c7620137c4a2041c98e438bda52ec3bde39af8e43922f0ec7bf025afb8",
+  "postgresToolDirectory": null,
+  "outputSha256": "8a3aab13064b4acb50bcce5bbbb27baf818cf0704f1679d415772a2653c421bb",
+  "outputTail": "packages/attachment/userdoc-local/src/identity-fs.ts:430:1: error @stylistic(max-len): This line has a length of 148. Maximum allowed is 140.\npackages/attachment/userdoc-local/tests/private-upload-paths.spec.ts:14:7: error eslint(prefer-const): `manager` is never reassigned. help: Use `const` instead.\n"
+}

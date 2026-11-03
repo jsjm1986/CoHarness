@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-stop-all-worker-failures.md
 document:
-  en: e85a942927649d5b181c9939d626e5219aa6537a
-  zh: 91a1c56d395366e016cc0ccabb9a73f7577843a2
+  en: e14dcfdb1420778c4b4915d8380b071f99b3115e
+  zh: a82ff7e25e8bdd56ebe82efe08ef31092da3f2cf
 /agent-note-drain-shutdown-workers-after-target-failures:
   en: 15b0d62811c4cfaf
   zh: 1b6420da5822649c
@@ -18,8 +18,8 @@ document:
   en: 7ec66cb953285126
   zh: 76682325f038d51d
 /agent-note-drain-shutdown-workers-after-target-failures/consequences:
-  en: 2f4632ab8d22f412
-  zh: 20e741a41b52e2ba
+  en: c1ff81bba2958420
+  zh: 0995cfbbefe5c905
 /agent-note-drain-shutdown-workers-after-target-failures/testing:
   en: f9f8385b5ec878fd
   zh: 7144e1bebd80e2fd

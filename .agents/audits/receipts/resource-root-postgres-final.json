@@ -1,0 +1,13 @@
+{
+  "name": "resource-root-postgres-final",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/node-resource-budget-postgres.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-23T12:32:07.268404+00:00",
+  "seconds": 6.568,
+  "exitCode": 0,
+  "inputsBefore": "7385c98deffb4fc9ee9d55318d5f753c7eeaee502fedfecc3be15fdc7c4ae88b",
+  "inputsAfter": "7385c98deffb4fc9ee9d55318d5f753c7eeaee502fedfecc3be15fdc7c4ae88b",
+  "outputSha256": "fc9f9699c83d2dea1d7110721f0901b17094865ee31e5a7684e950aec99aaaac",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  22 passed (22)\n   Start at  20:32:09\n   Duration  4.36s (transform 128ms, setup 0ms, import 224ms, tests 4.00s, environment 0ms)\n\n",
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf"
+}

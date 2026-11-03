@@ -1,0 +1,14 @@
+{
+  "name": "document-parent-swap-validation-2",
+  "cwd": ".",
+  "command": "pnpm exec tsc -b packages/attachment/userdoc-local",
+  "startedAt": "2026-10-26T01:28:08.217725+00:00",
+  "seconds": 3.628,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "419a3d5e94599739b2152576ea77512553e840b05eca65d3b875baf4e2a7530e",
+  "inputsAfter": "419a3d5e94599739b2152576ea77512553e840b05eca65d3b875baf4e2a7530e",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-sdk-subagent-process-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md
+document:
+  en: 6c13568fe531cf4b4795a5e2babb1b3594e7e0e8
+  zh: b436fb688124d9aa8ca908490f6169e917307aa0
+/agent-note-sdk-subagent-process-admission-and-ownership:
+  en: 3fd869fd24875563
+  zh: ce309592a2d152c6
+/agent-note-sdk-subagent-process-admission-and-ownership/problem:
+  en: 38774d6f6ea1e2ab
+  zh: 1df833aff9035094
+/agent-note-sdk-subagent-process-admission-and-ownership/decision:
+  en: cbeb9fe11d243389
+  zh: 83730857cdb895fd
+/agent-note-sdk-subagent-process-admission-and-ownership/alternatives-considered:
+  en: d1da96b39e4cccf6
+  zh: a645ac2cd8f03458
+/agent-note-sdk-subagent-process-admission-and-ownership/consequences:
+  en: 63f17934044a9515
+  zh: 02798b435a2b3d58
+/agent-note-sdk-subagent-process-admission-and-ownership/verification:
+  en: 9927ee293a8d3948
+  zh: 9efcb1540d7363b2

@@ -26,6 +26,9 @@ importers:
       pg:
         specifier: 8.16.3
         version: 8.16.3
+      ws:
+        specifier: ^8.18.3
+        version: 8.22.0
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -57,9 +60,6 @@ importers:
       vitest:
         specifier: ^4.1.8
         version: 4.1.11(@types/node@22.20.5)(vite@8.3.3(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
-      ws:
-        specifier: ^8.18.3
-        version: 8.22.0
 
 packages:
 

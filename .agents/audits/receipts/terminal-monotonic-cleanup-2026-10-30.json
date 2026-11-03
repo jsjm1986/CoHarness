@@ -1,0 +1,369 @@
+{
+  "recordedAt": "2026-10-29T16:05:39.211699+00:00",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "findings": [
+    "B325"
+  ],
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z",
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-final-source-artifact-hashes.json",
+  "paths": [
+    "packages/subprocess/subprocess-local/src/terminal.ts",
+    "packages/subprocess/subprocess-local/tests/terminal.spec.ts",
+    "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+    "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+    "packages/subprocess/subprocess-local/tests/expected/terminal-clock.expected.md"
+  ],
+  "repair": "Terminal descendant and Windows shell grace deadlines use process-monotonic time. Frozen/backward wall-clock movement cannot prevent escalation, and forward movement cannot shorten the grace. Existing identity-fenced signalling, final quiescence, retained uncertain ownership and public interfaces remain intact.",
+  "negativeEvidence": [
+    {
+      "name": "terminal-clock-frozen-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T15:55:52.224904+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "TSX_TSCONFIG_PATH=./tsconfig.json",
+        "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/src/index.ts",
+        "DSH_TERMINAL_CLOCK_SCENARIO=frozen",
+        "node",
+        "--import",
+        "tsx/esm",
+        "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+        "examples/headless-agent/tests/fixtures/subprocess/subprocess-local/cordis.yml"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T15:55:57.660946+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-frozen-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-frozen-before.log"
+    },
+    {
+      "name": "terminal-clock-compiled-frozen-before-node22",
+      "status": "failed",
+      "startedAt": "2026-10-29T15:58:30.454036+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/lib/index.js",
+        "DSH_TERMINAL_CLOCK_SCENARIO=frozen",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+        "examples/headless-agent/tests/fixtures/subprocess/subprocess-local/cordis.yml"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T15:58:35.788998+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-compiled-frozen-before-node22.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-compiled-frozen-before-node22.log"
+    },
+    {
+      "name": "terminal-clock-final-fixture-old-provider-node22",
+      "status": "failed",
+      "startedAt": "2026-10-29T16:04:16.672190+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/lib/index.js",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-before-cordis.yml"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T16:04:22.408864+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-final-fixture-old-provider-node22.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-final-fixture-old-provider-node22.log"
+    }
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "terminal-clock-normal-before",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:55:45.187990+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "TSX_TSCONFIG_PATH=./tsconfig.json",
+          "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/src/index.ts",
+          "DSH_TERMINAL_CLOCK_SCENARIO=normal",
+          "node",
+          "--import",
+          "tsx/esm",
+          "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+          "examples/headless-agent/tests/fixtures/subprocess/subprocess-local/cordis.yml"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:55:45.792344+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-normal-before.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-normal-before.log"
+      },
+      {
+        "name": "terminal-clock-real-source-fixed",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:56:28.834440+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "TSX_TSCONFIG_PATH=./tsconfig.json",
+          "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/src/index.ts",
+          "node",
+          "--import",
+          "tsx/esm",
+          "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+          "examples/headless-agent/tests/fixtures/subprocess/subprocess-local/cordis.yml"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:56:29.877543+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-real-source-fixed.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-real-source-fixed.log"
+      },
+      {
+        "name": "terminal-clock-frozen-and-forward-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:58:09.349621+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/subprocess/subprocess-local/tests/terminal.spec.ts",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "--maxWorkers=2",
+          "--retry=0",
+          "--coverage",
+          "--coverage.include=packages/subprocess/subprocess-local/src/terminal.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-complete-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:58:22.042297+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-frozen-and-forward-coverage.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-frozen-and-forward-coverage.log"
+      },
+      {
+        "name": "terminal-clock-adjacent-subprocess-regressions",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:59:22.621120+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/subprocess/subprocess-local/tests",
+          "packages/subprocess/subprocess/tests",
+          "--maxWorkers=2",
+          "--retry=0",
+          "--coverage",
+          "--coverage.include=packages/subprocess/subprocess-local/src/terminal.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-adjacent-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:59:50.905482+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-adjacent-subprocess-regressions.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-adjacent-subprocess-regressions.log"
+      },
+      {
+        "name": "terminal-clock-compiled-normal-before-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T15:58:08.789772+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/lib/index.js",
+          "DSH_TERMINAL_CLOCK_SCENARIO=normal",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+          "examples/headless-agent/tests/fixtures/subprocess/subprocess-local/cordis.yml"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T15:58:09.305474+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-compiled-normal-before-node22.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-compiled-normal-before-node22.log"
+      },
+      {
+        "name": "terminal-clock-public-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:01:59.195472+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/lib/index.js",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+          "examples/headless-agent/tests/fixtures/subprocess/subprocess-local/cordis.yml"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:02:00.038318+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-public-node22.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-public-node22.log"
+      },
+      {
+        "name": "terminal-clock-public-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:03:12.558310+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/lib/index.js",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+          "examples/headless-agent/tests/fixtures/subprocess/subprocess-local/cordis.yml"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:03:13.487431+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-public-node24.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-public-node24.log"
+      },
+      {
+        "name": "terminal-clock-full-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:00:50.394753+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "build"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:01:16.102935+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-full-build.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-full-build.log"
+      },
+      {
+        "name": "terminal-clock-lint-final",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:01:48.089380+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "packages/subprocess/subprocess-local/src/terminal.ts",
+          "packages/subprocess/subprocess-local/tests/terminal.spec.ts",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:01:52.761353+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-lint-final.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-lint-final.log"
+      },
+      {
+        "name": "terminal-clock-docs",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:02:00.083695+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:03:31.168844+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-docs.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/terminal-clock-docs.log"
+      },
+      {
+        "name": "subprocess-exit-warning-trace",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:03:13.533787+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "NODE_OPTIONS=--trace-warnings",
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/subprocess/subprocess-local/tests/local.spec.ts",
+          "--maxWorkers=1",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:03:15.116085+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/subprocess-exit-warning-trace.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T155208Z/subprocess-exit-warning-trace.log"
+      }
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 234,
+          "covered": 234,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 275,
+          "covered": 275,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 55,
+          "covered": 55,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 161,
+          "covered": 161,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subprocess/subprocess-local/src/terminal.ts": {
+        "lines": {
+          "total": 234,
+          "covered": 234,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 55,
+          "covered": 55,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 275,
+          "covered": 275,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 161,
+          "covered": 161,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "counts": "58focused terminal/Loader cases;422adjacent subprocess cases passed with16platformskips. Selections overlap. Source and Node22/24 public Loader+PTY transcripts,8full-build steps,scoped lint and20docs gates passed."
+  },
+  "resourceQuiescence": {
+    "status": "passed",
+    "recordedAt": "2026-10-29T16:04:35.362012+00:00",
+    "ownedFixturePids": [],
+    "ownedDatabaseCreated": false,
+    "peerAndProductionResourcesAccessed": false,
+    "ownership": "Each real fixture awaits terminal termination, top-level completion and observed absence of its owned descendant before removing its private root; the final process scan found no matching Node fixture."
+  },
+  "limitations": [
+    "Real native PTY acceptance runs on this macOS host through source and Node22/24 public compiled providers. The Windows branch has injected inspector/PTY unit evidence; real Windows and Linux user-systemd execution are not newly claimed.",
+    "The100%statements/branches/functions/lines result applies only to subprocess-local/src/terminal.ts;438selected cases include422passes and16platformskips. It is not whole-package or whole-project audit completion.",
+    "The terminal-session fallback retains its existing escaped-descendant and process-table visibility limitations. B04/B25 and every original audit domain remain open.",
+    "The exit-listener warning is localized and tracked as a separate unconfirmed production candidate; no listener limit was raised and no warning was suppressed. Real model API and public push remain human-deferred."
+  ],
+  "realProviderApiValidation": "human-deferred",
+  "fixtureMaintenance": "The isolated Loader fixture freezes only its process wall clock, restores all inherited globals, confirms TERM resistance before exercising the deadline, joins exact PTY and descendant exits, and preserves an unconfirmed owner root on cleanup failure. An immutable pre-fix provider with the same final fixture passes the normal-clock control and fails the frozen-clock case. The only initial lint failure was arrow-parenthesis formatting; its receipt remains preserved."
+}

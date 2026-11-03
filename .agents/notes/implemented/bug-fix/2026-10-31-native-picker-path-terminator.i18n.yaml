@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-31-native-picker-path-terminator.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-native-picker-path-terminator.md
+document:
+  en: 0820f51f7020b7b628861b0635c6af8d2a70305a
+  zh: c5697462076457412f2aeadb5c126f35c7cfa67d
+/agent-note-posix-native-chooser-path-terminator:
+  en: 30ec97d95b8225f7
+  zh: 59e1e437079f572a
+/agent-note-posix-native-chooser-path-terminator/problem:
+  en: b881e871ae382fa7
+  zh: 13d962652f239535
+/agent-note-posix-native-chooser-path-terminator/decision:
+  en: e7c96b57840dd062
+  zh: 2c6fcf969c8e4ba3
+/agent-note-posix-native-chooser-path-terminator/alternatives-considered:
+  en: aaa2d7fbd9a961c7
+  zh: df5c480a44916c22
+/agent-note-posix-native-chooser-path-terminator/consequences:
+  en: 27550b8ae69f8055
+  zh: 5fc3b4287de5ee6c

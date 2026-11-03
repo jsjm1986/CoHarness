@@ -35,18 +35,18 @@ Integration 只使用最新 `request/header.config` 的 provider／model 与 shi
 | 分区 | 保留输入 |
 | --- | --- |
 | `REVIEW_POLICY` | 固定分类、来源权威与严格结果规则；allow 后立即以 Full access 执行，没有后续确认 |
-| `ENVIRONMENT` | 仅既有 Session header `cwd` |
+| `ENVIRONMENT` | 由 working-directory 服务解析的当前 Session 工作目录 |
 | `PROJECT_INSTRUCTIONS` | 可见项目指令，保留原始来源并赋予约束角色 |
 | `FILTERED_HISTORY` | 当前 compaction surface 中带来源的 human／直接父级消息、checkpoint、图片／附件事实，以及历史调用名称与日志参数 |
 | `PENDING_ACTION` | 工具名称、描述、参数 schema 与解析后的 arguments |
 
 reviewer 从 Session 的完整动作历史构建这两个动作分节：授权是符合 `REVIEW_POLICY` 来源规则的那个更早调用，而重复或冲突的身份必须在整份日志的任何位置都可见，而不是只在近期窗口内可见，因此 Session 投影与有界读取都无法支撑该判定。这次读取使用已废弃的同步 `snapshotEvents()`，并带有行级 `typescript/no-deprecated` 豁免。
 
-主 agent 的 V3 `system/message` 节点、assistant 正文／reasoning 与 tool results 全部排除。当前调用必须属于 `step/start` 记录的开放 step；缺少 step 归属时拒绝执行。该调用只在 `PENDING_ACTION` 出现；尚未开始的 sibling 没有历史调用事实。原生 schema 来自最新 request header。PTC 在 binding 构造时捕获冻结 schema，经由调度器传入 `ToolExecution`；描述与参数 schema 不进入开始／结算事件或 Session／SDK wire。动作事实缺失、不一致或有歧义时拒绝调用，不查询 live registry。超窗请求直接拒绝，不做摘要、截断、额外 compaction 或设置小型输出 token 预算。
+主 agent 的 V3 `system/message` 节点、assistant 正文／reasoning 与 tool results 全部排除。当前调用必须属于 `step/start` 记录的开放 step；缺少 step 归属时拒绝执行。该调用只在 `PENDING_ACTION` 出现；尚未开始的 sibling 没有历史调用事实。原生 schema 来自最新 request header。PTC 在 binding 构造时捕获冻结 schema，经由调度器传入 `ToolExecution`；描述与参数 schema 不进入开始／结算事件。[持久 reviewer 输入决策](../bug-fix/2026-10-24-auto-review-request-records.zh.md)通过独立的必需请求事件保留其面向模型的文本。动作事实缺失、不一致或有歧义时拒绝调用，不查询 live registry。超窗请求直接拒绝，不做摘要、截断、额外 compaction 或设置小型输出 token 预算。
 
 ### 结果与取消
 
-Reviewer 可以输出 reasoning blocks，随后恰好一个 JSON text block 和终态 `stop`。封闭对象只允许 `low + allow`、`medium + allow/deny` 与 `high + deny`；只有 deny 可携带字符串 `reason`。额外字段、重复成员、非法组合、其他 block 或终态以及 provider 失败均使用普通 Auto 拒绝结果。风险与 reviewer trace 不成为持久状态。
+Reviewer 可以输出 reasoning blocks，随后恰好一个 JSON text block 和终态 `stop`。封闭对象只允许 `low + allow`、`medium + allow/deny` 与 `high + deny`；只有 deny 可携带字符串 `reason`。额外字段、重复成员、非法组合、其他 block 或终态以及 provider 失败均使用普通 Auto 拒绝结果。风险、reviewer reasoning 与原始响应不成为持久状态；精确请求遵循 [reviewer 输入决策](../bug-fix/2026-10-24-auto-review-request-records.zh.md)。
 
 原生结果与 PTC 结算事件携带同形结构化 `AutoReviewDeniedError`／`AUTO_REVIEW_DENIED` 及可选原始理由。Reviewer 拒绝时，主 agent 通过普通失败渲染收到 `Auto review rejected tool "<name>"; its body was not executed`。PTC 保留既有程序异常／catch 行为；捕获拒绝不会将其提升为外层失败。通用 Web 工具卡片为折叠行提供拒绝身份，为展开行提供一行未执行输出，不提供输入正文。只有该显示过程会 trim、折叠行分隔符，或提供本地化空理由 fallback；持久化与两套 SDK 保留完整原始理由，不增加长度或脱敏规则。
 
@@ -70,7 +70,7 @@ Auto 带右上标 `EXP`。两个可见当前会话选择器都要求实验确认
 
 **新增 sandbox 或 approval-policy 值**会把 review 与执行耦合，产生没有当前消费者的组合。显式 preset 身份保留 Full access 未改变的执行行为。
 
-**持久化 PTC schema 或重新读取 registry**要么为临时输入扩张持久 wire，要么审查与程序收到的 binding 不同的定义。Binding 已经拥有所需不可变快照。
+**重新读取 registry**会审查与程序收到的 binding 不同的定义。Binding 持有所需的不可变 schema；reviewer 记录实际消费的精确请求文本。
 
 **用 Session 事件表达目录变化**会把进程可用性归到 Session，并要求同序号重新发布。完整 Remote 读取加失效通知让每项事实保留在自己的 owner。
 

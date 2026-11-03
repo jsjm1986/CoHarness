@@ -1,0 +1,14 @@
+{
+  "name": "cancel-session-unrenderable-observer-fixed",
+  "cwd": ".",
+  "command": "node --import tsx/esm .agents/audits/.local/cancel-unrenderable-observer-probe.mjs session",
+  "startedAt": "2026-10-26T10:04:32.821558+00:00",
+  "seconds": 2.599,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "489dbd4268f54bfcdea70038f1c4e8db7b8be18b1f9d1698c9efa0d7f8302957",
+  "inputsAfter": "489dbd4268f54bfcdea70038f1c4e8db7b8be18b1f9d1698c9efa0d7f8302957",
+  "postgresToolDirectory": null,
+  "outputSha256": "ef491f5b505954e55ba1be6023f037ebccf77d8deb38b50c1ba24c5f73e2a272",
+  "outputTail": "{\"stage\":\"session\",\"observerFailureContained\":true,\"activeRequestAborted\":true,\"laterObserverCalls\":1,\"pendingInput\":0}\n"
+}

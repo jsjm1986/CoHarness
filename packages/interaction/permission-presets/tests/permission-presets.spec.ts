@@ -49,6 +49,50 @@ async function mounted(options: {
   return ctx
 }
 
+describe('blank reuse permission ownership', () => {
+  it('advances a still-effective default selection to the current future-session default', async () => {
+    const ctx = await mountedStore()
+    try {
+      const session = ctx.sessions.create(SessionId('reuse-default'))
+      await ctx.settings.mutate('permission', [{ op: 'set', path: ['defaultPreset'], value: 'danger-full-access' }])
+      ctx.permissionPresets.refreshDefaultForReuse(session)
+      expect(ctx.permissionPresets.current(session)).toBe('danger-full-access')
+      expect(session.snapshotEvents().filter(event => event.type === 'permission/preset').at(-1))
+        .toMatchObject({ data: { preset: 'danger-full-access', origin: 'default' } })
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it.each(['started', 'explicit', 'drifted', 'legacy', 'empty'] as const)('preserves %s permission state during blank reuse', async (kind) => {
+    const ctx = await mountedStore()
+    try {
+      const session = kind === 'legacy' || kind === 'empty' ? freshSession(`reuse-${kind}`)
+        : ctx.sessions.create(SessionId(`reuse-${kind}`))
+      if (kind === 'started') session.append('turn/start', { turn: 1 })
+      if (kind === 'explicit') {
+        ctx.permissionPresets.set(session, 'danger-full-access')
+        ctx.permissionPresets.set(session, 'workspace-write')
+      }
+      if (kind === 'drifted') session.append('sandbox/mode', { mode: 'danger-full-access' })
+      if (kind === 'legacy') session.append('permission/preset', { preset: 'workspace-write' })
+      const before = session.snapshotEvents(), current = ctx.permissionPresets.current(session)
+      await ctx.settings.mutate('permission', [{ op: 'set', path: ['defaultPreset'], value: 'danger-full-access' }])
+      ctx.permissionPresets.refreshDefaultForReuse(session)
+      expect(session.snapshotEvents()).toEqual(before)
+      expect(ctx.permissionPresets.current(session)).toBe(current)
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('rejects a deployment-forbidden preset without changing either permission knob', async () => {
+    const ctx = await mountedStore()
+    try {
+      const session = ctx.sessions.create(SessionId('restricted-preset')), before = session.snapshotEvents()
+      ctx.provide('permissionPresetAuthorization', { canSelect: () => false })
+      expect(() => { ctx.permissionPresets.set(session, 'danger-full-access') }).toThrow('administrator-only')
+      expect(session.snapshotEvents()).toEqual(before)
+    } finally { await ctx.fiber.dispose() }
+  })
+})
+
 function freshSession(id: string): Session {
   return Session.create(SessionId(id))
 }

@@ -3,23 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-typescript-sdk-and-sdk-subagent-backend.md
 document:
-  en: f538aa97d419aa70a2d28eb3019f1b7e018f4ea4
-  zh: f141e836a116ccfb333d79ed8fc3a725249263b2
+  en: 1f13190c20069c08aa12fc75a4c7fd27960c120a
+  zh: c50f756ab9a61062edd10df8060cc3381e38e00e
 /agent-note-typescript-sdk-client-and-the-sdk-subagent-backend:
   en: 2fac49345d1586e3
-  zh: 568067008166eb51
+  zh: e01f4ed6dc1ebcbf
 /agent-note-typescript-sdk-client-and-the-sdk-subagent-backend/problem:
-  en: 87caba2d548b6afd
-  zh: a612a5c4056077a6
+  en: 7e3ee112c280b107
+  zh: 9889c490f94be7ee
 /agent-note-typescript-sdk-client-and-the-sdk-subagent-backend/decision:
-  en: 825ff4d3e8a1e1b5
-  zh: 27612cb51e42ea61
+  en: dd60d536be027591
+  zh: a84ac7e2b04fafa4
 /agent-note-typescript-sdk-client-and-the-sdk-subagent-backend/testing:
-  en: 4a3ba80f6bf6d474
-  zh: d74a94c62ee6e726
+  en: 6095a5a6f462de68
+  zh: e98c3dcf65a62ff8
 /agent-note-typescript-sdk-client-and-the-sdk-subagent-backend/alternatives-considered:
-  en: 42a49e07ac2fe745
-  zh: 8267141eebb06308
+  en: 1bd51912383544be
+  zh: a192a022b748f937
 /agent-note-typescript-sdk-client-and-the-sdk-subagent-backend/consequences:
-  en: f2a3bd97631abb20
-  zh: 91f94e4b19fc57cd
+  en: b947f6cb58e8b63c
+  zh: d1253e3d37143c05

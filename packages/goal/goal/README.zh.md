@@ -47,6 +47,8 @@ kind: "package-reference"
 
 严格回放只从 `goal/change` 派生生命周期变更，并拒绝形状错误、不连续 revision、非法生命周期转换、每目标时间戳非单调，以及不连续的已准入 Goal Round。只有来源为 goal 且已准入的 `user/message` 事件会推进正数 Round。挂钟时间倒退时，变更时间戳会限制在不早于上一次目标更新的值。增量回放会把游标保留在第一个损坏事件处；`goal/changed` 会在持久事件提交后触发，监听器失败会被隔离处理。`goal/activation-changed` 在不改变持久状态的情况下，转发携带精确当前 ref 的进程本地 `armed`／`disarmed` 边界；clear 后则不携带 goal。
 
+调低 `maxGoalRounds` 会保留已准入轮数，即使该计数超过新上限。目标仍可通过回放和投影检查点读取；只有增加剩余容量后，才能继续自动轮次或恢复目标。
+
 组合 `dsh-session-projection` 时，服务读取注册表主动驱动的 `goal` 状态，以常数时间取得当前状态并复用检查点。没有该可选注册表的组合继续使用本地增量缓存，因此 headless 组装保留原有依赖集合与行为。
 
 续行启用状态绝不持久化。新缓存与每次 `agent/created` 初始化都会停用续行，即使回放找到了持久 phase 为 active 的目标。续行驱动器在卸载前或持久性不确定后也会调用 `disarm()`。因此，会话恢复、fork 与驱动器替换会保留目标、phase、revision 和已准入 Round 数量，却不会启动工作；之后必须通过显式 resume 变更重新启用续行。

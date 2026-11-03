@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-preparation-final-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.json --noEmit",
+  "startedAt": "2026-10-24T23:28:52.267644+00:00",
+  "seconds": 5.553,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fa2ab15af44b8c3810a7d51aaca4100f349ac082fdee9aed065ceebe47dd1685",
+  "inputsAfter": "fa2ab15af44b8c3810a7d51aaca4100f349ac082fdee9aed065ceebe47dd1685",
+  "postgresToolDirectory": null,
+  "outputSha256": "dd279c342cb333125bcda0feb51a0e7fc34f9f0a4c9f6a3ea05e27b799504538",
+  "outputTail": "gateway/src/tunnel-supervisor.ts(175,37): error TS2345: Argument of type 'ReadableStream<Uint8Array<ArrayBuffer>>' is not assignable to parameter of type 'ReadableStream<any>'.\n  The types of 'getReader(...).read' are incompatible between these types.\n    Type '<T extends Exclude<BufferSource, ArrayBuffer>>(view: T, options?: ReadableStreamBYOBReaderReadOptions | undefined) => Promise<ReadableStreamReadResult<T>>' is not assignable to type '<T extends ArrayBufferView>(view: T, options?: { min?: number | undefined; } | undefined) => Promise<ReadableStreamReadResult<T>>'.\n      Types of parameters 'view' and 'view' are incompatible.\n        Type 'T' is not assignable to type 'ArrayBufferView<ArrayBuffer>'.\n          Type 'ArrayBufferView<ArrayBufferLike>' is not assignable to type 'ArrayBufferView<ArrayBuffer>'.\n            Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.\n              Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer'.\n                Types of property '[Symbol.toStringTag]' are incompatible.\n                  Type '\"SharedArrayBuffer\"' is not assignable to type '\"ArrayBuffer\"'.\n"
+}

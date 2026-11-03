@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-20-remote-desktop-file-state-and-wire-error-repairs.md
 document:
-  en: d696175722585771db3f2f81f506bae5592ca15b
-  zh: aa8d05e8a6e7dc84dcc493acfed94eb68284816c
+  en: d608e77776b053950c3ded0ac64777a574456076
+  zh: 66107b39a684395c265f3157793633c97563c7b7
 /agent-note-remote-desktop-file-state-reloads-transactionally-and-capability-failures-keep-their-wire-codes:
   en: f627979b0d4ac1ec
   zh: e6b6ce55ef71794a
@@ -12,11 +12,11 @@ document:
   en: c3b462dbe1fcc794
   zh: 617c700d19df50b4
 /agent-note-remote-desktop-file-state-reloads-transactionally-and-capability-failures-keep-their-wire-codes/decision:
-  en: e0040fe246baa7cc
-  zh: 5377b9d49c2a1946
+  en: 2b4adafca13d3e1c
+  zh: bade167bcfcbcb35
 /agent-note-remote-desktop-file-state-reloads-transactionally-and-capability-failures-keep-their-wire-codes/alternatives-considered:
-  en: 99abb77aebf126f9
-  zh: 2549f067680b6af2
+  en: 595aaa4f23361cc3
+  zh: 65e733e542e34022
 /agent-note-remote-desktop-file-state-reloads-transactionally-and-capability-failures-keep-their-wire-codes/consequences:
   en: 3e7385083befc694
   zh: 448dd8d633e97c64

@@ -1,0 +1,14 @@
+{
+  "name": "runtime-relay-final-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts gateway/tests/runtime-relay.ts gateway/tests/runtime-relay.spec.ts gateway/tests/instances.spec.ts gateway/tests/proxy.spec.ts gateway/tests/apply-grants.spec.ts",
+  "startedAt": "2026-10-25T00:58:23.653234+00:00",
+  "seconds": 3.11,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "35ae46569d776641d42ffcf3c8757d9fb6b873d4d456604d214195e89c76c9fe",
+  "inputsAfter": "35ae46569d776641d42ffcf3c8757d9fb6b873d4d456604d214195e89c76c9fe",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

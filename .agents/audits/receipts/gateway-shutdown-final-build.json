@@ -1,0 +1,14 @@
+{
+  "name": "gateway-shutdown-final-build",
+  "cwd": "gateway",
+  "command": "npm run build",
+  "startedAt": "2026-10-26T11:59:13.392738+00:00",
+  "seconds": 5.652,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "59a4732a8b4ca8e68fd77ca23e4549ff8403b9208a6ac32d142a0983157bafde",
+  "inputsAfter": "59a4732a8b4ca8e68fd77ca23e4549ff8403b9208a6ac32d142a0983157bafde",
+  "postgresToolDirectory": null,
+  "outputSha256": "898095a3ceeb02add8ff851ae671d7fc499316aab1c64f358d6b61663d57feb4",
+  "outputTail": "\n> build\n> tsc -p tsconfig.build.json\n\n"
+}

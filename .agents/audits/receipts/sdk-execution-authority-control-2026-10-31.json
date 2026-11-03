@@ -1,0 +1,139 @@
+{
+  "at": "2026-10-31T09:44:07.239182+00:00",
+  "finding": "B400",
+  "title": "Authority-only SDK composition bypasses parent model authorization by omitting mandatory control",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "paths": [
+    "packages/subagent/subagent-dsh-sdk/src/admission.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/startup-owner.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/startup-owner-child.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/startup-owner.jsonl",
+    "packages/subagent/subagent-dsh-sdk/README.md",
+    "packages/subagent/subagent-dsh-sdk/README.zh.md",
+    "packages/subagent/subagent-dsh-sdk/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-execution-authority-control/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-execution-authority-control/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-execution-authority-control/guide.zh.md"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z/sdk-authority-source-coverage.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z/sdk-authority-package-build-plan.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z/sdk-authority-package-compile.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z/sdk-authority-package-bundle.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z/sdk-authority-docs.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z/sdk-authority-built-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z/sdk-authority-built-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z/sdk-authority-lint.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z/sdk-authority-catalog.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z/sdk-authority-export-jsdoc.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z/sdk-authority-origin-fetch.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z/sdk-authority-pairing.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T093016Z/sdk-authority-private-old-observation.json"
+  ],
+  "causalEvidence": "Original-source root and isolated authority-only starts omit the parent bootstrap. The unchanged real-child example rejects the complete old SDK graph. Private observation on that graph runs two actual children without a resource budget or model-access service: both skip parent authorization, including a request explicitly denied by its parent that still reaches the child adapter. Updated source and built Node22/24 apply exactly one captured-scope parent check, permit the positive adapter call and prevent the denied call before dispatch.",
+  "behavior": "Execution authority on the initiating Agent requires private SDK parent control, just like parent model policy or resource admission. The retained parent scope governs each child model dispatch. Existing standalone execution still applies when all three services are absent; no model defaults or user grants are broadened.",
+  "verification": {
+    "uniqueRelatedCases": 259,
+    "sourceCases": 259,
+    "sourceUnitCases": 255,
+    "sourceNativeApplicationCases": 4,
+    "builtNativeApplicationCasesPerNode": 3,
+    "startupOwnerRows": 8,
+    "standardCoverage": {
+      "packages/subagent/subagent-dsh-sdk/src/admission.ts": {
+        "statements": [
+          125,
+          125
+        ],
+        "branches": [
+          55,
+          55
+        ],
+        "functions": [
+          32,
+          32
+        ],
+        "lines": [
+          99,
+          99
+        ]
+      },
+      "packages/subagent/subagent-dsh-sdk/src/run.ts": {
+        "statements": [
+          127,
+          127
+        ],
+        "branches": [
+          48,
+          48
+        ],
+        "functions": [
+          29,
+          29
+        ],
+        "lines": [
+          115,
+          115
+        ]
+      }
+    },
+    "coverageLimits": "Admission and SDK startup modules meet all four per-file 100% metrics. No policy/exclusion/threshold changes.",
+    "build": "Dry build plan proves only the SDK provider is stale; its actual package compile and declared two-entry bundle pass. Full 8-gate build is not rerun or claimed for B400.",
+    "quickDocumentationGates": 20,
+    "guideEnglishWords": 135,
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0,
+    "identityLimits": "The example uses an explicit test authority and real captured async scope, Loader, CLI, protocol and process. It is not actual account/PostgreSQL or cross-computer authorization acceptance."
+  },
+  "noteReview": {
+    "owner": ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+    "decision": "Extend the owning managed-model decision to explain why authority alone requires control. No redundant Agent Note or archived record is changed."
+  },
+  "baseline": {
+    "at": "2026-10-31T09:39:16.443026+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "source": "Peer direct report; not root production acceptance.",
+    "candidate": "Peer reports R13 includes B395/B396/B397, full build, Admin537 and native PostgreSQL/double-Gateway/Web/Admin replay passed; production switch not yet confirmed.",
+    "disk": "Peer traced private QA Buffer retention and swap pressure, recreated that private driver after saving tab storage, and reports recovery near 7GiB. Root observed 6.9GiB; all new Node checks disable compile cache. Root performed only the planned single-package incremental compile and 80KB bundle after the earlier full-build pause.",
+    "merge": "Merge fourteen B400 delta paths onto the B399 immutable capsule and rebuild matching SDK index/managed entries. A planned package-only compile and 80KB paired bundle passed with source and built Node22/24 native SDK applications; no new full repository build is claimed. B398/B399/B400 remain follow-up candidates, not additions to the peer current R13 freeze. Preserve newer peer artifacts; cumulative references are not deployment replacements."
+  },
+  "pinnedBrowserDeadlineReview": {
+    "scope": "Read-only inspection of pinned external browser SDK; no API calls or live-browser validation.",
+    "package": "@browserbasehq/stagehand",
+    "version": "4.1.0",
+    "source": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.pnpm/@browserbasehq+stagehand@4.1.0/node_modules/@browserbasehq/stagehand/dist/index.mjs",
+    "sha256": "54c999b326e815ce426dee26198926ad9be646e5a8e71664b3f354cb807bccc3",
+    "findings": [
+      "localBrowser.connect and Stagehand.create both run withStagehandInitDeadline.",
+      "The pinned SDK initialization controller aborts after 60000ms and passes its signal through connection/initialization.",
+      "This refutes using an unbounded external test substitute as evidence of an unbounded product initializer; no new product timeout rule or full startup audit completion is claimed."
+    ]
+  },
+  "externalSourceChangesExcluded": {
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "7a54b9e99352908283ee973e2dcd7707c9d7a7ba312ad9761311219172a47569",
+    "packages/subprocess/subprocess-local/README.md": "223b3dfcdc9732041ea508d9d131b9505e98abca53ea60dbb098851bd2c74629",
+    "packages/subprocess/subprocess-local/README.zh.md": "f13592bad150012aaa31e62226119ed4f22772b4bca5174936f988e1ae0cd407"
+  },
+  "externalArtifactChangesExcluded": {
+    "packages/subagent/subagent-dsh-sdk/lib/index.js": "088dd78cdb1c82b6ed9b4c6293418e5cacc641e6211761a87f61e46558b9bc32",
+    "packages/subprocess/subprocess-local/lib/index.js": "5fbdc054c9a1ef7799f7da80b030e5db88ffdb3639b5e5b0f2a908d5e183e950"
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Review opaque external runtimes with execution authority alone, shared-runtime debug authority and remaining allocation consumers.",
+    "Continue remote pipes, resource-only remote execution, native containment and nonconflicting business permissions.",
+    "Peer owns multi-computer operational acceptance and reserved Local/Gateway/UI changes. Preserve per-user model authorization and default-model denial.",
+    "Paid API validation stays deferred. No root deployment, production database or physical Linux/Windows acceptance is claimed."
+  ]
+}

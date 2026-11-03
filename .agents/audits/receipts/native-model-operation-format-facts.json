@@ -1,0 +1,14 @@
+{
+  "name": "native-model-operation-format-facts",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/persistence-formats.ts --write",
+  "startedAt": "2026-10-24T07:23:30.988636+00:00",
+  "seconds": 4.366,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a1cf540c5ac6e609e2ed0cdd098bc163bd0085028f11924608c9a15310e625df",
+  "inputsAfter": "a1cf540c5ac6e609e2ed0cdd098bc163bd0085028f11924608c9a15310e625df",
+  "postgresToolDirectory": null,
+  "outputSha256": "d6c9f2c2cff46c610fab393d8a78df7da58714d1e912302d50567e4ea0563544",
+  "outputTail": "Persistence formats: v0 through v7 verified (8 complete references). Refreshed 3 files.\n"
+}

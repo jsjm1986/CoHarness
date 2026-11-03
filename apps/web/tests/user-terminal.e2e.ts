@@ -108,6 +108,34 @@ describe('web e2e: private user terminal lifecycle', () => {
     }, null, 2), webSnapshotMode())
     const inventory = await world.ctx.terminalController.list(SESSION)
     expect(inventory).toHaveLength(1)
+    const release = Promise.withResolvers<undefined>()
+    let firstInputReady = false
+    let queuedRequests = 0
+    const inputRoute = /\/api\/terminal\/write(?:\?.*)?$/
+    await page.route(inputRoute, async (route) => {
+      queuedRequests += 1
+      const response = await route.fetch()
+      if (queuedRequests === 1) {
+        firstInputReady = true
+        await release.promise
+      }
+      await route.fulfill({ response })
+    })
+    try {
+      await input.fill('printf ')
+      await expect.poll(() => firstInputReady).toBe(true)
+      await page.keyboard.type('QA_界_BATCH > terminal-batch-proof.txt')
+      await input.press('Enter')
+      expect(queuedRequests).toBe(1)
+      release.resolve(undefined)
+      await expect.poll(async () => readFile(join(world.workspaceCwd, 'terminal-batch-proof.txt'), 'utf8').catch(() => '')).toBe('QA_界_BATCH')
+      expect(queuedRequests).toBe(2)
+      await compareOrRefreshGolden(join(DIRECTORY, 'queued-input.expected.md'),
+        `Queued input RPCs: ${queuedRequests}\n\nTerminal file: ${await readFile(join(world.workspaceCwd, 'terminal-batch-proof.txt'), 'utf8')}`, webSnapshotMode())
+    } finally {
+      release.resolve(undefined)
+      await page.unroute(inputRoute)
+    }
     const management = async (method: string, args: object) => {
       const response = await world.hostFetch(`/api/terminal/${method}`, { method: 'POST',
         headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: 'terminal-administration', method: `terminal/${method}`, payload: { args } }) })
@@ -141,5 +169,5 @@ describe('web e2e: private user terminal lifecycle', () => {
     expect(await page.locator('[data-slot-error]').count()).toBe(0)
   })
 
-  it('owns the terminal guide and ordered-input goldens', async () => { await assertFixtureInventory(DIRECTORY, ['guide.expected.md', 'input.expected.md']) })
+  it('owns the terminal guide and input goldens', async () => { await assertFixtureInventory(DIRECTORY, ['guide.expected.md', 'input.expected.md', 'queued-input.expected.md']) })
 })

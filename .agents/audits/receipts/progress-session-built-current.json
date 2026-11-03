@@ -1,0 +1,14 @@
+{
+  "name": "progress-session-built-current",
+  "cwd": "gateway",
+  "command": "node tests/run-built-resource-admission.mjs",
+  "startedAt": "2026-10-23T22:56:49.332342+00:00",
+  "seconds": 2.536,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0ab0b78774fd9e7f822601272d72a2140fbb772a48b0c318830be3eb170ac3a5",
+  "inputsAfter": "0ab0b78774fd9e7f822601272d72a2140fbb772a48b0c318830be3eb170ac3a5",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "34d0a10316362936d22c765b6257e99c6b39721cb6ae7e1249a00a92b3e7d0a1",
+  "outputTail": "{\"freshPressureRequired\":true,\"sharedCreditSpent\":true,\"cancellationBeforeAllocation\":true,\"activeAssignmentPreserved\":true}\n{\"compiledGatewayModel\":true,\"kernelOwnerLoaded\":true,\"waitedForNodeGrant\":true,\"exactRequestEvidence\":true,\"sessionFormatReconstruction\":true,\"deploymentHeaders\":true,\"harnessAttribution\":true,\"disjointTokenTotal\":17,\"releasedAfterCompletion\":true}\n"
+}

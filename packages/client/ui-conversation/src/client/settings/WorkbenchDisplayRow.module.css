@@ -47,9 +47,7 @@
   corner-shape: round;
 }
 
-/* Measured sliding thumb: carries the active fill so selection travels
-   instead of blink-switching. Slight overshoot reads as a settle, not a
-   bounce. */
+/* The measured thumb carries the active fill between selected segments. */
 .segmentThumb {
   position: absolute;
   top: 2px;
@@ -59,8 +57,8 @@
   corner-shape: round;
   background: var(--dsw-alias-state-business-primary);
   pointer-events: none;
-  transition: transform 240ms cubic-bezier(0.34, 1.35, 0.64, 1),
-    width 240ms cubic-bezier(0.34, 1.35, 0.64, 1);
+  transition: transform 240ms var(--dsw-motion-ease-smooth-out),
+    width 240ms var(--dsw-motion-ease-smooth-out);
 }
 
 .segment {

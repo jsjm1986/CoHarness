@@ -5,9 +5,11 @@
  */
 
 import type { Branded } from '@deepseek-ai/dsh-brand'
+import type { ResourceOriginIntent } from '@deepseek-ai/dsh-resource-budget/types'
 import type { FileAttachmentRef, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { MessageId, ToolCallId, ProviderRequestId, ReasoningEffortId } from './brand.ts'
 import type { Message, UserMessage } from './message.ts'
+import type { LlmOperationInput } from './operations.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -551,6 +553,8 @@ export interface GenerateOptions {
    * one-shot may include identity-free user inputs.
    */
   messages: RequestMessage[]
+  /** Exact adapter-owned operation input; only a prepared operation may dispatch it, and `messages` is then empty. */
+  operation?: LlmOperationInput
   /**
    * System prompt text for one-shot callers; adapters map it to the provider's
    * system slot ahead of `messages`. Loop-built requests leave it undefined.
@@ -574,10 +578,12 @@ export interface GenerateOptions {
    * to separate cursors; adapters may map it to model-hidden transport metadata.
    */
   sessionId?: Branded<'SessionId'>
+  /** Resource ownership for execution, live interactive work, or Runtime maintenance; never sent to the adapter. */
+  resourceOrigin?: ResourceOriginIntent
   /**
    * Provider-neutral classification for an auxiliary model call. Adapters may
    * map the purpose to model-hidden transport metadata or purpose-specific
    * generation policy. Ordinary conversation requests leave it unset.
    */
-  purpose?: 'compaction' | 'session-title' | 'auto-review' | 'memory' | 'session-handoff'
+  purpose?: 'compaction' | 'session-title' | 'auto-review' | 'memory' | 'session-handoff' | 'web-search' | 'translation'
 }

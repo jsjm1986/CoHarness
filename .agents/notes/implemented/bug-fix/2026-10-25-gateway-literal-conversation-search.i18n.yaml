@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-25-gateway-literal-conversation-search.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-25-gateway-literal-conversation-search.md
+document:
+  en: 8f97808754cdded0649dd606a2a8ea0aa67d5aaa
+  zh: 03c854e0590f3180b4d4cb175da1933f31386c04
+/agent-note-literal-conversation-search-before-fuzzy-alternatives:
+  en: 05e6fff7ec364c8d
+  zh: 70e6c7b3040beef7
+/agent-note-literal-conversation-search-before-fuzzy-alternatives/problem:
+  en: eb169c5de2b1d256
+  zh: 5a96761bae03071e
+/agent-note-literal-conversation-search-before-fuzzy-alternatives/decision:
+  en: a6d90664bc97ba86
+  zh: 265c46b3cb5b80ab
+/agent-note-literal-conversation-search-before-fuzzy-alternatives/alternatives-considered:
+  en: fc3dabf80b335893
+  zh: 2e3bc43f6bc65a03
+/agent-note-literal-conversation-search-before-fuzzy-alternatives/consequences:
+  en: bf6bb68a3305dedc
+  zh: a4abe7f7e853b265
+/agent-note-literal-conversation-search-before-fuzzy-alternatives/verification:
+  en: 3ccd9728947cb853
+  zh: ea4cf082512b87aa

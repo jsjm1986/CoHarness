@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-gateway-response-cancellation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-gateway-response-cancellation.md
+document:
+  en: 09119b60575d8a8cceed86080e4c836e9f2fdded
+  zh: 312dc9a747039c76ac35410f5ba3d32f7929a5b8
+/agent-note-bounded-response-failures-do-not-wait-for-cancellation-acknowledgement:
+  en: bc0044de90a307e6
+  zh: 2c0d74279f5919e3
+/agent-note-bounded-response-failures-do-not-wait-for-cancellation-acknowledgement/problem:
+  en: 061c890e8c8994e6
+  zh: d326c30bfae0dc05
+/agent-note-bounded-response-failures-do-not-wait-for-cancellation-acknowledgement/decision:
+  en: 6c851ce3a7d2ee63
+  zh: d11c18434cb3ce26
+/agent-note-bounded-response-failures-do-not-wait-for-cancellation-acknowledgement/alternatives-considered:
+  en: 6ef7818733682341
+  zh: d020e693d4c4670b
+/agent-note-bounded-response-failures-do-not-wait-for-cancellation-acknowledgement/consequences:
+  en: 74a253f8db315d76
+  zh: 1db04fcc74679da8
+/agent-note-bounded-response-failures-do-not-wait-for-cancellation-acknowledgement/verification:
+  en: dd47e54f5e8b3a9a
+  zh: 3ab144de5d043924

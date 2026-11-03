@@ -1,0 +1,14 @@
+{
+  "name": "ordinary-model-dispatch-config",
+  "cwd": ".",
+  "command": "pnpm run verify-cordis-config",
+  "startedAt": "2026-10-25T05:27:18.135751+00:00",
+  "seconds": 6.454,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "db10f49bdffd3629ef4ade031ce127f4c5e854feaa72792220ab5fbca0f70544",
+  "inputsAfter": "db10f49bdffd3629ef4ade031ce127f4c5e854feaa72792220ab5fbca0f70544",
+  "postgresToolDirectory": null,
+  "outputSha256": "2916550d33365117471c7ceee3ba3f6e27db3c2c7d2a5dfbba10d10b5eed25f1",
+  "outputTail": "$ tsx scripts/verify-cordis-config.ts\nverify-cordis-config: 409 config files passed.\n"
+}

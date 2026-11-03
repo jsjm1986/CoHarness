@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/mcp/mcp-client/README.md
 document:
-  en: 4580848547e64d392044aa73be333a841342ad43
-  zh: 62091968df8f61a7eb74af56f9c706f68d659295
+  en: 877e643ae74d65af85101249864e541b83049a26
+  zh: c53303910974f51e678a47c2bc9bf5a5dc4dd0a5
 /:
   en: 6440e0efb151c0fa
   zh: d767308eb95b9d3f
@@ -21,8 +21,8 @@ document:
   en: e77871d58566601a
   zh: 01d5c6eabc8d2db9
 /deepseek-ai-dsh-mcp-client/use-this-package/minimal-configuration:
-  en: 4d8b58f6a5e0c3f1
-  zh: 28e1c06aeef33131
+  en: fd9a1b03d9295188
+  zh: 335433b704035c8f
 /deepseek-ai-dsh-mcp-client/use-this-package/tool-naming-and-coexistence:
   en: 75ae9745d5b04796
   zh: 8ae5b8ca6e73296e
@@ -39,17 +39,17 @@ document:
   en: dc5647187103cb24
   zh: 0602112369690c32
 /deepseek-ai-dsh-mcp-client/understand-the-implementation/source-map:
-  en: f134d7502d573290
-  zh: 5dd8ad502f8db776
+  en: e10738d2a7322c43
+  zh: 4cc25b53df2b1b9e
 /deepseek-ai-dsh-mcp-client/understand-the-implementation/lifecycle-and-sync:
   en: ae9029b48b2a2e4e
   zh: 048f08361b799667
 /deepseek-ai-dsh-mcp-client/understand-the-implementation/tool-execution-internals:
-  en: b4333df1bd3f027c
-  zh: 6bb4be691452c27a
+  en: 5cadf27b570a0bd5
+  zh: d491784a74431ae2
 /deepseek-ai-dsh-mcp-client/understand-the-implementation/environment-scrubbing-stdio:
-  en: fef482a6f8cc789f
-  zh: 08f4c594ec83b4a1
+  en: 482df2d6bcf532c5
+  zh: acafad89548e703d
 /deepseek-ai-dsh-mcp-client/further-exploration:
   en: 402f4148cc9a39eb
   zh: 02060d6909b39f7e
@@ -93,8 +93,8 @@ document:
   en: 189198f7ace2a991
   zh: 712a7ceed6bd6f41
 /deepseek-ai-dsh-mcp-client/known-limitations-and-deferred-work:
-  en: 56be94497d0658a1
-  zh: df9bfeee7300a101
+  en: c262e008d77d0bc7
+  zh: 1f196d876d620f10
 /deepseek-ai-dsh-mcp-client/known-limitations-and-deferred-work/dev-note:
-  en: 0ef388d17ea82af1
-  zh: e7104aeb4b23c660
+  en: c36e7029dbe21c2c
+  zh: 6550376740cfc788

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-workspace-publication-revision.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-workspace-publication-revision.md
+document:
+  en: 7d9007bac620fdcc18ee6c57c4acbf44bf77367a
+  zh: eaf1963c1d61d7cf3d9df32b74c6a1fcfa37cbfb
+/agent-note-workspace-publication-order-belongs-to-the-application:
+  en: 25fc6666c1692b5e
+  zh: fefa2007faf0e1d5
+/agent-note-workspace-publication-order-belongs-to-the-application/problem:
+  en: 348fbc856b2f67d5
+  zh: b39e92cea3733c2e
+/agent-note-workspace-publication-order-belongs-to-the-application/decision:
+  en: 32fb05ac93aaf309
+  zh: 92479b6437470be1
+/agent-note-workspace-publication-order-belongs-to-the-application/alternatives-considered:
+  en: 46b91439bf887c3d
+  zh: 81a97a655543198d
+/agent-note-workspace-publication-order-belongs-to-the-application/consequences:
+  en: 2d167680c82a773e
+  zh: b11211f99c487155
+/agent-note-workspace-publication-order-belongs-to-the-application/verification:
+  en: c8c5beadc04d2bd9
+  zh: 822f14ed2529b364

@@ -1,0 +1,14 @@
+{
+  "name": "trash-safety-lint",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/trash.ts packages/attachment/userdoc-local/tests/trash-integrity.spec.ts packages/attachment/userdoc-local/tests/trash-publication.spec.ts examples/headless-agent/tests/fixtures/userdoc-migration-driver.ts examples/headless-agent/tests/userdoc-migration.snapshot.ts",
+  "startedAt": "2026-10-24T04:48:40.132754+00:00",
+  "seconds": 3.958,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "aa9d963df65db1ffeb9f1ae736422d48e99b24832a00628e1203bea64833b6db",
+  "inputsAfter": "db7e56a763628ba87d1cdef67d5cae5a083620ef0bc58ecad9227fe07f7c27ce",
+  "postgresToolDirectory": null,
+  "outputSha256": "6961292d998e60c762a1c06c300001c478e40e7a046a6ac36b5407467892631a",
+  "outputTail": "packages/attachment/userdoc-local/tests/trash-publication.spec.ts:114:70: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\n"
+}

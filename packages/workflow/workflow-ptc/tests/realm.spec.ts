@@ -108,6 +108,11 @@ describe('materializeFromRealm', () => {
     expect(materializeFromRealm(value)).toEqual({ visible: 1 })
   })
 
+  it.each(['00', '01', '1.0', '1e0', '0x1', ' 1', '-0', ''])('rejects the non-index array key %j instead of losing its value', (key) => {
+    const value = inRealm(`Object.assign([10, 20], { [${JSON.stringify(key)}]: 'retained report' })`)
+    expect(rejection(value)).toContain('non-index')
+  })
+
   it('works on plain host values too (the boundary is realm-agnostic)', () => {
     expect(materializeFromRealm({ a: [1, 'x'] })).toEqual({ a: [1, 'x'] })
     expect(materializeFromRealm('str')).toBe('str')

@@ -11,6 +11,8 @@ export type CatalogDeleteOutcome = 'deleted' | 'failed' | 'pending'
 export interface CatalogSnapshot<Item extends { readonly id: ScheduleId } = ScheduleRecord> {
   readonly records: readonly Item[]
   readonly status: 'loading' | 'ready' | 'error'
+  /** The addressed Runtime has no active Schedule provider. */
+  readonly unsupported?: true
   readonly deleting: readonly ScheduleId[]
   /**
    * Whether an authoritative list read has ever succeeded.
@@ -105,9 +107,13 @@ export function createCatalogSource<Item extends { readonly id: ScheduleId } = S
       return
     }
     if (current !== epoch) return
+    const previous = { ...snapshot }
+    delete previous.unsupported
     publish(result.ok
-      ? { ...snapshot, records: result.value, status: 'ready', settled: true, readSettled: request }
-      : { ...snapshot, status: 'error' })
+      ? { ...previous, records: result.value, status: 'ready', settled: true, readSettled: request }
+      : { ...previous, status: 'error', ...(['gateway/service-unavailable', 'gateway/method-unavailable',
+        'gateway/invocation-unavailable', 'gateway/definition-unavailable'].includes(result.error.code)
+        ? { unsupported: true as const } : {}) })
   }
   let batching = false
   let inFlight: Promise<void> | undefined

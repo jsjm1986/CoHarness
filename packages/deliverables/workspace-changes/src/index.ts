@@ -93,7 +93,7 @@ function eligible(session: Session): string | undefined {
 }
 
 /**
- * Resolve the git executable once. On macOS the Xcode stub at `/usr/bin/git`
+ * Resolve the git executable and its availability. On macOS the Xcode stub at `/usr/bin/git`
  * opens an installer dialog instead of running, so it counts as absent until
  * developer tools are selected.
  * @param ctx - subprocess capability.
@@ -110,8 +110,8 @@ async function resolveGit(ctx: Context, signal: AbortSignal, execution?: PosixRe
   /* v8 ignore next -- the POSIX execution world is exercised only by POSIX-gated suites. */
   if (execution !== undefined) return await execution.gitAvailable(executable, signal) ? executable : null
   if (process.platform !== 'darwin' || executable !== '/usr/bin/git') return executable
-  const probe = ctx.subprocess.spawn({
-    argv: ['/usr/bin/xcode-select', '-p'], cwd: homedir(),
+  const probe = await ctx.subprocess.spawn({
+    argv: ['/usr/bin/xcode-select', '-p'], cwd: homedir(), resourceOrigin: 'infrastructure',
     stdio: { stdin: 'ignore', stdout: { maxBytes: 4096 }, stderr: { maxBytes: 4096 } }, graceMs: 1_000, signal,
   })
   const outcome = await probe.done.catch(() => ({ exitCode: null }))
@@ -191,20 +191,25 @@ export function apply(ctx: Context, config: Config): void {
       ?? (await historical(sessionId, seq, signal))?.diffs[index],
   }
   ctx.provide('workspaceChanges', service)
-  let runner: Promise<GitRunner | null> | undefined
-  const gitRunner = (execution?: PosixRecorderExecution): Promise<GitRunner | null> => {
-    const create = () => resolveGit(ctx, lifetime.signal, execution).then((executable) => {
-      if (executable === null) {
-        ctx.logger.info('workspace-changes: git is unavailable; only file-tool edits are summarized')
-        return null
-      }
-      return new GitRunner(ctx.subprocess, executable, { timeoutMs: config.timeoutMs, outputMaxBytes: config.outputMaxBytes }, execution)
-    })
-    /* v8 ignore next -- the POSIX execution world is exercised only by POSIX-gated suites. */
-    if (execution !== undefined) return create()
-    runner ??= create()
-    return runner
+  const gitResolver = (execution?: PosixRecorderExecution): (() => Promise<GitRunner | null>) => {
+    let runner: Promise<GitRunner | null> | undefined
+    return () => {
+      if (runner !== undefined) return runner
+      const pending: Promise<GitRunner | null> = resolveGit(ctx, lifetime.signal, execution).then((executable) => {
+        if (executable === null) {
+          ctx.logger.info('workspace-changes: git is unavailable; only file-tool edits are summarized')
+          return null
+        }
+        return new GitRunner(ctx.subprocess, executable, { timeoutMs: config.timeoutMs, outputMaxBytes: config.outputMaxBytes }, execution)
+      }).catch((error: unknown) => {
+        runner = undefined
+        throw error
+      })
+      runner = pending
+      return pending
+    }
   }
+  const localGit = gitResolver()
   const recorderFor = (session: Session, cwd: string): TurnRecorder => {
     let recorder = recorders.get(session)
     if (recorder === undefined) {
@@ -217,7 +222,7 @@ export function apply(ctx: Context, config: Config): void {
         /* v8 ignore start -- the POSIX execution world is exercised only by POSIX-gated suites. */
         ...execution === undefined ? {} : { execution },
         /* v8 ignore stop */
-        git: gitRunner(execution), tempRoot: tmpdir(), maxFiles: config.maxFiles,
+        git: execution === undefined ? localGit : gitResolver(execution), tempRoot: tmpdir(), maxFiles: config.maxFiles,
         maxFileBytes: config.maxFileBytes, diffTimeoutMs: config.diffTimeoutMs,
         warn: (message) => { ctx.logger.warn(message) },
       })

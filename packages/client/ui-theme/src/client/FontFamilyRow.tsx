@@ -10,6 +10,7 @@ import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-cli
 import { normalizeFontFamily, type FontRole } from '../theme-settings.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { createFontRowStore } from './settings-store.ts'
+import { settingsFeedback } from './settings-feedback.ts'
 import rowCss from './FontSizeRow.module.css'
 import css from './FontFamilyRow.module.css'
 
@@ -33,8 +34,10 @@ export type FontFamilyRowComponentProps =
  */
 export function FontFamilyRow({ t, role, setFontFamily, useStore }: FontFamilyRowComponentProps) {
   const value = useStore(s => s.fontFamilies[role])
+  const { disabled } = settingsFeedback(useStore(s => s.settings))
   const title = t(`fontFamily.${role}.title`)
   const commit = (input: HTMLInputElement): void => {
+    if (disabled) return
     input.value = normalizeFontFamily(input.value)
     setFontFamily(input.value)
   }
@@ -48,6 +51,7 @@ export function FontFamilyRow({ t, role, setFontFamily, useStore }: FontFamilyRo
         key={value}
         className={css.field as string}
         defaultValue={value}
+        disabled={disabled}
         placeholder={t('fontFamily.placeholder')}
         aria-label={title}
         spellCheck={false}

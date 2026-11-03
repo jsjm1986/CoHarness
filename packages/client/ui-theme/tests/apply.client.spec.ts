@@ -147,6 +147,27 @@ async function keyboardTheme(host = stubSettingsScope<ThemeSettings>()) {
 }
 
 describe('ui-theme apply', () => {
+  it('keeps direct and shortcut font writes behind Host authority when account appearance is writable', async () => {
+    const ctx = new Context()
+    ctx.provide('locale', new LocaleRuntime(ctx))
+    const keyboard = fontKeyboard(ctx)
+    const host = stubSettingsScope<ThemeSettings>()
+    const section: ThemeSettings = { preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+      textFontFamily: '', codeFontFamily: '', terminalFontFamily: '' }
+    host.publish({ status: 'ready', value: section, revision: 1, writable: true })
+    const theme = new ThemeRuntime(ctx, {
+      ...host.scope,
+      getFieldControlState: () => ({ status: 'ready', writable: false, writableReason: 'project', write: { status: 'idle' } }),
+    })
+    theme.setTheme('dark')
+    theme.setFontSize('text', 16)
+    theme.setFontFamily('code', 'monospace')
+    keyboard.press()
+    expect(theme.getTheme()).toMatchObject({ preference: 'dark', fontSizes: { text: 14, code: 11, terminal: 13 },
+      fontFamilies: { text: '', code: '', terminal: '' } })
+    expect(host.set.mock.calls).toEqual([['preference', 'dark']])
+  })
+
   it('declares the slot and locale services', () => {
     expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'settingsScope'])
   })

@@ -20,6 +20,10 @@ The [experimental runtime helper](../../../../packages/experimental/browser-use-
 
 Stagehand's launcher inherits its process environment, and SDK initialization can time out before its cleanup settles. The provider host uses `@puppeteer/browsers` to own launched Chromium and its temporary profile before CDP or SDK readiness, with a scrubbed child environment. For both launch and attachment, an isolated Worker runs the SDK and only connects over CDP. Native inference has no abort signal. SDK close waits for active work; successful cleanup permits later reconnection while retaining browser state. Failed SDK drain blocks reuse while Chromium remains alive. Final cleanup can release a launched-browser reservation after owned Chromium and its Worker terminate. Failed SDK drain during attachment, failed Worker termination, or failed owned-process cleanup retains the reservation. The host kills only its own Chromium process and waits for child closure before removing the profile; an externally owned browser remains running.
 
+Failed acquisition carries any unconfirmed cleanup in `ResourceAcquisitionCleanupError`. The shared resource manager retains that owner and its attachment reservation until the transferred cleanup succeeds; a plain acquisition rejection confirms complete rollback. Worker exit remains the physical completion proof for its node permit, even when the original initialization waiter has rejected.
+
+Without an explicit extension id, Stagehand attachment reads installed-extension metadata using a temporary Playwright CDP connection and reuses the sole enabled runtime. An absent runtime permits installation; disabled or ambiguous runtimes reject attachment. The SDK retains compatibility validation. The temporary connection disconnects without closing Chromium.
+
 Stagehand uses an explicitly configured native model from its pinned SDK catalog. The configured API key and optional headers are forwarded into the browser extension, where Stagehand performs inference. Browser tool inputs and returned data, including SDK result metadata, use the existing Session log. DSH model routing, credential reuse, underlying inference request/response capture, and integration into Session usage accounting remain deferred; this integration adds no persistence events or Session schema changes.
 
 MCP client activation waits for connection and tool discovery, but provider activation can finish before any Session exists. That activation promise cannot represent the clients owned by future Sessions. Each MCP browser provider awaits one client startup attempt within the existing serial `agent/created` event. The [awaited Agent creation decision](2026-09-09-awaited-agent-creation.md) owns queued-input ordering and creation rollback. Successful creation or resume exposes the completed catalog to prompt assembly and direct callers.
@@ -45,6 +49,10 @@ Startup failure or cancellation rejects creation or resume and triggers rollback
 **Delegated browser agents.** The experiments compare browser-control backends. Delegating the whole task to another planner would alter DSH's control of the task loop.
 
 **DSH model bridge.** Native Stagehand configuration keeps its browser integration independent of DSH model-request adaptation and persistence. Session model selection, credential reuse, underlying inference capture, and Session usage accounting are deferred as one coordinated integration.
+
+**Reloading the extension for every attachment.** Reloading its service worker can stall the pinned SDK before Stagehand initialization. Metadata discovery preserves the installed runtime and lets the SDK validate it through its supported extension-id option.
+
+**Discarding a rejected acquisition.** Rejection does not prove that rollback stopped a partially acquired Worker or browser. Transferred cleanup keeps its reservation and provider registration until shutdown is confirmed.
 
 ## Consequences
 

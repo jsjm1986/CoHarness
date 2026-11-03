@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-27-bounded-runtime-work-and-teardown-fences.md
 document:
-  en: 729e11590aace225e86b0f959047b568036d1764
-  zh: 238e579c3826e0025cc7d2aec2d0160cd8c730f9
+  en: 1c9743e24fb7d282a0773858242fb82e28c84006
+  zh: 7da0761b18f10c33f9031dea60cada6705efefc7
 /agent-note-bounded-runtime-work-and-teardown-fences:
   en: e30e46d5c7b78799
   zh: 51896390fbc15bf3
@@ -12,8 +12,8 @@ document:
   en: 8955a97c1ebed9d3
   zh: 658a6c2d0c641201
 /agent-note-bounded-runtime-work-and-teardown-fences/decision:
-  en: 5d6cd691167e6e07
-  zh: 75c3317a4cd620c7
+  en: b7d168c6d3369f35
+  zh: a6eb7d872d3d7cd7
 /agent-note-bounded-runtime-work-and-teardown-fences/alternatives-considered:
   en: bbfefca43a2322c2
   zh: 2465b82e26e6ad85
@@ -21,5 +21,5 @@ document:
   en: a35525cad13977cf
   zh: 8804e16b92c3d748
 /agent-note-bounded-runtime-work-and-teardown-fences/verification:
-  en: ac8c6c11acfeee60
-  zh: bc63e214aee1e417
+  en: 05bf90c73e35a20c
+  zh: 198859b925d6d431

@@ -30,6 +30,8 @@ At most one goal is current. Create requires no current non-complete goal and al
 
 A cache built from any seed starts disarmed, and every `agent/created` initialization disarms it again. `GoalService.disarm(agent)` also lets a lifecycle owner remove process-local authority without a session event, revision change, or `goal/changed` notification. Resume, fork, and continuation-driver replacement therefore preserve the durable objective and history but never initiate work on their own. A later human prompt can be interpreted by the model, whose policy API may explicitly call resume and arm the goal.
 
+The round cap controls future admission, while the admitted-round count records work already accepted. Edits may lower the cap below that count; replay and checkpoint validation retain both values rather than rejecting the goal or rewriting its history.
+
 When the optional session-projection registry is composed, `GoalService` reads its strict `GoalProjectionState` for current state and replay failures; a composition without that registry retains the local incremental cache.
 
 ### Service boundary

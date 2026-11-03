@@ -68,11 +68,11 @@
     "@deepseek-ai/dsh-client-connection": "workspace:*"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/client.js",
     "lib/styles",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "scripts": {
     "bundle": "tsdown",

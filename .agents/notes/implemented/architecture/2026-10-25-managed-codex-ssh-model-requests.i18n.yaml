@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-25-managed-codex-ssh-model-requests.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-25-managed-codex-ssh-model-requests.md
+document:
+  en: 903fd098895cebc3e97f9a980d9fc51a1904bf50
+  zh: ae803388a4f0c23c89a850be014719bfacc9729f
+/agent-note-parent-model-control-across-ssh-codex-execution:
+  en: c98bcf4092941956
+  zh: 4905fa0305759943
+/agent-note-parent-model-control-across-ssh-codex-execution/problem:
+  en: 2799d9d1d4b707d5
+  zh: 377453708f621f94
+/agent-note-parent-model-control-across-ssh-codex-execution/decision:
+  en: 2562ef9ca6f5679b
+  zh: 3b00c17badf66139
+/agent-note-parent-model-control-across-ssh-codex-execution/alternatives-considered:
+  en: 0bf26f32651b939e
+  zh: 9810811326127555
+/agent-note-parent-model-control-across-ssh-codex-execution/consequences:
+  en: 0ad31f2e444c4c6b
+  zh: 8200852d538156fc
+/agent-note-parent-model-control-across-ssh-codex-execution/verification:
+  en: 98aa501c3cec3fbe
+  zh: 63ca06eaf1965020

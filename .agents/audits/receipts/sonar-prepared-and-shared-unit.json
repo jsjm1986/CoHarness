@@ -1,0 +1,14 @@
+{
+  "name": "sonar-prepared-and-shared-unit",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/web/web/tests/model-search.spec.ts packages/web/web-search-perplexity/tests packages/web/web-search-deepseek/tests --retry=0",
+  "startedAt": "2026-10-24T08:47:24.829478+00:00",
+  "seconds": 3.918,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4de21c2bb5d75b75c3aed758ef159531d3ba4958ae8f8b7757a2f2b0c5dcaad5",
+  "inputsAfter": "4de21c2bb5d75b75c3aed758ef159531d3ba4958ae8f8b7757a2f2b0c5dcaad5",
+  "postgresToolDirectory": null,
+  "outputSha256": "836441e44fffcf47e80af1b96da3ae667c2085d51c28d2b47258abba036bc5d8",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  11 passed (11)\n      Tests  146 passed (146)\n   Start at  16:47:27\n   Duration  916ms (transform 2.62s, setup 393ms, import 3.76s, tests 974ms, environment 1ms)\n\n"
+}

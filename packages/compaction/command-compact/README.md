@@ -49,6 +49,8 @@ The command turns each expected failure into a stable message you can show direc
 
 Cancelling the command stops the wait: the backend finishes its required cleanup, and the command settles as `Compaction cancelled.` while the UI stops waiting. Failures other than these expected cases surface as errors rather than being silently converted.
 
+In a managed deployment, `/compact` attests the current command caller before entering the engine. Execution permission, resource admission and summary usage belong to that caller while retaining the history participants' restrictions. Missing required authority, cancellation during authorization, or provider replacement prevents engine entry. Independent local compositions can omit execution authority.
+
 ### Composing the command
 
 Mount the command registry, one condensation backend, and this plugin:

@@ -193,7 +193,9 @@ export function ConversationContent({
   const workspaces = useWorkspaces(s => s)
   // A plugin this package cannot import (ui-model-selection) says this session cannot
   // send; its reason is already localized by whoever raised it.
-  const composerBlock = useComposerBlock(block => block)
+  const existingBlock = useComposerBlock(block => block)
+  const openingSession = useSessions(s => sessionId !== undefined && s.navigationBlockedSessionId === sessionId)
+  const composerBlock = openingSession ? { reason: t('placeholder.openingSession') } : existingBlock
   const displaySettings = useDisplaySettings(value => value)
   // The pane's steward marker follows the session's own runtime, not the page
   // scope: a workbench pane can hold another scope's conversation. An encoded
@@ -296,6 +298,15 @@ export function ConversationContent({
     }
   }, [activeWorkspace?.workspaceId, discardWorkspace, discardWorkspaceId, pendingWorkspace, pendingWorkspaceId, workspaces.phase])
 
+  // While a session is still replaying (loading + blank) the hero/docked
+  // choice is unknowable — render the composer hidden instead of flashing
+  // the centered hero and snapping to the docked bar (or vice versa).
+  // Exemption: a session the list summary already proves blank can only
+  // land on the hero, so hiding would blank the column for the whole
+  // history round-trip (the startup auto-selection flash) for nothing.
+  // The exemption is deliberately open-state-wide, not loading-only: a
+  // summary-blank session is the hero before its open starts (`cold`) and
+  // after one fails (`error`) for the same reason — there is no history.
   // Initial navigation and unread history retain the mounted composer until its layout is known.
   // A current summary-proven blank Session keeps its Hero while history opens.
   const initialSelectionPending = sessionId === undefined && workspaces.initialSelectionPending === true
@@ -340,6 +351,7 @@ export function ConversationContent({
         onPick: chooseWorkspace,
         onClose: () => { setPickerOpen(false) },
       })}
+      {renderSlot('conversation.hero.context', { compact, ...(sessionId === undefined ? {} : { conversationId: sessionId }) })}
       {renderSlot('conversation.hero.agentPreset', {})}
     </div>
   )

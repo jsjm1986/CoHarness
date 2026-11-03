@@ -1,0 +1,13 @@
+{
+  "name": "chromium-first-host-emit",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=2 ./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T17:15:07.889427+00:00",
+  "seconds": 7.857,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f676d72d767434ec6ea15e84b76e2b2fe1b44c2767a9fd933ae5548db731aeb4",
+  "inputsAfter": "f676d72d767434ec6ea15e84b76e2b2fe1b44c2767a9fd933ae5548db731aeb4",
+  "outputSha256": "b212058e654376c66dd168ed4de56cff395adbb58cb5519ac5bd6bf8257820e8",
+  "outputTail": "packages/experimental/browser-use-stagehand-native/src/launch.ts(78,33): error TS2322: Type '\"ignore\"' is not assignable to type 'SubprocessOutputMode'.\n"
+}

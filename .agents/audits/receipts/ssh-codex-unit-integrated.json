@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-unit-integrated",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/ssh/ssh/tests/startup-behavior.spec.ts packages/subagent/subagent-codex/tests/managed-model-http.spec.ts packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts",
+  "startedAt": "2026-10-25T11:54:01.398895+00:00",
+  "seconds": 6.575,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e6485de6b910a4ab759f968b9dc13d22297e26a957b3cfe700004913e89a28df",
+  "inputsAfter": "e6485de6b910a4ab759f968b9dc13d22297e26a957b3cfe700004913e89a28df",
+  "postgresToolDirectory": null,
+  "outputSha256": "5c735d7e5bc20d9b9ad5cb046a6f73ed60ce77504ed2a8aab0d1d4a685881e37",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  3 passed (3)\n      Tests  95 passed (95)\n   Start at  19:54:05\n   Duration  2.16s (transform 3.04s, setup 138ms, import 4.08s, tests 552ms, environment 0ms)\n\n"
+}

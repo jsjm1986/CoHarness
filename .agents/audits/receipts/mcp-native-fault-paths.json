@@ -1,0 +1,13 @@
+{
+  "name": "mcp-native-fault-paths",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/mcp/mcp-client/tests/managed-stdio.spec.ts packages/mcp/mcp-client/tests/resource-admission.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-23T16:43:57.786358+00:00",
+  "seconds": 3.621,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "55b245673f8222c33d7e2250dd6a6b2bbf6956b674350f1bc338a1ee51ceae95",
+  "inputsAfter": "55b245673f8222c33d7e2250dd6a6b2bbf6956b674350f1bc338a1ee51ceae95",
+  "outputSha256": "2f697df536adfc7467a2a91d4fb44b4060ddb42ea1bcb0cd29dfb9d4b4a601bf",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/mcp/mcp-client/tests/managed-stdio.spec.ts (12 tests | 1 failed) 25ms\n   × contains a malformed inbound message and closes its managed range 3ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/mcp/mcp-client/tests/managed-stdio.spec.ts > contains a malformed inbound message and closes its managed range\nAssertionError: expected [] to have a length of 1 but got +0\n\n- Expected\n+ Received\n\n- 1\n+ 0\n\n ❯ packages/mcp/mcp-client/tests/managed-stdio.spec.ts:96:18\n     94|   test.fixture.stdout.write('invalid-json\\n')\n     95|   await test.transport.close()\n     96|   expect(errors).toHaveLength(1)\n       |                  ^\n     97|   expect(test.fixture.terminate).toHaveBeenCalled()\n     98| })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 1 passed (2)\n      Tests  1 failed | 15 passed (16)\n   Start at  00:43:59\n   Duration  1.66s (transform 660ms, setup 72ms, import 836ms, tests 1.11s, environment 0ms)\n\n"
+}

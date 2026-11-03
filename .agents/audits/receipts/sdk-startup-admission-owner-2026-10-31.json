@@ -1,0 +1,130 @@
+{
+  "at": "2026-10-31T06:47:24.806473+00:00",
+  "finding": "B392",
+  "title": "SDK startup adopts changed resource and execution owners across asynchronous startup waits",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "paths": [
+    "packages/subagent/subagent-dsh-sdk/src/admission.ts",
+    "packages/subagent/subagent-dsh-sdk/src/run.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/startup-owner.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/startup-owner-child.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/startup-owner.jsonl",
+    "packages/subagent/subagent-dsh-sdk/README.md",
+    "packages/subagent/subagent-dsh-sdk/README.zh.md",
+    "packages/subagent/subagent-dsh-sdk/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.zh.md",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z/sdk-start-owner-final-source-coverage.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z/sdk-start-owner-build.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z/sdk-start-owner-doc-quick.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z/sdk-start-owner-built-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z/sdk-start-owner-built-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z/sdk-start-owner-sdk-projection.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z/sdk-start-owner-python-projection.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z/sdk-start-owner-lint-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z/sdk-start-owner-guide.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z/sdk-start-owner-origin-fetch.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z/sdk-start-owner-catalog-freshness.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z/sdk-start-owner-export-jsdoc.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T054906Z/sdk-start-owner-final-pairing.json"
+  ],
+  "causalEvidence": "The original queued replacement/downgrade tests both launch. An immutable previous complete SDK artifact also physically creates four stale runtimes across queue/control waits; two complete work with migrated ownership and two fail only after process startup. Updated source and Node22/24 Loader transcripts create zero stale children, preserve original grants and retain both managed and independent positive starts.",
+  "behavior": "Capture initiating budget, initial required flag and execution authority before cleanup; verify original owners after waits, before native launch, initialization, publication and first prompt. Preserve caller verification and initialization callbacks. Return unused permits, join original runtimes, and retain failed rollback through existing SdkStartupCleanupError. The final pending-start check owns cancellation before listener publication, so the unreachable duplicate late-cancellation block is removed.",
+  "verification": {
+    "uniqueRelatedCases": 271,
+    "sdkSourceCases": 257,
+    "newSourceCases": 20,
+    "typescriptSdkSnapshots": 7,
+    "pythonSdkSnapshots": 7,
+    "standardCoverage": {
+      "packages/subagent/subagent-dsh-sdk/src/admission.ts": {
+        "statements": [
+          125,
+          125
+        ],
+        "branches": [
+          54,
+          54
+        ],
+        "functions": [
+          32,
+          32
+        ],
+        "lines": [
+          99,
+          99
+        ]
+      },
+      "packages/subagent/subagent-dsh-sdk/src/run.ts": {
+        "statements": [
+          127,
+          127
+        ],
+        "branches": [
+          48,
+          48
+        ],
+        "functions": [
+          29,
+          29
+        ],
+        "lines": [
+          115,
+          115
+        ]
+      }
+    },
+    "applicationReplay": "Six real Loader/SDK rows: four rejected stale starts plus managed and independent completions. Native spawn objects and child-written markers establish physical creation and close; no PID-only liveness inference.",
+    "otherScenarios": "Ownership across prior cleanup recovery, control waits, construction, handshake, first-turn directory configuration, last handoff, rollback failure/retry, caller cancellation, isolated execution authority and live Cordis Service proxies.",
+    "coverageLimits": "All four metrics on the two named modules only; no exclusions, thresholds or invalid same-process values were added.",
+    "buildGates": 8,
+    "quickDocumentationGates": 20,
+    "guideEnglishWords": 496,
+    "documentation": "Final pairing and guide validation follow the last guide trim; generated catalog and public export JSDoc remain fresh. Full doc-sync is not claimed.",
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "noteReview": {
+    "owner": ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md",
+    "decision": "Extended the active SDK process ownership note and existing unreleased guide. Parent model governance and standalone SDK close remain separately owned; no duplicate or archived edit."
+  },
+  "baseline": {
+    "at": "2026-10-31T06:41:44.331566+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "at": "2026-10-31T06:47:24.806473+00:00",
+    "source": "Peer direct reports; no root production acceptance.",
+    "serving": "Peer reports R10 serving on A/B with frozen root changes through B391. Its fixed twelve reference hashes exclude the merged Local artifact; B392 is for the next candidate.",
+    "terminal": "Peer terminal retry retains incomplete-observation refusal while bounding re-observation by configured grace. Peer reports 63 unit cases, real Linux close success and zero reservations after retry; standalone tests accept the injected Linux unreadable-proc diagnostic while retaining ownership assertions.",
+    "otherPeerWork": "REAL001 delay and REAL025 realtime completion projection remain open. Peer owns realtime UI projection.",
+    "policyPackageReadability": "Peer reproduced missing policy-plugin imports for new B project29 although files exist: copied lib directories root:root mode0770 cannot be traversed by assigned UID993. Test runtime stopped; peer owns materializePolicyPackage in gateway/src/instances.ts. It will normalize published code permissions without opening workspace or credential directories.",
+    "readiness": "Required Host plugin import failure can still advertise ready; recorded for further review after root readability repair, without claiming a diagnosed cause.",
+    "merge": "Apply only the sixteen B392 source paths onto the existing candidate. Preserve peer Local documentation/terminal changes. The cumulative capsule retains older Local reference inputs for provenance; rebuild combined packages and do not overwrite a newer peer Local artifact."
+  },
+  "externalSourceChangesExcluded": {
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "7a54b9e99352908283ee973e2dcd7707c9d7a7ba312ad9761311219172a47569",
+    "packages/subprocess/subprocess-local/README.md": "223b3dfcdc9732041ea508d9d131b9505e98abca53ea60dbb098851bd2c74629",
+    "packages/subprocess/subprocess-local/README.zh.md": "f13592bad150012aaa31e62226119ed4f22772b4bca5174936f988e1ae0cd407"
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Audit remaining direct resource consumers: migration verifier, plugin-market parser Worker, browser Worker, independent model search and Inspector; include authority-only SDK composition review.",
+    "Review remaining remote pipes, resource-only remote execution and nonconflicting business permissions.",
+    "Peer owns realtime UI projection, policy-package publication permissions and related Gateway changes. Required-plugin readiness remains open for follow-up.",
+    "No root paid API, production database operation or deployment. Physical Linux/Windows and fresh owned PostgreSQL acceptance remain unclaimed."
+  ]
+}

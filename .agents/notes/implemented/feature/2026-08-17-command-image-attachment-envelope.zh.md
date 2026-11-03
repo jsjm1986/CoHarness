@@ -14,15 +14,21 @@ Web composer 的一次提交是一个信封——草稿文本、已附加图片�
 
 提交信封被端到端建模，每条命令路径要么整体消费它，要么响亮拒绝。
 
-**声明。**`CommandDefinition.input.images: boolean`（缺省为 false）声明 composer 图片是否可以随调用提交。该标志随冻结的 `CommandDescriptor` 经 `commands/list` 到达每个客户端，进入铸造出的 `CommandClaim`（`images: true`），再进入输入状态机发布的 claim 快照。
+**声明。** `CommandDefinition.input.attachments: boolean`（缺省为 false）声明调用是否接受 composer 附件。该标记随选中的命令经过目录发现与输入裁决。
 
-**通用标识，图片专用载荷。**浏览器草稿与持久化引用已经使用 `DraftAttachmentId` 和 `AttachmentId`；命令 RPC 传输的是编码字节，而非图片标识。图片仍是唯一已经定义准入规则和模型块语义的非文本附件，因此 wire 保持 `EncodedImageAttachment[]`，声明保持 `input.images`。
+**带类型的提交载荷。** 命令 wire 携带 `CommandSubmitAttachment[]`：编码图片和限定到会话的暂存文件凭证。上传所有者为接收 Agent 解析每个文件凭证；通过准入的图片和文件按最初选择顺序传给处理器。
 
-**执行器强制。**`CommandRuntime.execute(agent, line, images, signal)` 携带本次提交的 base64 图片（来自 `@deepseek-ai/dsh-attachment/types` 的 `EncodedImageAttachment`）。强制执行声明的是执行器而非 composer：把图片发给未声明的命令、附件存储缺失、批量超限，都会在处理器运行前以记录在案的 `command/done` 错误结算。准入经由 attachment 包的 `admitEncodedImages`——共享 wire 入口，强制执行规范 base64 并把批量准入（限额、校验、有序提交）委托给 `AttachmentStore.saveImages`——使两个 wire 端点（prompt RPC 与命令执行器）共享同一序列，被拒绝的批量不会发布任何持久化对象。通过准入的批量以冻结的有序 `ImageBlock` 数组挂在 `invocation.attachments` 上交给处理器。
+**执行器强制。** `CommandRuntime.execute(agent, line, attachments, signal)` 在处理器入口前强制执行声明。不支持的附件、缺失的附件存储、未知文件凭证及图片批量限制均以已记录的错误结算。图片验证采用共享附件准入路径；验证拒绝不会开始写入。通过准入的内容块组成冻结的 `invocation.attachments` 数组。
 
-**模型可见性由生产方负责。**注册表自身绝不调度这些图片。`/goal` 在 create 或 edit 成功后通过 `agent.followup` 提交一条用户消息——图片块加固定文本 `Reference images for the goal objective.`——后续 Goal Round 从普通会话历史读取图片，goal 领域不存储附件状态。`/plan <message>` 把图片并入其 steer 的文本消息；不带参数的 `/plan` 则 steer 一条只含图片的用户消息，因为图片可能包含全部任务内容。不会发送模型输入的控制形式（`/goal pause`、`/plan off`）会直接返回错误，composer 的图片原地保留。plan 投影会把 `command/run` 视为候选选择，并在配对的 `command/done` 报错时丢弃它，因此被拒绝的带图 `/plan off` 不会留下待退出状态。
+**调用者存续期。** 等待中的准入与实际处理器 promise 归属确切的 Agent，因此自动空闲释放必须等待两者完成。UI 等待被取消不代表处理器清理已结算。强制释放或替换仍可能在存储等待期间关闭 Agent；执行器会在处理器入口前重新检查捕获的注册表，且绝不把旧调用转交给具有相同 Session id 的替代者。没有 Agent 注册表的独立组合仍由调用方管理存续期。 服务撤下会中止已接收的工作，拒绝旧引用准入，并等待实际处理器 promise。组合的 Cordis effect 会将空闲释放监听器保留到这些工作完成。
+
+**注册项归属。** 附件存储和同步会话监听器的处理可能越过命令贡献项的存续期。执行器在处理器入口前检查捕获的注册项仍然生效，包括限定到 agent 的覆盖。移除或替换会以错误关闭现有生命周期事件对，调用不会转交给其他注册项。重新发起调用时才解析当前处理器。
+
+**模型可见性由生产方负责。**注册表自身绝不调度这些图片。`/goal` 在 create 或 edit 成功后通过 `agent.followup` 提交一条用户消息——图片块加固定文本 `Reference images for the goal objective.`——后续 Goal Round 从普通会话历史读取图片，goal 领域不存储附件状态。`/plan <message>` 把图片并入其 steer 的文本消息；不带参数的 `/plan` 则 steer 一条只含图片的用户消息，因为图片可能包含全部任务内容。不会发送模型输入的控制形式（`/goal pause`、`/plan off`）会直接返回错误，composer 的图片原地保留。plan 投影会把 `command/run` 视为候选选择，并在配对的 `command/done` 报错时只丢弃该候选目标。被拒绝的带附件命令既不会创建待退出状态，也不会抹掉较早成功的待生效选择。投影状态版本 4 会按此规则重新折叠已缓存会话；无密钥 Loader 记录验证命令拒绝、实时与回放的待生效状态一致，以及下一步实际应用选择。
 
 **composer 的拒绝是可见横幅，一切保留。**ui-commands 的 `matchEnter` 从裁决收到 `SubmitEnvelope`（图片数量），对每条无法消费图片的回车路径抛出本地化的 `notice.imagesUnsupported` 拒绝：contribution 弹窗、decoration 弹窗、未声明的 claim、bare 分离执行。输入状态机发布一条错误通知，composer 通过瞬态 Toast 横幅呈现它，草稿与图片不动。已 claim 状态下的提交（空格或菜单 claim）由 facade 用 `conversation` 命名空间的同款文案把关。接受路径上，facade 经 hub 的 `commandImages` 管道序列化草稿图片、传给 `claim.submit`，仅在成功 outcome 后清除并释放；错误结果（包括生产方的语法拒绝）保留它们。
+
+命令的 run 事件即使不带附件，也可能同步取消请求，因此普通提交和附件提交必须在共同的处理器入口检查取消。新的 `/plan` 文本和附件属于人类发起的执行输入：不可变 Gateway 凭证先于模式选择与排队投递，才能保留调用者限制，避免成为身份未验证的历史。同一次等待也可能越过提供方、服务或原 Agent 的存续期；迟到的完成不能选择模式或排入输入。
 
 ## Testing
 
@@ -35,12 +41,12 @@ Web composer 的一次提交是一个信封——草稿文本、已附加图片�
 - **在 goal 领域存储附件引用并渲染进 Round 提示词**——被拒绝：需要持久化 goal schema 变更，且要么把图片块复制进每轮提示词，要么引入仅首轮的提示词形态；round 提示词不变量将需要附件状态。一条普通的已记录用户消息达到同样的模型可见性。
 - **只要命令成功就消费图片，不管语法**——被拒绝：`/goal pause` 带图会把图片静默丢弃，在更深一层重演原始缺陷。消费与生产方的显式成功绑定，语法不匹配返回错误。
 - **只在客户端强制**——被拒绝：schema 省略不是强制执行；直接 RPC 调用方可以绕过 composer。执行器自己结算声明。
-- **把命令 wire 泛化成多媒体标识**——被拒绝：两个标识已经是附件通用类型，wire 传输的是字节，其图片专用字段明确表达了 Host 强制执行的准入规则。文件和视频尚无共同的准入规则与模型可见语义，一个不带类型标记的多媒体标识也无法提供这些信息。出现第二种受支持附件时再引入泛化：命令信封扩展为带类型标记的附件联合类型，命令声明接受的类型，`AttachmentId` 保持不变。
+- **不带类型标记的多媒体标识**——被拒绝：图片字节和暂存文件凭证需要不同的准入方式。带类型标记的联合类型保留上传所有者的会话检查与图片批量策略。
 
 ## Consequences
 
 - 任何命令路径都不可能消费提交的文本而滞留图片：契约强制整信封消费或可见拒绝，对现有与未来命令一体适用。
-- commands 包新增对 `dsh-attachment` 与 `dsh-llm` 的依赖，`commands/execute` 携带必填的 `images` wire 参数——每个调用方都显式陈述其信封。
+- commands 包新增对 `dsh-attachment` 与 `dsh-llm` 的依赖，`commands/execute` 携带必填的 `attachments` wire 参数——每个调用方都显式陈述其信封。
 - `/goal` 与 `/plan` 获得参考图输入，代价是一条额外的已记录用户消息（goal）与 steer 消息中的图片块（plan），其中不带参数的 `/plan` 会产生只含图片的消息；所有这些输入的计费都与常规图片提示词相同。
 - 菜单点选的弹窗流程不查询信封：附有图片时从菜单点选弹窗命令，图片会可见地留在附件栏，而不是拒绝该交互。回车提交是被强制执行的信封边界。
 - 「被拒绝的批量不发布任何持久化对象」只覆盖准入前的三种结算（声明、存储缺失、批量超限）。handler 级语法拒绝（如 `/goal pause` 带图）与准入后取消发生在批量已提交之后，会留下没有会话事件引用的内容寻址对象——在 sha256 去重与附件存储延后的引用感知 GC 下无害，但并非「未写入任何对象」。

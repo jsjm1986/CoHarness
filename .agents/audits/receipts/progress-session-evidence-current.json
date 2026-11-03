@@ -1,0 +1,14 @@
+{
+  "name": "progress-session-evidence-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-progress-postgres.spec.ts tests/node-resource-budget-postgres.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-23T22:53:03.224136+00:00",
+  "seconds": 17.865,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4eac9b529ecaea3888db4156d0ea407066eee5d74e823b0be7b5af921e62c66c",
+  "inputsAfter": "4eac9b529ecaea3888db4156d0ea407066eee5d74e823b0be7b5af921e62c66c",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "6c2a0b9236b1e33d0adb4c1df380ba63214a9142d716149922980606798a01f9",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/project-progress-postgres.spec.ts (20 tests | 1 failed) 8688ms\n     × reconstructs the exact utility request from its durable current-format Session 625ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/project-progress-postgres.spec.ts > project digest governed model path > reconstructs the exact utility request from its durable current-format Session\nSessionFormatUnsupportedMigrationError: Session migration from v7 refuses the transformed artifact: request/header is outside an open turn\n ❯ Object.finish ../packages/session/session-format-catalog/src/logical.ts:357:17\n ❯ Object.migrate ../packages/session/session-format-catalog/src/logical.ts:303:24\n ❯ tests/project-progress-postgres.spec.ts:173:50\n    171|     )).rows[0]!\n    172|     expect(row.session).toMatchObject({ header: { id: row.request_id, …\n    173|     const artifact = sessionLogicalFormatCatalog.migrate(row.session!.…\n       |                                                  ^\n    174|     const header = artifact.events.find(event => event.type === 'reque…\n    175|     const messages = artifact.events.filter(event => event.type === 'u…\n\nCaused by: SessionFormatError: request/header is outside an open turn\n ❯ Relationships.requireTurn ../packages/session/session-format-v6-to-v7/src/relationships.ts:82:35\n ❯ Relationships.accept ../packages/session/session-format-v6-to-v7/src/relationships.ts:300:14\n ❯ assertV7LifecycleRelationships ../packages/session/session-format-v6-to-v7/src/relationships.ts:384:46\n ❯ assertReleasedV7Relationships ../packages/session/session-format-v6-to-v7/src/validation.ts:136:3\n ❯ restoreReleasedV7Artifact ../packages/session/session-format-v6-to-v7/src/validation.ts:86:3\n ❯ Object.finish ../packages/session/session-format-catalog/src/logical.ts:349:28\n ❯ Object.migrate ../packages/session/session-format-catalog/src/logical.ts:303:24\n ❯ tests/project-progress-postgres.spec.ts:173:50\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 1 passed (2)\n      Tests  1 failed | 50 passed (51)\n   Start at  06:53:06\n   Duration  15.01s (transform 1.51s, setup 0ms, import 1.99s, tests 12.69s, environment 0ms)\n\n"
+}

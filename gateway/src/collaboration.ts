@@ -1,3 +1,5 @@
+import type { RuntimeNodeId } from './runtime-catalog.ts'
+
 export type CollaborationAction = 'read' | 'write' | 'manage' | 'approve'
 
 /** Project-level theme policy exposed to the user frontend. */
@@ -9,6 +11,9 @@ export interface ProjectScopeView {
   name: string
   path: string
   mode: 'ro' | 'rw'
+  /** Fixed project computer; omitted by legacy local-only services. */
+  nodeId?: RuntimeNodeId
+  nodeName?: string
   /** Whether this account may manage the project's shared configuration. */
   canManage?: boolean
   origin?: 'admin' | 'user'
@@ -22,8 +27,10 @@ export interface ProjectScopeView {
 export interface ProjectAuthorityView extends ProjectScopeView {
   /** True when the current organization role grants implicit project authority. */
   administrator: boolean
-  /** Current owner or administrator management authority from the authorized project read. */
+  /** Current owner or organization administrator authority, read with membership. */
   canManage: boolean
+  /** Current project theme policy, read with membership. */
+  uiThemePolicy: ProjectThemePolicy
 }
 
 export interface ConversationParticipantView {
@@ -57,7 +64,11 @@ export interface ConversationAccess {
 /** Lightweight account-wide conversation row for the multi-runtime workbench. */
 export interface AccountConversationView {
   sessionId: string
-  runtime: { kind: 'personal' } | { kind: 'project'; projectId: number; projectName: string }
+  runtime: ({ kind: 'personal' } | { kind: 'project'; projectId: number; projectName: string }) & {
+    runtimeId?: import('./runtime-catalog.ts').RuntimeId
+    nodeId?: import('./runtime-catalog.ts').RuntimeNodeId
+    nodeName?: string
+  }
   title?: string
   cwd?: string
   visibility: 'personal' | 'project' | 'private'
@@ -72,7 +83,8 @@ export interface AccountConversationView {
 
 /** Stable collaboration denial used by HTTP and runtime transports. */
 export class CollaborationDeniedError extends Error {
-  constructor(readonly code: 'not-member' | 'conversation-not-found' | 'forbidden' | 'visibility-locked' | 'steward-reserved') {
+  constructor(readonly code: 'not-member' | 'conversation-not-found' | 'forbidden' | 'visibility-locked' | 'steward-reserved'
+    | 'invitation-computer-required') {
     super(code)
     this.name = 'CollaborationDeniedError'
   }

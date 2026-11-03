@@ -36,7 +36,7 @@ describe.skipIf(configPath === undefined || process.platform === 'win32')('SSH w
       await write('.gitignore', '.ignored\n')
       const git = await ctx.subprocess.resolveExecutable('git')
       const run = async (argv: string[], cwd = root!) => {
-        const handle = ctx.subprocess.spawn({
+        const handle = await ctx.subprocess.spawn({
           argv, cwd, stdio: { stdin: 'ignore', stdout: { maxBytes: 65536 }, stderr: { maxBytes: 65536 } }, graceMs: 2000,
         })
         const result = await handle.done
@@ -51,7 +51,7 @@ describe.skipIf(configPath === undefined || process.platform === 'win32')('SSH w
       const objects = await run([git, 'count-objects'])
       await write('user-prior.txt', 'user change\n')
       const spawn = ctx.subprocess.spawn.bind(ctx.subprocess)
-      vi.spyOn(ctx.subprocess, 'spawn').mockImplementation((spec) => {
+      vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async (spec) => {
         if (spec.env?.GIT_OBJECT_DIRECTORY !== undefined) remoteStorage.add(spec.env.GIT_OBJECT_DIRECTORY)
         return spawn(spec)
       })
@@ -89,7 +89,7 @@ describe.skipIf(configPath === undefined || process.platform === 'win32')('SSH w
       await recorder?.dispose()
       if (root !== undefined) {
         const hello = await ctx.ssh.ready
-        const child = ctx.subprocess.spawn({
+        const child = await ctx.subprocess.spawn({
           argv: [hello.executable, '-e', 'require("node:fs").rmSync(process.argv[1],{recursive:true,force:true})', root], cwd: hello.workspace,
           stdio: { stdin: 'ignore', stdout: { maxBytes: 1024 }, stderr: { maxBytes: 1024 } }, graceMs: 2000,
         })

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-06-17-ts-build-config.md
 document:
-  en: 4f2ab38129d448e8397be118c73b3660bc15fc11
-  zh: 907152f0ac760033dc9643d777d6907ee2615b7b
+  en: 03949036665cb34b5681df1a06f62fe440428575
+  zh: 6bbc6c5944df199eef83b638e6f0b8217d529d9c
 /agent-note-tsc-first-build-and-one-compiler-ownership:
   en: e9cbeed63a791dff
   zh: fab8078dd92399a7
@@ -12,8 +12,8 @@ document:
   en: 62307ddfb9e110cb
   zh: 236bdad7df92a028
 /agent-note-tsc-first-build-and-one-compiler-ownership/decision:
-  en: e2b61f1e0549117d
-  zh: 596ca8cf8207f2b5
+  en: 8852e47eb260b622
+  zh: 58c8b1a0dd5b89f2
 /agent-note-tsc-first-build-and-one-compiler-ownership/alternatives-considered:
   en: 9b143ba610f06e2f
   zh: 7832be7816aec7e6

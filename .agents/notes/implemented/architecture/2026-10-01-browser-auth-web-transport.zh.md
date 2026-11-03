@@ -18,6 +18,8 @@ Status: implemented
 
 在围栏与 Cookie 检查之间有一个通用准入点：`connection/authenticate(request)`，同步事件，声明为 `@mode bail`，经 `ctx.bail` 求值——第一个已定义应答生效，`undefined` 表示不下结论。裁决用词是字面量对 `'allow'`/`'deny'` 而非布尔值，因为 Cordis 的 bail 无法承载 `false`：`'allow'` 不铸 Cookie 即放行，`'deny'` 即使存在已签发 Cookie 或存活启动令牌也拒绝。`connection.authorizeIndex` 以相同方式询问它，provider 放行仍须通过 Host/Origin 围栏。provider 必须自行验证身份——看到请求头绝不是放行依据——其注册保持效应作用域，随 provider fiber 一并销毁。GatewayRuntime 挂载了已发布的 provider：其签名的 `x-dsh-gateway-principal` 断言在无需浏览器 Cookie 的情况下放行 index、`/api` 子树、通用通道与事件流，而任何受限用途的断言都被约束在其声明的 HTTP 操作上，绝不能提供 index 或开启事件流。principal 的再次校验、用途限制与 AsyncLocalStorage 传播仍留在 `connection/request` waterfall 中——provider 只裁决准入。
 
+用途断言授权一项管理流程，不代表交互式管理员身份。GatewayRuntime 在派发前要求方法和路径精确匹配[各用途的声明](../../../../packages/context/gateway-runtime/README.zh.md#runtime-contract)，包括归档读取和文档生命周期操作。Gateway 的私有运行时 API 也会先检查端点是否明确允许该用途，再调用携带 principal 的操作。业务处理器的权限检查不能代替这些限制：无关插件可以注册其他 HTTP 端点，管理员角色不能把专用流程的权限授予该端点。
+
 `apply` 变为异步，因为 `BrowserAuth.create` 要等待凭证记录。Web 服务器注册下沉进 `ctx.inject(['webServer'], ...)`，非 Web 组合只保留 RPC 注册表而无需 HTTP 面。测试与脚手架助手经 `authorizeIndex` 在进程内铸 cookie；Node 侧 `hostFetch` 显式附带。
 
 活动事件连接续租保留相同的初始准入与用途限制；[socket 所有的 principal 决策](2026-10-23-event-stream-principal-renewal.zh.md) 拥有资格复核、有界私有合批和签名期限。

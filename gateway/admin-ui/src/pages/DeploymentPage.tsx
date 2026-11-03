@@ -1,6 +1,10 @@
+import { useDeploymentContext } from '../deployment-context.tsx'
+import { DeploymentTopologySection, NodeConnectionSection } from './DeploymentTopologySection.tsx'
 /** Deployment control: maintenance windows, node convergence, backups, restore requests, and the operation ledger. */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { RuntimeAllocationPolicyEditor } from '../components/RuntimeAllocationPolicyEditor.tsx'
 import { NodeConfigurationSection } from './NodeConfigurationSection.tsx'
+import { NodeAccessSection } from './NodeAccessSection.tsx'
 import { TunnelAccessSection } from './TunnelAccessSection.tsx'
 import { NODE_CONFIG_FIELDS } from '../../../src/node-config-fields.ts'
 import { DatabaseBackup, HardDriveDownload, RefreshCw, ShieldCheck, Wrench } from 'lucide-react'
@@ -48,6 +52,8 @@ function heartbeatText(node: DeploymentNode): string {
 }
 
 export function DeploymentPage() {
+  const deployment = useDeploymentContext()
+  const policyReady = deployment.value !== null
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
   const [state, setState] = useState<DeploymentState | null>(null)
   const [backups, setBackups] = useState<DeploymentBackup[] | null>(null)
@@ -58,23 +64,45 @@ export function DeploymentPage() {
   const [restoring, setRestoring] = useState<DeploymentBackup | null>(null)
   const [exiting, setExiting] = useState(false)
   const [configurationPreview, setConfigurationPreview] = useState<{ backup: BackupNodeConfigurationPreview; current: NodeConfigurationView } | null>(null)
+  const lifetime = useRef<AbortController | undefined>(undefined)
+  const flight = useRef<Promise<void> | undefined>(undefined)
+  const queued = useRef<Promise<void> | undefined>(undefined)
 
-  const refresh = useCallback(async () => {
-    try {
-      const [next, list] = await Promise.all([getDeployment(), listBackups()])
-      setState(next)
-      setBackups(list.backups)
-      setError('')
-    } catch (cause) {
-      setError(messageOf(cause))
+  const refresh = useCallback((): Promise<void> => {
+    const owner = lifetime.current
+    if (owner === undefined || owner.signal.aborted) return Promise.resolve()
+    if (flight.current !== undefined) {
+      if (queued.current !== undefined) return queued.current
+      const next = flight.current.then(() => {
+        if (queued.current === next) queued.current = undefined
+        if (lifetime.current === owner && !owner.signal.aborted) return refresh()
+      })
+      queued.current = next
+      return next
     }
+    const request = Promise.all([getDeployment(owner.signal), listBackups(owner.signal)]).then(([next, list]) => {
+      if (owner.signal.aborted) return
+      setState(next); setBackups(list.backups); setError('')
+    }).catch(cause => {
+      if (!owner.signal.aborted) setError(messageOf(cause))
+    }).finally(() => { if (flight.current === request) flight.current = undefined })
+    flight.current = request
+    return request
   }, [])
 
   useEffect(() => {
+    if (!policyReady) return
+    const owner = new AbortController()
+    lifetime.current = owner
     void refresh()
-    const timer = setInterval(() => { void refresh() }, 10_000)
-    return () => { clearInterval(timer) }
-  }, [refresh])
+    const whenVisible = () => { if (document.visibilityState !== 'hidden' && flight.current === undefined) void refresh() }
+    const timer = setInterval(whenVisible, 10_000)
+    document.addEventListener('visibilitychange', whenVisible)
+    return () => {
+      owner.abort(); clearInterval(timer); document.removeEventListener('visibilitychange', whenVisible)
+      if (lifetime.current === owner) { lifetime.current = undefined; flight.current = undefined; queued.current = undefined }
+    }
+  }, [refresh, policyReady])
 
   const run = async (work: () => Promise<unknown>, ok: string) => {
     setActing(true)
@@ -139,11 +167,16 @@ export function DeploymentPage() {
         )}
       </Section>
 
+      <DeploymentTopologySection />
+      <NodeConnectionSection />
+      <Section title={t('runtimeLimits')}><RuntimeAllocationPolicyEditor /></Section>
+      {deployment.value?.scope === 'organization' && <NodeAccessSection />}
+
       <TunnelAccessSection />
 
       <NodeConfigurationSection />
 
-      <Section flush title={t('nodesTitle')} meta={t('nodesMeta')}>
+      {deployment.value?.scope === 'organization' && <Section flush title={t('nodesTitle')} meta={t('nodesMeta')}>
         {state === null ? null : state.nodes.length === 0 ? <EmptyState title={t('nodesEmpty')} /> : (
           <div className="tableWrap" role="region" aria-label={t('nodesTableAria')} tabIndex={0}>
             <table className="dataTable">
@@ -178,7 +211,7 @@ export function DeploymentPage() {
             </table>
           </div>
         )}
-      </Section>
+      </Section>}
 
       <Section title={t('migrationsTitle')} meta={t('migrationsMeta')}>
         {state === null ? null : state.migrations === null ? <EmptyState title={t('migrationsUnavailable')} /> : (

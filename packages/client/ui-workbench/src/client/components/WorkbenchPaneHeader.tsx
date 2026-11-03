@@ -1,17 +1,18 @@
 /** Per-pane header actions contributed to the conversation viewport. */
 import { useState } from 'react'
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { HostObservable, PropsHooks, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   IconCloseOutline16, IconEllipsisOutline16, IconFolderOpenOutline16, IconMaximizeOutline16,
-  IconMinimizeOutline16, IconRestoreOutline16, Menu, StateDot, Tooltip,
+  IconMinimizeOutline16, IconRestoreOutline16, Menu, StateDot, Tooltip, ComputerBadge,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { ProjectUiPolicySnapshot, SessionId, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
+import type { DeploymentContextSnapshot, ProjectUiPolicySnapshot, SessionId, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { NS } from '../locales.ts'
 import { paneIdentity, ScopeTile } from './ScopeTile.tsx'
 import css from './Workbench.module.css'
 
-interface Props extends PropsRuntime<'conversation.workbench.pane.header'>, PropsLocale<typeof NS> {
+interface Props extends PropsRuntime<'conversation.workbench.pane.header'>, PropsLocale<typeof NS>,
+  PropsHooks<{ deployment: HostObservable<DeploymentContextSnapshot> }> {
   replacePane: () => void
   movePane: (direction: 'previous' | 'next') => void
   /** Provider availability for this pane's runtime, evaluated at render time. */
@@ -33,12 +34,13 @@ export function stateOf(summary: SessionListState['byId'][SessionId] | undefined
 export function WorkbenchPaneHeader({
   sessionId, active, onFocus, onClose, maximized, onMaximize, condensed = false, collapsed = false, collapsible = false,
   onToggleCollapse, solo = false, onSolo, replacePane, movePane,
-  filesAvailable, openFiles, useSessions, useWorkspaces, useProjectPolicy, t,
+  filesAvailable, openFiles, useSessions, useWorkspaces, useProjectPolicy, useDeployment, t,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const summary = useSessions(s => s.byId[sessionId])
   const workspaces = useWorkspaces(s => s)
   const policy = useProjectPolicy(value => value)
+  const showComputer = useDeployment(value => value.showComputer)
   const identity = paneIdentity(sessionId, summary, workspaces, policy, t('personal'), t('untitled'))
   const subtitle = identity.workspaceName === '' || identity.workspaceName === identity.scopeName
     ? identity.scopeName
@@ -94,11 +96,13 @@ export function WorkbenchPaneHeader({
                 : <StateDot state={state} size={8} />}
               <span>{t(status)}</span>
             </span>
+            {showComputer && identity.computerName !== undefined && <ComputerBadge name={identity.computerName} label={t('computer')} />}
             <span className={css.paneSubtitle} title={subtitle}>{subtitle}</span>
           </div>
         </div>
       </div>
       <span className={css.paneActions}>
+
         {collapsible && (
           <button
             type="button"

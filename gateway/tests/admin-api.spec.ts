@@ -1,8 +1,9 @@
+import { parseConversationArchiveId } from '../src/archive-identity.ts'
 import { TerminalManagementError } from '../src/terminal-management.ts'
 import { WebhookReceiptError } from '../src/postgres/webhook-delivery-service.ts'
 import { DesktopAccessError } from '../src/desktop-access.ts'
 import { ResourceAccessError } from '../src/resource-access.ts'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, parse } from 'node:path'
@@ -14,7 +15,11 @@ import { AuthService } from '../src/auth.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
-import { InstanceManager, type RuntimeTargetInput } from '../src/instances.ts'
+import { InstanceManager, RuntimeStartBlockedError, type RuntimeTargetInput } from '../src/instances.ts'
+import { RuntimeCapacityError } from '../src/runtime-capacity.ts'
+import { RuntimeAccountError } from '../src/launcher.ts'
+import { NodeResourceBudgetError } from '../src/node-resource-budget.ts'
+import { PostgresCheckoutQueueFullError } from '../src/postgres/database.ts'
 import { ModelGovernanceService } from '../src/model-governance.ts'
 import { ProjectService } from '../src/projects.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
@@ -23,7 +28,7 @@ import type { GatewayPrincipalClaims } from '../src/principal.ts'
 import type { ConversationArchiveDetail, ConversationArchiveRow } from '../src/postgres/conversation-archive-service.ts'
 
 let closer: (() => Promise<void>) | undefined
-afterEach(async () => { await closer?.() })
+afterEach(async () => { const close = closer; closer = undefined; await close?.() })
 
 async function login(base: string, username: string, password: string): Promise<string> {
   const loginRes = await fetch(`${base}/login`, {
@@ -60,16 +65,16 @@ async function setup(
   const instances = new InstanceManager(db, cfg)
   const stoppedTargets: RuntimeTargetInput[] = []
   const stop = instances.stop.bind(instances)
-  instances.stop = async target => {
+  instances.stop = async (target, reason, administratorUserId) => {
     stoppedTargets.push(target)
     if (typeof target !== 'number' && target.kind === 'project') return
-    await stop(target)
+    await stop(target, reason, administratorUserId)
   }
   const withStopped = instances.withStopped.bind(instances)
-  instances.withStopped = async <T>(target: RuntimeTargetInput, operation: () => Promise<T>): Promise<T> => {
+  instances.withStopped = async <T>(target: RuntimeTargetInput, operation: () => Promise<T>, projectActorUserId?: number): Promise<T> => {
     stoppedTargets.push(target)
     if (typeof target !== 'number' && target.kind === 'project') return operation()
-    return withStopped(target, operation)
+    return withStopped(target, operation, projectActorUserId)
   }
   let now = Date.now()
   const desktops = withDesktops
@@ -103,7 +108,13 @@ async function setup(
     adminRoot: join(root, 'public/admin'),
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  closer = () => new Promise(resolve => server.close(() => resolve()))
+  closer = async () => {
+    await instances.stopAll()
+    server.closeAllConnections()
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    db.close()
+    rmSync(root, { recursive: true, force: true })
+  }
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   cfg.publicOrigins.push(base)
   const cookie = await login(base, 'boss', 'pw-12345678')
@@ -111,6 +122,148 @@ async function setup(
 }
 
 describe('admin JSON API', () => {
+  it('applies accepted numeric quota subjects to the same account used by quota reads', async () => {
+    const { base, cookie, member } = await setup()
+    const response = await fetch(`${base}/admin/api/quotas`, { method: 'PUT',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ subjectType: 'user', subjectId: String(member.id).padStart(3, '0'), tokenLimit: 0, companyCostMicrosLimit: null }),
+    })
+    expect(response.status).toBe(204)
+    const read = await fetch(`${base}/admin/api/quotas?subjectType=user&subjectId=${String(member.id)}`, { headers: { cookie } })
+    expect(read.status).toBe(200)
+    expect(await read.json()).toMatchObject({ tokenMode: 'custom', tokenLimit: 0, companyCostMode: 'unlimited' })
+  })
+
+  it.each(['model', 'user-access', 'quota'] as const)('refuses retained administrator %s mutation after service admission waits', async kind => {
+    const { base, cookie, deps, admin, member } = await setup()
+    const governance = deps.governance!
+    const keeper = await deps.users.create({ username: 'keeper-admin', password: 'pw-12345678', role: 'admin' })
+    await governance.upsertModel({ provider: 'p', model: 'm', displayName: 'Original', enabled: true,
+      adminAllowed: true, userAllowed: false, inputMicrosPerMillion: 0, outputMicrosPerMillion: 0,
+      cacheReadMicrosPerMillion: 0, cacheWriteMicrosPerMillion: 0 })
+    const state = async () => ({ models: await governance.listModels(), overrides: await governance.userOverrides(member.id),
+      quota: await governance.roleQuota?.('user'), revision: await governance.configurationRevision?.() })
+    const before = await state()
+    let entered!: () => void, release!: () => void
+    const observed = new Promise<void>(resolve => { entered = resolve })
+    const gate = new Promise<void>(resolve => { release = resolve })
+    const queued = <Args extends unknown[]>(operation: (...args: Args) => unknown) => async (...args: Args): Promise<void> => {
+      entered(); await gate; await operation(...args)
+    }
+    if (kind === 'model') governance.upsertModel = queued(governance.upsertModel.bind(governance))
+    else if (kind === 'user-access') governance.setUserAccess = queued(governance.setUserAccess.bind(governance))
+    else governance.setQuota = queued(governance.setQuota.bind(governance))
+    const path = kind === 'model' ? 'models' : kind === 'user-access' ? 'model-access' : 'quotas'
+    const body = kind === 'model' ? { provider: 'p', model: 'm', displayName: 'Withdrawn' }
+      : kind === 'user-access' ? { userId: member.id, provider: 'p', model: 'm', allowed: true }
+        : { subjectType: 'role', subjectId: 'user', tokenLimit: 0, companyCostMicrosLimit: null }
+    const pending = fetch(`${base}/admin/api/${path}`, { method: 'PUT',
+      headers: { cookie, origin: base, 'content-type': 'application/json' }, body: JSON.stringify({ ...body, actorUserId: keeper.id }),
+    }).then(async response => ({ status: response.status, body: await response.text() }))
+    try {
+      await observed; await deps.users.setRole(admin.id, 'user'); release()
+      expect(await pending).toEqual({ status: 403, body: JSON.stringify({ error: 'forbidden' }) })
+      expect(await state()).toEqual(before)
+      const action = kind === 'model' ? 'admin.models.upsert' : kind === 'user-access' ? 'admin.models.user-access' : 'admin.models.quota'
+      expect(await deps.audit.query({ action })).toHaveLength(0)
+      expect(await deps.audit.query({ action: 'admin.request' })).toEqual([expect.objectContaining({ status: 403 })])
+    } finally { release(); await pending }
+  })
+
+  it.each(['start', 'stop', 'restart'] as const)('refuses administrator %s after revocation during target lookup', async action => {
+    const { deps, base, cookie, member, admin } = await setup()
+    const keeper = await deps.users.create({ username: 'keeper-admin', password: 'pw-12345678', role: 'admin' })
+    const lookup = deps.users.getById.bind(deps.users)
+    let entered!: () => void, release!: () => void
+    const observed = new Promise<void>(resolve => { entered = resolve })
+    const gate = new Promise<void>(resolve => { release = resolve })
+    deps.users.getById = async id => {
+      const user = await lookup(id)
+      if (id === member.id) { entered(); await gate }
+      return user
+    }
+    const before = { state: await deps.instances.stateOf(member.id), generation: await deps.instances.generationOf(member.id),
+      reason: await deps.instances.stopReasonOf(member.id) }
+    const prepare = vi.fn(() => { throw new Error('Revoked administration cannot prepare a Runtime') })
+    deps.instances.beforeStart = prepare
+    const pending = fetch(`${base}/admin/api/users/${member.id}/instance/${action}`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ actorUserId: keeper.id }),
+    })
+    try {
+      await observed
+      await deps.users.setRole(admin.id, 'user')
+      release()
+      const response = await pending
+      expect(response.status).toBe(403)
+      expect(await response.json()).toEqual({ error: 'forbidden' })
+      expect(prepare).not.toHaveBeenCalled()
+      expect({ state: await deps.instances.stateOf(member.id), generation: await deps.instances.generationOf(member.id),
+        reason: await deps.instances.stopReasonOf(member.id) }).toEqual(before)
+      expect(await deps.audit.query({ action: `admin.instances.${action}` })).toEqual([])
+    } finally { release(); await pending }
+  })
+
+  it('keeps disabled account model inspection available with no effective access', async () => {
+    const { deps, base, cookie, member } = await setup()
+    await deps.governance!.upsertModel({ provider: 'p', model: 'm', displayName: 'M', enabled: true,
+      adminAllowed: true, userAllowed: true, inputMicrosPerMillion: 0, outputMicrosPerMillion: 0,
+      cacheReadMicrosPerMillion: 0, cacheWriteMicrosPerMillion: 0 })
+    await deps.governance!.setUserAccess(member.id, 'p', 'm', true)
+    await deps.users.setStatus(member.id, 'disabled')
+    const response = await fetch(`${base}/admin/api/model-access?userId=${member.id}`, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ effective: { defaultAllowed: false, models: [], providers: [] },
+      overrides: [{ provider: 'p', model: 'm', allowed: true }] })
+  })
+
+  it('refuses disabled model inspection when a legacy policy adapter has no revision reader', async () => {
+    const { deps, base, cookie, member } = await setup()
+    await deps.users.setStatus(member.id, 'disabled')
+    Object.assign(deps.governance!, { configurationRevision: undefined })
+    const response = await fetch(`${base}/admin/api/model-access?userId=${member.id}`, { headers: { cookie } })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'model-policy-revision-unavailable' })
+  })
+
+  it('stops a Runtime without restarting when one account patch changes role and disables it', async () => {
+    const { deps, base, cookie, member, stoppedTargets } = await setup()
+    deps.instances.stateOf = async () => 'ready'
+    const start = vi.fn(async () => { throw new Error('Disabled accounts cannot start a Runtime') })
+    deps.instances.ensureRunning = start
+    const response = await fetch(`${base}/admin/api/users/${member.id}`, {
+      method: 'PATCH', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ role: 'admin', status: 'disabled' }),
+    })
+    expect(response.status).toBe(204)
+    expect(await deps.users.getById(member.id)).toMatchObject({ role: 'admin', status: 'disabled' })
+    expect(start).not.toHaveBeenCalled()
+    expect(stoppedTargets).toContain(member.id)
+    expect(await deps.audit.query({ action: 'admin.instances.restart-failed' })).toEqual([])
+  })
+
+  it.each([
+    { failure: new RuntimeAccountError('harness-unprovisioned', 'missing'), status: 409, code: 'RUNTIME_ACCOUNT_NOT_PROVISIONED' },
+    { failure: new RuntimeAccountError('harness-unverified', 'unavailable'), status: 503, code: 'RUNTIME_ACCOUNT_VERIFICATION_UNAVAILABLE' },
+    { failure: new RuntimeStartBlockedError('unavailable'), status: 503, code: 'INSTANCE_UNAVAILABLE' },
+    { failure: new RuntimeStartBlockedError('manual'), status: 409, code: 'INSTANCE_STOPPED' },
+    { failure: new RuntimeCapacityError('timeout'), status: 503, code: 'INSTANCE_CAPACITY' },
+    { failure: new NodeResourceBudgetError(409, 'stale-generation', 'Runtime allocation is no longer pending'), status: 409, code: 'resource-stale-generation' },
+    { failure: new PostgresCheckoutQueueFullError(1), status: 503, code: 'DB_CHECKOUT_QUEUE_FULL' },
+  ])('reports and audits Runtime admission $code with HTTP $status', async ({ failure, status, code }) => {
+    const { deps, base, cookie, member } = await setup()
+    deps.instances.ensureRunning = async () => { throw failure }
+    const response = await fetch(`${base}/admin/api/users/${member.id}/instance/start`, {
+      method: 'POST', headers: { cookie, origin: base },
+    })
+    expect(response.status).toBe(status)
+    expect(await response.json()).toEqual({ error: failure instanceof RuntimeCapacityError
+      ? 'The server is at its Runtime capacity. Try again after another Runtime is released.'
+      : failure instanceof PostgresCheckoutQueueFullError ? 'The database is at capacity. Reload the current state before trying again.' : failure.message, code })
+    expect((await deps.audit.query({ action: 'admin.request' })).some(event => event.status === status)).toBe(true)
+    expect(await deps.audit.query({ action: 'admin.instances.start' })).toEqual([])
+  })
+
   it('rejects an invalid organization provider id before invoking the storage service', async () => {
     const { deps, base, cookie } = await setup()
     const upsertProvider = vi.fn(async () => {})
@@ -152,7 +305,7 @@ describe('admin JSON API', () => {
     const response = await fetch(url, { headers: { cookie } })
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ items: [], nextCursor: null })
-    expect(list).toHaveBeenCalledWith('70ee10ba-3cb9-4e4f-91dd-03606a5527cb', undefined, 10)
+    expect(list).toHaveBeenCalledWith(1, '70ee10ba-3cb9-4e4f-91dd-03606a5527cb', undefined, 10)
     list.mockRejectedValueOnce(new WebhookReceiptError(400, 'invalid webhook receipt query'))
     expect((await fetch(`${url}&cursor=invalid`, { headers: { cookie } })).status).toBe(400)
   })
@@ -263,6 +416,7 @@ describe('admin JSON API', () => {
 
   it('lists, reads, and batches archive lifecycle actions for administrators', async () => {
     const row: ConversationArchiveRow = {
+      archiveId: parseConversationArchiveId('22000000-0000-4000-8000-000000000022')!,
       rootSessionId: 'session-archive-1', title: '已归档对话', contentPreview: '首条用户内容摘要', creator: { id: 2, displayName: 'worker' },
       project: null, runtime: { kind: 'user', id: 2 }, workspace: null, state: 'archived',
       archivedAt: 1000, restoredAt: null, trashedAt: null, purgeAfter: null, syncState: 'synced',
@@ -273,29 +427,42 @@ describe('admin JSON API', () => {
     const archives = {
       adminList: async () => [row],
       detail: async () => detail,
-      status: async (id: string) => id === row.rootSessionId ? { ...row, syncState: 'conflict', lastSyncError: 'Stop active resources first' } : null,
+      status: async (id: string) => id === row.archiveId ? { ...row, syncState: 'conflict', lastSyncError: 'Stop active resources first' } : null,
       setState: async (id: string, state: 'archived' | 'trash') => { calls.push(`${state}:${id}`); return { ...row, state } },
       purge: async (id: string) => { calls.push(`purge:${id}`); return true },
     } as unknown as GatewayDeps['archives']
     const { base, cookie } = await setup(archives)
-    const list = await fetch(`${base}/admin/api/archives?state=archived&q=归档`, { headers: { cookie } })
+    const list = await fetch(`${base}/admin/api/archives/records?state=archived&q=归档`, { headers: { cookie } })
     expect(list.status).toBe(200)
     expect(await list.json()).toEqual([row])
-    const read = await fetch(`${base}/admin/api/archives/${row.rootSessionId}`, { headers: { cookie } })
+    const read = await fetch(`${base}/admin/api/archives/records/${row.archiveId}`, { headers: { cookie } })
     expect(read.status).toBe(200)
     expect(await read.json()).toEqual(detail)
-    const status = await fetch(`${base}/admin/api/archives/${row.rootSessionId}/status`, { headers: { cookie } })
+    const status = await fetch(`${base}/admin/api/archives/records/${row.archiveId}/status`, { headers: { cookie } })
     expect(status.status).toBe(200)
     expect(await status.json()).toMatchObject({ syncState: 'conflict', lastSyncError: 'Stop active resources first' })
-    expect((await fetch(`${base}/admin/api/archives/missing/status`, { headers: { cookie } })).status).toBe(404)
-    expect((await fetch(`${base}/admin/api/archives/${row.rootSessionId}/status`)).status).toBe(401)
-    const action = await fetch(`${base}/admin/api/archives/actions`, {
+    expect((await fetch(`${base}/admin/api/archives/records/22000000-0000-4000-8000-000000000023/status`, { headers: { cookie } })).status).toBe(404)
+    expect((await fetch(`${base}/admin/api/archives/records/${row.archiveId}/status`)).status).toBe(401)
+    const action = await fetch(`${base}/admin/api/archives/records/actions`, {
       method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
-      body: JSON.stringify({ action: 'restore', ids: [row.rootSessionId], idempotencyKey: 'archive-test' }),
+      body: JSON.stringify({ action: 'restore', archiveIds: [row.archiveId], idempotencyKey: 'archive-test' }),
     })
     expect(action.status).toBe(200)
-    expect(await action.json()).toMatchObject({ results: [{ rootSessionId: row.rootSessionId, ok: true }] })
-    expect(calls).toEqual([`archived:${row.rootSessionId}`])
+    expect(await action.json()).toMatchObject({ results: [{ archiveId: row.archiveId, ok: true }] })
+    for (const path of ['/admin/api/archives', `/admin/api/archives/${row.rootSessionId}`, `/admin/api/archives/${row.rootSessionId}/status`, `/admin/api/archives/${row.rootSessionId}/export`]) {
+      const legacy = await fetch(`${base}${path}`, { headers: { cookie } })
+      expect(legacy.status).toBe(410)
+      expect(await legacy.json()).toMatchObject({ error: 'archive-api-upgrade-required' })
+    }
+    for (const archiveIds of [[row.rootSessionId], [row.archiveId, row.archiveId.toUpperCase()]]) {
+      const invalid = await fetch(`${base}/admin/api/archives/records/actions`, {
+        method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'trash', archiveIds }),
+      })
+      expect(invalid.status).toBe(400)
+    }
+    expect((await fetch(`${base}/admin/api/archives/records/${row.rootSessionId}/status`, { headers: { cookie } })).status).toBe(400)
+    expect(calls).toEqual([`archived:${row.archiveId}`])
   })
 
   it('separates the usage overview from contributor activity reports', async () => {
@@ -710,6 +877,15 @@ describe('admin JSON API', () => {
     expect(rows).toEqual([expect.objectContaining({ action: 'login', username: 'worker' })])
   })
 
+  it.each(['limit=1.5', 'offset=1.5', 'limit=1e100', 'offset=1e100', 'offset=9007199254740992'])(
+    'rejects non-integral or unsafe audit pagination: %s', async query => {
+      const { base, cookie } = await setup()
+      const response = await fetch(`${base}/admin/api/audit?${query}`, { headers: { cookie } })
+      expect(response.status).toBe(400)
+      expect(await response.json()).toEqual({ error: 'invalid audit pagination' })
+    },
+  )
+
   it('records a failed mutating admin request once', async () => {
     const { base, cookie, deps, admin } = await setup()
     const res = await fetch(`${base}/admin/api/users/${admin.id}`, {
@@ -845,7 +1021,7 @@ describe('admin desktop coordination API', () => {
       body: JSON.stringify({ kind: 'user', id: 1, enabled: true, revision: '0' }),
     })
     expect(saved.status).toBe(200)
-    expect(set).toHaveBeenCalledWith({ kind: 'user', id: 1 }, true, '0')
+    expect(set).toHaveBeenCalledWith({ kind: 'user', id: 1 }, true, '0', 1)
     expect(await deps.audit.query({ action: `admin.${resource}s.permission` })).toHaveLength(1)
     set.mockRejectedValueOnce(new DesktopAccessError(409, 'desktop policy changed'))
     const stale = await fetch(url, { method: 'POST', headers: { cookie, origin: base }, body: JSON.stringify({ kind: 'user', id: 1, enabled: false, revision: '0' }) })
@@ -875,7 +1051,7 @@ describe('admin desktop coordination API', () => {
       body: JSON.stringify({ kind: 'user', id: 1, enabled: true, revision: '0' }),
     })
     expect(saved.status).toBe(200)
-    expect(set).toHaveBeenCalledWith({ kind: 'user', id: 1 }, true, '0')
+    expect(set).toHaveBeenCalledWith({ kind: 'user', id: 1 }, true, '0', 1)
     expect(await deps.audit.query({ action: 'admin.memorys.permission' })).toHaveLength(1)
     set.mockRejectedValueOnce(new ResourceAccessError(409, 'memory policy changed'))
     const stale = await fetch(url, { method: 'POST', headers: { cookie, origin: base }, body: JSON.stringify({ kind: 'user', id: 1, enabled: false, revision: '0' }) })
@@ -886,7 +1062,7 @@ describe('admin desktop coordination API', () => {
   })
 
   it('serves the steward overview and keeps steward writes admin-scoped', async () => {
-    const { base, cookie, deps } = await setup()
+    const { base, cookie, deps, admin } = await setup()
     const entries = [{
       userId: 7, username: 'root', displayName: 'Root', role: 'admin' as const,
       userStatus: 'active', membershipStatus: 'active',
@@ -908,7 +1084,7 @@ describe('admin desktop coordination API', () => {
       body: JSON.stringify({ kind: 'user', id: 7, enabled: true, revision: '3' }),
     })
     expect(saved.status).toBe(200)
-    expect(set).toHaveBeenCalledWith({ kind: 'user', id: 7 }, true, '3')
+    expect(set).toHaveBeenCalledWith({ kind: 'user', id: 7 }, true, '3', admin.id)
     expect(await deps.audit.query({ action: 'admin.stewards.permission' })).toHaveLength(1)
     // Steward policies are user-scoped; project owners are rejected.
     expect((await fetch(url, {

@@ -1,0 +1,14 @@
+{
+  "name": "sdk-child-model-policy-remaining-proof",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/reproduce-sdk-child-model-policy.mjs",
+  "startedAt": "2026-10-24T10:23:27.797097+00:00",
+  "seconds": 1.23,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ac6adf61ff3154ced5100deff598e51a87491e0d5b953a81f089960dd5c9f89c",
+  "inputsAfter": "ac6adf61ff3154ced5100deff598e51a87491e0d5b953a81f089960dd5c9f89c",
+  "postgresToolDirectory": null,
+  "outputSha256": "28067ef4373dcd39b870bccd61e335d49e558115e03c0d5954c1de1bf7e63d07",
+  "outputTail": "{\"actualChildProcess\":true,\"childExecutedModel\":true,\"parentModelPolicyAllows\":false,\"requiredResourceAcquisitions\":2,\"modelAcquisitionsDuringChild\":0,\"processAcquisitions\":1,\"released\":2,\"result\":\"completed\"}\n"
+}

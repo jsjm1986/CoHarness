@@ -1,0 +1,13 @@
+{
+  "name": "gateway-model-doc-pair",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write gateway/README.md .agents/notes/implemented/architecture/2026-10-24-gateway-model-ownership.md .agents/notes/implemented/feature/2026-10-21-project-progress-journal.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+  "startedAt": "2026-10-23T21:30:36.913141+00:00",
+  "seconds": 4.574,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7da3bd5bed158f612103832b935e6b2975789f0a8ae98db773a44967b46d531d",
+  "inputsAfter": "bb238dc57a9a4734150b21d42c7afeb96f928b91278cb3fcb771a8cfc8669275",
+  "outputSha256": "d96c04de5149efd8892eb8f83b504df81364073d3b77a696ce707598271b13bf",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write gateway/README.md .agents/notes/implemented/architecture/2026-10-24-gateway-model-ownership.md .agents/notes/implemented/feature/2026-10-21-project-progress-journal.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md\nverify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-gateway-model-ownership.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-10-21-project-progress-journal.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 4 record(s) written; run the check to validate the pairs.\n"
+}

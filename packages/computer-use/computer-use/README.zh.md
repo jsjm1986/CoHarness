@@ -25,6 +25,8 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
+提供方可在注册时声明已知环境限制 `{ unavailableReason: 'headless' | 'disabled' }`。注册仍保留提供方名称，`run` 在进入驱动前拒绝桌面操作。`unavailableReason` 与操作系统权限、用户授权相互独立，并随提供方卸载清除。浏览器桌面状态会先返回该限制，界面不再提供确认使用的操作。
+
 在 Cordis 组合中，将服务与选定的提供方一起挂载一次：
 
 ```yaml
@@ -38,6 +40,8 @@ kind: "package-reference"
 提供方通过 `ctx.computerUse.run(execution, operation)` 包裹实际桌面操作。独立本机调用保留宿主操作者权限。受管运行时要求活动 Agent 和 `computerUseAuthorization` 提供方；提供方卸载不会恢复本机权限。部署政策负责资格、会话确认和租约；取消会传入驱动，驱动结束后的已撤权结果也会被拒绝。
 
 可选的 `computerUseAuthorization.confirmation` 控制器读取和修改交互用户的确认。操作要求活动人工请求及确切的根会话、节点和桌面，不作为模型工具。浏览器消费者从 `/types` 导入传输数据类型，不加载 Host 服务声明。
+
+部署可在未注册驱动时发布 `computerUseEnvironment`。`computerUseUnavailableReason(ctx)` 优先报告已注册提供方自己的状态，仅在没有提供方时使用环境限制。这些元数据既不预留提供方槽位，也不授予桌面权限。
 
 -----
 

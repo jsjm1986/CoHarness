@@ -1,0 +1,238 @@
+{
+  "finding": "B431",
+  "status": "fixed_verified_named_subagent_cleanup_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T06:45:49.815512+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-origin.json"
+  },
+  "problem": "One-shot background subagent completion converted failed run disposal into a terminal failed Job, closed termination retries and wrote durable settlement while child resources remained active.",
+  "fix": "Retain the published run and await successful cleanup within the existing outcome mapper; show unconfirmed cleanup progress, retry on another termination, then settle failed without partial answer and with independent result detail.",
+  "verification": {
+    "distinctCases": 200,
+    "unitAndRalphCases": 196,
+    "typescriptSdkCases": 2,
+    "pythonSdkCases": 2,
+    "newUnitCases": 3,
+    "versionRepeatsAndSubsetRerunsNotAdded": true,
+    "checks": [
+      {
+        "name": "subagent-origin",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-origin.json"
+      },
+      {
+        "name": "subagent-related-coverage",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-related-coverage.json"
+      },
+      {
+        "name": "subagent-coverage-measurement",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-coverage-measurement.json"
+      },
+      {
+        "name": "subagent-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-types.json"
+      },
+      {
+        "name": "subagent-bundle",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-bundle.json"
+      },
+      {
+        "name": "subagent-sdk-source",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-sdk-source.json"
+      },
+      {
+        "name": "subagent-sdk-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-sdk-node22.json"
+      },
+      {
+        "name": "subagent-sdk-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-sdk-node24.json"
+      },
+      {
+        "name": "subagent-sdk-python",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-sdk-python.json"
+      },
+      {
+        "name": "subagent-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-lint.json"
+      },
+      {
+        "name": "subagent-final-test-lint-fixed",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-final-test-lint-fixed.json"
+      },
+      {
+        "name": "subagent-barrier-unit",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-barrier-unit.json"
+      },
+      {
+        "name": "subagent-barrier-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-barrier-types.json"
+      },
+      {
+        "name": "subagent-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-python-lint.json"
+      },
+      {
+        "name": "subagent-export-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-export-docs.json"
+      },
+      {
+        "name": "subagent-cordis-config",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-cordis-config.json"
+      },
+      {
+        "name": "subagent-pairing",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-pairing.json"
+      },
+      {
+        "name": "subagent-docs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-docs.json"
+      },
+      {
+        "name": "subagent-references-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-references-final.json"
+      }
+    ],
+    "counterfactual": {
+      "originalPackageFiles": 58,
+      "originalNotesPreserved": 3,
+      "unitNegative": "3 intended running-versus-failed assertions fail before source repair",
+      "sdkNegative": "Complete original Consumer yields2 intended marker failures in both source and Node22 built modes; no module failure or timeout"
+    },
+    "coverage": {
+      "status": "passed",
+      "scope": "Added executable statements and branch groups against complete frozen tool-subagent Consumer; auxiliary measurement, existing repository baseline unchanged",
+      "addedStatementCount": 21,
+      "addedBranchGroupCount": 2,
+      "allAddedStatementsCovered": true,
+      "allAddedBranchArmsCovered": true,
+      "wholeFile": {
+        "total": {
+          "lines": {
+            "total": 220,
+            "covered": 218,
+            "skipped": 0,
+            "pct": 99.09
+          },
+          "statements": {
+            "total": 241,
+            "covered": 238,
+            "skipped": 0,
+            "pct": 98.75
+          },
+          "functions": {
+            "total": 39,
+            "covered": 39,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 213,
+            "covered": 204,
+            "skipped": 0,
+            "pct": 95.77
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/tool-subagent/src/index.ts": {
+          "lines": {
+            "total": 220,
+            "covered": 218,
+            "skipped": 0,
+            "pct": 99.09
+          },
+          "functions": {
+            "total": 39,
+            "covered": 39,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 241,
+            "covered": 238,
+            "skipped": 0,
+            "pct": 98.75
+          },
+          "branches": {
+            "total": 213,
+            "covered": 204,
+            "skipped": 0,
+            "pct": 95.77
+          }
+        }
+      },
+      "preexistingUncoveredLines": [
+        355,
+        541
+      ],
+      "preexistingUncoveredBranchGroups": 9
+    },
+    "coverageGateUnchanged": true,
+    "coverageCaveat": "The existing repository baseline excludes this monolithic index. Default collection measured0/0; auxiliary collection reports99.09% lines,98.75% statements,95.77% branches,100% functions. All21 added executable statements and2 added branch groups are covered. This is not a claim of a repository100% gate pass.",
+    "physicalProof": "Actual shipped SDK profile, ordinary tool-subagent Consumer and owned HTTP child response. Disposal failure leaves transport open, owner busy and durable job-end absent. A termination retry physically closes the response before one failed ending; independent result failure survives.",
+    "reliability": "Final unit fixture observes logger cleanup or actual job settlement, with no fixed sleep. Failed intermediate missing controller, wrong subscription accessor and void diagnostic receipts are retained; corrected final unit/types/lint pass.",
+    "docsQuick": "20 passed,0 failed",
+    "bilingualPairs": 3,
+    "cordisConfigs": 436
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/subagent-cleanup-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-job-cleanup.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-job-cleanup.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-job-cleanup.zh.md",
+    ".agents/notes/implemented/feature/2026-07-08-background-subagent-tasks.i18n.yaml",
+    ".agents/notes/implemented/feature/2026-07-08-background-subagent-tasks.md",
+    ".agents/notes/implemented/feature/2026-07-08-background-subagent-tasks.zh.md",
+    "apps/cli/tests/profiles/sdk/subagent-cleanup.expected.e2e.ts",
+    "examples/headless-agent/tests/fixtures/subagent-cleanup/expected.json",
+    "examples/headless-agent/tests/fixtures/subagent-cleanup/model.mjs",
+    "examples/headless-agent/tests/fixtures/subagent-cleanup/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/subagent-cleanup/runtime.cordis.yml",
+    "packages/subagent/tool-subagent/README.i18n.yaml",
+    "packages/subagent/tool-subagent/README.md",
+    "packages/subagent/tool-subagent/README.zh.md",
+    "packages/subagent/tool-subagent/src/index.ts",
+    "packages/subagent/tool-subagent/tests/background-cleanup.spec.ts",
+    "python/sdk/tests/test_subagent_cleanup_expected.py"
+  ],
+  "readOnlyPrerequisiteCount": 55,
+  "artifactReferences": 5,
+  "noteReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T063156Z/note-supersession.json",
+  "remaining": [
+    "All12 project domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Review foreground workflow/Ralph/subagent cleanup failure recovery and exact parent ownership; retained idle veto alone does not prove a reachable retry path. No unverified additional finding is claimed.",
+    "Continue remaining resource admission, model/tool/Inspector authorization and cross-account/computer review outside peer-owned topology, GUI, documents and Host ApiProxy fetch/client.ts.",
+    "B431 uses existing Job termination to retry after a cleanup failure. Persistent failure can hold owner/service teardown. No automatic cleanup abandonment is added.",
+    "Peer-reported R24/schema103 deployment excludes B416+ root audit capsules; REAL-042 remains open. Peer now owns Host ApiProxy non2xx body cancellation and related Web failure reproduction.",
+    "Official paid Responses remains deferred. No root production deploy, restart, dependency synchronization, reset, stash, commit or push."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true
+}

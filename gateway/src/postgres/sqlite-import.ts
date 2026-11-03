@@ -29,6 +29,8 @@ export interface SqliteImportReport {
   skippedSessions: number
   skippedLoginAttempts: number
   skippedIntakeTokens: number
+  /** Noncanonical numeric account quota keys that never participated in SQLite effective quotas. */
+  skippedQuotaAliases: number
 }
 
 type SqliteRow = Record<string, unknown>
@@ -94,6 +96,11 @@ async function modelId(client: PoolClient, organizationId: string, provider: unk
  * Sessions and login attempts are intentionally not copied: users sign in again,
  * while existing JSONL session logs remain the durable conversation source until
  * the remote persistence phase is enabled.
+ * Imported accounts' quota overrides match canonical SQLite keys on every replay;
+ * dormant numeric aliases are reported without becoming effective or modifying the source.
+ * @param pool - destination PostgreSQL pool; one transaction owns the complete import.
+ * @param options - frozen SQLite source and destination organization/node names.
+ * @returns imported record counts and intentionally skipped runtime/security records and quota aliases.
  */
 export async function importSqliteControlPlane(pool: Pool, options: SqliteImportOptions): Promise<SqliteImportReport> {
   const db = new Database(options.sqliteFile, { readonly: true, fileMustExist: true })
@@ -134,6 +141,8 @@ export async function importSqliteControlPlane(pool: Pool, options: SqliteImport
         await client.query(`INSERT INTO harness.memberships(organization_id,user_id,role,status)
           VALUES($1,$2,$3,$4) ON CONFLICT(organization_id,user_id) DO UPDATE SET role=excluded.role,status=excluded.status`,
         [organizationId, userId, row.role === 'admin' ? 'admin' : 'member', row.status])
+        await client.query(`INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled)
+          VALUES($1,$2,$3,true) ON CONFLICT DO NOTHING`, [organizationId, nodeId, userId])
       }
 
       const sourceProjects = rows(db, 'projects')
@@ -198,7 +207,7 @@ export async function importSqliteControlPlane(pool: Pool, options: SqliteImport
         await client.query(`INSERT INTO harness.instances(
           organization_id,user_id,assigned_node_id,desired_state,observed_state,port,legacy_user_id,started_at,last_activity_at
         ) VALUES($1,$2,$3,'stopped','stopped',$4,$5,$6,$7)
-        ON CONFLICT(organization_id,user_id) WHERE user_id IS NOT NULL DO UPDATE
+        ON CONFLICT(organization_id,assigned_node_id,user_id) WHERE user_id IS NOT NULL AND storage_layout='legacy' DO UPDATE
           SET assigned_node_id=excluded.assigned_node_id,
           desired_state='stopped',observed_state='stopped',port=excluded.port,started_at=excluded.started_at,
           last_activity_at=excluded.last_activity_at,updated_at=now()`,
@@ -250,6 +259,10 @@ export async function importSqliteControlPlane(pool: Pool, options: SqliteImport
         priceCount++
       }
 
+      await client.query(`DELETE FROM harness.user_quotas quota USING harness.users account
+        WHERE quota.user_id=account.id AND account.organization_id=$1 AND account.legacy_id=ANY($2::bigint[])`,
+      [organizationId, sourceUsers.map(row => row.id)])
+      let skippedQuotaAliases = 0
       for (const row of rows(db, 'model_quotas')) {
         if (row.subject_type === 'role') {
           await client.query(`INSERT INTO harness.role_quotas(organization_id,role,token_limit,company_cost_limit)
@@ -257,12 +270,19 @@ export async function importSqliteControlPlane(pool: Pool, options: SqliteImport
             company_cost_limit=excluded.company_cost_limit`, [organizationId,
             row.subject_id === 'user' ? 'member' : row.subject_id, row.token_limit, row.company_cost_micros_limit === null ? null : micros(row.company_cost_micros_limit)])
         } else {
+          const userId = typeof row.subject_id === 'string' ? Number(row.subject_id) : NaN
+          if (!Number.isSafeInteger(userId) || userId <= 0) throw new Error(`invalid SQLite user quota subject ${String(row.subject_id)}`)
+          const account = await idForLegacy(client, 'users', organizationId, userId)
+          if (String(userId) !== row.subject_id) {
+            skippedQuotaAliases += 1
+            continue
+          }
           const token = row.token_limit as number | null
           const cost = row.company_cost_micros_limit as number | null
           await client.query(`INSERT INTO harness.user_quotas(user_id,token_mode,token_limit,company_cost_mode,company_cost_limit)
             VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id) DO UPDATE SET token_mode=excluded.token_mode,
             token_limit=excluded.token_limit,company_cost_mode=excluded.company_cost_mode,company_cost_limit=excluded.company_cost_limit`, [
-            await idForLegacy(client, 'users', organizationId, Number(row.subject_id)),
+            account,
             token === -1 ? 'inherit' : token === null ? 'unlimited' : 'custom', token === null || token === -1 ? null : token,
             cost === -1 ? 'inherit' : cost === null ? 'unlimited' : 'custom', cost === null || cost === -1 ? null : micros(cost),
           ])
@@ -330,6 +350,7 @@ export async function importSqliteControlPlane(pool: Pool, options: SqliteImport
         auditEvents: sourceAudits.length, skippedSessions: rows(db, 'auth_sessions').length,
         skippedLoginAttempts: rows(db, 'login_attempts').length,
         skippedIntakeTokens: rows(db, 'model_intake_tokens').length,
+        skippedQuotaAliases,
       }
     })
   } finally {

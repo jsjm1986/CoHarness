@@ -1,0 +1,14 @@
+{
+  "name": "sonar-host-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p tsconfig.host.json",
+  "startedAt": "2026-10-24T09:14:45.855854+00:00",
+  "seconds": 83.702,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3230b47f75014ad4d8610628c61adb6250e024bd2b154c5dbe9e7d6ea0d1cdb9",
+  "inputsAfter": "d08df89b7cc4c3381b5791b7b71c697447b9cc13ca65d826c142ca4a0d35a5be",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

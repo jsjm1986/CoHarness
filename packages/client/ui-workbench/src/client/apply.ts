@@ -1,15 +1,15 @@
 /** Contributes workbench controls without importing the conversation renderer. */
-import { WorkspaceResourceError, clientSessionKey, commitSessionNavigation, parseClientSessionKey, parseWorkspaceResourceAddress, resolveWorkspacePath, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
-import type { WorkspaceResourceOpenRequest, WorkspaceResourceSource } from '@deepseek-ai/dsh-client-runtime/client'
+import { WorkspaceResourceError, clientSessionKey, runtimeTargetKey, commitSessionNavigation, parseClientSessionKey, parseWorkspaceResourceAddress, resolveWorkspacePath, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
+import type { WorkspaceResourceOpenRequest, WorkspaceResourceSource, WorkspaceResourceTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientContext, ConversationViewport, ProjectUiPolicySnapshot, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { WorkbenchCatalog } from './catalog.ts'
-import { WorkbenchCatalogReader } from './catalog-reader.ts'
+import type { LegacyWorkbenchRestore, WorkbenchRestoreOptions } from './layout-restore.ts'
 import { WorkbenchEmpty } from './components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from './components/WorkbenchPaneHeader.tsx'
 import { WorkbenchSidebar, type WorkbenchSidebarInjected } from './components/WorkbenchSidebar.tsx'
@@ -32,7 +32,7 @@ import { WorkspaceFileTitle } from './components/WorkspaceFileTitle.tsx'
 import { createWorkspacePreviewReaders } from './preview-readers.ts'
 
 /** Required Cordis capabilities; slot declarations may arrive in either order. */
-export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'conversationViewport', 'sidebarRight', 'sidebarRightTabs', 'layout', 'workspaceResources']
+export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'conversationViewport', 'sidebarRight', 'sidebarRightTabs', 'layout', 'workspaceResources', 'deploymentContext']
 
 function controller(ctx: ClientContext): ConversationViewport {
   const viewport = ctx.get('conversationViewport')
@@ -63,6 +63,12 @@ type WorkbenchViewport = ConversationViewport & {
   switchWorkbench?: (id: string) => void
 }
 
+/** Compare executable Runtime identities; display names do not identify a resource owner. */
+function sameResourceRuntime(first: WorkspaceResourceTarget, second: WorkspaceResourceTarget): boolean {
+  if (first.kind === 'base' || second.kind === 'base') return first.kind === second.kind
+  return runtimeTargetKey(first) === runtimeTargetKey(second)
+}
+
 /** Mount the workbench's slot contributions and localized controls.
  * @param ctx - client plugin context.
  */
@@ -71,23 +77,11 @@ export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle | undefined
   const config = Config((globalThis as { __DSH_WORKBENCH_CONFIG__?: unknown }).__DSH_WORKBENCH_CONFIG__ ?? {})
   const chooser = createWorkbenchStore()
-  const catalogRestore: HostObservable<boolean> = {
-    // Viewport providers without restoration demand retain eager validation.
-    getSnapshot: () => (viewport as WorkbenchViewport).needsCatalogRestore?.() ?? true,
-    subscribe: listener => viewport.snapshot.subscribe(listener),
-  }
   const lifetime = new AbortController()
-  const catalogReader = new WorkbenchCatalogReader(() => catalogRestore.getSnapshot())
-  let catalogPickerOpening = 0
+  let restoreOperation: AbortController | undefined
   let disposed = false
   const isDisposed = (): boolean => disposed
-  ctx.effect(() => () => {
-    disposed = true
-    lifetime.abort()
-    return catalogReader.dispose()
-  }, 'ui-workbench: pending navigation and catalog lifetime')
-  ctx.effect(() => catalogRestore.subscribe(() => { catalogReader.releaseUnobserved() }),
-    'ui-workbench: catalog restoration demand')
+  ctx.effect(() => () => { disposed = true; lifetime.abort() }, 'ui-workbench: pending navigation lifetime')
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workbench: dictionaries')
   ctx.effect(() => ctx.locale.register('sidebarPdf', { zh: pdfZh, en: pdfEn }))
   ctx.effect(() => ctx.locale.register('sidebarOffice', { zh: officeZh, en: officeEn }))
@@ -96,7 +90,7 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register('sidebarExcel', { zh: excelZh, en: excelEn }), 'ui-workbench: excel dictionaries')
   const openResource = (request: WorkspaceResourceOpenRequest): void => {
     const target = ctx.sessions.runtimeTargetFor?.(request.sessionId) ?? { kind: 'base' as const }
-    if (target.kind !== request.runtimeTarget.kind || (target.kind === 'project' && request.runtimeTarget.kind === 'project' && target.projectId !== request.runtimeTarget.projectId)) {
+    if (!sameResourceRuntime(target, request.runtimeTarget)) {
       throw new WorkspaceResourceError('access-revoked', 'Workspace resource runtime no longer owns this Session')
     }
     const current = viewport.snapshot.getSnapshot()
@@ -163,8 +157,7 @@ export function apply(ctx: ClientContext): void {
         nativeOpenAvailable: nativeCapable,
         openNativePath: async (request) => {
           const target = runtimeTarget()
-          if (target.kind !== request.runtimeTarget.kind
-            || (target.kind === 'project' && request.runtimeTarget.kind === 'project' && target.projectId !== request.runtimeTarget.projectId)) {
+          if (!sameResourceRuntime(target, request.runtimeTarget)) {
             throw new WorkspaceResourceError('access-revoked', 'Workspace resource runtime no longer owns this Session')
           }
           if (!nativeCapable()) throw new Error('native path opening is unavailable in this application')
@@ -223,10 +216,6 @@ export function apply(ctx: ClientContext): void {
       ? (snap.activePaneId ?? snap.paneIds[0])
       : ctx.sessions.list.getSnapshot().current
   }
-  const focusConversation = (sessionId: SessionId): void => {
-    ctx.layout.selectPanel(null)
-    viewport.focus(sessionId)
-  }
   ctx.slots.inject('conversation.workbench.toolbar', () => ctx.slots.register({
     name: 'conversation.workbench.toolbar',
     locale: NS,
@@ -234,14 +223,7 @@ export function apply(ctx: ClientContext): void {
     inject: () => {
       const wb = viewport as WorkbenchViewport
       return {
-        hooks: { catalogRestore },
-        loadCatalog: (signal: AbortSignal, fresh: boolean) => {
-          if (lifetime.signal.aborted) return Promise.reject(new DOMException('Workbench plugin disposed', 'AbortError'))
-          const picker = ctx.slots.bindStore(chooser).store.getSnapshot()
-          const opened = picker.pickerOpen && picker.pickerOpening !== catalogPickerOpening
-          catalogPickerOpening = picker.pickerOpening
-          return catalogReader.read(signal, fresh || opened)
-        },
+        hooks: { deployment: ctx.deploymentContext },
         listWorkbenches: () => wb.listWorkbenches?.() ?? [],
         currentWorkbench: () => wb.currentWorkbench?.(),
         createWorkbench: (name: string) => wb.createWorkbench?.(name) ?? '',
@@ -249,17 +231,19 @@ export function apply(ctx: ClientContext): void {
         duplicateWorkbench: (id: string, name: string) => wb.duplicateWorkbench?.(id, name) ?? '',
         deleteWorkbench: (id: string) => { wb.deleteWorkbench?.(id) },
         switchWorkbench: (id: string) => { wb.switchWorkbench?.(id) },
-        chooseSession,
-        focusSession: focusConversation,
-        createSession: async (target: SessionRuntimeTarget, replace: boolean) => {
+        chooseSession: (item: import('./catalog.ts').WorkbenchConversation, replace: boolean, signal?: AbortSignal) =>
+          chooseSession(item, replace, AbortSignal.any([ctx.sessions.beginNavigation(), ...(signal === undefined ? [] : [signal])])),
+        focusSession: (id: SessionId) => { ctx.layout.selectPanel(null); viewport.focus(id) },
+        createSession: async (target: SessionRuntimeTarget, replace: boolean, signal?: AbortSignal) => {
+          signal?.throwIfAborted()
           if (viewport.snapshot.getSnapshot().pendingIdentity === true) return { ok: false as const, reason: 'unknown' as const }
           // Enforce capacity before creating a Session; recheck after the async
           // create in case another navigation filled the last slot meanwhile.
           if (!replace && viewport.snapshot.getSnapshot().paneIds.length >= 4) return { ok: false as const, reason: 'limit' as const }
-          const navigation = ctx.sessions.beginNavigation()
+          const navigation = AbortSignal.any([ctx.sessions.beginNavigation(), ...(signal === undefined ? [] : [signal])])
           if (ctx.sessions.usingRuntime === undefined) return { ok: false as const, reason: 'unknown' as const }
           return ctx.sessions.usingRuntime(target, AbortSignal.any([navigation, lifetime.signal]), async (signal) => {
-            const id = await ctx.sessions.createSession?.(target, signal)
+            const id = await ctx.workspaces.createRuntimeSession?.(target, undefined, signal)
             if (id === undefined) return { ok: false as const, reason: 'unknown' as const }
             return disposed || navigation.aborted ? { ok: false as const, reason: 'unknown' as const } : chooseSession({
               sessionId: parseClientSessionKey(id)?.sessionId ?? id,
@@ -273,27 +257,48 @@ export function apply(ctx: ClientContext): void {
             }, replace, navigation)
           })
         },
-        hydrateCatalog: async (catalog: WorkbenchCatalog, paneIds: readonly SessionId[]) => {
+        hydrateCatalog: async (catalog: WorkbenchCatalog, paneIds: readonly SessionId[],
+          options: WorkbenchRestoreOptions = {}): Promise<LegacyWorkbenchRestore | undefined> => {
           if (isDisposed()) return
+          restoreOperation?.abort()
+          restoreOperation = new AbortController()
+          const signal = AbortSignal.any([lifetime.signal, restoreOperation.signal,
+            ...(options.signal === undefined ? [] : [options.signal])])
+          signal.throwIfAborted()
           ctx.sessions.setBaseRuntimeTarget?.(catalog.activeRuntime)
           const workbench = viewport as WorkbenchViewport
           if (workbench.needsCatalogRestore?.() === false) { viewport.markCatalogReady(); return }
           const version = workbench.sessionKeyVersion?.()
-          // A partial personal directory cannot disambiguate any legacy raw ID.
-          if (version === 2 && !catalog.personalComplete) return
+          const workbenchId = workbench.currentWorkbench?.().id
+          if (options.selection !== undefined && options.selection.workbenchId !== workbenchId) return
           const ids = version === undefined ? paneIds : version === 2
             ? workbench.currentWorkbench?.().paneIds ?? [] : viewport.snapshot.getSnapshot().paneIds
-          const candidatesFor = (id: SessionId, version: 2 | 3 | undefined) => catalog.items.filter(candidate =>
-            version === 2 || (version === undefined && parseClientSessionKey(id) === undefined)
-              ? candidate.sessionId === id : clientSessionKey(candidate.runtime, candidate.sessionId) === id)
+          const allIds = version === 2 ? [...new Set(workbench.listWorkbenches?.().flatMap(row => row.paneIds) ?? ids)] : ids
+          const candidatesFor = (id: SessionId, encoding: 2 | 3 | undefined) => {
+            const rows = catalog.items.filter(candidate =>
+              encoding === 2 || (encoding === undefined && parseClientSessionKey(id) === undefined)
+                ? candidate.sessionId === id : clientSessionKey(candidate.runtime, candidate.sessionId) === id)
+            const candidates = [...new Map(rows.map(row => [clientSessionKey(row.runtime, row.sessionId), row])).values()]
+            const chosen = options.selection?.owners[id]
+            return encoding !== 2 || chosen === undefined ? candidates : candidates.filter(row =>
+              chosen !== null && clientSessionKey(row.runtime, row.sessionId) === chosen)
+          }
+          if (version === 2) {
+            const issues = allIds.flatMap((sessionId) => {
+              const candidates = candidatesFor(sessionId, version)
+              const chosen = options.selection?.owners[sessionId]
+              if (chosen === null || candidates.length === 1 && (chosen !== undefined || catalog.personalComplete)) return []
+              return [{ sessionId, candidates }]
+            })
+            if (issues.length > 0) return { workbenchId, issues }
+          }
           const items = ids.flatMap((id) => {
             const candidates = candidatesFor(id, version)
             // Old records without a runtime never choose the first colliding ID.
             const item = candidates.length === 1 ? candidates[0] : undefined
             return item === undefined ? [] : [item]
           })
-          const targets = [...new Map(items.map(item => [item.runtime.kind === 'personal' ? 'personal'
-            : `project:${item.runtime.projectId}`, item.runtime])).values()]
+          const targets = [...new Map(items.map(item => [runtimeTargetKey(item.runtime), item.runtime])).values()]
           const restore = async (): Promise<void> => {
             const unavailable = new Set<SessionId>()
             const denied = new Set<SessionId>()
@@ -301,7 +306,7 @@ export function apply(ctx: ClientContext): void {
               await Promise.all(items.map(async (item) => {
                 const key = ctx.sessions.keyFor?.(item.sessionId, item.runtime) ?? item.sessionId
                 try {
-                  if (await ctx.sessions.ensureSession?.(item.runtime, item.sessionId, lifetime.signal) !== true) denied.add(key)
+                  if (await ctx.sessions.ensureSession?.(item.runtime, item.sessionId, signal) !== true) denied.add(key)
                 } catch (error) {
                   if (error instanceof WorkspaceResourceError && error.code === 'access-revoked'
                     || error instanceof Error && 'status' in error && (error.status === 401 || error.status === 403)) denied.add(key)
@@ -309,12 +314,15 @@ export function apply(ctx: ClientContext): void {
                 }
               }))
             }
-            if (!disposed) {
+            if (!signal.aborted && !disposed && workbench.currentWorkbench?.().id === workbenchId
+              && workbench.sessionKeyVersion?.() === version) {
               workbench.reconcileSessionKeys?.((id, version) => {
                 const matches = candidatesFor(id, version)
                 const item = matches.length === 1 ? matches[0] : undefined
                 if (matches.length === 0 && version === 3 && !catalog.personalComplete
-                  && parseClientSessionKey(id)?.runtime.kind === 'personal') {
+                  && parseClientSessionKey(id)?.runtime.kind === 'personal'
+                  && (catalog.personalRuntimes === undefined || catalog.personalRuntimes.some(target =>
+                    target.runtimeId === parseClientSessionKey(id)?.runtime.runtimeId))) {
                   unavailable.add(id)
                   return id
                 }
@@ -328,7 +336,7 @@ export function apply(ctx: ClientContext): void {
             const target = targets[index]
             if (target === undefined) return restore()
             if (ctx.sessions.usingRuntime === undefined) throw new Error('Runtime discovery requires an owned runtime operation')
-            return ctx.sessions.usingRuntime(target, lifetime.signal, () => hold(index + 1))
+            return ctx.sessions.usingRuntime(target, signal, () => hold(index + 1))
           }
           await hold(0)
         },
@@ -379,13 +387,10 @@ export function apply(ctx: ClientContext): void {
         // Row tiles resolve the same per-pane steward tone as the pane header.
         projectPolicy: ctx.get('projectUiPolicy') ?? ABSENT_PROJECT_POLICY,
       },
-      focusPane: focusConversation,
+      focusPane: (sessionId) => { ctx.layout.selectPanel(null); viewport.focus(sessionId) },
       removePane: (sessionId) => { viewport.remove(sessionId) },
       setPaneRatios: (ratios) => { viewport.setPaneRatios(ratios) },
-      exitWorkbench: () => {
-        ctx.layout.selectPanel(null)
-        viewport.setMode('single')
-      },
+      exitWorkbench: () => { ctx.layout.selectPanel(null); viewport.setMode('single') },
     }),
   }, WorkbenchSidebar))
   ctx.slots.inject('conversation.workbench.pane.header', () => ctx.slots.register({
@@ -395,7 +400,7 @@ export function apply(ctx: ClientContext): void {
     inject: (sessionId: SessionId) => ({
       // The pane's steward tone follows its own session runtime, read from the
       // roster mirror — the page's active scope never applies to a pane.
-      hooks: { projectPolicy: ctx.get('projectUiPolicy') ?? ABSENT_PROJECT_POLICY },
+      hooks: { projectPolicy: ctx.get('projectUiPolicy') ?? ABSENT_PROJECT_POLICY, deployment: ctx.deploymentContext },
       replacePane: () => {
         viewport.focus(sessionId)
         ctx.slots.bindStore(chooser).actions.openPicker(true)

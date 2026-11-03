@@ -1,0 +1,13 @@
+{
+  "name": "python-managed-lint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/experimental/ptc-runtime-python/src/index.ts packages/experimental/ptc-runtime-python/src/launch.ts packages/experimental/ptc-runtime-python/tests/boot-write-failure.spec.ts packages/experimental/ptc-runtime-python/tests/resource-admission.spec.ts packages/experimental/ptc-runtime-python/tests/runtime.spec.ts packages/experimental/ptc-runtime-python/tests/sandbox.spec.ts snapshots/session/ptc-python-turn/resource-admission-fixture.mjs",
+  "startedAt": "2026-10-23T15:57:11.855080+00:00",
+  "seconds": 2.973,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "02d947cf3758a28cd912d9a6f43e768e597818b4f200878d9c29af92e5add5b4",
+  "inputsAfter": "02d947cf3758a28cd912d9a6f43e768e597818b4f200878d9c29af92e5add5b4",
+  "outputSha256": "e2d773dd56734eb7ca1943785c3d343031b745c43349e26429f7414bb4863b61",
+  "outputTail": "packages/experimental/ptc-runtime-python/tests/boot-write-failure.spec.ts:22:22: error @stylistic(member-delimiter-style): Unexpected separator (;).\npackages/experimental/ptc-runtime-python/tests/boot-write-failure.spec.ts:22:42: error @stylistic(member-delimiter-style): Unexpected separator (;).\npackages/experimental/ptc-runtime-python/tests/boot-write-failure.spec.ts:22:63: error @stylistic(member-delimiter-style): Unexpected separator (;).\npackages/experimental/ptc-runtime-python/tests/boot-write-failure.spec.ts:22:84: error @stylistic(member-delimiter-style): Unexpected separator (;).\npackages/experimental/ptc-runtime-python/src/index.ts:432:22: error typescript(no-non-null-assertion): Forbidden non-null assertion. help: Consider using the optional chain operator `?.` instead. `x!.y` is equivalent to `x.y` at runtime and will throw if `x` is `null` or `undefined`, but `x?.y` will return `undefined`.\npackages/experimental/ptc-runtime-python/src/index.ts:934:31: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/experimental/ptc-runtime-python/src/index.ts:426:1: error @stylistic(indent): Expected indentation of 4 spaces but found 6.\npackages/experimental/ptc-runtime-python/src/index.ts:427:1: error @stylistic(indent): Expected indentation of 4 spaces but found 6.\npackages/experimental/ptc-runtime-python/tests/boot-write-failure.spec.ts:300:7: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\npackages/experimental/ptc-runtime-python/tests/boot-write-failure.spec.ts:300:85: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\n"
+}

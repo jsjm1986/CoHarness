@@ -1,0 +1,13 @@
+{
+  "name": "business-metadata-regressions",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run scripts/verify-upstream-sovereignty.spec.ts scripts/gen-third-party-notices.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-23T19:10:53.083933+00:00",
+  "seconds": 7.376,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c5d2fd22fd7230a49fa49b4a7844579f34638cb0b5b2f2091b7ac85bb3f81291",
+  "inputsAfter": "c5d2fd22fd7230a49fa49b4a7844579f34638cb0b5b2f2091b7ac85bb3f81291",
+  "outputSha256": "5bebe834c75ddf8107152d84a0daffb9d153dd9fefc581e40684f0261e2238e5",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  2 passed (2)\n      Tests  68 passed (68)\n   Start at  03:10:56\n   Duration  3.64s (transform 621ms, setup 91ms, import 426ms, tests 6.43s, environment 0ms)\n\n"
+}

@@ -1,7 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import {
-  NavigationController, SlotRegistry, WorkspaceArchiveError,
+  NavigationController, SlotRegistry, WorkspaceArchiveError, createSnapshotStore,
   type AddPaneResult, type SessionId, type SessionListState, type SessionSummary,
   type WorkspaceId, type WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -66,6 +66,11 @@ async function bench() {
     title: 'new', sessionIds: [], createdAt: '0', updatedAt: '0',
   }))
   const startSession = vi.fn()
+  const createRuntimeSession = vi.fn(async () => sid('computer-conversation'))
+  const refreshPersonalDirectory = vi.fn(async () => {})
+  const usingRuntime = vi.fn(async (
+    _target: unknown, signal: AbortSignal, operation: (active: AbortSignal) => Promise<void>,
+  ) => operation(signal))
   const rename = vi.fn(async () => ({}))
   const insertSessionBefore = vi.fn(async () => ({}))
   const navigation = new NavigationController()
@@ -118,6 +123,8 @@ async function bench() {
     refresh: refreshWorkspaces,
     create,
     startSession,
+    createRuntimeSession,
+    refreshPersonalDirectory,
     rename,
     delete: vi.fn(async () => undefined),
     insertBefore: vi.fn(async () => undefined),
@@ -129,6 +136,7 @@ async function bench() {
     listDirectory: vi.fn(async () => ({ entries: [], ancestors: [] })),
   } as never)
   ctx.provide('sessions', {
+    retainInfo: () => createSnapshotStore({ referenceCount: 0, retainedBy: {} }),
     list: { getSnapshot: () => sessionSnapshot, subscribe },
     currentScopeList: { getSnapshot: () => currentScopeSnapshot ?? sessionSnapshot, subscribe },
     refresh: refreshSessions,
@@ -136,6 +144,7 @@ async function bench() {
     open,
     retain,
     using,
+    usingRuntime,
     search,
     searchResultLimit: 20,
     binding,
@@ -166,7 +175,7 @@ async function bench() {
   ctx.provide('layout', { selectPanel } as never)
   ctx.provide('locale', locale)
   return {
-    ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, startSession, rename,
+    ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, startSession, createRuntimeSession, refreshPersonalDirectory, usingRuntime, rename,
     insertSessionBefore, open, selectPanel, search, renameSession, binding, retain, using, fork,
     archiveSession, unarchiveSession, pinSession, unpinSession, workspacesSubscribe,
     refreshSessions, refreshWorkspaces,
@@ -246,6 +255,26 @@ describe('ui-workspace apply', () => {
     } finally { await b.ctx.fiber.dispose() }
   })
 
+  it('computer creation finishes when its conversation opens without waiting for directory metadata', async () => {
+    const b = await bench()
+    declare(b.slots, 'sidebar.workspaces')
+    let complete!: () => void
+    const directory = new Promise<void>((resolve) => { complete = resolve })
+    b.refreshPersonalDirectory.mockImplementation(() => directory)
+    try {
+      await b.ctx.plugin({ inject: [...inject], apply }).await()
+      const browser = faceOf(b.slots.entries('sidebar.workspaces')[0]!) as WorkspaceBrowserInjected
+      const target = { kind: 'personal' as const, runtimeId: 'computer-b' as never }
+      await browser.startRuntimeSession!(target, 'workspace-b' as WorkspaceId)
+      expect(b.createRuntimeSession).toHaveBeenCalledWith(target, 'workspace-b', expect.any(AbortSignal))
+      expect(b.open).toHaveBeenCalledWith('computer-conversation')
+      expect(b.refreshPersonalDirectory).toHaveBeenCalledOnce()
+      expect(b.usingRuntime).toHaveBeenCalledOnce()
+    } finally {
+      complete()
+      await b.ctx.fiber.dispose()
+    }
+  })
   it('declares the services it drives', () => {
     expect(inject).toEqual(['slots', 'sessions', 'workspaces', 'locale', 'connection', 'conversationViewport', 'shortcuts', 'layout'])
   })

@@ -1,0 +1,14 @@
+{
+  "name": "auth-waited-authority-build",
+  "cwd": "gateway",
+  "command": "npm run build",
+  "startedAt": "2026-10-24T01:55:03.182740+00:00",
+  "seconds": 4.066,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e676de363fe067ec1ea79d05daa4bc829065af8787be3cc6610daa74fae30de8",
+  "inputsAfter": "e676de363fe067ec1ea79d05daa4bc829065af8787be3cc6610daa74fae30de8",
+  "postgresToolDirectory": null,
+  "outputSha256": "898095a3ceeb02add8ff851ae671d7fc499316aab1c64f358d6b61663d57feb4",
+  "outputTail": "\n> build\n> tsc -p tsconfig.build.json\n\n"
+}

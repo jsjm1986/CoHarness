@@ -1,8 +1,9 @@
+import ResourceBudget from '@deepseek-ai/dsh-resource-budget'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
@@ -134,6 +135,8 @@ it('requires a browser mode and validates launch and attachment settings', () =>
   expect(BrowserMcpConfig({ mode: 'launch' })).toEqual({ mode: 'launch', headless: true })
   expect(BrowserMcpConfig({ mode: 'launch', headless: false, executablePath: '/chromium', toolCallTimeoutMs: 12 })).toMatchObject({ headless: false, toolCallTimeoutMs: 12 })
   expect(BrowserMcpConfig({ mode: 'attach', endpoint: 'wss://browser.example/devtools/browser/id' })).toMatchObject({ mode: 'attach' })
+  expect(() => { validateBrowserMcpConfig({ mode: 'launch', headless: true }) }).not.toThrow()
+  expect(() => { validateBrowserMcpConfig({ mode: 'attach', endpoint: 'https://browser.example/' }) }).not.toThrow()
   for (const invalid of [{}, { mode: 'attach' }, { mode: 'attach', endpoint: 'file:///tmp/browser' }, { mode: 'launch', toolCallTimeoutMs: 0 }, { mode: 'launch', executablePath: '' }]) {
     expect(() => BrowserMcpConfig(invalid as never)).toThrow()
   }
@@ -171,6 +174,41 @@ it('waits for SystemPrompt and ToolRuntime before reserving the provider', async
 })
 
 describe('Session MCP Loader composition', () => {
+  it.each(['failure', 'cancellation'] as const)('retains an attachment after %s until its actual MCP cleanup can be retried', async (cause) => {
+    const { ctx, root, browser } = await load(true, cause === 'cancellation' ? 'hold' : 'fail')
+    let reportingUnavailable = true, allocations = 0
+    const occupied = new Set<number>()
+    onTestFinished(() => { reportingUnavailable = false })
+    ctx.provide('resourceBudgetRequired', true)
+    new class extends ResourceBudget { async acquire() {
+      const allocation = ++allocations
+      occupied.add(allocation)
+      return {
+        signal: new AbortController().signal, async uncertain() {},
+        async release() {
+          if (reportingUnavailable) throw new Error('browser completion report unavailable')
+          occupied.delete(allocation)
+        },
+      }
+    } }(ctx)
+    const controller = new AbortController()
+    const rejected = expect(ctx.agents.create({ sessionId: SessionId('failed-browser-report'), signal: controller.signal })).rejects.toThrow()
+    if (cause === 'cancellation') {
+      await vi.waitFor(async () => { expect((await events(root)).some(event => event.event === 'probe')).toBe(true) })
+      controller.abort(new Error('cancel browser while its completion report is unavailable'))
+    }
+    await rejected
+    expect(allocations).toBe(1)
+    const blocked = await ctx.agents.create({ sessionId: SessionId('waiting-browser-owner') })
+    expect((await warm(ctx, blocked.agent)).tools.some(tool => tool.name === TOOL)).toBe(false)
+    expect(allocations).toBe(1)
+    expect(occupied.size).toBe(1)
+    reportingUnavailable = false
+    await browser.dispose()
+    expect(occupied.size).toBe(0)
+    expect(ctx.browserUse.providerName).toBeUndefined()
+    await blocked.dispose()
+  })
   it('discovers schemas before the first model request and retains distinct state across turns', async () => {
     const { ctx, root, model, browser } = await load(false, undefined, 5000, [TOOL, '<unlisted-tools>'])
     const first = await ctx.agents.create({ sessionId: SessionId('first'), meta: { cwd: root }, agentOptions: { provider: 'fixture', model: 'fixture' } })

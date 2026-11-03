@@ -5,7 +5,10 @@ window.__ModuleLoader__.load({
     return {
       inject: ['uiWorkspace', 'workspaces', 'sessions'],
       apply(ctx) {
+        let initializations = 0
+        ctx.on('conversation/draft-initialize', () => { initializations += 1 })
         window.__draftInit = {
+          initializations: () => initializations,
           startSession: (workspaceId, options) => ctx.uiWorkspace.startSession(workspaceId, options),
           /**
            * Mirrors the connectWorkspace reuse scan verbatim: a blank Session

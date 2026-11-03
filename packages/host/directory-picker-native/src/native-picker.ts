@@ -61,8 +61,9 @@ function run(argv) {
   return ObjC.unwrap(urls.objectAtIndex(0).path);
 }`
 
+/** POSIX chooser output ends in one LF; preceding CR/LF characters belong to the path. */
 function outputPath(stdout: string): string | null {
-  const path = stdout.replace(/[\r\n]+$/, '')
+  const path = stdout.endsWith('\n') ? stdout.slice(0, -1) : stdout
   return path === '' ? null : path
 }
 

@@ -11,7 +11,9 @@ The workflow seam (`ctx.workflowEngine`) executes a model-written orchestration 
 
 `@deepseek-ai/dsh-workflow-ptc` is the current engine and `@deepseek-ai/dsh-tool-workflow` is the model-facing consumer. A future process or sandbox engine can replace the implementation without changing the tool.
 
-The package root is the Host face. The browser-safe `@deepseek-ai/dsh-workflow/types` subpath contains run identities, metadata, results, and observe-only lifecycle payloads without importing `Agent`, Cordis services, or Host context declarations; Host-only `WorkflowStartRequest` and `WorkflowRun` live behind the package root.
+The package root is the Host face. The browser-safe `@deepseek-ai/dsh-workflow/types` subpath contains run identities, metadata, results, and observe-only lifecycle payloads without importing `Agent`, Cordis services, or Host context declarations; Host-only Foreground Consumers enter `engine.withForeground(parent, signal, operation)` before starting a run and keep startup, collection, disposal and failed cleanup transfer inside its callback. The callback receives cancellation combined with engine withdrawal. Withdrawal rejects new admission, cancels and joins accepted callbacks, and retains their exact parents until they finish. Providers also retain admission in dependencies that own child cleanup. Independent raw starts and background Jobs keep holder controls.
+
+`WorkflowStartRequest` and `WorkflowRun` live behind the package root.
 
 ## Summary
 
@@ -31,13 +33,13 @@ Run a plain-JavaScript orchestration script that fans work out to subagents and 
 <a id="service-and-run-contract"></a>
 ## Service and run contract
 
-`WorkflowEngine.start(request): WorkflowRun` validates enough synchronously to reject a malformed meta block, unparseable script, unavailable provider route, or unsupported per-run limit before a run exists. Once returned, `WorkflowRun.result` never rejects: execution failures resolve with `stopReason: 'error'`, and cancellation resolves with `cancelled` within the engine's bounded grace.
+`WorkflowEngine.start(request): WorkflowRun` validates enough synchronously to reject a malformed meta block, unparseable script, unavailable provider route, or unsupported per-run limit before a run exists. Once returned, `WorkflowRun.result` never rejects: execution failures resolve with `stopReason: 'error'`, and cancellation uses `stopReason: 'cancelled'`. Cleanup can retain the run beyond process termination.
 
-A run is holder-owned. Engine-plugin unload prevents new starts but does not revoke accepted runs. The holder must call `dispose()` on every path; disposal cancels remaining work and reaches or abandons quiescence within the documented bound.
+A run is holder-owned. Engine-plugin unload prevents new starts but does not revoke accepted runs. The holder must call `dispose()` on every path. Concurrent calls share one cleanup attempt; a failed attempt rejects and retains unfinished cleanup for a later retry. Result settlement does not confirm physical cleanup. A foreground holder transfers rejected cleanup with `run.retainFailedCleanup()` before discarding the handle. Observe its confirmation asynchronously; awaiting it inside the failing call would prevent that caller from requesting recovery. Holder-owned background work keeps its retry controls.
 
 `WorkflowStartRequest` contains `{ meta, script, args?, subagentProvider?, maxTotalAgents?, parent, signal? }`. `parent` attributes every child agent to the invoking agent. `subagentProvider` optionally routes every child in that run without exposing provider choice to the script; omission uses the engine's configured provider. `maxTotalAgents` optionally lowers the engine's deployment ceiling for one run and is likewise invisible to the script. An implementation rejects invalid routes and limits synchronously. `meta` and `args` are plain data, not script fragments.
 
-`WorkflowRun` exposes `{ id, meta, result, cancel(reason?), dispose() }`. `WorkflowResult` contains `{ value, stopReason, error?, agentsStarted }`; `value` is plain JSON data or `null`.
+`WorkflowRun` exposes `{ id, meta, result, cancel(reason?), dispose(), retainFailedCleanup() }`. `WorkflowResult` contains `{ value, stopReason, error?, agentsStarted }`; `value` is plain JSON data or `null`.
 
 <a id="events"></a>
 ## Events
@@ -76,11 +78,11 @@ No direct invalidation; the named consumer and engine own any request-prefix cha
 
 ## Known Limitations and Deferred Work
 
-- **Foreground collection only** — the caller owns one live run and awaits it; background start/poll, spill handles, and detached collection are deferred.
+- **No Job controls on the engine** — `start()` returns a holder-owned run; Consumers use the Job capability for background registration and collection.
 - **No journaling or resume** — scripts, child progress, and intermediate values are not checkpointed, so a process restart cannot continue a run.
 - **No saved or nested workflows** — the seam starts caller-supplied scripts only, and a workflow script receives no `workflow()` hook for recursive orchestration.
 - **No token-budget vocabulary** — engines cap concurrency, items, and children, but neither the request nor result accounts for model tokens across children.
-- **Runs are holder-owned, not service-tracked** — unloading the engine does not discover independent live handles; every consumer must dispose the run it started.
+- **Independent handles require their holders** — raw `start()` calls remain untracked; foreground Consumers use `withForeground()` for withdrawal joins. Every holder must dispose its run.
 
 See the [dynamic-workflows Agent Note](../../../.agents/notes/implemented/feature/2026-07-05-dynamic-workflows.md) for the deferred workflow API.
 

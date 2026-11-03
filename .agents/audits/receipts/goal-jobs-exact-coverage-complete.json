@@ -1,0 +1,14 @@
+{
+  "name": "goal-jobs-exact-coverage-complete",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/goal-jobs-exact-coverage.config.mts packages/goal packages/jobs --coverage",
+  "startedAt": "2026-10-26T03:30:12.205795+00:00",
+  "seconds": 24.606,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5e5e2f63248000d3a7fdf168ca33083c343a74fa6cb85691ce1468901f61a801",
+  "inputsAfter": "5e5e2f63248000d3a7fdf168ca33083c343a74fa6cb85691ce1468901f61a801",
+  "postgresToolDirectory": null,
+  "outputSha256": "801aff7ef363ec0c735db92dc5af1536f6f92a42d8203e824098051a4e3087d0",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  14 passed (14)\n      Tests  334 passed (334)\n   Start at  11:30:27\n   Duration  8.96s (transform 9.65s, setup 786ms, import 13.98s, tests 7.18s, environment 2ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\nAll files          |   99.74 |    99.29 |     100 |   99.71 |                   \n .../tool-goal/src |   99.12 |    98.37 |     100 |   99.05 |                   \n  authority.ts     |   97.82 |    95.23 |     100 |   97.43 | 40                \n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 99.74% ( 396/397 )\nBranches     : 99.29% ( 281/283 )\nFunctions    : 100% ( 93/93 )\nLines        : 99.71% ( 349/350 )\n================================================================================\nERROR: Coverage for lines (97.43%) does not meet global threshold (100%) for packages/goal/tool-goal/src/authority.ts\nERROR: Coverage for statements (97.82%) does not meet global threshold (100%) for packages/goal/tool-goal/src/authority.ts\nERROR: Coverage for branches (95.23%) does not meet global threshold (100%) for packages/goal/tool-goal/src/authority.ts\n"
+}

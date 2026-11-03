@@ -84,6 +84,7 @@ kind: "package-reference"
 
 ### 所有权与清理规则
 
+- 后端撤下会以 `NO_BACKEND` 取消未发布的启动，并等待回滚。等待 `registerBackend()` 返回的释放函数即可观察清理完成或失败。已发布的会话在后端重载后仍归属于原来的确切 Agent。
 - 限制基于确切的 `Agent` 对象：`hasOwnerActivity(owner)` 覆盖从尚未发布的设置到最终关闭的全过程，没有发布竞态，因此生命周期策略可以精确限制所有者。
 - 无法清理部分启动资源的后端会以 `TerminalBackendCleanupError` 拒绝；服务会将该失败保留为受跟踪的所有者活动，直到所有者或服务 dispose 消费并报告它。
 - 调用方取消保留其确切的 `AbortSignal.reason`；`kill()` 与 dispose 只在后端捕获的进程树完全停稳后完成。

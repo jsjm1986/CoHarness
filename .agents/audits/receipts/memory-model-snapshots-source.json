@@ -1,0 +1,13 @@
+{
+  "name": "memory-model-snapshots-source",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/memory-execution.snapshot.ts examples/headless-agent/tests/memory-cancellation.snapshot.ts examples/headless-agent/tests/memory-curation-race.snapshot.ts examples/headless-agent/tests/gateway-memory.snapshot.ts gateway/tests/model-policy.snapshot.ts --retry=0",
+  "startedAt": "2026-10-23T13:19:33.549951+00:00",
+  "seconds": 7.019,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1251d6ad967930c8b9eb452b4a75c60f47a88d10c3a8bc9743e4cce6fec6409e",
+  "inputsAfter": "1251d6ad967930c8b9eb452b4a75c60f47a88d10c3a8bc9743e4cce6fec6409e",
+  "outputSha256": "9eea7c66d6d54ce4ffdd57ee49848b4f8258d79d04850ff3b689374d7c3e5305",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  5 passed (5)\n      Tests  7 passed (7)\n   Start at  21:19:36\n   Duration  4.18s (transform 4.91s, setup 194ms, import 6.71s, tests 9.62s, environment 1ms)\n\n"
+}

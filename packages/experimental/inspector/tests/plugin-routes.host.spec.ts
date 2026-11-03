@@ -5,13 +5,15 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createConnection, createServer, type AddressInfo, type Socket } from 'node:net'
 import { Context } from '@deepseek-ai/cordis'
 import type { Message } from '@deepseek-ai/cordis'
-import type { WebRoute, WebServer, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
+import type { IndexInjection, WebRoute, WebServer, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
 import { HostConnectionService } from '@deepseek-ai/dsh-client-connection'
+import ExecutionAuthority from '@deepseek-ai/dsh-execution-authority'
 import type { BrowserAuth } from '@deepseek-ai/dsh-client-connection/src/browser-auth.ts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apply, Config, inject, name } from '../src/index.ts'
+import { apply, Config, inject, name, InspectorStartupCleanupError } from '../src/index.ts'
 import { startInspector, type InspectorHandle } from '../src/host/bridge/controller.ts'
 import { InspectorClientFixture } from './fixtures/client-source.host.ts'
+import { httpFetch } from './api-fetch.ts'
 
 type AssetMiddleware = (req: IncomingMessage, res: ServerResponse, next: (error?: unknown) => void) => void
 
@@ -50,7 +52,7 @@ describe('experimental Inspector Host DevTools routes', () => {
     vi.clearAllMocks()
   })
 
-  async function mount(options: { indexAllowed?: () => boolean; before?: (ctx: Context) => void } = {}) {
+  async function mount(options: { indexAllowed?: () => boolean; isolate?: boolean; before?: (ctx: Context, realm: Context) => void } = {}) {
     context = new Context()
     vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const routes: WebRoute[] = []
@@ -73,10 +75,165 @@ describe('experimental Inspector Host DevTools routes', () => {
     new HostConnectionService(context, [], auth as BrowserAuth)
     const messages: Message[] = []
     context.logger.exporter({ levels: { default: 3 }, export: (message) => { messages.push(message) } })
-    options.before?.(context)
-    const fiber = context.plugin({ name, inject: [...inject], Config, apply }, { port: 0, captureFetch: false })
+    const realm = options.isolate ? context.isolate('executionAuthority').isolate('executionAuthorityRequired') : context
+    options.before?.(context, realm)
+    const fiber = realm.plugin({ name, inject: [...inject], Config, apply }, { port: 0, captureFetch: false })
     return { fiber, routes, upgrades, messages }
   }
+
+  it.each(['required', 'provider'] as const)('refuses Host debugging before allocation with %s execution authority', async (control) => {
+    const { fiber, routes, upgrades } = await mount({ before: (ctx) => {
+      if (control === 'required') ctx.provide('executionAuthorityRequired', true)
+      else new FixtureAuthority(ctx)
+    } })
+    const outcome = await fiber.await().then(() => 'ready', (error: unknown) => error instanceof Error ? error.message : String(error))
+    expect(outcome).toContain('Inspector requires an independent local runtime')
+    expect(startInspector).not.toHaveBeenCalled()
+    expect(context!.get('inspector')).toBeUndefined()
+    expect(routes).toEqual([])
+    expect(upgrades).toEqual([])
+  })
+
+  it.each(['required', 'provider'] as const)('cannot hide root %s authority in an isolated Inspector realm', async (control) => {
+    const { fiber } = await mount({ isolate: true, before: (ctx) => {
+      if (control === 'required') ctx.provide('executionAuthorityRequired', true)
+      else new FixtureAuthority(ctx)
+    } })
+    const outcome = await fiber.await().then(() => 'ready', (error: unknown) => error instanceof Error ? error.message : String(error))
+    expect(outcome).toContain('Inspector requires an independent local runtime')
+    expect(startInspector).not.toHaveBeenCalled()
+  })
+
+  it.each(['required', 'provider'] as const)('refuses %s authority confined to its own Inspector realm', async (control) => {
+    const { fiber } = await mount({ isolate: true, before: (_ctx, realm) => {
+      if (control === 'required') realm.provide('executionAuthorityRequired', true)
+      else new FixtureAuthority(realm)
+    } })
+    const outcome = await fiber.await().then(() => 'ready', (error: unknown) => error instanceof Error ? error.message : String(error))
+    expect(outcome).toContain('Inspector requires an independent local runtime')
+    expect(startInspector).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { control: 'required', isolated: false }, { control: 'provider', isolated: false },
+    { control: 'required', isolated: true }, { control: 'provider', isolated: true },
+  ])('returns an unused startup grant when $control authority appears while queued with isolation=$isolated', async ({ control, isolated }) => {
+    const entered = Promise.withResolvers<undefined>(), grant = Promise.withResolvers<undefined>()
+    const release = vi.fn(async () => {}), uncertain = vi.fn(async () => {})
+    const { fiber } = await mount({ isolate: isolated, before: (ctx) => {
+      ctx.provide('resourceBudget', { async acquire() {
+        entered.resolve(undefined); await grant.promise
+        return { signal: new AbortController().signal, release, uncertain }
+      } })
+    } })
+    const ready = fiber.await()
+    void ready.catch(() => {})
+    try {
+      await entered.promise
+      if (control === 'required') context!.provide('executionAuthorityRequired', true)
+      else new FixtureAuthority(context!)
+      grant.resolve(undefined)
+      const outcome = await ready.then(() => 'ready', (error: unknown) => error instanceof Error ? error.message : String(error))
+      expect(outcome).toContain('Inspector requires an independent local runtime')
+      expect(context!.get('inspector')).toBeUndefined()
+      expect(release).toHaveBeenCalledOnce()
+      expect(uncertain).not.toHaveBeenCalled()
+    } finally { grant.resolve(undefined); await ready.catch(() => {}) }
+  })
+
+  it.each([
+    { control: 'required', isolated: false }, { control: 'provider', isolated: false },
+    { control: 'required', isolated: true }, { control: 'provider', isolated: true },
+  ])('closes existing debugging and refuses a retained relay after $control authority appears with isolation=$isolated', async ({ control, isolated }) => {
+    const { fiber, routes, upgrades } = await mount({ isolate: isolated })
+    await fiber.await()
+    const optional = context!.provide('executionAuthorityRequired', false)
+    expect(context!.get('inspector')).toBeDefined()
+    optional()
+    const upgrade = upgrades.find(row => row.path === '/inspector/devtools/cdp')!
+    const pair = await socketPair()
+    const reply = readUpgrade(pair.client)
+    await upgrade.handler(upgradeRequest(undefined, {}), pair.server,
+      clientTextFrame(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: '21*2' } })))
+    expect((await reply).message).toHaveProperty('result.result.value', 42)
+    if (control === 'required') context!.provide('executionAuthorityRequired', true)
+    else new FixtureAuthority(context!)
+    if (control === 'required') new FixtureAuthority(context!)
+    else context!.provide('executionAuthorityRequired', true)
+    const injected: IndexInjection[] = []
+    context!.emit('webserver/index-inject', injected)
+    expect(injected).toEqual([])
+    let status: number | undefined
+    const response = { writeHead(code: number) { status = code; return this }, end() { return this } }
+    await routes.find(row => row.path === '/inspector/devtools')!.handler(
+      upgradeRequest('/inspector/devtools/', {}), response as ServerResponse,
+    )
+    expect(status).toBe(403)
+    await pair.closed
+    await vi.waitFor(() => { expect(context!.get('inspector')).toBeUndefined() })
+    const refused = await socketPair()
+    await upgrade.handler(upgradeRequest(undefined, {}), refused.server, Buffer.alloc(0))
+    await refused.closed
+    expect(refused.received().toString()).toMatch(/^HTTP\/1\.1 403 /u)
+  })
+
+  it('retries unused-grant completion after authority cancels queued startup', async () => {
+    const entered = Promise.withResolvers<undefined>(), grant = Promise.withResolvers<undefined>()
+    const release = vi.fn(async () => {}).mockRejectedValueOnce(new Error('Unused completion unavailable'))
+    const uncertain = vi.fn(async () => {})
+    const { fiber } = await mount({ before: (ctx) => {
+      ctx.provide('resourceBudget', { async acquire() {
+        entered.resolve(undefined); await grant.promise
+        return { signal: new AbortController().signal, release, uncertain }
+      } })
+    } })
+    const pending = fiber.await().then(() => undefined, (error: unknown) => error)
+    try {
+      await entered.promise
+      context!.provide('executionAuthorityRequired', true)
+      grant.resolve(undefined)
+      expect(await pending).toBeInstanceOf(InspectorStartupCleanupError)
+      expect(release).toHaveBeenCalledTimes(2)
+      expect(uncertain).not.toHaveBeenCalled()
+      expect(context!.get('inspector')).toBeUndefined()
+    } finally { grant.resolve(undefined); await pending }
+  })
+
+  it('rejects a ready Worker returned after the authority changed and closes its unpublished endpoint', async () => {
+    const close = vi.fn(async () => {})
+    vi.mocked(startInspector).mockImplementationOnce(async (options, admission) => {
+      const actual = await vi.importActual<typeof import('../src/host/bridge/controller.ts')>('../src/host/bridge/controller.ts')
+      const handle = await actual.startInspector(options, admission)
+      close.mockImplementation(() => handle.close())
+      context!.provide('executionAuthorityRequired', true)
+      return { endpoint: handle.endpoint, source: handle.source, close }
+    })
+    const { fiber } = await mount()
+    const outcome = await fiber.await().then(() => 'ready', (error: unknown) => error instanceof Error ? error.message : String(error))
+    expect(outcome).toContain('Inspector requires an independent local runtime')
+    expect(context!.get('inspector')).toBeUndefined()
+    expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('blocks bootstrap during managed cleanup and retries failed accounting', async () => {
+    const release = vi.fn(async () => {}).mockRejectedValueOnce(new Error('Resource completion unavailable'))
+    const { fiber, messages } = await mount({ before: (ctx) => {
+      ctx.provide('resourceBudget', { async acquire() {
+        return { signal: new AbortController().signal, release, uncertain: async () => {} }
+      } })
+    } })
+    await fiber.await()
+    context!.provide('executionAuthorityRequired', true)
+    const response = await httpFetch(context!.get('connection') as HostConnectionService,
+      new Request('http://localhost/api/experimental-inspector/bootstrap'))
+    expect(response.status).toBe(403)
+    await vi.waitFor(() => {
+      expect(messages.some(message => message.args[0] === 'experimental-inspector: managed debugging cleanup failed')).toBe(true)
+    })
+    expect(release).toHaveBeenCalledOnce()
+    await fiber.dispose()
+    expect(release).toHaveBeenCalledTimes(2)
+  })
 
   it('answers frontend requests by method, index authorization, redirect, and asset outcome', async () => {
     let indexAllowed = true
@@ -231,6 +388,21 @@ describe('experimental Inspector Host DevTools routes', () => {
     expect(rollback?.args[1]).toMatchObject({ errors: [closeFailure] })
   })
 })
+
+/** A mounted authority whose guarded runtime must never invoke debugging on its behalf. */
+class FixtureAuthority extends ExecutionAuthority {
+  stamp(): never { throw new Error('Fixture does not stamp messages') }
+  answer(): never { throw new Error('Fixture does not answer questions') }
+  runCaptured(): never { throw new Error('Fixture does not run captured work') }
+  runRequest(): never { throw new Error('Fixture does not run requests') }
+  capture(): never { throw new Error('Fixture does not capture execution') }
+  current(): undefined { return undefined }
+  captureSession(): never { throw new Error('Fixture does not capture Sessions') }
+  inherit(): never { throw new Error('Fixture does not inherit execution') }
+  relay(): never { throw new Error('Fixture does not relay execution') }
+  authorize(): never { throw new Error('Fixture does not authorize debugging') }
+  authorizeSelection(): never { throw new Error('Fixture does not select presets') }
+}
 
 function upgradeRequest(url: string | undefined, headers: Record<string, string | string[] | undefined>): IncomingMessage {
   return {

@@ -1,0 +1,14 @@
+{
+  "name": "runtime-web-current-emit",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.build.json",
+  "startedAt": "2026-10-24T21:27:23.043641+00:00",
+  "seconds": 2.173,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cfd0584c6b5816a86b605ca3d6daca9e9c5ed7df3215a0e5f25e3d7f5412c949",
+  "inputsAfter": "cfd0584c6b5816a86b605ca3d6daca9e9c5ed7df3215a0e5f25e3d7f5412c949",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

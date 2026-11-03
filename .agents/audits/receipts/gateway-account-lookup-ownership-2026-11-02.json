@@ -1,0 +1,354 @@
+{
+  "finding": "B472",
+  "status": "fixed_verified_async_bounded_account_lookup_and_native_closure_85_cases_global_review_open",
+  "updatedAt": "2026-11-02T07:44:03.903241+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-current-baseline-fetch.json",
+    "verifiedAt": "2026-11-02T07:34:02.153796+00:00",
+    "recordedHeadEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-baseline.json"
+  },
+  "problem": "Privileged document account lookup uses synchronous unbounded id children, blocking unrelated Gateway work. Project-profile lookup returns cancellation after execFile rejects while two TERM-resistant identity helpers remain alive. Both paths bypass the existing scrubbed, bounded native command owner.",
+  "fix": "Resolve document UID/GID asynchronously, retain both queries through close on success or failure, pass the node readiness deadline explicitly and use the existing runGatewayChildCommand for document and project preparation. Treat external account output as bounded decimal POSIX identifiers. Await the new permission result in the broker and real-UID fixture.",
+  "verification": {
+    "differentUnitAndSourceCases": 85,
+    "countDerivation": "66 initial related cases +18 account parser/publication cases +1 broker retry; Node22/24 repetitions are not additional cases.",
+    "platformSkippedCases": 9,
+    "skippedScope": "Existing project-runtime-data unit cases require Linux; this macOS run skips them. Separate compiled Linux-root native acceptance exercises actual account ownership and permissions. It is not a claim that those nine skipped tests ran.",
+    "realLinuxNativeExamples": 1,
+    "realLinuxSnapshotFacts": 3,
+    "counterexamplesBeforeFix": 2,
+    "originalReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-lookup-before.json",
+    "eventLoopResponsiveWhileQueriesWait": true,
+    "termResistantHelpersClosedBeforeCancellationAndTimeoutReturn": true,
+    "ambientGatewayAndCredentialSettingsExcluded": true,
+    "accountFailureDoesNotPublishEngineAndRetrySucceeds": true,
+    "sourceNode22AndBuiltNode24Verified": true,
+    "linuxHost": "Owned read-only network-disabled Node22.22.1 Alpine container, real nobody/daemon identities. No other host or account was changed.",
+    "wholeGatewayCoverageClaimed": false,
+    "coverageThresholdChanged": false,
+    "checks": [
+      {
+        "name": "account-lookup-native-complete",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-lookup-native-complete.json",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--root",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+          "--config",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/vitest.config.ts",
+          "tests/account-lookup-lifetime.spec.ts",
+          "tests/documents-local.spec.ts",
+          "tests/project-runtime-data.spec.ts",
+          "tests/launcher.spec.ts",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot"
+        ]
+      },
+      {
+        "name": "account-record-boundaries",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-record-boundaries.json",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--root",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+          "--config",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/vitest.config.ts",
+          "tests/document-runtime-account.spec.ts",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot"
+        ]
+      },
+      {
+        "name": "account-broker-retry",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-broker-retry.json",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--root",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+          "--config",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/vitest.config.ts",
+          "tests/documents-local.spec.ts",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot"
+        ]
+      },
+      {
+        "name": "account-oldest-engine",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-oldest-engine.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--root",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+          "--config",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/vitest.config.ts",
+          "tests/account-lookup-lifetime.spec.ts",
+          "tests/document-runtime-account.spec.ts",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot"
+        ]
+      },
+      {
+        "name": "account-native-built24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-native-built24.json",
+        "command": [
+          "env",
+          "HGW_ACCOUNT_LOOKUP_IMPLEMENTATION=lib",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--root",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+          "--config",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/vitest.config.ts",
+          "tests/account-lookup-lifetime.spec.ts",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot"
+        ]
+      },
+      {
+        "name": "gateway-normal-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/gateway-normal-build.json",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "gateway/tsconfig.build.json",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "account-caller-final-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-caller-final-types.json",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "gateway/tsconfig.json",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/gateway-check.tsbuildinfo",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "account-scoped-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-scoped-lint.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_OXLINT_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/document-storage.ts",
+          "gateway/src/project-runtime-data.ts",
+          "gateway/src/documents-local.ts",
+          "gateway/tests/account-lookup-lifetime.spec.ts",
+          "gateway/tests/document-runtime-account.spec.ts",
+          "gateway/tests/fixtures/account-lookup-lifetime.mjs",
+          "gateway/tests/fixtures/document-storage-uid.ts"
+        ]
+      },
+      {
+        "name": "account-new-fixture-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-new-fixture-lint.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_OXLINT_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/tests/run-built-account-publication.mjs",
+          "gateway/tests/document-runtime-account.spec.ts"
+        ]
+      },
+      {
+        "name": "account-broker-final-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-broker-final-lint.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_OXLINT_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/tests/documents-local.spec.ts"
+        ]
+      },
+      {
+        "name": "account-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-doc-quick.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_GATE_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/run-docs.mjs"
+        ]
+      },
+      {
+        "name": "account-final-verify-doc-budgets",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-final-verify-doc-budgets.json",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-doc-budgets.ts"
+        ]
+      },
+      {
+        "name": "account-final-verify-md-links",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-final-verify-md-links.json",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-md-links.ts"
+        ]
+      },
+      {
+        "name": "account-final-verify-translation-pairing",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-final-verify-translation-pairing.json",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts"
+        ]
+      },
+      {
+        "name": "allocation-scan-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/allocation-scan-final.json",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/scan-allocations-final.mjs"
+        ]
+      },
+      {
+        "name": "account-current-baseline-fetch",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-current-baseline-fetch.json",
+        "command": [
+          "git",
+          "fetch",
+          "--no-tags",
+          "origin",
+          "master"
+        ]
+      },
+      {
+        "name": "account-linux-artifact-bundle",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-linux-artifact-bundle.json",
+        "command": [
+          "env",
+          "RAYON_NUM_THREADS=1",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/tsdown/dist/run.mjs",
+          "--config",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/linux-account-artifact.config.mjs"
+        ]
+      },
+      {
+        "name": "account-linux-artifact-real-uid",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-linux-artifact-real-uid.json",
+        "command": [
+          "docker",
+          "run",
+          "--rm",
+          "--name",
+          "hgw-account-artifact-b0669e06d200",
+          "--network",
+          "none",
+          "--read-only",
+          "--tmpfs",
+          "/tmp:rw,mode=1777",
+          "--mount",
+          "type=bind,source=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/linux-account-artifact,target=/fixture,readonly",
+          "node:22.22.1-alpine",
+          "node",
+          "/fixture/run-built-account-publication.mjs"
+        ]
+      }
+    ],
+    "cleanup": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-native-cleanup.json",
+    "artifactPlaneAcceptance": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-artifact-plane-acceptance.json",
+    "earlierPrivateBundleScope": "Earlier bundle is retained as exploratory evidence; artifact-only acceptance above supplies the final compiled-native result."
+  },
+  "compatibility": {
+    "documentRuntimeAccessAsync": true,
+    "documentRuntimeAccessExplicitTimeoutAdded": true,
+    "allRepositoryConsumersUpdated": true,
+    "newConfig": false,
+    "deadline": "Existing HGW_READINESS_TIMEOUT_MS per identity query",
+    "schemaChanged": false,
+    "sessionFormatChanged": false,
+    "publicRemoteProtocolChanged": false,
+    "modelCallsMade": false,
+    "productionDeploymentPerformed": false,
+    "peerReservedIndexCatalogWorkbenchEdited": false
+  },
+  "capsule": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/account-lookup-capsule.json",
+  "integrationIndex": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T065406Z/B416-B472-integration-index.json",
+  "remaining": [
+    "B04 remains open: finish the classified direct/helper/Python/third-party allocation inventory and account/computer admission acceptance beyond the named cases.",
+    "B25 original acknowledged-owner SIGKILL failure has repaired source/built/PostgreSQL evidence; escaped-descendant and remaining native platform acceptance remain separate open questions.",
+    "Database connection-string process-argument privacy remains the already recorded wrapper/service-compatibility design candidate; this batch does not change deployment commands.",
+    "Peer retains index/catalog/workbench and migration104. No new migration, production deployment or live QA is performed by Root. Exact Runtime management REAL-050/B451 still requires independent operational acceptance.",
+    "Continue remaining business and permission domains. Scoped review does not complete any of the12 global domains.",
+    "Official paid Responses validation remains deferred by the user."
+  ],
+  "wholeProjectComplete": false,
+  "productionAcceptanceClaimed": false,
+  "officialResponsesDeferredByUser": true
+}

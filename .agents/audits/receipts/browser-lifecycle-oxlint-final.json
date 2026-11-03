@@ -1,0 +1,13 @@
+{
+  "name": "browser-lifecycle-oxlint-final",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/experimental/browser-use-runtime/src packages/experimental/browser-use-runtime/tests/resources.spec.ts packages/experimental/browser-use-stagehand-native/src packages/experimental/browser-use-stagehand-native/tests snapshots/session/browser-use-stagehand-native/native-fixture.mjs",
+  "startedAt": "2026-10-23T14:26:43.197288+00:00",
+  "seconds": 12.331,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7923fc153ec7c622084c6991c34ba09a67022bde1219f1ce2d3e69b63f685071",
+  "inputsAfter": "7923fc153ec7c622084c6991c34ba09a67022bde1219f1ce2d3e69b63f685071",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -1,0 +1,435 @@
+{
+  "findings": [
+    "B370",
+    "B371",
+    "B372",
+    "B373"
+  ],
+  "status": "fixed_named_recall_cases_verified_remaining_full_review_open",
+  "updatedAt": "2026-10-30T22:00:52.554859+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T214940Z",
+  "sourcePaths": [
+    "packages/memory/memory-context/src/index.ts",
+    "packages/memory/memory-context/tests/memory-context.spec.ts",
+    "examples/headless-agent/memory-recall-integrity.cordis.snapshot.yml",
+    "examples/headless-agent/tests/fixtures/memory-recall-integrity-model.ts",
+    "examples/headless-agent/tests/fixtures/memory-recall-integrity-driver.ts",
+    "examples/headless-agent/tests/memory-recall-integrity.snapshot.ts",
+    "examples/headless-agent/tests/snapshots/memory-recall-integrity/recalls.expected.jsonl",
+    "packages/memory/memory-context/README.md",
+    "packages/memory/memory-context/README.zh.md",
+    "packages/memory/memory-context/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-recall-addresses.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-recall-addresses.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-recall-addresses.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/memory/memory-context/src/index.ts": "2b014f2ee0d8a28901f694a89e40988caca25c18eee139fb157dc6e993d9cd7f",
+    "packages/memory/memory-context/tests/memory-context.spec.ts": "e8c94477531e430079186959237fe5d0510e9ce716df660579b0f0fae9818cc4",
+    "examples/headless-agent/memory-recall-integrity.cordis.snapshot.yml": "dbadfe59b5e7317566a978f1b7fcd2a4efe7f4f37ecf8bcaad28ff2328db8092",
+    "examples/headless-agent/tests/fixtures/memory-recall-integrity-model.ts": "bcf1ce3c33f34fa1f941900aa6e1b349a8eb69d3b2646a7bc039264709287734",
+    "examples/headless-agent/tests/fixtures/memory-recall-integrity-driver.ts": "b7118622289b5a57f90e4bc5b610edfae2e58736998888e199fd42d9d9cdd968",
+    "examples/headless-agent/tests/memory-recall-integrity.snapshot.ts": "74320fea9874a409964afe1fb58a9f02f6eec445ba26b275587a0560dabdda3e",
+    "examples/headless-agent/tests/snapshots/memory-recall-integrity/recalls.expected.jsonl": "7ba0f6e9f0ee60715404014e941355f1b3d110e531055d513aa2f5764a08d5bc",
+    "packages/memory/memory-context/README.md": "b437272ad04cc48755567cdb3bbdfbbb28303e68cff45fbea9879c01a0771bad",
+    "packages/memory/memory-context/README.zh.md": "dffeb7ae6e1137a53a43c81238011470ce4736cfe4fe372a14e3db62938f2e42",
+    "packages/memory/memory-context/README.i18n.yaml": "97838bedca8df043d6e46ca34c51d445ef050c09e8db406b9f946d2433832144",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-recall-addresses.md": "63aed484ef1aff9a9c579ae5c3ec149b358b2055b6fd3414b94f0059852c1eeb",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-recall-addresses.zh.md": "c21cc8b0b7b95873dc1bfc8ed7dcf628b043a3b41777efd692ebe61300b3df6d",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-recall-addresses.i18n.yaml": "5557449537b864b6ce1d9c77fcd9e4383f1b070cda244d1dcc231783f2162ff5"
+  },
+  "compiledArtifactHashes": {
+    "packages/memory/memory-context/lib/index.js": "fc76c23b5798a8ca3ca992f2f442b176c065735a2e60d0b41e5434301e62e0bd"
+  },
+  "repairs": [
+    {
+      "id": "B370",
+      "title": "Recall UTF-8 truncation adds replacement characters and can exceed inclusive input or content byte limits",
+      "repair": "UTF-8 truncation now discards an incomplete encoded tail without flushing a replacement character."
+    },
+    {
+      "id": "B371",
+      "title": "Recall metadata marks entries dropped by the message budget as already injected",
+      "repair": "The fitter returns matching text and retained addresses; omitted entries remain eligible on subsequent turns."
+    },
+    {
+      "id": "B372",
+      "title": "Same-named recall keys resolve to the last scope instead of catalog-order first match",
+      "repair": "The name index preserves the first eligible catalog row, retaining scope order."
+    },
+    {
+      "id": "B373",
+      "title": "Repeated selector keys inject one memory address multiple times",
+      "repair": "Each resolved address contributes at most one entry to an injected recall message."
+    }
+  ],
+  "causalEvidence": {
+    "initialFocusedNegative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T21:50:15.751157+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/memory/memory-context/tests/memory-context.spec.ts",
+        "--maxWorkers=2",
+        "-t",
+        "keeps complete UTF-8|records only fitted|resolves a key shared|injects a selected address once"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T21:50:18.230153+00:00"
+    },
+    "initialFocusedFixtureCorrection": "The initial later-turn case accidentally used two short entries which both fit. It was corrected to use an oversized second body; the existing partial-frame case gained an exact keys assertion. The corrected behavior is independently reproduced by the private real Loader negative.",
+    "privateRealLoaderControls": {
+      "recall-integrity-provenance-causal-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:56:49.017121+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T214940Z/run-recall-negative.py",
+          "wrong-provenance"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:56:49.744331+00:00"
+      },
+      "recall-integrity-scope-causal-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:56:49.016828+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T214940Z/run-recall-negative.py",
+          "wrong-scope"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:56:49.748496+00:00"
+      }
+    },
+    "privateControlMeaning": "A successful causal-control receipt means its private defective child exited1 at the maintained driver assertion. The first child carries two addresses beside one rendered entry; the second chooses the workspace entry before the personal one. Shared production source remains fixed."
+  },
+  "verification": {
+    "uniqueRelatedCases": 280,
+    "memoryPackageCases": 261,
+    "memoryContextCases": 54,
+    "newFocusedCases": 5,
+    "composedMemoryGatewayExecutionAndTypeScriptSdkCases": 18,
+    "pythonSdkCases": 1,
+    "repeatedEngineRunsAreNotAdditionalCases": true,
+    "coverage": {
+      "file": "packages/memory/memory-context/src/index.ts",
+      "statements": [
+        292,
+        292
+      ],
+      "branches": [
+        206,
+        206
+      ],
+      "functions": [
+        41,
+        41
+      ],
+      "lines": [
+        245,
+        245
+      ],
+      "allFourMetrics": 100,
+      "newExemptions": 0
+    },
+    "realLoaderTranscript": {
+      "turns": 3,
+      "first": "Personal shared-key retains62UTF8bytes; only that address is recorded.",
+      "second": "Previously omitted second-fact injects64body bytes.",
+      "third": "The remaining workspace shared-key injects once despite repeated selector keys.",
+      "humanInputBytes": [
+        255,
+        255,
+        255
+      ],
+      "modelAdmissions": 9,
+      "executionAdmissions": 3,
+      "physicallyReleasedAdmissions": 9
+    },
+    "platforms": "Mac source launch and compiled Node22.22.1/24.19.0. No physical Windows or Linux claim for this new scenario.",
+    "sdk": "Existing real TypeScript and Python Loader/SDK auxiliary-model transcripts and persisted resume continue to match their goldens. No root real API requests are made.",
+    "checks": {
+      "recall-context-source-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:51:34.673068+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/memory",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/memory/memory-context/src/index.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T214940Z/recall-context-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:51:48.766578+00:00"
+      },
+      "recall-integrity-focused-corrected-fixture": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:50:59.346102+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/memory/memory-context/tests/memory-context.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:51:02.467265+00:00"
+      },
+      "recall-integrity-loader-source-fixed": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:56:26.549542+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/memory-recall-integrity.snapshot.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:56:27.520037+00:00"
+      },
+      "recall-integrity-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:57:16.369028+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/memory-recall-integrity.snapshot.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:57:22.506382+00:00"
+      },
+      "recall-integrity-memory-sdk-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:57:48.127034+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/memory-recall-integrity.snapshot.ts",
+          "examples/headless-agent/tests/memory.snapshot.ts",
+          "examples/headless-agent/tests/memory-curation-race.snapshot.ts",
+          "examples/headless-agent/tests/memory-consolidation-sessions.snapshot.ts",
+          "examples/headless-agent/tests/memory-execution.snapshot.ts",
+          "examples/headless-agent/tests/gateway-memory.snapshot.ts",
+          "snapshots/sdk/memory-auxiliary.snapshot.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:57:53.585328+00:00"
+      },
+      "recall-integrity-sdk-python": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:58:16.976710+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "uv",
+          "run",
+          "--no-sync",
+          "--project",
+          "python/sdk",
+          "python",
+          "-m",
+          "pytest",
+          "python/sdk/tests/test_memory_model_snapshot.py",
+          "-q"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:58:19.444466+00:00"
+      },
+      "recall-integrity-host-types-fixed": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:56:49.016801+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:57:48.932447+00:00"
+      },
+      "recall-integrity-lint-final": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:57:16.371244+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/memory/memory-context/src/index.ts",
+          "packages/memory/memory-context/tests/memory-context.spec.ts",
+          "examples/headless-agent/tests/fixtures/memory-recall-integrity-model.ts",
+          "examples/headless-agent/tests/fixtures/memory-recall-integrity-driver.ts",
+          "examples/headless-agent/tests/memory-recall-integrity.snapshot.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:57:21.512918+00:00"
+      },
+      "recall-integrity-doc-final": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:58:16.976678+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:58:44.205798+00:00"
+      },
+      "recall-integrity-config-entrypoints": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:58:16.976693+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-cordis-config.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:58:19.450847+00:00"
+      },
+      "recall-integrity-entrypoint-final": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:58:33.739088+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-application-entrypoints.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:58:34.455325+00:00"
+      },
+      "recall-integrity-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:59:05.960156+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "master"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:59:09.615487+00:00"
+      },
+      "recall-integrity-provenance-causal-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:56:49.017121+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T214940Z/run-recall-negative.py",
+          "wrong-provenance"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:56:49.744331+00:00"
+      },
+      "recall-integrity-scope-causal-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T21:56:49.016828+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T214940Z/run-recall-negative.py",
+          "wrong-scope"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T21:56:49.748496+00:00"
+      }
+    }
+  },
+  "build": {
+    "completeInvocation": {
+      "status": "failed",
+      "startedAt": "2026-10-30T21:54:47.910125+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "--import",
+        "tsx/esm",
+        "scripts/build.ts"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T21:55:37.531496+00:00"
+    },
+    "failedGate": "Only Host aggregate: the new driver array required an explicit SessionEvent annotation.",
+    "successfulFailedGateRetest": {
+      "status": "passed",
+      "startedAt": "2026-10-30T21:56:49.016801+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "tsconfig.host.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T21:57:48.932447+00:00"
+    },
+    "result": "Eight required build gates converge across the complete invocation and Host aggregate retest; the first invocation is not called passing."
+  },
+  "fixtureCorrections": [
+    "External model adapters do not receive runtime-only resourceOrigin; the LLM service consumes it before adapter dispatch. The fixture asserts execution origin at the admission coordinator instead.",
+    "Auxiliary assertion failures now reject the primary-stream barrier and propagate through the driver, avoiding misleading fixture timeouts.",
+    "Source lint and the concrete-term documentation rule passed after fixture typing and new-note naming corrections."
+  ],
+  "noteReview": {
+    "newNote": ".agents/notes/implemented/bug-fix/2026-10-31-memory-recall-addresses.md",
+    "newNotes": 1,
+    "retainedActive": {
+      ".agents/notes/implemented/bug-fix/2026-10-24-memory-auxiliary-ownership.md": "Exact request logging, resource attribution, cancellation and cleanup remain independent responsibilities.",
+      ".agents/notes/implemented/feature/2026-11-19-zcode-aligned-memory-signal-gates.md": "Human-input thresholds, already-read exclusions and effort selection remain current; cross-linked from the new note.",
+      ".agents/notes/implemented/bug-fix/2026-10-28-memory-curation-scope.md": "Curation tool authorization remains independent of recall output fitting."
+    },
+    "archivedOrDeleted": 0,
+    "frozenNotesEdited": false,
+    "externalFormat": "No new configuration key, wire/SDK field, Session event or durable schema is introduced."
+  },
+  "additionalReview": {
+    "paths": [
+      "packages/memory/memory-context/src/index.ts",
+      "packages/memory/tool-memory/src/index.ts"
+    ],
+    "remainingCandidate": "The tool resolver consults scopesFor for workspace requests but synthesizes personal/project scopes. Validate feature-disabled explicit tool reads/searches against the documented agent/owner distinction before changing behavior. No exploit result or permission fix is claimed for this source-only candidate."
+  },
+  "limits": [
+    "Historical Session recall metadata is folded as recorded. Committed generations are neither rewritten nor retrospectively corrected by parsing free-form entry bodies. A new Session resets that historical dedup state.",
+    "Pending injections can be discarded before request admission under the existing Agent cancellation rules; this patch introduces no new admission or Session event protocol.",
+    "Whole-file and whole-domain review remain open; all12original domains and B04/B25 are still in progress.",
+    "Root Responses provider-specific actual API validation remains explicitly human-deferred. Peer real model/dual-host acceptance is separately authorized and tracked.",
+    "Peer owns topology, NoGUI, launcher and deployment. Root changes only the disjoint recall files named here."
+  ]
+}

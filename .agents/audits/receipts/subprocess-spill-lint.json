@@ -1,0 +1,14 @@
+{
+  "name": "subprocess-spill-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/subprocess/subprocess-local/src/output.ts packages/subprocess/subprocess-local/tests/spill-short-writes.spec.ts packages/subprocess/subprocess-local/tests/loader-spill.spec.ts packages/subprocess/subprocess-local/tests/fixtures/spill-write-driver.mjs",
+  "startedAt": "2026-10-25T10:51:58.642251+00:00",
+  "seconds": 3.44,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "81e499eaccd40e4645b814ad2ca049a6f8be204a497fc76d8251826819b2b082",
+  "inputsAfter": "81e499eaccd40e4645b814ad2ca049a6f8be204a497fc76d8251826819b2b082",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

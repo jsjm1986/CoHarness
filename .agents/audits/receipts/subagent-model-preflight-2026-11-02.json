@@ -1,0 +1,287 @@
+{
+  "finding": "B453",
+  "status": "fixed_verified_original_runtime_model_preflight_full_tool_entry_100_percent_global_review_open",
+  "updatedAt": "2026-11-01T20:42:13.679096+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "verifiedAt": "2026-11-01T20:32:08.798039+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-latest-origin-fetch.json",
+    "workingTreePreserved": true
+  },
+  "problem": "Child model metadata preflight ran before its original Runtime operation was retained. Foreground and background calls kept an uncancelled metadata signal after Core withdrawal. The original built Runtime completed withdrawal while its native HTTP metadata response and adapter cleanup remained pending; a fixture deadline, not Runtime cancellation, later ended the transport.",
+  "fix": "Capture original Core at delegation entry and retain the existing host operation through route preparation, foreground collection or background handoff. Pass its composed cancellation to metadata and continuable preparation. The background producer keeps its own controller and original Core; published background runs remain independent. No new ownership store or retry timer is added.",
+  "compatibility": {
+    "newWireOrEventFields": false,
+    "schemaOrSessionFormatChange": false,
+    "publicServiceSignatureChange": false,
+    "newBackgroundCancellationAfterPublication": false,
+    "rootProductionMutation": false
+  },
+  "verification": {
+    "distinctPassingNamedCases": 393,
+    "unitCases": 377,
+    "unitFiles": 17,
+    "typescriptRunnableCases": 8,
+    "pythonRunnableCases": 8,
+    "versionRepeatsAddedToCount": false,
+    "sourceNode22AndNormalBuiltNode24": true,
+    "completeToolEntryCoverage": {
+      "lines": {
+        "total": 226,
+        "covered": 226,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 41,
+        "covered": 41,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 251,
+        "covered": 251,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 217,
+        "covered": 217,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "repositoryThresholdOrBaselineChanged": false,
+    "completeCoreEntryDebtUnchanged": true,
+    "originalEvidence": "Two original source cases leave metadata cancellation false. The original normally built Tool bundle byte-matches B452; both native SDK cases prove runtimeCancelledfalse, providerFinishedBeforeWithdrawalfalse and withdrawalWhileResponseOpentrue with zero child starts. All profiles start successfully; original failures are behavior assertions. The ten-second fixture deadline bounds the predecessor and is excluded from successful cancellation evidence.",
+    "currentNativeEvidence": "The actual SDK profile owns native HTTP metadata. Original Core withdrawal aborts the metadata signal, joins physical response closure and adapter cleanup, then completes without creating a child or Job. Both SDKs pin the foreground/background proof.",
+    "businessCases": [
+      "Foreground, one-shot background and continuable preflight cancellation",
+      "Published background child retains its original independent Job control after Core removal",
+      "Provider replacement during metadata refuses both old and replacement child allocation",
+      "Provider defaults for effort-only selection obey the Session route allowlist before metadata or child allocation",
+      "Explicit working-directory forwarding and unsupported child-option refusal",
+      "Policy publication reenters shared-preset reconciliation without duplicate tools or policy records",
+      "Cancelled continuable preparation leaves no child or durable session while its sibling persists and completes"
+    ],
+    "checks": [
+      {
+        "name": "preflight-final-local-cases",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-final-local-cases.json"
+      },
+      {
+        "name": "preflight-sibling-abort-observation",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-sibling-abort-observation.json"
+      },
+      {
+        "name": "preflight-reentrant-policy",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-reentrant-policy.json"
+      },
+      {
+        "name": "preflight-final-source22-coverage",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-final-source22-coverage.json"
+      },
+      {
+        "name": "preflight-final-source22-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-final-source22-sdk.json"
+      },
+      {
+        "name": "preflight-final-built24-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-final-built24-sdk.json"
+      },
+      {
+        "name": "preflight-final-python-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-final-python-sdk.json"
+      },
+      {
+        "name": "preflight-final-aggregate",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-final-aggregate.json"
+      },
+      {
+        "name": "preflight-final-normal-bundle",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-final-normal-bundle.json"
+      },
+      {
+        "name": "preflight-final-host-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-final-host-types.json"
+      },
+      {
+        "name": "preflight-complete-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-complete-lint.json"
+      },
+      {
+        "name": "preflight-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-python-lint.json"
+      },
+      {
+        "name": "preflight-doc-quick",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-doc-quick.json"
+      },
+      {
+        "name": "preflight-export-jsdoc",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-export-jsdoc.json"
+      },
+      {
+        "name": "preflight-latest-origin-fetch",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-latest-origin-fetch.json"
+      },
+      {
+        "name": "preflight-withdrawal-before",
+        "status": "expected_original_preflight_cancellation_and_quiescence_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-withdrawal-before.json"
+      },
+      {
+        "name": "preflight-native-old-built",
+        "status": "expected_original_preflight_cancellation_and_quiescence_assertion_failure",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-native-old-built.json"
+      },
+      {
+        "name": "preflight-post-record-repository-refs",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/preflight-post-record-repository-refs.json"
+      }
+    ],
+    "intermediateSetup": [
+      "The first full run exposed an existing test identifying calls by AbortSignal object identity. Composed cancellation legitimately changes that identity. It now records the reserved child id on the actual abort event, removes its listener, and retains both the cancelled-child absence and surviving-child durable assertions.",
+      "An intermediate fixture attempted a label field absent from ContinuableCreateRequest; the final test uses only its documented signal and sessionId.",
+      "Scoped lint removed an unnecessary preset argument assertion and its unused type import. No behavior guard was weakened."
+    ],
+    "coreCoverageMeasurementScope": "Last measured in B450; current Core SHA-256 is unchanged. B453 measures the full Tool entry, not a fresh full Core gate."
+  },
+  "peerR36TargetedAcceptance": {
+    "status": "trusted_peer_report_and_local_receipt_inspected_targeted_R36_default_entry_acceptance",
+    "receipt": ".artifacts/full-real-task-20261031/r36-deployment-and-real-acceptance.json",
+    "receiptSha256": "cba94295dd86a648f9b077fa8d7af4777a8f0f280c06484416fb7dfcf62d4bf3",
+    "schema": 103,
+    "servingEpoch": 106,
+    "nativeDefaultWorkbenchRendered": true,
+    "nativeInteractionMatrixComplete": false,
+    "freshProductionLoginFormSubmittedThisTurn": false,
+    "freshLoginInBuiltRealGatewayTranscript": true,
+    "modelPromptsForEntryFix": 0,
+    "distinctGatewayCases": 165,
+    "docLeaves": 20,
+    "rootIndependentlyRanProductionOrModel": false,
+    "scope": "Peer reports three account entry redirects, exact authorized metadata, preserved file hashes and restored local Runtime state. Specific default-entry render only; full native account/Admin interaction coverage remains incomplete.",
+    "pendingRelease": "Peer is independently assembling B451 over R36 as R37; no B450/B452/B453 Runtime changes are included.",
+    "webSearchReportedGap": "The selected account refuses the configured built-in official search route. Its currently enabled organization provider uses openai-completions, while the available native search factory requires anthropic-messages. Treat as an unresolved capability/configuration gap; do not broaden account authorization."
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/model-preflight-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.zh.md",
+    "apps/cli/tests/profiles/sdk/subagent-model-preflight.expected.e2e.ts",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/subagent-model-preflight/expected.json",
+    "examples/headless-agent/tests/fixtures/subagent-model-preflight/model.mjs",
+    "examples/headless-agent/tests/fixtures/subagent-model-preflight/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/subagent-model-preflight/runtime.cordis.yml",
+    "examples/headless-agent/tests/fixtures/subagent-model-preflight/runtime.mjs",
+    "packages/subagent/tool-subagent/README.i18n.yaml",
+    "packages/subagent/tool-subagent/README.md",
+    "packages/subagent/tool-subagent/README.zh.md",
+    "packages/subagent/tool-subagent/src/index.ts",
+    "packages/subagent/tool-subagent/tests/model-preflight-withdrawal.spec.ts",
+    "packages/subagent/tool-subagent/tests/model-selection-settings.spec.ts",
+    "packages/subagent/tool-subagent/tests/model-selection.spec.ts",
+    "packages/subagent/tool-subagent/tests/tool-subagent.spec.ts",
+    "python/sdk/tests/test_subagent_model_preflight_expected.py"
+  ],
+  "readOnlyPrerequisiteCount": 297,
+  "artifactReferences": {
+    "apps/cli/lib/bin.js": "a3f373cfa7a3a84aa5fb6e25c3db5b2cb9b338afe986169c00fcc38ea0044455",
+    "packages/boot/app-boot/lib/index.js": "e7527dacdd9bc28e1a95536f3930f042ebbac186b16393059469ac7f3a537b80",
+    "packages/bundle/sdk-minimal/lib/index.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "packages/core/agent-loop/lib/index.js": "4d9e306e15bd8a750ff97bd48c6253a45f2faa49edf5b41ac88b37c2b0f0e882",
+    "packages/core/agent/lib/index.js": "4ffa8768f1ed50640eaba1ef6cddd9183c824a5a183208e3012a4f86ed27fa18",
+    "packages/extensions/tool-cordis/lib/index.js": "a8db112aaa38e65f1c4a25ff4215d876df687c4f079ad38faaa8c83a9bd01cb8",
+    "packages/extensions/tool-cordis/lib/types/api-catalog.d.ts": "751ebac54d1c2d0a694d18973b2d1a95f901b8dda3ed49eb6303795a30c8dc4e",
+    "packages/extensions/tool-cordis/lib/types/api-catalog.js": "334764efe25e6aa5156df7b9dc104d54c7e3087f01c4db9e1109d22d29fe6ed3",
+    "packages/extensions/tool-cordis/lib/types/index.d.ts": "af71d264ee9c5c04b991eeb6c75c7b02137bc0281cd576b6db3f8e7f8d49ae57",
+    "packages/extensions/tool-cordis/lib/types/index.js": "a96b33268cd03e577cdfc62f32c55ebc380e98d7ba3006789feb65cd2480dfc6",
+    "packages/jobs/jobs-local/lib/index.js": "376e13f6ad2eb71dd76dee6f3098d4d596ea34a28c8c95603014dd00eeb92c81",
+    "packages/jobs/jobs/lib/index.js": "0e7659e20c3ab0cdef78aeadc08d14baa23cc05412f28daf21e5ecc7b71b3821",
+    "packages/jobs/tool-jobs/lib/index.js": "d09749a36d2b6247ac32a476fb2947c1fe32fe95ea4444bbd768901c6b838c0b",
+    "packages/ptc-runtime/ptc-runtime-node/lib/index.js": "9b01e82609461ca27c7353386722a523bed4ebbed0f326d6ccc803c620032fa6",
+    "packages/sdk/client/lib/index.js": "7099941321aa5a129caed823ac18c4749ac269dba7705c5ce6274b0276f51aad",
+    "packages/sdk/server/lib/index.js": "c94739bc12898d337ca362ef657464e2aa06d117cec7c90395fc37a03abd4196",
+    "packages/subagent/subagent/lib/index.js": "7ba1e71c5ec1cde8540e1b7eb04845a16e9a1be13ef9c4ddd79e72a4edd4cf0a",
+    "packages/subagent/subagent/lib/types/index.d.ts": "e45e23b6d568af68cb0c5e4b035308b951469698975b19fa8a616d4b5463f66d",
+    "packages/subagent/subagent/lib/types/index.js": "9efc45e8b8874ab9e2a1c2b35860be1dfc47e06c629560e7059079efa528e710",
+    "packages/subagent/subagent/lib/types/internal.d.ts": "910db97a43b6dd599126d6c7cf9057b2c007120bcf9dd761bcf1439aa2e45291",
+    "packages/subagent/subagent/lib/types/internal.js": "9e629487ae14104c2d46269197692279bf5c1a5209af0b2a56ee0865ac477afb",
+    "packages/subagent/subagent/lib/types/retained-cleanup.d.ts": "612a42281e3890f569f17ff5a8a34cbd14b62efde68bf7b4578bfce7bf0bebf3",
+    "packages/subagent/subagent/lib/types/retained-cleanup.js": "f3faf639884fea1af4ddcf84386170e8e41926d229b7fd131425b7bba71924a1",
+    "packages/subagent/subagent/lib/types/run-lease.d.ts": "b4a73727a97ba0369cf20f99633cef031ba8a9b3671b7ef427021ffc91fa2037",
+    "packages/subagent/subagent/lib/types/run-lease.js": "68a420195cd7358362a8edd97d9a4cfd4c766e836d1f32e25e467d2b9ec7fa63",
+    "packages/subagent/subagent/lib/types/types.d.ts": "fe23d6fbb40919d51ec2b1a65934249b074f6d3b9794847d58dfe453f6887501",
+    "packages/subagent/subagent/lib/types/types.js": "74c4a6ef14ae2c83292457c179e22fc44885e5d92976595089107527c160f9cd",
+    "packages/subagent/tool-subagent/lib/index.js": "d9de7ae8a530685125fa1cca13d988bde53ab75c30e9846188c2efe264e0cf46",
+    "packages/subagent/tool-subagent/lib/types/index.d.ts": "8b09f71db58a223e7e965f4f5775d97941851d5d6dd8d92b3e6a83d54b6eea5c",
+    "packages/subagent/tool-subagent/lib/types/index.js": "4d8643492ed30c70d067d7d0e5f91115371318e890e35da11380847c7b9041c5",
+    "packages/workflow/tool-ralph/lib/index.js": "657f8d26e9bba0ed6a953351c3133c0042e3e5d33e145a265988e58308b50c47",
+    "packages/workflow/tool-ralph/lib/types/index.d.ts": "aca7d199ca84ddfa327b1f198767482d647cadab731176dbfc66466eb2064d1a",
+    "packages/workflow/tool-ralph/lib/types/index.js": "5eb5bd99e37fbefec07703d7b6d28e0e98e90f0bdf07ca2e5d8f09e1fbad4736",
+    "packages/workflow/tool-workflow/lib/index.js": "b67d1ca2c2f20b0ae0162ab79977cacac34358ec0dbdbf72329da00d5dcba466",
+    "packages/workflow/tool-workflow/lib/types/index.d.ts": "580add4796ea967c51f79558608ef6472780a393c046e20673751437d41df549",
+    "packages/workflow/tool-workflow/lib/types/index.js": "63ba6b1738032618f6894e342b488ff9a6ddd24a27f58c7f12a3ba303095411b",
+    "packages/workflow/tool-workflow/lib/types/record.d.ts": "b76ec5244084c6bc7a23bf099fab530280c818b7c4b87866d0d675960fa521a6",
+    "packages/workflow/tool-workflow/lib/types/record.js": "a796561d1ce5a65fcaeb4c62f20694dfade02a92102534306ed0c6c7ccbfa8f6",
+    "packages/workflow/workflow-ptc/lib/index.js": "c3d9578dcdaa08430018fc72848d587d98f457d695b2200dd5a385d758a4b373",
+    "packages/workflow/workflow-ptc/lib/types/index.d.ts": "7fb2a61124763eed3629d93eb1d0e95de4de7a2e68697961b740f959eda81c54",
+    "packages/workflow/workflow-ptc/lib/types/index.js": "4faffdf81ad5a92ec4b99070ec2775362af9ce7711da3f0e2ff3f0e63e0a70e5",
+    "packages/workflow/workflow/lib/index.js": "fa7c0ac38c714b7230c41fa38d22524923c1237940fbfa416f63d3e1b37fde8b",
+    "packages/workflow/workflow/lib/types/index.d.ts": "91b595cdbb6d70e398d68b7529e4980f74f4651cea24a65f286201926dee1b15",
+    "packages/workflow/workflow/lib/types/index.js": "889279d97ad94551d2dcc2e945f0d4363e6056d3d175ae3dabd6cc889d1cd54d"
+  },
+  "noteReview": {
+    "action": "updated existing admission/cleanup note, package README and existing upgrade guide with original bilingual metadata captured",
+    "newNotes": 0,
+    "archivedNotesChanged": false
+  },
+  "remaining": [
+    "All12 business domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue B454 with remaining Core lifecycle and resource-admission paths, model/Inspector consumers, queued continuation, exact-parent teardown and permission withdrawal. Full Tool index coverage is scoped evidence, not complete domain acceptance.",
+    "Complete ToolSubagent index now passes unchanged100%all4metrics:251 statements,217 branch arms,41 functions,226 lines. The last complete Core index measurement is B450 against byte-identical current Core, below100%:92.61%statements,87.50%branches,96.92%functions,92.43%lines; continue the missing paths without lowering policy.",
+    "Peer owns B451 R37 integration and real multi-computer operational acceptance. R36 default-entry production render is trusted targeted evidence; full native user/Admin matrix remains incomplete. Do not repeatedly message or modify its Gateway/server/router/catalog surfaces.",
+    "Keep the reported search capability/configuration gap open: current authorized organization provider cannot use the available native search factory. Inspect existing provider/configuration behavior before proposing fixes; never grant an unauthorized route merely to make a test pass.",
+    "Continue cross-account/computer/document permissions and all remaining business modules outside peer-reserved areas; integration snapshots and passing cases do not prove the complete Root/peer release.",
+    "Official paid Responses remains deferred. No Root production deployment, restart, dependency synchronization, reset, stash, commit or push."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": {
+    "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T200648Z/B416-B453-integration-index.json",
+    "findings": 38,
+    "capsules": 31,
+    "frozenDeltaVersions": 679,
+    "presentPaths": 390,
+    "currentSourceDriftPaths": [
+      "gateway/README.i18n.yaml",
+      "gateway/README.md",
+      "gateway/README.zh.md",
+      "packages/context/gateway-runtime/src/index.ts"
+    ]
+  }
+}

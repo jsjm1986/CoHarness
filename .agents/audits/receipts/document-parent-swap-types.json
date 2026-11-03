@@ -1,0 +1,14 @@
+{
+  "name": "document-parent-swap-types",
+  "cwd": ".",
+  "command": "pnpm exec tsc -b packages/attachment/userdoc-local",
+  "startedAt": "2026-10-26T01:24:42.117940+00:00",
+  "seconds": 4.284,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0d677cbcd05417abb87c4d2bed2e7691a1f9330ec0bee8ba6df7a119ea22e4e3",
+  "inputsAfter": "0d677cbcd05417abb87c4d2bed2e7691a1f9330ec0bee8ba6df7a119ea22e4e3",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

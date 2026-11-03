@@ -1,0 +1,51 @@
+- banner:
+  - navigation "Session hierarchy":
+    - button "Use the read tool twice" [disabled]
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - button "Manage conversation sharing":
+    - img
+    - text: Conversation sharing
+  - button "Open right sidebar":
+    - img
+- text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop."
+- group "Message time and speed": "{{clock}}"
+- button "Copy":
+  - img
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Read files"
+- paragraph: DONE
+- button "Copy":
+  - img
+- button "Branch into a new conversation":
+  - img
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message time and speed": "{{clock}}"
+- textbox "Message COHARNESS"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"': Workspace write
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message" [disabled]
+- group "Session statistics":
+  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 2 steps{{throughput}} tok/s"
+  - button "16K tok · Cache hit 98%":
+    - img
+    - text: 16K tokCache hit 98%
+- separator "Adjust transcript content width"
+- separator "Adjust transcript content width"

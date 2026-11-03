@@ -1,0 +1,16 @@
+- id: llm-deepseek
+  disabled: true
+
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, ordinaryModelRevocationReady]
+
+- insert:
+    - id: ordinary-model-credentials
+      name: '@deepseek-ai/dsh-credentials-local'
+      config:
+        path: !!js process.cwd() + '/.ordinary-credentials.yaml'
+        watch: false
+    - id: ordinary-model-fixture
+      name: '../ordinary-model-revocation/plugin.mjs'
+      config:
+        protocol: pi

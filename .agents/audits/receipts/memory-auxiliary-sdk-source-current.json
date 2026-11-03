@@ -1,0 +1,14 @@
+{
+  "name": "memory-auxiliary-sdk-source-current",
+  "cwd": ".",
+  "command": "pnpm exec vitest run --config vitest.snapshot.config.ts snapshots/sdk/memory-auxiliary.snapshot.ts --retry=0",
+  "startedAt": "2026-10-24T01:41:37.511497+00:00",
+  "seconds": 7.941,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b2fc6546248a77d8e803169dd3d5882f1b1ccb0c10ed0615a01e62bb4c2c713a",
+  "inputsAfter": "b2fc6546248a77d8e803169dd3d5882f1b1ccb0c10ed0615a01e62bb4c2c713a",
+  "postgresToolDirectory": null,
+  "outputSha256": "b8d712d0b0c413810067e91abfac2c744a7aa55ed4a4db639ee59013d149d3a1",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  09:41:40\n   Duration  4.53s (transform 1.19s, setup 35ms, import 1.55s, tests 2.83s, environment 0ms)\n\n"
+}

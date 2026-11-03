@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-lint-fixed",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc/src/identity.ts packages/attachment/userdoc/src/index.ts packages/attachment/userdoc/tests/identity.spec.ts packages/attachment/userdoc-local/src/upload.ts packages/attachment/userdoc-local/tests/upload.spec.ts packages/attachment/userdoc-local/tests/private-upload-paths.spec.ts packages/client/userdoc-upload/src/index.ts packages/client/userdoc-upload/tests/uploader.client.spec.ts packages/host/userdoc-http/src/index.ts packages/host/userdoc-http/tests/acl.spec.ts gateway/src/document-transfer.ts gateway/tests/document-transfer.spec.ts",
+  "startedAt": "2026-10-26T22:34:18.955055+00:00",
+  "seconds": 9.38,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4a3a995d0134f08212a99c796f19b72e4eec9a3da4b20812ecaf92fdd4616489",
+  "inputsAfter": "4a3a995d0134f08212a99c796f19b72e4eec9a3da4b20812ecaf92fdd4616489",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

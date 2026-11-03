@@ -268,6 +268,7 @@ export async function executeSessionTitleLlm(
     system: prepared.system,
     sessionId: request.session.id,
     purpose: 'session-title',
+    resourceOrigin: 'infrastructure',
     signal: callDeadline.signal,
   })
   request.session.append('session/title-llm-request', {

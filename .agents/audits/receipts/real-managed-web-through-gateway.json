@@ -1,0 +1,14 @@
+{
+  "name": "real-managed-web-through-gateway",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx --tsconfig gateway/tsconfig.run.json .agents/audits/.local/probe-managed-web.ts",
+  "startedAt": "2026-10-24T20:41:47.387381+00:00",
+  "seconds": 4.317,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b3b07a8e81ae38d14f2b74475a37a195e32d57dbf41ed061fe71ecaac2b1703b",
+  "inputsAfter": "39c9f1db6fc6331e6a18f8ab49aca642a6320e5fa5f78d1da401b5cdf7ffb8bd",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "836339bd8436a4adfa2b216deae87dccc44602e5b32ca23e814d5f8d19c81b0a",
+  "outputTail": "managed-ready {\"port\":51845,\"generation\":2} registered true\nproxy-status 200 <!doctype html>\n<html lang=\"en\">\n  <head><base href=\"./\"><script>(()=>{\nconst pendingQueue=[]\nwindow\nsafe-log dsh: all_proxy names a SOCKS proxy, which is not supported; connecting directly for that scheme — set an http:// or https:// proxy URL instead\ndsh web: http://127.0.0.1:51865/?token=[fixture-token]\n\n"
+}

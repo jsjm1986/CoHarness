@@ -9,6 +9,7 @@ import { withFileLock, writeFileAtomic } from '../src/index.ts'
 
 const state = vi.hoisted(() => ({
   afterClaim: undefined as ((claim: string) => Promise<void>) | undefined,
+  afterTempWrite: undefined as (() => void) | undefined,
   claimFailure: undefined as string | undefined,
   claimRemovalFails: false,
   lockRemovalFails: false,
@@ -40,22 +41,33 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       }
       return actual.rm(...args)
     }),
-    writeFile: (async (path: unknown, ...rest: never[]) => {
-      if (String(path).includes('.lock.takeover-')) {
-        if (state.claimFailure !== undefined) {
-          throw Object.assign(new Error(`${state.claimFailure}: injected claim failure`), { code: state.claimFailure })
-        }
-        await (actual.writeFile as (path: unknown, ...args: never[]) => Promise<void>)(path, ...rest)
-        await state.afterClaim?.(String(path))
-        return
+    open: async (...args: Parameters<typeof actual.open>) => {
+      const path = String(args[0])
+      if (path.includes('.lock.takeover-') && state.claimFailure !== undefined) {
+        throw Object.assign(new Error(`${state.claimFailure}: injected claim failure`), { code: state.claimFailure })
       }
-      if (state.lockPermissionFailures > 0 && String(path).endsWith('.lock')) {
+      if (state.lockPermissionFailures > 0 && path.endsWith('.lock')) {
         state.lockPermissionFailures -= 1
-        if (state.releaseLockBeforeProbe) await actual.rm(String(path))
+        if (state.releaseLockBeforeProbe) await actual.rm(path)
         throw Object.assign(new Error('EPERM: injected exclusive-create failure'), { code: 'EPERM' })
       }
-      return (actual.writeFile as (path: unknown, ...args: never[]) => Promise<void>)(path, ...rest)
-    }) as typeof actual.writeFile,
+      const handle = await actual.open(...args)
+      if (path.endsWith('.tmp')) {
+        const write = handle.writeFile.bind(handle)
+        vi.spyOn(handle, 'writeFile').mockImplementation(async (...input) => {
+          await write(...input)
+          state.afterTempWrite?.()
+        })
+      }
+      if (path.includes('.lock.takeover-')) {
+        const write = handle.writeFile.bind(handle)
+        vi.spyOn(handle, 'writeFile').mockImplementation(async (...input) => {
+          await write(...input)
+          await state.afterClaim?.(path)
+        })
+      }
+      return handle
+    },
   }
 })
 
@@ -65,6 +77,7 @@ afterEach(async () => {
   vi.useRealTimers()
   vi.restoreAllMocks()
   state.afterClaim = undefined
+  state.afterTempWrite = undefined
   state.claimFailure = undefined
   state.claimRemovalFails = false
   state.lockRemovalFails = false
@@ -122,6 +135,28 @@ async function waitForLock(lockPath: string): Promise<void> {
 }
 
 describe('writeFileAtomic', () => {
+  it('preserves the committed target when its publication signal is already aborted', async () => {
+    const dir = await scratch(), target = join(dir, 'doc.yaml'), lifetime = new AbortController()
+    await writeFile(target, 'committed')
+    const reason = new Error('retained authority ended')
+    lifetime.abort(reason)
+    await expect(writeFileAtomic(target, 'unavailable authority', { mode: 0o600, signal: lifetime.signal })).rejects.toBe(reason)
+    expect(await readFile(target, 'utf8')).toBe('committed')
+    expect(await readdir(dir)).toEqual(['doc.yaml'])
+  })
+
+  it('removes the acquired temp without publishing when authority ends after its bytes are written', async () => {
+    const dir = await scratch(), target = join(dir, 'doc.yaml'), lifetime = new AbortController()
+    await writeFile(target, 'committed')
+    const reason = new Error('retained authority ended')
+    state.afterTempWrite = () => { lifetime.abort(reason) }
+    try {
+      await expect(writeFileAtomic(target, 'unavailable authority', { mode: 0o600, signal: lifetime.signal })).rejects.toBe(reason)
+    } finally { state.afterTempWrite = undefined }
+    expect(await readFile(target, 'utf8')).toBe('committed')
+    expect(await readdir(dir)).toEqual(['doc.yaml'])
+  })
+
   it('creates the file and its parents with exactly the stated mode', async () => {
     const dir = await scratch()
     const target = join(dir, 'nested', 'deep', 'doc.yaml')

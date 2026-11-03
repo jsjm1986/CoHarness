@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/mcp.md
 document:
-  en: ba7db061d4f970c5f5dd3dda8e5697a591248afb
-  zh: fbfd426165ab1c594026744af99294cf00f4254a
+  en: bae5c6d16a9441065abccfd8f7260fcc73d3ef77
+  zh: 7118b5edadd1ddea04b49fdf5ca8047f85efb0d7
 /mcp:
   en: 8e65e07d162dcc41
   zh: 5f4ae607cd468767
@@ -12,8 +12,8 @@ document:
   en: 7855928245a9ae43
   zh: 41a2e31cfe7c68c3
 /mcp/table-of-contents:
-  en: 5c0aa5a2e528af97
-  zh: ae2ba2297294e3de
+  en: 150ff403979791cb
+  zh: 4ce7c716ba3f6aa8
 /mcp/configuration:
   en: 579ebd95d7fe9644
   zh: 4cc6f7d53b39e185
@@ -27,11 +27,14 @@ document:
   en: df9cc13a5d6eb923
   zh: 3276d65c19d4c446
 /mcp/resource-provider-types:
-  en: 16ae356364b54262
-  zh: 28fa0c87dbbd5e88
+  en: 54a9e9abf7dd6da1
+  zh: 7586402b300d2770
+/mcp/connection-owner:
+  en: 072f53c9c63d3f0a
+  zh: ff5782fd12dcc946
 /mcp/limits:
-  en: 27a59706525c88ed
-  zh: 1fb1684bc03bb6ae
+  en: bc459d1ffab63a17
+  zh: cea5ccfe2dfad065
 /mcp/further-reading:
   en: cf58310429e7acbd
   zh: 38bd76669379269d

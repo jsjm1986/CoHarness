@@ -163,7 +163,8 @@ export interface JobHooks {
   cancel(reason?: string): void
   /**
    * Resolves after the producer releases its resources, not merely when work
-   * finishes. Must not reject; the runtime converts a rejection to `failed`.
+   * finishes. Must not reject; the runtime converts a rejection to a `failed`
+   * record while unconfirmed resource release keeps automatic idle release blocked.
    * If teardown cancellation throws, the runtime may force-fail only the
    * registry record without claiming that the work stopped.
    */
@@ -298,9 +299,10 @@ export type JobEventListener = (event: JobEvent) => void
 export interface JobEvents {
   /**
    * Register an effect-scoped listener. Events are dispatched synchronously
-   * after the commit they announce; a job's first event is `registered`, and
-   * a `settled` event follows the release of every waiter. No listener runs
-   * after service disposal.
+   * after the commit they announce. Notifications triggered by an observer
+   * follow the current event for every matching subscriber. A job's first
+   * event is `registered`, and a `settled` event follows the release of every
+   * waiter. No listener runs after service disposal.
    * @param filter - which owners' events to deliver.
    * @param listener - receives each matching event.
    * @returns disposer that unregisters the listener.

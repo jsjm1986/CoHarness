@@ -4,6 +4,7 @@ import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORGANIZATION_MODEL_SETTINGS_SCHEMA } from '../../../src/organization-model-settings-schema.ts'
 import * as api from '../api.ts'
+import { PendingEditsProvider } from '../pending-edits.tsx'
 import { ModelsPage } from './ModelsPage.tsx'
 import { OrganizationModelsEditor } from '../components/OrganizationModelsEditor.tsx'
 
@@ -130,6 +131,7 @@ describe('ModelsPage', () => {
     })
     vi.mocked(api.listModels).mockResolvedValue(models)
     vi.mocked(api.listUsers).mockResolvedValue(users)
+    vi.mocked(api.getDigestModelSettings).mockResolvedValue({ model: null, candidates: [] })
     vi.mocked(api.getModelAccess).mockResolvedValue({
       effective: { version: 1, defaultAllowed: false, models: [] },
       overrides: [],
@@ -160,58 +162,44 @@ describe('ModelsPage', () => {
     expect(screen.queryByRole('button', { name: '登记模型' })).toBeNull()
   })
 
-  it('owns one live read in StrictMode and keeps it across changed callback identities', async () => {
+  it.each(['create', 'edit'] as const)('retains the %s Provider draft when another model view is requested', async (mode) => {
     const user = userEvent.setup()
-    const firstChanged = vi.fn()
-    const secondChanged = vi.fn()
-    const view = render(<StrictMode><OrganizationModelsEditor onChanged={firstChanged} /></StrictMode>)
+    render(<PendingEditsProvider><ModelsPage /></PendingEditsProvider>)
     await screen.findByText('组织主连接')
-    expect(api.describeOrganizationModelSettings).toHaveBeenCalledTimes(1)
-    const signal = vi.mocked(api.describeOrganizationModelSettings).mock.calls[0]![0]!
-    expect(signal.aborted).toBe(false)
-    view.rerender(<StrictMode><OrganizationModelsEditor onChanged={secondChanged} /></StrictMode>)
-    expect(api.describeOrganizationModelSettings).toHaveBeenCalledTimes(1)
-    expect(signal.aborted).toBe(false)
-    await user.click(screen.getByRole('button', { name: '编辑 组织主连接 (org-primary)' }))
-    await user.click(screen.getByText('自定义设置'))
-    await user.clear(screen.getByLabelText('API 地址'))
-    await user.type(screen.getByLabelText('API 地址'), 'https://changed.example.com/v1')
-    await user.click(screen.getByRole('button', { name: '保存' }))
-    await waitFor(() => expect(secondChanged).toHaveBeenCalledTimes(1))
-    expect(firstChanged).not.toHaveBeenCalled()
-    const readsBeforeRemount = vi.mocked(api.describeOrganizationModelSettings).mock.calls.length
-    view.unmount()
-    expect(signal.aborted).toBe(true)
-    render(<StrictMode><OrganizationModelsEditor onChanged={secondChanged} /></StrictMode>)
-    await screen.findByText('组织主连接')
-    expect(api.describeOrganizationModelSettings).toHaveBeenCalledTimes(readsBeforeRemount + 1)
-    const nextSignal = vi.mocked(api.describeOrganizationModelSettings).mock.calls.at(-1)![0]!
-    expect(nextSignal).not.toBe(signal)
-    expect(nextSignal.aborted).toBe(false)
-  })
-
-  it('does not publish a departed owner read into a remounted editor', async () => {
-    let release!: (value: api.OrganizationModelSettingsView) => void
-    const pending = new Promise<api.OrganizationModelSettingsView>(resolve => { release = resolve })
-    vi.mocked(api.describeOrganizationModelSettings).mockReturnValueOnce(pending)
-    const view = render(<OrganizationModelsEditor onChanged={() => {}} />)
-    await waitFor(() => expect(api.describeOrganizationModelSettings).toHaveBeenCalledTimes(1))
-    const signal = vi.mocked(api.describeOrganizationModelSettings).mock.calls[0]![0]!
-    view.unmount()
-    expect(signal.aborted).toBe(true)
-    render(<OrganizationModelsEditor onChanged={() => {}} />)
-    try {
-      await screen.findByText('组织主连接')
-      const stale = settingsView(2)
-      stale.namespaces[0]!.value = { providers: { 'org-departed': { ...profile, displayName: '已离开的组织连接' } } }
-      release(stale)
-      await pending
-      expect(screen.queryByText('已离开的组织连接')).toBeNull()
-      expect(api.describeOrganizationModelSettings).toHaveBeenCalledTimes(2)
-    } finally {
-      release(settingsView())
-      await pending
+    if (mode === 'create') {
+      await user.click(screen.getByRole('button', { name: '添加组织 Provider' }))
+      expect(screen.getByText('添加至少一个模型后才能保存组织 Provider')).toBeTruthy()
+      expect(screen.queryByText('模型选择器中将不显示任何模型；目录外 ID 仍可直接发送。')).toBeNull()
+      await user.type(screen.getByLabelText('Provider ID'), 'org-draft')
+      await user.type(screen.getByLabelText('显示名称'), '待保存 Provider')
+    } else {
+      await user.click(screen.getByRole('button', { name: '编辑 组织主连接 (org-primary)' }))
+      await user.click(screen.getByText('自定义设置'))
     }
+    const endpoint = screen.getByLabelText('API 地址')
+    await user.clear(endpoint)
+    await user.type(endpoint, 'https://draft.example.invalid/v1')
+    const credential = screen.getByLabelText('API 密钥')
+    await user.type(credential, 'draft-key')
+    await user.click(screen.getByRole('button', { name: '组织模型' }))
+    expect(screen.queryByRole('dialog', { name: '保留当前编辑' })).toBeNull()
+    for (const destination of ['权限与计价', '个人登记']) {
+      await user.click(screen.getByRole('button', { name: destination }))
+      const guard = await screen.findByRole('dialog', { name: '保留当前编辑' })
+      expect(screen.getByRole('button', { name: '组织模型' }).getAttribute('aria-pressed')).toBe('true')
+      expect(screen.getByLabelText('API 地址')).toBe(endpoint)
+      expect(screen.getByLabelText('API 密钥')).toBe(credential)
+      expect((endpoint as HTMLInputElement).value).toBe('https://draft.example.invalid/v1')
+      expect((credential as HTMLInputElement).value).toBe('draft-key')
+      expect((credential as HTMLInputElement).type).toBe('password')
+      await user.click(within(guard).getByRole('button', { name: '留在当前页面' }))
+    }
+    expect(api.mutateOrganizationModelSettings).not.toHaveBeenCalled()
+    expect(api.setOrganizationCredential).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: '取消' }))
+    await user.click(screen.getByRole('button', { name: '权限与计价' }))
+    expect(screen.getByRole('button', { name: '权限与计价' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryByRole('dialog', { name: '保留当前编辑' })).toBeNull()
   })
 
   it('routes the discovery probe through the organization model endpoint', async () => {
@@ -242,6 +230,43 @@ describe('ModelsPage', () => {
     expect(screen.getAllByText('新增模型').length).toBeGreaterThan(0)
     expect(screen.getByText('custom')).toBeTruthy()
     expect(api.listModelRegistrations).toHaveBeenCalled()
+  })
+
+  it('keeps a failed personal registration query separate from a successful empty result', async () => {
+    vi.mocked(api.listModelRegistrations).mockRejectedValue(new Error('Registrations unavailable'))
+    const user = userEvent.setup()
+    render(<ModelsPage />)
+    await screen.findByText('组织主连接')
+    await user.click(screen.getByRole('button', { name: '个人登记' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('Registrations unavailable')
+    expect(screen.queryByText('暂无个人登记记录')).toBeNull()
+    expect(api.listModelRegistrations).toHaveBeenCalledExactlyOnceWith({ limit: 200 })
+  })
+
+  it('does not claim an empty organization model directory when its query fails', async () => {
+    vi.mocked(api.listModels).mockRejectedValue(new Error('Directory unavailable'))
+    const user = userEvent.setup()
+    render(<ModelsPage />)
+    expect((await screen.findByRole('alert')).textContent).toContain('Directory unavailable')
+    await user.click(screen.getByRole('button', { name: '权限与计价' }))
+    expect(screen.queryByText('还没有组织模型')).toBeNull()
+    expect(screen.queryByText('0 个组织模型')).toBeNull()
+    expect(screen.queryByText('0 个模型')).toBeNull()
+    expect(api.listModels).toHaveBeenCalledOnce()
+  })
+
+  it('shows a successful empty personal registration result', async () => {
+    vi.mocked(api.listModelRegistrations).mockResolvedValue({
+      summary: { providerCount: 0, modelCount: 0, eventCount: 0, createdCount: 0, modifiedCount: 0, deletedCount: 0 },
+      rows: [],
+    })
+    const user = userEvent.setup()
+    render(<ModelsPage />)
+    await screen.findByText('组织主连接')
+    await user.click(screen.getByRole('button', { name: '个人登记' }))
+    expect(await screen.findByText('暂无个人登记记录')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(api.listModelRegistrations).toHaveBeenCalledExactlyOnceWith({ limit: 200 })
   })
 
   it('applies personal registration filters only after explicit submission', async () => {

@@ -14,6 +14,8 @@ The [plugin card form](../../../../packages/client/ui-settings-plugins/src/clien
 
 The [plugin-owned settings decision](../architecture/2026-08-12-plugin-owned-settings-surface.md) continues to own registration and presentation. This decision changes acknowledgment and draft lifetime, without introducing another settings writer or changing account and project ownership.
 
+Changing an Admin model view does not acknowledge a settings write. Internal view buttons consult the document's pending-edit registry, as computer switches and external navigation do, so Provider, pricing and utility-model editors retain their drafts until editing completes or is cancelled.
+
 ## Alternatives considered
 
 **Disable every editor during saves.** This prevents concurrent edits but does not establish whether a rejected credential write succeeded. Retaining newer drafts allows continued editing without mistaking them for saved values.

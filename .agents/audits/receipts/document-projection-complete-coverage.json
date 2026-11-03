@@ -1,0 +1,14 @@
+{
+  "name": "document-projection-complete-coverage",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests/projection.spec.ts packages/attachment/userdoc-local/tests/identity.spec.ts packages/attachment/userdoc-local/tests/mutation.spec.ts packages/attachment/userdoc-local/tests/identity-fs.spec.ts --coverage --coverage.include=packages/attachment/userdoc-local/src/projection.ts --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.reportsDirectory=.agents/audits/.local/document-projection-complete-coverage",
+  "startedAt": "2026-10-25T22:01:09.696189+00:00",
+  "seconds": 66.382,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "328bc514427494906b707d3df714065fbb19adb47a42fdef203a02674aba5617",
+  "inputsAfter": "328bc514427494906b707d3df714065fbb19adb47a42fdef203a02674aba5617",
+  "postgresToolDirectory": null,
+  "outputSha256": "89440b06964869f15621d8146219b3f0612e1e6b2c208bc04fe32c2d03121bc3",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  4 passed (4)\n      Tests  111 passed (111)\n   Start at  06:02:08\n   Duration  7.09s (transform 3.19s, setup 542ms, import 3.90s, tests 10.08s, environment 1ms)\n\n % Coverage report from v8\n---------------|---------|----------|---------|---------|-------------------\nFile           | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n---------------|---------|----------|---------|---------|-------------------\n---------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 88/88 )\nBranches     : 100% ( 69/69 )\nFunctions    : 100% ( 10/10 )\nLines        : 100% ( 70/70 )\n================================================================================\n"
+}

@@ -1,0 +1,491 @@
+{
+  "findings": [
+    "B375",
+    "B376"
+  ],
+  "status": "fixed_named_sdk_resource_recovery_cases_verified_remaining_full_review_open",
+  "updatedAt": "2026-10-30T23:07:46.719842+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T223002Z",
+  "sourcePaths": [
+    "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+    "packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/control.spec.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-child.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-parent.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/resource-completion.jsonl",
+    "packages/subagent/subagent-dsh-sdk/README.md",
+    "packages/subagent/subagent-dsh-sdk/README.zh.md",
+    "packages/subagent/subagent-dsh-sdk/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.zh.md",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts": "a06275760ef5c06f6115c172f379cfc3938f7ea8c0ecd0990f25d603aa50676c",
+    "packages/subagent/subagent-dsh-sdk/src/bridge.ts": "b9275de24771cb0d91e61f461ac69386c741b4087f888412885825cb56296b09",
+    "packages/subagent/subagent-dsh-sdk/tests/control.spec.ts": "3d4327910b9fe5e5f3a846a522f4dfe2c7c1d541914fa1ebc113cdb0f7e2eaef",
+    "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts": "9bc8bc0a8dd89d9e826e534a85e429ae09b290c544e567e5a63cfb8849582da6",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion.mjs": "df1d93e033c294da17f2461cd1db41b11597b43d13200c4c3d3c23a56914fe85",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-child.mjs": "119416a248cb67d9399d4773c605ff83fe41268bf053e72bfa4abfa47a105eed",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-parent.mjs": "80494341808aa810f48b75722367410e5c51bf7f30640b2a8a94ba77e95cf37e",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/resource-completion.jsonl": "df3709204c043ce7134b475f7b24496d1c0317906d57a4e7337a44f0d1bf5a67",
+    "packages/subagent/subagent-dsh-sdk/README.md": "70da75b0aaf9a5c4f98d423b6d13b08618e4932bdcf287d39eb17e7d8b06ceb0",
+    "packages/subagent/subagent-dsh-sdk/README.zh.md": "32ec222f0dadadfba59cf544ca39bdf91828c498980c8ca5e83237a2b8d70ca6",
+    "packages/subagent/subagent-dsh-sdk/README.i18n.yaml": "6e3eaaa403d3fda7a641277167afea73ed8995809d3dcca7dfdb6d1f091eee93",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md": "c6c81e5e8edc687a03e10eb993c9a99dd61f1f021d99fae4aece61860ddf51c2",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.zh.md": "460648801bea6dcca5612981f1d559c5f92a4a79c18b69f99cc5166c8ea26460",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml": "cf3594fd6f15b84f8ca39d35525fe28b280f4227415a2c24a419327853bdb09b",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md": "cd1e9d186324538ab40b0464c183e4c2d47db86a0e2f6eeef0d97c8463d27183",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md": "6b8c421db4d3e6bc3e977e890e7495c22b390e099e6c85bc34d3fadac55935f0",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml": "2fc19bb6348da2aa27bdc806561ea940ea7841e2cc39bf1827bd1534684f4b43"
+  },
+  "compiledArtifactHashes": {
+    "packages/subagent/subagent-dsh-sdk/lib/index.js": "cbceb4ec4f3b961341725c5f592c2880f87a2d41463a2cf18f032a05d2e95263",
+    "packages/subagent/subagent-dsh-sdk/lib/managed.js": "fa95dcdaef53e8614474c02d81a98189ad44c3062b5d0e14b2289d84402a950e"
+  },
+  "repairs": [
+    {
+      "id": "B375",
+      "title": "Failed SDK child admission discards its unpublished completion record and leaves unused parent capacity occupied",
+      "repair": "Retain the operation from registration, report exact not-started cleanup through the existing completion owner, retry outstanding reports before later admission, and reject shutdown while acknowledgements fail."
+    },
+    {
+      "id": "B376",
+      "title": "Early SDK cancellation records exhaust private control capacity after later registrations already forbid their ids",
+      "repair": "Advance the registration id and discard early cancellations at or below it, preserving higher pending cancellations and refusal of reused identities."
+    }
+  ],
+  "causalEvidence": {
+    "originalSourceNegative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T22:30:08.691139+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T22:30:11.259866+00:00"
+    },
+    "sourceWitness": "Two real loopback cases retain an unused parent grant after cancellation and one rejects the next grant because that capacity remains occupied. A third case fills two early-cancellation slots despite successful later registrations. All three fail before correction.",
+    "compiledControls": {
+      "sdk-resource-unpublished-compiled-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:55:41.435883+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T223002Z/run-sdk-negative.py",
+          "unpublished"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:55:42.255427+00:00"
+      },
+      "sdk-resource-cancellation-compiled-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:56:42.926606+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T223002Z/run-sdk-negative.py",
+          "cancellation"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:56:43.785464+00:00"
+      }
+    },
+    "compiledWitness": "Evidence-local copies remove only pending-report recovery or early-record retirement from the actual compiled artifacts. The first controlled SDK child fails with2allocations and1capacity refusal. The second reaches6allocations before obsolete cancellation records reject continued initialization. Detector receipts pass only when their private child fails at that expected phase. Shared source and artifacts remain fixed."
+  },
+  "verification": {
+    "uniqueRelatedCases": 680,
+    "relatedPackageCasesPassed": 675,
+    "relatedPackageCasesSkipped": 16,
+    "relatedPackageFilesPassed": 35,
+    "relatedPackageFilesSkipped": 3,
+    "newFocusedCases": 6,
+    "additionalScopedAdmissionAndTypeScriptSdkCases": 4,
+    "pythonSdkCases": 1,
+    "repeatedEngineAndStandaloneLoaderCasesAreNotAdditionalCases": true,
+    "coverage": {
+      "managed-budget.ts": {
+        "statements": [
+          98,
+          98
+        ],
+        "branches": [
+          54,
+          54
+        ],
+        "functions": [
+          19,
+          19
+        ],
+        "lines": [
+          75,
+          75
+        ],
+        "allFourMetrics": 100
+      },
+      "bridge.ts": {
+        "statements": [
+          233,
+          233
+        ],
+        "branches": [
+          152,
+          152
+        ],
+        "functions": [
+          40,
+          40
+        ],
+        "lines": [
+          174,
+          174
+        ],
+        "allFourMetrics": 100
+      }
+    },
+    "newCoverageExemptions": 0,
+    "actualLoaderTranscript": {
+      "topology": "real Loader parent, SDK stdio child and native grandchildren with an external loopback coordinator",
+      "allocations": 9,
+      "successfulCompletionAcknowledgements": 9,
+      "completionAttempts": 12,
+      "occupiedAfterCleanup": 0,
+      "earlyCancelledRegistrations": 4,
+      "unpublishedGrantRecovery": true,
+      "nativeChildrenPhysicallyStopped": true,
+      "runtimeCompletionRetried": true,
+      "scope": "Every coordinator admission is attributed to the initiating parent Session and execution origin. Quiescence upgrades acknowledged uncertainty without duplicate admission."
+    },
+    "compiledMacNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "sdk": "Current TypeScript SDK scoped parent-service and auxiliary-model transcripts plus Python auxiliary-model and persisted resume pass with keyless providers. No root actual provider API call.",
+    "checks": {
+      "sdk-resource-recovery-related-complete-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:52:27.231960+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk",
+          "packages/context/resource-budget",
+          "packages/subprocess/subprocess",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T223002Z/sdk-resource-complete-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:52:59.973324+00:00"
+      },
+      "sdk-resource-recovery-loader-transport-fault": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:42:57.723300+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:43:03.694962+00:00"
+      },
+      "sdk-resource-recovery-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:57:41.927744+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:57:47.494976+00:00"
+      },
+      "sdk-resource-recovery-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:00:04.934110+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:00:07.601856+00:00"
+      },
+      "sdk-resource-recovery-scoped-and-sdk-snapshots": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:01:25.600882+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/scoped-sdk-model-admission.snapshot.ts",
+          "snapshots/sdk/memory-auxiliary.snapshot.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:01:29.338898+00:00"
+      },
+      "sdk-resource-recovery-python-sdk": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:00:04.934939+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "uv",
+          "run",
+          "--no-sync",
+          "--project",
+          "python/sdk",
+          "python",
+          "-m",
+          "pytest",
+          "python/sdk/tests/test_memory_model_snapshot.py",
+          "-q"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:00:06.423174+00:00"
+      },
+      "sdk-resource-recovery-complete-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:38:29.601936+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/build.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:39:25.827384+00:00"
+      },
+      "sdk-resource-recovery-host-types-final": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:53:24.010067+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:53:29.530583+00:00"
+      },
+      "sdk-resource-recovery-lint-final": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:53:24.010503+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+          "packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/control.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion.mjs",
+          "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-child.mjs",
+          "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-parent.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:53:25.912669+00:00"
+      },
+      "sdk-resource-recovery-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:55:42.292718+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:56:09.911578+00:00"
+      },
+      "sdk-resource-recovery-guide-artifact": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:56:42.945506+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T223002Z/verify-sdk-guide.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:56:42.992912+00:00"
+      },
+      "sdk-resource-recovery-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:57:41.927744+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "master"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:57:45.596739+00:00"
+      },
+      "sdk-resource-recovery-entrypoints": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:01:25.600948+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-application-entrypoints.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:01:26.097355+00:00"
+      },
+      "sdk-resource-unpublished-compiled-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:55:41.435883+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T223002Z/run-sdk-negative.py",
+          "unpublished"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:55:42.255427+00:00"
+      },
+      "sdk-resource-cancellation-compiled-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T22:56:42.926606+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T223002Z/run-sdk-negative.py",
+          "cancellation"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T22:56:43.785464+00:00"
+      }
+    }
+  },
+  "build": {
+    "completeInvocation": {
+      "status": "passed",
+      "startedAt": "2026-10-30T22:38:29.601936+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "--import",
+        "tsx/esm",
+        "scripts/build.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T22:39:25.827384+00:00"
+    },
+    "result": "All8gates pass in the complete invocation. Final Host aggregate also passes after the added focused cases. Owned runtime code matches the tested compiled artifacts; later edits are fixture/documentation or a private field comment."
+  },
+  "verificationCorrections": [
+    "The initial assembled run started before its preferred built child bootstrap was refreshed; an initialization failure was not counted as a product negative.",
+    "A newly added fixture held one registration response while waiting for a later queued cancellation to finish. That fixture deadlock was replaced with a bounded registration transport failure before parent delivery. Exact not-started reports still use the real control endpoint.",
+    "The first final coverage run had675passing cases but four unmeasured paths. New cases preserve future cancellation records and wake joined shutdown under a controlled deadline; the current map is100percent for both files.",
+    "The shutdown case asserts its service completion before advancing the controlled clock; a process-wide timer-count assertion was removed because it did not measure only this service."
+  ],
+  "noteReview": {
+    "updatedOwningNote": ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+    "newNotes": 0,
+    "archivedOrDeleted": 0,
+    "retainedActive": [
+      ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md",
+      ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+      ".agents/notes/implemented/bug-fix/2026-10-29-inspector-resource-completion.md"
+    ],
+    "reason": "SDK process ownership, per-request control and inspector cleanup retain distinct live responsibilities. The existing managed-model decision now covers unpublished report ownership and cancellation retirement; no frozen archive is edited.",
+    "upgradeGuide": "Updated the current SDK process-admission guide pair and package README. The guide stays467English words. Wire fields, SDK arguments, Session events and durable schema versions are unchanged."
+  },
+  "coordination": {
+    "peerFrozenRelease": "coharness-full-real-20261031-r4",
+    "frozenDirectory": "/Users/a1234/harness-gateway-releases/coharness-full-real-20261031-r4",
+    "snapshotSdkSourceMatchesBeforeFix": true,
+    "rootDidNotModifyFrozenRelease": true,
+    "scope": "B374was overlaid into R4by the peer. B375/B376are subsequent source work and are absent from this frozen R4. Root did not deploy or operate Docker/production services.",
+    "peerReservedFiles": [
+      "gateway/src/runtime-resource-api.ts",
+      "gateway/src/node-resource-budget.ts",
+      "packages/context/gateway-runtime/src/resource-budget.ts"
+    ],
+    "peerAdditionalOwnership": "ui-collaboration conversation URLs, corresponding tests and identity documents remain with the peer.",
+    "peerReportedBuildObservation": "A cloned release retained incremental compiler caches and first skipped older-mtime overlay sources. Peer removed386candidate compiler caches and rebuilt before publication; B374artifact hashes then matched. No root claim is made that the first candidate build proved overlay freshness.",
+    "peerReportedRealObservation": "One Ubuntu real model/file continuation completed with checked Linux path and file hash, but took3minutes13seconds; performance acceptance remains open. This is peer-authorized evidence, not root Responses validation."
+  },
+  "peerRealAcceptanceSnapshot": {
+    "source": ".agents/audits/full-real-task-2026-10-31/ledger.json",
+    "status": "inventory_in_progress",
+    "targetRelease": "coharness-full-real-20261031-r3",
+    "coverage": {
+      "inventoried": 172,
+      "executed": 24,
+      "passed": 20,
+      "failed": 1,
+      "partial": 3,
+      "blocked": 0,
+      "unsupported": 0,
+      "pending": 148,
+      "note": "Atomic supporting observations are recorded separately; incomplete scenarios do not count as passed."
+    },
+    "scope": "Peer scenario inventory and partial results are separate from root keyless test counts; no complete real acceptance claim."
+  },
+  "additionalReadOnlyReview": {
+    "paths": [
+      "packages/context/resource-budget/src/index.ts",
+      "packages/context/resource-budget/src/types.ts",
+      "packages/context/resource-budget/src/wire.ts",
+      "packages/subprocess/subprocess/src/index.ts",
+      "packages/llm/llm/src/index.ts",
+      "packages/subagent/subagent-dsh-sdk/src/admission.ts",
+      "packages/subagent/subagent-dsh-sdk/src/run.ts",
+      "packages/subagent/subagent-dsh-sdk/src/model-relay.ts",
+      "packages/subagent/subagent-dsh-sdk/src/managed-client.ts",
+      "packages/subagent/subagent-dsh-sdk/src/managed.ts",
+      "packages/web/web/src/model-search.ts",
+      "packages/context/gateway-runtime/src/resource-budget.ts"
+    ],
+    "scope": "Read generic resource requests/wire, selected process/model consumers, SDK admission/control lifetimes and the peer-owned Gateway provider. Read-only observations do not complete each file or the remaining allocation inventory."
+  },
+  "limits": [
+    "Only Mac source and compiled Node22/24 execution are verified in this batch.16guarded cases remain skipped; physical Linux/Windows acceptance is separate.",
+    "The related suite still emits the previously observed11exit-listener warning from retained subprocess cleanup-failure cases. No warning limit was raised and no new production leak is inferred.",
+    "The standalone upgrade-guide command named by the skill remains absent. Existing20doc gates and the edited-guide artifact check pass; the missing command is not counted as passing.",
+    "Full SDK transport/lifecycle and aggregate cleanup-deadline paths still require review beyond these named repairs.",
+    "B04/B25 and all12original domains remain open. Root actual Responses validation stays human-deferred; no real paid model API is used by root."
+  ]
+}

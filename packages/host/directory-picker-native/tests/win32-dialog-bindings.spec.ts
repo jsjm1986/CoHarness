@@ -9,6 +9,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { EventEmitter } from 'node:events'
 import { HRESULT_CANCELLED, runFolderDialog } from '../src/win32-dialog-logic.ts'
 
 const E_FAIL = 0x80004005 | 0
@@ -266,11 +267,40 @@ describe('loadWin32DialogBindings over the fake COM world', () => {
 })
 
 describe('closeThreadWindows over the fake COM world', () => {
+  it('discards delayed window closure after the driver observes native worker exit', async () => {
+    const world = comWorld()
+    installFakeKoffi(world)
+    const { pickWin32Directory } = await import('../src/win32-dialog.ts')
+    const worker = Object.assign(new EventEmitter(), { kill: () => true })
+    const controller = new AbortController()
+    const result = pickWin32Directory(controller.signal, { spawnWorker: () => worker }).catch((error: unknown) => error)
+    worker.emit('message', { kind: 'showing', threadId: 777 })
+    controller.abort()
+    worker.emit('exit')
+    worker.emit('close')
+    expect(await result).toEqual(new Error('native directory picker aborted'))
+    expect(world.posted).toEqual([])
+    expect(world.registered).toBe(0)
+  })
+
+  it.each(['before', 'during'])('refuses window messages when worker closure occurs %s binding preparation', async (timing) => {
+    const world = comWorld()
+    installFakeKoffi(world)
+    const { closeThreadWindows } = await loadBindingsModule()
+    const lifetime = new AbortController()
+    if (timing === 'before') lifetime.abort()
+    const operation = closeThreadWindows(777, lifetime.signal)
+    if (timing === 'during') lifetime.abort()
+    await expect(operation).rejects.toBe(lifetime.signal.reason)
+    expect(world.posted).toEqual([])
+    expect(world.registered).toBe(0)
+  })
+
   it('posts WM_CLOSE to every window of the thread and unregisters the callback', async () => {
     const world = comWorld()
     installFakeKoffi(world)
     const { closeThreadWindows } = await loadBindingsModule()
-    await closeThreadWindows(777)
+    await closeThreadWindows(777, new AbortController().signal)
     expect(world.posted).toEqual([
       { hwnd: { kind: 'hwnd', n: 1 }, message: WM_CLOSE },
       { hwnd: { kind: 'hwnd', n: 2 }, message: WM_CLOSE },
@@ -283,7 +313,7 @@ describe('closeThreadWindows over the fake COM world', () => {
     const world = comWorld({ enumThrows: true })
     installFakeKoffi(world)
     const { closeThreadWindows } = await loadBindingsModule()
-    await expect(closeThreadWindows(777)).rejects.toThrow('EnumThreadWindows refused')
+    await expect(closeThreadWindows(777, new AbortController().signal)).rejects.toThrow('EnumThreadWindows refused')
     expect(world.unregistered).toBe(1)
   })
 })

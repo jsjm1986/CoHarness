@@ -1,0 +1,25 @@
+{
+  "reply": "PREFLIGHT_WITHDRAWAL_OK",
+  "cases": {
+    "foreground": {
+      "mode": "foreground",
+      "metadataStarted": 1,
+      "runtimeCancelled": true,
+      "responseClosed": true,
+      "providerFinishedBeforeWithdrawal": true,
+      "withdrawalWhileResponseOpen": false,
+      "childStarts": 0,
+      "toolError": true
+    },
+    "background": {
+      "mode": "background",
+      "metadataStarted": 1,
+      "runtimeCancelled": true,
+      "responseClosed": true,
+      "providerFinishedBeforeWithdrawal": true,
+      "withdrawalWhileResponseOpen": false,
+      "childStarts": 0,
+      "toolError": true
+    }
+  }
+}

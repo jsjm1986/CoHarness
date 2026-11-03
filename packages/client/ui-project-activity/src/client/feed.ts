@@ -1,4 +1,5 @@
 /** Activity feed wire types, account-route fetch, and client-side grouping. */
+import { addressRuntimeUrl, type SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 
 /** One member-visible feed row as served by `GET /account/api/activity`. */
 export interface ActivityItem {
@@ -22,16 +23,27 @@ export interface ActivityPage {
 
 const PAGE_SIZE = 50
 
+/** Keep account routes on their Session's allocation independently of the scope cookie. */
+function activityUrl(path: string, target: SessionRuntimeTarget | undefined): string {
+  if (target === undefined) return path
+  const url = new URL(path, 'http://dsh.internal')
+  addressRuntimeUrl(url, target)
+  return url.pathname + url.search
+}
+
 /**
  * Read one page of the project activity feed through the account session.
  * @param before - opaque cursor from the previous page.
  * @param signal - abort for superseded or disposed reads.
+ * @param target - owning Session's Runtime; absence preserves standalone account routing.
  * @returns the normalized page; transport and payload failures reject.
  */
-export async function fetchActivity(before: string | undefined, signal: AbortSignal): Promise<ActivityPage> {
+export async function fetchActivity(
+  before: string | undefined, signal: AbortSignal, target: SessionRuntimeTarget | undefined,
+): Promise<ActivityPage> {
   const params = new URLSearchParams({ limit: String(PAGE_SIZE) })
   if (before !== undefined) params.set('before', before)
-  const response = await fetch(`/account/api/activity?${params.toString()}`, { credentials: 'same-origin', signal })
+  const response = await fetch(activityUrl(`/account/api/activity?${params.toString()}`, target), { credentials: 'same-origin', signal })
   if (!response.ok) throw new Error(`project activity request failed: ${String(response.status)}`)
   const body = await response.json() as { items?: unknown; nextBefore?: unknown }
   if (!Array.isArray(body.items)) throw new TypeError('project activity returned an invalid page')
@@ -95,10 +107,11 @@ export interface ProgressPage {
 /**
  * Read the human-facing progress journal through the account session.
  * @param signal - abort for superseded or disposed reads.
+ * @param target - owning Session's Runtime; absence preserves standalone account routing.
  * @returns the normalized page; transport and payload failures reject.
  */
-export async function fetchProgress(signal: AbortSignal): Promise<ProgressPage> {
-  const response = await fetch('/account/api/progress', { credentials: 'same-origin', signal })
+export async function fetchProgress(signal: AbortSignal, target: SessionRuntimeTarget | undefined): Promise<ProgressPage> {
+  const response = await fetch(activityUrl('/account/api/progress', target), { credentials: 'same-origin', signal })
   // The route is absent wherever the journal service is not mounted — present
   // that as a feature-off page instead of a transport failure.
   if (response.status === 400 || response.status === 404) {
@@ -119,10 +132,11 @@ export interface ProgressGenerateResult {
 
 /**
  * Ask the gateway to run one digest pass now, overriding the idle gates.
+ * @param target - owning Session's Runtime; absence preserves standalone account routing.
  * @returns whether a pass was admitted; refusals arrive in `reason`.
  */
-export async function generateProgress(): Promise<ProgressGenerateResult> {
-  const response = await fetch('/account/api/progress/generate', { method: 'POST', credentials: 'same-origin' })
+export async function generateProgress(target: SessionRuntimeTarget | undefined): Promise<ProgressGenerateResult> {
+  const response = await fetch(activityUrl('/account/api/progress/generate', target), { method: 'POST', credentials: 'same-origin' })
   if (!response.ok) throw new Error(`project progress generate failed: ${String(response.status)}`)
   return await response.json() as ProgressGenerateResult
 }
@@ -178,7 +192,9 @@ function latestOf(rows: readonly ActivityItem[]): string {
 }
 
 /** Attach collapsed-view statistics (digest row, actors, answer count) to a section. */
-function withStats(section: Omit<ActivitySection, 'digest' | 'actors' | 'answers'>): ActivitySection {
+type ActivityRows = [ActivityItem, ...ActivityItem[]]
+
+function withStats(section: Omit<ActivitySection, 'digest' | 'actors' | 'answers' | 'rows'> & { rows: ActivityRows }): ActivitySection {
   let digest: ActivityItem | undefined
   let answers = 0
   const seen = new Map<number, string>()
@@ -192,10 +208,17 @@ function withStats(section: Omit<ActivitySection, 'digest' | 'actors' | 'answers
   const pick = digest ?? section.rows[0]
   return {
     ...section,
-    ...(pick === undefined ? {} : { digest: pick }),
+    digest: pick,
     actors: [...seen.entries()].map(([userId, label]) => ({ userId, label })),
     answers,
   }
+}
+
+/** Group maps contain their first row at insertion, retaining its display metadata. */
+function appendGroup(groups: Map<string, ActivityRows>, key: string, row: ActivityItem): void {
+  const rows = groups.get(key)
+  if (rows === undefined) groups.set(key, [row])
+  else rows.push(row)
 }
 
 /**
@@ -214,28 +237,23 @@ export function groupItems(
 ): ActivitySection[] {
   const titleOf = (item: ActivityItem): string => item.conversationTitle ?? conversationTitle(item.sessionId)
   if (grouping === 'time') {
-    const days = new Map<string, ActivityItem[]>()
+    const days = new Map<string, ActivityRows>()
     for (const item of items) {
       const day = dayLabel(item.occurredAt)
-      let rows = days.get(day)
-      if (rows === undefined) days.set(day, rows = [])
-      rows.push(item)
+      appendGroup(days, day, item)
     }
     return [...days.entries()].map(([day, rows]) =>
       withStats({ id: day, day, title: day, rows }))
   }
-  const keyed = new Map<string, ActivityItem[]>()
+  const keyed = new Map<string, ActivityRows>()
   for (const item of items) {
-    const key = grouping === 'conversation' ? `${titleOf(item)}${item.sessionId}` : `${item.actorLabel}${item.actorUserId}`
-    let rows = keyed.get(key)
-    if (rows === undefined) keyed.set(key, rows = [])
-    rows.push(item)
+    const key = grouping === 'conversation' ? item.sessionId : String(item.actorUserId)
+    appendGroup(keyed, key, item)
   }
   return [...keyed.entries()]
     .sort((left, right) => latestOf(right[1]).localeCompare(latestOf(left[1])))
     .map(([key, rows]) => {
       const first = rows[0]
-      if (first === undefined) return withStats({ id: key, title: '', rows })
       return withStats({
         id: key,
         title: grouping === 'conversation' ? titleOf(first) : first.actorLabel,
@@ -256,7 +274,7 @@ export const CONV_TONES = ['toneBlue', 'toneGreen', 'toneAmber', 'toneRed', 'ton
  */
 export function convTone(sessionId: string): number {
   let sum = 0
-  for (const char of sessionId) sum += char.codePointAt(0) ?? 0
+  for (const char of sessionId) sum += Number(char.codePointAt(0))
   return sum % CONV_TONES.length
 }
 
@@ -267,11 +285,18 @@ export function convTone(sessionId: string): number {
  * @returns `today`/`yesterday` words for recent days, else the raw date.
  */
 export function relativeDayLabel(day: string, labels: { today: string; yesterday: string }): string {
-  const today = dayLabel(new Date().toISOString())
+  const { today, yesterday } = localCalendarDays()
   if (day === today) return labels.today
-  const yesterday = dayLabel(new Date(Date.now() - 86_400_000).toISOString())
   if (day === yesterday) return `${labels.yesterday} · ${day.slice(5)}`
   return day
+}
+
+/** Viewer-local calendar days include daylight-saving changes. */
+function localCalendarDays(): { today: string; yesterday: string } {
+  const date = new Date()
+  const today = dayLabel(date.toISOString())
+  date.setDate(date.getDate() - 1)
+  return { today, yesterday: dayLabel(date.toISOString()) }
 }
 
 /**
@@ -283,8 +308,9 @@ export function relativeDayLabel(day: string, labels: { today: string; yesterday
  */
 export function agoLabel(iso: string, yesterdayLabel: string): string {
   const day = dayLabel(iso)
-  if (day === dayLabel(new Date().toISOString())) return timeLabel(iso)
-  if (day === dayLabel(new Date(Date.now() - 86_400_000).toISOString())) return `${yesterdayLabel} ${timeLabel(iso)}`
+  const { today, yesterday } = localCalendarDays()
+  if (day === today) return timeLabel(iso)
+  if (day === yesterday) return `${yesterdayLabel} ${timeLabel(iso)}`
   return day.slice(5)
 }
 

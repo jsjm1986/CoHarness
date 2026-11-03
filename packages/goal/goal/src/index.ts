@@ -84,7 +84,7 @@ const goalProjectionSchema: ZodType<GoalProjection | null> = zod.union([
 
 const goalProjectionStateSchema: ZodType<GoalProjectionState> = zod.object({
   current: goalProjectionSchema,
-  seenGoalIds: zod.array(zod.string().min(1)).refine(
+  seenGoalIds: zod.array(zod.string().min(1).transform(GoalId)).refine(
     ids => new Set(ids).size === ids.length,
     { message: 'seen goal ids must be unique' },
   ),
@@ -97,10 +97,7 @@ const goalProjectionStateSchema: ZodType<GoalProjectionState> = zod.object({
   if (state.current.updatedAt < state.current.createdAt) {
     context.addIssue({ code: 'custom', message: 'current goal update cannot precede its creation' })
   }
-  if (state.current.roundsStarted > state.current.goal.maxGoalRounds) {
-    context.addIssue({ code: 'custom', message: 'current goal rounds cannot exceed its configured limit' })
-  }
-}) as unknown as ZodType<GoalProjectionState>
+})
 
 /** Build strict fold state from one checkpoint-safe projection state. */
 function goalFoldState(state: GoalProjectionState): GoalFoldState {

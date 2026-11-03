@@ -68,6 +68,8 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
   private terminals = new Set<LocalTerminalHandle>()
   /** Caller endpoints retained until close, independently of managed process lifetime. */
   private controlChannels = new Set<Duplex>()
+  /** Unload's exit-listener disposer remains available until retained native owners and control endpoints are gone. */
+  private retireHostExit: (() => void) | undefined
   /** Test hook: process, spill, and platform operations forwarded to spawnSubprocess. */
   internals: SpawnInternals = {}
   /** Provider-lifetime latch suppressing repeated weaker-containment warnings. */
@@ -93,14 +95,21 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       const onHostExit = (): void => { this.terminateForHostExit() }
       process.prependListener('exit', onHostExit)
       return async () => {
-        await this.disposeManagedProcesses()
-        process.off('exit', onHostExit)
+        this.retireHostExit = () => { process.off('exit', onHostExit) }
+        try { await this.disposeManagedProcesses() }
+        finally { this.retireHostExitIfQuiescent() }
       }
     }, 'local subprocess teardown')
   }
 
   /** Spill failures reach the plugin logger; the log line is the only trace of why a result has no spill path. */
   private readonly reportSpillFailure = logSpillFailure(this.ctx.logger, 'subprocess-local')
+
+  private retireHostExitIfQuiescent(): void {
+    if (this.live.size > 0 || this.terminals.size > 0 || this.controlChannels.size > 0) return
+    this.retireHostExit?.()
+    this.retireHostExit = undefined
+  }
 
   private terminateForHostExit(): void {
     for (const handle of this.live) {
@@ -132,10 +141,10 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       pending.push(Promise.all([
         handle.done.catch(() => {}),
         handle.waitForExit(),
-      ]).then(() => { this.live.delete(handle) }))
+      ]).then(() => { this.live.delete(handle); this.retireHostExitIfQuiescent() }))
     }
     for (const terminal of this.terminals) {
-      pending.push(terminal.terminate().then(() => { this.terminals.delete(terminal) }))
+      pending.push(terminal.terminate().then(() => { this.terminals.delete(terminal); this.retireHostExitIfQuiescent() }))
     }
     const outcomes = await Promise.allSettled(pending)
     await Promise.all([...this.controlChannels].map(control => new Promise<void>((resolveClose) => {
@@ -194,9 +203,12 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       extensions.map(extension => resolve(process.cwd(), directory, command + extension)))
   }
 
-  spawn(spec: SubprocessSpawnSpec): SubprocessHandle {
-    validateSubprocessSpec(spec)
-    const env = targetEnvironment(spec)
+  protected override spawnProcess(spec: SubprocessSpawnSpec): SubprocessHandle {
+    let env: Record<string, string>
+    try {
+      validateSubprocessSpec(spec)
+      env = targetEnvironment(spec)
+    } catch (error) { this.rejectAfterCleanup(error) }
     const containmentMode = this.selectContainmentMode('ordinary')
     let handle: LocalSubprocessHandle
     const internals: SpawnInternals = { ...this.internals, onSpillFailure: this.reportSpillFailure }
@@ -215,14 +227,14 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
     const control = handle.control
     if (control !== undefined) {
       this.controlChannels.add(control)
-      control.once('close', () => { this.controlChannels.delete(control) })
+      control.once('close', () => { this.controlChannels.delete(control); this.retireHostExitIfQuiescent() })
     }
     // Release ownership only once the whole managed range is gone, not at direct-child
     // settlement — a TERM-trapping helper that outlives the leader must stay
     // owned so teardown can still escalate it. For the common no-survivor
     // case waitForExit resolves immediately after settlement.
     const release = (): Promise<void> =>
-      handle.waitForExit().then(() => { this.live.delete(handle) })
+      handle.waitForExit().then(() => { this.live.delete(handle); this.retireHostExitIfQuiescent() })
     void handle.done.then(release, release).catch(() => {})
     return handle
   }
@@ -287,15 +299,16 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
 
   // Local PTY allocation is synchronous, but the provider contract permits remote asynchronous allocation.
   // oxlint-disable-next-line typescript/require-await -- Preserve promise rejection semantics at the async provider contract.
-  async spawnTerminal(spec: SubprocessTerminalSpawnSpec): Promise<SubprocessTerminalHandle> {
+  protected override async spawnTerminalProcess(spec: SubprocessTerminalSpawnSpec): Promise<SubprocessTerminalHandle> {
     const file = spec.argv[0]
     if (file === undefined || file.length === 0) {
-      throw new Error('subprocess-local: terminal argv must contain a program')
+      this.rejectAfterCleanup(new Error('subprocess-local: terminal argv must contain a program'))
     }
     spec.signal?.throwIfAborted()
-    const inspector = this.terminalInspector ?? createProcessInspector()
+    const inspector = this.terminalInspector ?? createProcessInspector(spec.graceMs)
     const containmentMode = this.selectContainmentMode('terminal')
-    const env = targetEnvironment(spec)
+    let env: Record<string, string>
+    try { env = targetEnvironment(spec) } catch (error) { this.rejectAfterCleanup(error) }
     const platform = this.internals.platform ?? process.platform
     const activity = prepareShellActivity(spec, env, platform)
     const launch = activity === undefined ? spec : { ...spec, argv: activity.argv, env: activity.env }
@@ -350,7 +363,7 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       owner,
       scope?.resolveOutcome,
       activity,
-      () => { this.terminals.delete(handle as LocalTerminalHandle) },
+      () => { this.terminals.delete(handle as LocalTerminalHandle); this.retireHostExitIfQuiescent() },
       spec.shellActivity === true,
     )
     this.terminals.add(handle)
@@ -361,6 +374,7 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       if (spec.shellActivity === true) return
       await handle.terminate()
       this.terminals.delete(handle)
+      this.retireHostExitIfQuiescent()
     }
     void handle.done.then(release, release).catch(() => {})
     return handle

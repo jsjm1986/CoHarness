@@ -1,0 +1,14 @@
+{
+  "name": "runtime-relay-concurrent-a",
+  "cwd": "gateway",
+  "command": "node_modules/.bin/vitest run tests/runtime-relay.spec.ts tests/instances.spec.ts tests/apply-grants.spec.ts tests/proxy.spec.ts --retry=0",
+  "startedAt": "2026-10-25T00:59:23.960707+00:00",
+  "seconds": 30.438,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "658d3ca198fa57f89556bccc6b2a066b4e177c83045834bf1ec2153e840bc210",
+  "inputsAfter": "658d3ca198fa57f89556bccc6b2a066b4e177c83045834bf1ec2153e840bc210",
+  "postgresToolDirectory": null,
+  "outputSha256": "671d80f0aac99a53bc4909e463b8d425e2970d15ba30f2cb4558106748c3d6a1",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  4 passed (4)\n      Tests  81 passed (81)\n   Start at  08:59:25\n   Duration  28.87s (transform 4.68s, setup 0ms, import 6.12s, tests 52.42s, environment 0ms)\n\n"
+}

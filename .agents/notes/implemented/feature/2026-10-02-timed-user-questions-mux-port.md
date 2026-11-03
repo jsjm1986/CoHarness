@@ -21,6 +21,8 @@ Keep the mux transport and port the card model onto it.
 - A closed turn owns a turn-process row even without assistant evidence, so a reply-only turn still folds what it leaves behind; folded members stay mounted under `hidden` instead of leaving the DOM, since a late reply mutates while hidden and must paint complete on reveal.
 - A late answer lands as a `user/message` whose source is `user-question-reply`; the `question-reply` node definition projects it as a read-only review row that reopens the recorded answer batch.
 
+Late reply admission owns its execution identity. The service attests the exact user message before steering and reserves one reply while that asynchronous check is pending. The Remote routing policy keeps the write permission check and leaves input registration to the service; a temporary request identity cannot identify a reply queued beyond the RPC lifetime. Exact Agent and authority checks prevent delivery after withdrawal or replacement, and pending replies retain their Agent against idle retirement. Durable replies without attestation remain unverified for privileged execution. Gateway admission attaches the signed project caller snapshot to human messages and continued replies; source-provided participant fields cannot replace that identity. Collaboration context accepts both human source kinds and logs the paired model-visible attribution. Restoration retains the original answerer and rechecks current execution permissions.
+
 ## Alternatives considered
 
 **Adopt upstream's plugin-published pending model wholesale.** Rejected: it retires the mux `question/requested` frame and `/api/respond` that approval and other transports share, and rewrites a working wire for no product-visible gain.

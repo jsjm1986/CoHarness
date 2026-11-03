@@ -1,0 +1,13 @@
+{
+  "name": "organization-auth-build-current",
+  "cwd": "gateway",
+  "command": "npm run build",
+  "startedAt": "2026-10-23T19:21:03.064023+00:00",
+  "seconds": 5.804,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "00ad38e0c05a4a0157b15255eb7afc1ef539ecada00a96d2bb2dcefd25e268b4",
+  "inputsAfter": "00ad38e0c05a4a0157b15255eb7afc1ef539ecada00a96d2bb2dcefd25e268b4",
+  "outputSha256": "898095a3ceeb02add8ff851ae671d7fc499316aab1c64f358d6b61663d57feb4",
+  "outputTail": "\n> build\n> tsc -p tsconfig.build.json\n\n"
+}

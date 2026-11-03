@@ -1,0 +1,14 @@
+{
+  "name": "document-parent-swap-store-lint-final",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/rooted-fs.ts packages/attachment/userdoc-local/src/store.ts packages/attachment/userdoc-local/tests/private-upload-paths.spec.ts",
+  "startedAt": "2026-10-26T01:27:10.727188+00:00",
+  "seconds": 6.322,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c6e86482a3758585ba4026778c4b419317c8c6af27527e2e39cdd1004ded7e21",
+  "inputsAfter": "c6e86482a3758585ba4026778c4b419317c8c6af27527e2e39cdd1004ded7e21",
+  "postgresToolDirectory": null,
+  "outputSha256": "9f659d0aa8143ca93b114b2bcc2183c0d15ed537c514d5a2ccf435f93e44edc1",
+  "outputTail": "packages/attachment/userdoc-local/src/store.ts:746:60: error @stylistic(arrow-parens): Unexpected parentheses around single function argument having a body with no curly braces.\npackages/attachment/userdoc-local/src/store.ts:745:9: error typescript(no-unnecessary-condition): Unnecessary conditional, value is always falsy.\n"
+}

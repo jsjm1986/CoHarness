@@ -23,9 +23,9 @@ For a background call, the tool validates the parent and refuses an already-abor
 The task registration maps the subagent seam as follows:
 
 - `kind` is `subagent`, `label` is the model-supplied description, and `owner` is the parent agent.
-- `cancel(reason?)` aborts the task-owned controller. The same signal covers pending provider startup and the published run's remaining work.
-- `done` awaits provider startup, the child result, and `run.dispose()`. Completed runs return final text, aborted runs become `killed`, and other stop reasons become `failed` with the Provider diagnostic when present. Startup, result, and disposal failures become failed outcomes rather than rejected task promises.
-- `readOutput` is absent. While live, `job_output` returns status only; after settlement, it returns final output idempotently. Intermediate child activity remains in the child session.
+- `cancel(reason?)` aborts the task-owned controller. The same signal covers pending provider startup and the published run's remaining work. It also retries a published run's unconfirmed cleanup under the [cleanup ownership decision](../bug-fix/2026-11-01-subagent-job-cleanup.md).
+- `done` awaits provider startup, the child result, and successful `run.dispose()`. Completed runs return final text, aborted runs become `killed`, and other stop reasons become `failed` with the Provider diagnostic when present. A published run's disposal failure keeps completion pending until a later termination request confirms cleanup; it then reports failure without the child's answer. Startup and result failures become failed outcomes rather than rejected task promises. Unrenderable failures cannot skip cleanup or reject the producer promise.
+- No output source is registered. While live, `job_output` returns status and any cleanup progress notice. The job registry owns final-result delivery and the model cursor; intermediate child activity remains in the child session.
 
 ## Lifecycle
 

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-25-web-command-surfaces-and-assembly.md
 document:
-  en: 4aa50af409687a0ba29388614e59ba4dc5a80bf4
-  zh: db17b64e3729f658aed6cfa6c0c1fd8bf7470228
+  en: 403a31579777d10251eaa23a79f0a8d3f83e42a1
+  zh: 954bb27c955fd7dd27621645cb7daf3356315068
 /agent-note-web-command-business-surfaces-and-assembly-ui-commands-ui-skill-ui-subagent:
   en: 4dd9d2d0f3ae27fd
   zh: 9b9f8a676f718250
@@ -15,8 +15,8 @@ document:
   en: a15c7c13f167e5ac
   zh: 63bcc2ef60c2f344
 /agent-note-web-command-business-surfaces-and-assembly-ui-commands-ui-skill-ui-subagent/decision/ui-commands-a-commanduiruntime-a-session-keyed-commanddirectory-a-per-session-popupselectcontroller:
-  en: acdbc8b9de55acfa
-  zh: d418e3e753573816
+  en: 7e4fb407670a1f7c
+  zh: 39e66481c36b8bcc
 /agent-note-web-command-business-surfaces-and-assembly-ui-commands-ui-skill-ui-subagent/decision/reference-sources-seeing-only-projections-plus-their-own-apply-closures-on-the-root-ctx:
   en: 05dcbe136bc7c342
   zh: 3a2252c7420fcee0

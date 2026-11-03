@@ -10,6 +10,7 @@ import type {
 import type {} from '@deepseek-ai/dsh-plugin-manager'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
+import { discardGatewayRead } from './response.ts'
 
 const protectedModules = new Set([
   '@deepseek-ai/dsh-gateway-runtime',
@@ -90,7 +91,7 @@ export function gatewayPluginManagementAuthorization(
         method: 'POST', principal, signal,
       })
       if (response.status !== 204) {
-        await response.body?.cancel()
+        discardGatewayRead(response.body)
         throw new RemoteError('plugin-management/forbidden', 'The Gateway did not authorize profile management.', {})
       }
     },
@@ -98,7 +99,7 @@ export function gatewayPluginManagementAuthorization(
       signal.throwIfAborted()
       const response = await runtime.request(pluginStatePath, { method: 'GET', signal })
       if (response.status !== 200) {
-        await response.body?.cancel()
+        discardGatewayRead(response.body)
         throw new Error(`Gateway plugin-state read failed: ${response.status}`)
       }
       return await response.json() as PluginDesiredStateSnapshot
@@ -118,20 +119,22 @@ export function gatewayPluginManagementAuthorization(
         const current = await response.json() as PluginDesiredStateSnapshot
         return { status: 'conflict', current }
       }
-      await response.body?.cancel()
+      discardGatewayRead(response.body)
       throw new Error(`Gateway plugin-state publish failed: ${response.status}`)
     },
-    async authorizeInstall(spec: ParsedInstallSpec): Promise<void> {
-      signal.throwIfAborted()
-      if (sources === undefined) return
-      const host = 'host' in spec ? spec.host : undefined
-      const rule = sources.get(spec.kind)
-      if (sources.has(spec.kind) && (rule === undefined || host === undefined || rule.has(host))) return
-      throw new RemoteError(
-        'plugin-management/install-source',
-        `The organization does not allow installing plugins from ${spec.kind}${host === undefined ? '' : ` host ${host}`} specs.`,
-        {},
-      )
+    authorizeInstall(spec: ParsedInstallSpec): Promise<void> {
+      return Promise.resolve().then(() => {
+        signal.throwIfAborted()
+        if (sources === undefined) return
+        const host = 'host' in spec ? spec.host : undefined
+        const rule = sources.get(spec.kind)
+        if (sources.has(spec.kind) && (rule === undefined || host === undefined || rule.has(host))) return
+        throw new RemoteError(
+          'plugin-management/install-source',
+          `The organization does not allow installing plugins from ${spec.kind}${host === undefined ? '' : ` host ${host}`} specs.`,
+          {},
+        )
+      })
     },
   }
 }

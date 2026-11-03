@@ -1,6 +1,7 @@
 /** Account-scoped pool of SessionRuntime instances used by the workbench. */
 import { clientSessionKey, parseClientSessionKey, runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { Context, Fiber } from '@deepseek-ai/cordis'
+import { prepareGatewayRuntime } from '../prepare-runtime.ts'
 import type {
   ConnectionHandle,
   ConnectionFailure,
@@ -33,6 +34,8 @@ import { WorkspaceResourceError, workspaceResourceProvider } from '../workspace-
 import type { WorkspaceResourceTarget } from '../workspace-resources.ts'
 import type { WorkspaceArchiveSnapshot } from '../workspaces/manager.ts'
 import { createSnapshotStore, type ObservableSnapshot, type SnapshotStore } from '../contract/store.ts'
+import { WorkspaceManager } from '../workspaces/manager.ts'
+import type { RuntimeWorkspaceSnapshot } from '../contract/sessions-port.ts'
 
 interface RuntimeEntry {
   references?: number
@@ -61,13 +64,6 @@ function targetKey(target: ConnectionRuntimeTarget): string {
   return runtimeTargetKey(target)
 }
 
-/** Bound on a lazily opened target runtime's initial readiness wait. A failed
- *  generation is only a transient while the connection's reconnect loop keeps
- *  retrying inside this window; two generation-handshake budgets give one
- *  stalled attempt plus its retry room to establish before the entry is
- *  released as unavailable. */
-const TARGET_RUNTIME_READY_TIMEOUT_MS = 30_000
-
 /**
  * Coordinates one base runtime with lazily opened project runtimes. Every
  * runtime keeps its own transport, event stream, history windows, and scope
@@ -77,6 +73,9 @@ export class SessionRuntimePool implements ISessions {
   readonly searchResultLimit: number
   readonly list: SnapshotStore<SessionListState>
   readonly currentScopeList: SnapshotStore<SessionListState>
+  /** Live Workspace metadata for Runtimes already opened by explicit user actions. */
+  readonly workspaceSnapshots = createSnapshotStore<readonly RuntimeWorkspaceSnapshot[]>([])
+  private readonly workspaceManagers = new Map<string, { target: SessionRuntimeTarget; manager: WorkspaceManager }>()
   readonly currentProvideInfo: HostObservable<SessionMaybeProvideInfo>
   readonly provideInfoRevision: HostObservable<number>
   private readonly entries = new Map<string, RuntimeEntry>()
@@ -88,6 +87,9 @@ export class SessionRuntimePool implements ISessions {
   private readonly retentionSources = new Map<SessionId, ObservableSnapshot<SessionRetainInfo>>()
   private readonly runtimeOperations = new Map<string, { references: number }>()
   private readonly lifetime = new AbortController()
+  private directoryRows: readonly SessionSummary[] = []
+  private personalDirectory = false
+  private aggregatePersonalDirectory = true
   private activeSession: SessionId | undefined
   private accountInvalidated = false
   private baseGeneration = 0
@@ -255,10 +257,16 @@ export class SessionRuntimePool implements ISessions {
     const jobsBySession: SessionListState['jobsBySession'] = {}
     const observedJobs: Record<string, SessionListState['observedJobs'][string]> = {}
     const maskedSelections: Runtime[] = []
+    const listed = new Set<SessionId>()
+    for (const row of this.directoryRows) { ids.push(row.id); listed.add(row.id); byId[row.id] = row }
     for (const entry of this.entries.values()) {
       const state = this.projectEntry(entry)
-      ids.push(...state.ids)
-      Object.assign(byId, state.byId)
+      for (const id of state.ids) if (!listed.has(id)) { listed.add(id); ids.push(id) }
+      for (const [id, live] of Object.entries(state.byId) as Array<[SessionId, SessionSummary]>) {
+        const known = byId[id]
+        byId[id] = live.title === undefined && known?.title !== undefined
+          ? { ...live, title: known.title, displayTitle: known.title } : live
+      }
       Object.assign(archivedById, state.archivedById)
       Object.assign(subagentsByParent, state.subagentsByParent)
       Object.assign(jobsBySession, state.jobsBySession)
@@ -278,6 +286,20 @@ export class SessionRuntimePool implements ISessions {
     const current = this.activeSession !== undefined && byId[this.activeSession] !== undefined
       ? this.activeSession
       : this.currentScopeList.getSnapshot().current
+    if (this.personalDirectory) {
+      const selectedRuntime = current === undefined ? this.bootstrapRuntimeTarget().runtimeId : byId[current]?.runtime?.runtimeId
+      const visible = (row: SessionSummary): boolean => row.runtime?.kind === 'personal'
+        && (this.aggregatePersonalDirectory || row.runtime.runtimeId === selectedRuntime)
+      const personalIds = ids.filter((id) => {
+        const row = byId[id]
+        return row !== undefined && visible(row)
+      })
+      const personalSet = new Set(personalIds)
+      this.currentScopeList.set({ ...this.currentScopeList.getSnapshot(), ids: personalIds,
+        byId: Object.fromEntries(Object.entries(byId).filter(([id]) => personalSet.has(id as SessionId))),
+        archivedById: Object.fromEntries(Object.entries(archivedById).filter(([, row]) => visible(row))),
+        current: current !== undefined && personalIds.includes(current) ? current : undefined })
+    }
     if (current !== undefined && byId[current] === undefined) this.activeSession = undefined
     const owner = current === undefined ? undefined : this.ownerFor(current)
     const nextProvide = owner?.runtime.currentProvideInfo.getSnapshot()
@@ -290,6 +312,8 @@ export class SessionRuntimePool implements ISessions {
     this.list.set({
       ids, byId, archivedById, current: current !== undefined && byId[current] !== undefined ? current : undefined,
       phase: baseline.phase, state: baseline.state, error: baseline.error,
+      ...(this.base.list.getSnapshot().navigationBlockedSessionId === undefined ? {}
+        : { navigationBlockedSessionId: this.base.list.getSnapshot().navigationBlockedSessionId }),
       subagentsByParent, jobsBySession, observedJobs,
       currentAddress: owner === undefined ? undefined : this.projectEntry(owner).currentAddress,
     })
@@ -299,6 +323,24 @@ export class SessionRuntimePool implements ISessions {
     // releaseSelection keeps in-flight navigation intents alive — masking
     // is not a user clear.
     for (const runtime of maskedSelections) runtime.releaseSelection()
+  }
+
+  /** Install authorized personal metadata without opening Runtime connections.
+   * @param rows - account-filtered Session metadata with exact Runtime identities.
+   * @param enabled - whether the unified personal directory is active.
+   * @param aggregate - whether this browser entry aggregates personal Runtimes.
+   */
+  installPersonalDirectory(rows: readonly SessionSummary[], enabled: boolean, aggregate = true): void {
+    if (this.accountInvalidated) return
+    this.directoryRows = rows; this.personalDirectory = enabled; this.aggregatePersonalDirectory = aggregate; this.rebuild()
+  }
+
+  /** Apply entry visibility to retained metadata without changing a conversation or its draft.
+   * @param aggregate - current entry aggregation policy.
+   */
+  setPersonalDirectoryAggregation(aggregate: boolean): void {
+    this.aggregatePersonalDirectory = aggregate
+    this.rebuild()
   }
 
   private projectEntry(entry: RuntimeEntry): SessionListState {
@@ -312,8 +354,11 @@ export class SessionRuntimePool implements ISessions {
       let cached = this.summaryProjections.get(summary)
       if (cached === undefined || cached.target !== entry.target) {
         cached = { target: entry.target, value: {
-          ...summary, id,
+          ...summary, id, runtime: entry.target,
           ...(summary.parentId === undefined ? {} : { parentId: key(summary.parentId) }),
+          ...(entry.target.kind === 'personal' && entry.runtime !== this.base && summary.workspaceId !== undefined
+            ? { workspaceId: `dsh-workspace:${entry.target.runtimeId}:${encodeURIComponent(summary.workspaceId)}` as typeof summary.workspaceId }
+            : {}),
           ...(entry.target.kind === 'project' ? { projectId: entry.target.projectId,
             ...(entry.target.projectName === undefined ? {} : { workspaceName: entry.target.projectName }) } : {}),
         } }
@@ -342,7 +387,13 @@ export class SessionRuntimePool implements ISessions {
     signal = AbortSignal.any([signal, this.lifetime.signal])
     signal.throwIfAborted()
     if (this.accountInvalidated) throw new Error('Client account identity was invalidated')
+    const metadata = this.directoryRows.find(row => row.runtime !== undefined && targetKey(row.runtime) === targetKey(target))?.runtime
+    if (metadata !== undefined) target = { ...metadata, ...target,
+      ...(target.nodeId === undefined && metadata.nodeId !== undefined ? { nodeId: metadata.nodeId } : {}),
+      ...(target.nodeName === undefined && metadata.nodeName !== undefined ? { nodeName: metadata.nodeName } : {}) }
     const key = targetKey(target)
+    await prepareGatewayRuntime(this.baseConnection, target, signal)
+    signal.throwIfAborted()
     let entry = this.entries.get(key)
     // A later name-bearing descriptor (catalog row, scope-aware create) heals
     // an entry first opened by a nameless target; the key pins projectId, and
@@ -361,6 +412,14 @@ export class SessionRuntimePool implements ISessions {
         hostDescription: connection.hostDescription,
       })
       entry = { key, target, runtime, connection, fiber }
+      const manager = new WorkspaceManager(connection.api)
+      this.workspaceManagers.set(key, { target, manager })
+      const publishWorkspaces = (): void => {
+        this.workspaceSnapshots.set([...this.workspaceManagers.values()].flatMap(owner => owner.manager.getSnapshot().phase === 'ready'
+          ? [{ target: owner.target, state: owner.manager.getSnapshot() }] : []))
+      }
+      const stopWorkspace = manager.subscribe(publishWorkspaces)
+      fiber.ctx.effect(() => () => { stopWorkspace(); this.workspaceManagers.delete(key); publishWorkspaces() }, 'sessions: target Workspace projection')
       runtime.setPresentationKey(id => clientSessionKey(target, id), target)
       this.entries.set(key, entry)
       try {
@@ -388,6 +447,7 @@ export class SessionRuntimePool implements ISessions {
         onHostEnvelope: (envelope: Parameters<Runtime['handleHostEnvelope']>[0]) => {
           if (this.accountInvalidated || this.entries.get(establishedEntry.key) !== establishedEntry) return
           runtime.handleHostEnvelope(envelope)
+          manager.handleHostEnvelope(envelope)
           const frame = envelope.payload
           if (frame.type === 'host/archived-sessions-changed') {
             this.installArchive(establishedEntry, frame)
@@ -417,10 +477,11 @@ export class SessionRuntimePool implements ISessions {
             if (this.entries.get(establishedEntry.key) !== establishedEntry || establishedEntry.generation !== generation) return
             if (runtime.list.getSnapshot().phase === 'ready') resolveReady()
             else rejectReady(new Error('target runtime session list unavailable'))
-            return this.refreshArchive(establishedEntry, this.lifetime.signal)
-          }).catch((error: unknown) => {
-            if (this.entries.get(establishedEntry.key) === establishedEntry && establishedEntry.generation === generation) {
-              rejectReady(error)
+            return manager.refresh()
+          }).then(() => {
+            if (manager.getSnapshot().phase === 'ready' && this.entries.get(establishedEntry.key) === establishedEntry) {
+              this.archivedByTarget.set(establishedEntry.key, new Set(manager.getSnapshot().archivedSessionIds))
+              this.rebuild()
             }
           })
         },
@@ -441,7 +502,7 @@ export class SessionRuntimePool implements ISessions {
       // failure would release a target whose retry was about to succeed.
       const readyDeadline = setTimeout(() => {
         rejectReady(new Error('target runtime connection unavailable'))
-      }, TARGET_RUNTIME_READY_TIMEOUT_MS)
+      }, connection.metadataTiming.requestTimeoutMs)
       void entry.ready.then(
         () => { clearTimeout(readyDeadline) },
         () => { clearTimeout(readyDeadline) },
@@ -502,6 +563,11 @@ export class SessionRuntimePool implements ISessions {
     } finally { active.removeEventListener('abort', release); release() }
   }
 
+  async prepareRuntime(target: SessionRuntimeTarget, signal: AbortSignal): Promise<void> {
+    const entry = await this.runtimeForTarget(target, signal)
+    if (entry === undefined || entry.connection === undefined) throw new Error('Target Runtime is unavailable for management')
+  }
+
   /** Check whether a Session exists in the target runtime. */
   async ensureSession(target: SessionRuntimeTarget, id: SessionId, signal?: AbortSignal): Promise<boolean> {
     const active = signal === undefined ? this.lifetime.signal : AbortSignal.any([signal, this.lifetime.signal])
@@ -553,15 +619,32 @@ export class SessionRuntimePool implements ISessions {
 
   private async pullArchive(entry: RuntimeEntry, signal: AbortSignal): Promise<void> {
     if (entry.connection === undefined) throw new Error('Target runtime has no Workspace transport')
-    const { result } = await entry.connection.api.workspace.list({}, AbortSignal.any([signal, this.lifetime.signal]))
+    const owner = this.workspaceManagers.get(entry.key)
+    if (owner === undefined) {
+      const { result } = await entry.connection.api.workspace.list({}, AbortSignal.any([signal, this.lifetime.signal]))
+      signal.throwIfAborted()
+      this.lifetime.signal.throwIfAborted()
+      if (this.entries.get(entry.key) !== entry) throw new Error('Target runtime was released during Workspace read')
+      if (!result.ok) {
+        if (result.error.code === 'collaboration-forbidden') throw new WorkspaceResourceError('access-revoked', result.error.message)
+        throw new Error(result.error.message)
+      }
+      this.installArchive(entry, result.value)
+      return
+    }
+    const snapshot = await owner.manager.shareRefresh(signal)
     signal.throwIfAborted()
     this.lifetime.signal.throwIfAborted()
     if (this.entries.get(entry.key) !== entry) throw new Error('Target runtime was released during Workspace read')
-    if (!result.ok) {
-      if (result.error.code === 'collaboration-forbidden') throw new WorkspaceResourceError('access-revoked', result.error.message)
-      throw new Error(result.error.message)
+    if (snapshot === undefined) {
+      const failure = owner.manager.getSnapshot().error
+      if (failure !== null) {
+        if (failure.code === 'collaboration-forbidden') throw new WorkspaceResourceError('access-revoked', failure.message)
+        throw new Error(failure.message)
+      }
+      throw new Error('Workspace archive read aborted before settlement')
     }
-    this.installArchive(entry, result.value)
+    this.installArchive(entry, snapshot)
   }
 
   private cancelArchiveRead(entry: RuntimeEntry, reason: Error): void {
@@ -581,11 +664,11 @@ export class SessionRuntimePool implements ISessions {
   }
 
   /** Create a Session in the target runtime and index its owner. */
-  async createSession(target: SessionRuntimeTarget, signal?: AbortSignal): Promise<SessionId> {
+  async createSession(target: SessionRuntimeTarget, signal?: AbortSignal, options?: Parameters<Runtime['create']>[0]): Promise<SessionId> {
     const active = signal === undefined ? this.lifetime.signal : AbortSignal.any([signal, this.lifetime.signal])
     const entry = await this.runtimeForTarget(target, active)
     if (entry === undefined) throw new Error('target runtime transport unavailable')
-    const id = await entry.runtime.create()
+    const id = await entry.runtime.create(options)
     active.throwIfAborted()
     if (this.entries.get(entry.key) !== entry) throw new Error('target runtime was released during session creation')
     this.indexEntry(entry)
@@ -602,6 +685,18 @@ export class SessionRuntimePool implements ISessions {
     opts: Parameters<Runtime['createOrReuse']>[0],
     reusableSessionIds: readonly SessionId[],
   ): Promise<SessionId> {
+    if (opts.runtimeTarget !== undefined) {
+      const target = opts.runtimeTarget
+      return this.usingRuntime(target, this.lifetime.signal, async (signal) => {
+        const owner = await this.runtimeForTarget(target, signal)
+        if (owner === undefined) throw new Error('Target Runtime is unavailable')
+        const id = await owner.runtime.createOrReuse({ ...opts,
+          ...(opts.sessionId === undefined ? {} : { sessionId: this.originalId(opts.sessionId, owner) }) },
+        reusableSessionIds.map(id => this.originalId(id, owner)))
+        this.indexEntry(owner); this.rebuild()
+        return clientSessionKey(owner.target, id)
+      })
+    }
     const owner = [...this.entries.values()].find(entry => entry.runtime === this.base)
     if (owner === undefined) throw new Error('Bootstrap runtime is unavailable')
     return this.base.createOrReuse(opts, reusableSessionIds.map(id => this.originalId(id, owner)))
@@ -615,6 +710,11 @@ export class SessionRuntimePool implements ISessions {
    * @returns the resolved pooled Session identity.
    */
   create(opts?: Parameters<Runtime['create']>[0]): Promise<SessionId> {
+    const target = opts?.runtimeTarget
+    if (target !== undefined) {
+      return this.usingRuntime(target, this.lifetime.signal,
+        signal => this.createSession(target, signal, opts))
+    }
     const owner = [...this.entries.values()].find(entry => entry.runtime === this.base)
     if (owner === undefined) return Promise.reject(new Error('Bootstrap runtime is unavailable'))
     const options = opts?.sessionId === undefined
@@ -636,6 +736,7 @@ export class SessionRuntimePool implements ISessions {
   invalidateAccount(): void {
     if (this.accountInvalidated) return
     this.accountInvalidated = true
+    this.directoryRows = []
     this.sessionOwners.clear()
     this.activeSession = undefined
     this.currentProvideSnapshot = this.base.unboundProvideInfo()
@@ -683,7 +784,8 @@ export class SessionRuntimePool implements ISessions {
         projected = [{ ...first, agentId: this.keyFor(Reflect.get(first, 'agentId') as SessionId, target) }, ...args.slice(1)]
       }
     }
-    this.rootCtx.remote.$dispatch(event, projected)
+    const remote = target === undefined ? this.rootCtx.remote : this.rootCtx.remote.$forTarget(target)
+    remote.$dispatch(event, projected)
   }
 
   /** Route a host frame to the base runtime.
@@ -806,6 +908,16 @@ export class SessionRuntimePool implements ISessions {
     return this.ownerFor(id)?.target
   }
 
+  /**
+   * Read the bootstrap transport's verified identity before restoring a foreign selection.
+   * @returns the current handshake target; Runtime UUID remains absent until verification.
+   */
+  bootstrapRuntimeTarget(): SessionRuntimeTarget {
+    const base = [...this.entries.values()].find(entry => entry.runtime === this.base)
+    if (base === undefined) throw new Error('Bootstrap runtime is unavailable')
+    return base.target
+  }
+
   runtimeTargetFor(id: SessionId): SessionRuntimeTarget | undefined {
     const owner = this.addressOwner(id)
     // The base runtime's sessions ride the base connection; a target here
@@ -821,7 +933,10 @@ export class SessionRuntimePool implements ISessions {
     const established = this.baseTargetEstablished
     this.baseTargetEstablished = true
     if (targetKey(baseEntry.target) === targetKey(target)) {
-      if (target.kind === 'project' && target.projectName !== undefined) { baseEntry.target = target; this.rebuild() }
+      if (baseEntry.target.nodeId !== target.nodeId || baseEntry.target.nodeName !== target.nodeName
+        || target.kind === 'project' && target.projectName !== undefined && (baseEntry.target.kind !== 'project' || baseEntry.target.projectName !== target.projectName)) {
+        baseEntry.target = target; this.rebuild()
+      }
       return
     }
     // The first declaration resolves the bootstrap placeholder; later changes supersede navigation.
@@ -844,8 +959,12 @@ export class SessionRuntimePool implements ISessions {
     this.rebuild()
   }
 
-  beginNavigation(): AbortSignal {
-    return this.base.beginNavigation()
+  beginNavigation(options?: { readonly blockInputFor?: SessionId | undefined }): AbortSignal {
+    return this.base.beginNavigation(options)
+  }
+
+  finishNavigation(signal: AbortSignal): void {
+    this.base.finishNavigation(signal)
   }
 
   /**
@@ -949,6 +1068,7 @@ export class SessionRuntimePool implements ISessions {
     this.currentProvideSnapshot = owner.runtime.currentProvideInfo.getSnapshot()
     this.rebuild()
     this.notifyProvide()
+    if (this.personalDirectory) this.releaseUnused(this.stagedIds)
   }
 
   clear(): void {
@@ -985,6 +1105,7 @@ export class SessionRuntimePool implements ISessions {
     // current-space navigation list.
     for (const entry of [...this.entries.values()]) {
       if (entry.runtime === this.base || (entry.references ?? 0) > 0
+        || this.personalDirectory && this.activeSession !== undefined && this.ownerFor(this.activeSession) === entry
         || this.runtimeOperations.has(entry.key)
         || [...retained].some(id => this.ownerFor(id) === entry)) continue
       this.releaseEntry(entry)
@@ -1008,7 +1129,7 @@ export class SessionRuntimePool implements ISessions {
       disposers.get(entry)?.()
       disposers.delete(entry)
     }
-    void entry.fiber?.dispose().catch((error: unknown) => {
+    void Promise.resolve(entry.fiber?.dispose()).catch((error: unknown) => {
       console.error('[web-runtime] target runtime disposal failed:', error)
     })
   }

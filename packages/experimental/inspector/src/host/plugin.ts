@@ -1,12 +1,13 @@
 /** Host Cordis plugin for the cross-realm Inspector Worker and full fetch capture. */
 
-import type { Context } from '@deepseek-ai/cordis'
+import { symbols, type Context } from '@deepseek-ai/cordis'
 import { fileURLToPath } from 'node:url'
 import { connect } from 'node:net'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
 import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-client-connection'
+import type {} from '@deepseek-ai/dsh-execution-authority'
 import type {} from '@deepseek-ai/dsh-cmdline'
 import { resolveInspectorOptions, startInspector, type InspectorHandle, type InspectorOptions } from './bridge/controller.ts'
 import type { InspectorClientBootstrap } from '../shared/bridge/messages/control.ts'
@@ -16,14 +17,17 @@ import {
   INSPECTOR_BOOTSTRAP_PATH, INSPECTOR_CLIENT_QUERY, INSPECTOR_SOURCE_SCOPE_QUERY, readInspectorClientSelection,
 } from '../shared/web.ts'
 import { disposeInspectorResources } from '../shared/dispose.ts'
+import { ResourceAdmissionError, resourceBudgetOf, type ResourceBudget } from '@deepseek-ai/dsh-resource-budget'
+import { InspectorStartupCleanupError } from './bridge/controller.ts'
 
 const DEVTOOLS_PATH = '/inspector/devtools'
+const MANAGED_DEBUGGING_ERROR = 'Inspector requires an independent local runtime; managed execution cannot expose Host or Client debugging.'
 
 /** Node's standard code for a feature the running platform cannot provide, such as `worker_threads` in a browser Worker host. */
 const FEATURE_UNAVAILABLE_ON_PLATFORM = 'ERR_FEATURE_UNAVAILABLE_ON_PLATFORM'
 
-export { resolveInspectorOptions, startInspector } from './bridge/controller.ts'
-export type { InspectorEndpoint, InspectorHandle, InspectorOptions, InspectorSpec } from './bridge/controller.ts'
+export { InspectorStartupCleanupError, resolveInspectorOptions, startInspector } from './bridge/controller.ts'
+export type { InspectorAdmission, InspectorEndpoint, InspectorHandle, InspectorOptions, InspectorSpec } from './bridge/controller.ts'
 export type { CordisRuntimeTreeReader } from '../shared/cordis/reader.ts'
 export type {
   CordisRuntimeConnection,
@@ -55,24 +59,63 @@ export interface HostPluginConfig extends Omit<InspectorOptions, 'clientOrigins'
  * The bootstrap route exists before the Worker is ready, so a Client published during startup waits instead of failing.
  * When the platform cannot run the Worker (`ERR_FEATURE_UNAVAILABLE_ON_PLATFORM`), the plugin warns once and stays active
  * with only that route, which answers 503; every other startup failure rolls back and rejects the fiber.
+ * Execution authority rejects startup and permanently stops a live instance before removing its debugging transports.
+ * @throws When managed execution is configured or startup and cleanup cannot complete.
  */
 export async function apply(ctx: Context, config: HostPluginConfig): Promise<void> {
+  if (managedDebugging(ctx)) throw new Error(MANAGED_DEBUGGING_ERROR)
+  const startup = new AbortController()
+  ctx.on('internal/plugin', (fiber) => {
+    if (fiber === ctx.fiber && fiber.uid === null) startup.abort(new Error('inspector: provider is stopping'))
+  })
+  ctx.effect(() => () => { startup.abort(new Error('inspector: provider is stopping')) }, 'experimental-inspector.startup')
   await ctx.effect(async () => {
     const spec = resolveInspectorOptions(config)
     const ready = Promise.withResolvers<InspectorClientBootstrap | undefined>()
     const disposers: Array<() => unknown> = []
     let worker: InspectorHandle | undefined
-    const dispose = () => disposeInspectorResources(disposers, () => worker?.close(), 'experimental-inspector: disposal failed')
+    let blocked = false, closing: Promise<void> | undefined
+    const dispose = (): Promise<void> => closing ??= disposeInspectorResources(
+      disposers, () => worker?.close(), 'experimental-inspector: disposal failed',
+    ).catch((error: unknown) => { closing = undefined; throw error })
+    const assertIndependent = (): void => {
+      if (blocked || managedDebugging(ctx)) throw new Error(MANAGED_DEBUGGING_ERROR)
+    }
     try {
+      const authorityChanged = (service: string): void => {
+        if (service !== 'executionAuthority' && service !== 'executionAuthorityRequired') return
+        if (blocked || !managedDebugging(ctx)) return
+        blocked = true
+        startup.abort(new Error(MANAGED_DEBUGGING_ERROR))
+        if (worker === undefined) return
+        void dispose().catch((error: unknown) => {
+          ctx.logger.error('experimental-inspector: managed debugging cleanup failed', error)
+        })
+      }
+      disposers.push(ctx.on('internal/service', authorityChanged))
+      disposers.push(ctx.effect(() => ctx.root.on('internal/service', authorityChanged),
+        'experimental-inspector: root execution authority'))
       // Fork seam: exact-path Fetch routes do not exist here; the bootstrap is
       // a buffered GET on the streaming prefix below /api, behind the same
       // trusted-host Host/Origin fence and browser authentication.
       disposers.push(ctx.connection.http.handlePrefix(
         INSPECTOR_BOOTSTRAP_PATH,
-        (req, res) => { void bootstrapResponse(ready.promise, req, res) },
+        (req, res) => {
+          if (blocked) { res.writeHead(403).end(); return }
+          void bootstrapResponse(ready.promise, req, res)
+        },
         { authority: 'trusted-host' },
       ))
-      const handle = await startInspector(spec).catch((error: unknown) => {
+      const budget = resourceBudgetOf(ctx)
+      const original = (value: ResourceBudget | undefined): ResourceBudget | undefined =>
+        (value as (ResourceBudget & { [symbols.original]?: ResourceBudget }) | undefined)?.[symbols.original] ?? value
+      const handle = await startInspector(spec, { budget, signal: startup.signal, assertOwnership() {
+        assertIndependent()
+        if (original(resourceBudgetOf(ctx)) !== original(budget)) {
+          throw new ResourceAdmissionError('unavailable', 'Inspector resource owner changed; retry with its current provider.')
+        }
+      } }).catch((error: unknown) => {
+        if (error instanceof InspectorStartupCleanupError) disposers.push(error.cleanup)
         if (!isUnavailableOnPlatform(error)) throw error
         ctx.logger.warn('experimental-inspector: NodeJS Inspector is unavailable on this platform; Host inspection stays disabled', error)
         return undefined
@@ -82,15 +125,17 @@ export async function apply(ctx: Context, config: HostPluginConfig): Promise<voi
         return dispose
       }
       worker = handle
+      assertIndependent()
       // Node-only frontend and launcher packages load after the Worker starts, so a platform without it never loads them.
       const { default: serveStatic } = await import('serve-static')
+      assertIndependent()
       disposers.push(publishCordisTree(ctx, handle.source, {
         maxNodes: spec.maxCordisNodes,
         maxBytes: spec.maxSourceFrameBytes - 4_096,
       }))
       disposers.push(ctx.provide('inspector', createInspectorService(handle.source)))
       disposers.push(ctx.on('webserver/index-inject', (table: IndexInjection[]) => {
-        table.push({ kind: 'global', name: '__DSH_INSPECTOR__', value: handle.endpoint.client })
+        if (!blocked) table.push({ kind: 'global', name: '__DSH_INSPECTOR__', value: handle.endpoint.client })
       }))
       const assets = serveStatic(fileURLToPath(new URL('./lib/devtools/',
         import.meta.resolve('@deepseek-ai/dsh-experimental-inspector/package.json'))), {
@@ -100,6 +145,7 @@ export async function apply(ctx: Context, config: HostPluginConfig): Promise<voi
       disposers.push(ctx.webServer.register({
         kind: 'prefix', path: DEVTOOLS_PATH,
         handler: (req, res) => {
+          if (blocked) { res.writeHead(403).end(); return }
           if (req.method !== 'GET' && req.method !== 'HEAD') {
             res.writeHead(405, { allow: 'GET, HEAD' }).end()
             return
@@ -136,6 +182,10 @@ export async function apply(ctx: Context, config: HostPluginConfig): Promise<voi
       disposers.push(ctx.webServer.registerUpgrade({
         path: `${DEVTOOLS_PATH}/cdp`,
         handler: (req, socket, head) => {
+          if (blocked) {
+            socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')
+            return
+          }
           const rejection = ctx.connection.requestRejection(req)
           if (rejection !== undefined) {
             const reason = rejection === 401 ? 'Unauthorized' : 'Forbidden'
@@ -192,6 +242,12 @@ export async function apply(ctx: Context, config: HostPluginConfig): Promise<voi
   }, 'experimental-inspector: Host Worker')
 }
 
+/** Host evaluation and shared fetch capture cannot preserve per-request execution restrictions. */
+function managedDebugging(ctx: Context): boolean {
+  return ctx.root.get('executionAuthorityRequired') === true || ctx.root.get('executionAuthority') !== undefined
+    || ctx.get('executionAuthorityRequired') === true || ctx.get('executionAuthority') !== undefined
+}
+
 /**
  * Report whether a Worker startup failure means this platform cannot run the Inspector at all.
  * @param error - Rejection from {@link startInspector}.
@@ -206,7 +262,7 @@ function isUnavailableOnPlatform(error: unknown): boolean {
  * The fork carrier is the streaming HTTP prefix face (`IncomingMessage`/`ServerResponse`), so the
  * upstream Fetch-shaped `bootstrapResponse` writes through the equivalent status/headers here.
  * @param ready - Resolves with the Client bootstrap, or with undefined after initialization failed or found the platform unavailable.
- * @param req - Incoming bootstrap request; its close event stands in for the Fetch request's abort signal.
+ * @param req - Incoming bootstrap request admitted by the streaming prefix dispatcher.
  * @param res - Response this handler owns end-to-end.
  */
 async function bootstrapResponse(
@@ -214,7 +270,8 @@ async function bootstrapResponse(
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
-  const pathname = new URL(req.url ?? '/', 'http://inspector.invalid').pathname
+  // A matching prefix requires a server request URL; IncomingMessage also types client responses without one.
+  const pathname = new URL(req.url as string, 'http://inspector.invalid').pathname
   if (req.method !== 'GET' || pathname !== INSPECTOR_BOOTSTRAP_PATH) {
     res.writeHead(req.method === 'GET' ? 404 : 405, req.method === 'GET' ? {} : { allow: 'GET' }).end()
     return
@@ -222,17 +279,13 @@ async function bootstrapResponse(
   const headers = { 'cache-control': 'no-store' }
   const abandoned = Promise.withResolvers<undefined>()
   const abandon = (): void => { abandoned.resolve(undefined) }
-  // 'close' fires on completion too; writableEnded keeps it abort-only.
-  const onClose = (): void => { if (!res.writableEnded) abandon() }
-  res.once('close', onClose)
-  req.once('close', onClose)
+  res.once('close', abandon)
   try {
     const client = await Promise.race([ready, abandoned.promise])
-    if (res.writableEnded) return
+    if (res.destroyed) return
     if (client === undefined) res.writeHead(503, headers).end()
     else res.writeHead(200, { ...headers, 'content-type': 'application/json' }).end(JSON.stringify(client))
   } finally {
-    res.removeListener('close', onClose)
-    req.removeListener('close', onClose)
+    res.removeListener('close', abandon)
   }
 }

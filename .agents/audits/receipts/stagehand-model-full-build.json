@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-full-build",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm run build",
+  "startedAt": "2026-10-23T18:23:42.484483+00:00",
+  "seconds": 68.877,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "63645cf12427eeb914812fa23ce0fab9ff5c74f9020f99c9f2179c88ec03958b",
+  "inputsAfter": "63645cf12427eeb914812fa23ce0fab9ff5c74f9020f99c9f2179c88ec03958b",
+  "outputSha256": "a06a1e493b3fbeebf6366478251d7f418fa915a701fb3f1544ca323d104d4103",
+  "outputTail": "$ tsx scripts/build.ts\nrun-gates: build running 8 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start native addon\nrun-gates: PASS native addon (0.70s)\nrun-gates: start host compiler\nrun-gates: PASS host compiler (1.38s)\nrun-gates: start Host bundle\nrun-gates: PASS Host bundle (5.59s)\nrun-gates: start client compiler\nrun-gates: PASS client compiler (9.04s)\nrun-gates: start Client bundle\nrun-gates: PASS Client bundle (3.66s)\nrun-gates: start Web build\nrun-gates: PASS Web build (3.75s)\nrun-gates: start host aggregate check\n\n== FAILED host aggregate check (39.79s) ==\ncommand: tsc -p tsconfig.host.json\noutcome: exit 2\npackages/experimental/browser-use-stagehand-native/tests/fixtures/stagehand.ts(136,11): error TS2322: Type 'ZodStandardJSONSchemaPayload<ZodType<unknown, unknown, $ZodTypeInternals<unknown, unknown>>> | { type: \"object\"; additionalProperties: true; }' is not assignable to type 'JSONType'.\n  Type 'ZodStandardJSONSchemaPayload<ZodType<unknown, unknown, $ZodTypeInternals<unknown, unknown>>>' is not assignable to type 'JSONType'.\n    Type 'ZodStandardJSONSchemaPayload<ZodType<unknown, unknown, $ZodTypeInternals<unknown, unknown>>>' is missing the following properties from type 'JSONType[]': length, pop, push, concat, and 35 more.\nrun-gates: start client aggregate check\nrun-gates: PASS client aggregate check (2.81s)\n\nrun-gates: 7 passed, 1 failed, 0 skipped in 66.72s.\nrun-gates: unsuccessful gates:\n  - FAILED host aggregate check (39.79s, exit 2)\n    tsc -p tsconfig.host.json\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

@@ -1,5 +1,6 @@
 /** Provider routing, cancellation, and fiber-owned registration lifetimes. */
 import { Context } from '@deepseek-ai/cordis'
+import { setImmediate as yieldEventLoop } from 'node:timers/promises'
 import z from '@deepseek-ai/schemastery'
 import { describe, expect, it, vi } from 'vitest'
 import SpeechToText from '../src/index.ts'
@@ -12,6 +13,61 @@ const input = new AbortController().signal
 function provider(id: string, transcribe: SpeechProvider['transcribe'] = async () => result): SpeechProvider {
   return { info: { id: id as SpeechProviderId, name: id, location: 'host-local', languages: ['auto', 'zh', 'en', 'ja'] }, transcribe }
 }
+
+it.each(['duplicate', 'registry'] as const)('joins detached speech work during overlapping %s disposal', async (phase) => {
+  const ctx = new Context(), entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<Transcript>()
+  let active: Promise<unknown> | undefined, removing: Promise<void> | undefined, following: Promise<void> | undefined
+  try {
+    const base = ctx.plugin(SpeechToText, { defaultProvider: 'local', language: 'auto' }); await base
+    const speech = ctx.get('speechToText')!
+    const unregister = speech.register(provider('local', async () => { entered.resolve(undefined); return release.promise }))
+    active = speech.transcribe(speech.resolve({ audio }), input).then(value => ({ value }), (error: unknown) => ({ error }))
+    await entered.promise
+    removing = unregister()
+    let finished = false
+    following = (phase === 'duplicate' ? unregister() : base.dispose()).then(() => { finished = true })
+    await yieldEventLoop()
+    expect(speech.listProviders()).toEqual([])
+    expect(finished).toBe(false)
+    release.resolve(result)
+    await Promise.all([active, removing, following])
+    expect(finished).toBe(true)
+  } finally {
+    release.resolve(result)
+    await Promise.allSettled([active, removing, following])
+    await ctx.fiber.dispose()
+  }
+})
+
+it('joins speech work and repeated cleanup before reporting an unsubscribe failure', async () => {
+  const ctx = new Context(), entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<Transcript>()
+  const failure = new Error('Recognizer subscription cleanup failed.')
+  const pending: Promise<unknown>[] = []
+  let cancelled: AbortSignal | undefined
+  try {
+    const base = ctx.plugin(SpeechToText, { defaultProvider: 'local', language: 'auto' }); await base
+    const speech = ctx.get('speechToText')!
+    const unregister = speech.register({ ...provider('local', async (_value, signal) => {
+      cancelled = signal; entered.resolve(undefined); return release.promise
+    }), preparation: { snapshot: () => ({ phase: 'ready' }), prepare() {}, cancel: async () => {},
+      subscribe: () => () => { throw failure } } })
+    pending.push(speech.transcribe(speech.resolve({ audio }), input).catch((error: unknown) => error))
+    await entered.promise
+    let firstDone = false, secondDone = false, registryDone = false
+    const first = unregister().then(() => undefined, (error: unknown) => { firstDone = true; return error })
+    const second = unregister().then(() => undefined, (error: unknown) => { secondDone = true; return error })
+    const closing = base.dispose().then(() => { registryDone = true }, (_error: unknown) => { registryDone = true })
+    pending.push(first, second, closing)
+    await yieldEventLoop()
+    expect(cancelled?.aborted).toBe(true)
+    expect([firstDone, secondDone, registryDone]).toEqual([false, false, false])
+    release.resolve(result)
+    expect(await first).toBe(failure)
+    expect(await second).toBe(failure)
+    await closing
+    expect(registryDone).toBe(true)
+  } finally { release.resolve(result); await Promise.allSettled(pending); await ctx.fiber.dispose() }
+})
 
 /** Mount the service behind Loader with a settings stub exposing the registered namespace scope. */
 async function mounted(ctx: Context, config: object) {

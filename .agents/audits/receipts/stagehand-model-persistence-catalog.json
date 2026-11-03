@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-persistence-catalog",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=2 pnpm run gen-persistence-catalog",
+  "startedAt": "2026-10-23T18:16:41.375675+00:00",
+  "seconds": 11.034,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3f40acb5fd63b879d8ecd5fa0ac98386eb234bcb755ddd848d5bbf59ffd9b1c5",
+  "inputsAfter": "818b53378a377a4b2a1192f498a3a39052a520c0120405e69a8b78af536dbaf0",
+  "outputSha256": "5c459d1e735e4332e7d0953772e978eebf0aff0dd1e15d5f0151633532f047f8",
+  "outputTail": "$ tsx scripts/gen-persistence-catalog.ts\ngen-persistence-catalog: wrote docs/persistence-catalog.md.\ngen-persistence-catalog: wrote docs/persistence-catalog.zh.md.\ngen-persistence-catalog: wrote docs/persistence-catalog.i18n.yaml.\ngen-persistence-catalog: wrote docs/experimental-persistence-catalog.md.\ngen-persistence-catalog: wrote docs/experimental-persistence-catalog.zh.md.\ngen-persistence-catalog: wrote docs/experimental-persistence-catalog.i18n.yaml.\ngen-persistence-catalog: wrote packages/core/session/src/known-event-types.ts.\ngen-persistence-catalog: wrote docs/persistence-schema.json.\n"
+}

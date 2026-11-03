@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-28-personal-runtime-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-28-personal-runtime-authority.md
+document:
+  en: 25b96dc6360cf0d1d5caef6cc0dfd6092d267fad
+  zh: 3ea24893723e72f70ab8385e56577ca7978e3f88
+/agent-note-personal-runtime-admission-uses-current-account-privileges:
+  en: fa727d6a027f3df2
+  zh: 82a2c78c105d67e6
+/agent-note-personal-runtime-admission-uses-current-account-privileges/problem:
+  en: 04c802277b855f95
+  zh: 97c9c62028b41b41
+/agent-note-personal-runtime-admission-uses-current-account-privileges/decision:
+  en: e9b6397585cde88f
+  zh: 4cf0f4a5eaa7c518
+/agent-note-personal-runtime-admission-uses-current-account-privileges/alternatives-considered:
+  en: 5832f8cde522e254
+  zh: 7c6962ee1df9d00d
+/agent-note-personal-runtime-admission-uses-current-account-privileges/consequences:
+  en: 44a340d8d2afb515
+  zh: a1c239757923b9ba
+/agent-note-personal-runtime-admission-uses-current-account-privileges/verification:
+  en: 14946bdea19c9bb2
+  zh: 1a2a88be6a0e983c

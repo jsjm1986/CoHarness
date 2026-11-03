@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-collaboration/README.md
 document:
-  en: 0068b4fcbdc079cb46b542d73d2fce85efa11ced
-  zh: bb618d2ce8de7eca5dbc406718cb935b27d4a110
+  en: 75ba6f696d135a23734491cbe56562a232f3fa2d
+  zh: 36f1ea9f268d44b0e3f5a423b82b98bcc44e896e
 /:
   en: 559f91ef9aa54024
   zh: 61495d48365178df
 /deepseek-ai-dsh-client-ui-collaboration:
-  en: ecfae5f3dac6e5c5
-  zh: ee2db8b4789c8336
+  en: fff71b20065b242f
+  zh: 5e7adaa0415c2514
 /deepseek-ai-dsh-client-ui-collaboration/summary:
   en: 3dd942140d37f68c
   zh: ad8dfeef06c46918
@@ -18,8 +18,8 @@ document:
   en: 1b6f6aeae6e9088e
   zh: 28f2bc5049e10b31
 /deepseek-ai-dsh-client-ui-collaboration/user-interface-contract:
-  en: 0812de85bc5742bf
-  zh: cbee75f8201327fa
+  en: 192f5cff5c1f3867
+  zh: 3fea8e721d993c7a
 /deepseek-ai-dsh-client-ui-collaboration/model-experience:
   en: 48e765a1bfca16ed
   zh: 3ccd706d7cde0ea7
@@ -27,8 +27,8 @@ document:
   en: c62adaa305f773bb
   zh: 680eec328574ed58
 /deepseek-ai-dsh-client-ui-collaboration/known-limitations-and-deferred-work:
-  en: 4e2c1d0606b4f7b7
-  zh: b6cfd59752ebde76
+  en: 7787f62a12ebd054
+  zh: 462f03cacbbfefb7
 /deepseek-ai-dsh-client-ui-collaboration/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

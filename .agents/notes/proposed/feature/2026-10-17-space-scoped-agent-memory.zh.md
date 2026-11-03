@@ -66,6 +66,8 @@ kind 闭集为 `profile`（用户或团队是谁：角色、专长、偏好）�
 
 ## Write authorization
 
+已经实现的[成员授权有效期](../../implemented/bug-fix/2026-10-23-memory-member-authority.zh.md)和[持久修改结果](../../implemented/bug-fix/2026-10-23-memory-mutation-outcomes.zh.md)记录负责请求过期、提供方失效及游标与条目的提交顺序。
+
 `ctx.memory.save()` 与 `ctx.memory.delete()` 在修改之前执行全部规则，因为模型工具、整理和浏览器都只经由这两个操作写入记忆：
 
 - **个人与工作区作用域。** agent 写入方只能指向自己会话的工作区。除已授权的执行外不需要额外授权。

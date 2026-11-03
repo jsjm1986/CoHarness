@@ -1,0 +1,13 @@
+{
+  "name": "chromium-current-admission-coverage",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/browser-use-stagehand-native/tests --coverage --coverage.include=packages/experimental/browser-use-stagehand-native/src/launch.ts --coverage.include=packages/experimental/browser-use-stagehand-native/src/index.ts --coverage.reportsDirectory=.agents/audits/.local/chromium-admission-coverage --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-23T17:16:26.888064+00:00",
+  "seconds": 14.22,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5e175a03738ed3470f00d01d5ad95d56c8c4abae15708293cfb5ef9e295aa660",
+  "inputsAfter": "5e175a03738ed3470f00d01d5ad95d56c8c4abae15708293cfb5ef9e295aa660",
+  "outputSha256": "894503d134c8b416a4f7339ca95076bdf150e8d1cc55f825b9a33f682db01289",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  10 passed (10)\n      Tests  106 passed (106)\n   Start at  01:16:37\n   Duration  3.85s (transform 1.07s, setup 131ms, import 2.13s, tests 2.04s, environment 0ms)\n\n % Coverage report from v8\n-----------|---------|----------|---------|---------|-------------------\nFile       | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-----------|---------|----------|---------|---------|-------------------\n-----------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 164/164 )\nBranches     : 100% ( 72/72 )\nFunctions    : 100% ( 32/32 )\nLines        : 100% ( 142/142 )\n================================================================================\n"
+}

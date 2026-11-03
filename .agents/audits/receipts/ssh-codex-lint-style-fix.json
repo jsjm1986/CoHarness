@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-lint-style-fix",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts --fix packages/ssh/ssh/src/index.ts packages/ssh/ssh/tests/startup-behavior.spec.ts packages/ssh/ssh/tests/live.e2e.ts packages/subagent/subagent-codex/src/managed-model.ts packages/subagent/subagent-codex/tests/managed-model-http.spec.ts packages/subagent/subagent-codex/tests/managed-ssh-loader.spec.ts packages/preset/agent-preset-registry/tests/realm.spec.ts",
+  "startedAt": "2026-10-25T12:38:05.076375+00:00",
+  "seconds": 8.436,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f3872b5d958f05747c5056e7f311a1a51a45e15ae2ee1dfc425bde12946fba69",
+  "inputsAfter": "9f0091dfeae03f74ad169ee2f538fae86a24fbbb2f8a480323ebc3de7d2db8e5",
+  "postgresToolDirectory": null,
+  "outputSha256": "a4edef60c6c2106ab49d997eee6bc149171459f70584df6ead99399c4e443332",
+  "outputTail": "packages/ssh/ssh/tests/live.e2e.ts:77:1: error @stylistic(max-len): This line has a length of 142. Maximum allowed is 140.\n"
+}

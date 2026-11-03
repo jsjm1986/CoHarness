@@ -1,0 +1,14 @@
+{
+  "name": "trash-safety-doc-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write packages/attachment/userdoc-local/README.md .agents/notes/implemented/architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.md",
+  "startedAt": "2026-10-24T04:48:38.968151+00:00",
+  "seconds": 2.366,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "aa9d963df65db1ffeb9f1ae736422d48e99b24832a00628e1203bea64833b6db",
+  "inputsAfter": "db7e56a763628ba87d1cdef67d5cae5a083620ef0bc58ecad9227fe07f7c27ce",
+  "postgresToolDirectory": null,
+  "outputSha256": "de9e9b5601a9479cf21e4c0b339b184c0f2386857c35c646d740672e34cfc452",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write packages/attachment/userdoc-local/README.md .agents/notes/implemented/architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.md\nverify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.i18n.yaml\nverify-translation-pairing: recorded packages/attachment/userdoc-local/README.i18n.yaml\nverify-translation-pairing: 2 record(s) written; run the check to validate the pairs.\n"
+}

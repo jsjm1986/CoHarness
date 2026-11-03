@@ -1,0 +1,14 @@
+{
+  "name": "project-account-source-lint-final",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts gateway/src/postgres/project-service.ts gateway/src/postgres/user-service.ts gateway/src/users.ts gateway/src/apply-grants.ts gateway/src/services.ts gateway/tests/project-service-postgres.spec.ts gateway/tests/apply-grants.spec.ts gateway/tests/users.spec.ts gateway/tests/macos-release-control.spec.ts gateway/src/node-resource-budget.ts gateway/tests/node-resource-budget-postgres.spec.ts gateway/tests/execution-fixture-server.ts",
+  "startedAt": "2026-10-24T00:08:05.785080+00:00",
+  "seconds": 3.476,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d6c4ac49f06ddb492fd3ae9fee4b5a5a6059b80376c35a26d8a69a4f70464d8d",
+  "inputsAfter": "d6c4ac49f06ddb492fd3ae9fee4b5a5a6059b80376c35a26d8a69a4f70464d8d",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

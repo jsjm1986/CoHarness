@@ -1,0 +1,827 @@
+{
+  "findings": [
+    "B344",
+    "B345",
+    "B346",
+    "B347"
+  ],
+  "status": "named_managed_directory_policy_fixes_and_existing_cli_protection_verified",
+  "updatedAt": "2026-10-30T11:22:53.806415+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z",
+  "sourcePaths": [
+    "packages/util/launch-environment/src/index.ts",
+    "packages/util/launch-environment/tests/launch-environment.spec.ts",
+    "packages/host/directory-picker-auto/src/index.ts",
+    "packages/host/directory-picker-auto/src/resolve.ts",
+    "packages/host/directory-picker-auto/tests/resolve.spec.ts",
+    "packages/host/directory-picker-auto/tests/loader-composition.spec.ts",
+    "packages/host/directory-picker-browse/src/index.ts",
+    "packages/host/directory-picker-browse/package.json",
+    "packages/host/directory-picker-browse/tsconfig.json",
+    "packages/host/directory-picker-browse/tests/managed-grants.spec.ts",
+    "gateway/src/launcher.ts",
+    "gateway/tests/local-runtime-launcher.spec.ts",
+    "gateway/tests/fixtures/local-runtime-web-gateway.mjs",
+    "gateway/tests/run-local-web-assembly.mjs",
+    "gateway/tests/expected/local-runtime-web-assembly.expected.md",
+    "gateway/tests/expected/directory-readonly-web-assembly.expected.md",
+    "gateway/tests/expected/directory-empty-web-assembly.expected.md",
+    "plugins/dsh-directory-guard/cordis.patch.yml",
+    "pnpm-lock.yaml",
+    "packages/util/launch-environment/README.md",
+    "packages/util/launch-environment/README.zh.md",
+    "packages/util/launch-environment/README.i18n.yaml",
+    "packages/host/directory-picker-auto/README.md",
+    "packages/host/directory-picker-auto/README.zh.md",
+    "packages/host/directory-picker-auto/README.i18n.yaml",
+    "packages/host/directory-picker-browse/README.md",
+    "packages/host/directory-picker-browse/README.zh.md",
+    "packages/host/directory-picker-browse/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.md",
+    ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.zh.md",
+    ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.i18n.yaml",
+    ".agents/notes/implemented/feature/2026-07-29-directory-picker-adaptive-default.md",
+    ".agents/notes/implemented/feature/2026-07-29-directory-picker-adaptive-default.zh.md",
+    ".agents/notes/implemented/feature/2026-07-29-directory-picker-adaptive-default.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-directory-access/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-directory-access/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-directory-access/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/util/launch-environment/src/index.ts": "60c39f61246a5ac90e6cd196402a8e69687b4b242c68d6dcbce4795faaca296b",
+    "packages/util/launch-environment/tests/launch-environment.spec.ts": "f08436bed4159acfe1c4b48229322ce4a46d369509abf2a928a9d5c09723bad6",
+    "packages/host/directory-picker-auto/src/index.ts": "d482077da6808e411b158724936fd8910f8c41455027190fe13f044738b6a9d3",
+    "packages/host/directory-picker-auto/src/resolve.ts": "022df94b319d3f8d120040ed18011f22bbb77e367870a5068cbe2b18abefa1c0",
+    "packages/host/directory-picker-auto/tests/resolve.spec.ts": "fc6218bcb96f7192cb0e763fefb81e66d4575c9c36f0601836e2b781550b4e4e",
+    "packages/host/directory-picker-auto/tests/loader-composition.spec.ts": "e99c14fe6ce380f551779e4d2f9baff482a9684f855c50d6e6307dd5a7cfb530",
+    "packages/host/directory-picker-browse/src/index.ts": "fca43fded8d15e652cedc8e1848b69111b0c1a6283c3cd9ffb9295c18e9bce86",
+    "packages/host/directory-picker-browse/package.json": "2dc5a19b07b3bc3a284b9189fc6c343b5675c3ab73aa3f0c799fd1eab01fb4db",
+    "packages/host/directory-picker-browse/tsconfig.json": "b2d4fc797997e125b7da9883facd3ff948be0737535fbeeaa09d0e5280c0241a",
+    "packages/host/directory-picker-browse/tests/managed-grants.spec.ts": "6c937436acaf65690b8c828b85ea0754f1d7ba62c48a6ea01c6a7cc496128d87",
+    "gateway/src/launcher.ts": "6a565bfa4a2ed356cacc781c4e512542ab5c26646b6d90a20dc29c8607a66b34",
+    "gateway/tests/local-runtime-launcher.spec.ts": "fc5f6247c0aa37e00e227a7735d276be3bf9b4c60f0e994ad890855ea1263e5e",
+    "gateway/tests/fixtures/local-runtime-web-gateway.mjs": "e1568dcdabf786b2f455b0f14988f67c95454d7f781f13be6530ed8516848685",
+    "gateway/tests/run-local-web-assembly.mjs": "7b1606035de96d3b197a290e2933808b44e21871549af4eadd5dc926d3fb0e26",
+    "gateway/tests/expected/local-runtime-web-assembly.expected.md": "b3519ed88f17606db496b760e101a02eee18e7b14d7030878f75ead14872ec51",
+    "gateway/tests/expected/directory-readonly-web-assembly.expected.md": "37fb28bf1c56612e574453ffc739602bb7f2bb2d46eed06f32709618644dc7ac",
+    "gateway/tests/expected/directory-empty-web-assembly.expected.md": "991b9c745798e1030ce06f4257bfb007d432d5a2321a49af0d15264e67e45dd3",
+    "plugins/dsh-directory-guard/cordis.patch.yml": "9a7bf57e40cea2bfe6b5483e8ac329edbf2897e5391e07464966ecd889af3b15",
+    "pnpm-lock.yaml": "cf5cebe5619c24c565fa147b584437c173fc6db4685dceaa86b4ac89584c09ad",
+    "packages/util/launch-environment/README.md": "ee416e2de4d32725e49c5359cf93b3a7b13f36fee8e423d09ef1d48da61755e6",
+    "packages/util/launch-environment/README.zh.md": "e4e13227ad99fa592a8c684d4bd80def717be9c8ff35c7a04104d0bae87f86d9",
+    "packages/util/launch-environment/README.i18n.yaml": "600101c7695399d4593e64c5d66157754d83a4f5694af295477be309dc85e9ca",
+    "packages/host/directory-picker-auto/README.md": "27b5915f22c744980ee2bceb0e1d6e0918a8d697e27cc35f3fc47dcd1c8d3d97",
+    "packages/host/directory-picker-auto/README.zh.md": "a1f64159b287104220f1fb9639d21b54167cbe2a48310b037f8b2e8d2b42ff73",
+    "packages/host/directory-picker-auto/README.i18n.yaml": "cc4ed2862413a02c83de924a946b0f099d4dcf4a753424b52640f95467c276ea",
+    "packages/host/directory-picker-browse/README.md": "6e44bfe91ec320c33f54460828b43f2748bb378ddf6296f2ac247bd2f56c7d75",
+    "packages/host/directory-picker-browse/README.zh.md": "6d26f8894ba843f3e0686d062fcbb1f0fb07df1bc92b6b26d0ec2d8767157040",
+    "packages/host/directory-picker-browse/README.i18n.yaml": "335c665d8b791a91656236bc60c23df7938342615879aca91786f404bcaaeaea",
+    ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.md": "d16ce4420d4529d34d3e5bd18cf48533e7800ea5313de7faac8df8ea544a4a67",
+    ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.zh.md": "1ac69b04378a6c89a014e60bf215c6adcf3e4e142a9f09ad635f0c09da2f65cc",
+    ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.i18n.yaml": "c06eb37aaa7488cb68fb5b5a6ad4008bf0bf6fa41ed5e61e7f06cd9fc6e0f290",
+    ".agents/notes/implemented/feature/2026-07-29-directory-picker-adaptive-default.md": "b10246a0259405eca2d2ac07011beba30bc6cd644fc62ecc582d9d973359043d",
+    ".agents/notes/implemented/feature/2026-07-29-directory-picker-adaptive-default.zh.md": "e4f2c76722dae76686a62c2ff745dae79ac361fdc6b5784f07067aba44dc270d",
+    ".agents/notes/implemented/feature/2026-07-29-directory-picker-adaptive-default.i18n.yaml": "906cd80e130b4bac1a77a7aa55a8c7b4d409ce1b550f5a655794b006782163be",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-directory-access/guide.md": "b511cb24e54c36806de6bcc51369dd46e31afbd4f0853c6c848a1fa73378fa12",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-directory-access/guide.zh.md": "d050afce840de8e1b962bc1c22f61e38a4ad2c4060d5d9db1b1974de9d8c5044",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-directory-access/guide.i18n.yaml": "bd5eae4f3d7559e1f3fac665d4888b03e015548efee499e7117b3f98495a3e06"
+  },
+  "compiledArtifactHashes": {
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/util/launch-environment/lib/index.js": "04d14c11e81d537832572c6f75c12c69de2fc87b00d166334d8a2f4a9dca3b07",
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/host/directory-picker-auto/lib/index.js": "e3d92502d8ab7baec863501d36d0ff8f0a6c817bf4f5a7ff2f04aca290b7f8d3",
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/host/directory-picker-browse/lib/index.js": "2baedd2beba38592381f238b18982a62e32754773215a401224a4bce2c17bef8",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/runtime-capacity.js": "8d09b8fad840ab6e249717d214068e681ae0daf88deca675e763ef53594c8285",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/html.js": "bac417e138afb9eeccb4f3470a7bc1c296f43532dd2587ce1d464eada3de1c1d",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/response-budget.js": "8556d6407a0356728ec5c7c4086e18d6d0834ec9eb71af783f488d24ef68e2ae",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/tunnel-supervisor.js": "2d2cc30b622d2cc81ff0fcb1a3fc26bbee10fa8e91a13a529986ccf42a21bf2c",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/runtime-layout.js": "e483153bd3c64e2ac03d37a764a722987c7bfd1719834524445d10fdeab404bf",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-config-relocation.js": "3cdeac954952ec801025245127594c283cfc83f74a3b29bc3379ff8975e05b36",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/organization-model-settings.js": "6a99a94106d54452fd83078f52311d900ef31ca4b1b0405867cfc09f66f9b9f0",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-config-host.js": "4f31414ae51512738ca6835f67ad64350c4240e01ce1a01b786f9c69c42ecadb",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/deployment-protocol.js": "2b20bf799c3b54aa44aa97cc7c90ccd680021951340e287495f6ee399c6f360b",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/desktop-access.js": "a7407f423c6e3c9aaab0a077968994d429960091d89e6421ccaca67b5783b8be",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/archive-runtime-reader.js": "267c727b74cf94df2ea2fc30a04b52365049ddb5dbcd1e6b35d71bd14cb9dd33",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/plugin-meta.js": "f4581ec064974b5bd3fba763daea40afffffeb89d024002708aec1e5e470ddb6",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/systemd.js": "5673d426e47374ef1cc55397185282123c6a0f58ee3d8573afd1fcc0bdc87ed4",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/proxy.js": "3ca20b2ba7a5c8718ec8dee4ac22c06e57242f1bd07a44e99279fe15992f41fd",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/instances.js": "1b051445961c454c6989efa5300a6cfe9997e091497dd650fe7e559827ce0a14",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-connection.js": "0e880603beeb555bb1ef3c59334b410d29f2e85e823ea1814844b5efb4d14820",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/desktop-coordinator.js": "165867bba192c8de50fb162b4947a46caab4ec54debef3f0a3e835e4138726f5",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/memory-access.js": "57ae190f6c7276da99931c4794dcd6c12b2e47f949d646d881f5db71e81e06b7",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-channel.js": "4ef41cfe16a253febead72232a332e1d45d18760351ee3ddfd7110fc7b4c35da",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/money.js": "c618ac6eea61d46335d33153eedad48d1162c9a8ecdc841a6e05f6c01f798b0f",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/document-transfer.js": "efca98a47c63c067b0d20d77fbdc243273df71c47a9afa68622f9a5d94762d77",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-access.js": "eb0cc8f0407f87910f84f9463c79694c9e9ba7ba0a8acacd606a4dd93edc520a",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/cloudflare-api.js": "a5f5e1395659f5b1a0dd2b1d41262ed45e74439c345d0d93b2a67150f5903883",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/archive-identity.js": "3e591a69ebf5342713c068fca163a20e3ffa60b908c4b9261f2b4aa1153b9dfd",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/usage-intake.js": "ad43edbe4745895f2f208ef3a0e3c15800186c9a01719ae86c17afa322ddbac1",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/terminal-access.js": "f443e64ffdbc09de6ec57c16e363e53f9019cfd280aedfd736528cf577e85ae5",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-service-proxy.js": "8e88b2a02391f172879a923597da94d75b76a7d8f0d2281ed6cf1b48e326a410",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-resource-budget.js": "255f3bbf2c55a337a3547f722e215bde6cbf7775768edad01a7b53824bc799b1",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/organization-model-credentials.js": "df02bfb622c2857f5355f656847019ea9f615113456f5f1a8d7eeccdce534b5e",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-service-stream.js": "39b3d7df5bd1eafeb29ae0f67406c1e6f150d218928b2a2a6305ccee84f68deb",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/resource-access.js": "efcab06f930976592e50251a7530a2e2b00b5dc1acb46c1a1f14adf8aa938d4b",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-config-store.js": "1d295105aaaaf808e8a50c31f10577836f382e0a56051311fec7faa0c51365f6",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/runtime-resource-api.js": "4bc260a3e6b8c360378ed2b2bfc76facc66d3d393c93649912b414f7186e0fd2",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-channel-protocol.js": "6f8ac726aea7be23dd43fd1b36942ec5eaefddb556a31953603fdbe4cbe2c775",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/server.js": "3d4845078f369a57d59470b01127dc7cf2ecfe27e9a3cd1f4d1f8ee636006790",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/services.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/local-runtime-linux.js": "e4c49c01f2069c1bd4df157caa2f82189f6b1fc1b34302618442617309297f61",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/bootstrap-admin.js": "c5daa8a6ee8ab4c8e1e03c82bb56f8174bdf238d514c90e086d6def710116564",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/db.js": "65726ae9ecd2065710b654c125588fa067673e4a06a35abdcb7a2f41da3f4529",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/document-backups.js": "ba07c27e6c31587758647237bb159e2aef1279a474bb942c2c6dd581cf9b81cc",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/tunnel-process.js": "29fdaefae14343797bb6e966743978345de5e673ea2c124e2b428b83d952b186",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-control-paths.js": "af61ddcd6fb572bad3ffc75f34b267d182165942c16af89c6b184c7dc51f1148",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/auth.js": "12bc4a8679332ef2bef5b4028e8251707381548d04ea22f257ad33017b8689cb",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/execution-identity.js": "215a26fc8e9c5bebfff6357cf9ecd146b4e9b29a18f4afad4ff7be01aa73206e",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/remote-desktop-service.js": "39a82f02a81f0d12a09c1006227a1534cd4560261fd13c882c81bb0402ff969b",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/principal.js": "f56557894eb37e3c02f22759695efca39da85deef847def0ebd8f806ee6108d8",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-channel-wire.js": "c5174c7b1de8665b6fc8454c93747c75680cc70a82b6cf8408f46fc5451cc0b4",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/computer-access.js": "7cbb22504d5a9d873e759aa5573272e6fe3e64cc7ed85a659f54cc4afe126576",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/workspace-catalog.js": "5add03c82c6efc8f44908579b83946ddbe3fbe9667552f7c81721f56b83a23aa",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/steward-access.js": "069f79af241a0ce54005f7f4d593c8129e2455a766f0c51dc26b482c3b7a7440",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/users.js": "72e81e6f3e873f2b9d2ac896701993f93ae582fda8233709cf38b56e67269f8b",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-config-applier.js": "c14d87b7238efdcc1d021d91eb556d5e7ff0f31c2473192cfb86c983ce9f1392",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-service.js": "bf1e2c7df690f2da8bfb69306b56b70b02811198c78331e57cb01d70a4b13d29",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/document-catalog.js": "bc69640013f7bfa57040ed9dbaa46ee6aec276ce5120668c532de01864f3d89e",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/index.js": "e1f583d374756b1ed47d780704b54d95aab24373b788873a51e986e0b10edec7",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/child-environment.js": "53ce0bd138de86dd75319cd22230af2054c16ca5384f8949f61fc0fb516e5f6c",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/config.js": "5addcb9890f8222df496814fdee47fa970cb8d1aeb00a4c3eba84c50ce0ed181",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/conversation-safety.js": "efe76b7908235a9ee1e7ddc49ab2d158d17e2d2d2e1962057a8781e32487248b",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/managed-files.js": "fc0a80262ba50ef4093f89275605d7dbaed2aa6d71e100450943668b6e408be4",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/audit.js": "c617b1679ec6490c0e7a6e377f714ddc4d51bf277947de4d2c263b20de3a471b",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/runtime-log.js": "2704e5c8ae31af3021cae7302a98a716507bbf20d61c640aeb87acc8378b4ffe",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/project-configuration.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/audit-summary.js": "c5798b44bf0dcfcaeb13760eef44db0a9d5c69d0ff3892132888217a5f21e584",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/document-scope-storage.js": "d9fadbff674ec769d04e4a6305c5479e41ebddfc1b2f18482bca98b499fef189",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/account-preferences.js": "dcc3d844fcae0adaec90ca53df92425983dd65423457cb09bb5c0dc370ee317d",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/admin-api.js": "3fe5987a2a54396bf4fd7c483b4d03300d40b2c31bc498e49aec0cd19e1fcf17",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/password.js": "94e46571b703f3c8ce9fff758ee1cb315a69da2dd6226b714f67682e13272a83",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/projects.js": "100e36167621357939e5f28810cdf2475e0d8d9d8477d2ea968f3027735feff5",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/computer-access-api.js": "7f537595707d2478118596e98b2fde6007f39a4fbbdd45e79848f998c601733c",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/user-name.js": "a69bcc8baf2b84eed5e700bd70a58043fa200bbf3fe087a340a1b5f6023c5eb3",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/runtime-router.js": "d9d1fe3a2744374291eedb9aba9cb78a3658eea12ff72ed763586dce9bd3eaf4",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/project-directories.js": "943d458a843467ebdd976e34c9dd65fc2e4a3f81f0806fcf0f4574c8d91b7231",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/runtime-catalog.js": "0b56e628711c7693f83b85a538fdbc86f688d3aff596d28704fd35aebaafc01d",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/runtime-directory-grants.js": "3bbdfed406770b3a4307cdb1550e98f7fb52fb09ad6a78e213381d25bc6336b3",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/documents-local.js": "3b30e980f3a7aa738965b064442c19e88f051554c0829ee728e84802d7de150b",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/user-data.js": "2ac62677c01295c10a28340c9a333ca9ef5bb670da4f5b828af0408d411c038d",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/plugin-access.js": "843f67654be96d0ccfe4a79cb1b24e831c18a1091c926742d976b294596edae3",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/ssh-access.js": "3e4324b81bd7aace4fbad53bb76bb91528ffa0dc15787f8b1feca8bf3680d3f8",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-resource-pressure.js": "6c2e7b340cf54661a36f84b2a0aebaafb23f8b73d881ca56a87cc110bc58a2f4",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/runtime-readiness.js": "282650cccc61775a8035ad554ffdbdabc79c901717af0c2b3e2f49ac14d656d1",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/tunnel-access.js": "c946faebdd95681c5d7123dfe72fe84d309706da8cb98eee5eef6d0995caadc0",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-config-cli.js": "ce8d58477f97db53f22a85cdbcc1c1d5a253f9dd132ba465fd7d0ed5e3aa7573",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/webhook-intake.js": "349d187ff5ed4578951f496eed3e1704adb1120a7f255dafacd047f717675f9e",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/deployment-commands.js": "315fbbbf79f3029caa444a41370977aa27c9d4c9841191cf4c55b88aa0a63197",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/access-invalidation.js": "01d67d0618e09f0e2780d4b840c726674cccc5ce535972f60bbfa1b19e49f272",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/child-command.js": "ae0dfb9f6ed54d8c1b2aa9b83e7804c17ea3ca90a7d958f7c5d9eed3e4d081ee",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/gateway-model-budget.js": "cef62b8b54d91fe58ca3c08072834b904e49b0ff5ce47a7944db4fd883cac93b",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-agent.js": "37ef2d3f6fe00ed3ef0b0c58656e85cd99ff6da51945d34c846ea00f67bebe88",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-channel-client.js": "f08e5739eebb0201ec7c3c5b4e475084fc8b0245a7488dacf0eb991a151fe68d",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/performance-observer.js": "ccd52dc47238ebe29eed9e05612c230c6dbcb5a98673d3f4b147b225e9b0d392",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/document-storage.js": "288e707d7e0eda614506a2221b992d61868d0b48b9bd7c9fd0b29ee1172e5bdf",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/plugin-state.js": "c7a18bf0389d321e0af2e62b9da85c779d98df5f5b341a6d668326c456b31d40",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-agent-main.js": "35bfedb73b14386c8bb8a101d54a5b26cce70b0aec4472b9b33b9bf5c8d3490a",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/runtime-api.js": "a4311e360f80a32537e5e77c61be9ef218e866ae6cb0d35359e197cd4feb2c63",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/node-config-fields.js": "af5e73a0d3f4dc406150f8b3eb14b7887457d27b5297e9e714c1d692ca16599c",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/apply-model-governance.js": "f78f35e646104aa9923475f78fb0a293c08a07c13f90aa950060ac64b174bcaa",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/terminal-management.js": "564de79cd5c2a5c42395700dfb64786667dbd74d85c0fed5aecd1b5eb8922e22",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/model-governance.js": "2c8fd0c09ced8070378bc21bdf1c62354bd8e1cb3311335eb005e5cd427b7549",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/runtime-management-api.js": "83f5c289c0dae8f4031a6e236c8fb2f7562ae27482fb83900ae35f87b5e1d3af",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/workbench.js": "b1904c5b443f259a693bf262e97124e7efc2121bf9aa8129bec512393f7c2eb9",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/runtime-request-path.js": "c3462a23692153443220c272ce92da4a3bf4faa3fa7e4774e5d4707c905b0e5c",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/browser-documents.js": "9b8a8eae89f8050637846cc3146b1ad64b1c43e51203f18db7d3ca594df2f2cd",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/push-notifications.js": "9198d39d6049bfb8b3f7a81875c21fa9049d8e8a78a2db055ad7e4d7b9f9d020",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/sqlite-user-quota.js": "1e2f49104c27a997cdbea8a5c01d048ad124cfbade369650f93d7be824a45228",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/local-runtime-supervisor.js": "94a884633a30dc28e7b9bcbde5c455df3ba0c173517b379e847dbbc3ae18a332",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/runtime-document-store.js": "aff4e3f8638a43dccb0d4096d75d22fc3fbbcabd5759f7aa442906703a967232",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/organization-model-settings-schema.js": "b6fa96df20a44fcddfbbaec152bf607bfedbbc3403ce16341ff035b2c5dabe67",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/launcher.js": "a6500d02fc1b85cda7c16d8401d9d6fe1fbb0916e317c0ad7eb89f729ceceb03",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/administrator-authority.js": "d0d7655b244773f3dfcdb19b8c70a039cb7e1090cd71e2c3dd44339384aa66e1",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/static.js": "71dfed60c81001aa89b597dea0ffe2f21200d834f1b9e1eb71ddec40d6831347",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/plugin-management.js": "69db73b8ec7540a266b04693abe0774f00e2efeace7fecf6a24850ecbd165038",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/session-identity.js": "f64374a3e1067f2a15106eb2650b6496060cfe7dda28e32cf7cf12aac66ebc2b",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/local-runtime-control.js": "ff95b4e870a70d722fc7092c15376807269542211e9f0c401ca8e73f71a20300",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/deployment-topology.js": "470dbd1d4efbfd3d39ae1e7c84c21fa59cab1082868c7df8879fd9452a146048",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/local-runtime-owner.js": "a0b656277dc16ecc4be3d7d82468dd581b880b1840251540b9138d8d84809642",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/browser-return.js": "0d1cb203eb65beeb16e4f6930e5b57d95501b724bba5aa742dae1fb8cc5cda0e",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/apply-grants.js": "52e50edd54e93d26e0882697edfe53cf8b296bb4a59d42a234931bd49d9bc211",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/collaboration.js": "4d34bbeb6c7c23ef280cd649546ae191c6843525193ff666d015143799bc8064",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/local-runtime-protocol.js": "4448fd88b40fcd54b3600c334b86cbfe4a04dced972700fcd899afd81a43b848",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/runtime-management.js": "65600ae09f664a2039da6f260abcd2e97d29520ce5ce24b89c23d55a75051a34",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/desktop-coordinator-repository.js": "697d1bf0625e55ff89cc6831176d736d9f5d02d47c9c2c42fee44673440c96d6",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/backup-service.js": "90c7b1cc22d5b19c0754e42716d5ac6bc0fe5c1eaef319445b22ce0e9eb6154f",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/runtime-context.js": "868fcb109e20f0c99327a5d22a7b4ad168a6ec0d7a886ad65227813fc5e41188",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/account-preferences-service.js": "1f3c9a512f720ff73aaf8241ea30b096312e5f44c52e2595db602c85b08c7969",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/database.js": "d47725c74ba356e4850fc563a97419ef17eababf05a2cc6a64d1fd97925209ab",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/deployment-control-files.js": "3de7a571852be4edcbb07463c6e77af1dcc16d1931bb7ea1b55cbf218cd52fb1",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/remote-desktop-administration.js": "db176f181cd69af624ca457a92bcffb1f09eaf43a846cb305610ba1cf1641c7b",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/account-authority.js": "685a36fa21a697ee1d69c91899935fa77454146184791e0907fcf534de125a85",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/conversation-archive-service.js": "878108e86165ef5177e138615862d5445528d5e88606dc65c793507c15a1d403",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/webhook-delivery-service.js": "72afc010248695e1b6815aaf389370b5c19dd26760c2e2dda9e0bb80f3473656",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/webhook-endpoint-service.js": "3168cf32e252e94545c3b95e3e7391e794b381c65d1419ad4bfd6b662441b71a",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/deployment-inventory.js": "b68cce96bbe0a576fb2bdb634d03879f6608f80c4256182871febbf4ed5656f0",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/sqlite-import.js": "f361838310c6fe6ee5983468b5188e249810546f74f60071b4b083cfded1d828",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/ssh-target-service.js": "c8ccef925351608f6941eb75fae72fbb371a1f94cd35baf2a200e2a544e173ba",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/deployment-lock.js": "a0b2c1e871fa5d8662a26f621e2765c4ed9b3d7dd7805a33e54fb3e414144e49",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/maintenance-service.js": "b4ca64b10fbd4bc2f04ba65c7f36a1772c9882f0ac974a3454bb0ee4a1bd22e7",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/auth-service.js": "0413ee606d0fe92e249c092b5ca2fb7c7363796694646891f279a2dcba30e45d",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/project-management-authority.js": "51a6c1a2b956cef1f200231d10a4c555b6ca6f443f12cd69de8991a9ef639a93",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/document-locations.js": "c99912689665ce0ea25c73c1fae147af4928f0c740c27dcf299110c7d4f233f9",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/node-access-service.js": "f99dcd6045890a9e1395181ac7cf6e63b2c29953f5eb47ad6227e4606f3ba10f",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/search-text.js": "abb84f53c85944bc9f7804eed0757fc0db76640aa23e792f6b3ec2ebe664a2be",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/progress-usage.js": "91cc449e110d1139c74b5257f5ce6226699b6ca27a575d698417cf8072b28f47",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/literal-like-pattern.js": "d50dbeca1e571a5e8a36470ad50a3fa11d2400d17a93f454555c775cc95c85cc",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/deployment-data.js": "29fe0b2ed959d6ac03286f1e77a6916be4ba4f6ec515048e93ac6f71f83ef42e",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/document-catalog-service.js": "b14d35130d025711df09824044dddafa8a82e739413260f9f9a741623ebbca59",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/conversation-repository.js": "2b5806abb95a6ee36c1e3d10518c1c926c2d7835291fcf1b5067a53ac460dc5b",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/model-governance-service.js": "50cabe8d644015248dc9f87accd70632a5d8c539315306b2138c9c1b722c7faa",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/tunnel-access-service.js": "4da58fb7dcb8663c8240a33ea944b041ff65b50bf2c198bb5db35e872c9b7aa8",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/instance-repository.js": "8eb4f3f947c14fcb25db0c67f3d959d6f459c96dc1f0a3ac9e441192890bebb1",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/project-service.js": "a61f0574d620cd9ba73f73719ad483ecda911e8c17901a506b8814556dce89f2",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/runtime-catalog.js": "ebfd0fffec0961bb24f1375a1014587df3541c60b8cf70c2c3ead998c96dc501",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/conversation-query-migration-v1.js": "9201e7c2e3ca2574ec3cf6efc3b10aa3ffca67191fe431980c8b260a38b8ca8b",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/node-configuration-authority.js": "270c8b99c519fe303be4d59a8655c2284e4cc9f7ba192e6b727d8737b6df8090",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/collaboration-service.js": "0ad49dc25dd57cef10abb665fe958cfc4d09fdb476a12eef48fd0419169b9f77",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/progress-service.js": "20445629541b82e161d4321b39659be9b7297afae7a52f12e250eff49035e0c4",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/steward-query.js": "02154017d53b5131cd0285aa73fb84da8323e55e47197bc3b626651ae67298b5",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/port-allocation.js": "9d4e617bcfe2a9176fae98ed873668e2007620ee9d49da0593964b91cc8ecd85",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/administrator-authority.js": "ce163788323afd777ff0b6d036126d469e48466673ce74c59405c9cb2a451889",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/conversation-query-fields-v1.js": "bf1b6f1a91fb755a7c5fb4b6a4b2ad680148f605c76807135f617a84e1c96a0d",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/user-service.js": "7f50562769f88a3adf888e4a6d49a3ec75ac7593dcb1df5e20110c26070653d1",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/deployment-backups.js": "06ed1e92b32de9befbb0b49fcb1d41b37dc91873efa07d54d07ece12dba33348",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib/postgres/audit-service.js": "d6862e85ee69bb8dc3e1cd08f7418d706de220d45f6578f37fa334acca03aa08"
+  },
+  "repair": {
+    "B344": "Automatic chooser selects browsing for immutable inherited Gateway launch markers before service activation. The default Gateway guard already explicitly pins browsing; only automatic compositions without that override had the defect.",
+    "B345": "Directory creation requires the most specific matching writable grant; root presentation order remains stable and read-only browsing remains available.",
+    "B346": "Managed grant input must be an existing valid absolute-path grant array. Valid empty input denies access instead of falling back to host home. Independent optional grant behavior is preserved.",
+    "B347": "LocalLauncher supplies the inherited private grants path; managed bare hosts read the immutable inherited snapshot. The shipped CLI already rejects this launch-only key in project.env, so no production CLI privilege bypass is claimed."
+  },
+  "causalNegative": {
+    "correctedPriorSource": "directory-policy-causal-source-negative.json",
+    "selectedCases": 22,
+    "causalFailures": 9,
+    "controlsPassed": 13,
+    "priorCompiledShippedRuntime": "directory-policy-prior-compiled-auto-web-negative.json",
+    "priorCompiledFailure": "Actual Gateway/shipped CLI automatic composition selects native rather than browse on an unattended loopback Runtime; empty-policy listing returns directory-picker-unavailable instead of directory-unreadable.",
+    "bareHostRedirect": "directory-grants-launch-provenance-negative.json",
+    "existingShippedCliRefusal": "directory-policy-readonly-web-diagnostics.json",
+    "workingTreeRolledBack": false
+  },
+  "verification": {
+    "sourceUniqueVitestCases": 78,
+    "packageCases": 77,
+    "packageFiles": 5,
+    "additionalRealLauncherChildEnvironmentCases": 1,
+    "sourceRealPrograms": [
+      "default19line",
+      "ordinary-readonly-member6line",
+      "valid-empty-grants6line"
+    ],
+    "realPostgresGatewayAndShippedWebComposition": true,
+    "compiledNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "compiledPrograms": 6,
+    "compiledGatewayAndRuntimeUsePlainNode": true,
+    "outerDisposableDatabaseWrapperOnlyUsesTsx": true,
+    "replaysOverlapSourcePrograms": true,
+    "fullRootBuildGates": 8,
+    "checks": {
+      "directory-policy-final-unit-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:53:32.093435+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "./node_modules/.bin/vitest",
+          "run",
+          "packages/host/directory-picker-browse/tests/managed-grants.spec.ts",
+          "packages/host/directory-picker-browse/tests/service.spec.ts",
+          "packages/host/directory-picker-auto/tests/resolve.spec.ts",
+          "packages/host/directory-picker-auto/tests/loader-composition.spec.ts",
+          "packages/util/launch-environment/tests/launch-environment.spec.ts",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/host/directory-picker-browse/src/index.ts",
+          "--coverage.include=packages/host/directory-picker-auto/src/index.ts",
+          "--coverage.include=packages/host/directory-picker-auto/src/resolve.ts",
+          "--coverage.include=packages/util/launch-environment/src/index.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-final-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:53:42.886684+00:00"
+      },
+      "directory-policy-local-launcher-environment": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:04:46.868975+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/.bin/vitest",
+          "run",
+          "tests/local-runtime-launcher.spec.ts",
+          "-t",
+          "actual Runtime environment",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:04:50.501688+00:00"
+      },
+      "directory-policy-complete-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:59:29.094286+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "build"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:00:20.062644+00:00"
+      },
+      "directory-policy-focused-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:59:29.094220+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "tsx",
+          "scripts/run-oxlint.ts",
+          "packages/util/launch-environment/src/index.ts",
+          "packages/util/launch-environment/tests/launch-environment.spec.ts",
+          "packages/host/directory-picker-auto/src/index.ts",
+          "packages/host/directory-picker-auto/src/resolve.ts",
+          "packages/host/directory-picker-auto/tests/resolve.spec.ts",
+          "packages/host/directory-picker-auto/tests/loader-composition.spec.ts",
+          "packages/host/directory-picker-browse/src/index.ts",
+          "packages/host/directory-picker-browse/tests/managed-grants.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:59:33.534737+00:00"
+      },
+      "directory-policy-gateway-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:04:46.868990+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "./node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:04:57.736681+00:00"
+      },
+      "directory-policy-docs-acceptance": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:04:46.868968+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:05:14.437196+00:00"
+      },
+      "directory-policy-private-gateway-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:06:36.090770+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "./node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.build.json",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/tsconfig.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:06:38.556519+00:00"
+      },
+      "directory-policy-production-router-web": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:43:05.920629+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "node",
+          "--import",
+          "tsx/esm",
+          "tests/run-local-web-assembly.mjs",
+          "src"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:43:44.219171+00:00"
+      },
+      "directory-policy-readonly-web-current": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:56:43.226241+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_DIRECTORY_CASE=readonly",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "node",
+          "--import",
+          "tsx/esm",
+          "tests/run-local-web-assembly.mjs",
+          "src"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:56:49.308339+00:00"
+      },
+      "directory-policy-empty-real-web-source": {
+        "status": "passed",
+        "startedAt": "2026-10-30T10:50:23.779537+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_DIRECTORY_CASE=empty",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "node",
+          "--import",
+          "tsx/esm",
+          "tests/run-local-web-assembly.mjs",
+          "src"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T10:50:29.656367+00:00"
+      },
+      "directory-policy-final-note-pair-check": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:21:10.645989+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          ".agents/notes/implemented/feature/2026-07-29-directory-picker-adaptive-default.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:21:12.605919+00:00"
+      },
+      "directory-policy-final-note-budgets": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:21:10.645925+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-doc-budgets"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:21:12.396499+00:00"
+      },
+      "directory-policy-final-note-wrap": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:21:10.646160+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-md-wrap"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:21:21.747671+00:00"
+      },
+      "directory-policy-final-note-references": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:21:10.645925+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-doc-refs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:21:14.326894+00:00"
+      },
+      "directory-policy-compiled-node22-control": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:08:49.426269+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:09:26.961680+00:00"
+      },
+      "directory-policy-compiled-node22-readonly-auto": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:09:26.995909+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib",
+          "LOCAL_WEB_DIRECTORY_CASE=readonly",
+          "LOCAL_WEB_PICKER_AUTO=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:09:31.450184+00:00"
+      },
+      "directory-policy-compiled-node22-empty": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:09:31.472804+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib",
+          "LOCAL_WEB_DIRECTORY_CASE=empty",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:09:35.958475+00:00"
+      },
+      "directory-policy-compiled-node24-control": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:08:49.426243+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:09:26.961681+00:00"
+      },
+      "directory-policy-compiled-node24-readonly-auto": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:09:26.995883+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib",
+          "LOCAL_WEB_DIRECTORY_CASE=readonly",
+          "LOCAL_WEB_PICKER_AUTO=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:09:31.444604+00:00"
+      },
+      "directory-policy-compiled-node24-empty": {
+        "status": "passed",
+        "startedAt": "2026-10-30T11:09:31.469537+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "/opt/homebrew/opt/python@3.12/bin/python3.12",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T102001Z/directory-policy-gateway-artifact/lib",
+          "LOCAL_WEB_DIRECTORY_CASE=empty",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T11:09:35.958371+00:00"
+      }
+    }
+  },
+  "coverage": {
+    "changedModules": 4,
+    "summary": {
+      "total": {
+        "lines": {
+          "total": 214,
+          "covered": 214,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 251,
+          "covered": 251,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 45,
+          "covered": 45,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 185,
+          "covered": 185,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/host/directory-picker-auto/src/index.ts": {
+        "lines": {
+          "total": 30,
+          "covered": 30,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 3,
+          "covered": 3,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 33,
+          "covered": 33,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 8,
+          "covered": 8,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/host/directory-picker-auto/src/resolve.ts": {
+        "lines": {
+          "total": 7,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 2,
+          "covered": 2,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 13,
+          "covered": 13,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 22,
+          "covered": 22,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/host/directory-picker-browse/src/index.ts": {
+        "lines": {
+          "total": 153,
+          "covered": 153,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 30,
+          "covered": 30,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 179,
+          "covered": 179,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 141,
+          "covered": 141,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/util/launch-environment/src/index.ts": {
+        "lines": {
+          "total": 24,
+          "covered": 24,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 26,
+          "covered": 26,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 14,
+          "covered": 14,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "thresholdsLowered": false
+  },
+  "documentation": {
+    "initialCorpusQuickGates": 20,
+    "passed": 20,
+    "ownedPairs": 6,
+    "lastAdaptiveNoteCheckedSeparatelyAfterCorpusPass": true,
+    "updatedActiveNotes": [
+      ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam",
+      ".agents/notes/implemented/feature/2026-07-29-directory-picker-adaptive-default"
+    ],
+    "fullySupersededActiveNotes": [],
+    "frozenArchivesEdited": false
+  },
+  "fixtureCorrections": [
+    "The real Web fixture now uses the production PostgresRuntimeCatalog and GatewayRuntimeRouter with explicit Runtime IDs, computer grants and authoritative manager.storageOf locations.",
+    "A first boot failure correctly demonstrated the shipped CLI launch-only environment protection; the invalid project.env input was removed from the successful read-only scenario.",
+    "The prior-source resolver aliases apply to each Vitest project. Import-only failures and initial formatted Context assertions are not causal evidence.",
+    "A misspelled final doc runner mode failed before executing any gate; subsequent named pairing, budget, wrap and reference checks pass."
+  ],
+  "limits": [
+    "Directory path replacement, symlink races and complete filesystem confinement remain under review.",
+    "Native chooser helpers, open-in-app, command deadlines and full resource admission remain open.",
+    "This does not claim physical Windows or Linux native acceptance.",
+    "All12original business domains and B04/B25remain open.",
+    "Real paid model success and public push remain human-deferred. Deployment is owned by the separately authorized architecture peer."
+  ]
+}

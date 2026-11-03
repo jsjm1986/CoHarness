@@ -1,0 +1,11 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, foregroundWorkflowReady]
+- insert:
+    - id: foreground-ptc
+      name: '@deepseek-ai/dsh-ptc-runtime-node'
+    - id: foreground-runtime
+      name: './runtime.mjs'
+    - id: foreground-model
+      name: './model.mjs'

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-native-search-model-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-24-native-search-model-admission.md
+document:
+  en: f90025f487a9f1266ecdd289bd467d13785f7fc1
+  zh: 83f7bf16ea21c9d6622109a64ab9d6da4d7812f2
+/agent-note-native-search-owns-model-admission:
+  en: 3410dfb46c40e4b4
+  zh: 75bb2e138879123d
+/agent-note-native-search-owns-model-admission/problem:
+  en: 953413310d8c309c
+  zh: 6889047c364ad78c
+/agent-note-native-search-owns-model-admission/decision:
+  en: 1fa64754979aafa2
+  zh: d4d100a7668abebf
+/agent-note-native-search-owns-model-admission/alternatives-considered:
+  en: ba807acbaa08f50e
+  zh: 09b0bd9da3fe1a1f
+/agent-note-native-search-owns-model-admission/consequences:
+  en: cceb5b46aeb822fb
+  zh: 340fe43dce9855a6
+/agent-note-native-search-owns-model-admission/verification:
+  en: f691c9b7cbcb4513
+  zh: 59a2ffb1669c6ff6

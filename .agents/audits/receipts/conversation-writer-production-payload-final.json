@@ -1,0 +1,14 @@
+{
+  "name": "conversation-writer-production-payload-final",
+  "cwd": ".",
+  "command": "pnpm run build:production --verify-only",
+  "startedAt": "2026-10-24T00:55:22.763315+00:00",
+  "seconds": 1.785,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0b0fb548073dd27bdb3afa14f4bfd47662e86a23350ed052d35e4e56c189e308",
+  "inputsAfter": "0b0fb548073dd27bdb3afa14f4bfd47662e86a23350ed052d35e4e56c189e308",
+  "postgresToolDirectory": null,
+  "outputSha256": "aaba51620c4ac20aa9add4ff451193e5b20a25f0907471ee7e96cbde4383d8b4",
+  "outputTail": "$ tsx scripts/build-production.ts --verify-only\nbuild-production: verified Harness, Web, Gateway, Admin UI, and plugin payloads\n"
+}

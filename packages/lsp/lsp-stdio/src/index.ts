@@ -218,7 +218,7 @@ class LocalLspProvider implements LspProvider {
   readonly id: LspProviderId
   readonly extensionToLanguage: Readonly<Record<string, string>>
   /** One live instance per stable canonical workspace identity. */
-  private readonly instances = new Map<WorkspaceKey, LspInstance>()
+  private readonly instances = new Map<WorkspaceKey, { allocation: Promise<LspInstance>; instance?: LspInstance }>()
   /** One complete source-read→open→query→close serialization tail per canonical workspace. */
   private readonly queues = new Map<WorkspaceKey, Promise<void>>()
   /** Workspace canonicalizations that have not entered a provider-owned queue yet. */
@@ -280,7 +280,7 @@ class LocalLspProvider implements LspProvider {
       // Disposal may have snapshotted the instance map while host I/O was pending. Re-check before a
       // synchronous get-or-create so every spawned process remains owned by teardown.
       this.assertActive(querySignal)
-      let instance = this.instanceFor(workspaceKey, workspace)
+      let instance = await this.instanceFor(workspaceKey, workspace, querySignal)
       let canRetryTransport = true
       for (;;) {
         const [queryOutcome] = await Promise.allSettled([
@@ -289,8 +289,7 @@ class LocalLspProvider implements LspProvider {
         let teardownOutcome: PromiseSettledResult<void> | undefined
         if (instance.dead) {
           ;[teardownOutcome] = await Promise.allSettled([instance.dispose()])
-          // A dead instance is never reusable, even when its final quiescence observation fails.
-          this.evictIfCurrent(workspaceKey, instance)
+          if (teardownOutcome.status === 'fulfilled') this.evictIfCurrent(workspaceKey, instance)
         }
         if (teardownOutcome?.status === 'rejected') {
           if (queryOutcome.status === 'rejected') {
@@ -309,7 +308,7 @@ class LocalLspProvider implements LspProvider {
         }
         canRetryTransport = false
         this.assertActive(querySignal)
-        instance = this.instanceFor(workspaceKey, workspace)
+        instance = await this.instanceFor(workspaceKey, workspace, querySignal)
       }
     })
   }
@@ -328,24 +327,39 @@ class LocalLspProvider implements LspProvider {
     return result
   }
 
-  /** Return or synchronously publish the one instance for a canonical workspace. */
-  private instanceFor(workspaceKey: WorkspaceKey, workspace: HostWorkspace): LspInstance {
-    this.assertActive()
+  /** Publish allocation ownership before waiting for the workspace's process permit. */
+  private async instanceFor(workspaceKey: WorkspaceKey, workspace: HostWorkspace, signal: AbortSignal): Promise<LspInstance> {
+    this.assertActive(signal)
     const existing = this.instances.get(workspaceKey)
-    if (existing !== undefined) return existing
-    const created = this.createInstance(workspace)
-    this.instances.set(workspaceKey, created)
-    return created
+    if (existing !== undefined) {
+      const instance = await existing.allocation
+      if (!instance.dead) return instance
+      await instance.dispose()
+      this.evictIfCurrent(workspaceKey, instance)
+      this.assertActive(signal)
+    }
+    const slot: { allocation: Promise<LspInstance>; instance?: LspInstance } = { allocation: this.createInstance(workspace, signal) }
+    this.instances.set(workspaceKey, slot)
+    try {
+      slot.instance = await slot.allocation
+      this.assertActive(signal)
+      return slot.instance
+    } catch (error) {
+      // Disposal owns a published allocation even when the caller stops awaiting it.
+      if (!this.disposed && slot.instance === undefined && this.instances.get(workspaceKey) === slot) this.instances.delete(workspaceKey)
+      throw error
+    }
   }
 
   /** Drop the slot iff it still contains this instance. */
   private evictIfCurrent(workspace: WorkspaceKey, instance: LspInstance): void {
     /* v8 ignore next -- mismatch requires another query to replace the slot before this finally runs. */
-    if (this.instances.get(workspace) === instance) this.instances.delete(workspace)
+    if (this.instances.get(workspace)?.instance === instance) this.instances.delete(workspace)
   }
 
-  private createInstance(workspace: HostWorkspace): LspInstance {
+  private createInstance(workspace: HostWorkspace, signal: AbortSignal): Promise<LspInstance> {
     const spec: InstanceSpec = {
+      signal,
       command: this.executable,
       args: this.config.args,
       cwd: workspace.canonicalPath,
@@ -358,19 +372,23 @@ class LocalLspProvider implements LspProvider {
       shutdownTimeoutMs: this.config.shutdownTimeoutMs,
       killGraceMs: this.config.killGraceMs,
     }
-    return new LspInstance(spec, this.spawner)
+    return LspInstance.create(spec, this.spawner)
   }
 
   /** Dispose every live instance and block further queries. */
   async disposeAll(): Promise<void> {
     this.disposed = true
     this.lifetime.abort(new LspError('lsp-stdio provider is disposed', 'LSP_DISPOSED'))
-    const live = [...this.instances.values()]
+    const live = [...this.instances.entries()]
     const draining = [...this.queues.values()]
     const resolving = [...this.workspaceLookups]
-    this.instances.clear()
     const results = await Promise.allSettled([
-      ...live.map(instance => instance.dispose()),
+      ...live.map(async ([key, slot]) => {
+        await slot.allocation.then(instance => instance.dispose(), () => {
+          // The query observes failed allocation; no instance was published for disposal.
+        })
+        this.instances.delete(key)
+      }),
       ...draining,
       ...resolving,
     ])

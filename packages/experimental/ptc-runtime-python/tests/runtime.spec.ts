@@ -306,11 +306,13 @@ describe('PythonPtcRuntime — seam descriptors and misuse', () => {
     const future = join(dir, 'python-future')
     const pypy = join(dir, 'pypy')
     const failed = join(dir, 'python-failed')
+    const noisy = join(dir, 'python-noisy')
     await writeFile(oldMajor, '#!/bin/sh\nprintf \'cpython 2 99 0\\n\'\n', { mode: 0o755 })
     await writeFile(old, '#!/bin/sh\nprintf \'cpython 3 9 6\\n\'\n', { mode: 0o755 })
     await writeFile(future, '#!/bin/sh\nprintf \'cpython 4 0 0\\n\'\n', { mode: 0o755 })
     await writeFile(pypy, '#!/bin/sh\nprintf \'pypy 3 10 0\\n\'\n', { mode: 0o755 })
     await writeFile(failed, '#!/bin/sh\nexit 7\n', { mode: 0o755 })
+    await writeFile(noisy, '#!/bin/sh\nprintf \'%1500s\\n\' \'\'\nprintf \'cpython 3 10 0\\n\'\n', { mode: 0o755 })
     try {
       expect(resolvePythonBin(relative(process.cwd(), old))).toBe(old)
       const obsolete = await createRuntimeContext()
@@ -328,6 +330,9 @@ describe('PythonPtcRuntime — seam descriptors and misuse', () => {
       const probeFailure = await createRuntimeContext()
       await expect(probeFailure.plugin(PythonPtcRuntime, { pythonBin: failed }))
         .rejects.toThrow(/failed the CPython version probe/)
+      const oversizedProbe = await createRuntimeContext()
+      await expect(oversizedProbe.plugin(PythonPtcRuntime, { pythonBin: noisy }))
+        .rejects.toThrow('interpreter version response exceeded 1024 bytes')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -3437,40 +3442,42 @@ describe('PythonPtcRuntime — budgets, termination, disposal', () => {
     expect(() => process.kill(pid, 0)).toThrow(/ESRCH/)
   }, 8000)
 
-  it('settles on the decided result even when a setsid-escaped orphan holds stdio open past close', async () => {
-    // `close` only fires once every inherited stdio stream drains. A descendant
-    // started with start_new_session=True escapes the child's process group, so
-    // the SIGTERM/SIGKILL aimed at that group never reaches it; if it inherited
-    // our stdout/stderr/fd 3 and outlives the run, `close` would never fire and
-    // run() would hang forever. The close-deadline backstop (graceMs + margin)
-    // must force settlement on the value the `done` frame already decided.
+  it('settles its decided result when a descendant holds inherited output', async () => {
+    const handoff = await makeTempDir('dsh-python-descendant-')
+    const heartbeat = join(handoff, 'heartbeat'), stopped = join(handoff, 'stop')
     const { runtime } = await setup({ graceMs: 100 })
-    const start = Date.now()
-    const result = await runtime.run(runtime.resolve({
-      program: [
-        'import subprocess, sys',
-        // Orphan in a fresh session, inheriting our stdout/stderr/fd 3, alive
-        // past the close-deadline so `close` cannot fire on its own. Its own
-        // 5 s self-exit is the leak ceiling AND the discriminator: it must stay
-        // ABOVE the < 4000 ms upper-bound assertion below, so if the deadline
-        // backstop failed to settle, settlement could only come from this
-        // self-exit at ~5 s and blow the bound — a sharper signal than the wall
-        // ceiling would give.
-        'subprocess.Popen([sys.executable, "-c", "import time; time.sleep(5)"],',
-        '                 start_new_session=True)',
-        'return "escaped"',
-      ].join('\n'),
-      bindings: [],
-    }))
-    const elapsed = Date.now() - start
-    // The done frame decided the value; the deadline settled it despite the
-    // orphan pinning the pipes open.
-    expect(result.error).toBeUndefined()
-    expect(result.value).toBe('escaped')
-    // Settlement waited for the backstop (graceMs + CLOSE_REAP_MARGIN_MS ≈ 2.1s),
-    // not the orphan's 5 s self-exit — proving the deadline, not a fallback, fired.
-    expect(elapsed).toBeGreaterThanOrEqual(1_500)
-    expect(elapsed).toBeLessThan(4_000)
+    try {
+      const start = Date.now()
+      const result = await runtime.run(runtime.resolve({
+        program: [
+          'import subprocess, sys, os, time',
+          `heartbeat = ${JSON.stringify(heartbeat)}`,
+          `stopped = ${JSON.stringify(stopped)}`,
+          'code = "import os,sys,time\\nend = time.monotonic() + 8\\nwhile not os.path.exists(sys.argv[2]) and time.monotonic() < end:\\n    open(sys.argv[1], \'w\').close()\\n    time.sleep(0.05)"',
+          'subprocess.Popen([sys.executable, "-c", code, heartbeat, stopped], start_new_session=True)',
+          'deadline = time.monotonic() + 4',
+          'while not os.path.exists(heartbeat) and time.monotonic() < deadline: time.sleep(0.01)',
+          'if not os.path.exists(heartbeat): raise RuntimeError("descendant did not start")',
+          'return "escaped"',
+        ].join('\n'),
+        bindings: [],
+      }))
+      expect(result.error).toBeUndefined()
+      expect(result.value).toBe('escaped')
+      expect(existsSync(heartbeat)).toBe(true)
+      expect(Date.now() - start).toBeLessThan(4_000)
+    } finally {
+      await writeFile(stopped, '')
+      const deadline = Date.now() + 4_000
+      let previous = statSync(heartbeat).mtimeMs
+      while (Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 200))
+        const current = statSync(heartbeat).mtimeMs
+        if (current === previous) break
+        previous = current
+      }
+      expect(statSync(heartbeat).mtimeMs).toBe(previous)
+    }
   }, 8000)
 
   it('flushes a newline-free diagnostic when the closeDeadline forces settlement', async () => {

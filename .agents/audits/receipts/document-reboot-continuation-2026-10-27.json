@@ -1,0 +1,452 @@
+{
+  "status": "completed_named_scenarios_only",
+  "recordedAt": "2026-10-27T15:25:52.470644+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "checks": [
+    {
+      "name": "document-business-postgres-recovered-final",
+      "status": "passed",
+      "startedAt": "2026-10-27T15:19:05.336529+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:63240/hgw_documents_test",
+        "../node_modules/.bin/vitest",
+        "run",
+        "--config",
+        "vitest.config.ts",
+        "tests/runtime-api.spec.ts",
+        "tests/document-upload-postgres.spec.ts",
+        "tests/documents-local.spec.ts",
+        "tests/document-catalog.spec.ts",
+        "tests/document-catalog-service.spec.ts",
+        "tests/document-transfer.spec.ts",
+        "tests/document-backups.spec.ts",
+        "tests/document-catalog-maintenance.spec.ts",
+        "tests/admin-business-postgres.spec.ts",
+        "tests/document-scope-storage.spec.ts",
+        "tests/server.spec.ts",
+        "tests/access-invalidation.spec.ts",
+        "tests/shutdown.spec.ts",
+        "--coverage",
+        "--coverage.provider=v8",
+        "--coverage.include=src/document-scope-storage.ts",
+        "--coverage.include=src/document-storage.ts",
+        "--coverage.include=src/document-backups.ts",
+        "--coverage.include=src/documents-local.ts",
+        "--coverage.include=src/document-catalog.ts",
+        "--coverage.include=src/runtime-document-store.ts",
+        "--coverage.include=src/postgres/document-catalog-service.ts",
+        "--coverage.include=src/postgres/deployment-data.ts",
+        "--coverage.include=src/server.ts",
+        "--coverage.reporter=text",
+        "--coverage.reporter=json",
+        "--coverage.reportsDirectory=coverage/document-business-after-reboot"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T15:19:19.311633+00:00"
+    },
+    {
+      "name": "host-document-http-regression-browser-abort",
+      "status": "passed",
+      "startedAt": "2026-10-27T15:01:04.209098+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/host/userdoc-http/tests"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T15:01:08.787102+00:00"
+    },
+    {
+      "name": "build-browser-upload-abort",
+      "status": "passed",
+      "startedAt": "2026-10-27T15:01:44.291162+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=4",
+        "pnpm",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T15:02:01.299000+00:00"
+    },
+    {
+      "name": "gateway-types-continuation-final",
+      "status": "passed",
+      "startedAt": "2026-10-27T15:19:06.504353+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T15:19:12.198263+00:00"
+    },
+    {
+      "name": "gateway-emit-scope-removal",
+      "status": "passed",
+      "startedAt": "2026-10-27T15:12:12.267909+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "-p",
+        "tsconfig.build.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T15:12:19.770348+00:00"
+    },
+    {
+      "name": "compiled-document-maintenance-scope-removed",
+      "status": "passed",
+      "startedAt": "2026-10-27T15:14:02.874249+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "node",
+        "tests/fixtures/document-background-writes.mjs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T15:14:03.292662+00:00"
+    },
+    {
+      "name": "compiled-document-authority-after-browser-abort",
+      "status": "passed",
+      "startedAt": "2026-10-27T15:14:02.874258+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "node",
+        "tests/fixtures/document-stream-built.mjs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T15:14:03.055681+00:00"
+    },
+    {
+      "name": "access-fixture-isolation-fixed",
+      "status": "passed",
+      "startedAt": "2026-10-27T15:18:29.592412+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:63240/hgw_documents_test",
+        "node",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/access-fixture-isolation.mjs",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T15:18:33.872806+00:00"
+    },
+    {
+      "name": "docs-reboot-continuation-final",
+      "status": "passed",
+      "startedAt": "2026-10-27T15:21:10.932189+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=4",
+        "pnpm",
+        "run",
+        "doc-sync"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T15:22:19.179702+00:00"
+    }
+  ],
+  "controlledNegativeReplays": [
+    {
+      "name": "document-backup-duplicate-owner-negative-ready",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T14:50:22.351928+00:00"
+    },
+    {
+      "name": "browser-upload-revocation-negative",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T14:53:49.993196+00:00"
+    },
+    {
+      "name": "browser-upload-preflight-close-negative",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T14:56:09.385125+00:00"
+    },
+    {
+      "name": "removed-document-scope-negative",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T15:04:48.136709+00:00"
+    },
+    {
+      "name": "access-fixture-isolation-negative",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T15:18:05.518859+00:00"
+    }
+  ],
+  "gateway": {
+    "files": 13,
+    "passed": 407,
+    "skipped": 0
+  },
+  "hostDocumentHttp": {
+    "files": 4,
+    "passed": 68,
+    "skipped": 0
+  },
+  "constraints": [
+    "Whole project audit remains in progress",
+    "Real model API validation remains user-deferred",
+    "No production PostgreSQL port5432 access",
+    "No commits, pushes, PRs, resets or subagents"
+  ],
+  "cleanup": "Owned r5 disposable PostgreSQL container stopped and --rm removal verified; r4 disappeared during Docker restart observation. No new guest tools, VMs or RAM volumes were created.",
+  "coverage": {
+    "path": "gateway/coverage/document-business-after-reboot/coverage-final.json",
+    "scope": "Nine selected Gateway modules; scoped measurement, not a100%coverage gate",
+    "totals": {
+      "statements": {
+        "covered": 2174,
+        "total": 3239,
+        "pct": 67.11
+      },
+      "branches": {
+        "covered": 2024,
+        "total": 3167,
+        "pct": 63.9
+      },
+      "functions": {
+        "covered": 329,
+        "total": 430,
+        "pct": 76.51
+      },
+      "lines": {
+        "covered": 1945,
+        "total": 2781,
+        "pct": 69.93
+      }
+    },
+    "files": {
+      "gateway/src/document-backups.ts": {
+        "statements": {
+          "covered": 76,
+          "total": 92,
+          "pct": 82.6
+        },
+        "branches": {
+          "covered": 59,
+          "total": 81,
+          "pct": 72.83
+        },
+        "functions": {
+          "covered": 16,
+          "total": 17,
+          "pct": 94.11
+        },
+        "lines": {
+          "covered": 64,
+          "total": 69,
+          "pct": 92.75
+        }
+      },
+      "gateway/src/document-catalog.ts": {
+        "statements": {
+          "covered": 122,
+          "total": 161,
+          "pct": 75.77
+        },
+        "branches": {
+          "covered": 210,
+          "total": 290,
+          "pct": 72.41
+        },
+        "functions": {
+          "covered": 23,
+          "total": 28,
+          "pct": 82.14
+        },
+        "lines": {
+          "covered": 119,
+          "total": 154,
+          "pct": 77.27
+        }
+      },
+      "gateway/src/document-scope-storage.ts": {
+        "statements": {
+          "covered": 92,
+          "total": 101,
+          "pct": 91.08
+        },
+        "branches": {
+          "covered": 76,
+          "total": 85,
+          "pct": 89.41
+        },
+        "functions": {
+          "covered": 13,
+          "total": 14,
+          "pct": 92.85
+        },
+        "lines": {
+          "covered": 83,
+          "total": 90,
+          "pct": 92.22
+        }
+      },
+      "gateway/src/document-storage.ts": {
+        "statements": {
+          "covered": 55,
+          "total": 79,
+          "pct": 69.62
+        },
+        "branches": {
+          "covered": 38,
+          "total": 68,
+          "pct": 55.88
+        },
+        "functions": {
+          "covered": 8,
+          "total": 10,
+          "pct": 80.0
+        },
+        "lines": {
+          "covered": 50,
+          "total": 68,
+          "pct": 73.52
+        }
+      },
+      "gateway/src/documents-local.ts": {
+        "statements": {
+          "covered": 475,
+          "total": 605,
+          "pct": 78.51
+        },
+        "branches": {
+          "covered": 321,
+          "total": 476,
+          "pct": 67.43
+        },
+        "functions": {
+          "covered": 96,
+          "total": 111,
+          "pct": 86.48
+        },
+        "lines": {
+          "covered": 428,
+          "total": 521,
+          "pct": 82.14
+        }
+      },
+      "gateway/src/runtime-document-store.ts": {
+        "statements": {
+          "covered": 82,
+          "total": 82,
+          "pct": 100.0
+        },
+        "branches": {
+          "covered": 63,
+          "total": 63,
+          "pct": 100.0
+        },
+        "functions": {
+          "covered": 6,
+          "total": 6,
+          "pct": 100.0
+        },
+        "lines": {
+          "covered": 67,
+          "total": 67,
+          "pct": 100.0
+        }
+      },
+      "gateway/src/server.ts": {
+        "statements": {
+          "covered": 683,
+          "total": 1261,
+          "pct": 54.16
+        },
+        "branches": {
+          "covered": 600,
+          "total": 1123,
+          "pct": 53.42
+        },
+        "functions": {
+          "covered": 55,
+          "total": 88,
+          "pct": 62.5
+        },
+        "lines": {
+          "covered": 608,
+          "total": 1076,
+          "pct": 56.5
+        }
+      },
+      "gateway/src/postgres/deployment-data.ts": {
+        "statements": {
+          "covered": 64,
+          "total": 196,
+          "pct": 32.65
+        },
+        "branches": {
+          "covered": 57,
+          "total": 154,
+          "pct": 37.01
+        },
+        "functions": {
+          "covered": 14,
+          "total": 51,
+          "pct": 27.45
+        },
+        "lines": {
+          "covered": 53,
+          "total": 148,
+          "pct": 35.81
+        }
+      },
+      "gateway/src/postgres/document-catalog-service.ts": {
+        "statements": {
+          "covered": 525,
+          "total": 662,
+          "pct": 79.3
+        },
+        "branches": {
+          "covered": 600,
+          "total": 827,
+          "pct": 72.55
+        },
+        "functions": {
+          "covered": 98,
+          "total": 105,
+          "pct": 93.33
+        },
+        "lines": {
+          "covered": 473,
+          "total": 588,
+          "pct": 80.44
+        }
+      }
+    }
+  },
+  "observedChecks": [
+    {
+      "command": "node_modules/.bin/tsx scripts/run-oxlint.ts <changed TypeScript and fixture paths>",
+      "exitCode": 0,
+      "note": "Exact paths are retained in the tool call; no full lint completion claim."
+    },
+    {
+      "command": "pnpm run verify-no-unknown-casts",
+      "exitCode": 0,
+      "note": "1863 existing assertions remain."
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "baseline": {
+    "reference": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "checkedAt": "2026-10-27T15:25:52.470644+00:00",
+    "evidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/baseline-after-continuation-final.json"
+  }
+}

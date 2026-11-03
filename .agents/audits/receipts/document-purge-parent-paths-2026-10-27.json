@@ -1,0 +1,54 @@
+{
+  "name": "document-purge-parent-paths-2026-10-27",
+  "verifiedAt": "2026-10-27T00:55:54.810989+00:00",
+  "headReference": "codex/business-logic-audit-2026-10-23",
+  "originReference": "origin/master",
+  "currentInputsSha256": "010ac8890c77dab54dddb19d01b9438f2498110e4401d52326dc73fa8fd51dfa",
+  "negativeControl": {
+    "case": "ordinary-purge",
+    "exitCode": 1,
+    "observed": "Before the repair, replacing the trash directory immediately before unlink deleted the unrelated outside file with the same hidden name."
+  },
+  "repair": "Linux purge and retention cleanup retain the manifest parent through lock acquisition, reads, payload deletion, metadata replacement and lock release. Payload deletion also uses a retained parent. A replaced directory refuses acknowledgement; restoring the original directory permits retry without a stale writer lock.",
+  "reports": {
+    "linuxSource": {
+      "passed": 479,
+      "failed": 0,
+      "skipped": 0,
+      "success": true,
+      "reportSha256": "9c7f3563df0b60629de374a8d47f1535123c8b6579fa53425db696a4f5c575cf"
+    },
+    "linuxBuilt": {
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "success": true,
+      "reportSha256": "c4b66187d7907a231109a94e2e03db139c10efc9b00e615bdb05d10b85c2fb47"
+    }
+  },
+  "macOSOwningTests": {
+    "passed": 74,
+    "failed": 0
+  },
+  "build": {
+    "command": "env NODE_DISABLE_COMPILE_CACHE=1 DSH_GATE_CONCURRENCY=2 pnpm run build",
+    "exitCode": 0,
+    "gatesPassed": 8,
+    "logSha256": "826ea3fb2424c7fb90bdd243246f2a90cceaa780b1ac80ebbb6e76651a17e985"
+  },
+  "docs": {
+    "command": "env NODE_DISABLE_COMPILE_CACHE=1 DSH_GATE_CONCURRENCY=3 pnpm run test:docs",
+    "exitCode": 0,
+    "gatesPassed": 20,
+    "logSha256": "c237e41587570d7ace1fc28eb3b32f9fa290120871d735211eb105e461f58403"
+  },
+  "sourceTypecheckExitCode": 0,
+  "changedFileLintExitCode": 0,
+  "diffCheckExitCode": 0,
+  "limitations": [
+    "This is verification of named Linux path-replacement scenarios, not a complete cross-platform filesystem guarantee.",
+    "B157 production managed backend, private roots and readable ordinary files for separate runtime accounts remain incomplete.",
+    "B131 incarnation and receiving-catalog ownership integration remains incomplete. Remaining private-state and directory/root-replacement paths still require review.",
+    "Existing whole-file coverage debt remains recorded; no threshold or exclusion was changed. Real model API verification remains user-deferred."
+  ]
+}

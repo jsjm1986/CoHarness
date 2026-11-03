@@ -1,0 +1,7 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, speechRemovalReady]
+- insert:
+    - id: speech-removal
+      name: './model.mjs'

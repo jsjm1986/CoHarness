@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-24-sdk-managed-model-requests.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md
+document:
+  en: 27e8606d84f43f0ebbb1c57a9548fbe705bd261e
+  zh: a8fdc7562f3c305f8a58d517c0dd1b304b771d73
+/agent-note-managed-sdk-child-model-and-process-requests:
+  en: 19a32ca7f378e3c0
+  zh: 6314c3d5aabcf8ce
+/agent-note-managed-sdk-child-model-and-process-requests/problem:
+  en: 8280d34fac94744f
+  zh: b424fbb7fe2762ce
+/agent-note-managed-sdk-child-model-and-process-requests/decision:
+  en: 24bb1815c4a557bf
+  zh: 68f9322d1642f1f1
+/agent-note-managed-sdk-child-model-and-process-requests/alternatives-considered:
+  en: 7754e17d216abaf1
+  zh: 81e9181c11c26c34
+/agent-note-managed-sdk-child-model-and-process-requests/consequences:
+  en: 7ac44a9269dc9ae5
+  zh: b82631283ac6ce10
+/agent-note-managed-sdk-child-model-and-process-requests/verification:
+  en: 15e61a8f2fc3558e
+  zh: 78ef03f45c603fc6

@@ -1,0 +1,14 @@
+{
+  "name": "runtime-web-owner-capacity-postgres",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/instance-capacity-postgres.spec.ts tests/node-resource-budget-postgres.spec.ts --retry=0 --no-file-parallelism",
+  "startedAt": "2026-10-24T21:29:10.052316+00:00",
+  "seconds": 6.165,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cfd0584c6b5816a86b605ca3d6daca9e9c5ed7df3215a0e5f25e3d7f5412c949",
+  "inputsAfter": "cfd0584c6b5816a86b605ca3d6daca9e9c5ed7df3215a0e5f25e3d7f5412c949",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "00292c621e6c726b6ebf2780c359664f0ca3d2ef980af97f5bb22cae2eb4a2d2",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  45 passed (45)\n   Start at  05:29:12\n   Duration  3.71s (transform 777ms, setup 0ms, import 1.04s, tests 2.45s, environment 0ms)\n\n"
+}

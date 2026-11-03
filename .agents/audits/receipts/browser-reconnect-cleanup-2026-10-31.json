@@ -1,0 +1,147 @@
+{
+  "at": "2026-10-31T09:21:41.019274+00:00",
+  "finding": "B399",
+  "title": "Failed native-browser reconnect loses rollback and releases attached ownership during in-flight shutdown",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "paths": [
+    "packages/experimental/browser-use-stagehand-native/src/index.ts",
+    "packages/experimental/browser-use-stagehand-native/src/worker-client.ts",
+    "packages/experimental/browser-use-stagehand-native/tests/provider.spec.ts",
+    "packages/experimental/browser-use-stagehand-native/tests/fixtures/startup-owner.mjs",
+    "packages/experimental/browser-use-stagehand-native/README.md",
+    "packages/experimental/browser-use-stagehand-native/README.zh.md",
+    "packages/experimental/browser-use-stagehand-native/README.i18n.yaml",
+    "snapshots/session/browser-startup-owner/expected.jsonl",
+    ".agents/notes/implemented/bug-fix/2026-10-31-browser-startup-resource-ownership.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-browser-startup-resource-ownership.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-browser-startup-resource-ownership.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-startup-owner/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-startup-owner/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-startup-owner/guide.zh.md"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T090823Z",
+  "checks": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T090823Z/browser-reconnect-final-coverage.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T090823Z/browser-reconnect-source-snapshot.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T090823Z/browser-reconnect-build.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T090823Z/browser-reconnect-docs.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T090823Z/browser-reconnect-built-node22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T090823Z/browser-reconnect-built-node24.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T090823Z/browser-reconnect-lint.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T090823Z/browser-reconnect-catalog.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T090823Z/browser-reconnect-export-jsdoc.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T090823Z/browser-reconnect-origin-fetch-retry.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T090823Z/browser-reconnect-pairing.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T090823Z/browser-reconnect-private-old-probe-final.json"
+  ],
+  "causalEvidence": "Two original-source regressions admit another reconnect without retained cleanup or release the attached reservation while reconnect rollback is unconfirmed. The unchanged application replay rejects the complete B398 package. Private observation around that old graph proves one extra process grant and real Worker after each completion/termination failure, with the original termination-failed Worker still alive, and releases the reservation on in-flight disposal despite unfinished accounting.",
+  "behavior": "Retain the connection promise before waiting, including failed reconnects. A subsequent operation retries retained rollback before admitting a fresh Worker. Provider close joins in-flight reconnect readiness and its cleanup, preserving the browser reservation when cleanup fails. Already rolled-back ordinary connection errors permit fresh retry.",
+  "verification": {
+    "uniqueRelatedCases": 168,
+    "sourceCases": 166,
+    "applicationSnapshots": 2,
+    "startupSnapshotRows": 15,
+    "standardCoverage": {
+      "packages/experimental/browser-use-stagehand-native/src/index.ts": {
+        "statements": [
+          117,
+          117
+        ],
+        "branches": [
+          66,
+          66
+        ],
+        "functions": [
+          24,
+          24
+        ],
+        "lines": [
+          101,
+          101
+        ]
+      },
+      "packages/experimental/browser-use-stagehand-native/src/launch.ts": {
+        "statements": [
+          73,
+          73
+        ],
+        "branches": [
+          14,
+          14
+        ],
+        "functions": [
+          13,
+          13
+        ],
+        "lines": [
+          63,
+          63
+        ]
+      },
+      "packages/experimental/browser-use-stagehand-native/src/worker-client.ts": {
+        "statements": [
+          139,
+          139
+        ],
+        "branches": [
+          30,
+          30
+        ],
+        "functions": [
+          32,
+          32
+        ],
+        "lines": [
+          107,
+          107
+        ]
+      }
+    },
+    "coverageLimits": "Three named source modules at all four 100% metrics, with no coverage-policy or exclusion changes. Existing built-entry exclusion is exercised through actual plain-Node Workers on Node22/24.",
+    "runtimes": "Source and built Node22/24 replay the complete startup/reconnect application and existing native-browser SDK transcript. Actual native threads prove allocation, failed termination liveness and final exit. An intentional failed plugin disposal retains its reservation; host restart remains the documented recovery, not a claimed hot-disposal retry.",
+    "buildGates": 8,
+    "quickDocumentationGates": 20,
+    "guideEnglishWords": 210,
+    "paidApiRequests": 0,
+    "productionDatabaseOperations": 0,
+    "rootDeployments": 0
+  },
+  "evidenceSetupCorrection": "The first added completion scenario released the previous model gate rather than its new process-grant gate, leaving top-level await unsettled. The fixture now releases the correct explicitly captured grant and waits for real cancellation before returning the disposal grant. The failed receipts are preserved. No timing delay decides the product result. The final private negative observation confirms orphan thread termination before completing fixture leases; the earlier observation is preserved separately.",
+  "noteReview": {
+    "owner": ".agents/notes/implemented/bug-fix/2026-10-31-browser-startup-resource-ownership.md",
+    "decision": "Extend the owning browser admission note and unreleased upgrade guide with reconnect rollback and shutdown ownership; no duplicate note or frozen archived change."
+  },
+  "baseline": {
+    "at": "2026-10-31T09:17:32.742440+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "merge": "Merge fourteen B399 delta paths onto the B398 native-browser package source graph. Rebuild the matching optional native-browser main/Worker pair. The cumulative capsule retains unchanged source prerequisites and earlier references; preserve newer peer Local/Gateway/UI files and artifacts. Root performs no deployment.",
+    "scope": "Independent native-browser lifecycle. None of the peer reserved files edited."
+  },
+  "hostResourceConstraint": {
+    "availableDiskMiBObserved": 399,
+    "newLargeBuilds": "paused after the completed 8-gate build",
+    "followup": "Remaining Node24/native probes disable compile cache. The complete root evidence tree is below 1 GiB and current private runtime state is below 3 MiB. Unchanged verified immutable capsule inputs use hard links; changed live inputs are copied. Frozen evidence and source/artifact capsules are retained; no Docker or production data cleanup is performed."
+  },
+  "matchingSourcePrerequisites": [],
+  "externalSourceChangesExcluded": {
+    "packages/subprocess/subprocess-local/README.i18n.yaml": "7a54b9e99352908283ee973e2dcd7707c9d7a7ba312ad9761311219172a47569",
+    "packages/subprocess/subprocess-local/README.md": "223b3dfcdc9732041ea508d9d131b9505e98abca53ea60dbb098851bd2c74629",
+    "packages/subprocess/subprocess-local/README.zh.md": "f13592bad150012aaa31e62226119ed4f22772b4bca5174936f988e1ae0cd407"
+  },
+  "externalArtifactChangesExcluded": {
+    "packages/subprocess/subprocess-local/lib/index.js": "5fbdc054c9a1ef7799f7da80b030e5db88ffdb3639b5e5b0f2a908d5e183e950",
+    "packages/experimental/browser-use-stagehand-native/lib/index.js": "bc4e482f80d2df6cd54d3ad817b74bd01335b5db079252f8c87a5067d4405657"
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Review native-browser startup deadlines, shared-runtime debug authority and authority-only SDK composition.",
+    "Continue remote pipes, resource-only remote execution and nonconflicting business permissions.",
+    "Peer owns multi-computer operational acceptance and reserved Local/Gateway/UI changes. Preserve per-user model authorization and default-model denial.",
+    "Paid API validation stays deferred. No root deployment, production database or physical Linux/Windows acceptance is claimed."
+  ]
+}

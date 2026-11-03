@@ -43,6 +43,8 @@ export interface LinuxScopeInternals {
   sleep?: (delayMs: number, signal?: AbortSignal) => Promise<void>
   /** Kernel unix socket table read by the user-manager confirmation; defaults to /proc/net/unix. */
   unixSocketTable?: string
+  /** Host cgroup membership used to retain a Gateway local Runtime's descendant slice. */
+  processCgroup?: string
 }
 
 interface SystemctlResult {
@@ -63,6 +65,14 @@ const KILL_ALL_MEMBERS = '--kill-who=all'
 /** Flags bit that /proc/net/unix sets on a listening socket (__SO_ACCEPTCON). */
 const UNIX_SOCKET_ACCEPTING = 0x10000
 
+/** Keep native child scopes under the managed Runtime slice inherited at process birth. */
+function runtimeSliceOptions(internals: LinuxScopeInternals): string[] {
+  if (process.platform !== 'linux' && internals.processCgroup === undefined) return []
+  const membership = readFileSync(internals.processCgroup ?? '/proc/self/cgroup', 'utf8')
+  const slice = /^(?:0::|\d+:name=systemd:)(?:\/[^\r\n/]*)*\/(dshruntime[a-f0-9]{32}\.slice)(?:\/|$)/mu.exec(membership)?.[1]
+  return slice === undefined ? [] : [`--slice=${slice}`]
+}
+
 /** systemd-run options that keep target argv literal; empty where scope mode never expands argv. */
 export type LiteralArgvOptions = readonly string[]
 
@@ -82,6 +92,7 @@ function querySystemctl(command: string, args: readonly string[]): Promise<Syste
       encoding: 'utf8',
       env: managerEnvironment(),
       timeout: SYSTEMCTL_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
     }, (error, stdout, stderr) => {
       const code = error === null ? 0 : (error as Error & { code?: string | number }).code
       resolveResult({
@@ -131,6 +142,7 @@ export function probeLinuxScope(internals: LinuxScopeInternals = {}): LiteralArg
       '--scope',
       '--quiet',
       '--collect',
+      ...runtimeSliceOptions(internals),
       ...literalArgv,
       `--unit=${unitBase}`,
       '--',
@@ -145,6 +157,7 @@ export function probeLinuxScope(internals: LinuxScopeInternals = {}): LiteralArg
       env: quietSystemdEnvironment(),
       stdio: ['ignore', 'ignore', 'pipe'],
       timeout: SYSTEMCTL_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
     })
     return { created: result.error === undefined && result.status === 0, stderr: result.stderr }
   }
@@ -174,7 +187,7 @@ export function probeLinuxManager(internals: LinuxScopeInternals = {}): boolean 
     'show',
     '--property=Version',
     '--value',
-  ], { env: managerEnvironment(), stdio: 'ignore', timeout: SYSTEMCTL_TIMEOUT_MS })
+  ], { env: managerEnvironment(), stdio: 'ignore', timeout: SYSTEMCTL_TIMEOUT_MS, killSignal: 'SIGKILL' })
   return result.error === undefined && result.status === 0
 }
 
@@ -304,7 +317,7 @@ class SystemdScopeOwner implements BoundProcessOwner {
   inspectTaskCount(): number | undefined {
     const result = this.runSync(this.systemctl, [
       '--user', 'show', '--property=LoadState', '--property=ActiveState', '--property=TasksCurrent', this.unit,
-    ], { encoding: 'utf8', env: managerEnvironment(), timeout: SYSTEMCTL_TIMEOUT_MS })
+    ], { encoding: 'utf8', env: managerEnvironment(), timeout: SYSTEMCTL_TIMEOUT_MS, killSignal: 'SIGKILL' })
     if (result.error !== undefined || result.status !== 0 || typeof result.stdout !== 'string') return undefined
     const state = this.parseUnitState(result.stdout)
     return state.loadState === 'loaded' && state.activeState === 'active' ? state.tasksCurrent : undefined
@@ -324,7 +337,7 @@ class SystemdScopeOwner implements BoundProcessOwner {
       KILL_ALL_MEMBERS,
       `--signal=${signal}`,
       this.unit,
-    ], { encoding: 'utf8', env: managerEnvironment(), timeout: SYSTEMCTL_TIMEOUT_MS })
+    ], { encoding: 'utf8', env: managerEnvironment(), timeout: SYSTEMCTL_TIMEOUT_MS, killSignal: 'SIGKILL' })
     this.wakeObservation()
     if (result.error === undefined && result.status === 0) {
       if (signal === 'SIGKILL') {
@@ -360,7 +373,7 @@ class SystemdScopeOwner implements BoundProcessOwner {
         KILL_ALL_MEMBERS,
         '--signal=SIGKILL',
         this.unit,
-      ], { env: managerEnvironment(), stdio: 'ignore', timeout: SYSTEMCTL_TIMEOUT_MS })
+      ], { env: managerEnvironment(), stdio: 'ignore', timeout: SYSTEMCTL_TIMEOUT_MS, killSignal: 'SIGKILL' })
     } catch {
       // Host exit cannot report one range; the runtime continues with the rest.
     }
@@ -402,6 +415,7 @@ class SystemdScopeOwner implements BoundProcessOwner {
         env: managerEnvironment(),
         stdio: 'ignore',
         timeout: SYSTEMCTL_TIMEOUT_MS,
+        killSignal: 'SIGKILL',
       })
     } catch {
       // The range is already empty; a failed cleanup leaves only the transient unit.
@@ -544,12 +558,14 @@ function scopeArgs(
   literalArgv: LiteralArgvOptions,
   invocation: RunnerInvocation,
   argv: readonly string[],
+  internals: LinuxScopeInternals,
 ): string[] {
   return [
     '--user',
     '--scope',
     '--quiet',
     '--collect',
+    ...runtimeSliceOptions(internals),
     ...literalArgv,
     `--unit=${unitBase}`,
     '--',
@@ -639,12 +655,13 @@ export function prepareLinuxTerminalScope(
   internals: LinuxScopeInternals = {},
 ): LinuxTerminalScopeLaunch {
   const invocation = internals.runnerInvocation ?? spawnRunnerInvocation()
+  const unitBase = unitStem('dsh-terminal')
+  const args = scopeArgs(unitBase, literalArgv, invocation, spec.argv, internals)
   const files = createLinuxLaunchFiles({ cwd: spec.cwd, env: targetEnv })
   const startup = new LinuxScopeStartup(files, 'terminal')
-  const unitBase = unitStem('dsh-terminal')
   return {
     command: internals.systemdRun ?? 'systemd-run',
-    args: scopeArgs(unitBase, literalArgv, invocation, spec.argv),
+    args,
     cwd: process.cwd(),
     env: runnerEnvironment(files.requestPath, invocation),
     bindOwner: direct => new SystemdScopeOwner(
@@ -676,20 +693,16 @@ export function launchLinuxScope(
   internals: LinuxScopeInternals = {},
 ): ManagedProcessLaunch {
   const invocation = internals.runnerInvocation ?? spawnRunnerInvocation()
+  const unitBase = unitStem('dsh-subprocess')
+  const args = scopeArgs(unitBase, literalArgv, invocation, spec.argv, internals)
   const files = createLinuxLaunchFiles({
     cwd: spec.cwd, env: targetEnv,
     ...spec.stdio.control === undefined ? {} : { control: spec.stdio.control },
   })
   const startup = new LinuxScopeStartup(files, 'subprocess')
-  const unitBase = unitStem('dsh-subprocess')
   let child: ReturnType<typeof spawn>
   try {
-    child = (internals.spawn ?? spawn)(internals.systemdRun ?? 'systemd-run', scopeArgs(
-      unitBase,
-      literalArgv,
-      invocation,
-      spec.argv,
-    ), {
+    child = (internals.spawn ?? spawn)(internals.systemdRun ?? 'systemd-run', args, {
       cwd: process.cwd(),
       env: runnerEnvironment(files.requestPath, invocation),
       stdio: runnerStdio(spec, false),

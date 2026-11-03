@@ -1,0 +1,14 @@
+{
+  "name": "catalog-batch-lock-order-before",
+  "cwd": "gateway",
+  "command": "node_modules/.bin/vitest run tests/admin-business-postgres.spec.ts --retry=0 -t 'batch removal alongside'",
+  "startedAt": "2026-10-25T01:10:20.310423+00:00",
+  "seconds": 4.767,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "41acae3af24686afa8632bf7c87fda3c796750116adae467b0cbde515eaa475d",
+  "inputsAfter": "41acae3af24686afa8632bf7c87fda3c796750116adae467b0cbde515eaa475d",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "e823c591424988550c0a598ea7a41f20a55941164a4db262fa36c7e1978f26f3",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/admin-business-postgres.spec.ts (114 tests | 1 failed | 113 skipped) 1357ms\n       × commits a runtime batch removal alongside a document lifecycle writer without a lock cycle 1290ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/admin-business-postgres.spec.ts > Admin business PostgreSQL regressions > document project authority > commits a runtime batch removal alongside a document lifecycle writer without a lock cycle\nAssertionError: expected 503 to be 200 // Object.is equality\n\n- Expected\n+ Received\n\n- 200\n+ 503\n\n ❯ tests/admin-business-postgres.spec.ts:795:33\n    793|         expect(single).toEqual({ ok: true })\n    794|         const response = await removed\n    795|         expect(response.status).toBe(200)\n       |                                 ^\n    796|         expect(await response.json()).toEqual({ version: 1, accepted: …\n    797|         const states = (await pool.query<{ runtime_doc_id: string; sta…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 113 skipped (114)\n   Start at  09:10:22\n   Duration  2.73s (transform 1.05s, setup 0ms, import 1.30s, tests 1.36s, environment 0ms)\n\n"
+}

@@ -22,3 +22,8 @@
 }
 
 .search input::placeholder { color: var(--dsw-alias-label-secondary); }
+
+@media (max-width: 767px) {
+  .options { max-height: none; overflow: visible; padding-right: 0; scrollbar-gutter: auto; }
+  .copy { font-size: 14px; line-height: 22px; }
+}

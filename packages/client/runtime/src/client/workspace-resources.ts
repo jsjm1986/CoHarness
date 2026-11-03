@@ -1,5 +1,6 @@
 /** Metadata-only Workspace resources isolated by connection target and Session. */
 import type { ConnectionRuntimeTarget, IApiClient, SessionId } from '@deepseek-ai/dsh-client-connection/client'
+import { runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 
 /** Opaque browser address containing only a Session and relative file path. */
 export type WorkspaceResourceAddress = string & { readonly __workspaceResourceAddress: unique symbol }
@@ -137,7 +138,7 @@ export function workspacePathForResource(cwd: string | undefined, path: string):
 }
 
 function targetKey(target: WorkspaceResourceTarget): string {
-  return target.kind === 'project' ? `project:${String(target.projectId)}` : target.kind
+  return target.kind === 'base' ? target.kind : runtimeTargetKey(target)
 }
 const EMPTY: WorkspaceResourceState = { status: 'none' }
 const UNAVAILABLE: WorkspaceResourceState = {

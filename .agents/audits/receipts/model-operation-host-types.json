@@ -1,0 +1,14 @@
+{
+  "name": "model-operation-host-types",
+  "cwd": ".",
+  "command": "pnpm exec tsc -p tsconfig.host.json --noEmit --incremental false",
+  "startedAt": "2026-10-24T05:48:01.696359+00:00",
+  "seconds": 9.125,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1cde6fc17882a49d860e442bf1c97fd1b01a9b041f68dd21c0d909a336ea728d",
+  "inputsAfter": "1cde6fc17882a49d860e442bf1c97fd1b01a9b041f68dd21c0d909a336ea728d",
+  "postgresToolDirectory": null,
+  "outputSha256": "a80a8992d46b3d55d3ecd951e737a1bfa18591ed4ae9101a6eb97a83d8d3bdd4",
+  "outputTail": "tsconfig.host.json(6,3): error TS6379: Composite projects may not disable incremental compilation.\n"
+}

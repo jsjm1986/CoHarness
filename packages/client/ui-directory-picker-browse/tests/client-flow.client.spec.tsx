@@ -185,7 +185,7 @@ describe('directory-picker-browse client half', () => {
     await expect(injected.listDirectory()).resolves.toBe(homeListing)
     await expect(injected.createDirectory(HOME, 'fresh')).resolves.toBe(`${HOME}/fresh`)
     expect(b.listDirectory).toHaveBeenCalledOnce()
-    expect(b.createDirectory).toHaveBeenCalledWith(HOME, 'fresh')
+    expect(b.createDirectory).toHaveBeenCalledWith(HOME, 'fresh', undefined)
   })
 
   it('adapts the owner conversation onto the dialog: confirm picks, dismissal cancels', async () => {

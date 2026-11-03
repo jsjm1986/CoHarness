@@ -564,7 +564,7 @@ export class PluginManager extends TypertRemoteService {
   }
 
   /** Replace one plugin row's config in the profile patch, validated against its schema.
-   * `config: null` removes the override so composition defaults apply. The loader
+   * `config: null` clears all matching profile config overrides so composition defaults apply. The loader
    * rejects a failing schema at reload as well; validating here first reports a
    * readable error instead of a broken reload.
    * @param id Loader entry identity returned by listPlugins.

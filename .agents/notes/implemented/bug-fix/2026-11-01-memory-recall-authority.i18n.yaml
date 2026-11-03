@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-memory-recall-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-memory-recall-authority.md
+document:
+  en: 1f6a8cac2a052d8818ccecd069f7f9e1991ae01f
+  zh: 822c795b59a5c00175f2e420c324674f6b17c140
+/agent-note-recall-follows-the-admitted-question-through-publication:
+  en: 9ebe3dcd597a90aa
+  zh: 9566b3976040fabb
+/agent-note-recall-follows-the-admitted-question-through-publication/problem:
+  en: bea3b5a10bae91f7
+  zh: b187579302dca3c9
+/agent-note-recall-follows-the-admitted-question-through-publication/decision:
+  en: 9590ca6cc99b3e51
+  zh: adfdc92a2d85b3e5
+/agent-note-recall-follows-the-admitted-question-through-publication/alternatives-considered:
+  en: 1363be390dd88cdf
+  zh: dd400cc375611d5b
+/agent-note-recall-follows-the-admitted-question-through-publication/consequences:
+  en: c268646d8ec9f926
+  zh: fb2592ea1350ed81
+/agent-note-recall-follows-the-admitted-question-through-publication/verification:
+  en: f923ad864d9c3993
+  zh: 0bdfe5468e89c93c

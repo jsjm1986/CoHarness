@@ -29,6 +29,8 @@ Repository builds also materialize a dev-only `runtime/node/` carrier. It runs `
 
 Both carriers execute the same `dsh` grammar and shipped profiles, including the standalone `sdk-minimal` tree and the full `web` profile with its frontend assets. The private `dsh-python-runtime-closure` manifest defines the packaged dependency closure. This package also checks in `runtime/cordis.yml`, a bundled bootstrap composition selectable through an explicit `DSH_CORDIS_CONFIG` or argv config path.
 
+The closure includes the [resource-budget service definition](../../packages/context/resource-budget/README.md) and [model-access service definition](../../packages/llm/model-access/README.md) required by model, native-operation and subprocess consumers. Provider activation remains owned by the selected composition.
+
 ## Python module API
 
 - `bundled_package_dir() -> Path` returns the installed module-data root and verifies its release metadata.

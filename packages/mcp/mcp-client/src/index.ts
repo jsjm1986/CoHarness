@@ -20,6 +20,7 @@ import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { DEFAULT_MAX_INSTRUCTION_BYTES, RECONNECT_DEFAULTS, resolveReconnectPolicy, startConnection } from './connection.ts'
 import type { ReconnectConfig } from './connection.ts'
 import { registerServerContext } from './server-context.ts'
+import { resolveMcpProcessLimits } from './managed-stdio.ts'
 // Side-effect type import: declaration-merges `ctx.tools` onto Context.
 import type {} from '@deepseek-ai/dsh-tools'
 
@@ -66,6 +67,12 @@ export interface StdioConfig {
   env: Record<string, string>
   /** Working directory for the child process. */
   cwd: string
+  /** TERM-to-KILL grace for each local MCP process (default2000ms). */
+  processGraceMs?: number
+  /** Bound on confirming local managed-range termination (default5000ms). */
+  processCloseTimeoutMs?: number
+  /** Admission, discovery and initial handshake deadline (default120000ms). */
+  startupTimeoutMs?: number
   /** Timeout per tool call or resource request in milliseconds. */
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
@@ -116,7 +123,7 @@ const Reconnect: z<ReconnectConfig> = z.object({
   maxAttempts: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(RECONNECT_DEFAULTS.maxAttempts),
 })
 
-export const Config = z.union([
+export const Config: z<ConfigInput, Config> = z.union([
   z.object({
     transport: z.const('stdio'),
     serverName: z.string().required().pattern(SERVER_NAME_PATTERN),
@@ -124,6 +131,9 @@ export const Config = z.union([
     args: z.array(String).default([]),
     env: z.dict(String).default({}),
     cwd: z.string().default(''),
+    processGraceMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(2_000),
+    processCloseTimeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(5_000),
+    startupTimeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(120_000),
     toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
     failOnStartupError: z.boolean().default(false),
     maxInstructionBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INSTRUCTION_BYTES),
@@ -139,27 +149,34 @@ export const Config = z.union([
     maxInstructionBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INSTRUCTION_BYTES),
     reconnect: Reconnect,
   }),
-]) as unknown as z<ConfigInput, Config>
+])
 
 // ---- Plugin apply ----
 
+/** Programmatic MCP activation with an explicit, retryable cleanup owner. */
+export interface McpClientHandle {
+  /** Initial connection and catalog readiness; rejects when strict startup fails. */
+  ready: Promise<void>
+  /** Stop the connection and confirm retained local process cleanup. */
+  dispose(): Promise<void>
+}
+
 /**
- * Connect one MCP server and publish its initial tool generation before activation.
- * This entry remains explicitly `async`: Cordis treats a prototype-bearing
- * ordinary function as a constructor, whose returned Promise is not startup work.
- * @param ctx - plugin context carrying the tool registry.
- * @param config - resolved transport and server namespace configuration.
- * @returns startup readiness after connection and initial tool discovery settle.
+ * Mount one MCP client and retain its actual transport cleanup independently of Cordis error reporting.
+ * @param ctx - Plugin context carrying the tool registry and registration owner.
+ * @param config - Resolved transport and namespace configuration.
+ * @returns Startup readiness and cleanup that remains retryable after failure.
  */
-export async function apply(ctx: Context, config: Config): Promise<void> {
+export function mountMcpClient(ctx: Context, config: Config): McpClientHandle {
   // Fail loud at load: reconnect misconfiguration (including programmatic
   // construction that bypassed Schemastery) rejects THIS instance before any
   // effect registers.
   const reconnect = resolveReconnectPolicy(config.reconnect, `mcp-client(${config.serverName}): reconnect`)
+  if (config.transport === 'stdio') resolveMcpProcessLimits(config)
 
   // Reserve the namespace next: a duplicate `serverName` fails THIS instance
   // at load with an actionable error and leaves the earlier instance intact.
-  ctx.effect(() => {
+  const releaseNamespace = ctx.effect(() => {
     const owner = scopeOf(ctx) ?? ctx.root
     let names = activeServerNames.get(owner)
     if (!names) {
@@ -182,6 +199,11 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   registerServerContext(ctx, config.serverName, connection)
   let stopping: Promise<void> | undefined
   const dispose = (): Promise<void> => stopping ??= connection.dispose()
+    .then(async () => { await releaseNamespace() })
+    .catch((error: unknown) => {
+      stopping = undefined
+      throw error
+    })
   // Cordis announces unload before awaiting an unfinished apply(). Closing
   // the transport here releases startup requests that are still awaiting a reply.
   // oxlint-disable-next-line typescript/no-misused-promises -- Cordis contains observer failures; the effect also awaits this promise.
@@ -189,15 +211,27 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     if (fiber !== ctx.fiber || fiber.uid !== null) return
     return dispose()
   }, { global: true })
-  ctx.effect(() => dispose, 'mcp-client.connection')
+  ctx.effect(() => [releaseNamespace, dispose], 'mcp-client.connection')
 
   // Block plugin activation on the initial connection + tool discovery so
   // Cordis consumers observe the tools immediately after the fiber activates.
   // When failOnStartupError is true, a failed initial attempt rejects the
   // fiber (Cordis rolls it back); otherwise the error is logged and the
   // supervisor enters its reconnect loop.
-  const outcome = await connection.ready
-  if (outcome.error !== undefined && config.failOnStartupError) {
-    throw new Error(`mcp-client(${config.serverName}): initial connection or tool synchronization failed`, { cause: outcome.error })
-  }
+  const ready = connection.ready.then((outcome) => {
+    if (outcome.error !== undefined && config.failOnStartupError) {
+      throw new Error(`mcp-client(${config.serverName}): initial connection or tool synchronization failed`, { cause: outcome.error })
+    }
+  })
+  return { ready, dispose }
+}
+
+/**
+ * Connect one MCP server and publish its initial tool generation before activation.
+ * @param ctx - Plugin context carrying the tool registry.
+ * @param config - Resolved transport and server namespace configuration.
+ * @returns After connection and initial tool discovery settle.
+ */
+export async function apply(ctx: Context, config: Config): Promise<void> {
+  await mountMcpClient(ctx, config).ready
 }

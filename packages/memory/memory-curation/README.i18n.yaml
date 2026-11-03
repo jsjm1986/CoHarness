@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/memory/memory-curation/README.md
 document:
-  en: 6a2cc42ede6452c8e814bed16122e6245c5388a3
-  zh: fc830e84c3a16a7f5bc896b17420e311bcc5aa8d
+  en: 03c96b5ff883a05fb493c6a1a6d8358ffdae5699
+  zh: 02b0c7a55bb94bbb6991408bbeda4c59c9bf8b98
 /:
   en: f2e21c3ec8ebec76
   zh: 610ff2190e64272c
 /deepseek-ai-dsh-memory-curation:
-  en: 3bac634ebdf627ba
-  zh: bb7b971db50382c0
+  en: 99240ab62260e1e5
+  zh: f3c8122bd2c14add
 /deepseek-ai-dsh-memory-curation/summary:
   en: fea7996be56ae322
   zh: ada89d1a4f7850e5
@@ -18,23 +18,23 @@ document:
   en: 5db39835773628c9
   zh: 51054db9dd5a5348
 /deepseek-ai-dsh-memory-curation/configuration:
-  en: 542dc7f319d20e80
-  zh: 6095182146e8bdb7
+  en: 0670dc9d6da1a4b6
+  zh: a657761e7bd13ba6
 /deepseek-ai-dsh-memory-curation/extraction:
-  en: 058d20343afa271c
-  zh: 8c4d009ef0ff7ff7
+  en: d8a98ee4b62fa08a
+  zh: 8b9b997d57d9b8b6
 /deepseek-ai-dsh-memory-curation/consolidation:
-  en: ab23002706c530fa
-  zh: eef73357bfb88357
+  en: 45aa3352e168d76b
+  zh: eb4b8291fef60920
 /deepseek-ai-dsh-memory-curation/the-restricted-tool-loop:
-  en: 771870f807cc0f87
-  zh: 4f78052969508352
+  en: 7c74051e4c27df43
+  zh: 3aa89c0800356265
 /deepseek-ai-dsh-memory-curation/cursors-and-attribution:
-  en: 9ac43a95449831d8
-  zh: eef9c903ecd2c879
+  en: 521efd420872edb1
+  zh: b973cde662b4c902
 /deepseek-ai-dsh-memory-curation/invariants:
-  en: 6251d4a34132ffb7
-  zh: 96407ce982cc559a
+  en: bc6353afcb6d0fe0
+  zh: 1490c9b4736f8770
 /deepseek-ai-dsh-memory-curation/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -66,5 +66,5 @@ document:
   en: 83b89f62cdcca357
   zh: d80908e33eb90f20
 /deepseek-ai-dsh-memory-curation/known-limitations-and-deferred-work/dev-note:
-  en: 2842600464d91442
-  zh: b8b5326692ee3653
+  en: 2014edf6d7e87daa
+  zh: 05dd3d1b604d22e6

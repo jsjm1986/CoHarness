@@ -16,7 +16,7 @@ Gateway 启动只对暂时性的 PostgreSQL 连接和服务器不可用错误采
 
 `08006` 是 SQLSTATE 的[连接故障分类](https://www.postgresql.org/docs/17/errcodes-appendix.html)。pg 会在扩展查询 Sync 之后忽略部分 `ECONNRESET` 和 `EPIPE`；连接故障码能够保留该路径的 EOF，无需检查驱动私有状态。其他套接字错误保持原有处理方式。
 
-本地启动器把每个子运行时登记到进程级退出清理集合。同步的进程退出处理器会向仍在运行的本地子进程发送 `SIGKILL`，因此 Gateway 被强制停止时不会留下继续占用分配端口的旧运行时。受控 release 部署还会把 Gateway 与子进程命令固定到同一个不可变 release，并在激活前验证新进程。
+本地启动器采用[独立且可恢复的监督](../architecture/2026-10-25-local-runtime-supervisor.zh.md)。[Runtime 准入](../architecture/2026-10-23-gateway-runtime-admission.zh.md)在协调器初始化时保留尚未确认终止的存活记录。受控 release 部署还会把 Gateway 与子进程命令固定到同一个不可变 release，并在激活前验证新进程。
 
 ## 验证
 
@@ -32,8 +32,8 @@ Gateway 启动只对暂时性的 PostgreSQL 连接和服务器不可用错误采
 
 **把全部数据库重试交给 launchd。** 否决，因为 Gateway 会留下平台特定的启动行为，也无法区分 PostgreSQL 瞬时故障与无效配置。
 
-**只依赖停止阶段的 `stopAll()` 优雅清理。** 否决，因为强制退出、拆卸期间崩溃和 supervisor 截止时间都可能绕过异步清理路径；本地子进程必须有进程退出兜底。
+**只依赖停止阶段的 `stopAll()` 优雅清理。** 否决，因为强制退出、拆卸期间崩溃和 supervisor 截止时间都可能绕过异步清理路径；本地子进程所有权要求独立且可恢复的监督进程。
 
 ## 后果
 
-PostgreSQL 不可用时，Gateway 会保持端口未绑定，直到依赖恢复；因此 `/healthz` 不会虚假地报告健康，而是不可访问。运维仍必须监督 PostgreSQL 容器，并在 Docker 或主机恢复后等待其就绪。本地运行时子进程在进程退出时终止，systemd 管理的运行时继续由其现有 supervisor 负责生命周期。
+PostgreSQL 不可用时，Gateway 会保持端口未绑定，直到依赖恢复；因此 `/healthz` 不会虚假地报告健康，而是不可访问。运维仍必须监督 PostgreSQL 容器，并在 Docker 或主机恢复后等待其就绪。Gateway 正常关闭会等待本地运行时结束；突然终止会保留独立且可恢复的所有者与未经确认的容量。systemd 管理的运行时继续由其现有 supervisor 负责生命周期。

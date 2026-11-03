@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-private-plugin-types-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p plugins/dsh-model-governance/tsconfig.json",
+  "startedAt": "2026-10-24T16:28:04.142699+00:00",
+  "seconds": 2.162,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cc3c736f11486699a31e3fd64f30fa353870749a1db64247b64a6a77d9ab692d",
+  "inputsAfter": "cc3c736f11486699a31e3fd64f30fa353870749a1db64247b64a6a77d9ab692d",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

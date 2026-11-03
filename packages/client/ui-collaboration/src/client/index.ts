@@ -5,8 +5,11 @@
  */
 import { clientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientContext, SessionCreateOptions, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import {
   CollaborationClient, createBrowserCollaborationTransport, conversationProject,
@@ -19,7 +22,11 @@ import { LogoutButton, type LogoutButtonInjected } from './LogoutButton.tsx'
 import {
   ReadOnlyComposer, type ProjectReadOnlyMatch,
 } from './ReadOnlyComposer.tsx'
+import { HeroComputerLabel } from './HeroComputerLabel.tsx'
 import { ScopeControl, type ScopeControlInjected } from './ScopeControl.tsx'
+import { ComputerControl } from './ComputerControl.tsx'
+import { SessionComputerLabel } from './SessionComputerLabel.tsx'
+import { SettingsComputerLabel } from './SettingsComputerLabel.tsx'
 import { StewardChip, type StewardChipInjected } from './StewardChip.tsx'
 import { en, NS, zh, type CollaborationKey } from './locales.ts'
 
@@ -52,7 +59,7 @@ class ProjectReadOnlyError extends Error {
 }
 
 /** Required services for collaboration slots, session creation, and copy. */
-export const inject = ['slots', 'sessions', 'locale']
+export const inject = ['slots', 'sessions', 'locale', 'deploymentContext']
 
 /**
  * Compose Gateway collaboration behavior and presentation.
@@ -61,15 +68,41 @@ export const inject = ['slots', 'sessions', 'locale']
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-collaboration: dictionaries')
 
-  const collaboration = new CollaborationClient(createBrowserCollaborationTransport())
+  const collaboration = new CollaborationClient(createBrowserCollaborationTransport({
+    canNavigate: () => ctx.get('conversation')?.input.hasUnsavedDrafts() !== true,
+  }))
+  ctx.on('conversation/document-admission', (sessionId) => {
+    const snapshot = collaboration.getSnapshot()
+    if (snapshot.context === undefined && snapshot.status === 'unavailable') return
+    if (!snapshot.contextVerified || snapshot.context === undefined) return 'deny'
+    const target = ctx.sessions.runtimeIdentityFor?.(sessionId)
+    const projectId = target?.kind === 'personal' ? undefined : target?.kind === 'project' ? target.projectId : conversationProject(snapshot, sessionId)
+    if (projectId !== undefined) {
+      const project = snapshot.context.projects.find(item => item.projectId === projectId)
+      if (project === undefined || project.mode === 'ro') return 'deny'
+    }
+    const detail = snapshot.conversations[sessionId]
+    if (detail?.status === 'ready' && !detail.detail.access.canWrite) return 'deny'
+    return
+  })
   const projectUiPolicy = ctx.get('projectUiPolicy')
+  const documentIdentityOwned = (ctx.get('connection') as ConnectionHandle | undefined)?.onPrincipalChange !== undefined
   ctx.effect(() => {
-    void collaboration.load()
+    void collaboration.load().then(() => collaboration.loadEnvironments())
     const syncPolicy = (): void => {
       const snapshot = collaboration.getSnapshot()
       const context = snapshot.context
-      projectUiPolicy?.setVerifiedAccountId(snapshot.contextVerified ? context?.user.id : undefined)
+      if (snapshot.contextVerified || !documentIdentityOwned) {
+        projectUiPolicy?.setVerifiedAccountId(snapshot.contextVerified ? context?.user.id : undefined)
+      }
       const scope = context?.scope
+      if (context?.environment !== undefined && snapshot.contextVerified && !snapshot.scopeBusy) {
+        const location = { runtimeId: context.environment.id, nodeId: context.environment.nodeId,
+          ...(context.environment.nodeName === undefined ? {} : { nodeName: context.environment.nodeName }) }
+        ctx.sessions.setBaseRuntimeTarget?.(scope?.kind === 'project'
+          ? { kind: 'project', projectId: scope.projectId, projectName: scope.projectName, ...location }
+          : { kind: 'personal', ...location })
+      }
       const full = context?.user.role === 'admin' && context.fullAccess === true
       const auto = context?.autoReviewEligible === true
       projectUiPolicy?.setAccountPermissions(!snapshot.contextVerified || snapshot.scopeBusy ? 'unknown'
@@ -104,7 +137,7 @@ export function apply(ctx: ClientContext): void {
       return
     }
     collaboration.invalidateContext()
-    void collaboration.refresh()
+    void collaboration.refresh().then(() => collaboration.loadEnvironments())
   })
 
   ctx.on('sessions/prepare-create', async (_options, next): Promise<SessionCreateOptions> => {
@@ -133,17 +166,26 @@ export function apply(ctx: ClientContext): void {
     return collaboration.matchesConversationVisibility(id, expected)
   })
 
-  const hooks = { collaboration }
+  const hooks = { collaboration, deployment: ctx.deploymentContext }
   const logoutInjected = (): LogoutButtonInjected => ({ hooks })
   const scopeInjected = (): ScopeControlInjected => ({
     hooks,
+    refreshDeployment: () => ctx.deploymentContext.invalidate(),
     switchScope: scope => collaboration.switchScope(scope),
+    dismissScopeOffer: () => { collaboration.dismissScopeOffer() },
+    dismissScopeError: () => { collaboration.dismissScopeError() },
+    toggleFavorite: () => { collaboration.toggleCurrentSpaceFavorite() },
+    loadEnvironments: cursor => collaboration.loadEnvironments(cursor),
+    chooseEnvironment: () => { window.location.assign('/?environments=1') },
+    openEnvironmentTab: (runtimeId) => { window.open(`/?dshRuntime=${encodeURIComponent(runtimeId)}`, '_blank', 'noopener,noreferrer') },
+    openEnvironmentPickerTab: () => { window.open('/?environments=1', '_blank', 'noopener,noreferrer') },
     stageVisibility: (visibility: CollaborationVisibility) => { collaboration.stageVisibility(visibility) },
-    createProject: name => collaboration.createProject(name),
+    createProject: (name, nodeId) => collaboration.createProject(name, nodeId),
+    listComputers: () => collaboration.listComputers(),
     listInvitations: projectId => collaboration.listInvitations(projectId),
     inviteMember: (projectId, username, mode) => collaboration.inviteMember(projectId, username, mode),
     acceptInvitation: id => collaboration.acceptInvitation(id),
-    listUsers: () => collaboration.listUsers(),
+    listUsers: projectId => collaboration.listUsers(projectId),
     getInvitationCount: () => collaboration.getInvitationCount(),
     loadProjectConfiguration: projectId => collaboration.loadProjectConfiguration(projectId),
     setProjectThemePolicy: (projectId, policy) => collaboration.setProjectThemePolicy(projectId, policy),
@@ -164,6 +206,29 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: scopeInjected,
   }, ScopeControl))
+
+  ctx.slots.inject('shell.mobile.header.context', () => ctx.slots.register({
+    name: 'shell.mobile.header.context',
+    id: 'collaboration-computer',
+    order: 0,
+    locale: NS,
+    inject: scopeInjected,
+  }, ComputerControl))
+
+  ctx.slots.inject('conversation.hero.context', () => ctx.slots.register({
+    name: 'conversation.hero.context', id: 'collaboration-blank-computer', order: 0, locale: NS, inject: scopeInjected,
+  }, HeroComputerLabel))
+
+  ctx.slots.inject('settings.action', () => ctx.slots.register({
+    name: 'settings.action', id: 'collaboration-settings-computer', order: -20, locale: NS, inject: scopeInjected,
+  }, SettingsComputerLabel))
+
+  ctx.slots.inject('plugins.context', () => ctx.slots.register({
+    name: 'plugins.context', id: 'collaboration-plugin-computer', order: -20, locale: NS, inject: scopeInjected,
+  }, SettingsComputerLabel))
+  ctx.slots.inject('plugins.detail.actions', () => ctx.slots.register({
+    name: 'plugins.detail.actions', id: 'collaboration-plugin-detail-computer', order: -20, locale: NS, inject: scopeInjected,
+  }, SettingsComputerLabel))
 
   ctx.slots.inject('sidebar.settings.action', () => ctx.slots.register({
     name: 'sidebar.settings.action',
@@ -188,6 +253,14 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: conversationInjected,
   }, ConversationShareAction))
+
+  ctx.slots.inject('conversation.session.header.titleMeta', () => ctx.slots.register({
+    name: 'conversation.session.header.titleMeta',
+    id: 'collaboration-session-computer',
+    order: -20,
+    locale: NS,
+    inject: scopeInjected,
+  }, SessionComputerLabel))
 
   ctx.effect(() => {
     let disposeComposer: (() => void) | undefined

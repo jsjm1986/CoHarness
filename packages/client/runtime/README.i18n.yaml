@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/runtime/README.md
 document:
-  en: 766908d58f3a8ea7ebc013bd8055587802dadf3b
-  zh: 316e6e33f911c8b6d98bb17f212ea0ab6cf53bd5
+  en: f0460be8e0e4de04c5bcd2a60aca1a2213de314c
+  zh: cad09f3929ebe25f2ed851afdc074092daa4a916
 /:
   en: d263c68503f0be45
   zh: 61495d48365178df
 /deepseek-ai-dsh-client-runtime:
-  en: 1f107c5ae7c19220
-  zh: 9cd5596a61a06de6
+  en: 10a26838850ac518
+  zh: ca571fe2f1d179fe
 /deepseek-ai-dsh-client-runtime/summary:
   en: 153df193e733af10
   zh: a65fe81e387c717d
@@ -27,8 +27,8 @@ document:
   en: d09f86355b89e9a4
   zh: a00a28e4d51ca12d
 /deepseek-ai-dsh-client-runtime/session-ownership:
-  en: b83b53b88455eae7
-  zh: ad4d4f6e651883db
+  en: e5f7c33f4a2cde86
+  zh: a755e8849249de85
 /deepseek-ai-dsh-client-runtime/workspace-and-session-lists:
   en: 748d904219edec63
   zh: 31aeb2e1f6e18a29
@@ -36,8 +36,8 @@ document:
   en: 0e1c55e0b0fd90f7
   zh: 8832ab88bc9a61c0
 /deepseek-ai-dsh-client-runtime/pending-queue-projection:
-  en: ef9c7d68388e82a7
-  zh: 60a7ac0f7dc07f14
+  en: f3f4a78241f2fdd5
+  zh: 2d7b0f43fb01a702
 /deepseek-ai-dsh-client-runtime/conversation-assembly:
   en: e392518e950dc2f7
   zh: bdec456ff4a5cf44
@@ -69,5 +69,5 @@ document:
   en: 603150ef8ca837d3
   zh: af79fedbfd266873
 /deepseek-ai-dsh-client-runtime/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: 3bb0c20c93f16f98
+  en: 7975b42164513ea8
+  zh: 64b3bd2cbdba963c

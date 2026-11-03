@@ -30,7 +30,8 @@ const initial: AccountPreferencesView = {
   migrated: true,
   values: {
     locale: {},
-    'ui-theme': { preference: 'system' },
+    'ui-theme': { preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+      textFontFamily: '', codeFontFamily: '', terminalFontFamily: '' },
     'ui-conversation': {
       busyEnter: 'queue', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14,
       transcriptView: 'detailed', performanceUsage: 'detailed', linkOpening: 'sidebar',
@@ -54,7 +55,7 @@ function themeView(revision: number, preference: 'light' | 'dark'): AccountPrefe
   return {
     ...initial,
     revision,
-    values: { ...initial.values, 'ui-theme': { preference } },
+    values: { ...initial.values, 'ui-theme': { ...initial.values['ui-theme'], preference } },
     overrides: { ...initial.overrides, 'ui-theme': { preference } },
   }
 }
@@ -81,7 +82,7 @@ function transport(): AccountPreferencesTransport & { calls: AccountPreferenceMu
           [mutation.namespace]: mutation.namespace === 'locale'
             ? (mutation.operation === 'unset' ? {} : { preference: mutation.value as 'zh' | 'en' })
             : mutation.namespace === 'ui-theme'
-              ? { preference: mutation.operation === 'unset' ? 'system' : mutation.value as 'light' | 'dark' | 'system' }
+              ? { ...current.values['ui-theme'], preference: mutation.operation === 'unset' ? 'system' : mutation.value as 'light' | 'dark' | 'system' }
               : {
                 ...current.values['ui-conversation'],
                 [mutation.field]: mutation.operation === 'unset'
@@ -309,7 +310,7 @@ describe('account settings scope', () => {
       mirror.accept({
         ...initial,
         revision,
-        values: { ...initial.values, 'ui-theme': { preference: 'dark' } },
+        values: { ...initial.values, 'ui-theme': { ...initial.values['ui-theme'], preference: 'dark' } },
       })
       const accepted = mirror.getSnapshot()
       expect(describe.mock.calls[0]?.[0]?.aborted).toBe(true)
@@ -579,10 +580,10 @@ describe('account settings scope', () => {
     expect(scope.getSnapshot()).toMatchObject({ status: 'ready', mode: 'account', owner: 'account', writable: true })
     await scope.set('preference', 'dark')
     expect(api.calls[0]).toMatchObject({ namespace: 'ui-theme', operation: 'set', value: 'dark', expectedRevision: 0 })
-    expect(scope.getSnapshot().value).toEqual({ preference: 'dark' })
+    expect(scope.getSnapshot().value).toEqual({ ...initial.values['ui-theme'], preference: 'dark' })
     await scope.unset('preference')
     expect(api.calls[1]).toMatchObject({ namespace: 'ui-theme', operation: 'unset', expectedRevision: 1 })
-    expect(scope.getSnapshot().value).toEqual({ preference: 'system' })
+    expect(scope.getSnapshot().value).toEqual(initial.values['ui-theme'])
     await scope.dispose()
   })
 
@@ -625,7 +626,7 @@ describe('account settings scope', () => {
           revision: current.revision + 1,
           values: {
             ...current.values,
-            'ui-theme': { preference: mutation.value as 'light' | 'dark' | 'system' },
+            'ui-theme': { ...current.values['ui-theme'], preference: mutation.value as 'light' | 'dark' | 'system' },
           },
           overrides: {
             ...current.overrides,
@@ -644,12 +645,12 @@ describe('account settings scope', () => {
     first.resolve({
       ...current,
       revision: 1,
-      values: { ...current.values, 'ui-theme': { preference: 'dark' } },
+      values: { ...current.values, 'ui-theme': { ...current.values['ui-theme'], preference: 'dark' } },
       overrides: { ...current.overrides, 'ui-theme': { preference: 'dark' } },
     })
     await Promise.all([dark, light])
     expect(requests[1]).toMatchObject({ expectedRevision: 1, value: 'light' })
-    expect(scope.getSnapshot().value).toEqual({ preference: 'light' })
+    expect(scope.getSnapshot().value).toEqual({ ...initial.values['ui-theme'], preference: 'light' })
     await scope.dispose()
   })
 
@@ -666,7 +667,7 @@ describe('account settings scope', () => {
         current = {
           ...current,
           revision: current.revision + 1,
-          values: { ...current.values, 'ui-theme': { preference: mutation.value as 'light' | 'dark' | 'system' } },
+          values: { ...current.values, 'ui-theme': { ...current.values['ui-theme'], preference: mutation.value as 'light' | 'dark' | 'system' } },
           overrides: { ...current.overrides, 'ui-theme': { preference: mutation.value as 'light' | 'dark' | 'system' } },
         }
         return structuredClone(current)
@@ -682,7 +683,7 @@ describe('account settings scope', () => {
     expect(requests).toHaveLength(2)
     expect(requests[0]?.expectedRevision).toBe(0)
     expect(requests[1]?.expectedRevision).toBe(1)
-    expect(scope.getSnapshot().value).toEqual({ preference: 'dark' })
+    expect(scope.getSnapshot().value).toEqual({ ...initial.values['ui-theme'], preference: 'dark' })
     expect(scope.getSnapshot().write).toEqual({ status: 'idle' })
     await scope.dispose()
   })
@@ -962,6 +963,33 @@ describe('account settings scope', () => {
     await composite.dispose()
   })
 
+  it('keeps project Host fields read-only while account font controls remain writable', async () => {
+    const accountApi = transport()
+    const mirror = new AccountPreferencesMirror(accountApi)
+    const account = new AccountSettingsScopeController(accountApi, { namespace: 'ui-theme' }, mirror)
+    const host = hostScope()
+    const snapshot = host.getSnapshot()
+    snapshot.writable = false
+    snapshot.writableReason = 'project'
+    const composite = new AccountOrHostSettingsScopeController(account, host, mirror, 'ui-theme')
+    try {
+      await mirror.ensure()
+      expect(composite.getSnapshot()).toMatchObject({ writable: true, mode: 'account' })
+      expect(composite.getFieldControlState('preference')).toMatchObject({ writable: true, mode: 'account' })
+      for (const field of ['fontSize', 'codeFontSize', 'terminalFontSize', 'textFontFamily', 'codeFontFamily', 'terminalFontFamily']) {
+        expect(composite.getFieldControlState(field)).toMatchObject({ writable: true, mode: 'account' })
+      }
+      expect(composite.getFieldControlState('pluginNotes')).toMatchObject({ writable: false, writableReason: 'project', mode: 'host' })
+      snapshot.writable = true
+      snapshot.writableReason = undefined
+      expect(composite.getFieldControlState('fontSize')).toMatchObject({ writable: true, mode: 'account' })
+      expect(composite.getFieldControlState('pluginNotes')).toMatchObject({ writable: true, mode: 'host' })
+    } finally {
+      await composite.dispose()
+      await mirror.dispose()
+    }
+  })
+
   it('keeps the account layer whole for unmapped namespaces and unloaded Host sections', async () => {
     const accountApi = transport()
     const mirror = new AccountPreferencesMirror(accountApi)
@@ -973,7 +1001,7 @@ describe('account settings scope', () => {
     const host: SettingsScope<unknown> = { ...hostScope(), getSnapshot: () => unloaded }
     const composite = new AccountOrHostSettingsScopeController(account, host, mirror, 'ui-theme')
     await mirror.ensure()
-    expect(composite.getSnapshot().value).toEqual({ preference: 'system' })
+    expect(composite.getSnapshot().value).toEqual(initial.values['ui-theme'])
     const unmapped = new AccountOrHostSettingsScopeController(
       new AccountSettingsScopeController(accountApi, { namespace: 'unmapped' }, mirror),
       host,

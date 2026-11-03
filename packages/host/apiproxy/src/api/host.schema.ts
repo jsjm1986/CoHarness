@@ -6,6 +6,10 @@ import { z } from 'zod'
 import type { DirectoryEntry } from './host.ts'
 import type { RequestPayload, ResponseValue } from './rpc-map.ts'
 import type { Wire } from './rpc.schema.ts'
+import type { ClientComputerId, ClientRuntimeId } from './client-session.ts'
+
+const runtimeId = z.uuid().transform(value => value as ClientRuntimeId)
+const computerId = z.uuid().transform(value => value as ClientComputerId)
 
 /** host.describe request payload (empty object literal). */
 export const hostDescribeRequestSchema = z.object({}) satisfies z.ZodType<Wire<RequestPayload<'host.describe'>>>
@@ -21,9 +25,10 @@ export const hostDescribeValueSchema = z.object({
   canOpenPath: z.boolean(),
   fileManager: z.enum(['finder', 'explorer', 'directory']).nullable().optional(),
   executionAuthorityRequired: z.boolean().optional(),
+  computerUseUnavailableReason: z.enum(['headless', 'disabled']).optional(),
   runtimeTarget: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('personal') }),
-    z.object({ kind: z.literal('project'), projectId: z.number().int().positive() }),
+    z.object({ kind: z.literal('personal'), runtimeId: runtimeId.optional(), nodeId: computerId.optional(), nodeName: z.string().optional() }),
+    z.object({ kind: z.literal('project'), projectId: z.number().int().positive(), runtimeId: runtimeId.optional(), nodeId: computerId.optional(), nodeName: z.string().optional() }),
   ]).optional(),
   workspaceFiles: z.object({
     maxBytes: z.number().int().positive(),

@@ -1,0 +1,14 @@
+{
+  "name": "activity-note-crossreference-pair",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-17-project-activity-feed.md",
+  "startedAt": "2026-10-23T21:47:05.770984+00:00",
+  "seconds": 3.038,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "65eaa7a1e5bd93ac190ebe33e40483a57e75b9e4ebec9961843211f862307e4d",
+  "inputsAfter": "65eaa7a1e5bd93ac190ebe33e40483a57e75b9e4ebec9961843211f862307e4d",
+  "postgresToolDirectory": null,
+  "outputSha256": "6a94e29c171d9c831d8c989db2c5d739a824a380bf72672668faee0ecf58ec22",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/feature/2026-10-17-project-activity-feed.md\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-10-17-project-activity-feed.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

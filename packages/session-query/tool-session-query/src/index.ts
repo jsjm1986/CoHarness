@@ -16,6 +16,8 @@ import { toolInput } from './input.ts'
 import { operations } from './operations.ts'
 import { presentation } from './presentation.ts'
 
+export type { SessionHandoffLlmRequestEventData } from './handoff.ts'
+
 /** Cordis plugin name used by Loader diagnostics. */
 export const name = 'tool-session-query'
 

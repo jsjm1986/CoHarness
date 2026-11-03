@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-preparation-browser-types-final",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.browser.json --noEmit",
+  "startedAt": "2026-10-24T23:36:07.594757+00:00",
+  "seconds": 3.506,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a0d86acc16e7427c0c08b6f641c0e08be8a16c49e7580a85af667fbf17ab1395",
+  "inputsAfter": "a0d86acc16e7427c0c08b6f641c0e08be8a16c49e7580a85af667fbf17ab1395",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

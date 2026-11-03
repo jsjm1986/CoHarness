@@ -1,0 +1,13 @@
+{
+  "name": "ssh-admission-owner-catalog",
+  "cwd": ".",
+  "command": "pnpm run gen-cordis-catalog",
+  "startedAt": "2026-10-23T15:20:24.317400+00:00",
+  "seconds": 8.432,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1ecccef50bd1d3a57e70e3675a0da9118d95c7c71b4d12d43b0fbb491481a07d",
+  "inputsAfter": "f3c1e9e48582a11fbadf44c5abfa656816edfc91ab223b7c3392080c6a27a76c",
+  "outputSha256": "94463d24954458d406d08e362357e5e436793a5a9077e4dcc2f789ee60181622",
+  "outputTail": "$ tsx scripts/gen-cordis-catalog.ts\ngen-cordis-catalog: 127 artifact(s) computed, 3 written.\n"
+}

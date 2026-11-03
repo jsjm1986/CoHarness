@@ -1,0 +1,23 @@
+{
+  "seedReply": "WORKFLOW_SEED_READY",
+  "reply": "WORKFLOW_ROUTE_OK",
+  "before-first": {
+    "mode": "before-first",
+    "oldProviderStarts": 0,
+    "originalDisposed": false,
+    "forkChildren": 0,
+    "inheritedSeed": false,
+    "failed": true,
+    "routeChanged": true
+  },
+  "ralph-round": {
+    "mode": "ralph-round",
+    "oldProviderStarts": 1,
+    "originalDisposed": true,
+    "forkChildren": 0,
+    "inheritedSeed": false,
+    "failed": true,
+    "routeChanged": true
+  },
+  "guardMessage": "subagent provider \"route-child\" changed after workflow admission; start a new workflow"
+}

@@ -36,7 +36,9 @@ declare const text: string
 await writeFileAtomic('/home/u/.dsh/cordis.patch.yml', text, { mode: 0o600 })
 ```
 
-Parent directories are created as needed, and readers observe either the old or the new complete content. On Windows, transient replacement interference reported as `EACCES`, `EBUSY`, or `EPERM` is retried for a bounded interval; any remaining failure removes the temporary file and leaves the target untouched.
+Parent directories are created as needed, and readers observe either the old or the new complete content. On Windows, transient replacement interference reported as `EACCES`, `EBUSY`, or `EPERM` is retried for a bounded interval; a failed acquisition preserves an occupying temporary entry. Failures after acquisition remove the owned temporary file and leave the target untouched; independent cleanup failures are retained together.
+
+A privileged writer may pass `owner: { uid, gid }` to assign the replacement inode to a local account before publication. The caller resolves that account and provisions directory access. Assignment failure prevents replacement and cleans up the acquired temporary file.
 
 ### Coordinating writers
 
@@ -55,6 +57,8 @@ await withFileLock('/home/u/.dsh/cordis.patch.yml', async () => {
 ```
 
 Only writers contend — readers never take the lock — and a contender backs off exponentially and fails with a timed-out error rather than blocking forever. How long a contender waits is stated per call through `waitMs`: the default is sized for file work alone, so a holder whose cycle includes a network round trip — a credential mutation that refreshes an expired token — states a longer one, because leaving the default would fail every other writer of that file for the duration. The retry cadence stays fixed. A contender removes an existing lock only when the lock names a process that no longer exists; file age alone never removes a lock.
+
+`withFileLock` accepts the same optional `owner` for its lock and recovery claims. Account assignment completes before the operation begins; a failed write, assignment or close removes the acquired lock and retains independent failures.
 
 ### Failures to plan for
 
@@ -83,6 +87,8 @@ The package is built on one separation: the atomic commit owns the swap, and the
 `writeFileAtomic` writes a random-suffix sibling opened with exclusive create (`wx`), then renames it over the target. The exclusive open refuses to follow a symlink planted at a guessable temp path; the same-directory sibling keeps the rename on one filesystem; and the rename replaces a symlinked target itself instead of writing through to its referent. A Windows retry keeps the same complete sibling and uses bounded exponential backoff, so temporary use of the target by software outside the cooperative writer lock cannot turn a safe replacement into an immediate failure; the archived [retry decision record](../../../.agents/notes/archived/bug-fix/2026-08-29-windows-atomic-replace-retry.md) documents the original rationale and rejected alternatives.
 
 `withFileLock` creates a `<filename>.lock` sibling with `wx`. `EEXIST` identifies contention directly; `EPERM` does so only when a fresh `lstat` confirms the lock path exists, covering Windows exclusive-create behavior without hiding an unrelated permission failure. The lock records its creator's PID as `<pid>\n` and is removed by the holder in a `finally`. A contender that reads a record whose PID a signal probe reports as absent (`ESRCH`) creates a `<filename>.lock.takeover-<record hash>` claim with `wx`, re-reads the lock and probes its PID again, removes it only if it still holds the same record and that PID is still absent, removes the claim, and retries at once. A claim whose recorded process exited is recovered with the same record-specific claim protocol before the original takeover is retried; this also recovers chains left by interrupted recoveries. A holder that exists under another user (`EPERM`) and a record naming the contender's own process are waited for. Contenders that read the same record contend for one claim, and the second probe rejects a holder that reused the exited PID, so a takeover never removes a lock that another contender acquired after the exited holder's. Takeover proves only that the recorded process exited; an operation that starts other writers leaves its successor a way to find them, as the [Plugin Manager](../../boot/plugin-manager/README.md) does for its pnpm runs. Contention backs off exponentially and fails when the per-call `waitMs` deadline (default two seconds) passes; the takeover decision record owns the rationale.
+
+`writeFileAtomic` accepts an optional caller-owned `signal`. Cancellation is checked before preparation and each rename attempt, including Windows retries; cancellation after staging removes the acquired temporary file. An already issued rename can commit, so callers reconcile current state after an ambiguous outcome.
 
 ### Why the swap stays safe
 

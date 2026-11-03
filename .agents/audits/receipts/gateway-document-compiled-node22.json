@@ -1,0 +1,14 @@
+{
+  "name": "gateway-document-compiled-node22",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 /Users/a1234/.nvm/versions/node/v22.22.1/bin/node gateway/tests/fixtures/document-stream-built.mjs",
+  "startedAt": "2026-10-26T20:14:02.770998+00:00",
+  "seconds": 1.233,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c9c0e0eee1cb02236f468d2947e8cbea5834d67a33515adb83dbb267d002d9db",
+  "inputsAfter": "c9c0e0eee1cb02236f468d2947e8cbea5834d67a33515adb83dbb267d002d9db",
+  "postgresToolDirectory": null,
+  "outputSha256": "a630fb9272121f032af56261c1be0e6445c230c62102f082a3dbedca46d3371e",
+  "outputTail": "node:internal/modules/package_json_reader:314\n  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);\n        ^\n\nError [ERR_MODULE_NOT_FOUND]: Cannot find package '@deepseek-ai/dsh-util-values' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/lib/runtime-document-store.js\n    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)\n    at packageResolve (node:internal/modules/esm/resolve:768:81)\n    at moduleResolve (node:internal/modules/esm/resolve:855:18)\n    at defaultResolve (node:internal/modules/esm/resolve:985:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)\n    at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)\n    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)\n    at ModuleJob._link (node:internal/modules/esm/module_job:182:49) {\n  code: 'ERR_MODULE_NOT_FOUND'\n}\n\nNode.js v22.22.1\n"
+}

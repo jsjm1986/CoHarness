@@ -1,6 +1,6 @@
 // Menu: minimal controlled dropdown (group-by pickers, project selectors).
 // Default: pure CSS positioning relative to the anchor wrapper — no popper.
-// Opt-in `portal` renders the list into document.body, fixed-positioned from
+// Opt-in `portal` renders the list into its containing dialog or document.body, fixed-positioned from
 // the anchor rect, for anchors inside overflow-clipping containers (sidebar).
 // The owner controls `open`; outside-click closing uses one document listener
 // active only while open. Submenus open on hover/focus inside the same root.
@@ -134,10 +134,10 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * @param props.selectedId - row shown as selected.
  * @param props.selectedIds - rows shown as selected when a menu contains independent option groups.
  * @param props.onSelect - row click callback (not called for disabled rows or submenu parents that only open children).
- * @param props.onClose - invoked on outside click, Escape, or a hidden owning region.
+ * @param props.onClose - invoked on outside click, Escape, a hidden owning region, or focus entering a foreground modal.
  * @param props.align - list alignment against the anchor (default 'start').
  * @param props.side - open below (`bottom`, default) or above (`top`) the anchor.
- * @param props.portal - render the list into document.body, fixed-positioned
+ * @param props.portal - render the list into its containing dialog or document.body, fixed-positioned
  * from the anchor rect (repositions on scroll/resize while open). Use when an
  * ancestor's overflow clipping would crop the in-place list; default false
  * keeps the pure-CSS in-place behavior.
@@ -322,7 +322,7 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
   }, [open])
 
   useEffect(() => {
-    if (!open || !autoFocus) return
+    if (!open || !autoFocus || isBehindModal(rootRef.current)) return
     const first = listRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')
     walkIndex.current = first === undefined || first === null ? null : 0
     if (first != null) focusWithoutRing(first)
@@ -334,7 +334,9 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
       walkIndex.current = null
       return
     }
+    if (isBehindModal(rootRef.current)) { onCloseRef.current(); return }
     const composition = observeComposition(document)
+    const onFocusIn = (): void => { if (isBehindModal(rootRef.current)) onCloseRef.current() }
     const onPointerDown = (e: PointerEvent) => {
       if (!(e.target instanceof Node)) return
       // The portaled list is outside the anchor subtree; check both.
@@ -422,6 +424,7 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
       if (document.activeElement instanceof HTMLIFrameElement) onCloseRef.current()
     }
     document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('focusin', onFocusIn)
     const onEscape = (event: KeyboardEvent): void => { if (event.key === 'Escape') onKeyDown(event) }
     const onOtherKey = (event: KeyboardEvent): void => { if (event.key !== 'Escape') onKeyDown(event) }
     document.addEventListener('keydown', onOtherKey)
@@ -430,6 +433,7 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
     return () => {
       composition.dispose()
       document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('focusin', onFocusIn)
       document.removeEventListener('keydown', onOtherKey)
       document.removeEventListener('keydown', onEscape, true)
       window.removeEventListener('blur', onWindowBlur)
@@ -580,7 +584,7 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
     >
       {anchor}
       {portal
-        ? (list !== false && createPortal(<>{mobileScrim}{list}</>, document.body))
+        ? (list !== false && createPortal(<>{mobileScrim}{list}</>, rootRef.current?.closest('[role="dialog"], dialog[open]') ?? document.body))
         : <>{mobileScrim}{list}</>}
     </span>
   )

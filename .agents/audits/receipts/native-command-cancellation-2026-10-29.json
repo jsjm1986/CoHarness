@@ -1,0 +1,257 @@
+{
+  "recordedAt": "2026-10-29T11:25:22.513205+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "findings": [
+    "B312"
+  ],
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z",
+  "negativeEvidence": {
+    "name": "native-command-cancellation-causal-before",
+    "status": "failed",
+    "startedAt": "2026-10-29T11:07:54.206464+00:00",
+    "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+    "command": [
+      "node_modules/.bin/vitest",
+      "run",
+      "packages/util/native-command/tests/cancellation.spec.ts",
+      "--maxWorkers=2"
+    ],
+    "exitCode": 1,
+    "finishedAt": "2026-10-29T11:07:55.258857+00:00",
+    "observedFailure": "Real POSIX helper remains alive after ABORT_ERR; fixture readiness proves its SIGTERM handler was already installed."
+  },
+  "repair": "Retain native helper ownership until close; an explicit addAbortListener force-kills on cancellation because execFile does not forward killSignal to its AbortSignal spawn path. Dispose the abort listener on close.",
+  "validation": {
+    "checks": [
+      {
+        "name": "native-command-consumer-full-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T11:14:37.743023+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/util/native-command/tests",
+          "packages/host/directory-picker-native/tests",
+          "packages/host/open-in-app/tests",
+          "packages/bundle/web-app/tests",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/util/native-command/src/runner.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/native-command-coverage-complete"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T11:14:52.354649+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/native-command-consumer-full-coverage.log"
+      },
+      {
+        "name": "native-command-snapshot-and-json-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T11:19:33.451311+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/util/native-command/tests/cancellation.spec.ts",
+          "packages/util/native-command/tests/native-command.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/util/native-command/src/runner.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/native-command-coverage-json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T11:19:42.966804+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/native-command-snapshot-and-json-coverage.log"
+      },
+      {
+        "name": "native-command-declarations",
+        "status": "passed",
+        "startedAt": "2026-10-29T11:16:29.475330+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "-b",
+          "packages/util/native-command/tsconfig.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T11:16:29.544918+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/native-command-declarations.log"
+      },
+      {
+        "name": "native-command-public-bundle",
+        "status": "passed",
+        "startedAt": "2026-10-29T11:18:05.698205+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsdown",
+          "--env.DSH_BUILD_FACE",
+          "host",
+          "--filter",
+          "@deepseek-ai/dsh-native-command",
+          "--concurrency",
+          "1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T11:18:10.702614+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/native-command-public-bundle.log"
+      },
+      {
+        "name": "native-command-public-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T11:19:33.142628+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/run-native-command-public.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T11:19:33.271874+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/native-command-public-node22.log"
+      },
+      {
+        "name": "native-command-public-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T11:19:33.294626+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/run-native-command-public.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T11:19:33.415610+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/native-command-public-node24.log"
+      },
+      {
+        "name": "native-command-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-29T11:18:05.698205+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "packages/util/native-command/src/runner.ts",
+          "packages/util/native-command/tests/cancellation.spec.ts",
+          "packages/util/native-command/tests/path-opener.spec.ts",
+          "packages/host/directory-picker-native/tests/native-picker.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T11:18:12.138835+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/native-command-scoped-lint.log"
+      },
+      {
+        "name": "native-command-host-typecheck",
+        "status": "passed",
+        "startedAt": "2026-10-29T11:20:10.463016+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "-b",
+          "tsconfig.host.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T11:21:16.478907+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/native-command-host-typecheck.log"
+      },
+      {
+        "name": "native-command-doc-quick",
+        "status": "passed",
+        "startedAt": "2026-10-29T11:20:10.462996+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T11:21:58.375517+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/native-command-doc-quick.log"
+      }
+    ],
+    "consumerCases": {
+      "passed": 242,
+      "skipped": 3,
+      "scope": "Native command, path opening, application resolution, directory picking and browser-opening source suites; platform-specific native tests remain skipped on this macOS host."
+    },
+    "coverage": {
+      "lines": {
+        "total": 12,
+        "covered": 12,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 15,
+        "covered": 15,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 7,
+        "covered": 7,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 2,
+        "covered": 2,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "thresholdsLowered": false,
+    "ignoresAdded": false,
+    "keylessProcessSnapshot": "packages/util/native-command/tests/expected/cancellation.jsonl",
+    "publicArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T100353Z/native-command-public-artifact.json",
+    "nativeVersions": [
+      "Node22.22.1",
+      "Node24.19.0"
+    ],
+    "testFixtureCorrection": "Old execFile adapters invoked callbacks synchronously and returned no ChildProcess. Their stubs now return a ChildProcess and emit asynchronous callback/close. No product fallback was added for invalid mocks."
+  },
+  "noteReview": {
+    "decision": "New ownership rationale remains active; no full supersession.",
+    "keptActive": [
+      ".agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.md",
+      ".agents/notes/implemented/simplification/2026-08-04-drop-windows-powershell-picker-fallback.md",
+      ".agents/notes/implemented/bug-fix/2026-10-04-open-in-app-local-runtime-gate.md"
+    ],
+    "reason": "Interaction composition, Windows COM backend choice and local Runtime authorization remain independent decisions.",
+    "archived": [],
+    "deleted": []
+  },
+  "resourceClassification": "Host-native GUI/detection helper outside Session model/process workload admission. The direct helper is owned until close; desktop-handoff applications have independent lifetimes.",
+  "paths": [
+    "packages/util/native-command/src/runner.ts",
+    "packages/util/native-command/tests/cancellation.spec.ts",
+    "packages/util/native-command/tests/expected/cancellation.jsonl",
+    "packages/util/native-command/tests/path-opener.spec.ts",
+    "packages/host/directory-picker-native/tests/native-picker.spec.ts",
+    "packages/util/native-command/README.md",
+    "packages/util/native-command/README.zh.md",
+    "packages/util/native-command/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-29-native-command-cancellation.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-native-command-cancellation.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-29-native-command-cancellation.i18n.yaml"
+  ],
+  "limitations": [
+    "Native Windows desktop and Linux desktop integration were not established by portable or mocked source tests.",
+    "B04 complete allocation/authority review, B25 Linux/systemd containment and the12 full audit domains remain open.",
+    "Human-deferred real provider API and public-cloud push validation remain deferred."
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "managed-copy-no-new-assertions",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-no-unknown-casts.ts",
+  "startedAt": "2026-10-25T11:12:41.538310+00:00",
+  "seconds": 36.087,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f228954b1842b443f207e7162d90835ebf91682da826eafc97713819e126d7c2",
+  "inputsAfter": "f228954b1842b443f207e7162d90835ebf91682da826eafc97713819e126d7c2",
+  "postgresToolDirectory": null,
+  "outputSha256": "78bcf14320b68ce5ff8ac0b90ea8f46b8c16c654b570dacc83e8c7394c47a8ed",
+  "outputTail": "verify-no-unknown-casts: no new assertions; 1866 existing assertions remain.\n"
+}

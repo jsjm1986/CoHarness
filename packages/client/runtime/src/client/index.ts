@@ -1,3 +1,5 @@
+import { DeploymentContextRuntime } from './deployment-context.ts'
+export type { ClientDeploymentContext, DeploymentContextSnapshot } from './deployment-context.ts'
 /** Browser runtime services for slots, sessions, workspaces, and connection-stream delivery. */
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
@@ -13,6 +15,8 @@ import { SessionRuntime } from './sessions/service.ts'
 import { SessionRuntimePool } from './sessions/pool.ts'
 import type { SessionListState } from './sessions/service.ts'
 import { WorkspaceRuntime } from './workspaces/service.ts'
+import { installPersonalDirectory } from './personal-directory.ts'
+import { createRuntimeEnvironments } from './runtime-environments.ts'
 import type { ConversationSnapshot } from './sessions/conversation.ts'
 import type { SessionBlankReuseRequest, SessionCreateOptions } from './contract/session-create.ts'
 import type { UseProjection } from './sessions/projection-store.ts'
@@ -24,8 +28,9 @@ import { WorkspaceResourceRegistry } from './workspace-resources.ts'
 
 export { isAppendSurfaceEvent, isReplacementSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
 
-export { clientSessionKey, parseClientSessionKey, runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+export { clientSessionKey, parseClientSessionKey, runtimeTargetKey, addressRuntimeUrl } from '@deepseek-ai/dsh-host-apiproxy/api'
 export type { ClientSessionAddress, ClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+export type { RuntimeEnvironment,RuntimeEnvironments } from './runtime-environments.ts'
 
 export { NavigationController, commitSessionNavigation } from './navigation.ts'
 export { SlotRegistry } from './slots.ts'
@@ -65,7 +70,7 @@ export type {
   SettingsControlState, SettingsOwner, SettingsScope, SettingsScopeSnapshot, SettingsScopeSource, SettingsScopeSpec,
   SettingsWritableReason, SettingsWriteState,
 } from './contract/settings-scope.ts'
-export { settingsControlState } from './contract/settings-scope.ts'
+export { settingsControlState, settingsFieldControlState } from './contract/settings-scope.ts'
 export { onSettingsNavigation, requestSettingsSection } from './contract/settings-navigation.ts'
 export type { SettingsNavigationRequest } from './contract/settings-navigation.ts'
 export { sessionPersistenceKey } from './session-persistence.ts'
@@ -308,8 +313,12 @@ declare module '@deepseek-ai/cordis' {
     workspaces: import('./contract/workspaces.ts').IWorkspaces
     /** Active project UI policy shared by theme and project settings surfaces. */
     projectUiPolicy: import('./project-policy.ts').ProjectUiPolicyRuntime
+    /** Browser-ingress deployment policy; independent of the selected Runtime. */
+    deploymentContext: DeploymentContextRuntime
     /** Per-runtime permission preset catalog directory; one mirror per pooled connection. */
     permissionCatalog: import('./permission-catalog.ts').PermissionCatalogDirectory
+    /** Passive authorized management destinations; subscribing never starts a Runtime. */
+    runtimeEnvironments: import('@deepseek-ai/dsh-client-ui-slots').HostObservable<import('./runtime-environments.ts').RuntimeEnvironments>
     /** Metadata-only Workspace resource registry; providers bind one runtime target. */
     workspaceResources: WorkspaceResourceRegistry
     /** Optional provider for the multi-session conversation viewport. */
@@ -329,6 +338,9 @@ export function apply(ctx: Context): void {
   const workspaceResources = new WorkspaceResourceRegistry()
   ctx.provide('workspaceResources', workspaceResources)
   const connection = ctx.get('connection') as ConnectionHandle
+  const deploymentContext = new DeploymentContextRuntime(connection.metadataTiming)
+  ctx.provide('deploymentContext', deploymentContext)
+  ctx.effect(() => deploymentContext.start(connection, ctx.projectUiPolicy), 'runtime: entry deployment context')
   const conversation = {
     events: new ConversationEventRegistry(ctx),
     views: new ConversationViewRegistry(ctx),
@@ -369,6 +381,8 @@ export function apply(ctx: Context): void {
     },
   })
   const workspaces = new WorkspaceRuntime(ctx, connection.api, sessions)
+  const personalDirectory = installPersonalDirectory(ctx, connection, sessions, workspaces)
+  ctx.provide('runtimeEnvironments', createRuntimeEnvironments(ctx, connection, sessions, workspaces, deploymentContext, personalDirectory))
   ctx.effect(
     () => workspaces.startInitialSelection(),
     'runtime: initial Workspace selection',

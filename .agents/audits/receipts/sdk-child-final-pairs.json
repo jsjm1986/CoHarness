@@ -1,0 +1,14 @@
+{
+  "name": "sdk-child-final-pairs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md",
+  "startedAt": "2026-10-24T10:40:22.352753+00:00",
+  "seconds": 0.928,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d8c547a1cae7caebb1da3694c00a38c44cdeb3944104b6bfd12c217688babea0",
+  "inputsAfter": "d8c547a1cae7caebb1da3694c00a38c44cdeb3944104b6bfd12c217688babea0",
+  "postgresToolDirectory": null,
+  "outputSha256": "93feb1483397bbb3ce4695a864c158ca3b2cfbc06bcbcca9bc8b5e53c815295a",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

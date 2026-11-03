@@ -4,10 +4,14 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { createHmac, createPublicKey, timingSafeEqual, verify as verifySignature, type KeyObject } from 'node:crypto'
+import { createHmac, createPublicKey, randomUUID, timingSafeEqual, verify as verifySignature, type KeyObject } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Context, FiberState, Service } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/cordis-plugin-loader'
+import Schema from '@deepseek-ai/schemastery'
+import { publishWorkspaceCatalog } from './workspace-catalog.ts'
+import { launchAuthorityOf } from './launch-authority.ts'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type {
   ConnectionAuthenticationRequest,
@@ -19,6 +23,24 @@ import type {} from '@deepseek-ai/dsh-execution-authority'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { StreamPrincipalLeasePool, type StreamPrincipalRenewalConfig } from './stream-principal-leases.ts'
 export type { StreamPrincipalRenewalConfig } from './stream-principal-leases.ts'
+import type {} from '@deepseek-ai/dsh-resource-budget'
+import type {} from '@deepseek-ai/dsh-model-access'
+import type {} from '@deepseek-ai/dsh-host-apiproxy'
+import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { agentCarrier } from '@deepseek-ai/dsh-agent'
+import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+
+const runtimeExecutionNamespace = settingsNamespace('runtime-execution')
+interface RuntimeExecutionSettings { mode: 'resident' | 'on-demand' }
+const runtimeExecutionSchema: Schema<RuntimeExecutionSettings> = Schema.object({
+  mode: Schema.union([
+    Schema.const('resident').extra('description', { en: 'Keep running', zh: '保持运行' }),
+    Schema.const('on-demand').extra('description', { en: 'On demand', zh: '按需运行' }),
+  ]).default('resident').extra('description', {
+    en: 'Keep resident for timers and listeners. On-demand requires plugins to report background obligations.',
+    zh: '定时任务和持续监听应保持运行；按需仅适用于已声明后台占用的插件。',
+  }),
+})
 
 /** HTTP header carrying one Gateway-signed browser principal. */
 export const GATEWAY_PRINCIPAL_HEADER = 'x-dsh-gateway-principal'
@@ -40,6 +62,8 @@ export interface GatewayRuntimeIdentity {
   readonly kind: 'user' | 'project'
   readonly id: number
   readonly generation: number
+  /** Stable allocated environment; absent only in legacy single-assignment compositions. */
+  readonly runtimeId?: Branded<'GatewayRuntimeId'>
 }
 
 /** Scope selected by the authenticated browser request. */
@@ -103,6 +127,8 @@ export function GatewaySessionCreationAuthorization(value: string): GatewaySessi
 
 /** Options for one authenticated call to the Gateway's internal runtime API. */
 export interface GatewayRuntimeRequestInit extends RequestInit {
+  /** Node's half-duplex upload mode, required when the body is a ReadableStream. */
+  duplex?: 'half'
   /** Forward the current browser principal when this operation needs user authority. */
   principal?: boolean | GatewayRequestPrincipal
 }
@@ -135,10 +161,21 @@ function record(value: unknown): Record<string, unknown> | undefined {
 function positiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
+
+function validRuntimeId(value: unknown): boolean {
+  return value === undefined || typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(value)
+}
 /* jscpd:ignore-end */
 
 function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
+}
+
+/** Request cancellation without waiting for another branch of a shared body. */
+function cancelResponseRead(source: { cancel(): Promise<void> }): void {
+  void source.cancel().catch((_cancellationFailure: unknown) => {
+    // The read has already failed; cleanup acknowledgement cannot replace its cause.
+  })
 }
 
 /** Read one response chunk while allowing the caller to cancel the body. */
@@ -148,7 +185,7 @@ async function readResponseChunk(
 ): Promise<ReadableStreamReadResult<Uint8Array>> {
   if (signal === undefined) return reader.read()
   if (signal.aborted) {
-    await reader.cancel().catch(() => {})
+    cancelResponseRead(reader)
     throw signal.reason instanceof Error ? signal.reason : new Error('Gateway response read was cancelled', { cause: signal.reason })
   }
   return new Promise((resolve, reject) => {
@@ -162,7 +199,7 @@ async function readResponseChunk(
     }
     const onAbort = (): void => {
       if (!finish()) return
-      void reader.cancel().catch(() => {})
+      cancelResponseRead(reader)
       reject(signal.reason instanceof Error ? signal.reason : new Error('Gateway response read was cancelled', { cause: signal.reason }))
     }
     signal.addEventListener('abort', onAbort, { once: true })
@@ -179,6 +216,7 @@ async function readResponseChunk(
  * Read a private Gateway response without retaining more than the supplied
  * byte budget. The caller owns JSON validation; this helper only bounds the
  * response body and preserves the response stream's cancellation semantics.
+ * Failed reads request body cancellation without awaiting its acknowledgement.
  * @param response - response returned by {@link GatewayRuntime.request}.
  * @param limit - positive safe-integer UTF-8 byte budget.
  * @param signal - optional cancellation for the response body read.
@@ -190,12 +228,15 @@ export async function readGatewayResponseBytes(
   signal?: AbortSignal,
 ): Promise<Uint8Array> {
   if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError('Gateway response byte limit must be a positive safe integer')
-  signal?.throwIfAborted()
+  if (signal?.aborted) {
+    if (response.body !== null) cancelResponseRead(response.body)
+    signal.throwIfAborted()
+  }
   const declared = response.headers.get('content-length')
   if (declared !== null) {
     const length = Number(declared)
     if (!Number.isSafeInteger(length) || length < 0 || length > limit) {
-      await Promise.resolve(response.body?.cancel()).catch(() => {})
+      if (response.body !== null) cancelResponseRead(response.body)
       throw new GatewayResponseTooLargeError(limit)
     }
   }
@@ -209,7 +250,7 @@ export async function readGatewayResponseBytes(
       if (next.done) break
       total += next.value.byteLength
       if (!Number.isSafeInteger(total) || total > limit) {
-        await reader.cancel().catch(() => {})
+        cancelResponseRead(reader)
         throw new GatewayResponseTooLargeError(limit)
       }
       chunks.push(next.value)
@@ -288,12 +329,17 @@ export function parseGatewayRuntimeCredential(value: unknown): GatewayRuntimeCre
     || !nonEmptyString(credential.organization) || !nonEmptyString(credential.token)
     || !nonEmptyString(credential.principalPublicKey)
     || (runtime?.kind !== 'user' && runtime?.kind !== 'project')
-    || !positiveInteger(runtime.id) || !positiveInteger(runtime.generation)) {
+    || !positiveInteger(runtime.id) || !positiveInteger(runtime.generation) || !validRuntimeId(runtime.runtimeId)) {
     throw new Error('invalid Gateway runtime credential')
   }
-  const gatewayUrl = new URL(credential.gatewayUrl)
+  let gatewayUrl: URL
+  try {
+    gatewayUrl = new URL(credential.gatewayUrl)
+  } catch {
+    throw new Error('Gateway runtime credential must name a loopback HTTP origin')
+  }
   if (gatewayUrl.protocol !== 'http:'
-    || (gatewayUrl.hostname !== '127.0.0.1' && gatewayUrl.hostname !== '::1' && gatewayUrl.hostname !== 'localhost')
+    || (gatewayUrl.hostname !== '127.0.0.1' && gatewayUrl.hostname !== '[::1]' && gatewayUrl.hostname !== 'localhost')
     || gatewayUrl.username !== '' || gatewayUrl.password !== ''
     || gatewayUrl.pathname !== '/' || gatewayUrl.search !== '' || gatewayUrl.hash !== '') {
     throw new Error('Gateway runtime credential must name a loopback HTTP origin')
@@ -322,6 +368,7 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     || (scope?.kind !== 'personal' && scope?.kind !== 'project')
     || (runtime?.kind !== 'user' && runtime?.kind !== 'project')
     || !positiveInteger(runtime.id) || !positiveInteger(runtime.generation)
+    || !validRuntimeId(runtime.runtimeId)
     || typeof claims.issuedAt !== 'number' || !Number.isSafeInteger(claims.issuedAt) || claims.issuedAt < 0
     || typeof claims.expiresAt !== 'number' || !Number.isSafeInteger(claims.expiresAt)
     || claims.expiresAt <= claims.issuedAt || !nonEmptyString(claims.nonce)) {
@@ -378,6 +425,7 @@ export function verifyGatewayPrincipal(
     || claims.runtime.kind !== credential.runtime.kind
     || claims.runtime.id !== credential.runtime.id
     || claims.runtime.generation !== credential.runtime.generation
+    || claims.runtime.runtimeId !== credential.runtime.runtimeId
     || claims.issuedAt > now || claims.expiresAt <= now) {
     throw new Error('expired or foreign Gateway principal assertion')
   }
@@ -409,15 +457,24 @@ function credentialText(env: NodeJS.ProcessEnv): string {
 
 /**
  * Read the launch credential from its private process channel.
+ * Each call consumes the selected descriptor; application providers retain the validated result.
  * @param env - process environment naming exactly one credential source.
  * @returns the validated private runtime credential.
+ * @throws when the channel or credential is invalid; JSON diagnostics omit credential contents.
  */
 export function readGatewayRuntimeCredential(env: NodeJS.ProcessEnv = process.env): GatewayRuntimeCredential {
-  let value: unknown
+  let text: string
   try {
-    value = JSON.parse(credentialText(env))
+    text = credentialText(env)
   } catch (error: unknown) {
     throw new Error(`failed to read Gateway runtime credential: ${String(error)}`)
+  }
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch {
+    // Engine syntax errors can include private credential bytes in their message.
+    throw new Error('failed to read Gateway runtime credential: invalid JSON')
   }
   return parseGatewayRuntimeCredential(value)
 }
@@ -431,9 +488,21 @@ PLUGIN_MANAGEMENT_PATHS.add('/api/settings.describe')
 PLUGIN_MANAGEMENT_PATHS.add('/api/settings.mutate')
 PLUGIN_MANAGEMENT_PATHS.add('/api/_stream/pluginManager/installBundleStream')
 
-/** Authenticated Gateway context for one launched Harness runtime. */
+/** Managed readiness and Workspace metadata publication settings. */
+export interface Config {
+  /** Maximum duration of a Workspace catalog publication, in milliseconds. */
+  workspaceCatalogTimeoutMs?: number
+  /** Loader entry ids that must each have one active instance before readiness; absent means no additional entries. */
+  requiredPlugins?: string[]
+}
+
+/** Authenticated Gateway context whose application retains launch identity across provider replacement. */
 export class GatewayRuntime extends Service {
   static inject = ['connection']
+  static Config: Schema<Config> = Schema.object({
+    workspaceCatalogTimeoutMs: Schema.natural().min(1).default(30_000),
+    requiredPlugins: Schema.array(Schema.string().min(1)).default([]),
+  })
 
   /** Non-sensitive runtime identity bound to every accepted principal. */
   readonly identity: GatewayRuntimeIdentity
@@ -446,15 +515,29 @@ export class GatewayRuntime extends Service {
   private readonly requests = new AsyncLocalStorage<{ principal: GatewayRequestPrincipal; interactive: boolean }>()
   private readonly readinessRequests = new AsyncLocalStorage<string>()
   private readonly sessionCreations = new Map<SessionId, Promise<GatewaySessionCreationAuthorization>>()
+  private readonly readinessPlugins: readonly string[]
   private readonly streamPrincipals: StreamPrincipalLeasePool | undefined
+  private executionSettings: () => RuntimeExecutionSettings = () => ({ mode: 'resident' })
 
-  constructor(ctx: Context) {
+  constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'gatewayRuntime')
-    this.credential = readGatewayRuntimeCredential()
+    this.readinessPlugins = [...new Set(config.requiredPlugins ?? [])]
+    installSettingsSection(ctx, runtimeExecutionNamespace, runtimeExecutionSchema, { mode: 'resident' }, {
+      label: { en: 'Runtime execution', zh: '运行时策略' },
+      owner: 'project',
+      projectWrite: 'manager',
+      setSource: (source) => { this.executionSettings = source },
+      onChange: () => {},
+    })
+    const authority = launchAuthorityOf(ctx, () => {
+      const credential = readGatewayRuntimeCredential()
+      return { credential, publicKey: createPublicKey(credential.principalPublicKey) }
+    })
+    this.credential = authority.credential
     this.identity = { ...this.credential.runtime }
     this.organization = this.credential.organization
     this.gatewayUrl = new URL(this.credential.gatewayUrl)
-    this.publicKey = createPublicKey(this.credential.principalPublicKey)
+    this.publicKey = authority.publicKey
     this.streamPrincipals = this.credential.streamPrincipalRenewal === undefined ? undefined : new StreamPrincipalLeasePool({
       config: this.credential.streamPrincipalRenewal,
       verify: assertion => verifyGatewayPrincipal(assertion, this.credential, this.publicKey),
@@ -472,9 +555,34 @@ export class GatewayRuntime extends Service {
       reportUnavailable: () => { ctx.logger.warn('Gateway event connection renewal failed; reconnect if the signed authority expires.') },
     })
     ctx.effect(() => () => this.streamPrincipals?.close(), 'gateway-runtime: event connection principal leases')
+    if (this.identity.kind === 'user') {
+      ctx.inject(['workspaceRegistry', 'apiProxy'], (scope) => {
+        publishWorkspaceCatalog(scope, this, config.workspaceCatalogTimeoutMs ?? 30_000, async () => {
+          const response = await scope.apiProxy.sessions.list({ rpcId: RpcId(randomUUID()), payload: {} })
+          if (!response.result.ok) throw new Error(`Personal conversation metadata is unavailable: ${response.result.error.code}`)
+          return response.result.value.items
+        })
+      })
+    } else {
+      ctx.inject(['workspaceRegistry'], (scope) => {
+        publishWorkspaceCatalog(scope, this, config.workspaceCatalogTimeoutMs ?? 30_000)
+      })
+    }
+    if (ctx.root.get('modelAccessRequired') !== true) {
+      ctx.root.effect(() => ctx.root.provide('modelAccessRequired', true),
+        'gateway-runtime: managed model authorization')
+    }
+    if (ctx.root.get('resourceBudgetRequired') !== true) {
+      ctx.root.effect(() => ctx.root.provide('resourceBudgetRequired', true),
+        'gateway-runtime: managed resource admission')
+    }
     if (ctx.root.get('executionAuthorityRequired') !== true) {
       ctx.root.effect(() => ctx.root.provide('executionAuthorityRequired', true),
         'gateway-runtime: managed application identity')
+    }
+    if (this.identity.kind === 'project' && ctx.root.get('collaborationRequired') !== true) {
+      ctx.root.effect(() => ctx.root.provide('collaborationRequired', true),
+        'gateway-runtime: shared project authorization policy')
     }
     // Connection consults this provider before its token exchange and cookie;
     // a gateway-launched runtime admits only verified principal assertions, so
@@ -562,9 +670,8 @@ export class GatewayRuntime extends Service {
 
   /**
    * Bound a capability-purpose assertion to its declared HTTP operations.
-   * The three purposes with declared endpoints accept only those POST routes;
-   * every other defined purpose is an HTTP-only operation that never serves
-   * the index or opens an event stream.
+   * Each purpose accepts only its declared HTTP methods and paths; no purpose
+   * serves the index or opens an event stream.
    * @param claims - verified assertion claims.
    * @param kind - carrier the assertion arrives on: index, HTTP, or upgrade.
    * @param method - request method, when the carrier reports one.
@@ -576,6 +683,15 @@ export class GatewayRuntime extends Service {
     method: string | undefined,
     pathname: string | undefined,
   ): void {
+    if (claims.purpose === 'archive-read' && (method !== 'GET' || kind !== 'http'
+      || pathname !== '/api/internal/archive/read')) {
+      throw new Error('Archive assertions permit only the archive read endpoint.')
+    }
+    if (claims.purpose === 'document-admin' && (kind !== 'http'
+      || !((method === 'POST' && (pathname === '/api/documents/trash' || pathname === '/api/documents/restore'))
+        || (method === 'DELETE' && pathname === '/api/documents/purge')))) {
+      throw new Error('Document management assertions permit only trash, restore and purge.')
+    }
     if (claims.purpose === 'terminal-admin' && (method !== 'POST' || kind !== 'http'
       || (pathname !== '/api/terminal/adminList' && pathname !== '/api/terminal/adminClose'))) {
       throw new Error('Terminal management assertions permit only inventory and termination.')
@@ -601,12 +717,52 @@ export class GatewayRuntime extends Service {
       response.end(JSON.stringify({ error: 'readiness-proof-required' }))
       return
     }
+    if (this.ctx.get('resourceBudget') === undefined) {
+      response.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+      response.end(JSON.stringify({ error: 'resource-admission-unavailable' }))
+      return
+    }
+    if (this.readinessPlugins.length > 0) {
+      const entries = [...this.ctx.get('loader')?.entries() ?? []]
+      if (this.readinessPlugins.some((id) => {
+        const matching = entries.filter(entry => entry.options.id === id)
+        return matching.length !== 1 || matching[0]?.fiber?.state !== FiberState.ACTIVE
+      })) {
+        response.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+        response.end(JSON.stringify({ error: 'required-plugins-unavailable' }))
+        return
+      }
+    }
     response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+    const policy = this.executionSettings().mode
+    let canStop = false
+    try { canStop = policy === 'on-demand' && this.canReleaseRuntime() }
+    catch (error) {
+      this.ctx.logger.warn('Runtime idle check failed; keeping the process running (%s).', error instanceof Error ? error.name : 'unknown')
+    }
+    const idleMaterial = `dsh-gateway-idle-v1\u0000${nonce}\u0000${this.identity.kind}\u0000${String(this.identity.id)}\u0000${String(this.identity.generation)}\u0000${policy}\u0000${String(canStop)}`
     response.end(JSON.stringify({
       version: 1,
       runtime: this.identity,
       proof: readinessProof('response', this.credential.token, nonce, this.identity),
+      idle: { policy, canStop, proof: createHmac('sha256', this.credential.token).update(idleMaterial).digest('base64url') },
     }))
+  }
+
+  private canReleaseRuntime(): boolean {
+    if (this.ctx.root.fiber.state !== FiberState.ACTIVE || this.ctx.fiber.state !== FiberState.ACTIVE) return false
+    const agents = this.ctx.get('agents')
+    const loader = this.ctx.get('loader')
+    if (agents === undefined || loader === undefined) return false
+    if ([...loader.entries()].some(entry => entry.fiber === undefined
+      ? !entry.disabled
+      : entry.fiber.state !== FiberState.ACTIVE && !(entry.disabled && entry.fiber.state === FiberState.DISPOSED))) return false
+    if (this.ctx.bail('runtime/idle-release-check') === 'busy') return false
+    const live = agents.list()
+    if (agents.roots().length !== live.length) return false
+    return live.every(agent => agent.status === 'idle'
+      && agent.inbox.nextStep.length === 0 && agent.inbox.nextTurn.length === 0
+      && this.ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent }) !== 'busy')
   }
 
   /**

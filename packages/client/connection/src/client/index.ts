@@ -14,9 +14,11 @@ import { INTERACTIONS_QUERY, LAUNCH_TOKEN_QUERY } from '@deepseek-ai/dsh-host-ap
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionInteractions, ConnectionRuntimeTarget, HostDescription, IApiClient, SessionId } from './api.ts'
+import { runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { ConnectionController, resolveConnectionConfig, type ConnectionConfig, type ConnectionSinks, type ConnectionState } from './connection.ts'
 import { FixtureApiClient } from './fixture.ts'
 import { WebApiClient } from './web-api-client.ts'
+import { DEFAULT_BROWSER_RPC_TIMEOUT_MS } from '../browser-timing.ts'
 import {
   createBrowserAccountPreferencesTransport,
   type AccountPreferencesTransport,
@@ -36,7 +38,7 @@ export type {
   ApprovalResponsePayload, QuestionResponsePayload, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
   SessionAssistantStreamBaseline, SessionAssistantStreamFrame,
   SessionHistoryIndex, SessionHistoryIndexItem, ToolEventView,
-  DirectoryEntry, DirectoryListing, DesktopConfirmation,
+  DirectoryEntry, DirectoryListing, DesktopConfirmation, DesktopStatus,
   ToolCallView, ToolResultView, WorkspaceApi, WorkspaceId, WorkspaceView,
   WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceOfficePreview, WorkspaceFileEntry, WorkspaceFileStat, WorkspaceFileTextPage,
   SkillsApi, SkillEntry, SkillPreview,
@@ -66,7 +68,7 @@ export type { ConnectionConfig, ConnectionSinks, ConnectionState }
 export type { ClientConnectionRpc, ConnectionRpcResult } from '../rpc.ts'
 export type { RpcFetch } from './rpc.ts'
 export type {
-  AccountPreferenceMutation, AccountPreferenceNamespace, AccountPreferencesTransport, AccountPreferencesView,
+  AccountPreferenceMutation, AccountPreferenceNamespace, AccountPreferencesTransport, AccountPreferencesView, AccountThemePreferences,
 } from './account-preferences.ts'
 export { AccountPreferencesRequestError, createBrowserAccountPreferencesTransport, parseAccountPreferences } from './account-preferences.ts'
 export type {
@@ -128,6 +130,7 @@ interface ClientTransportGlobal {
   __DSH_TRANSPORT__?: ClientTransportHooks
   __DSH_CONNECTION_RECOVERY__?: unknown
   __DSH_DOCUMENT_IDENTITY__?: unknown
+  __DSH_CONNECTION_RPC_TIMEOUT_MS__?: unknown
 }
 
 /** Browser location fields used to classify loopback authority and detect fixture mode. */
@@ -152,6 +155,8 @@ export interface ConnectionInstallOptions {
   readonly transport?: ClientTransportHooks
   /** Reconnect timing overrides; omitted fields use controller defaults. */
   readonly recovery?: ConnectionConfig
+  /** Deadline for bounded browser unary RPC calls; custom API carriers retain their own policy. */
+  readonly rpcTimeoutMs?: number
   /** Page location; omit for a non-browser composition. */
   readonly location?: ConnectionLocation
   /** Authenticated HTML account/Runtime input; absent or non-browser carriers retain describe-first admission. */
@@ -159,7 +164,7 @@ export interface ConnectionInstallOptions {
 }
 
 function targetKey(target: ConnectionRuntimeTarget): string {
-  return target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`
+  return runtimeTargetKey(target)
 }
 
 /**
@@ -197,6 +202,8 @@ interface ConnectionShared {
 export interface ConnectionHandle {
   /** Authenticated HTML account and initial Runtime; absent for legacy, fixture, and explicit transports. */
   readonly documentIdentity?: ConnectionDocumentIdentity
+  /** Resolved connection budgets reused by entry metadata reads; configurable through connection.recovery. */
+  readonly metadataTiming: { requestTimeoutMs: number; retryAfterMs: number }
   /** Forwarded-event and answer participation selected at installation. */
   readonly interactions: ConnectionInteractions
   /** Shared api client (fixture or real, decided at boot from the page URL). */
@@ -219,6 +226,8 @@ export interface ConnectionHandle {
    * Resolve another runtime target's authenticated transport. Target handles
    * are memoized per runtime: callers share the pool-started connection, so
    * `state`, `hostDescription`, and `rpc` observe the live loop.
+   * Closing the stream preserves the handle; its next owner can reopen it,
+   * and an earlier owner's cleanup cannot stop the replacement stream.
    */
   readonly forTarget?: (target: ConnectionRuntimeTarget) => ConnectionHandle
   /**
@@ -249,7 +258,7 @@ export interface ConnectionHandle {
   readonly confirmPrincipal?: (id: number) => void
   /** Withdraw account-owned content and reload after explicit bootstrap authorization loss. */
   readonly invalidatePrincipal?: () => void
-  /** Dispose account-owned state before this document reloads after an identity change. */
+  /** Dispose account-owned state before an identity-change reload; present only with a document identity fence. */
   readonly onPrincipalChange?: (cleanup: () => void | Promise<void>) => () => void
   /** Request an immediate retry of the current connection generation. */
   reconnect(): void
@@ -279,6 +288,7 @@ interface ConnectionCarrier {
   readonly identity: BrowserIdentityFence | undefined
   /** Install-resolved interaction mode shared by every handle this carrier builds. */
   readonly interactions: ConnectionInteractions
+  readonly rpcTimeoutMs: number
 }
 
 /**
@@ -295,12 +305,12 @@ function carrierOf(carrier: ConnectionCarrier, target: ConnectionRuntimeTarget |
       // A transport without its own api builder (fetch/rpc only) still gets the
       // per-target browser carrier; one with an in-process api shares it.
       api: transport.createApiClient?.(carrier.interactions)
-        ?? new WebApiClient(target, undefined, undefined, carrier.identity?.socketUrl, undefined, carrier.interactions),
+        ?? new WebApiClient(target, carrier.rpcTimeoutMs, undefined, carrier.identity?.socketUrl, undefined, carrier.interactions),
       rpc: transport.rpc ?? createWebConnectionRpc(transport.fetch, target),
     }
   }
   return {
-    api: new WebApiClient(target, undefined, undefined, carrier.identity?.socketUrl, undefined, carrier.interactions),
+    api: new WebApiClient(target, carrier.rpcTimeoutMs, undefined, carrier.identity?.socketUrl, undefined, carrier.interactions),
     rpc: createWebConnectionRpc(undefined, target),
   }
 }
@@ -367,6 +377,7 @@ function createConnectionHandle(
     return { api: selected.wireApi ?? selected.api, sessionId: sharedState.originalSession(key) }
   })
   const handle: ConnectionHandle = {
+    metadataTiming: { requestTimeoutMs: bootstrapRecovery.generationReadyTimeoutMs, retryAfterMs: bootstrapRecovery.backoffMaxMs },
     interactions,
     ...(sharedState.documentIdentity === undefined ? {} : { documentIdentity: sharedState.documentIdentity }),
     wireApi: api,
@@ -396,7 +407,8 @@ function createConnectionHandle(
       const existing = sharedState.handles.get(key)
       if (existing !== undefined) return existing
       const composition: ConnectionCarrier = carrier === undefined
-        ? { api, rpc, transport: undefined, fixture: undefined, identity: sharedState.identity, interactions }
+        ? { api, rpc, transport: undefined, fixture: undefined, identity: sharedState.identity, interactions,
+          rpcTimeoutMs: DEFAULT_BROWSER_RPC_TIMEOUT_MS }
         : { ...carrier, fixture: undefined }
       const faces = carrierOf(composition, next)
       const child = createConnectionHandle(
@@ -450,43 +462,49 @@ function createConnectionHandle(
     privateResourceUrl: value => sharedState.identity?.privateUrl(value) ?? value,
     confirmPrincipal: (id) => { sharedState.identity?.confirm(id) },
     invalidatePrincipal: () => { sharedState.identity?.invalidate() },
-    onPrincipalChange: cleanup => sharedState.identity?.subscribe(cleanup) ?? (() => {}),
+    ...(sharedState.identity === undefined ? {} : { onPrincipalChange: sharedState.identity.subscribe }),
     reconnect() {
       controller?.reconnect()
     },
     start(sinks, config) {
       if (started) throw new Error('connection: the stream loop is already owned by another consumer')
       started = true
-      controller = new ConnectionController(api, {
+      let released = false
+      const owned = new ConnectionController(api, {
         ...sinks,
         onConnected: (next) => {
+          if (released || controller !== owned) return
           if (target === undefined && next.runtimeTarget !== undefined) handle.setBaseTarget?.(next.runtimeTarget)
           publishDescription(next)
           // A description subscriber may synchronously stop the loop. In that
           // case publishDescription(undefined) has already retracted this
           // generation, so do not leak its stale connected notification to
           // the consumer sink afterward.
-          if (!Object.is(description, next)) return
+          if (controller !== owned || !Object.is(description, next)) return
           sinks.onConnected?.(next)
         },
         onStateChange: (state) => {
+          if (released || controller !== owned) return
           if (state === 'reconnecting') publishDescription(undefined)
           publishState(state)
           sinks.onStateChange?.(state)
         },
       }, { ...bootstrapRecovery, ...config })
-      controller.start()
+      controller = owned
+      owned.start()
       const stopIdentity = sharedState.identity?.subscribe(() => {
-        controller?.stop(); publishDescription(undefined); publishState(undefined)
+        if (released || controller !== owned) return
+        owned.stop(); publishDescription(undefined); publishState(undefined)
       })
       return {
         stop: () => {
+          if (released) return
+          released = true
           stopIdentity?.()
-          controller?.stop()
+          owned.stop()
+          if (controller !== owned) return
           controller = undefined
-          if (target !== undefined && sharedState.handles.get(ownKey()) === handle) {
-            sharedState.handles.delete(ownKey())
-          }
+          started = false
           publishDescription(undefined)
           publishState(undefined)
         },
@@ -518,7 +536,7 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
   const nativeFetch = globalThis.fetch
   const identity = fixtureClient === undefined && transport === undefined && pageLocation?.origin !== undefined
     && /^https?:\/\//u.test(pageLocation.origin)
-    ? createBrowserIdentityFence(nativeFetch, pageLocation.origin, () => { pageLocation.reload?.() }) : undefined
+    ? createBrowserIdentityFence(nativeFetch, pageLocation.origin, () => { pageLocation.reload?.() }, pageLocation.search) : undefined
   const documentIdentity = identity === undefined ? undefined : parseDocumentIdentity(options.documentIdentity)
   if (identity !== undefined) {
     if (documentIdentity !== undefined) {
@@ -531,8 +549,13 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
       if (globalThis.fetch === identity.fetch) globalThis.fetch = nativeFetch
     }, 'connection: authenticated document requests')
   }
+  const bootstrapRecovery = resolveConnectionConfig(options.recovery ?? {})
+  const rpcTimeoutMs = options.rpcTimeoutMs ?? DEFAULT_BROWSER_RPC_TIMEOUT_MS
+  if (!Number.isSafeInteger(rpcTimeoutMs) || rpcTimeoutMs < 1 || rpcTimeoutMs > 2_147_483_647) {
+    throw new RangeError('rpcTimeoutMs must be a positive safe timer integer')
+  }
   const api: IApiClient = fixtureClient ?? transport?.createApiClient?.(interactions)
-    ?? new WebApiClient(undefined, undefined, undefined, identity?.socketUrl, (description) => {
+    ?? new WebApiClient(undefined, rpcTimeoutMs, undefined, identity?.socketUrl, (description) => {
       if (description.executionAuthorityRequired === true && description.runtimeTarget === undefined) {
         throw new Error('Managed Host did not declare its runtime identity')
       }
@@ -545,9 +568,8 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
   const projectModelSettings = fixtureClient === undefined
     ? transport?.createProjectModelSettingsTransport?.() ?? createBrowserProjectModelSettingsTransport()
     : undefined
-  const bootstrapRecovery = resolveConnectionConfig(options.recovery ?? {})
   const rpc = fixtureClient?.rpc ?? transport?.rpc ?? createWebConnectionRpc(transport?.fetch)
-  const carrier: ConnectionCarrier = { api, rpc, transport, fixture: fixtureClient, identity, interactions }
+  const carrier: ConnectionCarrier = { api, rpc, transport, fixture: fixtureClient, identity, interactions, rpcTimeoutMs }
   const handle = createConnectionHandle(
     api,
     pageLocation,
@@ -576,9 +598,11 @@ export function apply(ctx: Context): void {
   const pageLocation = typeof location === 'undefined' ? undefined : location
   const transport = globals.__DSH_TRANSPORT__
   const recovery = globals.__DSH_CONNECTION_RECOVERY__ as ConnectionConfig | undefined
+  const rpcTimeoutMs = globals.__DSH_CONNECTION_RPC_TIMEOUT_MS__ as number | undefined
   installConnection(ctx, {
     ...(transport === undefined ? {} : { transport }),
     ...(recovery === undefined ? {} : { recovery }),
+    ...(rpcTimeoutMs === undefined ? {} : { rpcTimeoutMs }),
     ...(pageLocation === undefined ? {} : { location: pageLocation }),
     ...(globals.__DSH_DOCUMENT_IDENTITY__ === undefined ? {} : { documentIdentity: globals.__DSH_DOCUMENT_IDENTITY__ }),
   })

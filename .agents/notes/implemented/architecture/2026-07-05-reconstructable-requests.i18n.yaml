@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.md
 document:
-  en: 5cb32d3acad185ff58232ffccfb7715abaed7669
-  zh: a6db88a2e5c6eb4d83785cfaf2611a9ba54d93b8
+  en: 8146cbbb505afe3f2dd6a3ad5418e8b427d5d9c4
+  zh: 489c5ca207a4162e2a53fc1890b2e346d7a823cd
 /agent-note-every-llm-request-is-reconstructable-from-the-session-log:
   en: 115dd45f40b0d7d8
   zh: 536b5a0399e7d06a
@@ -18,8 +18,8 @@ document:
   en: 6da15cf986d59a91
   zh: 40282908b54295f9
 /agent-note-every-llm-request-is-reconstructable-from-the-session-log/decision/the-mechanism:
-  en: 9c9ce38d0c013ee9
-  zh: f3d4038700449403
+  en: aa538d1ad7b53a8a
+  zh: b983fdf5e06f8503
 /agent-note-every-llm-request-is-reconstructable-from-the-session-log/decision/the-minicode-shape-adopted-with-the-event-log-as-the-source:
   en: e5f2ffaa3d7de0cc
   zh: 5ba6b36787a0e189

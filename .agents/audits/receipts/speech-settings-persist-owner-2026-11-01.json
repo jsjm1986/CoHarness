@@ -1,0 +1,151 @@
+{
+  "findings": [
+    "B423"
+  ],
+  "status": "fixed_verified_named_speech_write_owner_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T02:09:16.355520+00:00",
+  "baseline": {
+    "remote": "origin/master",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-origin-final.json",
+    "fetchedAt": "2026-11-01T02:07:39.998147+00:00",
+    "dirtyWorkspacePreserved": true
+  },
+  "problem": "Speech configure could acknowledge success after the Settings binding withdrew during an already-started persistence operation; effective selection had returned to defaults.",
+  "fix": "Recheck the exact bound scope after persistence before acknowledging. Preserve any original-file commit and reject a changed-provider acknowledgement so the caller can retry the current binding.",
+  "verification": {
+    "distinctRelatedTests": 138,
+    "packageTests": 130,
+    "typescriptSdkScenarios": 4,
+    "pythonSdkScenarios": 4,
+    "repeatVersionRunsNotAdded": true,
+    "normalPassedChecks": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-ack-observation-retention.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-owner-fixed.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-related.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-sdk-source.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-sdk-node22.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-sdk-node24.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-sdk-python.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-tsc.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-bundle.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-host-types.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-pairing.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-docs.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-lint.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-python-lint.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-origin-final.json"
+    ],
+    "negativeChecks": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-owner-negative.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-sdk-old-source.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-sdk-old-node22.json"
+    ],
+    "counterfactual": "Complete original B422 package in source/built modes fails only the new persistence-withdrawal scene and passes the prior3 scenes. Actual FileSettings writes the original file, the binding really withdraws and default selection becomes active.",
+    "commitPreservation": "Both versions commit ja to the original file; corrected response refuses success rather than undoing committed data.",
+    "coverage": {
+      "lines": {
+        "total": 102,
+        "covered": 102,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 33,
+        "covered": 32,
+        "skipped": 0,
+        "pct": 96.96
+      },
+      "statements": {
+        "total": 131,
+        "covered": 130,
+        "skipped": 0,
+        "pct": 99.23
+      },
+      "branches": {
+        "total": 48,
+        "covered": 47,
+        "skipped": 0,
+        "pct": 97.91
+      }
+    },
+    "coverageScope": "Additional diagnostic on an existing CI-exempt index, with no acceptance threshold/exclusion changes.",
+    "nonBugReview": {
+      "status": "candidate_ruled_out_for_current_call",
+      "source": "packages/subprocess/subprocess/src/types.ts:waitForExit",
+      "contract": "false only when the supplied bound aborts; unbounded calls wait for range quiescence or reject observation failure.",
+      "consumer": "SenseVoice stop supplies no bound and retains worker identity on observation failure.",
+      "test": "speech-ack-observation-retention.json",
+      "scope": "No fabricated false-without-signal provider case is used. This does not close all native-platform containment review."
+    },
+    "documentation": "20 quick gates passed, including copied API JSDoc/type equivalence and four owned pairs; full doc-sync not run. Existing active Settings-lifetime note extended rather than duplicated.",
+    "resources": {
+      "productionOsAllocationsAdded": 0,
+      "paidRequests": 0,
+      "recognitionInvocations": 0,
+      "postgresDatabasesAdded": 0,
+      "ownership": "Actual SDK processes, nested Boot Host and controlled FileSettings persistence gates are owned and joined; failure cleanup releases pending writes before Host shutdown and removes temporary files."
+    }
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T015820Z/speech-settings-persist-capsule.json",
+  "dependsOnFinding": "B422",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-speech-settings-provider-lifetime.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-speech-settings-provider-lifetime.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-speech-settings-provider-lifetime.zh.md",
+    "apps/cli/tests/profiles/sdk/speech-settings-owner.expected.e2e.ts",
+    "docs/subsystems/voice-input.i18n.yaml",
+    "docs/subsystems/voice-input.md",
+    "docs/subsystems/voice-input.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/speech-settings-lifetime/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/speech-settings-lifetime/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/speech-settings-lifetime/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/speech-settings-owner/expected.json",
+    "examples/headless-agent/tests/fixtures/speech-settings-owner/model.mjs",
+    "packages/experimental/speech-to-text/README.i18n.yaml",
+    "packages/experimental/speech-to-text/README.md",
+    "packages/experimental/speech-to-text/README.zh.md",
+    "packages/experimental/speech-to-text/src/index.ts",
+    "packages/experimental/speech-to-text/tests/configuration.spec.ts",
+    "python/sdk/tests/test_speech_settings_owner_expected.py"
+  ],
+  "readOnlyPrerequisiteCount": 4227,
+  "runtimeReferences": 1,
+  "mergeRequirement": "Apply after B421/B422 using only18 sourceDeltaPaths. Prerequisites remain read-only and may not overwrite newer peer source. Rebuild normally; the one lib artifact is a reference. This extends the existing Settings lifetime note/guide, and introduces no Session event, generation or database migration. Gateway Agent/node-service files are outside this packet.",
+  "notes": {
+    "decision": "extend existing active Settings-provider lifetime note; no new duplicate note",
+    "records": [
+      ".agents/notes/implemented/bug-fix/2026-11-01-speech-settings-provider-lifetime.md",
+      ".agents/notes/implemented/bug-fix/2026-11-01-speech-removal-quiescence.md"
+    ],
+    "rationale": "Persistence acknowledgement is the publication portion of the same Settings binding ownership rule. Recognition-removal quiescence is a distinct retained rationale. No archived notes changed."
+  },
+  "peerReport": {
+    "status": "peer_reported_not_root_reverified_except_documentation",
+    "servingRelease": "R23",
+    "recoverySourceOnly": "14 owned Gateway Agent/code/test/doc paths; R24 not deployed",
+    "verificationReported": {
+      "unitHttp": 24,
+      "sourcePostgres": 19,
+      "builtNode22And24ScenariosEach": 4,
+      "oldR23ThreePhaseBodyInterruptionFailures": 3
+    },
+    "publicHost": "Peer reports public SSH good, Linux cloudflared0, Agent epoch48/PID62949/restarts2 stable; two Gateway200.",
+    "protectedUi": "Peer reports both43-character drafts and Admin unsaved URL retained.",
+    "rootDocumentation": "Peer pair updates complete and root full20 quick docs passed.",
+    "nodeService": "No capacity/source change;503 review remains with peer.",
+    "requiredEvent": "B417 Session vocabulary publication/reader acceptance remains explicitly pending, not silently merged into older R23."
+  },
+  "remaining": [
+    "Integrate B423 after B421/B422 using only18 sourceDeltaPaths, including the updated existing Settings-lifetime note/guide and the actual four-scenario fixture. Prerequisites and the reference bundle must not overwrite newer peer source. Earlier B416/B417/B418/B419/B420 remain independently pending.",
+    "Continue auxiliary/extension model purpose, trace and interactive attribution, diagnostic/database argument privacy, filesystem/document races, cross-account/computer scope and native containment. All12 domains and B04/B25 remain open.",
+    "Continue direct allocation consumers and readiness/publication transitions. SenseVoice waitForExit(false) without a bound is ruled out by the declared provider contract; the legal observation-error retention/retry case is verified. Do not manufacture hostile same-process values solely to claim coverage.",
+    "Existing coverage debt is retained without policy changes. Additional speech index measurement has lines100%,statements99.23%,branches97.91%,functions96.96%; remaining old Loader callback and alternate ownership guard outcome stay explicit.",
+    "Peer owns Gateway Agent recovery, its14 paths and pending matching release, node-service503 investigation and REAL043 error copy. B417 required-on-read matching publication/acceptance remains separate from serving R23. Root now verifies full20 quick documentation checks after the peer pair updates.",
+    "Official paid Responses remains deferred; no root paid inference, ASR inference/download, new database or production deployment is claimed."
+  ],
+  "globalReviewComplete": false
+}

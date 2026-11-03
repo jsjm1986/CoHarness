@@ -1,0 +1,266 @@
+{
+  "finding": "B474",
+  "status": "fixed_verified_source_native_and_r44_production_scope_recovery_dual_node_api_acceptance_global_review_open",
+  "updatedAt": "2026-11-02T13:40:07.783284+00:00",
+  "baseline": {
+    "checkedAt": "2026-11-02T12:03:42.487804+00:00",
+    "command": "git fetch origin master --no-tags --quiet",
+    "result": "139\t0",
+    "sharedWorktreePreserved": true,
+    "headRef": "codex/business-logic-audit-2026-10-23",
+    "remoteRef": "origin/master",
+    "exactIdentityEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T134850Z/document-volume-exact-baseline.json"
+  },
+  "problem": "Original APFS directory and database inodes survive reboot but ephemeral device numbers change, refusing managed document provider startup. Schema2/3 startup and restored-copy validation additionally migrated metadata before rejecting copied roots or incomplete evidence.",
+  "fix": "Descriptor-derived filesystem UUIDs, schema4 and private marker2 retain strict live kernel-object checks while authorizing known-volume device normalization. Legacy acquisition requires unchanged original witnesses or explicit independently verified offline mount recovery. All copied-root or restore evidence checks precede legacy schema migration.",
+  "preserved": [
+    "Root/incarnation/revision/creator/actor",
+    "Six production trash records and later purged history; no database rollback",
+    "Delivery sequences and acknowledgements",
+    "Incomplete upload bytes and actor ownership",
+    "Immutable backup metadata bytes"
+  ],
+  "frozenDelivery": {
+    "finding": "B474",
+    "status": "source_and_matching_macos_arm64_linux_x64_candidates_frozen_production_acceptance_open",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/B474-document-volume-identity.delta.tar.gz",
+    "archiveSha256": "50da329b8762c61d51fc414f131df85ea984d366e05f9b679eaf5d1a9d448028",
+    "archiveBytes": 1118480,
+    "staging": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/B474-capsule-vbinlfzc",
+    "ownedChanges": 53,
+    "manifestSha256": "8f330b58903ab87e9a4fdeb00e67e91df4525ba28703f5da1ed7f394beee60bc",
+    "operatorHandoff": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/B474-capsule-vbinlfzc/operator-handoff.json",
+    "summary": {
+      "finding": "B474",
+      "status": "source_and_matching_macos_arm64_linux_x64_candidates_frozen_production_acceptance_open",
+      "sourceChanges": 53,
+      "tests": {
+        "userdoc": 655,
+        "userdocSkipped": 5,
+        "gatewayScope": 27,
+        "macNative": 59,
+        "peerLinuxNative": 64
+      },
+      "coverage": "221 changed executable statements covered. identity-storage.ts and handle.ts whole-file100%all4metrics. Other whole files retain explicit coverage gaps; no repository coverage gate claim.",
+      "documentGates": "34/41 doc-sync leaves passed initially; ENOSPC doc compilation repaired with98 blocks passing. Six concurrent peer-generated catalogs remain pending their owning source finalization. Final pairing2060, export JSDoc, markdown and budgets separately verified.",
+      "compatibility": {
+        "sqlite": 4,
+        "privateMarker": 2,
+        "nativeFamily": "0.1.4",
+        "sessionFormatChanged": false,
+        "windowsNativeCalled": false
+      },
+      "productionWritesByRoot": false,
+      "fullProjectAuditComplete": false,
+      "limitations": [
+        "Musl compiled and packaged, no musl behavior execution",
+        "Other native architectures and Windows require their platform CI",
+        "Production legacy recovery and fresh-session acceptance remain peer release work",
+        "Deferred official Responses API validation remains deferred"
+      ],
+      "checks": [
+        "pre-migration-binding-red",
+        "pre-migration-binding-green",
+        "restore-pre-migration-proof",
+        "userdoc-volume-coverage-v3",
+        "volume-final-type-build-v2",
+        "volume-normal-userdoc-build-v2",
+        "mount-built-loader-v2",
+        "volume-owned-lint-v2",
+        "volume-final-test-lint",
+        "gateway-document-scope-linked-tests",
+        "native-volume-unit-family",
+        "native-host-pack",
+        "native-host-packed-install",
+        "volume-host-types",
+        "volume-export-jsdoc-final",
+        "volume-doc-typecheck-ready",
+        "volume-final-pair-validation",
+        "volume-doc-budgets-final",
+        "volume-workspace-constraints-final"
+      ]
+    }
+  },
+  "verification": {
+    "userdocCasesPassed": 655,
+    "userdocCasesSkipped": 5,
+    "gatewayDocumentScopeCasesPassed": 27,
+    "macNativeCasesPassed": 59,
+    "peerLinuxNativeCasesPassed": 64,
+    "sourceNode22": "passed",
+    "normalBuiltNode24": "passed",
+    "nativeHostPackAndOfflineInstall": "passed on macOS arm64; peer verified Ubuntu x64 glibc",
+    "changedExecutableStatements": 221,
+    "changedExecutableStatementsCovered": 221,
+    "wholeFile100AllFourMetrics": [
+      "identity-storage.ts",
+      "handle.ts"
+    ],
+    "scopedSixFileCoverage": {
+      "lines": {
+        "total": 1279,
+        "covered": 1214,
+        "skipped": 0,
+        "pct": 94.91
+      },
+      "statements": {
+        "total": 1580,
+        "covered": 1458,
+        "skipped": 0,
+        "pct": 92.27
+      },
+      "functions": {
+        "total": 297,
+        "covered": 292,
+        "skipped": 0,
+        "pct": 98.31
+      },
+      "branches": {
+        "total": 1286,
+        "covered": 1157,
+        "skipped": 0,
+        "pct": 89.96
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "normalCoverageThresholdsChanged": false,
+    "repositoryCoverageGateClaimed": false,
+    "docSyncAggregate": "34 passed,7 failed initially; ENOSPC compile repaired and exact98-block check passed. Six peer-generated catalogs remain stale while their source is in progress.",
+    "finalPairing": 2060,
+    "finalExportJsdoc": "passed",
+    "finalMarkdownFilesChecked": 4060,
+    "fullProjectAuditComplete": false
+  },
+  "nativeMatrixLimitations": [
+    "Musl compiled and packed; execution was glibc only",
+    "Other native architectures and Windows remain their CI responsibilities"
+  ],
+  "productionRecovery": {
+    "executedByRoot": false,
+    "owner": "peer multi-computer release thread",
+    "instructions": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/B474-capsule-vbinlfzc/operator-handoff.json",
+    "state": "frozen inputs delivered; exclusive maintenance, recovery and fresh-session acceptance pending"
+  },
+  "deferredRealResponsesValidation": "Still deferred at user request",
+  "checkReceipts": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/pre-migration-binding-red.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/pre-migration-binding-green.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/restore-pre-migration-proof.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/userdoc-volume-coverage-v3.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/volume-final-type-build-v2.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/volume-normal-userdoc-build-v2.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/mount-built-loader-v2.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/volume-owned-lint-v2.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/volume-final-test-lint.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/gateway-document-scope-linked-tests.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/native-volume-unit-family.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/native-host-pack.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/native-host-packed-install.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/volume-host-types.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/volume-export-jsdoc-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/volume-doc-typecheck-ready.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/volume-final-pair-validation.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/volume-doc-budgets-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/volume-workspace-constraints-final.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/volume-markdown-wrap-final.json"
+  ],
+  "unexpectedToolingSync": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T085046Z/unexpected-pnpm-run-sync.json",
+  "exampleResolutionAddendum": {
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T121204Z/B474-example-resolution-addendum.delta.tar.gz",
+    "archiveSha256": "b0e3db376dfe78ebecd827e5059fe56e6ac0d7e90ae20bd5df201e44d0ddaab7",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T121204Z/B474-example-resolution-addendum-gbkymoi2",
+    "changes": 2,
+    "archiveBytes": 385432,
+    "manifestSha256": "25bdc2e6c5a30c2b63c301b62354ab5e1486e21430d85e15a54ae2fb6fdf399c"
+  },
+  "peerReleaseState": {
+    "release": "R44 candidate staged but not activated",
+    "maintenanceEpoch": 114,
+    "documentSchema": 3,
+    "states": "six trash + one later purged, sequence9",
+    "recoveryApplied": false,
+    "limitation": "Peer reports B database reverse SSH connection lost; exclusive quiescence gate refuses stale heartbeat113/inflight3. Root does not treat disconnection as completion."
+  },
+  "productionAcceptance": {
+    "rootReadOnlyEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T133538Z/r44-production-acceptance-readonly.json",
+    "release": "coharness-full-real-20261102-r44",
+    "rootVerified": {
+      "schema": 4,
+      "marker": 2,
+      "rootIdMatchesIndependentBackup": true,
+      "allSixSavedTrashLogicalRecordsMatchExcludingDeviceNormalization": true,
+      "currentStates": {
+        "active": 0,
+        "trash": 6,
+        "purged": 1,
+        "missing": 0
+      },
+      "sequence": 9,
+      "progress": [
+        9,
+        1,
+        9,
+        1
+      ],
+      "originalFourInodesPreserved": true,
+      "retainedFilesMatchingIndependentHashes": 64,
+      "independentDatabaseDigestUnchanged": true
+    },
+    "peerVerifiedApiNewSessionAndSend": {
+      "at": "2026-11-02T12:54:42.243Z",
+      "release": "coharness-full-real-20261102-r44",
+      "apiOnly": true,
+      "nativeUi": false,
+      "fullProjectAcceptance": false,
+      "cases": [
+        {
+          "label": "mac",
+          "runtimeId": "d441ed6a-1643-4405-a29b-71d1e8be3eb0",
+          "sessionId": "session-2dabe50a-897d-47b8-9011-1acea05e9d54",
+          "workspaceId": "c08f74b1-152b-4366-b159-b53755e8c79f",
+          "requestId": "ff466400-33d6-47ea-a181-aada5e755589",
+          "sessionCreated": true,
+          "presetNotOverridden": true,
+          "exactWorkspaceMembership": true,
+          "oneHumanMessage": true,
+          "requestAttributed": true,
+          "matchingReply": true,
+          "turnCompleted": true,
+          "toolCalls": 0,
+          "generation": 12628,
+          "observedPreset": "cordis",
+          "headlessCapabilityExplicit": false,
+          "userModelGrantsChanged": false
+        },
+        {
+          "label": "ubuntu",
+          "runtimeId": "d85f1b7d-cff0-4dea-b97b-99df6016e0f9",
+          "sessionId": "session-e6d34a94-afb9-47bd-8c85-894340f524e3",
+          "workspaceId": "39fe0f26-1819-4b39-826b-461852dfaa76",
+          "requestId": "2af4d6d3-7ed3-40f3-8128-4aa4112ff5da",
+          "sessionCreated": true,
+          "presetNotOverridden": true,
+          "exactWorkspaceMembership": true,
+          "oneHumanMessage": true,
+          "requestAttributed": true,
+          "matchingReply": true,
+          "turnCompleted": true,
+          "toolCalls": 0,
+          "generation": 30,
+          "observedPreset": "standard",
+          "headlessCapabilityExplicit": true,
+          "userModelGrantsChanged": false
+        }
+      ]
+    },
+    "nativeUiVerified": false,
+    "allProjectScopesClaimed": false,
+    "allFunctionsClaimed": false
+  },
+  "rootProductionWrites": false
+}

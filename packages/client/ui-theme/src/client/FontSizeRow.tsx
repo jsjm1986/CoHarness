@@ -1,7 +1,6 @@
 /**
- * Font-size preference row: title + role description + stepper pill (centered value; hover
- * reveals the up/down arrow column anchored to the pill's right edge) + a px
- * unit label after the pill. The text row is registered into the General
+ * Font-size preference row with visible decrement and increment controls around
+ * the current value. The text row is registered into the General
  * section item slot; the code and terminal rows render inside the font
  * settings group. The displayed value follows the persisted setting, never the
  * click echo.
@@ -13,6 +12,7 @@ import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-cli
 import { FONT_SIZE_SPECS, type FontRole } from '../theme-settings.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { createFontRowStore } from './settings-store.ts'
+import { settingsFeedback } from './settings-feedback.ts'
 import css from './FontSizeRow.module.css'
 
 /** Injected business face: the row's font role and its write (t rides the standard locale seat). */
@@ -48,6 +48,7 @@ export interface FontSizeRowExpander {
  */
 export function FontSizeRow({ t, role, setFontSize, useStore, expander }: FontSizeRowComponentProps) {
   const fontSize = useStore(s => s.fontSizes[role])
+  const { disabled } = settingsFeedback(useStore(s => s.settings))
   const { min, max } = FONT_SIZE_SPECS[role]
   return (
     <div className={css.row}>
@@ -62,20 +63,20 @@ export function FontSizeRow({ t, role, setFontSize, useStore, expander }: FontSi
             <button
               type="button"
               className={css.arrow}
-              aria-label={t(`fontSize.${role}.increase`)}
-              disabled={fontSize >= max}
-              onClick={() => { setFontSize(fontSize + 1) }}
+              aria-label={t(`fontSize.${role}.decrease`)}
+              disabled={disabled || fontSize <= min}
+              onClick={() => { setFontSize(fontSize - 1) }}
             >
-              <IconChevronUpOutline14 size={9} />
+              <IconChevronDownOutline14 size={14} />
             </button>
             <button
               type="button"
               className={css.arrow}
-              aria-label={t(`fontSize.${role}.decrease`)}
-              disabled={fontSize <= min}
-              onClick={() => { setFontSize(fontSize - 1) }}
+              aria-label={t(`fontSize.${role}.increase`)}
+              disabled={disabled || fontSize >= max}
+              onClick={() => { setFontSize(fontSize + 1) }}
             >
-              <IconChevronDownOutline14 size={9} />
+              <IconChevronUpOutline14 size={14} />
             </button>
           </span>
         </div>

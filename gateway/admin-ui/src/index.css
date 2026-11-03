@@ -11,19 +11,23 @@
   --surface-strong: #eceef2;
   --text: #0f1115;
   --text-secondary: #61666d;
-  --text-tertiary: #858a92;
+  --text-tertiary: #676c75;
   --border: rgba(15, 17, 21, 0.1);
   --border-strong: rgba(15, 17, 21, 0.18);
   --accent: #4176e6;
   --accent-hover: #5686ee;
   --accent-soft: #e4edfd;
+  --accent-ink: #2459bd;
   --success: #16a05d;
   --success-soft: #e6faed;
+  --success-ink: #08783f;
   --warning: #c27a0d;
   --warning-soft: #fef5e7;
+  --warning-ink: #895100;
   --danger: #dd2727;
   --danger-hover: #c71f1f;
   --danger-soft: #fef0f0;
+  --danger-foreground: #ffffff;
   --shadow-dialog: 0 24px 70px rgba(15, 17, 21, 0.22);
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -70,15 +74,15 @@
   --dsw-alias-border-l4: var(--border-strong);
   --dsw-alias-border-subtle: var(--border);
   --dsw-alias-brand-primary: var(--text);
-  --dsw-alias-state-business-primary: var(--accent);
+  --dsw-alias-state-business-primary: var(--accent-ink);
   --dsw-alias-state-warning-primary: var(--warning);
   --dsw-alias-state-warn-primary: var(--warning);
   --dsw-alias-state-warn-tertiary: var(--warning-soft);
   --dsw-elevation-prominent: var(--shadow-dialog);
   --dsw-focus-ring-width: 2px;
   --dsw-focus-ring-color: var(--accent);
-  --dsw-alias-button-primary-fill: var(--accent);
-  --dsw-alias-button-primary-hover: var(--accent-hover);
+  --dsw-alias-button-primary-fill: var(--accent-ink);
+  --dsw-alias-button-primary-hover: var(--accent-ink);
   --dsw-alias-button-soft-fill: var(--surface-strong);
   --dsw-alias-button-soft-hover: color-mix(in srgb, var(--surface-strong) 92%, var(--text));
   --dsw-alias-button-soft-active: color-mix(in srgb, var(--surface-strong) 84%, var(--text));
@@ -97,8 +101,8 @@
   --dsw-alias-scrollbar-bg-l2: var(--border-strong);
   --dsw-alias-scrollbar-hover-l2: var(--text-tertiary);
   --dsw-alias-state-error-primary: var(--danger);
-  --dsw-alias-state-success-primary: var(--success);
-  --dsw-alias-state-warn-label: var(--warning);
+  --dsw-alias-state-success-primary: var(--success-ink);
+  --dsw-alias-state-warn-label: var(--warning-ink);
   --dsw-alias-text-primary: var(--text);
   --dsw-alias-text-tertiary: var(--text-tertiary);
 }
@@ -120,13 +124,17 @@
     --accent: #679efe;
     --accent-hover: #79a9ff;
     --accent-soft: #34415b;
+    --accent-ink: #8bb7ff;
     --success: #4ed17e;
     --success-soft: #233c2c;
+    --success-ink: var(--success);
     --warning: #f5ad43;
     --warning-soft: #3d3427;
+    --warning-ink: var(--warning);
     --danger: #f25a5a;
     --danger-hover: #f06c6c;
     --danger-soft: #462727;
+    --danger-foreground: #151517;
     --shadow-dialog: 0 24px 70px rgba(0, 0, 0, 0.5);
   }
 
@@ -199,6 +207,7 @@ a {
 
 .brand {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   min-width: 0;
   gap: 10px;
@@ -258,6 +267,9 @@ a {
 .sidebarNav {
   display: flex;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
@@ -290,7 +302,7 @@ a {
 }
 
 .sidebarNav a.active svg {
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .sidebarNav svg {
@@ -300,6 +312,7 @@ a {
 
 .sidebarFooter {
   display: flex;
+  flex-shrink: 0;
   flex-direction: column;
   gap: 8px;
   padding: 12px;
@@ -332,6 +345,10 @@ a {
   display: none;
 }
 
+.adminRouteContent {
+  display: contents;
+}
+
 .mainContent {
   min-width: 0;
   padding: 32px 40px 64px;
@@ -340,6 +357,26 @@ a {
 .page {
   width: min(100%, 1440px);
   margin: 0 auto;
+}
+
+.computerBar {
+  margin-bottom: var(--dsw-space-4);
+}
+
+.computerBar .targetPicker {
+  max-width: 100%;
+  width: 320px;
+  gap: var(--dsw-space-2);
+}
+
+.computerBar .fieldLabel {
+  font-weight: 500;
+}
+
+.computerBar .fieldHint {
+  min-height: 1.5em;
+  margin: var(--dsw-space-2) 0 0;
+  color: var(--text-secondary);
 }
 
 .organizationModelsEditor {
@@ -457,6 +494,26 @@ a {
   padding: 18px;
 }
 
+.desktopEnvironmentNotice {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 16px 0;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+
+.desktopEnvironmentNotice p { margin: 0; flex: 1; min-width: 0; }
+.desktopEnvironmentNotice .button { flex-shrink: 0; }
+.section > .desktopEnvironmentNotice { margin: 16px 18px; }
+
+@media (max-width: 600px) {
+  .desktopEnvironmentNotice { align-items: flex-start; flex-direction: column; gap: 10px; }
+}
+
 /* Bare banners and paragraphs in flush sections still need side room; strips
    (tableWrap, filterPanel, archiveBulkBar) supply their own padding. */
 .section > .errorBanner,
@@ -520,7 +577,7 @@ a {
 
 .button-danger {
   background: var(--danger);
-  color: #fff;
+  color: var(--danger-foreground);
 }
 
 .button-danger:hover:not(:disabled) {
@@ -596,17 +653,17 @@ a {
 
 .status-info {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .status-success {
   background: var(--success-soft);
-  color: var(--success);
+  color: var(--success-ink);
 }
 
 .status-warning {
   background: var(--warning-soft);
-  color: var(--warning);
+  color: var(--warning-ink);
 }
 
 .status-danger {
@@ -823,12 +880,12 @@ a {
 .tunnelChoice h3 svg {
   width: 16px;
   height: 16px;
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .tunnelChoice p {
   margin: 0;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .tunnelUrl {
@@ -1048,7 +1105,7 @@ a {
 }
 
 .selectedDirectory > svg {
-  color: var(--success);
+  color: var(--success-ink);
 }
 
 .managedDirectorySummary span,
@@ -1304,7 +1361,7 @@ a {
 }
 
 .directoryBrowserOptions > span {
-  color: var(--warning);
+  color: var(--warning-ink);
   font-size: 11px;
 }
 
@@ -1367,7 +1424,7 @@ a {
   height: 34px;
   border-radius: var(--radius-lg);
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
@@ -1517,7 +1574,7 @@ a {
 }
 
 .allowed {
-  color: var(--success);
+  color: var(--success-ink);
 }
 
 .denied {
@@ -1758,7 +1815,7 @@ a {
 }
 
 .tableLink:hover strong {
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .pageActionGroup,
@@ -1814,7 +1871,7 @@ a {
 }
 
 .archiveMobileOpen:hover .codeText {
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .archiveDetail {
@@ -1944,7 +2001,7 @@ a {
 .archiveMessageNotice {
   display: block;
   margin-top: 7px;
-  color: var(--warning);
+  color: var(--warning-ink);
   font-size: 11px;
 }
 
@@ -1962,7 +2019,7 @@ a {
 
 .archiveEventRole-tool {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .archiveEventRole-system {
@@ -2100,7 +2157,7 @@ a {
 
 .archiveSystemCard-warning .archiveEventRole-system {
   background: color-mix(in srgb, var(--warning) 18%, var(--surface));
-  color: var(--warning);
+  color: var(--warning-ink);
 }
 
 .archiveSystemCard-success {
@@ -2110,7 +2167,7 @@ a {
 
 .archiveSystemCard-success .archiveEventRole-system {
   background: color-mix(in srgb, var(--success) 18%, var(--surface));
-  color: var(--success);
+  color: var(--success-ink);
 }
 
 .archiveRawDetails {
@@ -2290,7 +2347,7 @@ a {
 .documentDetail h3 svg {
   width: 16px;
   height: 16px;
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .historyList {
@@ -2376,6 +2433,11 @@ a {
   opacity: 0.45;
 }
 
+.auditPageToolbar .segmented {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
 .modelViewTabs {
   flex-wrap: wrap;
 }
@@ -2418,7 +2480,7 @@ a {
 }
 
 .projectOriginCell > span:last-child {
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   font-size: 12px;
 }
 
@@ -2428,12 +2490,8 @@ a {
   align-items: center;
   gap: 8px 16px;
   margin: 10px 0 20px;
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   font-size: 13px;
-}
-
-.projectConfigurationSection {
-  border-left: 3px solid var(--accent);
 }
 
 .projectConfigurationSummary {
@@ -2459,13 +2517,13 @@ a {
 
 .projectConfigurationSummary p {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   font-size: 12px;
   line-height: 1.45;
 }
 
 .definitionLabel {
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0;
@@ -2483,7 +2541,7 @@ a {
 }
 
 .projectLink:hover {
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .projectLink svg {
@@ -2679,7 +2737,7 @@ a {
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--warning-soft);
-  color: var(--warning);
+  color: var(--warning-ink);
   font-size: 12px;
 }
 
@@ -2790,7 +2848,7 @@ a {
 }
 
 .metric-warning strong {
-  color: var(--warning);
+  color: var(--warning-ink);
 }
 
 .monthPicker {
@@ -3061,7 +3119,7 @@ a {
   .mobileNav a.active,
   .mobileNav > button.active {
     background: var(--accent-soft);
-    color: var(--accent);
+    color: var(--accent-ink);
   }
 
   .mobileNav svg {
@@ -3220,12 +3278,15 @@ a {
     align-items: flex-start;
   }
 
-  .pageHeader:has(.modelPageToolbar) {
+  .pageHeader:has(.modelPageToolbar),
+  .pageHeader:has(.auditPageToolbar) {
     flex-wrap: wrap;
   }
 
   .pageHeader:has(.modelPageToolbar) .pageHeading,
-  .pageHeader:has(.modelPageToolbar) .pageActions {
+  .pageHeader:has(.modelPageToolbar) .pageActions,
+  .pageHeader:has(.auditPageToolbar) .pageHeading,
+  .pageHeader:has(.auditPageToolbar) .pageActions {
     flex: 1 1 100%;
     max-width: none;
   }
@@ -3247,6 +3308,11 @@ a {
 
   .pageHeader:has(.modelPageToolbar) .pageActions {
     max-width: none;
+  }
+
+  .auditPageToolbar {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .projectDetailPage .pageActions {
@@ -3531,9 +3597,79 @@ a {
   white-space: normal;
 }
 
+.computerPermissions .qualificationHead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: var(--dsw-space-2);
+  padding-block: var(--dsw-space-2);
+}
+
+.runtimePolicyDetails {
+  margin-top: var(--dsw-space-4);
+  padding-top: var(--dsw-space-4);
+  border-top: 1px solid var(--border);
+}
+
+.runtimePolicyDetails > summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.runtimePolicy {
+  margin-top: var(--dsw-space-3);
+}
+
+.runtimePolicyActions > .muted {
+  margin-inline-end: auto;
+}
+
+.runtimeMobileList {
+  padding-inline: 0;
+}
+
+.runtimeAssignmentId {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
 .deploymentStatus {
   display: grid;
   gap: 12px;
+}
+
+.nodeAccessScope {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.nodeAccessName {
+  min-width: 10ch;
+  max-width: 28ch;
+  overflow-wrap: anywhere;
+}
+
+.nodeAccessTicket {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.nodeAccessTicket p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.nodeAccessTicket code {
+  overflow-wrap: anywhere;
+}
+
+.nodeAccessSetup summary {
+  cursor: pointer;
+}
+
+.nodeAccessSetup p {
+  margin-top: 12px;
 }
 
 .statusRow {
@@ -3563,7 +3699,7 @@ a {
 
 .mobileMoreNav a.active {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .mobileMoreNav svg {
@@ -3590,7 +3726,7 @@ a {
 }
 
 .archiveSyncStale {
-  color: var(--warning);
+  color: var(--warning-ink);
 }
 
 .archiveMobileFooter {
@@ -3614,7 +3750,7 @@ a {
   border-radius: 8px;
   background: var(--surface-subtle);
   border: 1px solid var(--border);
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   font-size: 0.8125rem;
   line-height: 1.5;
 }
@@ -3632,7 +3768,7 @@ a {
 }
 
 .backLink:hover {
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .backLink svg {
@@ -3647,13 +3783,13 @@ a {
 }
 
 .userLink:hover .identityText strong {
-  color: var(--accent);
+  color: var(--accent-ink);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
 .projectLink:hover {
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .pageBadges {
@@ -3919,7 +4055,7 @@ a {
   border: none;
   background: none;
   padding: 0;
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: 12px;
   cursor: pointer;
 }

@@ -4,8 +4,6 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - button "Feedback":
-    - img
 - button "System prompt":
   - img
   - img
@@ -34,10 +32,6 @@
   - code: javascript:alert(1)
 - paragraph: INLINE_CODE_LINK_DONE
 - button "Copy":
-  - img
-- button "Good response":
-  - img
-- button "Bad response":
   - img
 - button "Branch into a new conversation":
   - img

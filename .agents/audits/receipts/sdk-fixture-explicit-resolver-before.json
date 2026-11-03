@@ -1,0 +1,14 @@
+{
+  "name": "sdk-fixture-explicit-resolver-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/test-support/session-snapshot/tests/profile-patch.spec.ts",
+  "startedAt": "2026-10-26T09:39:07.248918+00:00",
+  "seconds": 4.907,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "51c92202252e32a4909c7aa9dd4fbb6156d565d7f41fd67812c1848760821b3e",
+  "inputsAfter": "51c92202252e32a4909c7aa9dd4fbb6156d565d7f41fd67812c1848760821b3e",
+  "postgresToolDirectory": null,
+  "outputSha256": "ffba2493052eeb436618a9e29722312ab5720c0fb26102111cc76b388b23a0db",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/test-support/session-snapshot/tests/profile-patch.spec.ts (1 test | 1 failed) 9ms\n   × resolves bare plugins from an explicit workspace while retaining authored relative names and refusing conflicting links 8ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/test-support/session-snapshot/tests/profile-patch.spec.ts > resolves bare plugins from an explicit workspace while retaining authored relative names and refusing conflicting links\nError: ENOENT: no such file or directory, realpath '/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/snapshot-patch-resolver-f5OZjF/runtime/.dsh/profiles/sdk/node_modules/optional-fixture-provider'\n ❯ packages/test-support/session-snapshot/tests/profile-patch.spec.ts:26:12\n     24|     const materialized = materializeProfilePatch(source, cwd, 'sdk', t…\n     25|     const link = join(cwd, '.dsh', 'profiles', 'sdk', 'node_modules', …\n     26|     expect(await realpath(link)).toBe(await realpath(packageDir))\n       |            ^\n     27|     expect(await readFile(materialized, 'utf8')).toContain(pathToFileU…\n     28|     expect(await readFile(source, 'utf8')).toBe(original)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  17:39:11\n   Duration  644ms (transform 368ms, setup 42ms, import 502ms, tests 9ms, environment 0ms)\n\n"
+}

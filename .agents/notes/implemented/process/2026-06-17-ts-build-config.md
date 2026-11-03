@@ -35,6 +35,8 @@ In-package relative imports use explicit `.ts` specifiers.
 - Client tsc runs `tsc -b` against `tsconfig.client.json` after Host Typert has generated the Remote Client declarations; Client tsdown then reads the JavaScript emitted by the Client graph and produces the Client packages' Node loader entries and browser bundles.
 - The Web build starts only after both lib phases complete.
 
+The example-resolution check counts both directory references and explicit project-config files as coverage of their package directory, then follows named config references. Traversing this graph does not combine Host and Client compiler programs.
+
 `tsdown` is no longer the owner of TypeScript compilation or declaration output.
 
 `pnpm run typecheck` first runs the Host lib phase to generate the Remote declarations required by Client typechecking, then runs `tsc -b` against `tsconfig.client.json`. The two aggregates themselves check their respective examples, tests, and scripts with `noEmit`; referenced package/vendor projects retain the same emit behavior as the build.

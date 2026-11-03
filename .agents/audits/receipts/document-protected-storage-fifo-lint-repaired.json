@@ -1,0 +1,14 @@
+{
+  "name": "document-protected-storage-fifo-lint-repaired",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/identity-storage.ts packages/attachment/userdoc-local/src/file-object.ts packages/attachment/userdoc-local/src/mutation.ts packages/attachment/userdoc-local/src/identity-fs.ts packages/attachment/userdoc-local/src/identity.ts packages/attachment/userdoc-local/src/store.ts packages/attachment/userdoc-local/src/upload.ts packages/attachment/userdoc-local/tests/identity-storage.spec.ts packages/attachment/userdoc-local/tests/identity-storage-platform.spec.ts packages/attachment/userdoc-local/tests/identity.spec.ts packages/attachment/userdoc-local/tests/identity-fs.spec.ts packages/attachment/userdoc-local/tests/mutation.spec.ts packages/attachment/userdoc-local/tests/file-object.spec.ts packages/attachment/userdoc-local/tests/document-io.spec.ts packages/attachment/userdoc-local/tests/parts-loader.spec.ts",
+  "startedAt": "2026-10-26T00:39:44.984210+00:00",
+  "seconds": 7.946,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f10a300a0f07e8a6275e1d6d74af0e9e12504075b71c6bdb9105e0e49d843902",
+  "inputsAfter": "f10a300a0f07e8a6275e1d6d74af0e9e12504075b71c6bdb9105e0e49d843902",
+  "postgresToolDirectory": null,
+  "outputSha256": "8a80dd3da6acb96699d126b5ddce511c8519fc9fe86e85cf1d8c5622324cb5a9",
+  "outputTail": "packages/attachment/userdoc-local/tests/identity-storage.spec.ts:257:3: error typescript(no-dynamic-delete): Do not delete dynamically computed property keys. help: Use a static property key, or use a Map/Set for dynamic keys.\npackages/attachment/userdoc-local/tests/identity-storage.spec.ts:275:21: error @stylistic(member-delimiter-style): Unexpected separator (;).\npackages/attachment/userdoc-local/tests/identity-storage.spec.ts:275:37: error @stylistic(member-delimiter-style): Unexpected separator (;).\npackages/attachment/userdoc-local/tests/identity-storage.spec.ts:275:79: error @stylistic(member-delimiter-style): Unexpected separator (;).\npackages/attachment/userdoc-local/tests/identity-storage.spec.ts:256:9: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\npackages/attachment/userdoc-local/tests/identity-storage.spec.ts:266:9: error typescript(no-unsafe-assignment): Unsafe assignment of an any value.\n"
+}

@@ -1,0 +1,275 @@
+{
+  "findings": [
+    "B436",
+    "B437",
+    "B438"
+  ],
+  "status": "fixed_verified_named_subagent_admission_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T10:01:56.148959+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-origin.json",
+    "fetchCompletedAt": "2026-11-01T09:37:38.359603+00:00"
+  },
+  "problems": {
+    "B436": "A failed foreground cleanup retains parent occupation after the Consumer loses its returned handle; a failed catalog publication can similarly lose the only retry owner.",
+    "B437": "Provider lookup preceding asynchronous preparation can dispatch through a withdrawn or re-registered Provider.",
+    "B438": "Combining execution and cleanup failures with String on opaque errors replaces both causes with a conversion exception."
+  },
+  "fixes": {
+    "B436": "Explicitly hand failed foreground cleanup back to its original Service and exact parent, retry adopted leases before native admission, and automatically retain failed catalog rollback. Do not seize holder-owned background handles.",
+    "B437": "Capture effect-scoped registration identity and reject stale dispatch after preparation/cleanup barriers, including same-object registration replacement.",
+    "B438": "Use renderSubagentFailure for both diagnostics and retain both causes without unsafe coercion."
+  },
+  "verification": {
+    "distinctBusinessCases": 710,
+    "subagentConsumerWorkflowAndRalphUnitCases": 679,
+    "catalogAndToolCordisCases": 25,
+    "typescriptSdkCases": 3,
+    "pythonSdkCases": 3,
+    "versionRepeatsAndSubsetRerunsNotAdded": true,
+    "checks": [
+      {
+        "name": "subagent-retry-adopted-regression",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-adopted-regression.json"
+      },
+      {
+        "name": "subagent-retry-catalog-regression",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-catalog-regression.json"
+      },
+      {
+        "name": "subagent-retry-adopted-source-sdk",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-adopted-source-sdk.json"
+      },
+      {
+        "name": "subagent-retry-final-node22",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-final-node22.json"
+      },
+      {
+        "name": "subagent-retry-final-node24",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-final-node24.json"
+      },
+      {
+        "name": "subagent-retry-python",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-python.json"
+      },
+      {
+        "name": "subagent-retry-final-error-cases",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-final-error-cases.json"
+      },
+      {
+        "name": "subagent-retry-final-lint-fixed",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-final-lint-fixed.json"
+      },
+      {
+        "name": "subagent-retry-matched-build-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-matched-build-final.json"
+      },
+      {
+        "name": "subagent-retry-adopted-final-types",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-adopted-final-types.json"
+      },
+      {
+        "name": "subagent-retry-export-jsdoc",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-export-jsdoc.json"
+      },
+      {
+        "name": "subagent-retry-config",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-config.json"
+      },
+      {
+        "name": "subagent-retry-python-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-python-lint.json"
+      },
+      {
+        "name": "subagent-retry-pairing",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-pairing.json"
+      },
+      {
+        "name": "subagent-retry-subsystem-pairing",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-subsystem-pairing.json"
+      },
+      {
+        "name": "subagent-retry-test-preservation-complete",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-test-preservation-complete.json"
+      },
+      {
+        "name": "subagent-retry-docs-complete",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-docs-complete.json"
+      },
+      {
+        "name": "subagent-retry-catalog-build",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-catalog-build.json"
+      },
+      {
+        "name": "subagent-retry-origin",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-origin.json"
+      },
+      {
+        "name": "subagent-retry-final-repository-references",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-retry-final-repository-references.json"
+      }
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 18,
+          "covered": 18,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 23,
+          "covered": 23,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent/src/run-lease.ts": {
+        "lines": {
+          "total": 18,
+          "covered": 18,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 23,
+          "covered": 23,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 10,
+          "covered": 10,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "coverageScope": "Only the new run-lease.ts helper is100% in all4 metrics. Core and Consumer index files remain in the existing coverage baseline; no exclusions or thresholds changed and no whole-file/project100% claim.",
+    "physicalProof": "The actual shipped sdk-minimal profile, SubagentRuntime and foreground delegation Consumer retain a real native HTTP transport after failed cleanup, refuse further allocation, then close it before fresh admission. Catalog publication failure and provider replacement use real Session and WorkingDirectory service seams. Only the external backend/model inputs are controlled.",
+    "ownershipProof": "Only explicitly transferred failed foreground handles or unreturned failed-catalog handles join admission retry. Holder-owned failed background runs and untouched concurrent runs are excluded. Parent and service identity reject foreign transfer. Adopted cleanup joins known service disposal.",
+    "counterfactual": "Complete unchanged186-file original Core plus59-file original Consumer reproduce3 intended SUBAGENT_RETRY_FAILED results in both source and Node22 built SDK runs without module errors/timeouts. The original Consumer also fails the3 opaque-error assertions with unsafe String conversion. Early pre-adoption unit negatives are retained as intermediate evidence only.",
+    "originalTestPreservation": {
+      "status": "passed",
+      "originalDefinitionsPreserved": 52,
+      "cancellationAssertionsUnchanged": true,
+      "publicationBarrierReplacesTwoMicrotaskFlushes": true,
+      "addedParameterizedDefinition": "three opaque combined-failure cases"
+    },
+    "fixtureSyntax": {
+      "status": "passed",
+      "command": "NODE_DISABLE_COMPILE_CACHE=1 node --check <each path>",
+      "paths": [
+        "examples/headless-agent/tests/fixtures/subagent-retry-admission/model.mjs",
+        "examples/headless-agent/tests/fixtures/subagent-retry-admission/prepare.mjs"
+      ]
+    },
+    "lastLocalCorrection": "After the679-case run, a this:void type annotation and equivalent test Promise scheduling lint correction were checked by the final3-case error rerun, final7-file TS lint, normal matched build and full Host types.",
+    "docsQuick": "20 passed,0 failed",
+    "bilingualPairs": 6,
+    "cordisConfigs": 440,
+    "productionAcceptanceClaimed": false,
+    "officialResponsesDeferred": true
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/subagent-admission-capsule.json",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-subagent-admission-cleanup.zh.md",
+    "apps/cli/tests/profiles/sdk/subagent-retry-admission.expected.e2e.ts",
+    "docs/subsystems/subagent.i18n.yaml",
+    "docs/subsystems/subagent.md",
+    "docs/subsystems/subagent.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/subagent-retry-admission/expected.json",
+    "examples/headless-agent/tests/fixtures/subagent-retry-admission/model.mjs",
+    "examples/headless-agent/tests/fixtures/subagent-retry-admission/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/subagent-retry-admission/runtime.cordis.yml",
+    "packages/extensions/tool-cordis/src/api-catalog.ts",
+    "packages/subagent/subagent/README.i18n.yaml",
+    "packages/subagent/subagent/README.md",
+    "packages/subagent/subagent/README.zh.md",
+    "packages/subagent/subagent/src/index.ts",
+    "packages/subagent/subagent/src/run-lease.ts",
+    "packages/subagent/subagent/src/types.ts",
+    "packages/subagent/subagent/tests/run-cleanup.spec.ts",
+    "packages/subagent/tool-subagent/README.i18n.yaml",
+    "packages/subagent/tool-subagent/README.md",
+    "packages/subagent/tool-subagent/README.zh.md",
+    "packages/subagent/tool-subagent/src/index.ts",
+    "packages/subagent/tool-subagent/tests/tool-subagent.spec.ts",
+    "python/sdk/tests/test_subagent_retry_admission_expected.py"
+  ],
+  "generatedPathsToRegenerate": [
+    "docs/subsystems/subagent.md",
+    "docs/subsystems/subagent.zh.md",
+    "docs/subsystems/subagent.i18n.yaml",
+    "packages/extensions/tool-cordis/src/api-catalog.ts"
+  ],
+  "removedPaths": [],
+  "readOnlyPrerequisiteCount": 168,
+  "artifactReferences": 13,
+  "noteReview": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/note-supersession.json",
+  "remaining": [
+    "All12 domains remain in_progress; B04/B25 remain implementation_in_progress.",
+    "Continue remaining resource/model/tool/Inspector authorization and cross-account/computer business rules outside peer-reserved surfaces.",
+    "Review remaining foreground Workflow/Ralph cleanup recovery, in-flight withdrawal and queued provider/permission transitions. These are candidates until a deterministic business failure is demonstrated; holder-owned background runs must retain their cleanup authority.",
+    "Other response transports, native platform containment, document/runtime paths and full file-level coverage remain open. Preserve earlier B431 background cleanup and peer-owned fetch/client.ts.",
+    "Trusted peer reports R26 on both computers at schema103/epoch51 and R27 as tests only, excluding B416+ capsules. Matrix101 executed/78 pass/23 partial/74 pending; B latency/admission and full production cross-computer acceptance remain open. Root has not independently verified that report.",
+    "Peer requests a frozen B416-to-current integration index and the B417 required-on-read writer/readers/SDK/rollback obligations. Provide references and integration conditions; do not claim the collection is a validated release or copy a dirty tree.",
+    "Official paid Responses remains deferred. No root production deployment/restart/dependency synchronization/reset/stash/commit/push."
+  ],
+  "globalReviewComplete": false,
+  "officialResponsesDeferred": true,
+  "integrationIndex": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T083414Z/B416-B438-integration-index.json"
+}

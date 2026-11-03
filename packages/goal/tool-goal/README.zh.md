@@ -35,7 +35,7 @@ kind: "package-reference"
 
 3 个规范值都与已经渲染给 Native 调用方的紧凑 JSON 一致：`{ goal: null }` 或 `{ goal: { id, revision, objective, phase, roundsStarted, maxGoalRounds, blockedReason? }, activation }`。因此，编程消费方无需解析渲染后的 JSON，即可收到相同领域结构。
 
-自主 Goal Round 成功报告 `complete` 或 `blocked` 时，会用 `concludeTurn()` 标记该次工具执行，使物理轮次在该步骤后停止。人类直接变更绝不会导致这种停止：assistant 可以确认变更，循环仍可接收并发的人类 steering（中途引导）。
+自主 Goal Round 成功报告 `complete` 或 `blocked` 时，会增加一条已记录的收尾指令，assistant 通过普通的无工具调用停止路径给出结束回复。人类直接变更保留普通轮次流程。[轮次收尾决策](../../../.agents/notes/implemented/bug-fix/2026-08-02-goal-round-wrapup-message.zh.md)负责相关上下文与停止行为。
 
 <a id="authority"></a>
 ## 权限
@@ -56,7 +56,7 @@ complete 与 blocked 还接受完全一致的当前 Goal Round：来源为 goal 
     blockedAfterConsecutiveRounds: 3
 ```
 
-该值必须是正的安全整数。它既提供模型自行报告阻塞的硬下限，也决定模型指引中指明的数值。
+该值必须是正的安全整数。它既提供模型自行报告阻塞的硬下限，也决定模型指引中指明的数值。每次显式恢复都会为该目标开始新的阻塞判断区间，先前已接纳轮数仍计入目标的总预算。
 
 <a id="model-experience"></a>
 ## 模型体验

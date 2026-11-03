@@ -1,0 +1,17 @@
+{"operation":"publish","outsidePreserved":true,"foreignTouched":false,"refused":true}
+{"operation":"capture","outsidePreserved":true,"foreignTouched":false,"refused":true}
+{"operation":"detach","outsidePreserved":true,"foreignTouched":false,"refused":true}
+{"operation":"ordinary-save-parent","outsidePreserved":true,"partialRemoved":true,"refused":true}
+{"operation":"ordinary-trash-parent","outsidePreserved":true,"sourceRestored":true,"refused":true}
+{"operation":"ordinary-restore-parent","outsidePreserved":true,"recoverable":true,"refused":true}
+{"operation":"restore-directory-parent","outsidePreserved":true,"createdDirectoryRemoved":true,"refused":true}
+{"operation":"ordinary-purge-parent","outsidePreserved":true,"retryCompleted":true,"refused":true}
+{"operation":"resumable-private-source","outsidePreserved":true,"partialRetained":true,"refused":true}
+{"operation":"resumable-public-target","outsidePreserved":true,"partialRetained":true,"refused":true}
+{"operation":"identified-lifecycle","renamed":true,"moved":true,"restored":true,"purged":true}
+{"operation":"directory-source-parent","outsidePreserved":true,"selectedBytesPreserved":true,"refused":true}
+{"operation":"directory-target-parent","outsidePreserved":true,"selectedBytesPreserved":true,"refused":true}
+{"operation":"directory-capture-directory","foreignPreserved":true,"refused":true,"restartRetry":true,"identityPreserved":true,"creatorPreserved":true}
+{"operation":"directory-capture-file","foreignPreserved":true,"refused":true,"restartRetry":true,"identityPreserved":true,"creatorPreserved":true}
+{"operation":"directory-capture-marker","foreignPreserved":true,"refused":true,"restartRetry":true,"identityPreserved":true,"creatorPreserved":true}
+{"operation":"directory-descriptor-editor","completed":true,"editedBytesPreserved":true,"replacementIdentityDistinct":true,"replacementCreatorUnknown":true}

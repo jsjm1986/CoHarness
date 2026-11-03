@@ -1,0 +1,27 @@
+{
+  "finalResponse": "NATIVE_SEARCH_DONE",
+  "requests": [
+    {
+      "type": "web/perplexity-search-llm-request",
+      "path": "/sonar/v1/chat/completions",
+      "model": "sonar",
+      "maxTokens": 64,
+      "query": "native fixture query"
+    }
+  ],
+  "completion": {
+    "modelAdmissions": 3,
+    "executionAdmissions": 1,
+    "quiescent": 3,
+    "nativeRequests": 1,
+    "persistedBeforeHttp": true,
+    "usages": [
+      {
+        "inputTokens": 3,
+        "outputTokens": 2,
+        "credentialSource": "file",
+        "totalTokens": 5
+      }
+    ]
+  }
+}

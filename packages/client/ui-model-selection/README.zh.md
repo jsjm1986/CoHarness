@@ -37,6 +37,8 @@ Web GUI 允许用户通过 `/model` 弹窗或 composer 模型控件切换既有�
 
 -----
 
+每个目录通过所属 Session 的 Runtime 连接读取、选择并观察模型。模型或设置变化及重连只刷新该 Runtime 的目录。缺少其他 Runtime 的连接时会明确失败，不读取启动环境的目录。
+
 <a id="model-experience"></a>
 ## 模型体验
 

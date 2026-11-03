@@ -53,6 +53,8 @@ Historical CoHarness headers and packed streams are decoded by `coharnessJsonlFo
 | `root` | `string` (required) | Root directory for all session files. **No default** — a `process.cwd()` default would scatter files as the process's cwd changes (bash calls, subprocesses). An existing root must be a readable directory; an absent root is created on first materialization. |
 | `compression` | `'zstd' \| 'none'` | Defaults to `'zstd'`; `'none'` retains newline-delimited UTF-8 text. |
 | `listConcurrency` | `number` (positive integer) | Maximum concurrent filesystem reads while enumerating sessions; defaults to `3`. |
+| `verificationConcurrency` | `number` (positive safe integer) | Maximum admitted or running migration verifications in this provider; defaults to `2`. |
+| `maxQueuedVerifications` | `number` (nonnegative safe integer) | Maximum migration verifications waiting for a provider slot; defaults to `128`. A full queue refuses the request before Worker allocation. |
 | `maxPendingEvents` | `number` (positive safe integer) | Maximum events reserved across all this provider's write handles, including active writes; defaults to `100000`. |
 | `maxPendingBytes` | `number` (positive safe integer) | Maximum complete UTF-8 JSON event bytes reserved across those writes; defaults to `67108864` (64 MiB). |
 
@@ -87,7 +89,9 @@ Live batching uses a fixed per-handle window, and `session/flush` or disposal dr
 Plaintext body reads scan bounded byte windows and retain decoded events without a complete raw-file buffer. They check cancellation between reads and retry changed revisions. Successor publication rechecks the source revision after writing the temporary file; a changed or missing source refuses publication. Successors are encoded in bounded batches with cancellation checks between events and writes. Compressed reads and logical preparation still retain complete input or event arrays.
 
 
-Provider-triggered unload waits for injecting consumers to finish before removing live-event routing and closing handles. Consumer cleanup must belong to its injecting scope; concurrent root disposal has no dependency ordering guarantee.
+Each provider owns its migration verification queue. A verifier retains its resource provider before entering either the local or process-admission queue. Withdrawal, replacement or newly installed admission before Worker creation rejects with `ResourceAdmissionError` reason `unavailable` and returns any unused permit to its original provider; retry with a fresh write open. Managed compositions refuse a missing provider. Permits carry infrastructure attribution. Capacity refusal, Worker startup failure, and invalid Worker responses remain distinct from stored-log corruption. Failed termination retains the local slot and uncertain node occupation until the thread is confirmed stopped. See the [ownership decision](../../../.agents/notes/implemented/bug-fix/2026-10-31-migration-verification-resource-owner.md).
+
+Provider-triggered unload waits for injecting consumers and accepted opens, including migration preparation and publication, before removing live-event routing and closing handles. Publication runs to settlement once started, even if its caller cancels. Consumer cleanup must belong to its injecting scope; concurrent root disposal has no dependency ordering guarantee.
 
 <a id="model-experience"></a>
 

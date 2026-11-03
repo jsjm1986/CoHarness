@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-terminal-proof-before",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/local-runtime-launcher.spec.ts -t 'unavailable owner record' --retry=0",
+  "startedAt": "2026-10-24T19:22:17.904297+00:00",
+  "seconds": 3.343,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e96a6c4ecde586b5983a6203166a5238584bcd5f23ec198da7b588f6c172d3bc",
+  "inputsAfter": "e96a6c4ecde586b5983a6203166a5238584bcd5f23ec198da7b588f6c172d3bc",
+  "postgresToolDirectory": null,
+  "outputSha256": "c4d832a491bfe11701c449e665f146480aa69f24b3b29a35f9e9cf3c6be79af8",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/local-runtime-launcher.spec.ts (10 tests | 1 failed | 8 skipped) 656ms\n     × retains uncertain occupancy when an unavailable owner record says stopped 230ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/local-runtime-launcher.spec.ts > recoverable LocalLauncher > retains uncertain occupancy when an unavailable owner record says stopped\nAssertionError: promise resolved \"undefined\" instead of rejecting\n\n- Expected:\nError {\n  \"message\": \"rejected promise\",\n}\n\n+ Received:\nundefined\n\n ❯ tests/local-runtime-launcher.spec.ts:123:71\n    121|     await writeFile(f.store.recordPath, JSON.stringify({ ...record, ph…\n    122|     try {\n    123|       await expect(new LocalRuntimeControl(f.store, 100).terminate(0))…\n       |                                                                       ^\n    124|       expect(await (await fetch(`http://127.0.0.1:${runtime.port}`)).t…\n    125|     } finally { await writeFile(f.store.recordPath, original) }\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 1 passed | 8 skipped (10)\n   Start at  03:22:20\n   Duration  1.20s (transform 350ms, setup 0ms, import 458ms, tests 656ms, environment 0ms)\n\n"
+}

@@ -13,7 +13,7 @@ const cleanup: Array<() => Promise<void>> = []
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close() })
 const admin = { id: 1, role: 'admin', status: 'active', username: 'admin', displayName: 'Admin' } as UserRow
 const target = { kind: 'project' as const, id: 7 }
-async function fixture() {
+async function fixture(options: { beforeReply?: () => Promise<void>; beforeDispatch?: () => Promise<void>; value?: unknown } = {}) {
   const signer = new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'org', 30_000)
   let live = true, generation = 4, status = 200, size = 0
   const requests: unknown[] = []
@@ -28,8 +28,9 @@ async function fixture() {
       if (!req.url?.startsWith('/api/settings.')) expect(body.payload).toEqual({ args: {} })
       requests.push({ path: req.url, body })
       const stream = req.url?.includes('/_stream/') === true
+      await options.beforeReply?.()
       res.writeHead(status, { 'content-type': stream ? 'application/x-ndjson' : 'application/json' })
-      res.end(size > 0 ? 'x'.repeat(size) : JSON.stringify({ rpcId: body.rpcId, result: { ok: true, value: [] } }))
+      res.end(size > 0 ? 'x'.repeat(size) : JSON.stringify({ rpcId: body.rpcId, result: { ok: true, value: options.value ?? [] } }))
     })().catch(error => { res.writeHead(500); res.end(String(error)) })
   })
   await new Promise<void>(ready => server.listen(0, '127.0.0.1', ready))
@@ -37,8 +38,9 @@ async function fixture() {
   const operationRef = vi.fn(async (_target: typeof target, _delta: 1 | -1, _generation?: number) => {})
   const users = { getById: vi.fn(async () => admin) }
   const deps = { users, projects: { getById: async () => ({ name: 'Project' }) },
-    instances: { isLive: async () => live, generationOf: async () => generation, operationRef, portOf: async () => (server.address() as AddressInfo).port },
-    cfg: { upstreamTimeoutMs: 5000, upstreamResponseLimitBytes: 1024 },
+    instances: { isLive: async () => live, generationOf: async () => generation, operationRef,
+      portOf: async () => { await options.beforeDispatch?.(); return (server.address() as AddressInfo).port } },
+    cfg: { upstreamTimeoutMs: 5000, upstreamResponseLimitBytes: 1024, projectRuntimesRoot: '/fixture/project-runtimes' },
   } as unknown as GatewayDeps
   const manager = new GatewayPluginManagement(deps, signer, 'node-1')
   const request = { target, nodeId: 'node-1', generation: 4, rpcId: randomUUID(), endpoint: 'pluginManager/listBundles', args: {} }
@@ -47,7 +49,7 @@ async function fixture() {
     for await (const chunk of manager.invoke(admin, input, new AbortController().signal)) output.push(chunk)
     return Buffer.concat(output).toString()
   }
-  return { manager, invoke, request, requests, users, operationRef,
+  return { manager, invoke, request, requests, users, operationRef, deps,
     live: (value: boolean) => { live = value }, generation: (value: number) => { generation = value },
     status: (value: number) => { status = value }, size: (value: number) => { size = value } }
 }
@@ -137,4 +139,61 @@ it('forwards configuration payloads directly while keeping the same administrato
   for (const expectedRevision of [undefined, -1, 1.5, '3']) {
     await expect(f.invoke({ ...f.request, endpoint: 'settings.mutate', args: { expectedRevision } })).rejects.toMatchObject({ status: 400 })
   }
+})
+
+it.each(['pluginManager/listBundles', 'pluginManager/installBundleStream'])('refuses %s metadata when administrator authority is withdrawn during the Runtime response', async endpoint => {
+  let current = true
+  const f = await fixture({ beforeReply: async () => { current = false }, value: ['private-profile-bundle'] })
+  f.users.getById.mockImplementation(async () => current ? admin : { ...admin, role: 'user' })
+  await expect(f.invoke({ ...f.request, endpoint })).rejects.toMatchObject({ status: 403 })
+  expect(f.operationRef.mock.calls).toEqual([[target, 1, 4], [target, -1, 4]])
+})
+
+it('does not dispatch a plugin mutation after authority is withdrawn during port lookup', async () => {
+  let current = true
+  const f = await fixture({ beforeDispatch: async () => { current = false } })
+  f.users.getById.mockImplementation(async () => current ? admin : { ...admin, role: 'user' })
+  await expect(f.invoke({ ...f.request, endpoint: 'pluginManager/removeBundle' })).rejects.toMatchObject({ status: 403 })
+  expect(f.requests).toEqual([])
+  expect(f.operationRef.mock.calls).toEqual([[target, 1, 4], [target, -1, 4]])
+})
+
+it('withholds ordinary response bytes until lease cleanup and current authority have completed', async () => {
+  let current = true
+  const f = await fixture({ value: ['private-profile-bundle'] })
+  f.users.getById.mockImplementation(async () => current ? admin : { ...admin, role: 'user' })
+  f.operationRef.mockImplementation(async (_target, delta) => { if (delta === -1) current = false })
+  const response = f.manager.invoke(admin, f.request, new AbortController().signal)
+  await expect(response.next()).rejects.toMatchObject({ status: 403 })
+  expect(f.requests).toHaveLength(1)
+})
+
+it.each(['target', 'overview', 'state'] as const)('refuses the %s read after authority is withdrawn while loading its data', async method => {
+  let current = true
+  const f = await fixture()
+  f.users.getById.mockImplementation(async () => current ? admin : { ...admin, role: 'user' })
+  f.deps.instances.generationOf = async () => { current = false; return 4 }
+  f.deps.pluginState = {
+    list: async () => { current = false; return [] }, get: async () => ({ revision: '0', state: null }),
+    applied: async () => '0', observed: async () => null,
+  } as unknown as NonNullable<GatewayDeps['pluginState']>
+  const result = method === 'overview' ? f.manager.overview(admin) : f.manager[method](admin, target)
+  await expect(result).rejects.toMatchObject({ status: 403 })
+  expect(f.requests).toEqual([])
+})
+
+it('withholds a registry probe result after administrator withdrawal without dispatching to the Runtime', async () => {
+  let current = true
+  const f = await fixture()
+  f.users.getById.mockImplementation(async () => current ? admin : { ...admin, role: 'user' })
+  const transport = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+    current = false
+    return new Response(null, { status: 204 })
+  })
+  try {
+    await expect(f.invoke({ ...f.request, endpoint: 'pluginRegistryProbe/fastest' })).rejects.toMatchObject({ status: 403 })
+    expect(transport).toHaveBeenCalledTimes(2)
+    expect(f.requests).toEqual([])
+    expect(f.operationRef).not.toHaveBeenCalled()
+  } finally { transport.mockRestore() }
 })

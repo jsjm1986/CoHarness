@@ -56,6 +56,7 @@ import type {
   GenerateOptions,
   ImageAttachmentAccess,
   LlmModelInfo,
+  LlmOperationDispatch,
   LlmProviderInfo,
   LlmResolvedModelInfo,
   PreparedAdapterCall,
@@ -70,6 +71,9 @@ import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { toPiContext } from './context.ts'
 import { conversationUpdates, createModels, getSupportedThinkingLevels } from './models.ts'
 import { toStreamChunks } from './stream.ts'
+import { piAiSearchOperations } from './search-operation.ts'
+import { perplexitySearchOperations } from './perplexity-operation.ts'
+import { nativeStreamOperations } from './native-stream.ts'
 
 /**
  * Initially active declaration added to an Anthropic request whose projected
@@ -254,7 +258,7 @@ interface ModelEndpointCandidates {
   /** Raw profile/model prefix used as the process-local cache key. */
   rawBaseURL: string
   /** Ordered candidates, with a remembered successful endpoint first. */
-  candidates: readonly string[]
+  candidates: readonly [string, ...string[]]
 }
 
 /** Whether this model API uses the adapter's endpoint normalization and cache. */
@@ -280,7 +284,7 @@ function modelEndpointCandidatesFor(
   const rawBaseURL = profile.baseURL ?? model.baseUrl
   if (!supportsEndpointResolution(model.api)) return { rawBaseURL, candidates: [model.baseUrl] }
 
-  const candidates = [...modelEndpointCandidates(rawBaseURL, model.api)]
+  const candidates = modelEndpointCandidates(rawBaseURL, model.api)
   const cached = cache.get(model.api, rawBaseURL)
   if (cached === undefined || !candidates.includes(cached)) {
     if (cached !== undefined) cache.delete(model.api, rawBaseURL)
@@ -445,19 +449,27 @@ export class PiAiAdapter extends LlmAdapter {
 
   override prepareCall(provider: string, model: string, _signal?: AbortSignal): Promise<PreparedAdapterCall> {
     const snapshot = this.current()
+    const profile = this.profileOf(snapshot, provider)
+    const resolvedModel = this.modelOf(snapshot, provider, model)
+    const endpoint = modelEndpointCandidatesFor(resolvedModel, profile, this.endpointCache)
+    const operations = piAiSearchOperations(profile, resolvedModel, endpoint.candidates[0], this.config.resolveApiKey)
+      ?? perplexitySearchOperations(profile, resolvedModel, endpoint.candidates[0], this.config.resolveApiKey)
+      ?? nativeStreamOperations(profile, resolvedModel, endpoint.candidates[0], this.config.resolveApiKey)
     return Promise.resolve({
       model: this.modelInfo(snapshot, provider, model),
-      stream: options => this.streamWithSnapshot(options, snapshot),
+      stream: (options, dispatchRequest) => this.streamWithSnapshot(options, snapshot, dispatchRequest),
+      ...operations === undefined ? {} : { operations },
     })
   }
 
-  stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    return this.streamWithSnapshot(options, this.current())
+  stream(options: GenerateOptions, dispatchRequest?: LlmOperationDispatch): AsyncIterable<StreamChunk> {
+    return this.streamWithSnapshot(options, this.current(), dispatchRequest)
   }
 
   private async * streamWithSnapshot(
     options: GenerateOptions,
     snapshot: PiAiSnapshot,
+    dispatchRequest: LlmOperationDispatch = request => request(),
   ): AsyncIterable<StreamChunk> {
     if (options.stop !== undefined) {
       throw new LlmError('llm-pi-ai does not support GenerateOptions.stop', 'UNSUPPORTED_OPTION')
@@ -538,15 +550,22 @@ export class PiAiAdapter extends LlmAdapter {
         let providerResponse: ProviderResponse | undefined
         let iterator: AsyncIterator<StreamChunk> | undefined
         let exhausted = false
+        let authorizationFailure: { error: unknown } | undefined
 
         try {
           const requestModel = modelAtEndpoint(model, baseURL)
-          const events = snapshot.models.streamSimple(requestModel, context, {
+          const events = await dispatchRequest(() => Promise.resolve(snapshot.models.streamSimple(requestModel, context, {
             ...profileOptions(profile, reasoning, apiKey),
             ...options.temperature === undefined ? {} : { temperature: options.temperature },
             ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },
             ...options.sessionId === undefined ? {} : { sessionId: String(options.sessionId) },
             signal: attemptSignal,
+            onPayload: async () => {
+              try { await dispatchRequest(() => Promise.resolve()) } catch (error) {
+                authorizationFailure = { error }
+                throw error
+              }
+            },
             // Profile headers are deployment-owned; attribution names are
             // Harness-owned and therefore win collisions.
             headers: requestHeaders(profile.headers),
@@ -557,7 +576,7 @@ export class PiAiAdapter extends LlmAdapter {
                 attemptController.abort(pathMismatch)
               }
             },
-          })
+          })))
           const observedEvents = observeEndpointEvents(events, (error) => {
             // The OpenAI SDK rejects non-2xx responses before pi-ai's
             // onResponse hook runs. Its terminal message retains the status,
@@ -579,6 +598,8 @@ export class PiAiAdapter extends LlmAdapter {
           iterator = activeIterator
           while (true) {
             const result = await watchdog.next(activeIterator)
+            // pi-ai serializes callback failures into provider error events.
+            if (authorizationFailure !== undefined) throw authorizationFailure.error
             if (result.done) {
               exhausted = true
               break

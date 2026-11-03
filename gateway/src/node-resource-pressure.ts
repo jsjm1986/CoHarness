@@ -1,16 +1,23 @@
 /** Host pressure sampling and paced admission; running work has no numeric ceiling. */
-import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { availableParallelism, cpus } from 'node:os'
 import { monitorEventLoopDelay } from 'node:perf_hooks'
-import { promisify } from 'node:util'
+import { runGatewayChildCommand } from './child-command.ts'
 
-/** One completed host observation; missing or stale observations never admit new work. */
+/** Host pressure metrics used to calculate admission credits. */
 export interface NodePressureSample {
   cpu: number
   memory: 'normal' | 'warning' | 'critical'
+  /** Linux MemAvailable / MemTotal; the coordinator applies its committed reserve. */
+  memoryAvailableRatio?: number
   eventLoopMs: number
   parallelism: number
+}
+
+/** Local capture time follows its metrics through sensor and database waits. */
+export interface NodePressureObservation extends NodePressureSample {
+  /** Process-monotonic milliseconds captured before reading host metrics. */
+  readonly capturedAt: number
 }
 
 /** Deployment thresholds and observation timing, independent of task counts. */
@@ -21,8 +28,6 @@ export interface NodePressureConfig {
   eventLoopTargetMs: number
   linuxMemoryReserveRatio: number
 }
-
-const execute = promisify(execFile)
 
 /**
  * Translate macOS's exported dispatch pressure flags, not the kernel's internal enum.
@@ -45,7 +50,9 @@ export function darwinMemoryPressure(output: string): NodePressureSample['memory
  * @returns starts allowed during this observation, with no cap on running work.
  */
 export function pressureCredits(sample: NodePressureSample, config: NodePressureConfig): number {
-  if (sample.memory !== 'normal' || sample.cpu >= config.cpuTarget || sample.eventLoopMs >= config.eventLoopTargetMs) return 0
+  if (sample.memory !== 'normal'
+    || (sample.memoryAvailableRatio !== undefined && sample.memoryAvailableRatio <= config.linuxMemoryReserveRatio)
+    || sample.cpu >= config.cpuTarget || sample.eventLoopMs >= config.eventLoopTargetMs) return 0
   return Math.max(1, Math.floor(sample.parallelism * (1 - sample.cpu)))
 }
 
@@ -56,8 +63,8 @@ export class NodeResourcePressure {
   private timer: NodeJS.Timeout | undefined
   private pending: Promise<void> = Promise.resolve()
   private closed = false
-  /** @param config - validated thresholds. @param publish - durable node observation writer. @param failed - bounded diagnostic callback. */
-  constructor(private readonly config: NodePressureConfig, private readonly publish: (sample: NodePressureSample) => Promise<void>, private readonly failed: (error: unknown) => void) {}
+  /** @param config - validated thresholds. @param publish - durable node observation writer. @param failed - bounded diagnostic callback. @param enabled - current lifecycle permission to capture another observation. */
+  constructor(private readonly config: NodePressureConfig, private readonly publish: (sample: NodePressureObservation) => Promise<void>, private readonly failed: (error: unknown) => void, private readonly enabled: () => boolean) {}
 
   /** Begin observations; the first publication follows one full CPU interval. */
   start(): void {
@@ -65,7 +72,9 @@ export class NodeResourcePressure {
     if (process.platform !== 'darwin' && process.platform !== 'linux') throw new Error('node pressure admission requires macOS or Linux')
     this.histogram.enable()
     const tick = (): void => {
-      this.pending = this.sample().then(this.publish).catch(this.failed).finally(() => {
+      this.pending = Promise.resolve().then(async () => {
+        if (this.enabled()) await this.publish(await this.sample())
+      }).catch(this.failed).finally(() => {
         if (!this.closed) { this.timer = setTimeout(tick, this.config.sampleMs); this.timer.unref() }
       })
     }
@@ -81,7 +90,8 @@ export class NodeResourcePressure {
     this.histogram.disable()
   }
 
-  private async sample(): Promise<NodePressureSample> {
+  private async sample(): Promise<NodePressureObservation> {
+    const capturedAt = performance.now()
     const current = cpus().map(cpu => ({ ...cpu.times }))
     let idle = 0, total = 0
     for (let i = 0; i < current.length; i++) {
@@ -95,16 +105,19 @@ export class NodeResourcePressure {
     const eventLoopMs = this.histogram.percentile(99) / 1e6
     this.histogram.reset()
     let memory: NodePressureSample['memory']
+    let memoryAvailableRatio: number | undefined
     if (process.platform === 'darwin') {
-      const { stdout } = await execute('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level'], { timeout: this.config.sampleMs, maxBuffer: 1024 })
+      const { stdout } = await runGatewayChildCommand('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level'], this.config.sampleMs, undefined, 1024)
       memory = darwinMemoryPressure(stdout)
     } else {
       const info = await readFile('/proc/meminfo', 'utf8')
       const available = Number(/^MemAvailable:\s+(\d+)/m.exec(info)?.[1])
       const size = Number(/^MemTotal:\s+(\d+)/m.exec(info)?.[1])
       if (!Number.isFinite(available) || !Number.isFinite(size) || size <= 0) throw new Error('host available memory observation is missing')
-      memory = available / size <= this.config.linuxMemoryReserveRatio ? 'warning' : 'normal'
+      memoryAvailableRatio = available / size
+      memory = 'normal'
     }
-    return { cpu: Math.max(0, Math.min(1, 1 - idle / total)), memory, eventLoopMs, parallelism: availableParallelism() }
+    return { capturedAt, cpu: Math.max(0, Math.min(1, 1 - idle / total)), memory,
+      ...(memoryAvailableRatio === undefined ? {} : { memoryAvailableRatio }), eventLoopMs, parallelism: availableParallelism() }
   }
 }

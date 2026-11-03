@@ -12,6 +12,7 @@
 import { spawnSync } from 'node:child_process'
 import type { SubprocessTerminalSignal } from '@deepseek-ai/dsh-subprocess'
 import { createLazyRequire } from '@deepseek-ai/dsh-lazy-require'
+import { Win32Error } from '@deepseek-ai/dsh-win32-process'
 import type { ProcessIdentity, ProcessInspector, ProcessSnapshot } from './process-inspector.ts'
 
 type Koffi = typeof import('koffi')['default']
@@ -37,7 +38,7 @@ export interface WindowsProcessState {
 export interface WindowsProcessInspectorInternals {
   /** Enumerate the current process table (pid/parent pairs). */
   snapshot(): ProcessEntry[]
-  /** Return one process's creation identity and wait state, or undefined when unreadable. */
+  /** Return one process's identity and wait state, or undefined if absent; unreadable state throws. */
   processState(pid: number): WindowsProcessState | undefined
   /** Terminate one process tree; `force` maps to taskkill `/F`. */
   taskkill(pid: number, force: boolean): void
@@ -45,8 +46,8 @@ export interface WindowsProcessInspectorInternals {
 
 /**
  * Walk a process table from one root in children-first order, retaining only
- * members whose start identity is readable (unreadable members are detector
- * misses, exactly like an unreadable `/proc` entry on Linux).
+ * members whose start identity remains present. Identity-read failures propagate
+ * so incomplete observations cannot authorize cleanup.
  * @param entries - the process table snapshot.
  * @param rootPid - the tree root to descend from.
  * @param started - creation-time identity resolver for one member.
@@ -91,7 +92,8 @@ export function windowsProcessTree(
  */
 export class WindowsProcessInspector implements ProcessInspector {
   constructor(
-    private readonly internals: WindowsProcessInspectorInternals = defaultWindowsProcessInternals(),
+    commandTimeoutMs: number,
+    private readonly internals: WindowsProcessInspectorInternals = defaultWindowsProcessInternals(commandTimeoutMs),
   ) {}
 
   foregroundPgid(shellPid: number): number {
@@ -136,23 +138,27 @@ export class WindowsProcessInspector implements ProcessInspector {
 
 /**
  * Create the Windows process inspector.
+ * @param commandTimeoutMs - owning spawn's grace period, bounding each taskkill helper.
  * @param internals - injectable process operations; defaults to the koffi-backed table.
  * @returns the Windows inspector.
  */
 export function createWindowsProcessInspector(
-  internals: WindowsProcessInspectorInternals = defaultWindowsProcessInternals(),
+  commandTimeoutMs: number,
+  internals: WindowsProcessInspectorInternals = defaultWindowsProcessInternals(commandTimeoutMs),
 ): WindowsProcessInspector {
-  return new WindowsProcessInspector(internals)
+  return new WindowsProcessInspector(commandTimeoutMs, internals)
 }
 
 /** Terminate one Windows process tree with taskkill, contained like POSIX group signalling. */
-function taskkillTree(pid: number, force: boolean): void {
+function taskkillTree(pid: number, force: boolean, commandTimeoutMs: number): void {
   if (pid <= 0) return
   // Outcome deliberately unchecked: an already-absent tree, exit races, and a
   // missing taskkill binary are as tolerable here as ESRCH is for POSIX.
   spawnSync('taskkill', ['/PID', String(pid), '/T', ...(force ? ['/F'] : [])], {
     stdio: 'ignore',
     windowsHide: true,
+    timeout: Math.ceil(commandTimeoutMs),
+    killSignal: 'SIGKILL',
   })
 }
 
@@ -186,6 +192,7 @@ interface Win32Bindings {
   ): number
   waitForSingleObject(handle: NativePtr, milliseconds: number): number
   closeHandle(handle: NativePtr): number
+  getLastError(): number
 }
 
 /**
@@ -232,6 +239,8 @@ const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 const SYNCHRONIZE = 0x00100000
 const WAIT_OBJECT_0 = 0
 const WAIT_TIMEOUT = 0x102
+const ERROR_INVALID_PARAMETER = 87
+const ERROR_NO_MORE_FILES = 18
 
 let cachedBindings: Win32Bindings | undefined
 
@@ -263,6 +272,7 @@ function win32Bindings(): Win32Bindings {
     ]),
     waitForSingleObject: bind('WaitForSingleObject', 'uint32', [PVOID, 'uint32']),
     closeHandle: bind('CloseHandle', 'int', [PVOID]),
+    getLastError: bind('GetLastError', 'uint32', []),
   } as unknown as Win32Bindings
   return cachedBindings
 }
@@ -285,14 +295,16 @@ function snapshotWindowsProcesses(bindings: Win32Bindings): ProcessEntry[] {
   const koffi = requireKoffi()
   const { PROCESSENTRY32W } = win32Structs()
   const snapshot = bindings.createToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-  /* v8 ignore next -- an invalid snapshot for the process flag is not producible through the public API;
-     the guard mirrors POSIX's unreadable-proc tolerance and isInvalidHandle is unit-tested. */
-  if (isInvalidHandle(snapshot)) return []
+  if (isInvalidHandle(snapshot)) throw new Win32Error('CreateToolhelp32Snapshot', bindings.getLastError())
   const entries: ProcessEntry[] = []
   try {
     const entry = allocNative(PROCESSENTRY32W, 1)
     koffi.encode(entry, 'uint32', PROCESSENTRY32W.size)
     let ok = bindings.process32FirstW(snapshot, entry)
+    if (ok === 0) {
+      const error = bindings.getLastError()
+      if (error !== ERROR_NO_MORE_FILES) throw new Win32Error('Process32FirstW', error)
+    }
     while (ok !== 0) {
       const record = koffi.decode(entry, PROCESSENTRY32W) as {
         th32ProcessID: number
@@ -300,6 +312,10 @@ function snapshotWindowsProcesses(bindings: Win32Bindings): ProcessEntry[] {
       }
       entries.push({ pid: record.th32ProcessID, parentPid: record.th32ParentProcessID })
       ok = bindings.process32NextW(snapshot, entry)
+      if (ok === 0) {
+        const error = bindings.getLastError()
+        if (error !== ERROR_NO_MORE_FILES) throw new Win32Error('Process32NextW', error)
+      }
     }
   } finally {
     bindings.closeHandle(snapshot)
@@ -312,21 +328,24 @@ function windowsProcessState(bindings: Win32Bindings, pid: number): WindowsProce
   const koffi = requireKoffi()
   const { FILETIME } = win32Structs()
   const handle = bindings.openProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, 0, pid)
-  if (isInvalidHandle(handle)) return undefined
+  if (isInvalidHandle(handle)) {
+    const error = bindings.getLastError()
+    if (error === ERROR_INVALID_PARAMETER) return undefined
+    throw new Win32Error('OpenProcess', error)
+  }
   try {
     const creation = allocNative(FILETIME, 1)
     const exit = allocNative(FILETIME, 1)
     const kernel = allocNative(FILETIME, 1)
     const user = allocNative(FILETIME, 1)
-    /* v8 ignore next -- a GetProcessTimes failure after a successful open races process exit and
-       cannot be staged deterministically; the absent-process path is covered and the caller
-       treats undefined as a detector miss. */
-    if (bindings.getProcessTimes(handle, creation, exit, kernel, user) === 0) return undefined
+    if (bindings.getProcessTimes(handle, creation, exit, kernel, user) === 0) {
+      throw new Win32Error('GetProcessTimes', bindings.getLastError())
+    }
     const record = koffi.decode(creation, FILETIME) as { dwLowDateTime: number; dwHighDateTime: number }
     const wait = bindings.waitForSingleObject(handle, 0)
-    /* v8 ignore next -- an opened process handle has exactly one of these two
-       zero-time wait states; an unexpected Win32 failure is an unreadable process. */
-    if (wait !== WAIT_OBJECT_0 && wait !== WAIT_TIMEOUT) return undefined
+    if (wait !== WAIT_OBJECT_0 && wait !== WAIT_TIMEOUT) {
+      throw new Win32Error('WaitForSingleObject', bindings.getLastError())
+    }
     return {
       started: `${record.dwHighDateTime}:${record.dwLowDateTime}`,
       active: wait === WAIT_TIMEOUT,
@@ -337,10 +356,10 @@ function windowsProcessState(bindings: Win32Bindings, pid: number): WindowsProce
 }
 
 /** The koffi-backed default internals; bindings resolve lazily on first use. */
-function defaultWindowsProcessInternals(): WindowsProcessInspectorInternals {
+function defaultWindowsProcessInternals(commandTimeoutMs: number): WindowsProcessInspectorInternals {
   return {
     snapshot: () => snapshotWindowsProcesses(win32Bindings()),
     processState: pid => windowsProcessState(win32Bindings(), pid),
-    taskkill: taskkillTree,
+    taskkill: (pid, force) => { taskkillTree(pid, force, commandTimeoutMs) },
   }
 }

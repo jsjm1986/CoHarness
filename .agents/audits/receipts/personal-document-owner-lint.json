@@ -1,0 +1,14 @@
+{
+  "name": "personal-document-owner-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/host/userdoc-http/src/index.ts packages/host/userdoc-http/tests/acl.spec.ts gateway/tests/fixtures/document-transfer-loader.mjs",
+  "startedAt": "2026-10-26T13:23:35.143966+00:00",
+  "seconds": 6.603,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "dcfdb535aac7d9035ebc166fe00fd42be5d246c7780acb6c5302622df85299db",
+  "inputsAfter": "dcfdb535aac7d9035ebc166fe00fd42be5d246c7780acb6c5302622df85299db",
+  "postgresToolDirectory": null,
+  "outputSha256": "759fa88f17cdf5a13a6de6a68030e2135e6782791004cb7481e6d18049336b1f",
+  "outputTail": "packages/host/userdoc-http/tests/acl.spec.ts:150:44: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/host/userdoc-http/tests/acl.spec.ts:117:21: error typescript(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`. help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.\npackages/host/userdoc-http/tests/acl.spec.ts:137:23: error typescript(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`. help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.\npackages/host/userdoc-http/tests/acl.spec.ts:138:23: error typescript(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`. help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.\npackages/host/userdoc-http/tests/acl.spec.ts:139:23: error typescript(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`. help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.\npackages/host/userdoc-http/tests/acl.spec.ts:140:23: error typescript(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`. help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.\npackages/host/userdoc-http/tests/acl.spec.ts:141:23: error typescript(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`. help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.\n"
+}

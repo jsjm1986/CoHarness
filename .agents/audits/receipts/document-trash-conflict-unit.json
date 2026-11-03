@@ -1,0 +1,14 @@
+{
+  "name": "document-trash-conflict-unit",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests/trash.spec.ts packages/host/userdoc-http/tests/http.spec.ts packages/host/userdoc-http/tests/acl.spec.ts packages/client/ui-documents/tests/components.client.spec.tsx --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T05:02:49.386857+00:00",
+  "seconds": 6.182,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "634e5095ffb497c9bf9affc42a60c5c99f7119b57169962d1773c1c1c8b5c49b",
+  "inputsAfter": "634e5095ffb497c9bf9affc42a60c5c99f7119b57169962d1773c1c1c8b5c49b",
+  "postgresToolDirectory": null,
+  "outputSha256": "bfdbb800abd40792a8ac4525e2a87d12b23868cebd0709e77df44400d2151d72",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  4 passed (4)\n      Tests  105 passed (105)\n   Start at  13:02:50\n   Duration  4.76s (transform 684ms, setup 51ms, import 1.05s, tests 3.22s, environment 211ms)\n\n"
+}

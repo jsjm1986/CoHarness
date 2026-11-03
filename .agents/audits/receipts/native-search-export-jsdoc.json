@@ -1,0 +1,14 @@
+{
+  "name": "native-search-export-jsdoc",
+  "cwd": ".",
+  "command": "pnpm run verify-export-jsdoc",
+  "startedAt": "2026-10-24T03:49:28.075841+00:00",
+  "seconds": 8.511,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a63e35021964698d547d7f0ba328ef695538954de713b87a6f31dc8e27465548",
+  "inputsAfter": "a63e35021964698d547d7f0ba328ef695538954de713b87a6f31dc8e27465548",
+  "postgresToolDirectory": null,
+  "outputSha256": "34c3189bb05208432b51c80e9941df04ac432c6f79279e01c6008b6c09b8526f",
+  "outputTail": "$ tsx scripts/verify-export-jsdoc.ts\nverify-export-jsdoc: every exported name in each package API is documented.\n"
+}

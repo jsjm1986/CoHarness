@@ -49,6 +49,8 @@ Providers register **capabilities**, not tools. `dsh-tool-web` is the only owner
 
 The package also exports `readWebResponseBytes()` and `readWebResponseJson()`. Search providers use these readers to enforce a positive `maxResponseBytes` budget before parsing an upstream body; declared and chunked responses share the same limit, the configured cap cannot exceed 256 MiB, and `WebResponseTooLargeError` identifies the refusal.
 
+`registerModelSearch()` registers adapter-backed search with shared policy selection, resource ownership and joined unload. Its `ModelSearchImplementation` supplies route options, protocol preparation, exact request recording and independent transport; `ModelSearchRoute` and `PreparedModelSearch` retain the selected model and deferred operation. Independent transport receives `assertOwnership` as its fourth argument and must invoke it after asynchronous preparation, immediately before HTTP. The supplied search providers check before and after request recording. A changed resource provider or newly required model policy refuses the old request and returns any unused grant to its original owner; a fresh request can retry. See the [dispatch decision](../../../.agents/notes/implemented/bug-fix/2026-10-31-model-search-dispatch-ownership.md). `modelSearchUsage()` validates actual wire counters under `ModelSearchUsageFields`; missing usage stays missing and inconsistent totals are omitted. `resolveModelSearchCredential()` observes late credential settlement while respecting caller cancellation.
+
 <a id="selection"></a>
 ## Selection
 

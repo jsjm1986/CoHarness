@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-install-close-confirmed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/tunnel-install.spec.ts tests/tunnel-supervisor.spec.ts tests/tunnel-access.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T23:20:02.511249+00:00",
+  "seconds": 3.058,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9244a8a7d3e52287327d3d0784ca047cd4027428ebf74fd54bcd7e845f11bfda",
+  "inputsAfter": "9244a8a7d3e52287327d3d0784ca047cd4027428ebf74fd54bcd7e845f11bfda",
+  "postgresToolDirectory": null,
+  "outputSha256": "d58f3303e9a889446889d737e354f16fe047a74462b91a072d4e06eb11806036",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  45 passed (45)\n   Start at  07:20:04\n   Duration  949ms (transform 100ms, setup 0ms, import 220ms, tests 914ms, environment 0ms)\n\n"
+}

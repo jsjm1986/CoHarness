@@ -1,0 +1,193 @@
+{
+  "finding": "B411",
+  "title": "Recall lacks admitted identity and route, outlives its primary turn/issuer and accepts failed selector output",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "at": "2026-10-31T18:23:59.619409+00:00",
+  "localDate": "2026-11-01",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T173843Z",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-memory-recall-authority.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-memory-recall-authority.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-memory-recall-authority.zh.md",
+    "docs/module-graph.i18n.yaml",
+    "docs/module-graph.md",
+    "docs/module-graph.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-auxiliary-events/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-auxiliary-events/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-auxiliary-events/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/memory-execution-driver.ts",
+    "examples/headless-agent/tests/fixtures/memory-execution-model.ts",
+    "examples/headless-agent/tests/fixtures/memory-execution/expected/cancelled-registration.expected.jsonl",
+    "examples/headless-agent/tests/fixtures/memory-execution/expected/disconnect-delete.expected.jsonl",
+    "examples/headless-agent/tests/fixtures/memory-execution/expected/disconnect-save.expected.jsonl",
+    "examples/headless-agent/tests/fixtures/memory-execution/expected/project-delete.expected.jsonl",
+    "examples/headless-agent/tests/fixtures/memory-execution/expected/project-save.expected.jsonl",
+    "examples/headless-agent/tests/fixtures/memory-execution/expected/queued-participants.expected.jsonl",
+    "examples/headless-agent/tests/fixtures/memory-execution/expected/unrelated-user-delete.expected.jsonl",
+    "examples/headless-agent/tests/fixtures/memory-execution/expected/unrelated-user-save.expected.jsonl",
+    "examples/headless-agent/tests/fixtures/memory-execution/expected/user-delete.expected.jsonl",
+    "examples/headless-agent/tests/fixtures/memory-execution/expected/user-save.expected.jsonl",
+    "examples/headless-agent/tests/fixtures/memory-execution/register.mjs",
+    "examples/headless-agent/tests/memory-execution.expected.e2e.ts",
+    "packages/memory/memory-context/README.i18n.yaml",
+    "packages/memory/memory-context/README.md",
+    "packages/memory/memory-context/README.zh.md",
+    "packages/memory/memory-context/package.json",
+    "packages/memory/memory-context/src/index.ts",
+    "packages/memory/memory-context/tests/memory-context.spec.ts",
+    "packages/memory/memory-context/tsconfig.json",
+    "pnpm-lock.yaml",
+    "scripts/check-workspace-constraints.spec.ts",
+    "scripts/check-workspace-constraints.ts",
+    "vitest.expected.config.ts"
+  ],
+  "matchingPrerequisites": [
+    "apps/cli/src/sdk-source.cordis.patch.yml",
+    "apps/cli/tests/profiles/sdk/memory-curation-settings.expected.e2e.ts",
+    "examples/headless-agent/cordis.yml",
+    "examples/headless-agent/memory-execution.cordis.snapshot.yml",
+    "examples/headless-agent/tests/auxiliary-model-fixture.ts",
+    "examples/headless-agent/tests/fixtures/memory-curation-settings/model.mjs",
+    "examples/headless-agent/tests/fixtures/memory-curation-settings/register.mjs",
+    "examples/headless-agent/tests/fixtures/memory-curation-settings/runtime.cordis.yml",
+    "examples/package.json",
+    "packages/bundle/sdk-minimal/cordis.patch.yml",
+    "packages/client/ui-documents/LICENSE.material-icon-theme",
+    "packages/client/ui-documents/package.json",
+    "packages/context/execution-authority/src/index.ts",
+    "packages/context/execution-authority/src/types.ts",
+    "packages/context/gateway-execution/src/index.ts",
+    "packages/context/gateway-execution/src/input.ts",
+    "packages/context/gateway-execution/src/projection.ts",
+    "packages/extensions/tool-cordis/package.json",
+    "packages/extensions/tool-cordis/tsconfig.json",
+    "packages/llm/llm/src/index.ts",
+    "packages/llm/llm/src/operations.ts",
+    "packages/memory/memory-curation/package.json",
+    "packages/memory/memory-curation/src/index.ts",
+    "packages/memory/memory-curation/tsconfig.json",
+    "packages/memory/memory/package.json",
+    "packages/memory/memory/src/client.ts",
+    "packages/memory/memory/src/index.ts",
+    "packages/memory/memory/src/search.ts",
+    "packages/memory/memory/src/storage.ts",
+    "packages/memory/memory/src/types.ts",
+    "packages/memory/memory/tests/harness.ts",
+    "packages/memory/memory/tsconfig.json",
+    "packages/settings/settings-file/src/index.ts",
+    "packages/settings/settings/src/index.ts",
+    "packages/settings/settings/tests/memory.ts",
+    "packages/test-support/loader-smoke/src/index.ts",
+    "vitest.snapshot.config.ts"
+  ],
+  "cause": "Pre-step precedes Gateway message admission, so its old routed model and ambient participant state do not identify the admitted question. The independent selector controller misses primary cancellation until turn/end. Entry reads and valid JSON from failed/aborted responses can publish without current issuer or successful completion.",
+  "implementation": "Stage the question/catalog in pre-step and start from admitted agent/request configuration. Capture and retain the original authority and participants, pass explicit verified billing witnesses, link primary cancellation, recheck execute permission at dispatch/publication and compare the issuer after async work. Read recall never requires memory-writing qualification. Failed or aborted terminal outcomes cannot inject. Preserve owned cleanup and dispose the asynchronous context after all selectors settle.",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchedAt": "2026-10-31T17:58:06.986541+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T173843Z/memory-recall-origin-fetch.json",
+    "sharedChangesPreserved": true
+  },
+  "verification": {
+    "uniqueRelatedCases": 500,
+    "unitCases": 332,
+    "unitFiles": 12,
+    "existingSnapshotCases": 11,
+    "coverage": {
+      "memory-context": {
+        "statements": {
+          "covered": 367,
+          "total": 367,
+          "pct": 100.0
+        },
+        "branches": {
+          "covered": 241,
+          "total": 241,
+          "pct": 100.0
+        },
+        "functions": {
+          "covered": 55,
+          "total": 55,
+          "pct": 100.0
+        },
+        "lines": {
+          "covered": 300,
+          "total": 300,
+          "pct": 100.0
+        }
+      }
+    },
+    "coverageEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T173843Z/coverage-evidence.json",
+    "nodeMajors": [
+      22,
+      24
+    ],
+    "beforeFix": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T173843Z/memory-recall-authority-negative.json",
+    "oldCompiledNegative": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T173843Z/memory-recall-old-lib-negative.json",
+    "oldPrivatePackages": [
+      "old-memory-context"
+    ],
+    "negativeResults": "Three initial authority/cancellation tests and two terminal-outcome tests fail before fixes. Complete B410 predecessor selector source and library graphs each fail all3 final Gateway scenarios: missing captured witnesses, stale model route and failed/aborted output injection. Prior Gateway curation withdrawal fixture timed out because it waited for a forbidden second request; all10 legacy cases now observe captured task completion/refusal in their expected-output lane.",
+    "native": "Actual shipped SDK/headless profiles plus real Agent/GatewayExecution over deterministic Gateway wire replies. Source/Node22/Node24 run43 assembled cases each; new Gateway cases measure actor2 at dispatch/injection, current primary route and successful read-only recall while memory writing is denied. They are not a PostgreSQL, paid API or physical-computer claim.",
+    "fixtureCorrections": "Update the existing step helper to include request admission. Scope strict test types to the actually loaded subagent depth declaration. Migrate the10 non-recorded execution cases and expected files into the example-owned expected-output lane, preserving true recorded Session snapshots and explicit removed paths.",
+    "build": "Normal tsc memory/context/curation/catalog faces and4 normal tsdown builds. Strict changed tests including constraint tests have zero own/transitive diagnostics. Lint, JSDoc,127 catalog artifacts,3 module graph artifacts and workspace constraints pass.",
+    "documentation": "Four bilingual pairs and20 quick documentation gates pass. No whole repository suite, full doc-sync, PostgreSQL or root production deployment claimed.",
+    "constraintCases": 114,
+    "gatewayExecutionCases": 13,
+    "beforeFixTerminal": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T173843Z/memory-recall-finish-negative.json",
+    "assembledProcessCases": 43,
+    "shippedSdkCases": 21,
+    "shippedHeadlessCases": 9,
+    "newGatewayCases": 3
+  },
+  "peerReports": {
+    "source": "User-authorized peer messages in this goal turn; reports, not root production verification",
+    "serving": "R19/epoch97/schema102 on both computers. R18+B406/B407/B408 plus REAL-039 workspace-changes recovery; B409/B410/B411 not deployed.",
+    "recovery": "Peer reports the same generation19 Session recovers after a real30-second admission timeout: explicit retry completes turn5 in3690ms, official Flash/Bash pwd/Darwin/UID and unique QA file. Original18 events and drafts preserved.",
+    "nextReservedWork": "Peer owns Gateway operationRef roundtrip measurement; no permission cache or generation/node weakening.",
+    "coordination": "Peer approved only3 lock importer lines for memory-context execution-authority; current lock hash proves all other bytes unchanged. Peer retained icon license and sorted ui-documents files without changing their set; root owns the narrow existing per-package whitelist entry and acceptance/rejection checks.",
+    "manifestR19": "The mechanical icon notice file ordering is not retroactively written into frozenR19 and must be a matching input to a future freeze."
+  },
+  "remaining": [
+    "Continue auxiliary model consumers and extension operations, especially auto-review/compaction, retained authorization issuers, resolved routes, resource ownership and publication after async work.",
+    "Continue account/session identity and project revocation across remaining model/tool/workflow/Inspector paths; B411 does not close the memory or identity domains.",
+    "Preserve peer Gateway/Local/UI ownership. Peer R19 includes workspace-changes REAL-039 recovery over R18/B408, but B409/B410/B411 remain pending a combined matching freeze. Gateway operationRef latency work remains peer-owned.",
+    "Remaining resource allocation/native platform cases, full multi-computer acceptance and database maintenance argument privacy retain their existing open status. Root does not claim PostgreSQL or physical computer acceptance from local deterministic Gateway wire replies.",
+    "Paid/official Responses verification remains deferred by the user. All12 business domains and B04/B25 stay open."
+  ],
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T173843Z/r6-followup-root-source-union.json",
+  "mergeRequirement": "R19 reportedly includes B406/B407/B408 and workspace-changes recovery. Apply B409/B410 plus34 B411 deltas,37 matching inputs and11 explicit removed paths; rebuild the4 memory/catalog packages with matching types and Remote bindings. Preserve R19/Local/Gateway/UI/FortuneSheet and active peer operationRef work. The pnpm-lock edit adds only3 importer lines; retain its matching peer patch content. Root does not deploy this reference capsule.",
+  "globalReviewComplete": false,
+  "removedPaths": [
+    "examples/headless-agent/tests/memory-execution.snapshot.ts",
+    "examples/headless-agent/tests/snapshots/memory-execution/cancelled-registration.expected.jsonl",
+    "examples/headless-agent/tests/snapshots/memory-execution/disconnect-delete.expected.jsonl",
+    "examples/headless-agent/tests/snapshots/memory-execution/disconnect-save.expected.jsonl",
+    "examples/headless-agent/tests/snapshots/memory-execution/project-delete.expected.jsonl",
+    "examples/headless-agent/tests/snapshots/memory-execution/project-save.expected.jsonl",
+    "examples/headless-agent/tests/snapshots/memory-execution/queued-participants.expected.jsonl",
+    "examples/headless-agent/tests/snapshots/memory-execution/unrelated-user-delete.expected.jsonl",
+    "examples/headless-agent/tests/snapshots/memory-execution/unrelated-user-save.expected.jsonl",
+    "examples/headless-agent/tests/snapshots/memory-execution/user-delete.expected.jsonl",
+    "examples/headless-agent/tests/snapshots/memory-execution/user-save.expected.jsonl"
+  ],
+  "supplementalGateFix": {
+    "scope": "Existing per-package publication whitelist accepts the icon notice already declared by the peer, refuses omission and arbitrary extra files. Peer alone reordered ui-documents manifest without changing its set.",
+    "paths": [
+      "scripts/check-workspace-constraints.ts",
+      "scripts/check-workspace-constraints.spec.ts"
+    ],
+    "constraints": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T173843Z/memory-recall-constraints-final.json",
+    "tests": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T173843Z/memory-recall-constraint-tests-final.json",
+    "lockEdit": {
+      "scope": "Only memory-context devDependency importer added; peer approved this narrow edit and is not writing lock. Existing FortuneSheet/other importer bytes preserved.",
+      "beforeSha256": "11891a9393e60eced894fed999e44036621c312c59dcfec993cf435e5a98d0f2",
+      "afterSha256": "e75f81f88842cc72c6126387c327efab8d6a1774cce1ef1e0508bb6ac5e978ae",
+      "addedLines": 3
+    }
+  }
+}

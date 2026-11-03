@@ -1,0 +1,15 @@
+{"scenario":"current","outgoingCalls":1,"status":"sent","attempts":1,"currentOwner":"creator","transportAborted":null}
+{"scenario":"concurrent","outgoingCalls":1,"status":"sent","attempts":1,"currentOwner":"creator","transportAborted":null}
+{"scenario":"disabled-account","outgoingCalls":0,"status":null,"attempts":0,"currentOwner":"creator","transportAborted":null}
+{"scenario":"reassigned-before-claim","outgoingCalls":0,"status":null,"attempts":0,"currentOwner":"other","transportAborted":null}
+{"scenario":"expired-claim","outgoingCalls":1,"status":"sent","attempts":2,"currentOwner":"creator","transportAborted":null}
+{"scenario":"invalid-after-reassign","outgoingCalls":1,"status":"failed","attempts":1,"currentOwner":"other","transportAborted":null}
+{"scenario":"timeout","outgoingCalls":1,"status":"failed","attempts":1,"currentOwner":"creator","transportAborted":true}
+{"scenario":"gateway-completion","aborted":"inserted","completed":"inserted","duplicate":"duplicate","invalidCredentialStatus":401,"outgoingCalls":1,"completedEventCommittedBeforeSend":true,"status":"sent"}
+{"scenario":"personal-source-current","secondComputerAllowed":true,"outgoingCalls":1,"claimed":1}
+{"scenario":"personal-child-current","secondComputerAllowed":true,"outgoingCalls":1,"claimed":1}
+{"scenario":"personal-source-revoked","secondComputerAllowed":true,"outgoingCalls":0,"claimed":0}
+{"scenario":"personal-source-grant-missing","secondComputerAllowed":true,"outgoingCalls":0,"claimed":0}
+{"scenario":"personal-source-restored","secondComputerAllowed":true,"outgoingCalls":1,"claimed":1}
+{"scenario":"personal-provider-restored","outgoingCalls":1,"status":"sent","attempts":2,"registrationPreserved":true}
+{"scenario":"personal-source-runtime-retired","secondComputerAllowed":true,"outgoingCalls":0,"claimed":0}

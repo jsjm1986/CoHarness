@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-replaced-resource-owner-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-codex/tests/managed-model-http.spec.ts -t 'parent resource owner replaced' --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T03:56:36.117297+00:00",
+  "seconds": 4.276,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fe3f3e908e06672a0c498d46e2e1d3f95837798d4c01ff8ddce52a3257e60579",
+  "inputsAfter": "fe3f3e908e06672a0c498d46e2e1d3f95837798d4c01ff8ddce52a3257e60579",
+  "postgresToolDirectory": null,
+  "outputSha256": "6ca4c168de446179514d5627397a2acd938d43e564c2d745ceb064261e16b71d",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/subagent/subagent-codex/tests/managed-model-http.spec.ts (40 tests | 2 failed | 38 skipped) 30ms\n   × refuses a parent resource owner replaced before-request 23ms\n   × refuses a parent resource owner replaced queued 6ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/subagent/subagent-codex/tests/managed-model-http.spec.ts > refuses a parent resource owner replaced before-request\n FAIL  |thread-safe| packages/subagent/subagent-codex/tests/managed-model-http.spec.ts > refuses a parent resource owner replaced queued\nAssertionError: expected 200 to be 503 // Object.is equality\n\n- Expected\n+ Received\n\n- 503\n+ 200\n\n ❯ packages/subagent/subagent-codex/tests/managed-model-http.spec.ts:312:27\n    310|   release.resolve(undefined)\n    311|   const response = await pending\n    312|   expect(response.status).toBe(503)\n       |                           ^\n    313|   await response.text()\n    314|   expect(adapter.requests).toHaveLength(0)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 38 skipped (40)\n   Start at  11:56:39\n   Duration  1.18s (transform 852ms, setup 33ms, import 1.04s, tests 30ms, environment 0ms)\n\n"
+}

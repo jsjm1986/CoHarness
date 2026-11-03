@@ -1,0 +1,14 @@
+{
+  "name": "real-managed-web-import-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx --tsconfig gateway/tsconfig.run.json .agents/audits/.local/probe-managed-web.ts",
+  "startedAt": "2026-10-24T20:36:23.766475+00:00",
+  "seconds": 2.439,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b3b07a8e81ae38d14f2b74475a37a195e32d57dbf41ed061fe71ecaac2b1703b",
+  "inputsAfter": "b3b07a8e81ae38d14f2b74475a37a195e32d57dbf41ed061fe71ecaac2b1703b",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "4d3ac094ca0b7e2e1ef22f958c1726b1b7de9bc3e6e7e8b864e2042bd984018a",
+  "outputTail": "node:internal/modules/esm/resolve:271\n    throw new ERR_MODULE_NOT_FOUND(\n          ^\n\nError [ERR_MODULE_NOT_FOUND]: Cannot find module '/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/access-monitor.ts' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/probe-managed-web.ts\n    at finalizeResolution (node:internal/modules/esm/resolve:271:11)\n    at moduleResolve (node:internal/modules/esm/resolve:861:10)\n    at defaultResolve (node:internal/modules/esm/resolve:988:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:697:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:714:38)\n    at nextStep (node:internal/modules/customization_hooks:189:26)\n    at resolveBaseSync (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/register-C4vWVmug.mjs:2:10932)\n    at resolveDirectorySync (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/register-C4vWVmug.mjs:2:12238)\n    at resolveTsPathsSync (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/register-C4vWVmug.mjs:2:13445)\n    at resolve (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/register-C4vWVmug.mjs:2:15991) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/src/postgres/access-monitor.ts'\n}\n\nNode.js v25.8.1\n"
+}

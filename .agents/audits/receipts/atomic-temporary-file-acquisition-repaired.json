@@ -1,0 +1,14 @@
+{
+  "name": "atomic-temporary-file-acquisition-repaired",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/util/atomic-write/tests",
+  "startedAt": "2026-10-25T23:05:18.142979+00:00",
+  "seconds": 7.563,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "316822a84e8db23e075bf978ddb5b1e79d6aa5fb0bb1a22fd73ea06dc7a9e6e5",
+  "inputsAfter": "316822a84e8db23e075bf978ddb5b1e79d6aa5fb0bb1a22fd73ea06dc7a9e6e5",
+  "postgresToolDirectory": null,
+  "outputSha256": "ba146b536667c7cc6a83726fb7661cee897ab83b66bec6bee29544b3429eff34",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  2 passed (2)\n      Tests  46 passed (46)\n   Start at  07:05:22\n   Duration  3.48s (transform 150ms, setup 103ms, import 116ms, tests 3.30s, environment 0ms)\n\n"
+}

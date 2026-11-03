@@ -14,9 +14,9 @@
 
 ## 安装
 
-在精确的发布 checkout 中执行 `pnpm install --frozen-lockfile && pnpm run build:production`。该生产入口会构建 Harness 库与 Web 应用、两个树外插件和 Admin SPA，对 Gateway 做类型检查，并在缺少任何 CLI、Web、Gateway、Admin、插件、管理员覆盖层或协作 migration 产物时拒绝发布。
+在精确的发布 checkout 中执行 `pnpm install --frozen-lockfile && pnpm run build:production`。该生产入口会构建 Harness 库与 Web 应用、树外插件和 Admin SPA，对 Gateway 做类型检查，并在缺少任何 CLI、Web、Gateway、Admin、插件、管理员覆盖层或协作 migration 产物时拒绝发布。
 
-1. 把构建完成的 `gateway/` 目录复制到 `/srv/harness/gateway`，把 `packages/llm/llm/` 复制到 `/srv/harness/packages/llm/llm`，把 `packages/session/session-format/` 复制到 `/srv/harness/packages/session/session-format`，并保留这一相对布局；`build:production` 会在 `gateway/lib/` 生成 Gateway 入口及其本地模块，并创建编译 ESM 图所需的相对链接 `gateway/node_modules/@deepseek-ai/*`——对应 `GATEWAY_RUNTIME_PACKAGES` 中的每个 workspace 包；缺任一条链接的编译 release 会被 `validate_release` 拒绝。使用生产 Node 在 Gateway 目录执行 `npm install && npm rebuild better-sqlite3 argon2`，然后由纯 Node 启动 `lib/index.js`。编译后的 Gateway 保留 `@deepseek-ai/dsh-llm/discovery` 包导入，因此相邻包的构建 `lib/` 与生成的链接都必须包含在 release 中；新激活不使用源码 `tsx` loader，release controller 仍允许把只有源码的旧 release 作为回滚目标。`public/admin` 已被 gitignore，因此只能在 `build:production` 生成该目录后再从 checkout 复制。同样要把 `native/system/` 复制到 `/srv/harness/native/system`：flock 绑定与 Landlock launcher 的 `bin/` 产物都被 gitignore，源码归档本身无法提供它们，宿主平台载荷缺失的编译 release 会被 `validate_release` 拒绝。
+1. 复制构建完成的 `gateway/` 目录，以及 `scripts/gateway-runtime-packages.ts` 中 `GATEWAY_RUNTIME_PACKAGES` 列出的每个相邻包，并保留各自相对于仓库根目录的位置；`build:production` 会在 `gateway/lib/` 生成 Gateway 入口及其本地模块，并创建编译 ESM 图所需的相对链接 `gateway/node_modules/@deepseek-ai/*`——对应 `GATEWAY_RUNTIME_PACKAGES` 中的每个 workspace 包；缺任一条链接的编译 release 会被 `validate_release` 拒绝。使用生产 Node 在 Gateway 目录执行 `npm install && npm rebuild better-sqlite3 argon2`，然后由纯 Node 启动 `lib/index.js`。编译后的 Gateway 保留 `@deepseek-ai/dsh-llm/discovery` 包导入，因此相邻包的构建 `lib/` 与生成的链接都必须包含在 release 中；新激活不使用源码 `tsx` loader，release controller 仍允许把只有源码的旧 release 作为回滚目标。`public/admin` 已被 gitignore，因此只能在 `build:production` 生成该目录后再从 checkout 复制。同样要把 `native/system/` 复制到 `/srv/harness/native/system`：flock 绑定与 Landlock launcher 的 `bin/` 产物都被 gitignore，源码归档本身无法提供它们，宿主平台载荷缺失的编译 release 会被 `validate_release` 拒绝。
 2. 把构建完成的 `plugins/dsh-directory-guard/` 目录复制到 `/srv/harness/plugins/dsh-directory-guard`，把 `plugins/dsh-model-governance/` 复制到 `/srv/harness/plugins/dsh-model-governance`。钉死的 npm dsh 以纯 Node 运行插件 `lib/`，不使用 tsx。即使 `HGW_GUARD_PATCH=off`，模型治理仍是强制项。
 3. 把公司默认凭据写入 `/srv/harness/gateway-data/company.env`（`DEEPSEEK_API_KEY=...`，权限 600）。每次运行时启动都会把它复制到 `$DSH_HOME/.env`；用户在 Settings 里设置的个人 key 存放于 `.credentials.yaml`，优先级更高，共享项目运行时则把凭据设置暴露为只读并使用公司来源。
 4. 启动 [`deploy/postgres/`](postgres/README.zh.md)，应用 migration，并创建权限为 `0600` 的数据库 URL 文件。在启动 Gateway 前，导入冻结的 SQLite 控制面，或创建配置的企业与计算节点。
@@ -28,6 +28,8 @@ Admin 归档频道由 PostgreSQL migration 015 启用。可通过 `HGW_ARCHIVE_R
 托管桌面按节点选择启用。在宿主机上安装 Cua Driver 应用并授予其操作系统桌面权限，配置已发布的 `@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp` 包目录（将构建产物复制到发布根下的 `packages/experimental/computer-use-cua-driver-mcp`，或用 `HGW_DESKTOP_DRIVER_PACKAGE` 指向绝对包目录），并把 `HGW_DESKTOP_ID` 设为本节点的桌面标识。之后每个启动的运行时都会挂载 computer-use 服务与该提供者，并发布托管桌面策略；部署需要固定路径或 `--direct` 时，可用 `HGW_DESKTOP_DRIVER_COMMAND` 和 `HGW_DESKTOP_DRIVER_ARGS` 替换 `cua-driver` 查找与 `mcp` 参数。管理员随后在桌面协调页授权用户与项目，每位参与者在作曲器中对活动根会话和桌面完成确认后，驱动调用才会执行。`HGW_DESKTOP_ID` 未设置时，运行时不挂载驱动，也不会读取驱动包。
 
 ## 每用户开号
+
+启动在写入 systemd 凭据或分配进程之前核验已配置的 Unix 账号。账号缺失属于部署准备问题；默认个人账号模板在对应电脑执行 `deploy/provision-user.sh <username> <HGW_USERS_ROOT>`。分配 Runtime 或授予电脑使用权不会创建操作系统账号。
 
 在 `/admin` 创建用户，然后以 root 执行一次 `deploy/provision-user.sh <username>`：它创建 `harness-<username>` 系统账号并 chown `/srv/harness/users/<username>/{home,dsh}`。个人单元在每次启动时按该用户当前授权自动渲染。管理员发起的项目可以在 `HGW_PROJECTS_ROOT` 下得到 `0770` 受管目录，也可以导入从 `HGW_PROJECT_PATH_ROOTS` 下选择的既有目录；导入目录需要显式授予 `harness-project` 读写权限。用户发起的项目仍只提交名称，并在 `HGW_USER_PROJECTS_ROOT` 下创建空目录；前面的 setgid/默认 ACL 配置会让项目单元继承访问权，创建者成为 `rw` 所有者。两种来源都分配一个共享运行时，支持 `ro`/`rw` 邀请，并使用同一套对话与文件夹 scope。项目目录不能与用户数据、运行时或凭据数据、Gateway/发布/插件代码、用户受管项目存储或另一项目重叠。成员身份和个人目录权限写入会在需要时重启正在运行的个人运行时；项目 ACL 按请求检查，不要求重启共享运行时。管理员在个人和项目 scope 都保留 `danger-full-access` 预设，但项目运行时仍受内核项目路径约束。
 
@@ -170,4 +172,4 @@ Gateway 启动在 PostgreSQL 暂时不可用时采用有界指数退避等待（
 
 [当前节点配置](node-configuration/README.zh.md) 说明管理员设置、独立配置工作进程及本机恢复。保存与应用是分开的操作。
 
-升级 dsh：先在 Linux staging `npm install -g @deepseek-ai/dsh@<next>`，跑两个验收脚本和协作冒烟测试，然后逐个滚动生产运行时（`systemctl restart harness-<user>` / `systemctl restart harness-project-<id>`，或让闲置运行时在下次访问时使用新二进制）。Linux Gateway 升级会替换 `/srv/harness/gateway`、应用 PostgreSQL migration，再重启 `harness-gateway`；涉及协议或包变化时还要滚动重启运行时。macOS release 部署使用上面的控制器，使 Gateway 与本地运行时始终来自同一个不可变目录。数据库：把 `deploy/postgres/backup-postgres.sh` 挂进 cron，保留经过恢复校验的 dump，并把成功备份复制到第二台机器或 NAS。
+升级 dsh：先在 Linux staging `npm install -g @deepseek-ai/dsh@<next>`，跑两个验收脚本和协作冒烟测试，然后逐个滚动生产运行时（通过实例管理停止并启动，或让已闲置停止的运行时在下次访问时使用新二进制；[Runtime 准入](../README.zh.md#performance-and-runtime-admission)定义单元命名和停止标记）。Linux Gateway 升级会替换 `/srv/harness/gateway`、应用 PostgreSQL migration，再重启 `harness-gateway`；涉及协议或包变化时还要滚动重启运行时。macOS release 部署使用上面的控制器，使 Gateway 与本地运行时始终来自同一个不可变目录。数据库：把 `deploy/postgres/backup-postgres.sh` 挂进 cron，保留经过恢复校验的 dump，并把成功备份复制到第二台机器或 NAS。

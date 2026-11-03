@@ -41,12 +41,15 @@ Add these rows to a composition that already provides tools and system-prompt se
 
 | Field | Default | Meaning |
 |---|---|---|
+| `desktopMode` | `auto` | Detect a local desktop before launch; `disabled` starts no driver, `enabled` selects an explicitly prepared desktop or remote command wrapper |
 | `command` | `cua-driver` | Installed executable path or PATH command |
 | `args` | `[mcp]` | Arguments passed directly without a shell |
 | `toolCallTimeoutMs` | MCP client default | Per-call timeout override in milliseconds |
 | `reconnect` | MCP client policy | Optional reconnection overrides |
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-computer-use-cua-driver-mcp) lists accepted fields. The [MCP client](../../mcp/mcp-client/README.md) owns timeout and reconnection defaults.
+
+With `desktopMode: auto`, no detected graphical session produces an explicit unavailable status and optional system-prompt guidance without launching the executable. File, terminal and separately configured headless-browser tools remain independent. Desktop discovery does not establish OS permission or user authorization. For a command wrapper that connects a prepared remote desktop from a headless host, set `desktopMode: enabled` explicitly; `disabled` keeps the provider unavailable.
 
 ### Activation and ownership
 

@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-worker-retry-host-emit",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=2 ./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T17:24:00.365409+00:00",
+  "seconds": 11.202,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7d3e5690c83c72800b9b8f3a7e263cdae5b6105cba27be468e1a33d3cb282e20",
+  "inputsAfter": "7d3e5690c83c72800b9b8f3a7e263cdae5b6105cba27be468e1a33d3cb282e20",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

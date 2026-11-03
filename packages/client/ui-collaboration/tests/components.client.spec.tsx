@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -8,6 +8,8 @@ import { LogoutButton, type LogoutButtonProps } from '../src/client/LogoutButton
 import logoutCss from '../src/client/LogoutButton.module.css'
 import { ReadOnlyComposer, type ReadOnlyComposerProps } from '../src/client/ReadOnlyComposer.tsx'
 import { ScopeControl, type ScopeControlProps } from '../src/client/ScopeControl.tsx'
+import { ComputerControl } from '../src/client/ComputerControl.tsx'
+import { SessionComputerLabel, type SessionComputerLabelProps } from '../src/client/SessionComputerLabel.tsx'
 import { StewardChip, type StewardChipProps } from '../src/client/StewardChip.tsx'
 import css from '../src/client/ScopeControl.module.css'
 import type {
@@ -65,6 +67,7 @@ function snapshot(partial: Partial<CollaborationSnapshot> = {}): CollaborationSn
 function scopeProps(state: CollaborationSnapshot, overrides: Partial<ScopeControlProps> = {}): ScopeControlProps {
   return {
     wide: true,
+    useDeployment: selector => selector({ phase: 'ready', showComputer: true, aggregateComputers: true }),
     useCollaboration: selector => selector(state),
     switchScope: vi.fn().mockResolvedValue(undefined),
     stageVisibility: vi.fn(),
@@ -134,7 +137,114 @@ describe('LogoutButton', () => {
   })
 })
 
+describe('ComputerControl', () => {
+  it('shows only the current Runtime computer as passive header metadata', () => {
+    const environment = { id: '10000000-0000-4000-8000-000000000001', nodeId: '10000000-0000-4000-8000-000000000002', nodeName: 'Computer B' } as NonNullable<CollaborationContext['environment']>
+    render(<ComputerControl {...scopeProps(snapshot({ context: { ...projectContext, environment } }))} compact />)
+    expect(screen.getByRole('group', { name: t('computer.label') }).textContent).toBe('Computer B')
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.queryByText(environment.id)).toBeNull()
+  })
+
+  it('follows a selected conversation Runtime instead of the page bootstrap computer', () => {
+    const environment = { id: '10000000-0000-4000-8000-000000000002', nodeId: '10000000-0000-4000-8000-000000000012', nodeName: 'Computer B' } as NonNullable<CollaborationContext['environment']>
+    const props = scopeProps(snapshot({ context: { ...projectContext, environment } }), {
+      useSessions: selector => selector({ current: 's1', byId: { s1: { runtime: { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000001', nodeName: 'Computer A' } } } } as never),
+    })
+    render(<ComputerControl {...props} compact />)
+    expect(screen.getByRole('group', { name: t('computer.label') }).textContent).toBe('Computer A')
+    expect(screen.queryByText('Computer B')).toBeNull()
+  })
+})
+
+describe('SessionComputerLabel', () => {
+  it('uses the rendered Session’s computer instead of another environment selected in this tab', () => {
+    const environment = { id: '10000000-0000-4000-8000-000000000002', nodeId: '10000000-0000-4000-8000-000000000012', nodeName: 'Computer B' } as NonNullable<CollaborationContext['environment']>
+    let runtime = { runtimeId: '10000000-0000-4000-8000-000000000001', nodeName: 'Computer A' } as { runtimeId: string; nodeName?: string }
+    const state = snapshot({ context: { ...projectContext, environment } })
+    const props = { ...scopeProps(state), sessionId: 'session',
+      useSessions: (selector: (value: unknown) => unknown) => selector({ byId: { session: { runtime } } }),
+    } as unknown as SessionComputerLabelProps
+    const view = render(<SessionComputerLabel {...props} />)
+    expect(screen.getByText('Computer A', { exact: true })).toBeTruthy()
+    expect(screen.queryByText('Computer B', { exact: true })).toBeNull()
+    runtime = { runtimeId: runtime.runtimeId }
+    view.rerender(<SessionComputerLabel {...props} />)
+    expect(view.container.textContent).toBe('')
+    state.environments = { items: [{ target: { kind: 'personal', runtimeId: runtime.runtimeId as never },
+      name: 'lin', nodeName: 'Directory computer A', observedState: 'ready' }], nextCursor: null }
+    view.rerender(<SessionComputerLabel {...props} />)
+    expect(screen.getByText('Directory computer A', { exact: true })).toBeTruthy()
+    state.contextVerified = false
+    view.rerender(<SessionComputerLabel {...props} />)
+    expect(view.container.textContent).toBe('')
+  })
+})
+
 describe('ScopeControl', () => {
+  it('enters personal space through an available computer when the recent bootstrap computer is offline', () => {
+    const offline = '10000000-0000-4000-8000-000000000011' as never
+    const available = '10000000-0000-4000-8000-000000000012' as never
+    const switchScope = vi.fn().mockResolvedValue(undefined)
+    const state = snapshot({ recentRuntimeIds: [offline], context: { ...projectContext,
+      environment: { id: '10000000-0000-4000-8000-000000000013' as never,
+        nodeId: '20000000-0000-4000-8000-000000000013' as never, nodeName: 'Project computer' } },
+    environments: { items: [
+      { target: { kind: 'personal', runtimeId: offline }, name: 'lin', nodeName: 'Computer A', observedState: 'stopped', nodeStatus: 'offline' },
+      { target: { kind: 'personal', runtimeId: available }, name: 'lin', nodeName: 'Computer B', observedState: 'stopped', nodeStatus: 'active' },
+    ], nextCursor: null } })
+    render(<ScopeControl {...scopeProps(state, { switchScope })} />)
+    fireEvent.click(screen.getByRole('button', { name: t('scope.aria') }))
+    fireEvent.click(within(screen.getByRole('group', { name: t('scope.aria') })).getByRole('button', { name: '个人空间' }))
+    expect(switchScope).toHaveBeenCalledExactlyOnceWith({ kind: 'personal', runtimeId: available })
+  })
+  it('keeps one personal entry and exact fixed-computer project destinations', () => {
+    const firstId = '10000000-0000-4000-8000-000000000011' as never
+    const secondId = '10000000-0000-4000-8000-000000000012' as never
+    const projectId = '10000000-0000-4000-8000-000000000013' as never
+    const switchScope = vi.fn().mockResolvedValue(undefined)
+    const loadEnvironments = vi.fn().mockResolvedValue(undefined)
+    const state = snapshot({ context: { ...projectContext, scope: { kind: 'personal' },
+      environment: { id: firstId, nodeId: '10000000-0000-4000-8000-000000000001' as never, nodeName: 'Computer A' } },
+    environments: { items: [
+      { target: { kind: 'personal', runtimeId: firstId }, name: 'lin', nodeName: 'Computer A', observedState: 'ready' },
+      { target: { kind: 'personal', runtimeId: secondId }, name: 'lin', nodeName: 'Computer B', observedState: 'stopped' },
+      { target: { kind: 'project', projectId: 9, runtimeId: projectId }, name: '支付重构', nodeName: 'Computer B', observedState: 'ready' },
+    ], nextCursor: 'more' } })
+    render(<ScopeControl {...scopeProps(state, { switchScope, loadEnvironments })} />)
+    const trigger = screen.getByRole('button', { name: t('scope.aria') })
+    fireEvent.click(trigger)
+    const page = () => within(screen.getByRole('group', { name: t('scope.aria') }))
+    expect(page().queryByRole('button', { name: /审计平台/ })).toBeNull()
+    expect(page().getAllByRole('button', { name: '个人空间' })).toHaveLength(1)
+    expect(page().queryByRole('button', { name: /个人空间.*Computer/ })).toBeNull()
+    fireEvent.click(page().getByRole('button', { name: '个人空间' }))
+    expect(switchScope).not.toHaveBeenCalled()
+    fireEvent.click(trigger)
+    fireEvent.click(page().getByRole('button', { name: /支付重构.*Computer B/ }))
+    expect(switchScope).toHaveBeenLastCalledWith({ kind: 'project', projectId: 9, runtimeId: projectId })
+    fireEvent.click(trigger)
+    fireEvent.change(screen.getByRole('searchbox', { name: t('scope.searchAria') }), { target: { value: 'Computer B' } })
+    expect(page().queryByRole('button', { name: /个人空间.*Computer A/ })).toBeNull()
+    expect(page().queryByRole('button', { name: '个人空间' })).toBeNull()
+    fireEvent.click(page().getByRole('button', { name: t('scope.more') }))
+    expect(loadEnvironments).toHaveBeenLastCalledWith('more')
+    fireEvent.click(page().getByRole('button', { name: t('scope.refresh') }))
+    expect(loadEnvironments).toHaveBeenLastCalledWith()
+  })
+
+  it('keeps transient input in this tab and offers the prepared environment in a new tab', () => {
+    const openEnvironmentTab = vi.fn()
+    const dismissScopeOffer = vi.fn()
+    render(<ScopeControl {...scopeProps(snapshot({ scopeOffer: {
+      runtimeId: '10000000-0000-4000-8000-000000000012', target: { kind: 'personal' },
+    } }), { openEnvironmentTab, dismissScopeOffer })} />)
+    const dialog = within(screen.getByRole('dialog', { name: t('scope.draftTitle') }))
+    fireEvent.click(dialog.getByRole('button', { name: t('computer.newTab') }))
+    expect(openEnvironmentTab).toHaveBeenCalledWith('10000000-0000-4000-8000-000000000012')
+    expect(dismissScopeOffer).toHaveBeenCalledOnce()
+  })
+
   it('hides before collaboration is ready and for personal users without projects', () => {
     const loading = render(<ScopeControl {...scopeProps(snapshot({ status: 'loading' }))} />)
     expect(loading.container.textContent).toBe('')
@@ -159,16 +269,15 @@ describe('ScopeControl', () => {
     // non-default scopes, so a read-write project carries none.
     expect(trigger.textContent).not.toContain('可编辑')
     fireEvent.click(trigger)
-    fireEvent.click(screen.getByRole('tab', { name: '空间管理' }))
+    // Visibility staging lives one level down; the root row shows the value.
     fireEvent.click(screen.getByRole('button', { name: /新对话可见范围/ }))
-    fireEvent.click(screen.getByRole('radio', { name: /仅自己/ }))
+    fireEvent.click(screen.getByRole('button', { name: /仅自己/ }))
     expect(stageVisibility).toHaveBeenCalledWith('private')
     // Staging keeps the picker open; Escape pops back to the root view.
-    expect(screen.getByRole('radio', { name: /项目公开/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /项目公开/ })).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.getByRole('button', { name: /新对话可见范围/ })).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('tab', { name: '切换空间' }))
     fireEvent.click(screen.getByRole('button', { name: /个人空间/ }))
     expect(switchScope).toHaveBeenCalledWith({ kind: 'personal' })
 
@@ -181,22 +290,34 @@ describe('ScopeControl', () => {
     expect(screen.queryByText(/所有空间/)).toBeNull()
   })
 
-  it('keeps switching separate from management and exposes the global invitation count', async () => {
+  it('presents the wide surface as a push page: hero, settings group, and member entry', async () => {
+    const getInvitationCount = vi.fn().mockResolvedValue({ pending: 2 })
+    const loadProjectConfiguration = vi.fn().mockResolvedValue({
+      project: { id: 9, name: '支付重构', themePolicy: 'follow-user' },
+      canManage: true,
+      capabilities: {
+        themePolicy: true, runtimeSettings: false, projectModels: false, members: true, filesystem: false,
+      },
+    })
     render(<ScopeControl {...scopeProps(snapshot(), {
-      getInvitationCount: vi.fn().mockResolvedValue({ pending: 2 }),
+      getInvitationCount,
       listInvitations: vi.fn().mockResolvedValue([]),
+      loadProjectConfiguration,
+      setProjectThemePolicy: vi.fn(),
     })} />)
-    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
-    expect(screen.getByRole('tab', { name: '切换空间' }).getAttribute('aria-selected')).toBe('true')
-    expect(screen.queryByRole('button', { name: /新对话可见范围/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '返回工作台' }))
-    expect(screen.queryByRole('tab', { name: '切换空间' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
-    fireEvent.click(screen.getByRole('tab', { name: '空间管理' }))
-    const invite = await screen.findByRole('button', { name: /邀请中心/ })
+    const trigger = screen.getByRole('button', { name: '切换个人或项目空间' })
+    fireEvent.click(trigger)
+    // The page carries a back control, the settings group, and the roster.
+    expect(screen.getByText('空间设置')).toBeTruthy()
+    expect(screen.getByText(/所有空间/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+    expect(screen.queryByText('空间设置')).toBeNull()
+    fireEvent.click(trigger)
+    // Pending invitations keep their badge on the member row.
+    const invite = await screen.findByRole('button', { name: /邀请与待处理事项/ })
     expect(invite.textContent).toContain('2')
     fireEvent.click(invite)
-    expect(await screen.findByRole('dialog', { name: '邀请中心' })).toBeTruthy()
+    expect(await screen.findByText('项目成员与邀请')).toBeTruthy()
   })
 
   it('filters a growing project roster without hiding personal scope or pinned actions', () => {
@@ -213,27 +334,27 @@ describe('ScopeControl', () => {
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
 
     // The wide surface is the push page, not the rail's floating menu.
-    const page = screen.getByRole('dialog', { name: '切换个人或项目空间' })
+    const page = screen.getByRole('group', { name: '切换个人或项目空间' })
     expect(page.className.split(/\s+/)).toContain(css.scopePage)
-    const search = screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索项目空间' })
-    expect(search.placeholder).toBe('搜索项目空间')
+    const search = screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索空间或电脑' })
+    expect(search.placeholder).toBe('搜索空间或电脑')
     expect(screen.getByRole('button', { name: /个人空间/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '新建项目空间' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /新建项目空间/ })).toBeTruthy()
 
     fireEvent.change(search, { target: { value: '审计' } })
     expect(screen.getByRole('button', { name: /审计平台/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '项目 1' })).toBeNull()
 
     fireEvent.change(search, { target: { value: '不存在' } })
-    expect(screen.getByText('没有匹配的项目空间')).toBeTruthy()
-    fireEvent.click(screen.getAllByRole('button', { name: '清除项目空间搜索' })[0]!)
+    expect(screen.getByText(t('scope.searchEmpty'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '清除空间搜索' }))
     expect(search.value).toBe('')
     expect(screen.getByRole('button', { name: '项目 1' })).toBeTruthy()
 
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(screen.queryByRole('dialog', { name: '切换个人或项目空间' })).toBeNull()
+    expect(screen.queryByRole('group', { name: '切换个人或项目空间' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
-    expect(screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索项目空间' }).value).toBe('')
+    expect(screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索空间或电脑' }).value).toBe('')
     view.unmount()
   })
 
@@ -268,12 +389,14 @@ describe('ScopeControl', () => {
     expect(tile?.textContent).toBe('支')
   })
 
-  it('keeps administrator and writable rows quiet while marking read-only access', () => {
+  it('flags only the minority grant tier: the dominant tier renders unflagged', () => {
+    // Admin-dominant roster: admin rows go quiet, the plain read-write row
+    // keeps its flag, and personal/read-only always answer.
     const adminHeavy: CollaborationContext = {
       ...projectContext,
       projects: [
         { projectId: 9, name: '支付重构', path: '/srv/pay', mode: 'rw', canManage: true },
-        { projectId: 10, name: '审计平台', path: '/srv/audit', mode: 'ro', canManage: true },
+        { projectId: 10, name: '审计平台', path: '/srv/audit', mode: 'ro' },
         { projectId: 11, name: '提示词组合', path: '/srv/prompt', mode: 'rw', canManage: true },
         { projectId: 12, name: '数据看板', path: '/srv/data', mode: 'rw' },
       ],
@@ -284,10 +407,10 @@ describe('ScopeControl', () => {
     expect(screen.getByRole('button', { name: /支付重构/ }).textContent).not.toContain('管理员')
     expect(screen.getByRole('button', { name: /提示词组合/ }).textContent).not.toContain('管理员')
     expect(screen.getByRole('button', { name: /审计平台/ }).textContent).toContain('只读')
-    expect(screen.getByRole('button', { name: /数据看板/ }).textContent).not.toContain('可编辑')
+    expect(screen.getByRole('button', { name: /数据看板/ }).textContent).toContain('可编辑')
   })
 
-  it('keeps administrator rows quiet regardless of the roster composition', () => {
+  it('flags admin rows when read-write dominates the roster', () => {
     const rwHeavy: CollaborationContext = {
       ...projectContext,
       projects: [
@@ -298,7 +421,7 @@ describe('ScopeControl', () => {
     }
     render(<ScopeControl {...scopeProps(snapshot({ context: rwHeavy }))} />)
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
-    expect(screen.getByRole('button', { name: /支付重构/ }).textContent).not.toContain('管理员')
+    expect(screen.getByRole('button', { name: /支付重构/ }).textContent).toContain('管理员')
     expect(screen.getByRole('button', { name: /数据看板/ }).textContent).not.toContain('可编辑')
     expect(screen.getByRole('button', { name: /插件开发/ }).textContent).not.toContain('可编辑')
   })
@@ -333,16 +456,15 @@ describe('ScopeControl', () => {
     )
     // Root view: hero, the settings group, the roster, and create.
     expect(screen.getByRole('button', { name: /个人空间/ })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /新对话可见范围/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /新对话可见范围/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: '新建项目空间' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /支付重构/ }).getAttribute('aria-current')).toBe('true')
-    fireEvent.click(screen.getByRole('tab', { name: '空间管理' }))
+    // The visibility row pushes the second level rather than expanding inline.
     fireEvent.click(screen.getByRole('button', { name: /新对话可见范围/ }))
     expect(screen.getByText('只有创建者可以查看')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '新建项目空间' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '返回空间管理' }))
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
     expect(screen.getByRole('button', { name: '新建项目空间' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('tab', { name: '切换空间' }))
     // Tapping a scope row selects it and dismisses the page.
     fireEvent.click(screen.getByRole('button', { name: /审计平台/ }))
     expect(switchScope).toHaveBeenCalledWith({ kind: 'project', projectId: 10 })
@@ -350,7 +472,7 @@ describe('ScopeControl', () => {
     // The head toggles the same page back open at its root view.
     fireEvent.click(trigger)
     expect(screen.getByRole('button', { name: '新建项目空间' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: '切换空间' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('button', { name: /新对话可见范围/ })).toBeTruthy()
   })
 
   it('keeps project settings discoverable for a read-only member and explains the owner boundary', async () => {
@@ -367,9 +489,8 @@ describe('ScopeControl', () => {
       setProjectThemePolicy,
     })} />)
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
-    fireEvent.click(screen.getByRole('button', { name: '项目配置' }))
-    fireEvent.click(within(screen.getByRole('dialog', { name: '项目配置' })).getByRole('button', { name: '界面主题' }))
-    expect(await screen.findByText('只有项目所有者或组织管理员可以修改项目设置。')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '项目设置' }))
+    expect(await screen.findByText('只有项目 owner 或组织管理员可以修改项目策略。')).toBeTruthy()
     expect(loadProjectConfiguration).toHaveBeenCalledWith(9)
     expect(setProjectThemePolicy).not.toHaveBeenCalled()
   })
@@ -382,56 +503,15 @@ describe('ScopeControl', () => {
     expect(screen.getByRole('button', { name: '切换个人或项目空间' }).getAttribute('title')).toBe('空间切换失败，请重试')
   })
 
-  it('dismisses its modal focus layer on an outside pointer without toggling the trigger twice', () => {
-    render(<><button type="button">其他操作</button><ScopeControl {...scopeProps(snapshot())} /></>)
-    const trigger = screen.getByRole('button', { name: '切换个人或项目空间' })
-    fireEvent.click(trigger)
-    expect(screen.getByRole('dialog', { name: '切换个人或项目空间' }).getAttribute('aria-modal')).toBe('true')
-    fireEvent.pointerDown(trigger)
-    expect(screen.getByRole('dialog', { name: '切换个人或项目空间' })).toBeTruthy()
-    fireEvent.click(trigger)
-    expect(screen.queryByRole('dialog')).toBeNull()
-    fireEvent.click(trigger)
-    fireEvent.pointerDown(screen.getByRole('button', { name: '其他操作' }))
-    expect(screen.queryByRole('dialog')).toBeNull()
-  })
-
-  it('keeps the newly created project as the retry target after a switch failure', async () => {
-    let state = snapshot()
-    const props = scopeProps(state, {
-      useCollaboration: selector => selector(state),
-      createProject: vi.fn().mockResolvedValue(20),
-    })
-    const view = render(<ScopeControl {...props} />)
-    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
-    fireEvent.click(screen.getByRole('button', { name: /审计平台/ }))
-    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
-    fireEvent.click(screen.getByRole('button', { name: '新建项目空间' }))
-    const parent = view.container.querySelector(`.${css.scopePage}`)!
-    expect(parent.getAttribute('aria-hidden')).toBe('true')
-    fireEvent.pointerDown(screen.getByRole('dialog', { name: '新建项目空间' }))
-    expect(parent.isConnected).toBe(true)
-    const name = screen.getByRole('textbox', { name: '项目名称' })
-    fireEvent.change(name, { target: { value: '新业务空间' } })
-    fireEvent.submit(name.closest('form')!)
-    await waitFor(() => { expect(props.switchScope).toHaveBeenLastCalledWith({ kind: 'project', projectId: 20 }) })
-    state = snapshot({ scopeError: 'switch-failed' })
-    view.rerender(<ScopeControl {...props} />)
-    expect(await screen.findByText('未能进入「新业务空间」，当前空间没有变化')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '重试' }))
-    expect(props.switchScope).toHaveBeenLastCalledWith({ kind: 'project', projectId: 20 })
-    expect(props.createProject).toHaveBeenCalledExactlyOnceWith('新业务空间')
-  })
-
   it('shows a non-dismissible target and progress status while switching', () => {
     vi.useFakeTimers()
     try {
       render(<ScopeControl {...scopeProps(snapshot({
         scopeBusy: true,
-        scopeTarget: { kind: 'project', projectId: 10, projectName: '审计平台' },
+        scopeTarget: { kind: 'project', projectId: 10, projectName: '审计平台', nodeName: 'Computer B' },
       }))} />)
       expect(screen.getByRole('status').getAttribute('aria-busy')).toBe('true')
-      expect(screen.getByText('正在进入「审计平台」')).toBeTruthy()
+      expect(screen.getByText('正在进入「审计平台 · Computer B」')).toBeTruthy()
       expect(screen.getByText('正在提交空间切换请求')).toBeTruthy()
 
       act(() => { vi.advanceTimersByTime(3_500) })

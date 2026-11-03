@@ -1,0 +1,13 @@
+{
+  "name": "resource-root-built",
+  "cwd": ".",
+  "command": "pnpm --dir gateway run test:built-resource-admission",
+  "startedAt": "2026-10-23T12:42:45.844937+00:00",
+  "seconds": 12.484,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d5d25eaefd991b996554af78dd1374b937c22fbd1a30347577b604844a2aba67",
+  "inputsAfter": "d5d25eaefd991b996554af78dd1374b937c22fbd1a30347577b604844a2aba67",
+  "outputSha256": "e4baf1f9d27400b7d53334cc885b1890f85841f9d19e9cc78dced2463a4de845",
+  "outputTail": "? Verifying lockfile against supply-chain policies (195 entries)...\nLockfile is up to date, resolution step is skipped\nAlready up to date\nUpdate available! 11.28.5 → 12.15.0.\nChangelog: https://pnpm.io/v/12.15.0\nTo update, run: curl -fsSL https://get.pnpm.io/install.sh | sh -\n✓ Lockfile passes supply-chain policies (195 entries in 5.4s)\n\n[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: argon2@0.44.0, better-sqlite3@12.11.1, esbuild@0.28.2\n\nRun \"pnpm approve-builds\" to pick which dependencies should be allowed to run scripts.\n[WARN] The install that runs before scripts failed, so your node_modules may be out of sync with your lockfile. Set \"verifyDepsBeforeRun: false\" to skip this install.\n$ npm run build && node tests/fixtures/runtime-start-built.mjs\nnpm warn Unknown env config \"manage-package-manager-versions\". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.\n\n> build\n> tsc -p tsconfig.build.json\n\nnode:internal/fs/promises:953\n  const result = await PromisePrototypeThen(\n                 ^\n\nError: ENOENT: no such file or directory, scandir '/Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/deploy/postgres/migrations/'\n    at async readdir (node:internal/fs/promises:953:18)\n    at async migrationFiles (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/postgres/database.js:360:20)\n    at async runMigrations (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/postgres/database.js:413:24)\n    at async file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/tests/fixtures/runtime-start-built.mjs:20:3 {\n  errno: -2,\n  code: 'ENOENT',\n  syscall: 'scandir',\n  path: '/Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/deploy/postgres/migrations/'\n}\n\nNode.js v25.8.1\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

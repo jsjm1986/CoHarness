@@ -1,0 +1,1 @@
+- textbox "Message COHARNESS": Private draft restored after account verification

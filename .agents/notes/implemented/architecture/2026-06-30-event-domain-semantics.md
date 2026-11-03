@@ -28,6 +28,8 @@ This vocabulary is the foundation for interception decisions, the durable `hook/
 
 **Applying the rule to the boundary twins:** all four boundary mirrors — `agent/turn-start`, `agent/turn-end`, `agent/step-start`, `agent/step-end` — are **REMOVED**. No production consumer needs the live `Agent` at a boundary: the ACP bridge correlates its in-flight prompt with the exact `session/event` `turn/start`/`turn/end` pair, and other transcript consumers likewise derive boundaries from the durable stream. See [the remove-boundary-mirror-events Agent Note](../simplification/2026-06-20-remove-agent-boundary-mirror-events.md), which owns that decision. Removing the emits also simplifies the loop's `closeStep`/`closeTurn` (one append each, no paired emit).
 
+Observe-only Session and Agent notifications contain thrown and rejected values per listener. Their diagnostic paths use `formatThrownValue` from [the value utilities](../../../../packages/util/values/README.md#render-failure), retaining ordinary error text and a fixed label when conversion fails. Reporting an observer failure cannot veto a committed fact, starve later listeners or prevent a cancellation signal. Awaited `agent/created` listeners, synchronous `session/created` throws and pre-commit validation keep their documented publication vetoes.
+
 ## Consequences
 
 - The loop no longer emits any boundary mirror; `closeStep` appends `step/end` only and `closeTurn` appends `turn/end` only. `Session.append` owns post-commit observer containment, so a throwing boundary observer cannot change the turn outcome or starve later consumers; an acceptance or internal validation failure still escapes before the boundary enters the log.

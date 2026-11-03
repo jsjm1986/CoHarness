@@ -3,14 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/web.md
 document:
-  en: c65b048634d67bed612f6531ea2b4a450267b67e
-  zh: f371a584268f05b14885ab3975271bc0988e9b77
+  en: 08bab03ca2bfb90903c560da8c7cee7b1abda175
+  zh: 9a2cc7e00de7748a3f70d7199eb7a28e7a03fd10
 /web-access:
   en: 86d12e6e81fb63b8
   zh: 52ed66dcacaf6d85
 /web-access/why-one-capability-has-two-operations:
   en: 380da3cd0aabd52b
   zh: 1317c26089c3ab07
+/web-access/model-backed-search:
+  en: f0a09a9bfef63208
+  zh: 3722c7ebf58a67c5
 /web-access/search-request-and-result:
   en: 1ad94deb713024e2
   zh: 9d3df730fa99ad89

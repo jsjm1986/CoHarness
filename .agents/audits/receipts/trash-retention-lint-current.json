@@ -1,0 +1,14 @@
+{
+  "name": "trash-retention-lint-current",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/trash.ts packages/attachment/userdoc-local/tests/trash-retention.spec.ts examples/headless-agent/tests/fixtures/userdoc-migration-driver.ts",
+  "startedAt": "2026-10-24T05:08:07.176180+00:00",
+  "seconds": 5.397,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fa9fe08397a64e9801a5f782caf1f35598b1c0c04ab86ea8b512db5bd2cd561c",
+  "inputsAfter": "fa9fe08397a64e9801a5f782caf1f35598b1c0c04ab86ea8b512db5bd2cd561c",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

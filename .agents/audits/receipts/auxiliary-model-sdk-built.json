@@ -1,0 +1,14 @@
+{
+  "name": "auxiliary-model-sdk-built",
+  "cwd": ".",
+  "command": "env DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.snapshot.config.ts snapshots/sdk/memory-auxiliary.snapshot.ts snapshots/sdk/auto-review-model.snapshot.ts --retry=0",
+  "startedAt": "2026-10-24T03:08:37.754815+00:00",
+  "seconds": 4.977,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "afee19e97f5e41e4359386a3ae64852841f418f3eeb02f762990a78c29b6d284",
+  "inputsAfter": "afee19e97f5e41e4359386a3ae64852841f418f3eeb02f762990a78c29b6d284",
+  "postgresToolDirectory": null,
+  "outputSha256": "13d9e668d8a522b34491143e2b28c2634e5fcd5b3f60aed6d29f96a0ff61d05c",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  2 passed (2)\n      Tests  2 passed (2)\n   Start at  11:08:40\n   Duration  2.68s (transform 1.72s, setup 69ms, import 2.27s, tests 2.75s, environment 0ms)\n\n"
+}

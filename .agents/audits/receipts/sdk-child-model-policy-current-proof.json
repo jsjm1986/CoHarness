@@ -1,0 +1,14 @@
+{
+  "name": "sdk-child-model-policy-current-proof",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/reproduce-sdk-child-model-policy.mjs",
+  "startedAt": "2026-10-24T10:22:07.791282+00:00",
+  "seconds": 1.21,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b86f470b44bdd7e2292e444b8799cec9bfe3f6206e5e6845bc693e936f8fc706",
+  "inputsAfter": "b86f470b44bdd7e2292e444b8799cec9bfe3f6206e5e6845bc693e936f8fc706",
+  "postgresToolDirectory": null,
+  "outputSha256": "d882093f71f66ebcbd155f0bcc9569a6dc4d6cef50f056d7df2c084dda4367c8",
+  "outputTail": "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n2 !== 1\n\n    at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/.agents/audits/.local/reproduce-sdk-child-model-policy.mjs:47:126 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: 2,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v25.8.1\n"
+}

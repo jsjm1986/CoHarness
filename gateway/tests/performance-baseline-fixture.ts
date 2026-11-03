@@ -61,7 +61,7 @@ export async function createPerformanceFixture(enabled: boolean, plane: 'source'
       audit: { write: unreachable, query: unreachable },
       instances: {
         portOf: unreachable, stateOf: unreachable, stopReasonOf: unreachable, generationOf: unreachable,
-        isLive: unreachable, touch: unreachable, wsRef: unreachable, ensureRunning: unreachable, startRequest: unreachable,
+        isLive: unreachable, liveEndpoint: unreachable, touch: unreachable, wsRef: unreachable, ensureRunning: unreachable, startRequest: unreachable,
         reapIdle: unreachable, stop: unreachable, stopAll: unreachable, withStopped: unreachable,
       },
     }

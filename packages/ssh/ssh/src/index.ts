@@ -1,6 +1,5 @@
 /** OpenSSH connection owner for one version-matched POSIX helper and its independent forwarded streams. */
 
-import { spawn, execFile, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createConnection, type Socket } from 'node:net'
@@ -12,6 +11,8 @@ import { assertNever } from '@deepseek-ai/dsh-util-values'
 import { SshRpcPeer, SSH_PROTOCOL_VERSION } from './protocol.ts'
 import { helloSchema, type SshStreamEndpoint } from './schemas.ts'
 import { authenticateStream } from './stream-security.ts'
+import { LocalSubprocessRuntime } from '@deepseek-ai/dsh-subprocess-local'
+import type { SubprocessHandle, SubprocessOutputReader, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 
 type Hello = z.infer<typeof helloSchema>
 
@@ -126,6 +127,17 @@ const SSH_CONNECTION_DEFAULTS = {
   requestTimeoutMs: 30_000, maxFrameBytes: 64 * 1024 * 1024, maxPending: 128, leaseMs: 30_000,
 } as const
 
+/** Remote loopback listener owned by one local service and this SSH connection. */
+export interface SshLoopbackForward {
+  /** Dynamically allocated TCP port on the remote loopback interface. */
+  readonly port: number
+  /**
+   * Drain the local consumer, cancel the remote listener and confirm cancellation through the helper.
+   * @returns after consumer cleanup and forwarding removal; failure invalidates the connection.
+   */
+  close(): Promise<void>
+}
+
 /** One non-reconnecting SSH session; loss invalidates all active operations. */
 export class SshConnection extends Service {
   static Config: schema<Config> = schema.object({
@@ -145,17 +157,22 @@ export class SshConnection extends Service {
   /** Verified remote helper coordinates; callers must await this before launch. */
   readonly ready: Promise<Hello>
   private rpc: SshRpcPeer | undefined
-  private child: ChildProcessWithoutNullStreams | undefined
+  private child: SubprocessHandle | undefined
   private childClosed: Promise<void> | undefined
+  private readonly local: Promise<SubprocessRuntime>
+  private starting = true
   private directory: string | undefined
   private heartbeat: NodeJS.Timeout | undefined
   private closed = false
   private readonly lifetime = new AbortController()
+  private readonly processLifetime = new AbortController()
   private readonly operations = new Set<Promise<unknown>>()
+  private readonly consumers = new Set<() => Promise<void>>()
   private disposal: Promise<void> | undefined
   private failure: Error | undefined
   private sockets = new Set<Socket>()
   private nextSocket = 0
+  private readonly loopbackPorts = new Set<number>()
   private readonly config: ResolvedConfig
   private remote: Hello | undefined
 
@@ -180,14 +197,36 @@ export class SshConnection extends Service {
       leaseMs: z.number().int().min(3000).max(600_000).default(SSH_CONNECTION_DEFAULTS.leaseMs),
       passwordRef: z.string().refine(isCredentialRefName, 'passwordRef must be a credential reference').optional(),
     }).strict().parse(config) as ResolvedConfig
+    const local = ctx.isolate('subprocess').plugin(LocalSubprocessRuntime)
+    this.local = Promise.resolve(local).then(() => local.ctx.subprocess)
+    ctx.effect(() => [local.dispose, async () => {
+      try { await this.dispose() } finally { await local.dispose() }
+    }], 'ssh.local-process-owner')
+    ctx.on('internal/plugin', (fiber) => {
+      if (this.starting && fiber === ctx.fiber && fiber.uid === null) {
+        this.processLifetime.abort(new Error('SSH connection closed during startup'))
+      }
+    })
     this.ready = this.start()
     // Startup uses Node I/O, local validation, and Error-valued RPC failures.
-    void this.ready.catch((error: unknown) => { this.fail(error as Error) })
-    ctx.effect(() => () => this.dispose())
+    void this.ready.then(() => { this.starting = false }, (error: unknown) => { this.starting = false; this.fail(error as Error) })
   }
 
   /** Hold plugin readiness until the remote identity and helper digest are verified. */
   async [Service.init](): Promise<void> { await this.ready }
+
+  /**
+   * Keep admitted resource cleanup owned until it settles, including consumer-only disposal.
+   * @param cleanup - stop allocation and drain resources before the SSH transport closes.
+   * @returns the shared cleanup disposer; failed cleanup remains retained by the connection.
+   */
+  retainConsumer(cleanup: () => Promise<void>): () => Promise<void> {
+    this.assertOpen()
+    let closing: Promise<void> | undefined
+    const close = (): Promise<void> => closing ??= Promise.resolve().then(cleanup).then(() => { this.consumers.delete(close) })
+    this.consumers.add(close)
+    return close
+  }
 
   /** Verified remote PTC launch configuration; script deployments require a verified bootstrap. */
   get ptcLaunch(): { kind: 'embedded'; executable: string } | { kind: 'node-script'; executable: string; bootstrapPath: string } {
@@ -204,7 +243,8 @@ export class SshConnection extends Service {
   }
 
   /**
-   * Send a helper operation; cancellation never replays an ambiguous mutation.
+   * Send a helper operation; admitted process termination and wait remain usable while closing.
+   * Cancellation never replays an ambiguous mutation.
    * @param method - the private helper operation.
    * @param params - JSON request fields validated by the helper.
    * @param result - response validation before returning provider-visible data.
@@ -213,9 +253,10 @@ export class SshConnection extends Service {
    * @returns the validated remote result.
    */
   async request<T>(method: string, params: unknown, result: z.ZodType<T>, signal?: AbortSignal, wait: boolean = false): Promise<T> {
-    this.assertOpen()
+    const cleanup = method === 'process.terminate' || method === 'process.wait'
+    this.assertOpen(cleanup)
     await this.ready
-    this.assertOpen()
+    this.assertOpen(cleanup)
     const bounded = wait ? signal : signal === undefined
       ? AbortSignal.timeout(this.config.requestTimeoutMs)
       : AbortSignal.any([signal, AbortSignal.timeout(this.config.requestTimeoutMs)])
@@ -227,6 +268,7 @@ export class SshConnection extends Service {
    * @param endpoint - private coordinates issued by this connection's helper.
    * @param signal - cancellation of allocation and the resulting socket.
    * @returns a paused socket; attach a consumer before resuming it.
+   * @throws Failed forwarding rollback invalidates the connection and joins its native process observation.
    */
   async connectStream(endpoint: SshStreamEndpoint, signal?: AbortSignal): Promise<Socket> {
     return this.track(this.establishStream(endpoint, signal))
@@ -242,14 +284,30 @@ export class SshConnection extends Service {
     const local = join(this.directory as string, `s${this.nextSocket++}`)
     const forward = `${local}:${remote}`
     const cancelForward = async (): Promise<void> => {
-      // An unavailable master already removed its forwarding listeners.
-      if (!this.closed) await this.controlCommand(['-O', 'cancel', '-L', forward]).catch(() => {})
-      await rm(local, { force: true })
+      try {
+        if (!this.closed && this.failure === undefined) {
+          await this.controlCommand(['-O', 'cancel', '-L', forward], undefined, true)
+        }
+        if (this.failure !== undefined) await this.childClosed
+        await rm(local, { force: true })
+      } catch (error) {
+        const failure = new Error('SSH stream forwarding cleanup could not be confirmed', { cause: error })
+        this.fail(failure)
+        try { await this.childClosed } catch (observationError) {
+          throw new AggregateError([failure, observationError], 'SSH stream forwarding cleanup and process observation failed')
+        }
+        throw failure
+      }
     }
     try {
       await this.controlCommand(['-O', 'forward', '-o', 'ExitOnForwardFailure=yes', '-L', forward], signal)
-    } catch (error) { await cancelForward(); throw error }
-    signal.throwIfAborted()
+      signal.throwIfAborted()
+    } catch (error) {
+      try { await cancelForward() } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], 'SSH stream allocation and forwarding cleanup failed')
+      }
+      throw error
+    }
     const socket = createConnection({ path: local, allowHalfOpen: true })
     this.sockets.add(socket)
     socket.once('close', () => {
@@ -279,7 +337,73 @@ export class SshConnection extends Service {
     return authenticated
   }
 
-  /** Tear down the helper's remote managed ranges before releasing the SSH master when reachable. */
+  /**
+   * Expose one local service exclusively through a remote loopback listener.
+   * @param localPort - TCP port of the caller-owned service on local 127.0.0.1.
+   * @param beforeClose - abort and join that service before its SSH transport is released.
+   * @param signal - optional cancellation; omission keeps the forward until explicit or connection cleanup.
+   * An allocation already sent to OpenSSH settles before cancellation rolls it back.
+   * @returns the requested remote loopback port and its idempotent, retained cleanup owner.
+   */
+  forwardLoopback(localPort: number, beforeClose: () => Promise<void>, signal?: AbortSignal): Promise<SshLoopbackForward> {
+    return this.track(this.establishLoopback(localPort, beforeClose, signal))
+  }
+
+  private async establishLoopback(localPort: number, beforeClose: () => Promise<void>, signal?: AbortSignal): Promise<SshLoopbackForward> {
+    await this.ready
+    this.assertOpen()
+    signal?.throwIfAborted()
+    if (this.loopbackPorts.has(localPort)) throw new Error('SSH local loopback service already has a forwarding owner')
+    this.loopbackPorts.add(localPort)
+    const ownedSignal = signal === undefined ? this.lifetime.signal : AbortSignal.any([signal, this.lifetime.signal])
+    const forwarding = `127.0.0.1:0:127.0.0.1:${localPort}`
+    let allocatedPort: number | undefined
+    const close = this.retainConsumer(async () => {
+      ownedSignal.removeEventListener('abort', aborted)
+      await opening.catch(() => {})
+      const failures: unknown[] = []
+      try { await beforeClose() } catch (error) { failures.push(error) }
+      if (allocatedPort !== undefined) {
+        try {
+          // OpenSSH identifies a dynamic forward by its original zero-port request.
+          await this.controlCommand(['-O', 'cancel', '-R', forwarding], undefined, true)
+          // The mux acknowledgement queues cancellation; this later round trip
+          // confirms that the remote transport has processed it.
+          await (this.rpc as SshRpcPeer).request('heartbeat', {}, z.null(), AbortSignal.timeout(this.config.requestTimeoutMs))
+        } catch (error) { failures.push(error) }
+      }
+      if (allocatedPort === undefined || failures.length > 0) {
+        this.fail(new Error('SSH reverse forwarding cleanup could not be confirmed'))
+        try { await this.childClosed } catch (error) { failures.push(error) }
+      }
+      if (failures.length === 1) throw failures[0]
+      if (failures.length > 1) throw new AggregateError(failures, 'SSH loopback forwarding cleanup failed')
+      this.loopbackPorts.delete(localPort)
+    })
+    const aborted = (): void => { void this.track(close()).catch(() => {}) }
+    // Once sent, allocation must return its port before caller cancellation can
+    // remove it. The connection's administrative deadline still bounds this wait.
+    const opening = this.controlCommand(['-O', 'forward', '-o', 'ExitOnForwardFailure=yes', '-R', forwarding], undefined, true).then((output) => {
+      const port = output.trim()
+      if (!/^[1-9][0-9]{0,4}$/u.test(port) || Number(port) > 65535) throw new Error('SSH returned an invalid allocated port')
+      allocatedPort = Number(port)
+      return allocatedPort
+    })
+    ownedSignal.addEventListener('abort', aborted, { once: true })
+    try {
+      const port = await opening
+      ownedSignal.throwIfAborted()
+      this.assertOpen()
+      return { port, close }
+    } catch (error) {
+      try { await close() } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], 'SSH loopback forwarding allocation and cleanup failed')
+      }
+      throw error
+    }
+  }
+
+  /** Drain retained consumers and the reachable helper before awaiting the local SSH process range. */
   dispose(): Promise<void> {
     this.disposal ??= this.disposeOnce()
     return this.disposal
@@ -288,10 +412,17 @@ export class SshConnection extends Service {
   private async disposeOnce(): Promise<void> {
     this.closed = true
     this.lifetime.abort(new Error('SSH connection is closing'))
+    if (this.starting) this.processLifetime.abort(new Error('SSH connection closed before startup'))
     if (this.heartbeat !== undefined) clearInterval(this.heartbeat)
+    const failures: unknown[] = []
     try {
       await this.ready.catch(() => {})
-      if (this.failure === undefined) await this.rpc?.request('close', {}, z.null(), AbortSignal.timeout(this.config.requestTimeoutMs))
+      const consumers = await Promise.allSettled([...this.consumers].map(close => close()))
+      for (const outcome of consumers) if (outcome.status === 'rejected') failures.push(outcome.reason)
+      if (this.failure === undefined) {
+        try { await this.rpc?.request('close', {}, z.null(), AbortSignal.timeout(this.config.requestTimeoutMs)) }
+        catch (error) { failures.push(error) }
+      }
     } finally {
       this.rpc?.close()
       // TLS wrappers release their reads before their underlying sockets close.
@@ -299,19 +430,23 @@ export class SshConnection extends Service {
         if (socket.closed) resolve()
         else { socket.once('close', () => { resolve() }); socket.destroy() }
       }))
-      this.child?.kill('SIGTERM')
-      const force = setTimeout(() => { this.child?.kill('SIGKILL') }, this.config.requestTimeoutMs)
-      try { await this.childClosed } finally { clearTimeout(force) }
-      await Promise.all(socketClosures)
+      this.child?.terminate()
+      this.processLifetime.abort(new Error('SSH transport is closing'))
+      const stopped = await Promise.allSettled([this.childClosed, ...socketClosures])
+      for (const outcome of stopped) if (outcome.status === 'rejected') failures.push(outcome.reason)
       while (this.operations.size > 0) await Promise.allSettled([...this.operations])
-      if (this.directory !== undefined) await rm(this.directory, { recursive: true, force: true })
+      if (this.directory !== undefined && stopped[0].status === 'fulfilled') {
+        try { await rm(this.directory, { recursive: true, force: true }) } catch (error) { failures.push(error) }
+      }
     }
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1) throw new AggregateError(failures, 'SSH resource cleanup failed')
   }
 
   private controlPath(): string { return join(this.directory as string, 'master') }
 
-  private assertOpen(): void {
-    if (this.closed) throw new Error('SSH connection is closed')
+  private assertOpen(cleanup = false): void {
+    if (this.closed && !cleanup) throw new Error('SSH connection is closed')
     if (this.failure !== undefined) throw this.failure
   }
 
@@ -321,27 +456,32 @@ export class SshConnection extends Service {
     return operation
   }
 
-  private async controlCommand(args: string[], signal?: AbortSignal): Promise<void> {
-    const signals = [this.lifetime.signal, AbortSignal.timeout(this.config.requestTimeoutMs)]
+  private async controlCommand(args: string[], signal?: AbortSignal, cleanup = false): Promise<string> {
+    const signals = [cleanup ? this.processLifetime.signal : this.lifetime.signal, AbortSignal.timeout(this.config.requestTimeoutMs)]
     if (signal !== undefined) signals.push(signal)
     const combined = AbortSignal.any(signals)
     combined.throwIfAborted()
-    const result = Promise.withResolvers<undefined>()
-    const command = execFile('ssh', ['-S', this.controlPath(), ...args, this.config.host], {
-      signal: combined, maxBuffer: 64 * 1024,
-    }, (error) => { if (error === null) result.resolve(undefined); else result.reject(error) })
-    const closed = new Promise<void>((resolve) => { command.once('close', () => { resolve() }) })
-    let force: NodeJS.Timeout | undefined
-    const escalate = (): void => {
-      force = setTimeout(() => { command.kill('SIGKILL') }, this.config.requestTimeoutMs)
-      force.unref()
-    }
-    combined.addEventListener('abort', escalate, { once: true })
-    try { await result.promise }
-    finally {
-      await closed
-      combined.removeEventListener('abort', escalate)
-      if (force !== undefined) clearTimeout(force)
+    const local = await this.local
+    const command = await local.spawn({
+      argv: ['ssh', '-S', this.controlPath(), '-o', 'LogLevel=ERROR', ...args, this.config.host],
+      cwd: this.directory as string, resourceOrigin: 'infrastructure', signal: combined,
+      graceMs: this.config.requestTimeoutMs,
+      stdio: { stdin: 'ignore', stdout: { maxBytes: 64 * 1024 }, stderr: { maxBytes: 64 * 1024 } },
+    })
+    try {
+      const result = await command.done
+      const stdout = (command.collected.stdout as SubprocessOutputReader).readFrom(0)
+      const stderr = (command.collected.stderr as SubprocessOutputReader).readFrom(0)
+      // Some OpenSSH mux failures report exit zero with an error on stderr.
+      if (result.exitCode !== 0 || stdout.lossy || stderr.lossy || stderr.text.trim() !== '') {
+        throw new Error('SSH forwarding control command failed')
+      }
+      return stdout.text
+    } finally {
+      command.terminate()
+      if (!await command.waitForExit(AbortSignal.timeout(this.config.requestTimeoutMs))) {
+        throw new Error('SSH forwarding control command cleanup could not be confirmed')
+      }
     }
   }
 
@@ -352,7 +492,7 @@ export class SshConnection extends Service {
     if (this.heartbeat !== undefined) clearInterval(this.heartbeat)
     this.rpc?.close(error)
     for (const socket of [...this.sockets].reverse()) socket.destroy(error)
-    this.child?.kill('SIGTERM')
+    this.child?.terminate()
   }
 
   /**
@@ -385,6 +525,8 @@ export class SshConnection extends Service {
   }
 
   private async start(): Promise<Hello> {
+    const local = await this.local
+    this.processLifetime.signal.throwIfAborted()
     this.directory = await mkdtemp('/tmp/dsh-ssh-')
     const releaseAskpass = await this.prepareAskpass()
     if (this.closed) throw new Error('SSH connection closed before startup')
@@ -405,31 +547,40 @@ export class SshConnection extends Service {
       /* v8 ignore next -- Config parsing admits only these two launch kinds. */
       default: return assertNever(launch)
     }
-    const child = spawn('ssh', [
+    const child = await local.spawn({ argv: ['ssh',
       '-T', '-M', '-S', this.controlPath(), '-o', 'ControlPersist=no',
       '-o', `BatchMode=${releaseAskpass === undefined ? 'yes' : 'no'}`,
       ...(releaseAskpass === undefined ? [] : ['-o', 'NumberOfPasswordPrompts=1']),
       '-o', 'StrictHostKeyChecking=yes', '-o', 'ForwardAgent=no', '-o', 'ClearAllForwardings=yes',
       '-o', 'ServerAliveInterval=10', '-o', 'ServerAliveCountMax=3', this.config.host, command,
-    ], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      ...(releaseAskpass === undefined ? {} : {
-        env: {
-          ...process.env,
-          SSH_ASKPASS: join(this.directory, 'askpass'),
-          SSH_ASKPASS_REQUIRE: 'force',
-          // OpenSSH releases predating SSH_ASKPASS_REQUIRE still consult
-          // askpass only when DISPLAY is set without a controlling tty.
-          DISPLAY: 'dsh-ssh:0',
-        },
-      }),
+    ], cwd: this.directory, resourceOrigin: 'infrastructure', signal: this.processLifetime.signal,
+    graceMs: this.config.requestTimeoutMs,
+    stdio: { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
+    ...(releaseAskpass === undefined ? {} : {
+      env: {
+        SSH_ASKPASS: join(this.directory, 'askpass'),
+        SSH_ASKPASS_REQUIRE: 'force',
+        // OpenSSH releases predating SSH_ASKPASS_REQUIRE still consult
+        // askpass only when DISPLAY is set without a controlling tty.
+        DISPLAY: 'dsh-ssh:0',
+      },
+    }),
     })
     this.child = child
-    this.childClosed = new Promise((resolve) => { child.once('close', () => { resolve() }) })
-    child.stderr.resume() // SSH diagnostics can contain configured paths; operation errors remain structured.
-    child.once('error', (error) => { this.fail(error) })
-    child.once('close', () => { this.fail(new Error('SSH helper disconnected; remote outcomes and cleanup are unknown')) })
-    const rpc = new SshRpcPeer(child.stdout, child.stdin, this.config.maxFrameBytes, this.config.maxPending)
+    this.childClosed = child.waitForExit().then((exited) => {
+      if (!exited) throw new Error('SSH transport cleanup could not be confirmed')
+    })
+    void this.childClosed.catch(() => {})
+    const disconnected = (cause?: unknown): void => {
+      this.fail(new Error('SSH helper disconnected; remote outcomes and cleanup are unknown', { cause }))
+    }
+    void child.done.then(() => { disconnected() }, (error: unknown) => {
+      this.fail(error instanceof Error ? error : new Error('SSH transport failed', { cause: error }))
+    })
+    const { stdout, stdin, stderr } = child
+    if (stdout === undefined || stdin === undefined || stderr === undefined) throw new Error('SSH transport requires piped standard streams')
+    stderr.resume() // SSH diagnostics can contain configured paths; operation errors remain structured.
+    const rpc = new SshRpcPeer(stdout, stdin, this.config.maxFrameBytes, this.config.maxPending)
     this.rpc = rpc
     rpc.once('closed', (error) => { this.fail(error as Error) })
     let hello: Hello

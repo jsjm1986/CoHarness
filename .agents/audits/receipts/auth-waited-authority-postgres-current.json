@@ -1,0 +1,14 @@
+{
+  "name": "auth-waited-authority-postgres-current",
+  "cwd": "gateway",
+  "command": "npx vitest run tests/auth-postgres.spec.ts --retry=0",
+  "startedAt": "2026-10-24T01:49:14.893385+00:00",
+  "seconds": 6.108,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "029939098249046f45771e412e9060c0055a75ef975b57df9b6f76ba9cff2bc9",
+  "inputsAfter": "029939098249046f45771e412e9060c0055a75ef975b57df9b6f76ba9cff2bc9",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "49efd60a75af832696cc2d59403a1028447bfc6eeae4ab990d4ed424263dd01b",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  5 passed (5)\n   Start at  09:49:17\n   Duration  3.14s (transform 1.14s, setup 0ms, import 1.46s, tests 1.56s, environment 0ms)\n\n"
+}

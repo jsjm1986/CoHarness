@@ -7,6 +7,8 @@ import { basename, isAbsolute, join, posix, resolve } from 'node:path'
 import { DEFAULT_DESKTOP_COORDINATOR_CONFIG, type DesktopCoordinatorConfig } from './desktop-coordinator.ts'
 import { DEFAULT_PROGRESS_CONFIG, type ProgressConfig } from './postgres/progress-service.ts'
 import { DEFAULT_RUNTIME_LOG_CAP_BYTES } from './runtime-log.ts'
+import { loadNodeChannelConfig } from './node-channel-protocol.ts'
+import { loadNodeServiceConfig } from './node-service.ts'
 
 export interface GatewayConfig {
   /** Canonical immutable release directory for managed deployments. */
@@ -42,6 +44,16 @@ export interface GatewayConfig {
   streamPrincipalRenewal: { enabled: boolean; intervalMs: number; requestTimeoutMs: number; maxBatchSize: number }
   /** Maximum time an HTTP/WebSocket proxy waits on one runtime upstream operation. */
   upstreamTimeoutMs: number
+  /** Loopback resource-accounting request deadline for managed Runtime plugins. */
+  runtimeRequestTimeoutMs: number
+  /** Resource-accounting cleanup deadline, longer than one Runtime request. */
+  runtimeCleanupTimeoutMs: number
+  /** Managed browser readiness deadline, including its Host description and event streams. */
+  runtimeBrowserReadyTimeoutMs: number
+  /** Managed browser event-stream opening deadline. */
+  runtimeBrowserStreamTimeoutMs: number
+  /** Deadline for bounded browser RPC calls to managed Runtimes. */
+  runtimeBrowserRpcTimeoutMs: number
   /** Idle keep-alive lifetime of the public HTTP listener; must outlive the front proxy's origin pool. */
   keepAliveTimeoutMs: number
   /** Maximum interval between durable access-revocation reads and listener reconnects. */
@@ -70,6 +82,12 @@ export interface GatewayConfig {
   tunnelCredentialKeyFile: string
   /** Private state directory for the managed cloudflared binary (HGW_TUNNEL_STATE_DIR). */
   tunnelStateDir: string
+  /** Maximum time for a connector's registration witness and quick URL. */
+  tunnelStartupTimeoutMs: number
+  /** Maximum closure wait after forced tunnel termination. */
+  tunnelCloseTimeoutMs: number
+  /** Poll interval for the private connector registration witness. */
+  tunnelProbeIntervalMs: number
   /** Explicit cloudflared binary path override (HGW_CLOUDFLARED); empty resolves PATH, managed, then well-known locations. */
   cloudflaredBin?: string
   /** Owner-only one-time file for a newly generated bootstrap administrator password. */
@@ -100,11 +118,22 @@ export interface GatewayConfig {
   deployMigrationsDir: string
   /** State root whose key and credential material the backup manifest covers. */
   stateRoot: string
+  /** Private, non-restorable Node Agent enrollment configuration. */
+  nodeConnectionFile: string
   dshCommand: string[]
   dshRepoRoot: string
   instancePortBase: number
   /** Node-wide managed Runtime cold-start and residency admission. */
   runtimeCapacity: RuntimeCapacityConfig
+  /** Row and complete-response limits for environment-directory reads. */
+  runtimeCatalog: import('./runtime-catalog.ts').RuntimeCatalogLimits
+  /** Outbound node enrollment and control leases; connectivity does not grant execution. */
+  nodeAccess: import('./node-access.ts').NodeAccessConfig
+  nodeChannel: import('./node-channel-protocol.ts').NodeChannelConfig
+  /** Forwarding to an existing Gateway on an enrolled computer, with independent stream budgets. */
+  nodeService: import('./node-service.ts').NodeServiceConfig
+  /** Visible browser deployment-policy refresh interval; does not probe other computers. */
+  deploymentContextRefreshMs: number
   /** Durable node-wide model, process and execution-worker admission. */
   resourceBudget: NodeResourceBudgetConfig
   /** Enable bounded Gateway performance observations. */
@@ -134,6 +163,8 @@ export interface GatewayConfig {
   gatewayDir: string
   /** Unit directory the systemd launcher writes per-user unit files into. */
   systemdUnitDir: string
+  /** Maximum lifetime of each native systemctl control client. */
+  systemdCommandTimeoutMs: number
   /**
    * Absolute path of the dsh-directory-guard bundle patch mounted into every
    * instance's home patch layer, or '' to disable (HGW_GUARD_PATCH=off). The
@@ -160,6 +191,10 @@ export interface GatewayConfig {
   jpushAppKey?: string
   /** Owner-only JPush master secret used by the Gateway REST sender. */
   jpushMasterSecret?: string
+  /** Total budget for credential preparation and one outbound completion notification. */
+  pushDeliveryTimeoutMs: number
+  /** Lifetime of a pending delivery claim before retry; exceeds the send budget. */
+  pushDeliveryLeaseMs: number
   /** Interactive-desktop grant/queue TTLs and capacity (HGW_DESKTOP_*). */
   desktop: DesktopCoordinatorConfig
   /**
@@ -424,7 +459,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     requireReleasePath(env.HGW_DSH_REPO_ROOT, releaseRoot, 'HGW_DSH_REPO_ROOT')
   }
   const usersRoot = env.HGW_USERS_ROOT ?? join(homedir(), 'harness-users')
-  const stateRoot = env.HGW_STATE_ROOT ?? join(homedir(), '.harness-gateway')
+  const stateRoot = resolve(env.HGW_STATE_ROOT ?? join(homedir(), '.harness-gateway'))
   const bootstrapAdminPasswordFile = normalizedAbsolutePath(resolve(
     env.HGW_BOOTSTRAP_ADMIN_PASSWORD_FILE ?? join(stateRoot, 'bootstrap-admin-password'),
   ))
@@ -443,6 +478,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     env.HGW_TUNNEL_CREDENTIAL_KEY_FILE ?? join(stateRoot, 'tunnel-credentials.key'),
   )
   const tunnelStateDir = resolve(env.HGW_TUNNEL_STATE_DIR ?? join(stateRoot, 'tunnel'))
+  const tunnelStartupTimeoutMs = timerDelay(env.HGW_TUNNEL_STARTUP_TIMEOUT_MS, 30_000, 'HGW_TUNNEL_STARTUP_TIMEOUT_MS')
+  const tunnelCloseTimeoutMs = timerDelay(env.HGW_TUNNEL_CLOSE_TIMEOUT_MS, 5_000, 'HGW_TUNNEL_CLOSE_TIMEOUT_MS')
+  const tunnelProbeIntervalMs = timerDelay(env.HGW_TUNNEL_PROBE_INTERVAL_MS, 25, 'HGW_TUNNEL_PROBE_INTERVAL_MS')
+  if (tunnelProbeIntervalMs > tunnelStartupTimeoutMs) throw new Error('HGW_TUNNEL_PROBE_INTERVAL_MS must not exceed HGW_TUNNEL_STARTUP_TIMEOUT_MS')
   const cloudflaredBin = env.HGW_CLOUDFLARED === undefined || env.HGW_CLOUDFLARED === ''
     ? undefined : normalizedAbsolutePath(env.HGW_CLOUDFLARED)
   const launcher = env.HGW_LAUNCHER === 'systemd' ? 'systemd' : 'local'
@@ -582,6 +621,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   if ((jpushAppKey === undefined) !== (jpushMasterSecret === undefined)) {
     throw new Error('HGW_JPUSH_APP_KEY and HGW_JPUSH_MASTER_SECRET must be configured together')
   }
+  const pushDeliveryTimeoutMs = timerDelay(env.HGW_PUSH_DELIVERY_TIMEOUT_MS, 30_000, 'HGW_PUSH_DELIVERY_TIMEOUT_MS')
+  const pushDeliveryLeaseMs = timerDelay(env.HGW_PUSH_DELIVERY_LEASE_MS, 120_000, 'HGW_PUSH_DELIVERY_LEASE_MS')
+  if (pushDeliveryLeaseMs <= pushDeliveryTimeoutMs) {
+    throw new Error('HGW_PUSH_DELIVERY_LEASE_MS must exceed HGW_PUSH_DELIVERY_TIMEOUT_MS')
+  }
   const intakePort = portNumber(env.HGW_INTAKE_PORT, port + 1, 'HGW_INTAKE_PORT')
   if (intakePort === port) throw new Error('HGW_INTAKE_PORT must differ from HGW_PORT')
   const principalAssertionTtlMs = positiveSafeInteger(
@@ -608,6 +652,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     DEFAULT_KEEPALIVE_TIMEOUT_MS,
     'HGW_KEEPALIVE_TIMEOUT_MS',
   )
+  const runtimeRequestTimeoutMs = timerDelay(env.HGW_RUNTIME_REQUEST_TIMEOUT_MS, 5000, 'HGW_RUNTIME_REQUEST_TIMEOUT_MS')
+  const runtimeCleanupTimeoutMs = timerDelay(env.HGW_RUNTIME_CLEANUP_TIMEOUT_MS, 30000, 'HGW_RUNTIME_CLEANUP_TIMEOUT_MS')
+  if (runtimeCleanupTimeoutMs <= runtimeRequestTimeoutMs) throw new Error('HGW_RUNTIME_CLEANUP_TIMEOUT_MS must exceed HGW_RUNTIME_REQUEST_TIMEOUT_MS')
+  const runtimeBrowserReadyTimeoutMs = timerDelay(env.HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS, 15000, 'HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS')
+  const runtimeBrowserStreamTimeoutMs = timerDelay(env.HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS, 3000, 'HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS')
+  const runtimeBrowserRpcTimeoutMs = timerDelay(env.HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS, 30000, 'HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS')
   const upstreamResponseLimitBytes = positiveSafeInteger(
     env.HGW_UPSTREAM_RESPONSE_LIMIT_BYTES,
     DEFAULT_UPSTREAM_RESPONSE_LIMIT_BYTES,
@@ -627,6 +677,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     maxQueued: positiveSafeInteger(env.HGW_RUNTIME_MAX_QUEUED, 32, 'HGW_RUNTIME_MAX_QUEUED'),
     maxQueueWaitMs: timerDelay(env.HGW_RUNTIME_QUEUE_WAIT_MS, 30_000, 'HGW_RUNTIME_QUEUE_WAIT_MS'),
   }
+  const runtimeCatalog = {
+    pageSize: positiveSafeInteger(env.HGW_RUNTIME_CATALOG_PAGE_SIZE, 50, 'HGW_RUNTIME_CATALOG_PAGE_SIZE'),
+    maxBytes: positiveSafeInteger(env.HGW_RUNTIME_CATALOG_MAX_BYTES, 131072, 'HGW_RUNTIME_CATALOG_MAX_BYTES'),
+  }
+  if (runtimeCatalog.pageSize > 200 || runtimeCatalog.maxBytes < 512) {
+    throw new Error('Runtime catalog page size must be within 1..200 and its byte budget must be at least 512')
+  }
+  const nodeAccess = {
+    enrollmentTtlMs: timerDelay(env.HGW_NODE_ENROLLMENT_TTL_MS, 600_000, 'HGW_NODE_ENROLLMENT_TTL_MS'),
+    leaseMs: timerDelay(env.HGW_NODE_AGENT_LEASE_MS, 30_000, 'HGW_NODE_AGENT_LEASE_MS'),
+    heartbeatMs: timerDelay(env.HGW_NODE_AGENT_HEARTBEAT_MS, 5_000, 'HGW_NODE_AGENT_HEARTBEAT_MS'),
+    maxInFlight: positiveSafeInteger(env.HGW_NODE_CONTROL_MAX_INFLIGHT, 16, 'HGW_NODE_CONTROL_MAX_INFLIGHT'),
+  }
+  if (nodeAccess.leaseMs < nodeAccess.heartbeatMs * 3) throw new Error('HGW_NODE_AGENT_LEASE_MS must allow at least three heartbeat intervals')
   if (runtimeCapacity.maxResident !== 0 && runtimeCapacity.maxStarting > runtimeCapacity.maxResident) throw new Error('HGW_RUNTIME_MAX_STARTING must not exceed HGW_RUNTIME_MAX_RESIDENT')
   const resourceBudget: NodeResourceBudgetConfig = {
     sampleMs: timerDelay(env.HGW_RESOURCE_SAMPLE_MS, 500, 'HGW_RESOURCE_SAMPLE_MS'),
@@ -646,6 +710,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   }
   const idleTimeoutMs = positiveSafeInteger(env.HGW_IDLE_TIMEOUT_MS, 30 * 60 * 1000, 'HGW_IDLE_TIMEOUT_MS')
   const readinessTimeoutMs = timerDelay(env.HGW_READINESS_TIMEOUT_MS, 30 * 1000, 'HGW_READINESS_TIMEOUT_MS')
+  const systemdCommandTimeoutMs = timerDelay(env.HGW_SYSTEMD_COMMAND_TIMEOUT_MS, 120_000, 'HGW_SYSTEMD_COMMAND_TIMEOUT_MS')
   const sessionTtlMs = positiveSafeInteger(env.HGW_SESSION_TTL_MS, 7 * 24 * 3600 * 1000, 'HGW_SESSION_TTL_MS')
   const sessionAbsoluteTtlMs = positiveSafeInteger(
     env.HGW_SESSION_ABS_TTL_MS,
@@ -744,6 +809,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
       env.HGW_PROGRESS_MAX_OUTPUT_TOKENS, DEFAULT_PROGRESS_CONFIG.maxOutputTokens, 'HGW_PROGRESS_MAX_OUTPUT_TOKENS'),
     requestTimeoutMs: timerDelay(
       env.HGW_PROGRESS_TIMEOUT_MS, DEFAULT_PROGRESS_CONFIG.requestTimeoutMs, 'HGW_PROGRESS_TIMEOUT_MS'),
+    maxResponseBytes: positiveSafeInteger(
+      env.HGW_PROGRESS_RESPONSE_LIMIT_BYTES, DEFAULT_PROGRESS_CONFIG.maxResponseBytes, 'HGW_PROGRESS_RESPONSE_LIMIT_BYTES'),
+    usageReplayBatchSize: positiveSafeInteger(
+      env.HGW_PROGRESS_USAGE_REPLAY_BATCH, DEFAULT_PROGRESS_CONFIG.usageReplayBatchSize, 'HGW_PROGRESS_USAGE_REPLAY_BATCH'),
     leaseMs: timerDelay(env.HGW_PROGRESS_LEASE_MS, DEFAULT_PROGRESS_CONFIG.leaseMs, 'HGW_PROGRESS_LEASE_MS'),
     sweepMaxProjects: positiveSafeInteger(
       env.HGW_PROGRESS_SWEEP_MAX, DEFAULT_PROGRESS_CONFIG.sweepMaxProjects, 'HGW_PROGRESS_SWEEP_MAX'),
@@ -771,6 +840,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     principalAssertionTtlMs,
     streamPrincipalRenewal,
     upstreamTimeoutMs,
+    runtimeRequestTimeoutMs,
+    runtimeCleanupTimeoutMs,
+    runtimeBrowserReadyTimeoutMs,
+    runtimeBrowserStreamTimeoutMs,
+    runtimeBrowserRpcTimeoutMs,
     keepAliveTimeoutMs,
     upstreamResponseLimitBytes,
     runtimeLogCapBytes,
@@ -785,6 +859,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     webhookSecretKeyFile,
     tunnelCredentialKeyFile,
     tunnelStateDir,
+    tunnelStartupTimeoutMs,
+    tunnelCloseTimeoutMs,
+    tunnelProbeIntervalMs,
     ...(cloudflaredBin === undefined ? {} : { cloudflaredBin }),
     bootstrapAdminPasswordFile,
     backupDir: env.HGW_BACKUP_DIR ?? join(stateRoot, 'backups'),
@@ -800,10 +877,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     nodeStaleMs: timerDelay(env.HGW_NODE_STALE_MS, 30_000, 'HGW_NODE_STALE_MS'),
     deployMigrationsDir: env.HGW_DEPLOY_MIGRATIONS_DIR ?? join(gatewayRoot, 'deploy/postgres/migrations'),
     stateRoot,
+    nodeConnectionFile: resolve(env.HGW_NODE_CONNECTION_FILE ?? join(stateRoot, 'node-connection.json')),
     dshCommand,
     dshRepoRoot,
     instancePortBase,
     runtimeCapacity,
+    runtimeCatalog,
+    nodeAccess,
+    nodeChannel: loadNodeChannelConfig(env),
+    nodeService: loadNodeServiceConfig(env),
+    deploymentContextRefreshMs: timerDelay(env.HGW_DEPLOYMENT_CONTEXT_REFRESH_MS, 30_000, 'HGW_DEPLOYMENT_CONTEXT_REFRESH_MS'),
     resourceBudget,
     performanceEnabled,
     performanceEventLoopResolutionMs: timerDelay(env.HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS, 20, 'HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS'),
@@ -823,6 +906,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     cpuQuota,
     gatewayDir,
     systemdUnitDir,
+    systemdCommandTimeoutMs,
     guardPatch,
     modelGovernancePackage: releaseModelGovernancePackage
       ?? env.HGW_MODEL_GOVERNANCE_PACKAGE
@@ -832,6 +916,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     fcmServiceAccountFile: env.HGW_FCM_SERVICE_ACCOUNT_FILE?.trim() || undefined,
     jpushAppKey,
     jpushMasterSecret,
+    pushDeliveryTimeoutMs,
+    pushDeliveryLeaseMs,
     desktop,
     desktopId,
     desktopDriverPackage,

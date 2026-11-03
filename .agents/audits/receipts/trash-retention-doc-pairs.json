@@ -1,0 +1,14 @@
+{
+  "name": "trash-retention-doc-pairs",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write packages/attachment/userdoc-local/README.md .agents/notes/implemented/architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/document-trash-manifest/guide.md",
+  "startedAt": "2026-10-24T05:05:08.637864+00:00",
+  "seconds": 2.164,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5529f05e5350c618c46b76b63af54c5a0a862b0d5fe7a880fbe73a1212b4d6f1",
+  "inputsAfter": "f468e88eb955ffebb074803a810ce0207a20a06109883dd00744f42634710949",
+  "postgresToolDirectory": null,
+  "outputSha256": "9707efd8d869f54fac0985b10ed9c131fc1511bdfb82ba47a55aaac66db2230d",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write packages/attachment/userdoc-local/README.md .agents/notes/implemented/architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/document-trash-manifest/guide.md\nverify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/document-trash-manifest/guide.i18n.yaml\nverify-translation-pairing: recorded packages/attachment/userdoc-local/README.i18n.yaml\nverify-translation-pairing: 3 record(s) written; run the check to validate the pairs.\n"
+}

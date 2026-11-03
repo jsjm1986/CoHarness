@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-ui-admin-final-types",
+  "cwd": "gateway/admin-ui",
+  "command": "node_modules/.bin/tsc --noEmit",
+  "startedAt": "2026-10-24T23:10:08.868924+00:00",
+  "seconds": 7.128,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0d79b0a3a9ec65fe157c9612f0f068168e0caaf4f20f74c5778fa68715311b97",
+  "inputsAfter": "0d79b0a3a9ec65fe157c9612f0f068168e0caaf4f20f74c5778fa68715311b97",
+  "postgresToolDirectory": null,
+  "outputSha256": "9e145e96c5999334edea86e94758992fea7764a518b82d9465090f66cc83b13d",
+  "outputTail": "src/pages/TunnelAccessSection.tsx(195,28): error TS2367: This comparison appears to be unintentional because the types '\"stop\" | \"clear\" | \"install\" | null' and '\"start\"' have no overlap.\nsrc/pages/TunnelAccessSection.tsx(226,28): error TS2367: This comparison appears to be unintentional because the types '\"stop\" | \"clear\" | \"install\" | null' and '\"start\"' have no overlap.\n"
+}

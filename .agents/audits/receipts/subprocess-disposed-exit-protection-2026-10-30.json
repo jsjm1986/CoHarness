@@ -1,0 +1,374 @@
+{
+  "recordedAt": "2026-10-29T16:21:58.627566+00:00",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "findings": [
+    "B326"
+  ],
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z",
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-final-source-artifact-hashes-v2.json",
+  "paths": [
+    "packages/subprocess/subprocess-local/src/index.ts",
+    "scripts/coverage-policy.ts",
+    "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+    "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+    "packages/subprocess/subprocess-local/tests/expected/terminal-clock.expected.md"
+  ],
+  "repair": "Provider unload retains its actual exit callback disposer until its live processes, terminal sessions and control endpoints have all drained. Each owned collection release rechecks that condition; successful terminal cleanup retried after unload can retire the callback, while another unconfirmed terminal keeps it registered. The existing POSIX coverage exclusion for the provider entry is removed and both measured source files reach all four100%thresholds.",
+  "negativeEvidence": [
+    {
+      "name": "terminal-recovery-owned-listener-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T16:07:27.201160+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "TSX_TSCONFIG_PATH=./tsconfig.json",
+        "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/src/index.ts",
+        "DSH_TERMINAL_CLOCK_SCENARIO=recovery",
+        "node",
+        "--import",
+        "tsx/esm",
+        "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+        "examples/headless-agent/tests/fixtures/subprocess/subprocess-local/cordis.yml"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T16:07:27.737399+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/terminal-recovery-owned-listener-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/terminal-recovery-owned-listener-before.log"
+    },
+    {
+      "name": "terminal-recovery-compiled-before-node22",
+      "status": "failed",
+      "startedAt": "2026-10-29T16:09:29.069834+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/lib/index.js",
+        "DSH_TERMINAL_CLOCK_SCENARIO=recovery",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-before.yml"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T16:09:29.530806+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/terminal-recovery-compiled-before-node22.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/terminal-recovery-compiled-before-node22.log"
+    },
+    {
+      "name": "provider-final-owner-identity-before-node22",
+      "status": "failed",
+      "startedAt": "2026-10-29T16:16:57.886057+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/lib/index.js",
+        "DSH_TERMINAL_CLOCK_SCENARIO=recovery",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-before.yml"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T16:16:58.722711+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-final-owner-identity-before-node22.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-final-owner-identity-before-node22.log"
+    }
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "terminal-recovery-source-fixed",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:09:29.604848+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "TSX_TSCONFIG_PATH=./tsconfig.json",
+          "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/src/index.ts",
+          "DSH_TERMINAL_CLOCK_SCENARIO=recovery",
+          "node",
+          "--import",
+          "tsx/esm",
+          "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+          "examples/headless-agent/tests/fixtures/subprocess/subprocess-local/cordis.yml"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:09:30.237386+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/terminal-recovery-source-fixed.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/terminal-recovery-source-fixed.log"
+      },
+      {
+        "name": "provider-exit-restored-entry-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:12:02.909516+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/subprocess/subprocess-local/tests",
+          "packages/subprocess/subprocess/tests",
+          "--maxWorkers=2",
+          "--retry=0",
+          "--coverage",
+          "--coverage.include=packages/subprocess/subprocess-local/src/index.ts",
+          "--coverage.include=packages/subprocess/subprocess-local/src/terminal.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-restored-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:12:29.158504+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-exit-restored-entry-coverage.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-exit-restored-entry-coverage.log"
+      },
+      {
+        "name": "provider-owner-identity-loader-final",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:15:00.542090+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "scripts/coverage-selection.spec.ts",
+          "--maxWorkers=2",
+          "--retry=0"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:15:04.278726+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-owner-identity-loader-final.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-owner-identity-loader-final.log"
+      },
+      {
+        "name": "provider-exit-full-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:11:13.748768+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "build"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:12:27.318789+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-exit-full-build.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-exit-full-build.log"
+      },
+      {
+        "name": "provider-owner-current-lint-and-policy",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:15:52.575946+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "packages/subprocess/subprocess-local/src/index.ts",
+          "packages/subprocess/subprocess-local/tests/loader-terminal-clock.spec.ts",
+          "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+          "scripts/coverage-policy.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:15:58.313896+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-owner-current-lint-and-policy.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-owner-current-lint-and-policy.log"
+      },
+      {
+        "name": "provider-native-final-quiescent-fixture-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:18:40.347168+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/lib/index.js",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+          "examples/headless-agent/tests/fixtures/subprocess/subprocess-local/cordis.yml"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:18:42.004378+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-native-final-quiescent-fixture-node22.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-native-final-quiescent-fixture-node22.log"
+      },
+      {
+        "name": "provider-native-final-quiescent-fixture-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:18:41.505354+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_TERMINAL_CLOCK_BOOT_ENTRY=file:///Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/app-boot/lib/index.js",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs",
+          "examples/headless-agent/tests/fixtures/subprocess/subprocess-local/cordis.yml"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:18:43.214246+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-native-final-quiescent-fixture-node24.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-native-final-quiescent-fixture-node24.log"
+      },
+      {
+        "name": "provider-recovery-docs",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:13:52.129599+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:15:23.285080+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-recovery-docs.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-recovery-docs.log"
+      },
+      {
+        "name": "provider-fixture-native-syntax",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:19:18.353598+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--check",
+          "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:19:18.380506+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-fixture-native-syntax.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-fixture-native-syntax.log"
+      },
+      {
+        "name": "provider-fixture-flat-js-correctness-final",
+        "status": "passed",
+        "startedAt": "2026-10-29T16:20:56.720368+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node_modules/.bin/tsx",
+          "scripts/run-oxlint.ts",
+          "--config",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/native-fixture-lint.json",
+          "packages/subprocess/subprocess-local/tests/fixtures/terminal-clock-driver.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T16:20:56.828103+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-fixture-flat-js-correctness-final.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T160615Z/provider-fixture-flat-js-correctness-final.log"
+      }
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 385,
+          "covered": 385,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 458,
+          "covered": 458,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 96,
+          "covered": 96,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 279,
+          "covered": 279,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subprocess/subprocess-local/src/index.ts": {
+        "lines": {
+          "total": 151,
+          "covered": 151,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 41,
+          "covered": 41,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 183,
+          "covered": 183,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 118,
+          "covered": 118,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subprocess/subprocess-local/src/terminal.ts": {
+        "lines": {
+          "total": 234,
+          "covered": 234,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 55,
+          "covered": 55,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 275,
+          "covered": 275,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 161,
+          "covered": 161,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "counts": "422adjacent cases passed/16platformskips;7additional Loader/coverage-selection cases passed, overlapping the main selection. Three complete source/public native scenarios include an actual failed-observation two-terminal recovery; Node22/24 public artifacts,8full-build steps and20docs gates pass."
+  },
+  "resourceQuiescence": {
+    "status": "passed",
+    "recordedAt": "2026-10-29T16:19:46.797482+00:00",
+    "ownedFixturePids": [],
+    "ownedDatabaseCreated": false,
+    "peerAndProductionResourcesAccessed": false,
+    "resourceProof": "Each native fixture restores its global hooks, joins both terminal sessions, validates absence of both descendants and removes only its own private root. No fallback signal targets a session already confirmed stopped."
+  },
+  "limitations": [
+    "Native acceptance runs real Loader/PTY/descendants on macOS through source and public Node22/24 compiled entries. These are not new real Windows or Linux systemd/cgroup acceptance results.",
+    "The100%fourmetric result applies only to subprocess-local/src/index.ts and terminal.ts on the measured POSIX selection.422cases pass and16platformcases skip; no whole-package or whole-project safety claim follows.",
+    "The synthetic failed-owner unit suite still emits its exit-listener warning. It was not suppressed and the listener limit was not raised. The reproduced production repair proves recovered terminal sessions retire the actual provider registration after every retained owner drains; ordinary-process recovery and other listener sources still need review.",
+    "Existing escaped-descendant/process-table fallback limits, B04/B25 and every original audit domain remain open. Real model API and public push remain human-deferred."
+  ],
+  "realProviderApiValidation": "human-deferred",
+  "intermediateEvidence": [
+    "The first fixture counted every exit listener installed during Loader boot. That assertion failure was not a bug reproduction. The final fixture captures the exact prependListener registration identity and restores the hook before running terminal work.",
+    "The first passing coverage command named the provider entry but the pre-existing POSIX exclusion omitted it. That receipt only measures terminal.ts. After removing the exclusion, the final map explicitly contains both source files at100%in all four metrics.",
+    "The repository TypeScript lint profiles intentionally ignore.mjs; direct attempts reported no files. Those failures remain preserved. A separate flat JavaScript correctness profile with no exclusions, native syntax validation and actual execution cover the driver. The narrow no-unsafe-finally annotation explains that an AggregateError preserves primary and cleanup failures together."
+  ]
+}

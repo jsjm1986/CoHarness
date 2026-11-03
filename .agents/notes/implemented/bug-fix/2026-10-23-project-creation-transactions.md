@@ -12,11 +12,15 @@ Project mounts define which host files a shared runtime can access. A directory-
 
 [PostgresProjectService](../../../../gateway/src/postgres/project-service.ts) checks reserved user paths and existing project mounts with the transaction client after acquiring the node's port-allocation advisory lock. Administrator imports, user-owned creation and steward seeding use this same insertion path. The lock spans the checks and mount insertion; it also serializes creation with the user provisioning that reserves home paths.
 
+Administrator project creation and directory import carry the authenticated creator into the transaction and require a current active organization administrator. Account and membership locks precede node allocation; organization availability is checked after that wait. Rejected authority returns403 before allocating an administrator directory or registering a mount. SQLite checks authority, directory eligibility and insertion in one immediate transaction. An omitted service actor permits trusted internal maintenance.
+
 The insertion operation owns compensation for directories allocated by user-project creation. It permits removal only while its transaction body has not completed. Once that body is ready to commit, a missing commit acknowledgement or failed response-detail query preserves the directory. An ambiguous commit therefore cannot trigger recursive deletion of potentially committed project content.
 
 Project-kind checks accept the caller's query executor. Member changes and project deletion pass their existing transaction client, so each mutation needs only one checked-out connection.
 
-The [managed-directory policy](../feature/2026-08-16-gateway-managed-project-directories.md) and [administrator directory browser](../feature/2026-08-17-gateway-admin-host-directory-browser.md) retain their independent naming, browsing and host-file ownership decisions.
+Project deletion retains its project row before reading affected members, so a membership transaction that commits while deletion waits is included in the returned grant-refresh set. SQLite deletion acquires an immediate transaction before capturing the same set. Both providers preserve project files. Membership insertion reports an unknown project when it is absent; PostgreSQL rechecks after waiting for its project lock, without attempting a foreign-key write.
+
+The [deletion lifecycle](2026-10-28-project-deletion-lifecycle.md) owns Runtime stop admission and quiescence. The [managed-directory policy](../feature/2026-08-16-gateway-managed-project-directories.md) and [administrator directory browser](../feature/2026-08-17-gateway-admin-host-directory-browser.md) retain their independent naming, browsing and host-file ownership decisions.
 
 ## Alternatives considered
 

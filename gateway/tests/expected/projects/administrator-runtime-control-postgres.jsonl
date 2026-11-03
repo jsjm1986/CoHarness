@@ -1,0 +1,15 @@
+{"backend":"postgres","scenario":"user-start-role","status":403,"code":"forbidden","state":"stopped","runtimeReachable":false,"successAudit":false,"failedAuditStatus":403,"generationUnchangedOnRefusal":true}
+{"backend":"postgres","scenario":"user-start-current","status":204,"code":null,"state":"ready","runtimeReachable":true,"successAudit":true,"failedAuditStatus":null,"generationUnchangedOnRefusal":null}
+{"backend":"postgres","scenario":"user-stop-role","status":403,"code":"forbidden","state":"ready","runtimeReachable":true,"successAudit":false,"failedAuditStatus":403,"generationUnchangedOnRefusal":true}
+{"backend":"postgres","scenario":"user-stop-current","status":204,"code":null,"state":"stopped","runtimeReachable":false,"successAudit":true,"failedAuditStatus":null,"generationUnchangedOnRefusal":null}
+{"backend":"postgres","scenario":"user-restart-role","status":403,"code":"forbidden","state":"ready","runtimeReachable":true,"successAudit":false,"failedAuditStatus":403,"generationUnchangedOnRefusal":true}
+{"backend":"postgres","scenario":"user-restart-current","status":204,"code":null,"state":"ready","runtimeReachable":true,"successAudit":true,"failedAuditStatus":null,"generationUnchangedOnRefusal":null}
+{"backend":"postgres","scenario":"user-restart-late-role","status":403,"code":"forbidden","state":"stopped","runtimeReachable":false,"successAudit":false,"failedAuditStatus":403,"generationUnchangedOnRefusal":true}
+{"backend":"postgres","scenario":"project-start-role","status":403,"code":"forbidden","state":"stopped","runtimeReachable":false,"successAudit":false,"failedAuditStatus":403,"generationUnchangedOnRefusal":true}
+{"backend":"postgres","scenario":"project-start-current","status":204,"code":null,"state":"ready","runtimeReachable":true,"successAudit":true,"failedAuditStatus":null,"generationUnchangedOnRefusal":null}
+{"backend":"postgres","scenario":"project-stop-role","status":403,"code":"forbidden","state":"ready","runtimeReachable":true,"successAudit":false,"failedAuditStatus":403,"generationUnchangedOnRefusal":true}
+{"backend":"postgres","scenario":"project-stop-current","status":204,"code":null,"state":"stopped","runtimeReachable":false,"successAudit":true,"failedAuditStatus":null,"generationUnchangedOnRefusal":null}
+{"backend":"postgres","scenario":"project-restart-role","status":403,"code":"forbidden","state":"ready","runtimeReachable":true,"successAudit":false,"failedAuditStatus":403,"generationUnchangedOnRefusal":true}
+{"backend":"postgres","scenario":"project-restart-current","status":204,"code":null,"state":"ready","runtimeReachable":true,"successAudit":true,"failedAuditStatus":null,"generationUnchangedOnRefusal":null}
+{"backend":"postgres","scenario":"project-restart-late-role","status":403,"code":"forbidden","state":"stopped","runtimeReachable":false,"successAudit":false,"failedAuditStatus":403,"generationUnchangedOnRefusal":true}
+{"backend":"postgres","scenario":"user-start-database-capacity","status":503,"code":"DB_CHECKOUT_QUEUE_FULL","state":"stopped","runtimeReachable":false,"successAudit":false,"failedAuditStatus":503,"generationUnchangedOnRefusal":true}

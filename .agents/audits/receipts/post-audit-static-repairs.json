@@ -1,0 +1,13 @@
+{
+  "name": "post-audit-static-repairs",
+  "cwd": ".",
+  "command": "python3 -",
+  "startedAt": "2026-10-23T20:17:22.729276+00:00",
+  "seconds": 215.169,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "200f0aff5440021d09e89a0432937be2ed9452e22ad909d19d320158eeb04b45",
+  "inputsAfter": "200f0aff5440021d09e89a0432937be2ed9452e22ad909d19d320158eeb04b45",
+  "outputSha256": "72fadcf82167b7783a5d131f717aa818610462b1f88c6989348912e52723d2c8",
+  "outputTail": "$ knip --config knip.config.ts --treat-config-hints-as-errors\n$ tsx scripts/verify-no-unknown-casts.ts\nverify-no-unknown-casts: no new assertions; 1876 existing assertions remain.\n$ tsx scripts/verify-runtime-closure.ts\nverify-runtime-closure: 4 agent presets and 170 workspace packages form a closed runtime dependency graph.\n$ tsx scripts/verify-package-dependencies.ts\nverify-package-dependencies: 70 package(s) match the published dependency policy (5 Client-only, 63 Client/Host, 2 configured Host).\n"
+}

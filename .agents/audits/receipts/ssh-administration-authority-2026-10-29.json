@@ -1,0 +1,414 @@
+{
+  "recordedAt": "2026-10-28T23:20:02.979599+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "findings": [
+    "B279",
+    "B280"
+  ],
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "causalNegatives": [
+    {
+      "name": "ssh-administration-authority-causal-before-complete-entry",
+      "status": "failed",
+      "startedAt": "2026-10-28T23:13:15.576290+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_ssh_authority_test",
+        "DSH_AUDIT_SSH_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-authority-migrations-20261029",
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-ssh-administration-replay.py",
+        "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+        "src",
+        "ssh-admin-causal-before-complete"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T23:13:24.843239+00:00"
+    },
+    {
+      "name": "ssh-project-organization-both-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T23:13:49.438317+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_ssh_authority_test",
+        "DSH_AUDIT_SSH_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-authority-migrations-20261029",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/ssh-administration-postgres.spec.ts",
+        "--maxWorkers=2",
+        "-t",
+        "rejects inactive organization"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T23:13:50.267924+00:00"
+    },
+    {
+      "name": "ssh-administration-expanded-compiled-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-28T23:15:50.808308+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_ssh_authority_test",
+        "DSH_AUDIT_SSH_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-authority-migrations-20261029",
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-ssh-administration-replay.py",
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "lib",
+        "ssh-admin-expanded-causal-before",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/digest-model-artifact-20261029/lib"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-28T23:16:02.419968+00:00"
+    }
+  ],
+  "causalCounts": {
+    "preFixSourceAcceptedWithdrawnRequests": 40,
+    "sourceHttpObservations": 56,
+    "currentAdministratorControls": 8,
+    "preFixCompiledAcceptedWithdrawnRequestsIncludingOwnerRoutes": 42,
+    "compiledHttpObservations": 64,
+    "alreadyDeniedButErrorDifferences": 8,
+    "additionalActualPostgresDisabledOrganizationCounterexamples": 2
+  },
+  "behavior": [
+    "Target reads, registration, coordinate replacement, enable/disable/removal and administrative sharing retain current active organization administrator eligibility through the database transaction.",
+    "Administrative sharing has an explicit administrator-only service entry; project ownership alone cannot authorize an administrative request after demotion.",
+    "Project self-service catalog and sharing retain active organization, account and membership before rechecking current active project ownership or administration.",
+    "Target revisions and omitted versus cleared credential references retain their behavior; permission refusals change no rows/shares or successful-action audits."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "ssh-administration-source-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:16:59.749888+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_ssh_regression_test",
+          "DSH_AUDIT_SSH_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-authority-migrations-20261029",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/ssh.spec.ts",
+          "tests/ssh-administration-postgres.spec.ts",
+          "tests/ssh-administration-transcript.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism",
+          "--coverage",
+          "--coverage.include=src/postgres/ssh-target-service.ts",
+          "--coverage.include=src/postgres/administrator-authority.ts",
+          "--coverage.include=src/postgres/account-authority.ts",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-administration-source-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:17:21.015234+00:00"
+      },
+      {
+        "name": "ssh-administration-gateway-types",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:14:18.836195+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-preferences-typecheck.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:14:22.639577+00:00"
+      },
+      {
+        "name": "ssh-administration-private-artifact-build",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:15:50.808263+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/build-ssh-administration-artifact.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:15:53.691271+00:00"
+      },
+      {
+        "name": "ssh-administration-built-node22",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:16:58.596119+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_ssh_authority_test",
+          "DSH_AUDIT_SSH_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-authority-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-ssh-administration-replay.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "lib",
+          "ssh-admin-fixed-node22",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-administration-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:17:14.613106+00:00"
+      },
+      {
+        "name": "ssh-administration-built-node24",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:16:58.596101+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:58487/hgw_ssh_authority_test",
+          "DSH_AUDIT_SSH_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-authority-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-ssh-administration-replay.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "lib",
+          "ssh-admin-fixed-node24",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-administration-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:17:14.545431+00:00"
+      },
+      {
+        "name": "ssh-administration-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:17:36.210972+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/postgres/ssh-target-service.ts",
+          "gateway/src/admin-api.ts",
+          "gateway/src/server.ts",
+          "gateway/tests/ssh.spec.ts",
+          "gateway/tests/ssh-administration-postgres.spec.ts",
+          "gateway/tests/ssh-administration-transcript.spec.ts",
+          "gateway/tests/postgres-suite.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:17:37.142191+00:00"
+      },
+      {
+        "name": "ssh-administration-reviewed-doc-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:16:41.333724+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          "gateway/README.md",
+          ".agents/notes/implemented/architecture/2026-09-23-ssh-execution-providers.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-administration-authority/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:16:41.849750+00:00"
+      },
+      {
+        "name": "ssh-administration-doc-quick",
+        "status": "passed",
+        "startedAt": "2026-10-28T23:17:36.210961+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-28T23:18:51.028572+00:00"
+      }
+    ],
+    "sourceCases": 16,
+    "sourceFiles": 4,
+    "actualPostgresAuthorityCases": 6,
+    "httpGoldenObservations": 64,
+    "compiledNodes": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 135,
+          "covered": 132,
+          "skipped": 0,
+          "pct": 97.77
+        },
+        "statements": {
+          "total": 164,
+          "covered": 153,
+          "skipped": 0,
+          "pct": 93.29
+        },
+        "functions": {
+          "total": 29,
+          "covered": 29,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 139,
+          "covered": 120,
+          "skipped": 0,
+          "pct": 86.33
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/account-authority.ts": {
+        "lines": {
+          "total": 6,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 1,
+          "covered": 1,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 8,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 87.5
+        },
+        "branches": {
+          "total": 4,
+          "covered": 3,
+          "skipped": 0,
+          "pct": 75
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/administrator-authority.ts": {
+        "lines": {
+          "total": 6,
+          "covered": 6,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 1,
+          "covered": 1,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 7,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 8,
+          "covered": 8,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/postgres/ssh-target-service.ts": {
+        "lines": {
+          "total": 123,
+          "covered": 120,
+          "skipped": 0,
+          "pct": 97.56
+        },
+        "functions": {
+          "total": 27,
+          "covered": 27,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 149,
+          "covered": 139,
+          "skipped": 0,
+          "pct": 93.28
+        },
+        "branches": {
+          "total": 127,
+          "covered": 109,
+          "skipped": 0,
+          "pct": 85.82
+        }
+      }
+    },
+    "fullFileCoverageComplete": false,
+    "realSshTransportOrModelApiCalled": false,
+    "docs": "All20 documentation quick gates pass, including current bilingual corpus and references. The earlier in-progress peer proposal pairing failure is resolved at this cut."
+  },
+  "sourceHashes": {
+    "gateway/src/postgres/ssh-target-service.ts": "6004a6f9bf652fb2a33538abdad48ed8a3139dea0dcdf37f268147157072258c",
+    "gateway/src/admin-api.ts": "493d0b286ade5a393947bdc90f0866887c1621b6f8d63826e4d78ca84bfc38be",
+    "gateway/src/server.ts": "7d5067abdfea5ba9c34f18362585f21d2d12b6c0b2ce67f08f80e69d77911a22",
+    "gateway/tests/ssh.spec.ts": "bb56abda233df0fccce609856240728398552920dbca11c3b6089c48c2b4fc34",
+    "gateway/tests/ssh-administration-postgres.spec.ts": "7fbd8bcae145bcbfe25bae0bcf93d9b01a81132e9e7ee840a14d616cadf7bb1e",
+    "gateway/tests/ssh-administration-transcript.spec.ts": "a5110bd5da39a313c7efc15049bc0b10832c0c53c2936a23ae342fcc9113c3ce",
+    "gateway/tests/fixtures/ssh-administration.mjs": "d5923a1dadef6e167af669ad3f673b982f3ba4c2acc986f3ae56c2624c1585e3",
+    "gateway/tests/expected/projects/ssh-administration.jsonl": "abde751f94168b956bd59ee53b5f2cac8faad174d2021f378554f48b8db92983",
+    "gateway/tests/postgres-suite.spec.ts": "9f7e9fc16671687816552eb0c06d7a9b630d13856bf213264368f57c95a02a9f",
+    "gateway/package.json": "9056aa6e02fa0cfab1dda0a57fdb5de3018b5d6ecd899ae13d049c66f4448603"
+  },
+  "artifact": {
+    "directory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-administration-artifact-20261029/lib",
+    "buildMetadata": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/ssh-administration-build-inputs-20261029.json",
+    "migrationCut": "Immutable001–095; this is named SSH admission acceptance, not independent acceptance of every new multi-computer feature.",
+    "sourceDriftDuringBuild": []
+  },
+  "noteReview": {
+    "extendedExisting": [
+      ".agents/notes/implemented/architecture/2026-09-23-ssh-execution-providers.md"
+    ],
+    "new": [],
+    "partiallySuperseded": [],
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false
+  },
+  "upgradeGuide": "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/ssh-administration-authority/guide.md",
+  "privatePostgres": {
+    "ownerFile": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/digest-authority-postgres-owner-20261029.json",
+    "port": 58487,
+    "databases": [
+      "hgw_digest_authority_test",
+      "hgw_ssh_authority_test",
+      "hgw_ssh_regression_test"
+    ],
+    "status": "Retained only for immediate next independent business review.",
+    "productionAndPeerExcluded": [
+      5432,
+      55699
+    ]
+  },
+  "limitations": [
+    "All12 original domains remain in progress.",
+    "Native SSH transport/platform acceptance, allocation/directory followups, full-file coverage and new multi-computer permission review remain open.",
+    "Real model API and actual cloud push remain human-deferred."
+  ],
+  "subsequentOwnedDatabaseCleanup": {
+    "receipt": "receipts/remote-desktop-authority-2026-10-29.json",
+    "commandReceipt": "digest-ssh-desktop-private-postgres-cleanup",
+    "containerAndVolumeRemoved": true,
+    "openConnectionsBeforeClose": 0
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "conversation-creation-revocation-before",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/project-service-postgres.spec.ts -t 'rechecks .* revocation' --no-file-parallelism",
+  "startedAt": "2026-10-24T00:31:03.668281+00:00",
+  "seconds": 3.722,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "32be861f96b475317c3276ebff3f626fd32439c74bc564fcba7d91ee628076b3",
+  "inputsAfter": "32be861f96b475317c3276ebff3f626fd32439c74bc564fcba7d91ee628076b3",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "bbd0b9dff37714c82a06148de55ab75167bb1890c36a56f45374cc44e3dd90ea",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/project-service-postgres.spec.ts (24 tests | 2 failed | 22 skipped) 440ms\n     × rechecks membership revocation after waiting to create a project conversation 234ms\n     × rechecks role revocation after waiting to create a project conversation 174ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/project-service-postgres.spec.ts > PostgreSQL project creation and mutations > rechecks membership revocation after waiting to create a project conversation\n FAIL  tests/project-service-postgres.spec.ts > PostgreSQL project creation and mutations > rechecks role revocation after waiting to create a project conversation\nAssertionError: expected 200 to be 400 // Object.is equality\n\n- Expected\n+ Received\n\n- 400\n+ 200\n\n ❯ tests/project-service-postgres.spec.ts:206:27\n    204|     }\n    205|     expect(await revoked).toBeUndefined()\n    206|     expect(await created).toBe(400)\n       |                           ^\n    207|     expect(await conversations.load(sessionId)).toBeUndefined()\n    208|     await expect(`# Project conversation creation after ${kind} revoca…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 22 skipped (24)\n   Start at  08:31:04\n   Duration  2.38s (transform 1.49s, setup 0ms, import 1.83s, tests 440ms, environment 0ms)\n\n"
+}

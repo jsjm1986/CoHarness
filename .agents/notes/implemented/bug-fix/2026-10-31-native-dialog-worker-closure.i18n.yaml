@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-31-native-dialog-worker-closure.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-native-dialog-worker-closure.md
+document:
+  en: f61869d944268dbbcf83ca15d94f06e2b09d3729
+  zh: 741e29b5505cd531dd683306544f544618f5dcaa
+/agent-note-native-dialog-worker-closure:
+  en: 85434bc9a1d078ff
+  zh: 6e21775859658577
+/agent-note-native-dialog-worker-closure/problem:
+  en: 327eb9069e5d3042
+  zh: 2d393f681b6236f5
+/agent-note-native-dialog-worker-closure/decision:
+  en: e4b593d3a5a4570f
+  zh: d39ef2ce03fb4f01
+/agent-note-native-dialog-worker-closure/alternatives-considered:
+  en: 17a7a407bf7fed51
+  zh: 59d72f705a4c73af
+/agent-note-native-dialog-worker-closure/consequences:
+  en: 20676efcfc9cf47d
+  zh: 3f497101d03eed34

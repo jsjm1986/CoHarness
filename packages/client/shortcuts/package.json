@@ -63,11 +63,11 @@
     "@deepseek-ai/dsh-util-values": "workspace:*"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/client.js",
     "lib/protocol.js",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:~"

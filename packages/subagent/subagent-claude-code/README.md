@@ -30,6 +30,8 @@ Install this Profile Bundle when a delegated task should run as a fresh, unatten
 <a id="start-and-ownership"></a>
 ## Start and ownership
 
+The SDK custom-spawn callback is synchronous; its managed adapter exposes backpressured streams while awaiting subprocess admission. Run publication waits for the real handle. SDK termination, startup failure, and member disposal cancel queued allocation and join any returned process; they never treat an adapter object as evidence that a child started.
+
 `start(request)` accepts only a non-empty sequence of text blocks and derives the child cwd from the parent Session. It creates one private `AbortController`, calls the official SDK `query()`, and publishes the run only after the SDK's `spawnClaudeCodeProcess` hook has supplied a live CLI handle owned by [`dsh-subprocess`](../../subprocess/subprocess/README.md). A failure or cancellation before publication closes the query, terminates any acquired process tree, waits for it to exit, and rejects `start()`.
 
 The SDK receives the exact concatenated text task. The provider iterates the complete SDK message stream and accepts only a `result` message with `subtype: "success"`, `is_error: false`, and a nonblank `result`, followed by normal iterator completion. Every failure still maps to `error`: the four error subtypes in Agent SDK 0.3.263 retain their exact category, an error-marked or blank success becomes `invalid-success`, a missing result becomes `missing-result`, an unclassified query failure becomes `unknown`, and an early CLI exit becomes `process-exit`. The diagnostic also names the current `query-start`, `query-run`, `process`, or `teardown` stage and independently includes an observed exit code and signal. The provider produces neither `max-tokens` nor `refusal`.
@@ -182,6 +184,8 @@ Foreground input grows by the retained final answer or error. Background input a
 Append-only: foreground adds one result after the reusable parent prefix, while background appends the Job acknowledgement, notice, and later control or collection results. Background scheduling can add a notice-driven turn, but none of these messages rewrites the earlier prefix.
 
 ## Known Limitations and Deferred Work
+
+- **Managed model control** — persistent member routes are LLM orchestrations; external starts and member turns follow the [shared parent-control restriction](../subagent/README.md#delegated-policy).
 
 - **One fresh query and process per run** — there is no continuation, resume, pooling, progress stream, or product-session persistence.
 - **Static instance selection** — Profile rows fix provider names and tool bindings; calls cannot choose a provider dynamically, and every exposed tool needs a unique `toolName`.

@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-docs-final",
+  "cwd": ".",
+  "command": "pnpm run test:docs",
+  "startedAt": "2026-10-25T10:25:23.748294+00:00",
+  "seconds": 45.682,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "796b292af8022f51d6932e70b74c52ece82bbe22e2ab4fff4061a8309bd9b75d",
+  "inputsAfter": "796b292af8022f51d6932e70b74c52ece82bbe22e2ab4fff4061a8309bd9b75d",
+  "postgresToolDirectory": null,
+  "outputSha256": "4844d51c75683fe01787a2dbfeeefa881b2da3a2e211eb7531859e27609946fd",
+  "outputTail": "$ tsx scripts/run-gates.ts doc-quick\nrun-gates: doc-quick running 20 gate(s) with 8 worker(s) from 10 local default worker(s) of 10 CPU(s), doc-quick cap 8.\nrun-gates: start markdown links\nrun-gates: start type equivalence\nrun-gates: start translation pairing\nrun-gates: start markdown wrap\nrun-gates: start npm dependency catalog\nrun-gates: start Session format references\nrun-gates: start public repository links\nrun-gates: start repository references\nrun-gates: PASS npm dependency catalog (1.74s)\nrun-gates: start concrete terms\nrun-gates: PASS concrete terms (5.81s)\nrun-gates: start doc refs\nrun-gates: PASS doc refs (2.88s)\nrun-gates: start package README Summaries\nrun-gates: PASS package README Summaries (1.44s)\nrun-gates: start package README model experience\nrun-gates: PASS public repository links (12.12s)\nrun-gates: start agent note classification\nrun-gates: PASS agent note classification (1.20s)\nrun-gates: start agent note format\nrun-gates: PASS Session format references (14.53s)\nrun-gates: start archived agent notes\nrun-gates: PASS agent note format (1.50s)\nrun-gates: start skill invocation metadata\nrun-gates: PASS skill invocation metadata (0.83s)\nrun-gates: start translation prompt\nrun-gates: PASS archived agent notes (1.14s)\nrun-gates: start doc budgets\nrun-gates: PASS translation prompt (0.78s)\nrun-gates: start documentation standard tests\nrun-gates: PASS doc budgets (0.93s)\nrun-gates: start package README limitations\nrun-gates: PASS package README model experience (9.37s)\nrun-gates: PASS documentation standard tests (5.32s)\nrun-gates: PASS package README limitations (8.11s)\nrun-gates: PASS markdown wrap (31.00s)\nrun-gates: PASS repository references (31.64s)\nrun-gates: PASS type equivalence (33.23s)\nrun-gates: PASS translation pairing (33.94s)\nrun-gates: PASS markdown links (43.48s)\n\nrun-gates: 20 passed, 0 failed, 0 skipped in 43.48s.\n"
+}

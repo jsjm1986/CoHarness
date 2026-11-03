@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-dependency-catalog",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-dependency-catalog.ts",
+  "startedAt": "2026-10-25T12:33:57.703618+00:00",
+  "seconds": 0.961,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4ec14dcb9a48d99a3fd4a789051b7db2011757e8a0daaed8efe02ca7ed7b0cd5",
+  "inputsAfter": "4ec14dcb9a48d99a3fd4a789051b7db2011757e8a0daaed8efe02ca7ed7b0cd5",
+  "postgresToolDirectory": null,
+  "outputSha256": "d498ad341cf4d2e4946e80a8e5705f0d1f67cf3ed0b81daf0dc5f8e82093e560",
+  "outputTail": "dependency-catalog: generated docs/dependency-catalog.json\n"
+}

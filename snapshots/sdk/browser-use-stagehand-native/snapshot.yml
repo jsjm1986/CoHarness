@@ -1,0 +1,9 @@
+version: 1
+scenario: browser-use-stagehand-native
+profile: sdk
+composition: browser-use-stagehand-native
+recording: authored
+header:
+  class: browser-use-stagehand-native
+replay:
+  override: true

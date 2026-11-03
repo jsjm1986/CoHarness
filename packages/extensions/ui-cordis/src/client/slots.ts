@@ -1,10 +1,12 @@
 /** Injected faces and the Package-owned `tool.view.cordis` slot declaration. */
 
 import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
+import type { ConnectionRuntimeTarget } from '@deepseek-ai/dsh-client-connection/client'
+import type { RuntimeEnvironments } from '@deepseek-ai/dsh-client-runtime/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
   CordisRunActivity, CordisRunFailure, CordisUserRunRequest, DynamicCordisLivePackage,
-  DynamicCordisRenderFailure,
+  DynamicCordisRenderFailure, CordisPendingApproval,
 } from '@deepseek-ai/dsh-cordis-client-runner/client'
 import type { CordisActionResult } from './dynamic-port.ts'
 import type { CordisInventory } from './inventory.ts'
@@ -46,6 +48,8 @@ export interface CordisCardFace {
 
 /** Live facts used by the Run card and its business-view ownership index. */
 export interface CordisRunCardFace extends CordisCardFace {
+  /** Browser-only key prefix of the Runtime owning this card. */
+  readonly viewPrefix: string
   hooks: CordisCardFace['hooks'] & {
     runCards: CordisRunCardStore
     activeRuns: HostObservable<ReadonlyMap<CordisDynamicPluginId, CordisRunActivity>>
@@ -55,18 +59,41 @@ export interface CordisRunCardFace extends CordisCardFace {
 }
 
 /** Frame-wide panel state and lifecycle verbs. */
+export interface CordisPanelRuntimeHooks {
+  inventory: CordisInventory
+  activeRuns: HostObservable<ReadonlyMap<CordisDynamicPluginId, CordisRunActivity>>
+  runErrors: HostObservable<ReadonlyMap<CordisDynamicPluginId, CordisRunFailure>>
+  renderFailures: HostObservable<ReadonlyMap<CordisDynamicPluginId, DynamicCordisRenderFailure>>
+  loaded: HostObservable<readonly DynamicCordisLivePackage[]>
+}
+
+/** Actions captured to the Runtime shown when the panel opens. */
+export interface CordisPanelActions {
+  /** Page-local identity for retained version selections and pending actions. */
+  readonly runtimeKey: string
+  /** Captured allocation and retained computer label, independent of later conversation navigation. */
+  readonly runtimeId?: ConnectionRuntimeTarget['runtimeId']
+  readonly computerName?: string
+  readonly onApprove: (requestId: ApprovalRequestId, approveFutureVersions: boolean) => Promise<void>
+  readonly onDecline: (requestId: ApprovalRequestId) => Promise<void>
+  readonly onRun: (request: CordisUserRunRequest) => Promise<void>
+  readonly onStop: (sessionId: SessionId, pluginId: CordisDynamicPluginId) => Promise<CordisActionResult>
+  readonly onRemove: (sessionId: SessionId, pluginId: CordisDynamicPluginId) => Promise<CordisActionResult>
+  readonly onRefresh: () => void
+}
+
+/** Frame-wide notification source and Runtime-bound panel facts. */
 export interface CordisPanelFace {
   hooks: {
-    inventory: CordisInventory
-    activeRuns: HostObservable<ReadonlyMap<CordisDynamicPluginId, CordisRunActivity>>
-    runErrors: HostObservable<ReadonlyMap<CordisDynamicPluginId, CordisRunFailure>>
-    renderFailures: HostObservable<ReadonlyMap<CordisDynamicPluginId, DynamicCordisRenderFailure>>
-    loaded: HostObservable<readonly DynamicCordisLivePackage[]>
+    pendingApprovals: HostObservable<readonly CordisPendingApproval[]>
+    runtimeEnvironments: HostObservable<RuntimeEnvironments>
   }
-  onApprove(requestId: ApprovalRequestId, approveFutureVersions: boolean): Promise<void>
-  onDecline(requestId: ApprovalRequestId): Promise<void>
-  onRun(request: CordisUserRunRequest): Promise<void>
-  onStop(sessionId: SessionId, pluginId: CordisDynamicPluginId): Promise<CordisActionResult>
-  onRemove(sessionId: SessionId, pluginId: CordisDynamicPluginId): Promise<CordisActionResult>
-  onRefresh(): void
+  keyedHooks: {
+    inventory(key: string): CordisPanelRuntimeHooks['inventory']
+    activeRuns(key: string): CordisPanelRuntimeHooks['activeRuns']
+    runErrors(key: string): CordisPanelRuntimeHooks['runErrors']
+    renderFailures(key: string): CordisPanelRuntimeHooks['renderFailures']
+    loaded(key: string): CordisPanelRuntimeHooks['loaded']
+  }
+  actionsForSession(sessionId?: SessionId): CordisPanelActions
 }

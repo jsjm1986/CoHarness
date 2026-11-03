@@ -1,0 +1,156 @@
+{
+  "finding": "B476",
+  "status": "fixed_verified_exact_permission_agent_70_cases_normal_entry_100_percent_frozen_global_review_open",
+  "updatedAt": "2026-11-02T13:08:17.320222+00:00",
+  "baseline": {
+    "checkedAt": "2026-11-02T12:39:32.472603+00:00",
+    "fetch": "git fetch origin master --no-tags --quiet completed",
+    "aheadBehind": "139\t0"
+  },
+  "problem": "A /permission handler accepts a late authorization after its original Agent is disposed or another Agent reuses its Session id. Generic command admission protects entry, not mutation after a domain-specific asynchronous grant.",
+  "fix": "Capture optional registry at authorization entry and require the exact original Agent in the current registry immediately before permission/preset or knob writes. Registry disappearance or introduction cannot substitute another caller. Independent compositions without a registry keep direct invocation behavior.",
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T123932Z/permission-agent-before.json",
+  "realAgentOriginalFailures": 2,
+  "verification": {
+    "originalRealAgentCounterproofs": 2,
+    "differentNamedCases": 70,
+    "permissionCases": 68,
+    "coverageRosterCases": 2,
+    "coverage": {
+      "lines": {
+        "total": 164,
+        "covered": 164,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 184,
+        "covered": 184,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 41,
+        "covered": 41,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 135,
+        "covered": 135,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "normalRepositoryThresholdsEnforced": true,
+    "coverageBaselineEntryRemoved": true,
+    "sourceNode22": "passed",
+    "normallyBuiltNode24": "passed",
+    "sessionEventMapChanged": false,
+    "apiSignaturesChanged": false,
+    "testDependenciesOnly": [
+      "@deepseek-ai/dsh-agent-loop",
+      "@deepseek-ai/dsh-llm",
+      "@deepseek-ai/dsh-system-prompt",
+      "@deepseek-ai/dsh-tools"
+    ],
+    "modelApiCalls": 0
+  },
+  "coverageDebtPaid": "Removed exactly packages/interaction/permission-presets/src/index.ts from scripts/coverage-baseline.ts; normal repository thresholds pass without scoped/partition mode.",
+  "coverageInitialProbe": "Initial CLI include still matched a baseline exclusion and produced an empty map; not treated as acceptance. A private target-only diagnostic exposed missing behavior coverage, then tests paid every path before restoring normal enforcement.",
+  "frozenDelivery": {
+    "finding": "B476",
+    "status": "fixed_verified_exact_permission_agent_70_cases_normal_entry_100_percent_frozen_global_review_open",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T123932Z/B476-permission-agent-ownership.delta.tar.gz",
+    "archiveSha256": "3b5cf75c071d68e06af51f1b1bd40d698e640b7df85e9b196f6229399b8d6f7b",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T123932Z/B476-capsule-fdj59hci",
+    "manifestSha256": "b8d16368c5654dcb7bad65315942dd363ad986018cdb669519fc3c4d3bf4e9da",
+    "ownedChanges": 18,
+    "archiveBytes": 532637,
+    "verification": {
+      "originalRealAgentCounterproofs": 2,
+      "differentNamedCases": 70,
+      "permissionCases": 68,
+      "coverageRosterCases": 2,
+      "coverage": {
+        "lines": {
+          "total": 164,
+          "covered": 164,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 184,
+          "covered": 184,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 41,
+          "covered": 41,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 135,
+          "covered": 135,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "normalRepositoryThresholdsEnforced": true,
+      "coverageBaselineEntryRemoved": true,
+      "sourceNode22": "passed",
+      "normallyBuiltNode24": "passed",
+      "sessionEventMapChanged": false,
+      "apiSignaturesChanged": false,
+      "testDependenciesOnly": [
+        "@deepseek-ai/dsh-agent-loop",
+        "@deepseek-ai/dsh-llm",
+        "@deepseek-ai/dsh-system-prompt",
+        "@deepseek-ai/dsh-tools"
+      ],
+      "modelApiCalls": 0
+    }
+  },
+  "rootProductionWrites": false,
+  "sessionEventsChanged": false,
+  "sdkFormatChanged": false,
+  "publicSignaturesChanged": false,
+  "testOnlyDependencyEdges": 4,
+  "checks": {
+    "permission-agent-after": "passed",
+    "permission-owner-boundaries": "passed",
+    "permission-type-build": "passed",
+    "permission-normal-build": "passed",
+    "permission-loader-source": "passed",
+    "permission-loader-built": "passed",
+    "permission-normal-coverage": "passed",
+    "permission-lint-final": "passed",
+    "permission-test-coverage-lint": "passed",
+    "permission-final-pairs": "passed",
+    "permission-workspace-constraints": "passed",
+    "permission-cordis-config-final": "failed",
+    "permission-export-jsdoc-final": "failed"
+  },
+  "remainingGlobalChecks": [
+    "Peer connection compiler-aggregate reference",
+    "Peer createRuntimeCordisInventories return annotation"
+  ],
+  "blankReuseScope": "Unit coverage of Host refresh preconditions is not full Web or browser acceptance.",
+  "productionIntegration": "Later peer-owned isolated release after R44.",
+  "officialResponses": "Deferred per user instruction.",
+  "fullProjectAuditComplete": false
+}

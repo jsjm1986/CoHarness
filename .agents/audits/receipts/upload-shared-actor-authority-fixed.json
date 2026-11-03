@@ -1,0 +1,14 @@
+{
+  "name": "upload-shared-actor-authority-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run --config vitest.config.ts tests/documents-local.spec.ts -t 'original actor|another project member upload' --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T09:55:37.696914+00:00",
+  "seconds": 2.898,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f5b3b1da0cc373ce78776050bf26b466ae5ffc0e4b8f7ec46867718b1ad50f1f",
+  "inputsAfter": "f5b3b1da0cc373ce78776050bf26b466ae5ffc0e4b8f7ec46867718b1ad50f1f",
+  "postgresToolDirectory": null,
+  "outputSha256": "ba5cda16f00e9da8456c3e81ee4da9a57fc8b45146d1add7b360b008e0387384",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  5 passed | 11 skipped (16)\n   Start at  17:55:39\n   Duration  841ms (transform 546ms, setup 0ms, import 690ms, tests 80ms, environment 0ms)\n\n"
+}

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-06-approval-seam.md
 document:
-  en: d8609de99c40f3c34591a1545f740dee69834958
-  zh: 720907b94bee3516a4c0fcd1c8af9e7188cbad70
+  en: f5e96102df54cefb3ad7952595424205b91281c6
+  zh: b5542d5ea41a1456ed6a5e20461643186d1958df
 /agent-note-the-approval-seam-one-shot-permission-decisions-over-a-waterfall-of-answerers:
   en: 5a500ddf8910f3b2
   zh: 0461f97e3c905d72
@@ -21,8 +21,8 @@ document:
   en: a6d7884e4359af3a
   zh: e72588705942000a
 /agent-note-the-approval-seam-one-shot-permission-decisions-over-a-waterfall-of-answerers/decision/design-detail/the-seam-mechanism-and-policy-split:
-  en: 6d41190a8596f14f
-  zh: 30b8098b85fce21d
+  en: f0c27ef94f2e9a35
+  zh: 5569d8b6ec916610
 /agent-note-the-approval-seam-one-shot-permission-decisions-over-a-waterfall-of-answerers/decision/design-detail/ask-routing-in-dsh-tools:
   en: 1d4478059f608fd2
   zh: 4a1d12e4ccb766b5

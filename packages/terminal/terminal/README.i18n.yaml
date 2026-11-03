@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/terminal/terminal/README.md
 document:
-  en: 1b8734f6e5814f2df79f899702475a36e89bcf21
-  zh: 4fa9bf6159cd9d385cb14e80cc9248fd8a6e558a
+  en: cd96fb0ecd2a5509992476fc3edafa8986891928
+  zh: de04564b0df03f0cff06944fa6cee59cf506aff8
 /:
   en: 3d90ab1819787962
   zh: d5279e899341168a
@@ -48,8 +48,8 @@ document:
   en: a2adfa2708882e19
   zh: 002f257fd8c4addb
 /deepseek-ai-dsh-terminal/understand-the-implementation/ownership-and-cleanup-rules:
-  en: 7af36e58919e41d5
-  zh: 4fe7b4db1099bcbf
+  en: e359f5509d1f20b6
+  zh: a70d3fb6fec16892
 /deepseek-ai-dsh-terminal/understand-the-implementation/send-reservation:
   en: 5815723cd0c6089c
   zh: 0c612ffa4b8c466c

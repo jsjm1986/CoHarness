@@ -1,0 +1,14 @@
+{
+  "name": "auto-review-model-doc-graphs",
+  "cwd": ".",
+  "command": "pnpm run gen-doc-graphs",
+  "startedAt": "2026-10-24T03:02:58.511792+00:00",
+  "seconds": 14.848,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "85826958f8fa9b7265efc5bb650688451123e26661c46ea3126117a654eaa632",
+  "inputsAfter": "85826958f8fa9b7265efc5bb650688451123e26661c46ea3126117a654eaa632",
+  "postgresToolDirectory": null,
+  "outputSha256": "2b5460ebf8b8586bdc7f7ccd45ef9c74454fcb10568d696874c7bfeef6896ede",
+  "outputTail": "$ tsx scripts/gen-doc-graphs.ts\ngen-doc-graphs: wrote 9 graph doc(s).\n"
+}

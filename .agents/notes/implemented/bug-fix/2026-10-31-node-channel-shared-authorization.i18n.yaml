@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-node-channel-shared-authorization.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-node-channel-shared-authorization.md
+document:
+  en: 361a56d93b650c8af94cabfe194d4a12e15e01b8
+  zh: 907889e294a3d5e18d8ff7cd3b5810632b33cf05
+/agent-note-shared-node-channel-authorization:
+  en: ce09f7fccecf52ff
+  zh: d493b6811c42c627
+/agent-note-shared-node-channel-authorization/problem:
+  en: 54c918b08df63b23
+  zh: b562e24635906c0a
+/agent-note-shared-node-channel-authorization/decision:
+  en: 68adb65d61176e4d
+  zh: 9ac0159f62cbf0e4
+/agent-note-shared-node-channel-authorization/alternatives-considered:
+  en: 00dbfe29060fb0a2
+  zh: 606ad4ef3638bfde
+/agent-note-shared-node-channel-authorization/consequences:
+  en: cde79bec265423d3
+  zh: cd447aa7b07887e9
+/agent-note-shared-node-channel-authorization/verification:
+  en: 08a71476f4a45368
+  zh: dfa5bbdbdcc8ef83

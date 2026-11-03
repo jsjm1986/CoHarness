@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-token-arguments-before",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/tsx --tsconfig tsconfig.run.json ../.agents/audits/.local/tunnel-token-args-probe.mjs",
+  "startedAt": "2026-10-24T21:53:24.817768+00:00",
+  "seconds": 0.925,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ee387131d760802680f97a753e6c970f83b99ddae1bbbd21aaa17351d4e37737",
+  "inputsAfter": "ee387131d760802680f97a753e6c970f83b99ddae1bbbd21aaa17351d4e37737",
+  "postgresToolDirectory": null,
+  "outputSha256": "4e6b8f5e361c89db06769f4bb60e314366ec378e7e7a3342b9a3523a79371a27",
+  "outputTail": "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\ntrue !== false\n\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/tunnel-token-args-probe.mjs:22:9) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: true,\n  expected: false,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v25.8.1\n"
+}

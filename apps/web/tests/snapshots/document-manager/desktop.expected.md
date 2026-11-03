@@ -1,12 +1,13 @@
 - dialog "Document Manager":
-  - heading "Document Manager" [level=2]
-  - button "Close":
-    - img
-  - button "Upload information":
-    - img
+  - banner:
+    - heading "Document Manager" [level=2]
+    - button "Upload information":
+      - img
+    - button "Close":
+      - img
   - complementary "Document scopes":
     - img
-    - textbox "Find a project space"
+    - textbox "Find a space"
     - status:
       - text: Project scopes could not be refreshed; showing the last result
       - button "Retry"
@@ -21,6 +22,7 @@
       - img
       - text: Trash
     - button "History"
+  - status: Open a conversation to add documents to it. Browsing, downloads and copying remain available.
   - heading "Personal documents" [level=3]
   - navigation "Document path":
     - button "Root folder" [disabled]
@@ -59,7 +61,7 @@
         - checkbox "notes.txt"
         - button "Preview notes.txt": notes.txt Text · 2026-08-16
         - text: 30.0 KB
-        - button "Add notes.txt to conversation": Add to conversation
+        - button "Add notes.txt to conversation" [disabled]: Add to conversation
         - 'button "More actions: notes.txt"':
           - img
     - group "Upload date 2026-08-14":
@@ -68,7 +70,7 @@
         - checkbox "brief.txt"
         - button "Preview brief.txt": brief.txt Text · 2026-08-14
         - text: 21 B
-        - button "Add brief.txt to conversation": Add to conversation
+        - button "Add brief.txt to conversation" [disabled]: Add to conversation
         - 'button "More actions: brief.txt"':
           - img
   - 'complementary "Preview: brief.txt"':

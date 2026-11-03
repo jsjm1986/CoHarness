@@ -14,7 +14,43 @@ import {
   metadataExpressionErrors,
   packageTestFixtureDependencyErrors,
   packageTestPluginDependencyErrors,
+  rootProjectReferences,
 } from './verify-cordis-config.ts'
+
+describe('compiler reference coverage for runnable examples', () => {
+  it('recognizes a package referenced through its explicit Host config file', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'cordis-file-reference-'))
+    try {
+      const pkg = join(directory, 'packages', 'connection')
+      mkdirSync(pkg, { recursive: true })
+      writeFileSync(join(directory, 'tsconfig.json'), JSON.stringify({ references: [{ path: './tsconfig.host.json' }] }))
+      writeFileSync(join(directory, 'tsconfig.host.json'), JSON.stringify({ references: [{ path: './packages/connection/tsconfig.host.json' }] }))
+      writeFileSync(join(pkg, 'tsconfig.host.json'), JSON.stringify({ files: [] }))
+      expect(rootProjectReferences(directory).has(pkg)).toBe(true)
+    } finally { rmSync(directory, { recursive: true, force: true }) }
+  })
+
+  it('keeps directory references covered and leaves unrelated packages uncovered', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'cordis-directory-reference-'))
+    try {
+      writeFileSync(join(directory, 'tsconfig.json'), JSON.stringify({ references: [{ path: './packages/declared' }] }))
+      const references = rootProjectReferences(directory)
+      expect(references.has(join(directory, 'packages/declared'))).toBe(true)
+      expect(references.has(join(directory, 'packages/unreferenced'))).toBe(false)
+    } finally { rmSync(directory, { recursive: true, force: true }) }
+  })
+
+  it('rejects a missing referenced config and terminates a config cycle', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'cordis-reference-errors-'))
+    try {
+      writeFileSync(join(directory, 'tsconfig.json'), JSON.stringify({ references: [{ path: './missing.json' }] }))
+      expect(() => rootProjectReferences(directory)).toThrow('Cannot read file')
+      writeFileSync(join(directory, 'tsconfig.json'), JSON.stringify({ references: [{ path: './tsconfig.host.json' }] }))
+      writeFileSync(join(directory, 'tsconfig.host.json'), JSON.stringify({ references: [{ path: './tsconfig.json' }] }))
+      expect(rootProjectReferences(directory)).toEqual(new Set([directory]))
+    } finally { rmSync(directory, { recursive: true, force: true }) }
+  })
+})
 
 describe('verify-cordis-config metadata expressions', () => {
   it('accepts a disabled !!js expression', () => {

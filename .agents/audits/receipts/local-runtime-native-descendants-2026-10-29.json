@@ -1,0 +1,550 @@
+{
+  "recordedAt": "2026-10-29T13:28:47.335734+00:00",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z",
+  "baselineEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/baseline-current-native-review.json",
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-range-final-source-and-artifact-hashes.json",
+  "realProviderApiValidation": "human-deferred",
+  "ownedLinuxCleanup": {
+    "createdAt": "2026-10-29T11:43:28.305864+00:00",
+    "name": "dsh-audit-linux-native-112522",
+    "id": "df68626857041851a4483c4028468e15ac5a3685dfbea302a44aca80254338d6",
+    "image": "dsh-audit-linux-native:20261029-112522-aligned",
+    "hostMounts": [],
+    "cgroupNamespace": "private",
+    "network": "none",
+    "memory": "1g",
+    "cpus": 2,
+    "scope": "Owned isolated Linux validation only; no production or peer containers accessed.",
+    "dependencyAlignment": "Current worktree Koffi3.1.6 plus matching Linux binding.",
+    "status": "removed_after_confirmed_quiescence",
+    "removedAt": "2026-10-29T13:27:16.687274+00:00",
+    "removedOwnedImageTags": [
+      "dsh-audit-linux-native:20261029-112522-aligned",
+      "dsh-audit-linux-native:20261029-112522"
+    ],
+    "quiescenceReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-owned-complete-quiescence-final.json"
+  },
+  "findings": [
+    "B313"
+  ],
+  "repair": "New Linux allocations with a successfully probed user manager record immutable native ownership and place Runtime, probe, pipe, PTY and SDK descendants in a nonce-derived slice. Recovery requires a free inherited lease, absent original group and empty complete slice, and can clean that exact slice after owner failure. Native mode cannot be removed from the reservation; empty slices are retired.",
+  "paths": [
+    "gateway/src/launcher.ts",
+    "gateway/src/local-runtime-linux.ts",
+    "gateway/src/local-runtime-protocol.ts",
+    "gateway/src/local-runtime-owner.ts",
+    "gateway/src/local-runtime-control.ts",
+    "gateway/src/local-runtime-supervisor.ts",
+    "packages/subprocess/subprocess-local/src/linux-scope.ts",
+    "gateway/tests/run-built-local-native-supervision.mjs"
+  ],
+  "negativeEvidence": [
+    {
+      "name": "linux-runtime-whole-range-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T12:01:58.334941+00:00",
+      "cwd": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z",
+      "command": [
+        "docker",
+        "exec",
+        "--env",
+        "XDG_RUNTIME_DIR=/run/user/0",
+        "--env",
+        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus",
+        "dsh-audit-linux-native-112522",
+        "timeout",
+        "--kill-after=5s",
+        "45s",
+        "node",
+        "/opt/audit-gateway/audit-complete-range.mjs"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T12:01:59.755158+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-runtime-whole-range-causal-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-runtime-whole-range-causal-before.log"
+    }
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "linux-native-pipe-pty-complete",
+        "status": "passed",
+        "startedAt": "2026-10-29T11:58:16.153080+00:00",
+        "cwd": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z",
+        "command": [
+          "docker",
+          "exec",
+          "--env",
+          "XDG_RUNTIME_DIR=/run/user/0",
+          "--env",
+          "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus",
+          "dsh-audit-linux-native-112522",
+          "timeout",
+          "--kill-after=5s",
+          "45s",
+          "node",
+          "/opt/dsh-native/linux-native-processes.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T11:58:16.603235+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-native-pipe-pty-complete.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-native-pipe-pty-complete.log"
+      },
+      {
+        "name": "native-and-fallback-final-linux-assembly",
+        "status": "passed",
+        "startedAt": "2026-10-29T13:23:33.247728+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "docker",
+          "exec",
+          "-e",
+          "XDG_RUNTIME_DIR=/run/user/0",
+          "-e",
+          "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus",
+          "dsh-audit-linux-native-112522",
+          "node",
+          "/opt/audit-worktree/gateway/tests/run-built-local-native-supervision.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T13:23:41.385629+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/native-and-fallback-final-linux-assembly.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/native-and-fallback-final-linux-assembly.log"
+      },
+      {
+        "name": "linux-native-locale-quiescence-assembly",
+        "status": "passed",
+        "startedAt": "2026-10-29T13:04:39.438496+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "docker",
+          "exec",
+          "-e",
+          "LANG=zh_CN.UTF-8",
+          "-e",
+          "LC_ALL=zh_CN.UTF-8",
+          "-e",
+          "XDG_RUNTIME_DIR=/run/user/0",
+          "-e",
+          "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus",
+          "dsh-audit-linux-native-112522",
+          "node",
+          "/opt/audit-worktree/gateway/tests/run-built-local-native-supervision.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T13:04:46.012380+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-native-locale-quiescence-assembly.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-native-locale-quiescence-assembly.log"
+      },
+      {
+        "name": "gateway-range-control-final-regressions",
+        "status": "passed",
+        "startedAt": "2026-10-29T12:55:44.894174+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/local-runtime-linux.spec.ts",
+          "tests/local-runtime-native-control.spec.ts",
+          "tests/local-runtime-owner.spec.ts",
+          "tests/local-runtime-launcher.spec.ts",
+          "tests/launcher.spec.ts",
+          "tests/systemd-command.spec.ts",
+          "tests/tunnel-supervisor.spec.ts",
+          "tests/tunnel-install.spec.ts",
+          "--maxWorkers=2",
+          "--retry=0",
+          "--coverage",
+          "--coverage.include=src/child-command.ts",
+          "--coverage.include=src/local-runtime-linux.ts",
+          "--coverage.include=src/local-runtime-control.ts",
+          "--coverage.include=src/local-runtime-owner.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/gateway-range-control-coverage-complete"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T12:55:57.906087+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/gateway-range-control-final-regressions.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/gateway-range-control-final-regressions.log"
+      },
+      {
+        "name": "local-supervision-built-node22-final",
+        "status": "passed",
+        "startedAt": "2026-10-29T12:53:52.127583+00:00",
+        "cwd": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/gateway-built-checks-current/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/run-built-local-supervision.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T12:53:52.954424+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/local-supervision-built-node22-final.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/local-supervision-built-node22-final.log"
+      },
+      {
+        "name": "local-supervision-built-node24-final",
+        "status": "passed",
+        "startedAt": "2026-10-29T12:53:52.127576+00:00",
+        "cwd": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/gateway-built-checks-current/gateway",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "tests/run-built-local-supervision.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T12:53:52.989924+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/local-supervision-built-node24-final.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/local-supervision-built-node24-final.log"
+      },
+      {
+        "name": "linux-owned-complete-quiescence-final",
+        "status": "passed",
+        "startedAt": "2026-10-29T13:26:04.235960+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "docker",
+          "exec",
+          "-e",
+          "XDG_RUNTIME_DIR=/run/user/0",
+          "-e",
+          "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus",
+          "dsh-audit-linux-native-112522",
+          "node",
+          "/opt/audit-quiescence.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T13:26:04.324054+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-owned-complete-quiescence-final.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-owned-complete-quiescence-final.log"
+      }
+    ],
+    "coverage": {
+      "linuxScopeAndProcStat": {
+        "total": {
+          "lines": {
+            "total": 272,
+            "covered": 272,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 309,
+            "covered": 309,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 56,
+            "covered": 56,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 262,
+            "covered": 262,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subprocess/subprocess-local/src/linux-scope.ts": {
+          "lines": {
+            "total": 241,
+            "covered": 241,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 54,
+            "covered": 54,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 272,
+            "covered": 272,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 238,
+            "covered": 238,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subprocess/subprocess-local/src/proc-stat.ts": {
+          "lines": {
+            "total": 31,
+            "covered": 31,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 2,
+            "covered": 2,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 37,
+            "covered": 37,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 24,
+            "covered": 24,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      },
+      "gatewayOwnershipScope": {
+        "total": {
+          "lines": {
+            "total": 237,
+            "covered": 220,
+            "skipped": 0,
+            "pct": 92.82
+          },
+          "statements": {
+            "total": 313,
+            "covered": 286,
+            "skipped": 0,
+            "pct": 91.37
+          },
+          "functions": {
+            "total": 56,
+            "covered": 53,
+            "skipped": 0,
+            "pct": 94.64
+          },
+          "branches": {
+            "total": 188,
+            "covered": 170,
+            "skipped": 0,
+            "pct": 90.42
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/child-command.ts": {
+          "lines": {
+            "total": 8,
+            "covered": 8,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 3,
+            "covered": 3,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 11,
+            "covered": 11,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 2,
+            "covered": 2,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/local-runtime-control.ts": {
+          "lines": {
+            "total": 76,
+            "covered": 72,
+            "skipped": 0,
+            "pct": 94.73
+          },
+          "functions": {
+            "total": 18,
+            "covered": 17,
+            "skipped": 0,
+            "pct": 94.44
+          },
+          "statements": {
+            "total": 107,
+            "covered": 97,
+            "skipped": 0,
+            "pct": 90.65
+          },
+          "branches": {
+            "total": 68,
+            "covered": 59,
+            "skipped": 0,
+            "pct": 86.76
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/local-runtime-linux.ts": {
+          "lines": {
+            "total": 33,
+            "covered": 33,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 5,
+            "covered": 5,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 40,
+            "covered": 40,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 28,
+            "covered": 28,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/local-runtime-owner.ts": {
+          "lines": {
+            "total": 120,
+            "covered": 107,
+            "skipped": 0,
+            "pct": 89.16
+          },
+          "functions": {
+            "total": 30,
+            "covered": 28,
+            "skipped": 0,
+            "pct": 93.33
+          },
+          "statements": {
+            "total": 155,
+            "covered": 138,
+            "skipped": 0,
+            "pct": 89.03
+          },
+          "branches": {
+            "total": 90,
+            "covered": 81,
+            "skipped": 0,
+            "pct": 90
+          }
+        }
+      },
+      "gatewayNativeHelpers": {
+        "total": {
+          "lines": {
+            "total": 41,
+            "covered": 41,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 51,
+            "covered": 51,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 8,
+            "covered": 8,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 30,
+            "covered": 30,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/child-command.ts": {
+          "lines": {
+            "total": 8,
+            "covered": 8,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 3,
+            "covered": 3,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 11,
+            "covered": 11,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 2,
+            "covered": 2,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/local-runtime-linux.ts": {
+          "lines": {
+            "total": 33,
+            "covered": 33,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 5,
+            "covered": 5,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 40,
+            "covered": 40,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 28,
+            "covered": 28,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      }
+    }
+  },
+  "limitations": [
+    "Native descendant ownership applies to new allocations using the matching provider and working Linux user manager. Legacy process-group allocations, macOS escaped descendants and Windows remain under B25 review.",
+    "The SDK child answers a minimal transport handshake; no real model provider or public-network hardware acceptance is claimed.",
+    "This turn proves physical local process ownership; it is not new live PostgreSQL pressure/admission acceptance."
+  ],
+  "fixtureRepairsAndCleanup": {
+    "earlierFailuresPreserved": [
+      "linux-runtime-whole-range-first-fixed",
+      "linux-native-locale-final-assembly",
+      "linux-owned-quiescence"
+    ],
+    "details": "Integer CLI timeout was repaired during implementation. Linux /proc reads can fail with ESRCH during exit; fixture handles only positive absence codes. One interrupted fixture was recovered through its exact native owner, then global private-container quiescence confirmed zero live audit processes and zero audit units.",
+    "recoveryReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T112522Z/linux-interrupted-fixture-exact-recovery.json"
+  }
+}

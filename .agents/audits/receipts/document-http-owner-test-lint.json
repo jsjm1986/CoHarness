@@ -1,0 +1,14 @@
+{
+  "name": "document-http-owner-test-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts gateway/src/documents-local.ts gateway/tests/documents-local.spec.ts packages/host/userdoc-http/src/index.ts packages/host/userdoc-http/tests/handler-edges.spec.ts packages/host/userdoc-http/tests/loader-composition.spec.ts",
+  "startedAt": "2026-10-26T11:09:50.318348+00:00",
+  "seconds": 6.102,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "984925c1f7ccec6b0fa786ea6feea859ad8019d14faab8690a9bf02b3440e9a3",
+  "inputsAfter": "984925c1f7ccec6b0fa786ea6feea859ad8019d14faab8690a9bf02b3440e9a3",
+  "postgresToolDirectory": null,
+  "outputSha256": "18da4b3d7feceff3cdb003f0efa80492f13ecbdbe5676e89a33a63017395cfc6",
+  "outputTail": "packages/host/userdoc-http/tests/handler-edges.spec.ts:157:42: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\npackages/host/userdoc-http/tests/loader-composition.spec.ts:114:43: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\npackages/host/userdoc-http/tests/loader-composition.spec.ts:115:43: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\npackages/host/userdoc-http/tests/loader-composition.spec.ts:143:43: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\npackages/host/userdoc-http/tests/loader-composition.spec.ts:144:43: error typescript(no-invalid-void-type): Use `void` only as a return type or generic type argument. help: Replace this `void` type with an allowed type, or keep `void` only in a valid return position.\npackages/host/userdoc-http/tests/loader-composition.spec.ts:116:50: error typescript(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`. help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.\n"
+}

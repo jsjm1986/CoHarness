@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-26-session-draft-lifecycle-and-content-watermarks.md
 document:
-  en: 2f719299c1241c0ae00decaaf676fb0476410344
-  zh: f048a84a054c94d339f192c1cb2297169a77be04
+  en: b042bc513a957729051d1d379c9e4b16e2add7a1
+  zh: 58b1f1814f811747f7769d473c683216d13a3cb4
 /agent-note-deferred-session-drafts-and-authoritative-content-watermarks:
   en: 8f37310a316ab0ff
   zh: 1c1f69596b74b3c1
@@ -12,8 +12,8 @@ document:
   en: f5a589d2aa23eb5a
   zh: 93a2a0dbca39c55f
 /agent-note-deferred-session-drafts-and-authoritative-content-watermarks/decision:
-  en: 9216bd1af2cc23d7
-  zh: ba48b4883ca8a3e2
+  en: f2c85c30f24ff584
+  zh: 16f5e45bcc154563
 /agent-note-deferred-session-drafts-and-authoritative-content-watermarks/alternatives-considered:
   en: deeecbcbc96b1b0e
   zh: 76b4eb7d492bda2a

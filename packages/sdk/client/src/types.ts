@@ -59,6 +59,8 @@ export interface HarnessClientOptions {
   maxOutputBytes?: number
   /** Maximum notifications retained by one subscription when no consumer is waiting. */
   maxNotificationQueue?: number
+  /** Maximum active Session ancestry edges; exceeding it fails notification delivery explicitly. */
+  maxSessionRelationships?: number
 }
 
 /** Options for the high-level {@link DeepSeekHarness} wrapper. */

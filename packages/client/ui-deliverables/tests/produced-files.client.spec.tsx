@@ -20,7 +20,7 @@ import type {
 import { apply as applyLocale, inject as localeInject } from '@deepseek-ai/dsh-client-locale/client'
 import type { ChatFileMentions, TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { makeTranslate, stubSettingsScope, stubDeveloperTools } from '@deepseek-ai/dsh-client-test-runtime'
-import { ProducedFiles, type ProducedFilesProps } from '../src/client/ProducedFiles.tsx'
+import { ProducedFiles, type ProducedFilesProps, type ProducedFilesInjected } from '../src/client/ProducedFiles.tsx'
 import {
   changesForClosing, presentedForClosing, basename, deliverablesDefinition, producedFileMentions, producedForClosing, selectProducedFiles,
   type DeliverablesTurnData,
@@ -430,7 +430,8 @@ describe('plugin registration', () => {
     const baseSummary = vi.fn()
     const target = { kind: 'project', projectId: 7 }
     const hostDescription = createSnapshotStore({ executionAuthorityRequired: false, canOpenPath: true })
-    const project = { api: { workspaceChanges: { summary } }, hostDescription, isLoopback: true }
+    const targetDescription = createSnapshotStore({ executionAuthorityRequired: true, canOpenPath: false })
+    const project = { api: { workspaceChanges: { summary } }, hostDescription: targetDescription, isLoopback: true }
     const forTarget = vi.fn(() => project)
     ctx.provide('connection', { api: { settings: {}, workspaceChanges: { summary: baseSummary } }, hostDescription, isLoopback: true, forTarget } as never)
     ctx.provide('sessions', { scope: () => retained ? scope : undefined, runtimeTargetFor: () => target } as never)
@@ -441,6 +442,11 @@ describe('plugin registration', () => {
     try {
       await ctx.plugin({ inject: localeInject, apply: applyLocale }).await()
       await ctx.plugin({ inject: [...inject], apply }).await()
+      const produced = ctx.slots.entries('conversation.chat.turnTail')
+        .find(item => item.options.id === '@deepseek-ai/dsh-client-ui-deliverables/produced-files')!
+      const capability = produced.inject!(sessionId as never) as unknown as ProducedFilesInjected
+      expect(capability.hooks.hostDescription).toBe(targetDescription)
+      expect(capability.isLoopback).toBe(false)
       const entry = ctx.slots.entries('conversation.chat.turnTail')
         .find(item => item.options.id === '@deepseek-ai/dsh-client-ui-deliverables')!
       const face = entry.inject!(sessionId as never) as unknown as DeliverablesInjected

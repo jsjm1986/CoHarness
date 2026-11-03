@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/resource-budget.md
 document:
-  en: d294b5f358f99d266137c5d499ac2b5ff36f9dfe
-  zh: ad733280834cd1a35c100ab7396c780071476e67
-/execution-resource-admission:
-  en: e1360c31a054ff2b
-  zh: 419915bc6d08fabb
-/execution-resource-admission/resource-types:
-  en: 265e2e32e30a963a
-  zh: bce513da7641181e
+  en: a07fb5ede9f71873ab0fd1988d114f7aad505db3
+  zh: 22a6263a475c7ca326c82e252068f5cef493ca9b
+/resource-admission:
+  en: 2955dd3350363920
+  zh: 0546df41ca73a19c
+/resource-admission/permit-records:
+  en: 7ae06f587c564380
+  zh: 7c3df04f70f0123a

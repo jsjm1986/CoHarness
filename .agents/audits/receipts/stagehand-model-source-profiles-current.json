@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-model-source-profiles-current",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run --config vitest.snapshot.config.ts snapshots/session/headless.snapshot.ts snapshots/sdk/sdk.snapshot.ts -t 'replays browser-use-stagehand-native through' --retry=0",
+  "startedAt": "2026-10-23T18:36:14.553797+00:00",
+  "seconds": 7.818,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "19ff75d72d4b7c55b969c261eb29c0e8f8a75171efb8ec4ed8d367c4046a70cb",
+  "inputsAfter": "19ff75d72d4b7c55b969c261eb29c0e8f8a75171efb8ec4ed8d367c4046a70cb",
+  "outputSha256": "8618771e836ee69957208ad5aa75dc4f0c145240498a234fc064874d0de91208",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  2 passed (2)\n      Tests  2 passed | 176 skipped (178)\n   Start at  02:36:15\n   Duration  6.51s (transform 2.32s, setup 115ms, import 4.38s, tests 7.95s, environment 0ms)\n\n"
+}

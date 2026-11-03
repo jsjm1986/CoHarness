@@ -1,0 +1,179 @@
+{
+  "finding": "B410",
+  "title": "Project curation outlives memory qualification or issuing service at dispatch and cursor commit",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "at": "2026-10-31T17:34:21.044434+00:00",
+  "localDate": "2026-11-01",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T171000Z",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-curation-live-availability.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-curation-live-availability.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-memory-curation-live-availability.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-memory-curation-authority.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-memory-curation-authority.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-memory-curation-authority.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-memory-provider-availability.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-memory-provider-availability.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-memory-provider-availability.zh.md",
+    "apps/cli/tests/profiles/sdk/memory-curation-authority.expected.e2e.ts",
+    "docs/subsystems/memory.i18n.yaml",
+    "docs/subsystems/memory.md",
+    "docs/subsystems/memory.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-auxiliary-events/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-auxiliary-events/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/memory-auxiliary-events/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/memory-curation-authority/model.mjs",
+    "examples/headless-agent/tests/fixtures/memory-curation-authority/register.mjs",
+    "examples/headless-agent/tests/fixtures/memory-curation-authority/runtime.cordis.yml",
+    "packages/extensions/tool-cordis/src/api-catalog.ts",
+    "packages/memory/memory-curation/README.i18n.yaml",
+    "packages/memory/memory-curation/README.md",
+    "packages/memory/memory-curation/README.zh.md",
+    "packages/memory/memory-curation/src/index.ts",
+    "packages/memory/memory-curation/tests/memory-curation.spec.ts",
+    "packages/memory/memory/README.i18n.yaml",
+    "packages/memory/memory/README.md",
+    "packages/memory/memory/README.zh.md",
+    "packages/memory/memory/src/index.ts",
+    "packages/memory/memory/tests/cursor.spec.ts"
+  ],
+  "matchingPrerequisites": [
+    "apps/cli/src/sdk-source.cordis.patch.yml",
+    "apps/cli/tests/profiles/sdk/memory-curation-settings.expected.e2e.ts",
+    "examples/headless-agent/tests/auxiliary-model-fixture.ts",
+    "examples/headless-agent/tests/fixtures/memory-curation-settings/model.mjs",
+    "examples/headless-agent/tests/fixtures/memory-curation-settings/register.mjs",
+    "examples/headless-agent/tests/fixtures/memory-curation-settings/runtime.cordis.yml",
+    "examples/package.json",
+    "packages/bundle/sdk-minimal/cordis.patch.yml",
+    "packages/context/execution-authority/src/index.ts",
+    "packages/context/execution-authority/src/types.ts",
+    "packages/extensions/tool-cordis/package.json",
+    "packages/extensions/tool-cordis/tsconfig.json",
+    "packages/llm/llm/src/index.ts",
+    "packages/llm/llm/src/operations.ts",
+    "packages/memory/memory-context/package.json",
+    "packages/memory/memory-context/src/index.ts",
+    "packages/memory/memory-context/tsconfig.json",
+    "packages/memory/memory-curation/package.json",
+    "packages/memory/memory-curation/tsconfig.json",
+    "packages/memory/memory/package.json",
+    "packages/memory/memory/src/client.ts",
+    "packages/memory/memory/src/search.ts",
+    "packages/memory/memory/src/storage.ts",
+    "packages/memory/memory/src/types.ts",
+    "packages/memory/memory/tests/harness.ts",
+    "packages/memory/memory/tsconfig.json",
+    "packages/settings/settings-file/src/index.ts",
+    "packages/settings/settings/src/index.ts",
+    "packages/settings/settings/tests/memory.ts",
+    "vitest.expected.config.ts",
+    "vitest.snapshot.config.ts"
+  ],
+  "cause": "An initial memory authorization does not cover asynchronous catalog/model/tool work or a queued cursor. Generic model execute permission can remain valid after memory qualification is withdrawn. Replacing the captured execution issuer must not lend another actor or permission.",
+  "implementation": "Curation retains the original issuer and captured participants through instance-owned AsyncLocalStorage. Current-service identity and memory qualification recheck before rounds, after responses, after capacity admission and at physical adapter dispatch. Cursor authorization runs inside the serialized write queue after storage waits and returns a synchronous final issuer/scope/availability guard. Cancellation checks and existing cleanup/permits remain owned. The context is disabled only after all captured tasks settle.",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchedAt": "2026-10-31T17:23:02.150257+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T171000Z/memory-authority-origin-fetch.json",
+    "sharedChangesPreserved": true
+  },
+  "verification": {
+    "uniqueRelatedCases": 353,
+    "unitCases": 321,
+    "unitFiles": 12,
+    "assembledSdkCases": 21,
+    "newAuthoritySdkCases": 12,
+    "existingSettingsSdkCases": 9,
+    "existingSnapshotCases": 11,
+    "coverage": {
+      "memory": {
+        "statements": {
+          "covered": 275,
+          "total": 275,
+          "pct": 100.0
+        },
+        "branches": {
+          "covered": 178,
+          "total": 178,
+          "pct": 100.0
+        },
+        "functions": {
+          "covered": 55,
+          "total": 55,
+          "pct": 100.0
+        },
+        "lines": {
+          "covered": 240,
+          "total": 240,
+          "pct": 100.0
+        }
+      },
+      "memory-curation": {
+        "statements": {
+          "covered": 400,
+          "total": 400,
+          "pct": 100.0
+        },
+        "branches": {
+          "covered": 256,
+          "total": 256,
+          "pct": 100.0
+        },
+        "functions": {
+          "covered": 60,
+          "total": 60,
+          "pct": 100.0
+        },
+        "lines": {
+          "covered": 330,
+          "total": 330,
+          "pct": 100.0
+        }
+      }
+    },
+    "coverageEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T171000Z/coverage-evidence.json",
+    "nodeMajors": [
+      22,
+      24
+    ],
+    "beforeFix": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T171000Z/memory-authority-negative-completion.json",
+    "queuedCursorBeforeFix": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T171000Z/memory-authority-queued-cursor-negative.json",
+    "oldCompiledNegative": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T171000Z/memory-authority-old-sdk-complete.json",
+    "oldPrivatePackages": [
+      "old-memory",
+      "old-memory-curation"
+    ],
+    "negativeResults": "Six real LlmRuntime catalog/grant/response cases and four queued cursor cases fail before their fixes. Complete matching predecessor service/consumer packages fail10 of12 SDK authority cases;2 already protected replacement cases also pass on the predecessor. Old bytes match B409 and remain unchanged.",
+    "native": "Actual shipped sdk-minimal process, JSON memory storage, real LlmRuntime and required model budget. Qualification withdrawal leaves execute permission available. Extraction/consolidation cover pending grants, tool reads and queued cursor commits; original actor42, no replacement actor77 lending, exact logged input, unchanged owner body and all2 permits released after work completion. Authorizer/adapter are local deterministic fixtures, not a production Gateway/paid API claim.",
+    "fixtureCorrections": "Initial negative test disposed curation too early; corrected to await business completion and six cases fail. Additional SDK cursor fixture referenced a non-injected Agent registry; corrected to use the actual Agent captured by runCaptured. Four cursor cases then pass without changing deadlines. An obsolete write-denial fixture assumed a fixed authorization-call count; service write denial remains tested independently of current pass qualification.",
+    "build": "Scoped normal tsc faces and normal tsdown builds for memory/memory-context/memory-curation/tool-cordis; strict changed test face has zero own/transitive diagnostics; final lint/JSDoc and127 catalog freshness pass.",
+    "documentation": "Seven bilingual pairs recorded;20 final quick documentation gates pass. No full repository suite, full doc-sync, Docker or production deployment claimed."
+  },
+  "peerReports": {
+    "source": "User-authorized direct peer messages in this turn; reported, not root production verification",
+    "peerThread": "01a1821f-1577-7472-93db-3bd83ee42345",
+    "serving": "R18/schema102/epoch95, both computers. Matching B406/B407/B408 and ProjectAuthorityView optimization deployed; B409/B410 not deployed.",
+    "references": [
+      ".artifacts/full-real-task-20261031/r18-source-overlay.json",
+      ".artifacts/full-real-task-20261031/r18-serving-confirmation.json",
+      ".artifacts/full-real-task-20261031/r18-workspace-review-recovery-durable-proof.json"
+    ],
+    "acceptance": "175 total,88 exercised,67 passed,21 partial,87 pending. REAL-001 remains open; B sessions still read-only.",
+    "newReservedWork": "Peer investigates workspace-changes retained rejected git/xcode-select runner Promise (REAL-039) and Gateway operationRef serialization/SQL. Root does not touch these paths."
+  },
+  "remaining": [
+    "Review recall authorization through model admission and result publication, including issuer replacement and upstream account/project revocation. Read availability and curation write qualification remain distinct.",
+    "Continue other auxiliary and extension model operations, subprocess/terminal consumers, captured resource owners, quotas and cleanup; no whole-domain closure follows from these named curation cases.",
+    "Preserve peer ownership of Gateway ProjectAuthorityView/LocalRuntimeAdapter, operationRef metadata queries and workspace-changes rejected-runner recovery (REAL-039). No repeated coordination requests.",
+    "Broader cross-account/computer and production acceptance remain open. Peer reports R18/schema102/serving95 includes B406/B407/B408; B409/B410 await a later complete matching freeze.",
+    "Database maintenance argv privacy still requires a supported secret transport design preserving PostgreSQL credential precedence. Platform/delegated native work and paid Responses verification remain deferred or unverified as already recorded."
+  ],
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T171000Z/r6-followup-root-source-union.json",
+  "mergeRequirement": "R18 reportedly includes B406/B407/B408. Apply B409 plus30 B410 deltas and31 matching prerequisites in the next complete backend freeze. Rebuild memory, memory-context, memory-curation and tool-cordis with matching types and Remote bindings. The38 artifact inputs include unchanged matching closure. Preserve peer Gateway/Local/UI, FortuneSheet patch/lock, operationRef queries and workspace-changes recovery. Root does not deploy this reference capsule.",
+  "globalReviewComplete": false
+}

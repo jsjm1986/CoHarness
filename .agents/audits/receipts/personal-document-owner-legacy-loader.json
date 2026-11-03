@@ -1,0 +1,14 @@
+{
+  "name": "personal-document-owner-legacy-loader",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/document-transfer-loader.spec.ts",
+  "startedAt": "2026-10-26T13:23:35.143998+00:00",
+  "seconds": 6.247,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "dcfdb535aac7d9035ebc166fe00fd42be5d246c7780acb6c5302622df85299db",
+  "inputsAfter": "dcfdb535aac7d9035ebc166fe00fd42be5d246c7780acb6c5302622df85299db",
+  "postgresToolDirectory": null,
+  "outputSha256": "2bd968443b52a6ac6abef8794eda5ba0fd5e0ed63ea71f3d48310e313c810f58",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/document-transfer-loader.spec.ts (2 tests | 1 failed) 2894ms\n   × rejects an HTTP consumer that unloads before catalog delivery 882ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/document-transfer-loader.spec.ts > rejects an HTTP consumer that unloads before catalog delivery\nAssertionError: expected Error: Command failed: /Users/a1234/.nvm/… { …(6) } to match object { code: 1, …(2) }\n(3 matching properties omitted from actual)\n\n- Expected\n+ Received\n\n- {\n+ Error {\n    \"code\": 1,\n-   \"stderr\": StringContaining \"catalog delivery must finish before HTTP unload\",\n-   \"stdout\": StringContaining \"\\\"operation\\\":\\\"disabled-actor\\\"\",\n+   \"stderr\": \"node:internal/fs/promises:636\n+   return new FileHandle(await PromisePrototypeThen(\n+                         ^\n+\n+ Error: ENOSPC: no space left on device, open '/private/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/document-transfer-loader-1UiePO/source/credential.json'\n+     at async open (node:internal/fs/promises:636:25)\n+     at async writeFile (node:internal/fs/promises:1243:14)\n+     at async runtime (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/fixtures/document-transfer-loader.mjs:68:3)\n+     at async <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tests/fixtures/document-transfer-loader.mjs:118:18) {\n+   errno: -28,\n+   code: 'ENOSPC',\n+   syscall: 'open',\n+   path: '/private/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/document-transfer-loader-1UiePO/source/credential.json'\n+ }\n+\n+ Node.js v25.8.1\n+ \",\n+   \"stdout\": \"\",\n  }\n\n ❯ tests/document-transfer-loader.spec.ts:41:26\n     39|\n     40| it('rejects an HTTP consumer that unloads before catalog delivery', as…\n     41|   await expect(run(true)).rejects.toMatchObject({\n       |                          ^\n     42|     code: 1,\n     43|     stdout: expect.stringContaining('\"operation\":\"disabled-actor\"'),\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 1 passed (2)\n   Start at  21:23:38\n   Duration  3.12s (transform 18ms, setup 0ms, import 34ms, tests 2.89s, environment 0ms)\n\n"
+}

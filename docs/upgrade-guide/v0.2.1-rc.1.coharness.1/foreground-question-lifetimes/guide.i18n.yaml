@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/foreground-question-lifetimes/guide.md
+document:
+  en: 28da92be39db7c1616093a6344c8ede356936b7b
+  zh: e0a6cf060212fa30b8b758acef69335de15e4b17
+/:
+  en: 8b9652f844aca9ab
+  zh: ba8803a7f054a931
+/keep-foreground-answers-within-their-active-question:
+  en: 2fa42cb5a2c74fd7
+  zh: 0230e436bb48ada2
+/keep-foreground-answers-within-their-active-question/change:
+  en: 7abc68f06a11865d
+  zh: 1fa919cfc4d45028
+/keep-foreground-answers-within-their-active-question/migration:
+  en: a8d55d98b886cf0d
+  zh: 6476fb220adce5fa

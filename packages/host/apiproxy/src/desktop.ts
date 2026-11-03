@@ -3,8 +3,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
-import type {} from '@deepseek-ai/dsh-computer-use'
-import type { DesktopApi, DesktopConfirmation } from './api/desktop.ts'
+import { ComputerUseUnavailableError, computerUseUnavailableReason } from '@deepseek-ai/dsh-computer-use'
+import type { DesktopApi, DesktopStatus } from './api/desktop.ts'
 import type { RpcError, RpcRequest, RpcResponse } from './api/rpc.ts'
 
 interface Options {
@@ -41,19 +41,26 @@ export function createDesktopApi(ctx: Context, options: Options): DesktopApi {
         const current = await options.authorize(request.payload.sessionId, authorized.authority)
         if ('error' in current) return { rpcId: request.rpcId, result: { ok: false, error: current.error } }
         return { rpcId: request.rpcId, result: { ok: true, value } }
-      } catch {
+      } catch (error) {
         return { rpcId: request.rpcId, result: { ok: false, error: signal.aborted
           ? { code: 'cancelled', message: 'Desktop confirmation was cancelled.', details: {} }
-          : { code: 'internal', message: 'Desktop confirmation could not be completed. Refresh its current status.', details: {} } } }
+          : error instanceof ComputerUseUnavailableError
+            ? { code: 'desktop-unavailable', message: error.message, details: { reason: error.reason } }
+            : { code: 'internal', message: 'Desktop confirmation could not be completed. Refresh its current status.', details: {} } } }
       }
     })()
     pending.add(work)
     try { return await work } finally { pending.delete(work) }
   }
   return {
-    status: (request, signal) => invoke<DesktopConfirmation | null>(request, signal, async (agent, abort) =>
-      await ctx.get('computerUseAuthorization')?.confirmation?.read(agent, abort) ?? null),
+    status: (request, signal) => invoke<DesktopStatus>(request, signal, async (agent, abort) => {
+      const unavailableReason = computerUseUnavailableReason(ctx)
+      if (unavailableReason !== undefined) return { unavailableReason }
+      return await ctx.get('computerUseAuthorization')?.confirmation?.read(agent, abort) ?? null
+    }),
     confirm: (request, signal) => invoke(request, signal, async (agent, abort) => {
+      const unavailableReason = computerUseUnavailableReason(ctx)
+      if (request.payload.confirmed && unavailableReason !== undefined) throw new ComputerUseUnavailableError(unavailableReason)
       const policy = ctx.get('computerUseAuthorization')?.confirmation
       if (policy === undefined) throw new Error('Managed desktop confirmation is not configured.')
       return policy.set(agent, request.payload, request.payload.confirmed, abort)

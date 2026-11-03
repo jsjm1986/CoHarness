@@ -11,10 +11,12 @@ import { readResponseJson } from './response-budget.ts'
 export interface GatewayWorkbenchCatalog {
   items: AccountConversationView[]
   personalComplete: boolean
+  personalWorkspaces?: Awaited<ReturnType<import('./workspace-catalog.ts').PostgresWorkspaceCatalog['personal']>>
 }
 
 /** Read authenticated catalog metadata without treating an unavailable runtime as an empty one. */
-export type GatewayWorkbenchCatalogHandler = (user: UserRow, signal: AbortSignal) => Promise<GatewayWorkbenchCatalog>
+export type GatewayWorkbenchCatalogHandler = (user: UserRow, signal: AbortSignal,
+  selected?: { kind: 'personal' | 'project'; runtimeId?: import('./runtime-catalog.ts').RuntimeId }) => Promise<GatewayWorkbenchCatalog>
 
 function object(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -33,15 +35,32 @@ export function createGatewayWorkbenchCatalogHandler(deps: {
   principals: GatewayPrincipalSigner
   maxResponseBytes: number
   upstreamTimeoutMs: number
+  workspaceCatalog?: Pick<import('./workspace-catalog.ts').PostgresWorkspaceCatalog, 'personal'>
 }): GatewayWorkbenchCatalogHandler {
-  return async (user, signal) => {
+  return async (user, signal, selected) => {
     const projectRows = await deps.collaboration.listAccountConversations?.(user.id) ?? []
-    const target = { kind: 'user' as const, id: user.id }
+    if (deps.workspaceCatalog !== undefined) {
+      signal.throwIfAborted()
+      const personalWorkspaces = await deps.workspaceCatalog.personal(user)
+      const indexed = new Map(projectRows.map(item => [`${item.runtime.runtimeId
+        ?? (item.runtime.kind === 'project' ? `project:${item.runtime.projectId}` : 'personal')}:${item.sessionId}`, item]))
+      for (const group of personalWorkspaces) {
+        for (const item of group.conversations ?? []) {
+          indexed.set(`${group.runtime.runtimeId}:${item.sessionId}`, { ...item, runtime: group.runtime,
+            visibility: 'personal', creatorUserId: user.id, creatorDisplayName: user.displayName || user.username, canWrite: true })
+        }
+      }
+      return { items: [...indexed.values()].sort((left, right) => right.updatedAt - left.updatedAt),
+        personalComplete: false, personalWorkspaces: personalWorkspaces.map(group => ({ runtime: group.runtime,
+          status: group.status, observedState: group.observedState, syncedAt: group.syncedAt, items: group.items })) }
+    }
+    if (selected?.kind === 'project') return { items: projectRows, personalComplete: false }
+    const target = { kind: 'user' as const, id: user.id, ...(selected?.runtimeId === undefined ? {} : { runtimeId: selected.runtimeId }) }
     // Project authorization remains authoritative while the personal runtime
     // is unavailable. Incomplete personal metadata cannot prove deletion.
     let running: Awaited<ReturnType<GatewayInstanceService['ensureRunning']>>
     try {
-      running = await deps.instances.ensureRunning(user)
+      running = await deps.instances.ensureRunning({ ...user, ...(selected?.runtimeId === undefined ? {} : { runtimeId: selected.runtimeId }) })
     } catch (error: unknown) {
       if (signal.aborted) throw error
       return { items: projectRows, personalComplete: false }
@@ -56,7 +75,7 @@ export function createGatewayWorkbenchCatalogHandler(deps: {
       const principal = deps.principals.issue({
         user,
         scope: { kind: 'personal' },
-        runtime: { ...target, generation: running.generation },
+        runtime: { ...target, generation: running.generation, ...(running.runtimeId === undefined ? {} : { runtimeId: running.runtimeId }) },
       })
       const response = await fetch(`http://${authority}/api/session.list`, {
         method: 'POST',
@@ -103,7 +122,7 @@ export function createGatewayWorkbenchCatalogHandler(deps: {
         const title = object(object(row.projections)?.values)?.title
         return [{
           sessionId: row.sessionId,
-          runtime: { kind: 'personal' as const },
+          runtime: { kind: 'personal' as const, ...(running.runtimeId === undefined ? {} : { runtimeId: running.runtimeId }) },
           ...(typeof title === 'string' ? { title } : {}),
           ...(typeof row.cwd === 'string' ? { cwd: row.cwd } : {}),
           visibility: 'personal' as const,

@@ -1,0 +1,13 @@
+{
+  "name": "activity-gateway-build-and-types",
+  "cwd": "gateway",
+  "command": "python3 -",
+  "startedAt": "2026-10-23T19:42:47.119507+00:00",
+  "seconds": 9.915,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e052aa6abfc334a91a0dc8b8a8b6ae8c0a80e85de4dd041c89ecf9cd9e3ed3d2",
+  "inputsAfter": "e052aa6abfc334a91a0dc8b8a8b6ae8c0a80e85de4dd041c89ecf9cd9e3ed3d2",
+  "outputSha256": "f65f7ea56abf967bd03ca1955bdd15449b8be41f6a6e053bca564963a85e7d0c",
+  "outputTail": "\n> build\n> tsc -p tsconfig.build.json\n\n\n> typecheck\n> tsc --noEmit\n\n"
+}

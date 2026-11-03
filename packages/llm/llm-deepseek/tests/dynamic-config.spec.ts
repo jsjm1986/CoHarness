@@ -17,7 +17,7 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { LocalCredentialProvider } from '@deepseek-ai/dsh-credentials-local'
 import { FileSettingsProvider } from '@deepseek-ai/dsh-settings-file'
 import * as LlmDeepSeek from '@deepseek-ai/dsh-llm-deepseek-api-key'
-import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { assemble } from './assemble.ts'
 import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
@@ -141,6 +141,23 @@ function prompt(ctx: Context) {
 }
 
 describe('request-level dynamic configuration', () => {
+  it.each(['file', 'process'] as const)('retains the %s credential source in actual provider usage', async (source) => {
+    vi.stubEnv('DEEPSEEK_API_KEY', source === 'process' ? 'environment-key' : '')
+    const dir = await home()
+    const server = await mockServer([{ kind: 'sse', events: textEvents }])
+    const { ctx } = await boot(dir, { baseURL: server.url })
+    if (source === 'file') await ctx.credentials.set(KEY_REF, 'personal-file-key')
+    const usage: Array<Extract<StreamChunk, { type: 'usage' }>> = []
+    for await (const chunk of ctx.llm.stream({ provider: 'deepseek-official', model: 'deepseek-v4-flash', messages: [] })) {
+      if (chunk.type === 'usage') usage.push(chunk)
+    }
+    expect(server.requests).toHaveLength(1)
+    expect(usage.length).toBeGreaterThan(0)
+    const expectedSource = source === 'process' ? 'env' : source
+    expect(usage).toEqual(expect.arrayContaining([expect.objectContaining({ credentialSource: expectedSource })]))
+    expect(usage.every(chunk => chunk.credentialSource === expectedSource)).toBe(true)
+  })
+
   it('routes the next request with the freshly resolved base URL and credential', async () => {
     vi.stubEnv('DEEPSEEK_API_KEY', '')
     const dir = await home()

@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-monotonic-declarations",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/subagent/subagent-dsh-sdk/tsconfig.json",
+  "startedAt": "2026-10-24T16:51:21.121979+00:00",
+  "seconds": 1.339,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1dfa105e6ee9dd01c2c8d2c394fae440f4697fd6942aa1128c4cf018bcccff07",
+  "inputsAfter": "1dfa105e6ee9dd01c2c8d2c394fae440f4697fd6942aa1128c4cf018bcccff07",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

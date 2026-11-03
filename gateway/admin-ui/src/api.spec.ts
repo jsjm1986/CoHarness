@@ -1,5 +1,14 @@
+import { parseConversationSessionIdentity } from '../../src/session-identity.ts'
+import { parseConversationArchiveId } from '../../src/archive-identity.ts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  applyArchiveAction,
+  AdminRequestError,
+  getArchive,
+  getArchiveStatus,
+  listArchives,
+  previewEmptyDrafts,
+  trashEmptyDrafts,
   deleteUser,
   getProjectModelAccess,
   getProjectUsage,
@@ -23,15 +32,24 @@ afterEach(() => {
 })
 
 function jsonOk(body: unknown = {}, status = 200) {
-  return {
-    ok: true,
-    status,
-    headers: { get: () => null },
-    json: async () => body,
-  }
+  return status === 204 ? new Response(null, { status }) : Response.json(body, { status })
 }
 
 describe('admin api URLs', () => {
+  it('retains the Gateway code independently of localized computer failure copy', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'node-service/busy' }, { status: 409 })))
+    await expect(listUsers()).rejects.toMatchObject({
+      name: 'AdminRequestError', status: 409, code: 'node-service/busy',
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'Readable failure', code: 'settings-conflict' }, { status: 409 })))
+    await expect(listUsers()).rejects.toMatchObject({ message: 'Readable failure', code: 'settings-conflict' })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: { code: 'DB_CHECKOUT_QUEUE_FULL', message: 'Database capacity reached' } }, { status: 503 })))
+    await expect(listUsers()).rejects.toMatchObject({ message: 'Database capacity reached', code: 'DB_CHECKOUT_QUEUE_FULL' })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'node-service/busy' }, { status: 409 })))
+    await expect(listAudit()).rejects.toMatchObject({ code: 'node-service/busy' })
+    expect(new AdminRequestError(409, 'node-access/revision-conflict').code).toBe('node-access/revision-conflict')
+  })
+
   it('GETs /admin/api/users with same-origin credentials', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonOk([]))
     vi.stubGlobal('fetch', fetchMock)
@@ -208,5 +226,59 @@ describe('admin api URLs', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
     await expect(listUsers()).rejects.toThrow('Admin response is too large.')
     expect(cancelled).toBe(true)
+  })
+})
+
+describe('archive response identities', () => {
+  const archiveId = parseConversationArchiveId('22000000-0000-4000-8000-000000000022')!
+  const otherId = parseConversationArchiveId('22000000-0000-4000-8000-000000000023')!
+  it('uses the versioned archive record routes and the selected opaque identity', async () => {
+    const row = { archiveId, rootSessionId: 'same-root' }
+    const fetch = vi.fn().mockResolvedValueOnce(jsonOk([row])).mockResolvedValueOnce(jsonOk({ record: row })).mockResolvedValueOnce(jsonOk(row))
+      .mockResolvedValueOnce(jsonOk({ action: 'trash', results: [{ archiveId, ok: true }] }))
+    vi.stubGlobal('fetch', fetch)
+    expect((await listArchives())[0]?.archiveId).toBe(archiveId)
+    expect((await getArchive(archiveId)).record.archiveId).toBe(archiveId)
+    expect((await getArchiveStatus(archiveId)).archiveId).toBe(archiveId)
+    await applyArchiveAction('trash', [archiveId])
+    expect(fetch.mock.calls.map(call => call[0])).toEqual(['/admin/api/archives/records', `/admin/api/archives/records/${archiveId}?fromSeq=0&limit=200`, `/admin/api/archives/records/${archiveId}/status`, '/admin/api/archives/records/actions'])
+    expect(JSON.parse(fetch.mock.calls[3]![1].body)).toMatchObject({ action: 'trash', archiveIds: [archiveId] })
+  })
+  it('refuses a legacy response that omits archive identity', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonOk([{ rootSessionId: 'same-root' }])))
+    await expect(listArchives()).rejects.toThrow('invalid archive identity')
+  })
+  it('refuses status or detail belonging to a different archive even when the Host ID matches', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(jsonOk({ archiveId: otherId, rootSessionId: 'same-root' }))
+      .mockResolvedValueOnce(jsonOk({ record: { archiveId: otherId, rootSessionId: 'same-root' } })))
+    await expect(getArchiveStatus(archiveId)).rejects.toThrow('invalid archive identity')
+    await expect(getArchive(archiveId)).rejects.toThrow('invalid archive identity')
+  })
+  it('refuses an action receipt for another archive', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonOk({ action: 'purge', results: [{ archiveId: otherId, ok: true }] })))
+    await expect(applyArchiveAction('purge', [archiveId])).rejects.toThrow('invalid archive action response')
+  })
+})
+
+describe('Runtime-qualified empty-draft maintenance', () => {
+  const runtimeId = '33000000-0000-4000-8000-000000000033'
+  it('submits the reviewed Runtime and original Host id with the confirmed cutoff', async () => {
+    const session = parseConversationSessionIdentity({ rootSessionId: 'same-host', runtimeId })!
+    const fetchMock = vi.fn().mockResolvedValue(jsonOk({ trashed: [session] }))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await trashEmptyDrafts([session], 42)).toEqual({ trashed: [session] })
+    expect(fetchMock).toHaveBeenCalledWith('/admin/api/archives/empty-drafts/trash', {
+      credentials: 'same-origin', method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessions: [session], cutoff: 42 }),
+    })
+  })
+  it.each([undefined, 'same-host', 'invalid-uuid'])('refuses an unqualified preview Runtime %s', async identity => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonOk({ cutoff: 42, candidates: [{ rootSessionId: 'same-host', runtime: { kind: 'user', id: 7, runtimeId: identity } }] })))
+    await expect(previewEmptyDrafts()).rejects.toThrow('invalid empty-draft identity')
+  })
+  it('canonicalizes the Runtime id from the preview response', async () => {
+    const value = runtimeId.toUpperCase()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonOk({ cutoff: 42, candidates: [{ rootSessionId: 'same-host', runtime: { kind: 'user', id: 7, runtimeId: value } }] })))
+    expect((await previewEmptyDrafts()).candidates[0]!.runtime.runtimeId).toBe(runtimeId)
   })
 })

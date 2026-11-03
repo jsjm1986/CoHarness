@@ -51,7 +51,10 @@ async function bench(desktop = false, developerTools = stubDeveloperTools()) {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('connection', {
     api: { settings: {} }, isLoopback: desktop,
-    hostDescription: { getSnapshot: () => desktop ? { canOpenPath: true, executionAuthorityRequired: false } : undefined },
+    hostDescription: {
+      getSnapshot: () => desktop ? { canOpenPath: true, executionAuthorityRequired: false } : undefined,
+      subscribe: () => () => {},
+    },
   })
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })

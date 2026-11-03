@@ -13,11 +13,14 @@ import {
 import type { UserRow, StreamSessionQualification } from './auth.ts'
 import type { GatewayConfig } from './config.ts'
 import type { EffectiveGrant } from './projects.ts'
-import { gateCopy, gateLanguage, stoppedPage, waitingPage } from './html.ts'
-import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, type ProjectRuntime, type RuntimeTarget } from './instances.ts'
+import { gateCopy, gateLanguage, stoppedPage, waitingPage, type GatePageLanguage } from './html.ts'
+import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, runtimeTargetOf, type ProjectRuntime, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner, type PrincipalScope } from './principal.ts'
+import { runtimeRequestPath } from './runtime-request-path.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { StreamPrincipalLeases } from './stream-principal-leases.ts'
+import { NODE_SERVICE_TARGET_HEADER } from './node-service-stream.ts'
+import { ComputerAccessError } from './computer-access.ts'
 import { parseCookies, SESSION_COOKIE, type GatewayAccessInvalidation, type GatewayDeps, type GatewayRequestContext, type ProxyHandler, type UpgradeHandler } from './server.ts'
 
 function wantsHtml(req: IncomingMessage): boolean {
@@ -114,7 +117,7 @@ export function createProxyHandlers(
       if (!resOrSocket.destroyed && !resOrSocket.headersSent) {
         resOrSocket.writeHead(502, { 'content-type': 'application/json' })
         resOrSocket.end(JSON.stringify({ error: { code: 'INSTANCE_UNREACHABLE', message: 'The runtime is unavailable. Retry shortly.' } }))
-      } else if (!resOrSocket.destroyed && !resOrSocket.writableEnded) resOrSocket.end()
+      } else if (!resOrSocket.destroyed && !resOrSocket.writableEnded) resOrSocket.destroy()
       return
     }
     resOrSocket.destroy()
@@ -144,7 +147,14 @@ export function createProxyHandlers(
     },
     qualify: qualifyStream,
   })
+  server.on('proxyReqWs', upstream => {
+    if (deps.nodeServiceIdentity === undefined) return
+    upstream.prependOnceListener('upgrade', (response: IncomingMessage) => {
+      response.headers[NODE_SERVICE_TARGET_HEADER] = deps.nodeServiceIdentity!.nodeId
+    })
+  })
   const invalidateAccess: GatewayAccessInvalidation = (subject) => {
+    if (subject.nodeId !== undefined && deps.nodeServiceIdentity !== undefined && subject.nodeId !== deps.nodeServiceIdentity.nodeId) return
     for (const operation of [...active]) {
       const { user, scope } = operation.context
       if (subject.userId !== undefined && subject.userId !== user.id) continue
@@ -153,10 +163,19 @@ export function createProxyHandlers(
     }
   }
   const unsubscribeAccess = deps.accessMonitor?.subscribe(async (subject) => {
+    if (subject.nodeId !== undefined && deps.nodeServiceIdentity !== undefined && subject.nodeId !== deps.nodeServiceIdentity.nodeId) return
     invalidateAccess(subject)
     if (subject.restartRuntime !== true) return
-    if (subject.userId !== undefined) await instances.stop({ kind: 'user', id: subject.userId }, 'access-change')
-    if (subject.projectId !== undefined) await instances.stop({ kind: 'project', id: subject.projectId }, 'access-change')
+    const stopOwned = async (target: RuntimeTarget): Promise<void> => {
+      if (instances.targetsForOwner !== undefined) {
+        for (const runtime of await instances.targetsForOwner(target)) await instances.stop(runtime, 'access-change')
+        return
+      }
+      if (instances.owns !== undefined && !await instances.owns(target)) return
+      await instances.stop(target, 'access-change')
+    }
+    if (subject.userId !== undefined) await stopOwned({ kind: 'user', id: subject.userId })
+    if (subject.projectId !== undefined) await stopOwned({ kind: 'project', id: subject.projectId })
   })
 
   async function revalidate(token: string | undefined, context: GatewayRequestContext): Promise<boolean> {
@@ -164,12 +183,16 @@ export function createProxyHandlers(
     if (token === undefined) return false
     const user = await deps.auth.validate(token)
     if (user === null || user.id !== context.user.id || user.mustChangePassword) return false
+    if (deps.computerAccess !== undefined) {
+      try { await deps.computerAccess.authorize(user.id) }
+      catch (error) { if (error instanceof ComputerAccessError) return false; throw error }
+    }
     if (context.scope.kind === 'project') {
       const project = await deps.collaboration?.projectForUser(context.scope.projectId, user.id)
       if (project === undefined || project === null || 'username' in context.runtime || project.path !== context.runtime.path) return false
       context.scope = {
         ...context.scope, mode: project.mode,
-        canManage: user.role === 'admin' || project.administrator || project.canManage,
+        canManage: project.canManage,
       }
     } else if (user.homePath !== context.user.homePath || user.role !== context.user.role) {
       return false
@@ -195,7 +218,7 @@ export function createProxyHandlers(
     proxyResponse.once('error', (error) => {
       const code = (error as { code?: unknown })?.code
       console.error(`[gateway] proxy response stream error${typeof code === 'string' ? ` (${code})` : ''}: ${req.method} ${req.url}`)
-      if (!res.destroyed && !res.writableEnded) res.end()
+      if (!res.destroyed && !res.writableEnded) res.destroy()
     })
   })
 
@@ -231,13 +254,10 @@ export function createProxyHandlers(
     await ensureModelGovernanceForProject(cfg, deps.governance, runtime)
   }
 
-  const targetFor = (context: GatewayRequestContext): RuntimeTarget => 'username' in context.runtime
-    ? { kind: 'user', id: context.runtime.id }
-    : { kind: 'project', id: context.runtime.id }
+  const targetFor = (context: GatewayRequestContext): RuntimeTarget => runtimeTargetOf(context.runtime)
 
-  function refuseStopped(req: IncomingMessage, res: ServerResponse, target: RuntimeTarget): void {
+  function refuseStopped(req: IncomingMessage, res: ServerResponse, target: RuntimeTarget, lang: GatePageLanguage): void {
     res.setHeader('cache-control', 'no-store')
-    const lang = gateLanguage(req.headers.cookie)
     if (wantsHtml(req)) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
       res.end(stoppedPage(target, lang))
@@ -251,13 +271,15 @@ export function createProxyHandlers(
     req: IncomingMessage,
     res: ServerResponse | null,
     context: GatewayRequestContext,
+    lang: GatePageLanguage,
   ): Promise<{ port: number; generation: number; target: RuntimeTarget } | null> {
     const target = targetFor(context)
     // Trust the live handle, not the `ready` row: an external kill or crash
     // leaves the row stale, and proxying that port yields instance-unreachable.
-    if (!await instances.isLive(target)) {
+    const endpoint = await instances.liveEndpoint(target)
+    if (endpoint === null) {
       if (await instances.stopReasonOf(target) === 'manual') {
-        if (res !== null) refuseStopped(req, res, target)
+        if (res !== null) refuseStopped(req, res, target, lang)
         return null
       }
       const gate = await deps.maintenanceGate?.()
@@ -272,7 +294,7 @@ export function createProxyHandlers(
         const retryHeaders = { 'cache-control': 'no-store', 'retry-after': '2' }
         if (wantsHtml(req)) {
           res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...retryHeaders })
-          res.end(waitingPage(gateLanguage(req.headers.cookie)))
+          res.end(waitingPage(lang))
         } else {
           res.writeHead(503, { 'content-type': 'application/json', ...retryHeaders })
           res.end(JSON.stringify({
@@ -285,11 +307,7 @@ export function createProxyHandlers(
       const running = await pending
       return { ...running, target }
     }
-    return {
-      port: await instances.portOf(target),
-      generation: await instances.generationOf(target),
-      target,
-    }
+    return endpoint
   }
 
   function targetOptions(port: number, principal?: string): httpProxy.ServerOptions {
@@ -305,12 +323,14 @@ export function createProxyHandlers(
   }
 
   const proxyRequest: ProxyHandler = async (req, res, context) => {
+    const originalUrl = req.url
     const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
+    const lang = gateLanguage(req.headers.cookie)
     delete req.headers[PRINCIPAL_HEADER]
     scrubRuntimeHeaders(req)
     await deps.accessMonitor?.synchronize()
     if (res.destroyed) return
-    let ready = await ensureReady(req, res, context)
+    let ready = await ensureReady(req, res, context, lang)
     if (ready === null) return
     let operationLease = false
     try {
@@ -338,14 +358,14 @@ export function createProxyHandlers(
         }
       } catch (error) {
         if (error instanceof RuntimeStartBlockedError) {
-          if (error.code === 'INSTANCE_STOPPED') refuseStopped(req, res, ready.target)
+          if (error.code === 'INSTANCE_STOPPED') refuseStopped(req, res, ready.target, lang)
           else { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: error.reason })) }
           return
         }
         const retryHeaders = { 'cache-control': 'no-store', 'retry-after': '2' }
         if (wantsHtml(req)) {
           res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...retryHeaders })
-          res.end(waitingPage(gateLanguage(req.headers.cookie)))
+          res.end(waitingPage(lang))
         } else {
           res.writeHead(503, { 'content-type': 'application/json', ...retryHeaders })
           res.end(JSON.stringify({
@@ -367,7 +387,7 @@ export function createProxyHandlers(
       const principal = principalSigner?.issue({
         user: context.user,
         scope: context.scope,
-        runtime: { kind: ready.target.kind, id: ready.target.id, generation: ready.generation },
+        runtime: { ...ready.target, generation: ready.generation },
       })
       const pathname = new URL(req.url ?? '/', 'http://x').pathname
       if (pathname.startsWith('/api/') && !isDocumentUploadDataPath(req.method, pathname)) {
@@ -380,9 +400,13 @@ export function createProxyHandlers(
             methodPath: `${req.method} ${pathname}`,
             status: res.statusCode,
             ip: req.socket.remoteAddress ?? '',
+            ...(context.environment === undefined ? {} : { detail: JSON.stringify({
+              runtimeId: context.environment.id, nodeId: context.environment.nodeId, generation: ready.generation,
+            }) }),
           })).catch(error => { console.error('[gateway] API audit write failed:', error) })
         })
       }
+      req.url = runtimeRequestPath(req.url ?? '/')
       await new Promise<void>((resolve) => {
         let settled = false
         const finish = (): void => {
@@ -417,11 +441,11 @@ export function createProxyHandlers(
                 error: { code: 'INSTANCE_UNREACHABLE', message: 'The runtime is unavailable. Retry shortly.' },
               }))
             } else if (!res.writableEnded && !res.destroyed) {
-              res.end()
+              res.destroy()
             }
             if (res.destroyed) finish()
           })
-        } catch (error) {
+        } catch {
           if (!res.headersSent && !res.destroyed) {
             res.writeHead(502, { 'content-type': 'application/json' })
             res.end(JSON.stringify({
@@ -429,10 +453,11 @@ export function createProxyHandlers(
             }))
           }
           if (res.destroyed) finish()
-          else if (error instanceof Error && !res.writableEnded) res.end()
+          else if (!res.writableEnded) res.destroy()
         }
       })
     } finally {
+      req.url = originalUrl
       if (operationLease) {
         await Promise.resolve(instances.operationRef?.(ready.target, -1, ready.generation)).catch((error: unknown) => {
           // The response has already settled; retain the lease for the
@@ -446,13 +471,14 @@ export function createProxyHandlers(
 
   const upgradeRequest: UpgradeHandler = async (req, socket, head, context) => {
     const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
+    const lang = gateLanguage(req.headers.cookie)
     delete req.headers[PRINCIPAL_HEADER]
     scrubRuntimeHeaders(req)
     let ready: { port: number; generation: number; target: RuntimeTarget }
     try {
       await deps.accessMonitor?.synchronize()
       if (socket.destroyed) return
-      const resolved = await ensureReady(req, null, context)
+      const resolved = await ensureReady(req, null, context, lang)
       if (resolved === null) throw new Error('runtime did not start')
       ready = resolved
     } catch {
@@ -510,7 +536,7 @@ export function createProxyHandlers(
       const principalInput = {
         user: context.user,
         scope: context.scope,
-        runtime: { kind: ready.target.kind, id: ready.target.id, generation: ready.generation },
+        runtime: { ...ready.target, generation: ready.generation },
       }
       const principal = eventConnection ? principalSigner?.issueStream(principalInput, streamLogin?.expiresAt) : principalSigner?.issue(principalInput)
       if (eventConnection && principal !== undefined && token !== undefined && streamPrincipals !== undefined) {
@@ -529,11 +555,13 @@ export function createProxyHandlers(
   }
 
   const proxy: ProxyHandler = async (req, res, context) => {
+    await deps.computerAccess?.authorize(context.user.id)
     const operation = { context, cancel: (): void => { res.destroy() } }
     active.add(operation)
     try { await proxyRequest(req, res, context) } finally { active.delete(operation) }
   }
   const upgrade: UpgradeHandler = async (req, socket, head, context) => {
+    await deps.computerAccess?.authorize(context.user.id)
     const operation = { context, cancel: (): void => { socket.destroy() } }
     active.add(operation)
     const release = (): void => { active.delete(operation) }

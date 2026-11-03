@@ -43,12 +43,11 @@ export interface InstanceSpec extends ConnectionSpec {
  * pools these. `query()` serializes; `dispose()` rejects queued work and tears the process down.
  */
 export class LspInstance {
-  private readonly connection: LspConnection
   private capabilities: WireServerCapabilities | undefined
   /** The serialization tail: each query awaits the prior one, so lifecycles never interleave. */
   private queue: Promise<unknown> = Promise.resolve()
   private disposed = false
-  /** The one teardown transaction shared by abort, failure, and explicit disposal. */
+  /** Current cleanup attempt, retained after successful quiescence. */
   private teardownPromise: Promise<void> | undefined
   /** Set once the process closes, so the pool can synchronously skip a dead instance. */
   private processClosed = false
@@ -56,12 +55,22 @@ export class LspInstance {
   private readonly ready: Promise<void>
 
   /**
-   * @param spec - the launch, initialize, and teardown parameters.
-   * @param spawner - the subprocess seam's spawn function.
-   * @param writer - optional connection writer used by transport conformance tests.
+   * Allocate the server before publishing its initialized lifecycle owner.
+   * @param spec - launch and protocol settings.
+   * @param spawner - awaited subprocess allocation.
+   * @param writer - protocol writer override.
+   * @returns an instance owning allocation and handshake cleanup.
    */
-  constructor(private readonly spec: InstanceSpec, spawner: ConnectionSpawner, writer?: ConnectionWriter) {
-    this.connection = new LspConnection(spec, spawner, (method, params) => this.answerServerRequest(method, params), writer)
+  static async create(spec: InstanceSpec, spawner: ConnectionSpawner, writer?: ConnectionWriter): Promise<LspInstance> {
+    const connection = await LspConnection.create(spec, spawner, (method, params) => answerServerRequest(spec, method, params), writer)
+    return new LspInstance(spec, connection)
+  }
+
+  /**
+   * @param spec - the launch, initialize, and teardown parameters.
+   * @param connection - allocated server transport.
+   */
+  private constructor(private readonly spec: InstanceSpec, private readonly connection: LspConnection) {
     this.ready = this.initialize()
     // A handshake rejection must not surface as an unhandled rejection before the first query awaits
     // it; queries attach the real handler.
@@ -244,34 +253,21 @@ export class LspInstance {
     return { kind: 'locations', locations: normalizeLocations(payload), resolvedWorkspaceUri: this.spec.workspaceUri }
   }
 
-  private answerServerRequest(method: string, params: unknown): Promise<unknown> {
-    if (method === 'workspace/configuration') {
-      // Answer every requested item with the one static configuration value.
-      const record = params as { items?: unknown[] } | null
-      /* v8 ignore next -- a configuration request always carries an items array; the empty fallback is defensive. */
-      const items = Array.isArray(record?.items) ? record.items : []
-      return Promise.resolve(items.map(() => this.spec.configuration))
-    }
-    if (LIFECYCLE_NOOP_METHODS.has(method)) {
-      // Accept lifecycle bookkeeping requests with an empty result; we register nothing dynamic.
-      return Promise.resolve(null)
-    }
-    if (method === 'workspace/applyEdit') {
-      // This host never applies edits or runs commands.
-      return Promise.reject(new Error('workspace/applyEdit is not permitted by this host'))
-    }
-    return Promise.reject(new Error(`unsupported server request: ${method}`))
-  }
 
   /**
    * Reject queued work, attempt graceful `shutdown`/`exit`, then escalate SIGTERM→SIGKILL, awaiting
-   * process close so nothing outlives disposal.
+   * process close. A failed cleanup can be retried; it never reopens query admission.
    */
   async dispose(): Promise<void> {
-    await this.startTeardown()
+    const attempt = this.startTeardown()
+    try { await attempt }
+    catch (error) {
+      if (this.teardownPromise === attempt) this.teardownPromise = undefined
+      throw error
+    }
   }
 
-  /** Publish disposal once and make every caller await the same quiescence boundary. */
+  /** Close query admission and share the current teardown attempt. */
   private startTeardown(): Promise<void> {
     this.disposed = true
     this.teardownPromise ??= this.tearDown()
@@ -348,3 +344,22 @@ const CLIENT_CAPABILITIES = {
     references: {},
   },
 } as const
+
+function answerServerRequest(spec: InstanceSpec, method: string, params: unknown): Promise<unknown> {
+  if (method === 'workspace/configuration') {
+    // Answer every requested item with the one static configuration value.
+    const record = params as { items?: unknown[] } | null
+    /* v8 ignore next -- a configuration request always carries an items array; the empty fallback is defensive. */
+    const items = Array.isArray(record?.items) ? record.items : []
+    return Promise.resolve(items.map(() => spec.configuration))
+  }
+  if (LIFECYCLE_NOOP_METHODS.has(method)) {
+    // Accept lifecycle bookkeeping requests with an empty result; we register nothing dynamic.
+    return Promise.resolve(null)
+  }
+  if (method === 'workspace/applyEdit') {
+    // This host never applies edits or runs commands.
+    return Promise.reject(new Error('workspace/applyEdit is not permitted by this host'))
+  }
+  return Promise.reject(new Error(`unsupported server request: ${method}`))
+}

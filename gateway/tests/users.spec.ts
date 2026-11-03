@@ -19,6 +19,47 @@ function setup(env: Record<string, string> = {}) {
 }
 
 describe('UserService', () => {
+  const operations = ['create', 'patch', 'status', 'role', 'name', 'remove', 'password'] as const
+  const revoked = ['role', 'disabled', 'deleted'] as const
+  it.for(operations.flatMap(operation => revoked.map(revocation => ({ operation, revocation }))))(
+    'refuses $operation when the initiating administrator is $revocation', async ({ operation, revocation }) => {
+      const { db, cfg, users } = setup()
+      const actor = await users.create({ username: 'actor', password: 'pw-123456', role: 'admin' })
+      await users.create({ username: 'keeper', password: 'pw-123456', role: 'admin' })
+      const target = await users.create({ username: 'target', password: 'pw-123456', displayName: 'Retained target' })
+      writeFileSync(join(target.homePath, 'retained.txt'), 'retained bytes')
+      const before = db.prepare('SELECT * FROM users WHERE id=?').get(target.id)
+      if (revocation === 'role') users.setRole(actor.id, 'user')
+      else if (revocation === 'disabled') users.setStatus(actor.id, 'disabled')
+      else users.remove(actor.id)
+      const mutations: Record<typeof operation, () => unknown> = {
+        create: () => users.create({ username: 'new-account', password: 'pw-123456', role: 'admin' }, actor.id),
+        patch: () => users.patch(target.id, { role: 'admin', status: 'disabled', displayName: 'Changed', autoReviewEligible: true }, actor.id),
+        status: () => users.setStatus(target.id, 'disabled', actor.id),
+        role: () => users.setRole(target.id, 'admin', actor.id),
+        name: () => users.setDisplayName(target.id, 'Changed', actor.id),
+        remove: () => users.remove(target.id, actor.id),
+        password: () => users.resetPassword(target.id, 'replacement-password', actor.id),
+      }
+      await expect(Promise.resolve().then(mutations[operation])).rejects.toMatchObject({ code: 'forbidden' })
+      expect(db.prepare('SELECT * FROM users WHERE id=?').get(target.id)).toEqual(before)
+      expect(users.getByUsername('new-account')).toBeNull()
+      expect(existsSync(join(cfg.usersRoot, 'new-account'))).toBe(false)
+      expect(readFileSync(join(target.homePath, 'retained.txt'), 'utf8')).toBe('retained bytes')
+    },
+  )
+
+  it('distinguishes retained deletion from disabled and unknown accounts', async () => {
+    const { users } = setup()
+    const alice = await users.create({ username: 'alice', password: 'pw-123456' })
+    expect(users.isDeleted(alice.id)).toBe(false)
+    users.setStatus(alice.id, 'disabled')
+    expect(users.isDeleted(alice.id)).toBe(false)
+    expect(users.remove(alice.id)).toBe(true)
+    expect(users.isDeleted(alice.id)).toBe(true)
+    expect(users.isDeleted(alice.id + 10_000)).toBe(false)
+  })
+
   it('provisions home dirs and sequential ports', async () => {
     const { cfg, users } = setup()
     const alice = await users.create({ username: 'alice', password: 'pw-123456' })

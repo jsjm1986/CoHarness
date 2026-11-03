@@ -1,0 +1,336 @@
+{
+  "finding": "B365",
+  "status": "fixed_named_native_provider_lifetime_posix_process_scope",
+  "updatedAt": "2026-10-30T19:05:14.419426+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T182500Z",
+  "sourcePaths": [
+    "packages/host/directory-picker-native/src/index.ts",
+    "packages/host/directory-picker-native/src/native-picker.ts",
+    "packages/host/directory-picker-native/tests/service.spec.ts",
+    "packages/host/directory-picker-native/tests/lifetime.spec.ts",
+    "packages/host/directory-picker-native/tests/fixtures/lifetime.mjs",
+    "packages/host/directory-picker-native/tests/expected/lifetime-provider.jsonl",
+    "packages/host/directory-picker-native/tests/expected/lifetime-root.jsonl",
+    "packages/host/directory-picker-native/tests/expected/lifetime-caller.jsonl",
+    "packages/host/directory-picker-native/README.md",
+    "packages/host/directory-picker-native/README.zh.md",
+    "packages/host/directory-picker-native/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-service-lifetime.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-service-lifetime.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-service-lifetime.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/host/directory-picker-native/src/index.ts": "afbf67aaeb48d27e0aee6793fba3cf668ff0e5c8dec5184d5f33cc3e1bac3b14",
+    "packages/host/directory-picker-native/src/native-picker.ts": "a9b6a374a59a1bae98cb8d5d9f08d9410b6283872b1368ce713c2096ea6c5e43",
+    "packages/host/directory-picker-native/tests/service.spec.ts": "58f40dc10903b727d4747084913765b8ddaae259d89b85bbd7cdbc9fd2a6732d",
+    "packages/host/directory-picker-native/tests/lifetime.spec.ts": "2b9339094fe274c0b06e2dd1e8b9af34e274f06628b44d7dda907199ab2f48cf",
+    "packages/host/directory-picker-native/tests/fixtures/lifetime.mjs": "b2ccb2dc65e59f21d354bb4c300ec99a79a8a6a7cdcb01a251fc99291330de34",
+    "packages/host/directory-picker-native/tests/expected/lifetime-provider.jsonl": "68e3e133d41db4b812f82d141bd2fdf99a22b23c491280605d7631f8fd702e73",
+    "packages/host/directory-picker-native/tests/expected/lifetime-root.jsonl": "68e3e133d41db4b812f82d141bd2fdf99a22b23c491280605d7631f8fd702e73",
+    "packages/host/directory-picker-native/tests/expected/lifetime-caller.jsonl": "ae9b342f8007738dd4b182f839cc1a27452637a1f2e8efb0f6a7adf1f802fdfb",
+    "packages/host/directory-picker-native/README.md": "1f4d6033aa2703f5d06168c88060df55f82fc5d1a353464e6a234c9cf0e21dc2",
+    "packages/host/directory-picker-native/README.zh.md": "7726a04ec464dad75a474a975ef6ae8bf55aa219cca3b8b71e08c734702571ce",
+    "packages/host/directory-picker-native/README.i18n.yaml": "2aaa316a9cc1b6266e50cc26d5f02a447354538398fa6174330d1051705c8e58",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-service-lifetime.md": "ed6a6c02237dc5cfad58049819a92bc0abc52491e2905e914f93c79e8c9276bb",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-service-lifetime.zh.md": "b65832bee36e9d4efc074a961dc93a930e9aa098b9dcf80a786815408c727d24",
+    ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-service-lifetime.i18n.yaml": "8948387594bed4288393087e193e45cc17becc505088b766b68a49d9a621e127"
+  },
+  "builtArtifact": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/host/directory-picker-native/lib/index.js",
+  "builtHash": "f1a06480ec4d1e017e88d8eed815b8098325ebc2d2d57f854410cb830b9db1d6",
+  "repair": "Each service instance owns a lifetime controller and accepted pick promises. Caller and provider signals combine before dispatch. Disposal aborts and awaits accepted operations; completed operations leave the owner set. Retained capabilities refuse new allocation after withdrawal. No module singleton or additional production process is introduced.",
+  "causalEvidence": {
+    "source": {
+      "status": "failed",
+      "startedAt": "2026-10-30T18:58:26.483764+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/host/directory-picker-native/tests/lifetime.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T18:58:29.647852+00:00"
+    },
+    "compiledOldProviderWithJoinedLoader": {
+      "status": "failed",
+      "startedAt": "2026-10-30T18:59:53.667700+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/host/directory-picker-native/tests/lifetime.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T18:59:56.268226+00:00"
+    }
+  },
+  "negativeWitness": "Provider and enclosing-root withdrawal remove the service while actual accepted helper PID remains alive and its pick remains pending. A retained capability allocates again. The independent caller-abort control already stops its helper and permits later work.",
+  "verification": {
+    "uniqueRelatedSourceCases": 36,
+    "sourceFiles": 4,
+    "keylessRunnableScenarios": [
+      "provider-withdrawal",
+      "enclosing-root-disposal",
+      "caller-cancellation"
+    ],
+    "lifetimeGoldenStages": 9,
+    "pathGoldenStages": 6,
+    "coverage": {
+      "files": [
+        "packages/host/directory-picker-native/src/index.ts",
+        "packages/host/directory-picker-native/src/native-picker.ts"
+      ],
+      "statements": [
+        55,
+        55
+      ],
+      "branches": [
+        36,
+        36
+      ],
+      "functions": [
+        11,
+        11
+      ],
+      "lines": [
+        49,
+        49
+      ],
+      "perFileThreshold": 100,
+      "removedExemptions": 1,
+      "newExemptions": 0
+    },
+    "controlledCompletion": "Disposal remains pending after provider cancellation until the accepted helper promise settles.",
+    "isolation": "Concurrent callers and separate provider instances are checked; cancelling one caller leaves both other requests live, then withdrawing that provider cancels only its remaining caller.",
+    "compiledMacNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "compiledLinux": {
+      "node": "22.22.1",
+      "platform": "linux/arm64",
+      "uid": 1000,
+      "imageId": "sha256:8094c002d08262dba12645a3b4a15cd6cd627d30bc782f53229a2ec13ee22a00",
+      "scenarios": 3,
+      "ownedContainersRemoved": true,
+      "network": "none",
+      "repositoryMount": "read-only"
+    },
+    "rootBuildGates": 8,
+    "docQuickGates": 20,
+    "repeatedExecutionIsNotNewCases": true,
+    "checks": {
+      "native-picker-lifetime-source-isolation-coverage-repaired": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:02:54.166410+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/directory-picker-native/tests/native-picker.spec.ts",
+          "packages/host/directory-picker-native/tests/service.spec.ts",
+          "packages/host/directory-picker-native/tests/path-results.spec.ts",
+          "packages/host/directory-picker-native/tests/lifetime.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/host/directory-picker-native/src/native-picker.ts",
+          "--coverage.include=packages/host/directory-picker-native/src/index.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T182500Z/native-picker-lifetime-final-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:03:05.960735+00:00"
+      },
+      "native-picker-lifetime-service-final-cleanup": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:03:46.578904+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/directory-picker-native/tests/service.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:03:47.856953+00:00"
+      },
+      "native-picker-lifetime-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:00:45.074885+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/build.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:01:01.249977+00:00"
+      },
+      "native-picker-lifetime-host-test-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:01:57.025031+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:02:10.364474+00:00"
+      },
+      "native-picker-lifetime-final-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:02:54.166411+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/host/directory-picker-native/src/index.ts",
+          "packages/host/directory-picker-native/tests/service.spec.ts",
+          "packages/host/directory-picker-native/tests/lifetime.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:02:56.191021+00:00"
+      },
+      "native-picker-lifetime-final-service-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:03:46.578996+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/host/directory-picker-native/tests/service.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:03:48.177678+00:00"
+      },
+      "native-picker-lifetime-fixture-syntax": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:02:54.166439+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--check",
+          "packages/host/directory-picker-native/tests/fixtures/lifetime.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:02:54.188225+00:00"
+      },
+      "native-picker-lifetime-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:03:46.582084+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/directory-picker-native/tests/lifetime.spec.ts",
+          "packages/host/directory-picker-native/tests/path-results.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:03:50.384884+00:00"
+      },
+      "native-picker-lifetime-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:04:28.772057+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/directory-picker-native/tests/lifetime.spec.ts",
+          "packages/host/directory-picker-native/tests/path-results.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:04:32.131996+00:00"
+      },
+      "native-picker-lifetime-built-linux22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:02:54.166443+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T182500Z/native-picker-lifetime-linux-replay.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:02:55.194410+00:00"
+      },
+      "native-picker-lifetime-pairing": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:00:45.074897+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "--write",
+          "packages/host/directory-picker-native/README.md",
+          ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-service-lifetime.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:00:47.721928+00:00"
+      },
+      "native-picker-lifetime-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T19:01:57.022904+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T19:02:29.476839+00:00"
+      }
+    }
+  },
+  "harnessCorrections": [
+    "Loader disabled-entry update starts disposal; the fixture retains the original fiber and joins its inertia. The old compiled provider still fails after this correction.",
+    "Vitest beforeEach must not return its mock function: returning that function registers a cleanup invocation without a signal. The corrected hook returns void.",
+    "Concurrent fixture outcomes attach rejection observers before cancellation, including failure teardown."
+  ],
+  "documentation": {
+    "pairedStems": 2,
+    "newActiveDecision": ".agents/notes/implemented/bug-fix/2026-10-31-native-picker-service-lifetime.md",
+    "retainedIndependentDecisions": [
+      "2026-10-29-native-command-cancellation",
+      "2026-09-16-native-picker-stale-settlement-fence",
+      "2026-10-31-native-picker-path-terminator"
+    ],
+    "fullySupersededActiveNotes": [],
+    "frozenArchivesEdited": false,
+    "upgradeGuide": "No configuration, wire, export or durable format break; provider withdrawal now owns its existing operations."
+  },
+  "limits": [
+    "Real external helper processes replace only the interactive chooser. No physical AppKit/GTK/COM dialog was opened.",
+    "POSIX direct helper shutdown and provider promise drainage are verified. Win32 native driver close/kill confirmation remains a separate review; no physical Windows acceptance claim.",
+    "Standalone desktop helpers remain outside Session workload admission as documented by the native-command owner. Managed default browsing and remaining B04allocation inventory stay open.",
+    "This is not whole-package or whole-project coverage. Real paid model success and public push remain human-deferred; all12original domains and B04/B25stay in progress."
+  ],
+  "workerDriverFollowup": {
+    "at": "2026-10-30T19:36:51.013857+00:00",
+    "receipt": "receipts/native-dialog-worker-closure-2026-10-31.json",
+    "status": "driver_close_and_observed_exit_guard_verified_with_realIPC_and_compiled_public_failure",
+    "physicalWindows": "not_yet_accepted"
+  }
+}

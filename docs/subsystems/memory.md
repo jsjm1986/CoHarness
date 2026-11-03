@@ -84,17 +84,17 @@ interface MemorySearchHit {
 /**
  * Who is writing. `agent` writes through the model tools under the
  * `memory` execution authorization; `member` writes through the browser
- * Remote methods under the captured collaboration participant — an absent
- * participant means a runtime with no collaboration provider, which keeps
- * owner semantics. `signal` is the agent operation's cancellation carried
- * into the project authorization call; `source` stamps `extraction` or
+ * Remote methods under captured collaboration authority. Absent authority
+ * is reserved for independent applications without a collaboration requirement.
+ * `signal` cancels agent writes before authorization and before the entry
+ * mutation; `source` stamps `extraction` or
  * `consolidation` on curation writes and defaults to `agent`. Host-only
  * vocabulary: it names the `Agent` runtime type, so it is exported from
  * the service entry rather than the client-safe `./types`.
  */
 type MemoryWriter =
   | { readonly kind: 'agent'; readonly agent: Agent; readonly signal?: AbortSignal; readonly source?: 'extraction' | 'consolidation' }
-  | { readonly kind: 'member'; readonly participant?: CollaborationParticipant }
+  | { readonly kind: 'member'; readonly authority?: CollaborationAuthority }
 ```
 
 ```ts type-equiv
@@ -157,9 +157,9 @@ interface MemoryCursor {
   /** Consolidation: content digest of the scope when the last run committed. */
   readonly lastDigest?: string | undefined
   /**
-   * Consolidation: writes committed to the scope since the last run. The
-   * service increments this inside the same serialized write as the entry
-   * mutation, so the count survives restarts and plugin reloads.
+   * Consolidation: conservative count of admitted mutations since the last
+   * run. Persisted before each entry mutation, it can include a failed entry
+   * write but never omits a committed one. The content digest detects no-op reviews.
    */
   readonly changedSince?: number | undefined
 }
@@ -179,12 +179,13 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 Durable per-scope memory. Read paths (`scopesFor`, `read`, `list`, `search`) are lock-free; writes serialize on a single chain inside the service so create/duplicate, revision, and full checks stay atomic.
 
-The `memory/*` Remote methods serve the browser surface: reads are member-wide inside a project runtime, while member writes capture the request's collaboration participant and require `rw` project membership — a runtime with no collaboration provider keeps owner semantics. The `memory` settings section switches the whole feature off: scopes vanish for agents and every write refuses `scope-unavailable`, while stored entries stay readable for the owner.
+The `memory/*` Remote methods serve the browser surface: reads are member-wide inside a project runtime, while member writes capture the request's collaboration participant and require `rw` project membership. Independent applications without a collaboration requirement keep owner semantics. The `memory` settings section switches the whole feature off: scopes vanish for agents and every write refuses `scope-unavailable`, while stored entries stay readable for the owner.
 
 ```ts cordis-catalog
 /**
- * The resolved curation/recall switches. Consumers read this at each
- * decision point so a live settings change takes effect on the next pass.
+ * The effective feature switches from composition or the attached settings provider.
+ * Consumers read them at each decision; `memory/switches-updated` also
+ * notifies in-flight consumers after commits or provider replacement.
  * @returns the active switch values.
  */
 switches(): MemorySwitches
@@ -288,8 +289,8 @@ delete(request: MemoryDeleteRequest, writer: MemoryWriter): Promise<MemoryWriteR
 /**
  * Create or replace one entry as the calling member. The service
  * captures the request's collaboration participant itself: `rw` project
- * membership is required for the project scope, and a runtime with no
- * collaboration provider keeps owner semantics. Validation, revision,
+ * membership is required for the project scope. Independent applications
+ * without a collaboration requirement keep owner semantics. Validation, revision,
  * and capacity refusals return in the ordinary write result; a missing
  * principal or read-only membership rejects with the shared
  * `collaboration-forbidden` refusal.
@@ -320,8 +321,24 @@ async getCursor(key: string): Promise<MemoryCursor | undefined>
  * writes so an interleaved save cannot lose the advancement.
  * @param key - Cursor record key.
  * @param cursor - The complete next cursor record.
+ * @param signal - Optional curation cancellation, checked before persistence after queueing.
+ * @param beforeCommit - Optional live authorization after queue and storage waits, returning the final synchronous check.
+ *   Rejection prevents commit. Must not enqueue memory writes or cursors.
  */
-async writeCursor(key: string, cursor: MemoryCursor): Promise<void>
+async writeCursor(key: string, cursor: MemoryCursor, signal?: AbortSignal, beforeCommit?: () => Promise<() => void>): Promise<void>
+
+/**
+ * Commit a curation cursor only while its observed record is unchanged.
+ * Comparison and persistence serialize with entry mutations.
+ * @param key - Cursor record key.
+ * @param expected - Previously observed record; undefined requires an absent record.
+ * @param cursor - Complete next cursor record.
+ * @param signal - Optional curation cancellation, checked before persistence after queueing.
+ * @param beforeCommit - Optional live authorization after queue and storage waits, returning the final synchronous check.
+ *   Rejection prevents commit. Must not enqueue memory writes or cursors.
+ * @returns true after commit, or false when a newer record is retained.
+ */
+writeCursorIfUnchanged( key: string, expected: MemoryCursor | undefined, cursor: MemoryCursor, signal?: AbortSignal, beforeCommit?: () => Promise<() => void>, ): Promise<boolean>
 ```
 
 Types: [Agent](core.md)
@@ -350,4 +367,22 @@ Emitted after a memory write commits. Consumers re-read through the service; the
 ```
 
 Source: [`packages/memory/memory/src/types.ts`](../../packages/memory/memory/src/types.ts)
+
+<a id="memoryswitches-updated--emit"></a>
+
+#### `memory/switches-updated` — emit
+
+Recheck effective memory switches after a settings commit or provider source replacement. Subscribers read their own injected service and cancel unavailable work synchronously; asynchronous cleanup retains its existing owner. Provider wiring may notify more than once.
+
+```ts cordis-catalog
+/**
+ * Recheck effective memory switches after a settings commit or provider source replacement.
+ * Subscribers read their own injected service and cancel unavailable work synchronously;
+ * asynchronous cleanup retains its existing owner. Provider wiring may notify more than once.
+ * @mode emit
+ */
+'memory/switches-updated'(): void
+```
+
+Source: [`packages/memory/memory/src/index.ts`](../../packages/memory/memory/src/index.ts)
 <!-- END GENERATED cordis-surface -->

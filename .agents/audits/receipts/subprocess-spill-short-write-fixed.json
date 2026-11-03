@@ -1,0 +1,14 @@
+{
+  "name": "subprocess-spill-short-write-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subprocess/subprocess-local/tests/spill-short-writes.spec.ts packages/subprocess/subprocess-local/tests/spawn.spec.ts --retry=0 --maxWorkers=1 --coverage --coverage.include=packages/subprocess/subprocess-local/src/output.ts --coverage.reportsDirectory=.agents/audits/.local/subprocess-spill-short-coverage",
+  "startedAt": "2026-10-25T10:43:36.108422+00:00",
+  "seconds": 15.521,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "93912c442498bb69b99e05dcd39a5c13b331b8b4586ccae37b33caafeebbb8f5",
+  "inputsAfter": "93912c442498bb69b99e05dcd39a5c13b331b8b4586ccae37b33caafeebbb8f5",
+  "postgresToolDirectory": null,
+  "outputSha256": "c908e3aa33433d1a21e0277d749bec335a9dcd70e037dcffddda945a453f87dc",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\nto-parent\nto-parent\n\n Test Files  2 passed (2)\n      Tests  98 passed (98)\n   Start at  18:43:48\n   Duration  3.21s (transform 260ms, setup 52ms, import 208ms, tests 2.62s, environment 0ms)\n\n % Coverage report from v8\n----------|---------|----------|---------|---------|-------------------\nFile      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n----------|---------|----------|---------|---------|-------------------\nAll files |       0 |        0 |       0 |       0 |                   \n----------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : Unknown% ( 0/0 )\nBranches     : Unknown% ( 0/0 )\nFunctions    : Unknown% ( 0/0 )\nLines        : Unknown% ( 0/0 )\n================================================================================\n"
+}

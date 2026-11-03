@@ -1,0 +1,14 @@
+{
+  "name": "native-model-pipeline-final-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/llm/llm/src/index.ts packages/llm/llm/src/model-policy.ts packages/llm/llm/src/operation-call.ts packages/llm/llm/src/operations.ts packages/llm/llm/tests/model-policy.spec.ts packages/llm/llm/tests/operations.spec.ts packages/llm/model-access/src/index.ts packages/context/gateway-runtime/src/index.ts packages/context/gateway-runtime/tests/gateway-runtime.spec.ts packages/web/web-search-deepseek/src/admission.ts packages/web/web-search-deepseek/src/index.ts packages/web/web-search-deepseek/src/provider.ts packages/web/web-search-deepseek/src/types.ts packages/web/web-search-deepseek/src/usage.ts packages/web/web-search-deepseek/tests/admission.spec.ts packages/web/web-search-deepseek/tests/prepared.spec.ts packages/web/web-search-deepseek/tests/usage.spec.ts packages/llm/llm-deepseek/src/adapter.ts packages/llm/llm-deepseek/src/search-operation.ts packages/llm/llm-deepseek/src/types.ts packages/llm/llm-deepseek-api-key/src/index.ts packages/llm/llm-deepseek/tests/dynamic-config.spec.ts packages/llm/llm-deepseek/tests/search-operation.spec.ts packages/llm/llm-pi-ai/src/adapter.ts packages/llm/llm-pi-ai/src/search-operation.ts packages/llm/llm-pi-ai/tests/search-operation.spec.ts examples/headless-agent/tests/auxiliary-model-fixture.ts examples/headless-agent/tests/governed-native-model.snapshot.ts examples/headless-agent/tests/fixtures/governed-native-model/plugin.mjs examples/headless-agent/tests/fixtures/governed-native-model/prepare.mjs snapshots/sdk/auto-review-model.snapshot.ts snapshots/sdk/memory-auxiliary.snapshot.ts scripts/gen-cordis-catalog.ts plugins/dsh-model-governance/src/index.ts plugins/dsh-model-governance/tests/execution-billing.spec.ts gateway/tests/postgres.spec.ts",
+  "startedAt": "2026-10-24T07:38:03.683963+00:00",
+  "seconds": 4.552,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "inputsAfter": "c7c52e249509929b75431d16715e91ea477d995d75955e7ace3fae94439eefad",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

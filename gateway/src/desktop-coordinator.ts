@@ -33,7 +33,7 @@ export type DesktopIdentity = Pick<GatewayPrincipalClaims, 'organization' | 'run
 /** Holder identity projected from verified execution or interactive identity. */
 export interface DesktopHolder {
   organization: string
-  runtime: { kind: 'user' | 'project'; id: number; generation: number }
+  runtime: GatewayPrincipalClaims['runtime']
   user: { id: number; username: string }
   scope: PrincipalScope
   /** Exact driving Session or workflow; all grant operations must preserve it. */
@@ -43,7 +43,7 @@ export interface DesktopHolder {
 export function desktopHolderOf(claims: DesktopIdentity, runId?: string): DesktopHolder {
   return {
     organization: claims.organization,
-    runtime: { kind: claims.runtime.kind, id: claims.runtime.id, generation: claims.runtime.generation },
+    runtime: { ...claims.runtime },
     user: { id: claims.user.id, username: claims.user.username },
     scope: claims.scope,
     ...(runId === undefined ? {} : { runId }),
@@ -200,12 +200,13 @@ export class DesktopCoordinator {
     await this.sweep()
   }
 
-  private runtimeTargetOf(holder: DesktopHolder): RuntimeTarget {
-    return { kind: holder.runtime.kind, id: holder.runtime.id }
+  private runtimeTargetOf(holder: Pick<DesktopHolder, 'runtime'>): RuntimeTarget {
+    return { kind: holder.runtime.kind, id: holder.runtime.id,
+      ...(holder.runtime.runtimeId === undefined ? {} : { runtimeId: holder.runtime.runtimeId }) }
   }
 
   private async assertCurrentGeneration(claims: DesktopIdentity): Promise<void> {
-    const current = await this.generations.generationOf({ kind: claims.runtime.kind, id: claims.runtime.id })
+    const current = await this.generations.generationOf(this.runtimeTargetOf(claims))
     if (current !== claims.runtime.generation) {
       throw new DesktopCoordinationError(
         'stale-generation',

@@ -12,6 +12,7 @@ Global style sheets belong in `ui-theme/src/styles/`. Component styles live besi
 
 ## Component rules
 
+- Button dimensions follow their context; emphasis does not change geometry. Use the shared `toolbar` size for toolbar actions and `soft` for routine add/upload entry points. Keep `primary` for confirmation, submission, and empty-state guidance. Adjacent actions share size, alignment, and icon scale; do not enlarge `sm` locally to approximate a toolbar control.
 - Use CSS Modules and `clsx`; do not add a component library or Tailwind.
 - Use `--dsw-alias-*` semantic tokens in feature components. Do not copy static palette values or write literal colors there.
 - Keep theme selectors out of feature component CSS. Light/dark overrides belong to the theme owner.

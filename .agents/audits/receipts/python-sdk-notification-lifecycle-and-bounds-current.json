@@ -1,0 +1,14 @@
+{
+  "name": "python-sdk-notification-lifecycle-and-bounds-current",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_client.py -k 'session_relationship or session_ancestry or filter_cannot_publish_after_closing or filter_does_not_run_for_a_subscription_closed' -q",
+  "startedAt": "2026-10-24T10:59:30.248631+00:00",
+  "seconds": 1.208,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "dbb8ecd0bd099b45d459b61eb5f89aa2ea32953510f111e06817020fbbadcafb",
+  "inputsAfter": "dbb8ecd0bd099b45d459b61eb5f89aa2ea32953510f111e06817020fbbadcafb",
+  "postgresToolDirectory": null,
+  "outputSha256": "7040371af15613c02e821ec0eecc1d1330f691ace4cef93a41bfa358822c4103",
+  "outputTail": "..........                                                               [100%]\n"
+}

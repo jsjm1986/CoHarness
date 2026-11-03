@@ -1,4 +1,5 @@
 /** Account qualification and the independent project grant share optimistic revision checks. */
+import { usePendingEdits, useProtectedNavigation } from '../pending-edits.tsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { listProjects, listUsers, type AdminResourcePolicy } from '../api.ts'
 import { Button, ErrorBanner, Field, LoadingState, Section, Switch } from './ui.tsx'
@@ -41,7 +42,9 @@ export function ResourcePermissions({ name, description, saved, read, write, kin
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const navigation = useProtectedNavigation()
   const [notice, setNotice] = useState('')
+  usePendingEdits(saving || policy !== null && enabled !== policy.enabled)
   const generation = useRef(0)
   const [reload, setReload] = useState(0)
   const [ownerReload, setOwnerReload] = useState(0)
@@ -127,6 +130,7 @@ export function ResourcePermissions({ name, description, saved, read, write, kin
     <ErrorBanner message={ownersError || error} />
     {owner !== undefined ? null : ownersLoading ? <LoadingState label={t('loadingOwners')} /> : <Field label={t('ownerField')}>
       <select className="select" aria-label={t('ownerAria', { name })} value={selected} disabled={saving} onChange={(event) => {
+        if (!navigation.canReplace()) return
         generation.current++; setPolicy(null); setLoading(false); setNotice(''); setError(''); setSelected(event.target.value)
       }}>
         <option value="">{allowUser ? t('ownerPlaceholderUser') : t('ownerPlaceholderProject')}</option>

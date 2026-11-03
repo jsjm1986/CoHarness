@@ -1,0 +1,13 @@
+{
+  "name": "inspector-prior-built-denial-probe",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/inspector-denied-probe.mjs",
+  "startedAt": "2026-10-23T14:38:56.752797+00:00",
+  "seconds": 0.368,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "97ca530cb5acc5f5b59edb08c4c20d4253810243e18de68086feccd81a3c3951",
+  "inputsAfter": "97ca530cb5acc5f5b59edb08c4c20d4253810243e18de68086feccd81a3c3951",
+  "outputSha256": "9024c2f54df8f10ac02e77812439d672cd9f651283904ddc84130e86bb94182d",
+  "outputTail": "{\"allocated\":true,\"admissionCalls\":0}\n"
+}

@@ -7,8 +7,8 @@ import { Context, FiberState, Service, type Fiber } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { z as zod } from 'zod'
 import type { Branded } from '@deepseek-ai/dsh-brand'
-import { assertNever, deepFreeze, isAgentLoopRequest } from '@deepseek-ai/dsh-llm'
-import type { GenerateOptions } from '@deepseek-ai/dsh-llm'
+import { assertNever, deepFreeze } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, LlmRuntime, MessageId } from '@deepseek-ai/dsh-llm'
 import type {
   Session,
   SessionEvent,
@@ -315,7 +315,7 @@ interface ActiveProviderWork extends PendingAutomaticWork {
 interface SessionTitleWorkState {
   revision: number
   fallback?: Promise<SessionTitleSnapshot | undefined>
-  pending?: PendingAutomaticWork
+  pending?: PendingAutomaticWork & { readonly inputId: MessageId }
   active?: ActiveProviderWork
 }
 
@@ -415,10 +415,13 @@ export class SessionTitleService extends Service {
           break
       }
     })
-    ctx.on('llm/stream', (options, next) => {
-      this.onMainRequest(options)
-      return next()
-    }, { global: true, prepend: true })
+    const onMainRequest = this.onMainRequest.bind(this)
+    for (const event of ['llm/stream', 'llm/orchestration'] as const) {
+      ctx.on(event, function (this: LlmRuntime, options, next) {
+        onMainRequest(this, options)
+        return next()
+      }, { global: true, prepend: true })
+    }
     ctx.on('session/disposed', (session) => {
       const state = this.work.get(session)
       if (state === undefined) return
@@ -562,7 +565,7 @@ export class SessionTitleService extends Service {
       if (shouldSchedule) {
         const state = this.stateFor(session)
         const revision = this.supersede(state, 'newer user message superseded title generation')
-        state.pending = { registration, revision, throughSeq: event.seq }
+        state.pending = { registration, revision, throughSeq: event.seq, inputId: event.data.id }
       }
     }
     this.defer(async () => {
@@ -589,8 +592,8 @@ export class SessionTitleService extends Service {
   }
 
   /** Start unchanged-route work from the marked loop request after its header fold is current. */
-  private onMainRequest(options: GenerateOptions): void {
-    if (!this.serviceActive() || options.sessionId === undefined || !isAgentLoopRequest(options)) return
+  private onMainRequest(runtime: LlmRuntime, options: GenerateOptions): void {
+    if (!this.serviceActive() || options.sessionId === undefined || !runtime.isAgentLoopRequest(options)) return
     const session = this.ctx.sessions.get(options.sessionId)
     const state = session === undefined ? undefined : this.work.get(session)
     const pending = state?.pending
@@ -599,7 +602,7 @@ export class SessionTitleService extends Service {
     const boundary = session.snapshotEvents().findLast(event => event.type === 'step/start' || event.type === 'step/end')
     const route = session.requestHeader()?.config
     if (boundary?.type !== 'step/start'
-      || boundary.seq <= pending.throughSeq
+      || !options.messages.some(message => 'id' in message && message.id === pending.inputId)
       || route?.provider !== options.provider
       || route.model !== options.model) return
     this.startPending(session, state, pending, { provider: options.provider, model: options.model })

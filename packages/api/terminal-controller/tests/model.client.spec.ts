@@ -190,6 +190,28 @@ it('serializes input and resizes, clamps geometry, and suppresses unchanged size
   await expect.poll(() => vi.mocked(remote.resize).mock.calls.length).toBe(2)
 })
 
+it('coalesces queued keystrokes in order while preserving resize barriers', async () => {
+  const { model, remote } = fixture()
+  await connected(model)
+  const input = Promise.withResolvers<RemoteResult<void>>()
+  vi.mocked(remote.write).mockReturnValueOnce(input.promise)
+  try {
+    model.write('first')
+    await expect.poll(() => vi.mocked(remote.write).mock.calls.length).toBe(1)
+    const command = 'pwd; echo 界\r'
+    for (const character of command) model.write(character)
+    model.resize(90, 24)
+    model.write('after')
+    model.write(' resize\r')
+    expect(remote.resize).not.toHaveBeenCalled()
+    input.resolve(success(undefined))
+    await expect.poll(() => vi.mocked(remote.write).mock.calls.at(-1)?.[3]).toBe('after resize\r')
+    expect(vi.mocked(remote.write).mock.calls.map(call => call[3])).toEqual(['first', command, 'after resize\r'])
+    expect(vi.mocked(remote.write).mock.invocationCallOrder[1]).toBeLessThan(vi.mocked(remote.resize).mock.invocationCallOrder[0]!)
+    expect(vi.mocked(remote.resize).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(remote.write).mock.invocationCallOrder[2]!)
+  } finally { input.resolve(success(undefined)) }
+})
+
 it('bounds queued input by UTF-8 bytes and releases the byte budget after settlement', async () => {
   const { model, remote } = fixture()
   vi.mocked(remote.environment).mockResolvedValue(success({ ...environment, maxInputBytes: 6 }))

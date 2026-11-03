@@ -1,0 +1,13 @@
+{
+  "name": "organization-human-auth-races",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/vitest run tests/postgres.spec.ts -t 'refuses human .* after the organization is disabled' --no-file-parallelism --retry=0",
+  "startedAt": "2026-10-23T18:57:35.286070+00:00",
+  "seconds": 5.297,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "83f6a89a030a7235c94dbdf462baf2b8c707b7beef975a411687cbbd18c49ea4",
+  "inputsAfter": "83f6a89a030a7235c94dbdf462baf2b8c707b7beef975a411687cbbd18c49ea4",
+  "outputSha256": "1d466588fc2740ae6e706bc45967738bbae7c368687b8073cf26f14b70d99b8e",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/postgres.spec.ts (39 tests | 3 failed | 36 skipped) 642ms\n     × refuses human new-login after the organization is disabled 7ms\n     × refuses human existing-cookie after the organization is disabled 0ms\n     × refuses human during-login after the organization is disabled 0ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/postgres.spec.ts > PostgreSQL baseline > refuses human new-login after the organization is disabled\n FAIL  tests/postgres.spec.ts > PostgreSQL baseline > refuses human existing-cookie after the organization is disabled\n FAIL  tests/postgres.spec.ts > PostgreSQL baseline > refuses human during-login after the organization is disabled\nTypeError: Cannot destructure property 'signal' of 'undefined' as it is undefined.\n ❯ tests/postgres.spec.ts:2064:75\n    2062|\n    2063|   it.each(['new-login', 'existing-cookie', 'during-login'] as const)(\n    2064|     'refuses human %s after the organization is disabled', async (kind…\n       |                                                                           ^\n    2065|     const root = await mkdtemp(join(tmpdir(), 'hgw-organization-auth-'…\n    2066|     const slug = `organization-auth-${randomUUID()}`\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\n\n\n Test Files  1 failed (1)\n      Tests  3 failed | 36 skipped (39)\n   Start at  02:57:37\n   Duration  2.93s (transform 1.78s, setup 0ms, import 2.15s, tests 642ms, environment 0ms)\n\n"
+}

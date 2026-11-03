@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/context/session-reference/README.md
 document:
-  en: 0ad03f8a6de0f0301d2728f2566db108524774f4
-  zh: 645b2623aa7b08c3a7c5f58bf9aac1481e0793f1
+  en: 62d997685289be97d889f9711af5dcb510888888
+  zh: 4e04a4064bc138a77416fbad27af08d0dac747a4
 /:
   en: 11df651c671fd7e7
   zh: 61495d48365178df
@@ -24,8 +24,8 @@ document:
   en: 057e4e35f8030147
   zh: ad43c319b8b7b9ac
 /deepseek-ai-dsh-session-reference/configuration:
-  en: a38d9924aafc9303
-  zh: bcc04a416d066e69
+  en: cd0f9308138b4fd2
+  zh: 86fa5a785e24e127
 /deepseek-ai-dsh-session-reference/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -42,8 +42,8 @@ document:
   en: 530d6417585b5c9e
   zh: e8c429c7a7353cd0
 /deepseek-ai-dsh-session-reference/known-limitations-and-deferred-work:
-  en: bd32cab946159d7b
-  zh: c0b73a47865b2cae
+  en: ef52357f81b00bb3
+  zh: 30d511026619c3b6
 /deepseek-ai-dsh-session-reference/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

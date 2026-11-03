@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-current-types",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsc -b packages/attachment/userdoc-gateway/tsconfig.json",
+  "startedAt": "2026-10-26T17:20:20.341603+00:00",
+  "seconds": 9.183,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2b8f527fcd8c97e3bfc326bcf7f6a8db4c50b97bdfcb1dccb1f6638685ade6f7",
+  "inputsAfter": "2b8f527fcd8c97e3bfc326bcf7f6a8db4c50b97bdfcb1dccb1f6638685ade6f7",
+  "postgresToolDirectory": null,
+  "outputSha256": "16c6dcfe4af2bfc72023bf88d64b7fcd1390ff2f1bbd696b6e0ed6059844e6f8",
+  "outputTail": "packages/attachment/userdoc-gateway/src/server.ts(144,50): error TS2322: Type 'UserDocTrashPage' is not assignable to type '({ path: string; name: string; docId: UserDocId; } & {}) | ({ root: string; limits: { maxFileBytes: number | null; maxFilesPerMessage: number; maxMessageBytes: number; maxInlineTextBytes: number; upload: { ...; } & {}; } & {}; } & {}) | ... 10 more ... | null'.\n  Type 'UserDocTrashPage' is not assignable to type '{ documents: ({ docId: UserDocId; directoryId: UserDocDirectoryId; name: string; trashedAt: number; purgeAfter: number; bytes: number; mediaType: string; modifiedAt: number; } & { ...; })[]; totalDocuments: number; } & { ...; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.\n    Type 'UserDocTrashPage' is not assignable to type '{ documents: ({ docId: UserDocId; directoryId: UserDocDirectoryId; name: string; trashedAt: number; purgeAfter: number; bytes: number; mediaType: string; modifiedAt: number; } & { ...; })[]; totalDocuments: number; }'.\n      Types of property 'documents' are incompatible.\n        The type 'readonly UserDocTrashRef[]' is 'readonly' and cannot be assigned to the mutable type '({ docId: UserDocId; directoryId: UserDocDirectoryId; name: string; trashedAt: number; purgeAfter: number; bytes: number; mediaType: string; modifiedAt: number; } & { ...; })[]'.\n"
+}

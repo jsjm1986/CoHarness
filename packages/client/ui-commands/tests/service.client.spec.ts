@@ -838,6 +838,25 @@ describe('popupFor', () => {
 })
 
 describe('directory invalidation events', () => {
+  it('shares a pending catalog reference across a burst of forwarded registry events', async () => {
+    const first = Promise.withResolvers<{ commands: CommandDescriptor[] }>()
+    let calls = 0
+    const b = await bench({ commands: () => ++calls === 1
+      ? first.promise
+      : Promise.resolve({ commands: [{ name: 'fresh', description: 'current catalog', input: { hint: 'arguments' } }] }),
+    })
+    const pending = b.source.candidates(proj('s1'), req(''))
+    for (let i = 0; i < 40; i++) b.ctx.remote.$dispatch('commands/change', [])
+    expect(b.listCalls).toHaveLength(1)
+    expect(b.sessions.retainInfo(sid('s1')).getSnapshot().retainedBy.commandCatalog).toBe(1)
+    first.resolve({ commands: S1_CMDS })
+    await pending
+    expect(b.listCalls).toHaveLength(2)
+    expect(b.source.matchSpace!(proj('s1'), '/fresh')).toBeDefined()
+    expect(b.source.matchSpace!(proj('s1'), '/goal')).toBeUndefined()
+    expect(b.sessions.retainInfo(sid('s1')).getSnapshot().retainedBy.commandCatalog).toBeUndefined()
+  })
+
   it('commands/change repulls in the background while the old snapshot serves', async () => {
     let round = 0
     const { ctx, source, warm } = await bench({

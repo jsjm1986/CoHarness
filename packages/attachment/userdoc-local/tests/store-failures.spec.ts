@@ -1,6 +1,6 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   DOCUMENT_DELETE_FAILED_CODE, DOCUMENT_NOT_FOUND_CODE, DOCUMENT_READ_FAILED_CODE, DOCUMENT_WRITE_FAILED_CODE,
@@ -101,6 +101,7 @@ describe('storage failures other than absence', () => {
   })
 
   it('fails the listing rather than reporting a partial set', async () => {
+    await mkdir(root)
     failures.readdir = errno('EACCES')
     await expect(listDocFiles(root)).rejects.toMatchObject({ code: DOCUMENT_READ_FAILED_CODE })
   })
@@ -165,7 +166,7 @@ describe('storage failures other than absence', () => {
   it('skips an in-progress partial file when listing', async () => {
     const target = await resolveDocTarget(root, 'notes.txt', new Date())
     await saveDocFile(root, target, streamOf('body'), LIMITS)
-    await writeFile(`${target.path}.part`, 'half-written')
+    await writeFile(join(dirname(target.path), `.userdoc-${'a'.repeat(24)}.part`), 'half-written')
     const listed = await listDocFiles(root)
     expect(listed.map(ref => ref.name)).toEqual(['notes.txt'])
   })

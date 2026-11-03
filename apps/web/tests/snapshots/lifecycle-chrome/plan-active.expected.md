@@ -9,7 +9,6 @@
 - text: Workspaces
 - button "Search sessions":
   - img
-- textbox "Search sessions…"
 - button "View options":
   - img
 - button "Add workspace":

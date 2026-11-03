@@ -1,0 +1,7 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, modelAccess, titleInfrastructureReady]
+- insert:
+    - id: title-infrastructure
+      name: './model.mjs'

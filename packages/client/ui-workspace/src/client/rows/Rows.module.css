@@ -127,6 +127,14 @@
 
 .projectRow .rowActions {
   height: 20px;
+  display: inline-flex;
+  visibility: hidden;
+}
+
+.projectRow:hover .rowActions,
+.projectRow:focus-within .rowActions,
+.projectRow.menuOpen .rowActions {
+  visibility: visible;
 }
 
 /* Session cell (figma): pad 8, a 16px status slot, then a 4px title gap. */
@@ -422,6 +430,7 @@
   .projectRow .rowActions,
   .sessionRow .rowActions {
     display: flex;
+    visibility: visible;
   }
 
   .sessionRow .time {
@@ -451,6 +460,7 @@
 :global([data-viewport='compact']) .projectRow .rowActions,
 :global([data-viewport='compact']) .sessionRow .rowActions {
   display: flex;
+  visibility: visible;
 }
 
 :global([data-viewport='compact']) .sessionRow .time {

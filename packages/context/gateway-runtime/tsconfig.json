@@ -10,6 +10,9 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/loader"
+    },
+    {
       "path": "../../client/connection/tsconfig.host.json"
     },
     {
@@ -26,6 +29,24 @@
     },
     {
       "path": "../execution-authority"
+    },
+    {
+      "path": "../resource-budget"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../llm/model-access"
+    },
+    {
+      "path": "../../host/apiproxy"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../settings/settings"
     }
   ]
 }

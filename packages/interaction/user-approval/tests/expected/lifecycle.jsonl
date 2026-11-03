@@ -1,0 +1,4 @@
+{"operation":"cancelled-before-dispatch","answererRuns":0,"outcome":"cancelled"}
+{"operation":"withdrawn-approval-tool","lateGrantDispatches":0,"result":[{"type":"text","text":"Error: approval for tool \"sensitive\" was cancelled"}],"auditOutcome":"cancelled"}
+{"operation":"replacement-never-policy","retiredReference":"refused","retiredAuditWrites":0,"result":[{"type":"text","text":"Error: the user rejected tool \"sensitive\""}]}
+{"operation":"audit-completion","events":[{"type":"approval/asked"},{"type":"approval/decided","outcome":"cancelled"},{"type":"approval/asked"},{"type":"approval/decided","outcome":"allowed-once"},{"type":"approval/asked"},{"type":"approval/decided","outcome":"cancelled"},{"type":"approval/asked"},{"type":"approval/decided","outcome":"rejected"}]}

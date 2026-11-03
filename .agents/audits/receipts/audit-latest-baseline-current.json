@@ -1,0 +1,14 @@
+{
+  "name": "audit-latest-baseline-current",
+  "cwd": ".",
+  "command": "python3 -c 'import json,subprocess,sys; r=subprocess.run([\"git\",\"fetch\",\"origin\",\"master\"],capture_output=True,text=True); print(\"Remote baseline fetch \"+(\"succeeded\" if r.returncode==0 else \"failed\")); sys.exit(r.returncode) if r.returncode else None; out=lambda *a: subprocess.check_output([\"git\",*a],text=True).strip(); print(json.dumps({\"aheadBehind\":out(\"rev-list\",\"--left-right\",\"--count\",\"HEAD...origin/master\"),\"sourceTree\":out(\"rev-parse\",\"HEAD^{tree}\"),\"originTree\":out(\"rev-parse\",\"origin/master^{tree}\")}))'",
+  "startedAt": "2026-10-24T03:12:22.052838+00:00",
+  "seconds": 7.213,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "afee19e97f5e41e4359386a3ae64852841f418f3eeb02f762990a78c29b6d284",
+  "inputsAfter": "afee19e97f5e41e4359386a3ae64852841f418f3eeb02f762990a78c29b6d284",
+  "postgresToolDirectory": null,
+  "outputSha256": "84286db348bcbf5d141bcb27bd63c4892c81c5a742445b4c31f1f4410d00ce1a",
+  "outputTail": "Remote baseline fetch succeeded\n{\"aheadBehind\": \"139\\t0\", \"sourceTree\": \"bf87466f9b1c730312e4c1e57be1a69eae1b98cf\", \"originTree\": \"02b36f9ad80d4bbbd49c1e0a4e911e22a08f0ecf\"}\n"
+}

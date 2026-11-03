@@ -41,7 +41,7 @@ describe.skipIf(process.platform === 'win32')('SSH stream pathname replacement',
       const confined = await ctx.sandbox.confine([process.execPath, '-e', relay, endpoint.path, capture], {
         mode: 'workspace-write', workspaceRoot: root,
       })
-      attacker = ctx.subprocess.spawn({
+      attacker = await ctx.subprocess.spawn({
         argv: confined.argv, cwd: root, graceMs: 500,
         stdio: { stdin: 'ignore', stdout: 'pipe', stderr: { maxBytes: 4096 } },
       })

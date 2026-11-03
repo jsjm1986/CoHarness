@@ -1,0 +1,14 @@
+{
+  "name": "document-private-linux-fixed",
+  "cwd": ".",
+  "command": "limactl shell redroid -- sudo -n -- /tmp/coharness-document-audit.xhw1BMPE/node-v24.19.0-linux-arm64/bin/node /tmp/coharness-document-audit.xhw1BMPE/linux-object-replay.mjs --uid",
+  "startedAt": "2026-10-26T23:21:38.124934+00:00",
+  "seconds": 1.805,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "eb3df24af2e29bad1f2d956105a7731a784d3f477dcb7afa1459fd323c81fbb0",
+  "inputsAfter": "eb3df24af2e29bad1f2d956105a7731a784d3f477dcb7afa1459fd323c81fbb0",
+  "postgresToolDirectory": null,
+  "outputSha256": "f3419a62572bd94122d8aaf38144b9bba0d4989d1b1338e36b5157929e3fbdfb",
+  "outputTail": "{\"operation\":\"legacy-cross-uid\",\"ordinary\":\"EACCES\",\"actor\":\"EACCES\"}\n{\"operation\":\"publish\",\"outsidePreserved\":true,\"foreignTouched\":false,\"refused\":true}\n{\"operation\":\"capture\",\"outsidePreserved\":true,\"foreignTouched\":false,\"refused\":false}\n{\"operation\":\"detach\",\"outsidePreserved\":true,\"foreignTouched\":false,\"refused\":true}\n"
+}

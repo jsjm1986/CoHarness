@@ -1,0 +1,14 @@
+{
+  "name": "atomic-file-acquisition-emitted-node24",
+  "cwd": ".",
+  "command": "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node .agents/audits/.local/atomic-file-acquisition-native.mjs",
+  "startedAt": "2026-10-25T23:17:10.507966+00:00",
+  "seconds": 3.124,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7a1300b448aa7fba28cbc11ca1dac646c8d1f2f231083650bd915be1728f2cf1",
+  "inputsAfter": "7a1300b448aa7fba28cbc11ca1dac646c8d1f2f231083650bd915be1728f2cf1",
+  "postgresToolDirectory": null,
+  "outputSha256": "922d3b0734b7a058d195c51d864dceb699d9737ae21be53188346452198b4d2d",
+  "outputTail": "5 emitted-library scenarios passed: replacement, explicit owner, occupied temp, lock owner, recovery owner; POSIX same account only.\n"
+}

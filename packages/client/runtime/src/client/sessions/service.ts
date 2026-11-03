@@ -37,6 +37,8 @@ import type { Session } from './session.ts'
  */
 export interface SessionSummary {
   id: SessionId
+  /** Authenticated allocation and computer metadata for this browser presentation. */
+  runtime?: import('@deepseek-ai/dsh-client-connection/client').ConnectionRuntimeTarget
   /** Latest durable log-backed title, absent until the host projects one. */
   title?: string
   /** Human-facing label: durable title, project basename, then session id. */
@@ -100,6 +102,8 @@ export interface SessionListState {
    */
   archivedById: Record<SessionId, SessionSummary>
   current: SessionId | undefined
+  /** Originating composer held while a replacement Session is prepared; absent otherwise. */
+  navigationBlockedSessionId?: SessionId
   /** Arrival lifecycle projected 1:1 from the manager snapshot (see SessionListPhase): empty-with-ready means "truly no sessions". */
   phase: SessionListPhase
   /** Current baseline operation, independent of the sticky arrival phase and retained rows. */
@@ -249,15 +253,20 @@ interface RetentionObserver {
   published: SessionRetainInfo
 }
 
-/** A cancelled waiter releases only its own reference, not the shared opening. */
-async function waitForOpen(opening: Promise<void>, signal?: AbortSignal): Promise<void> {
-  if (signal === undefined) return opening
+/** Follow replacement history reads without cancelling another consumer's shared loading. */
+async function waitForOpen(session: Session, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted()
   const aborted = Promise.withResolvers<never>()
   const onAbort = (): void => { aborted.reject(signal.reason) }
   signal.addEventListener('abort', onAbort, { once: true })
   try {
-    if (signal.aborted) onAbort()
-    await Promise.race([opening, aborted.promise])
+    let opening = session.open()
+    for (;;) {
+      await Promise.race([opening, aborted.promise])
+      signal.throwIfAborted()
+      if (session.getSnapshot().openState !== 'loading') return
+      opening = session.open()
+    }
   } finally {
     signal.removeEventListener('abort', onAbort)
   }
@@ -281,12 +290,12 @@ class ClientSessionReference implements SessionReference {
     return this.record.binding
   }
 
-  attachOpening(opening: Promise<void>, signal?: AbortSignal): void {
+  attachOpening(session: Session, signal?: AbortSignal): void {
     const signals = [this.released.signal]
     if (this.record !== undefined) signals.push(this.record.ended.signal)
     if (signal !== undefined) signals.push(signal)
     const waitSignal = AbortSignal.any(signals)
-    void waitForOpen(opening, waitSignal).then(
+    void waitForOpen(session, waitSignal).then(
       () => {
         try {
           waitSignal.throwIfAborted()
@@ -411,10 +420,13 @@ export class SessionRuntime implements ISessions {
   ) {
     this.hostDescription = options.hostDescription
     rootCtx.effect(() => () => { this.navigation.dispose() }, 'sessions: navigation lifetime')
+    const tabRuntime = new URLSearchParams(typeof location === 'undefined' ? '' : location.search).get('dshRuntime')
     this.selection = createSnapshotStore<SessionSelection>(
       {},
       options.persistSelection === false ? undefined
-        : { persist: { name: options.selectionPersistenceKey ?? 'dsh.sessions.current' } })
+        : { persist: options.selectionPersistenceKey !== undefined
+          ? { name: options.selectionPersistenceKey }
+          : tabRuntime === null ? { name: 'dsh.sessions.current' } : { name: `dsh.sessions.current.v2.${tabRuntime}`, storage: 'session' } })
     const restored = this.selection.getSnapshot()
     if (restored.subagentAddress === undefined) this.restoredHistoryId = restored.sessionId
     const conversationEvents = rootCtx.get('conversationEvents')
@@ -539,9 +551,22 @@ export class SessionRuntime implements ISessions {
    */
   unboundProvideInfo(): SessionMaybeProvideInfo { return this.provideChannel.maybeInfo }
 
-  beginNavigation(): AbortSignal {
+  beginNavigation(options?: { readonly blockInputFor?: SessionId | undefined }): AbortSignal {
     this.cancelRestoredHistory()
-    return this.navigation.begin()
+    const previous = this.navigation.blockedSessionId
+    const signal = this.navigation.begin(options?.blockInputFor)
+    if (previous !== this.navigation.blockedSessionId) this.publishNavigation()
+    return signal
+  }
+
+  finishNavigation(signal: AbortSignal): void {
+    if (this.navigation.finish(signal)) this.publishNavigation()
+  }
+
+  private publishNavigation(): void {
+    const { navigationBlockedSessionId: _previous, ...state } = this.list.getSnapshot()
+    const blocked = this.navigation.blockedSessionId
+    this.list.set({ ...state, ...(blocked === undefined ? {} : { navigationBlockedSessionId: blocked }) })
   }
 
   retain(target: SessionTarget, options: SessionRetainOptions): SessionReference {
@@ -551,8 +576,9 @@ export class SessionRuntime implements ISessions {
     const id = typeof target === 'string' && this.scopes.has(target) ? target : this.manager.resolveTarget(target)
     const reference = this.retainScope(id, source)
     try {
-      this.manager.get(id).enterStage()
-      reference.attachOpening(this.manager.get(id).open(), signal)
+      const session = this.manager.get(id)
+      session.enterStage()
+      reference.attachOpening(session, signal)
       return reference
     } catch (error) {
       reference.release()
@@ -1195,6 +1221,8 @@ export class SessionRuntime implements ISessions {
     this.list.set({
       ids, byId, archivedById: NO_ARCHIVED_SUMMARIES, current, phase, state, error, subagentsByParent,
       jobsBySession, observedJobs, currentAddress,
+      ...(this.navigation.blockedSessionId === undefined ? {}
+        : { navigationBlockedSessionId: this.navigation.blockedSessionId }),
     })
   }
 

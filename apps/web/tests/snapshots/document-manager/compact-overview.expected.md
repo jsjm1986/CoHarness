@@ -1,3 +1,4 @@
+- status: Open a conversation to add documents to it. Browsing, downloads and copying remain available.
 - region "All accessible documents":
   - heading "All accessible documents" [level=2]
   - paragraph: Metadata only

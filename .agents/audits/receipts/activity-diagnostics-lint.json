@@ -1,0 +1,13 @@
+{
+  "name": "activity-diagnostics-lint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts --fix gateway/src/postgres/collaboration-service.ts gateway/tests/project-activity-postgres.spec.ts gateway/tests/project-activity.perf.ts gateway/tests/auth-admission.perf.ts gateway/tests/performance-report.ts gateway/tests/fixtures/project-activity-perf.mjs",
+  "startedAt": "2026-10-23T19:46:55.080597+00:00",
+  "seconds": 3.285,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "090e054090863f5d7964bc0fac2fff61b11f76dd6510a51d716c24dab4a26873",
+  "inputsAfter": "090e054090863f5d7964bc0fac2fff61b11f76dd6510a51d716c24dab4a26873",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

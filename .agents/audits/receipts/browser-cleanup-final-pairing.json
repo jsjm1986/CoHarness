@@ -1,0 +1,13 @@
+{
+  "name": "browser-cleanup-final-pairing",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write packages/experimental/browser-use-runtime/README.md packages/experimental/browser-use-stagehand-native/README.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+  "startedAt": "2026-10-23T17:29:06.467861+00:00",
+  "seconds": 3.976,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d13047249cf0270891e43e29addb08cf1f0cdaea4ed9beb38140efe6d80ad9d2",
+  "inputsAfter": "21fde249966fad09f53fc9040b73548d294f91352e85a4a026b563692400e194",
+  "outputSha256": "6b63317f7935f961ced18cf5dadc5fb0e8ad0533bdd48dae556014e2ae8d8743",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write packages/experimental/browser-use-runtime/README.md packages/experimental/browser-use-stagehand-native/README.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md\nverify-translation-pairing: recorded .agents/notes/proposed/feature/2026-10-23-node-resource-admission.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml\nverify-translation-pairing: recorded packages/experimental/browser-use-runtime/README.i18n.yaml\nverify-translation-pairing: recorded packages/experimental/browser-use-stagehand-native/README.i18n.yaml\nverify-translation-pairing: 4 record(s) written; run the check to validate the pairs.\n"
+}

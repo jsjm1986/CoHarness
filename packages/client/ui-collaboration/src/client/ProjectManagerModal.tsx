@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type SyntheticEvent } from 'react'
 import { Button, focusWithoutRing, Input, Menu, SegmentedTabs, IconChevronDownOutline14, IconFolderOpenOutline16, IconLoadingOutline16, IconPlusOutline16, IconUsersOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ProjectInvitation, UserSummary } from './collaboration-client.ts'
+import type { CollaborationComputer, CollaborationComputerId, ProjectInvitation, UserSummary } from './collaboration-client.ts'
 import type { CollaborationKey } from './locales.ts'
 import { CollaborationDialog } from './CollaborationDialog.tsx'
 import css from './ProjectManagerModal.module.css'
@@ -20,13 +20,17 @@ export interface ProjectManagerModalProps {
   initialView?: 'received' | 'sent' | 'compose'
   currentUserId: number
   t: (key: CollaborationKey, params?: Record<string, string | number>) => string
-  createProject?: (name: string) => Promise<number>
+  createProject?: (name: string, nodeId?: CollaborationComputerId) => Promise<number>
+  listComputers?: () => Promise<CollaborationComputer[]>
+  initialNodeId?: string
+  /** Only this computer is available when this entry has local scope. */
+  allowedNodeId?: CollaborationComputerId
   listInvitations?: (projectId?: number) => Promise<ProjectInvitation[]>
   inviteMember?: (projectId: number, username: string, mode: 'ro' | 'rw') => Promise<ProjectInvitation>
   acceptInvitation?: (id: string) => Promise<void>
-  listUsers?: () => Promise<UserSummary[]>
+  listUsers?: (projectId?: number) => Promise<UserSummary[]>
   /** Enter the confirmed project and retain its name for switch recovery. */
-  onCreated: (projectId: number, name: string) => void
+  onCreated: (projectId: number) => void
   onClose: () => void
 }
 
@@ -37,6 +41,7 @@ function errorText(error: unknown, t: ProjectManagerModalProps['t'], fallback: C
       'invitation-already-member': 'manager.alreadyMember',
       'user-not-found': 'manager.userNotFound',
       'user-disabled': 'manager.userDisabled',
+      'invitation-computer-required': 'manager.computerRequired',
       'invitation-forbidden': 'manager.invitationForbidden',
       forbidden: 'manager.invitationForbidden',
       'invitation-expired': 'manager.invitationExpired',
@@ -55,6 +60,24 @@ function errorText(error: unknown, t: ProjectManagerModalProps['t'], fallback: C
   return t(fallback)
 }
 
+/** Keep incoming invitations readable when a separate project-management read fails. */
+async function readInvitations(
+  list: (projectId?: number) => Promise<ProjectInvitation[]>,
+  managedProjectId: number | undefined,
+): Promise<{ invitations: ProjectInvitation[]; failures: unknown[] }> {
+  const results = await Promise.allSettled([
+    list(),
+    ...managedProjectId === undefined ? [] : [list(managedProjectId)],
+  ])
+  const invitations = new Map<string, ProjectInvitation>()
+  const failures: unknown[] = []
+  for (const result of results) {
+    if (result.status === 'rejected') failures.push(result.reason)
+    else for (const invitation of result.value) invitations.set(invitation.id, invitation)
+  }
+  return { invitations: [...invitations.values()], failures }
+}
+
 /**
  * Render project creation and the scoped incoming/outgoing invitation views.
  * @param props - Existing account operations, project identity, and initial presentation.
@@ -63,7 +86,8 @@ function errorText(error: unknown, t: ProjectManagerModalProps['t'], fallback: C
 export function ProjectManagerModal({
   open, mode, projectId, projectName, canManage = false, steward = false, currentUserId, t,
   initialScope = 'current', initialView = 'received',
-  createProject, listInvitations, inviteMember, acceptInvitation, listUsers, onCreated, onClose,
+  createProject, listComputers, initialNodeId, allowedNodeId,
+  listInvitations, inviteMember, acceptInvitation, listUsers, onCreated, onClose,
 }: ProjectManagerModalProps) {
   const id = useId()
   const [name, setName] = useState('')
@@ -72,7 +96,7 @@ export function ProjectManagerModal({
   const [invitations, setInvitations] = useState<ProjectInvitation[]>([])
   const [users, setUsers] = useState<UserSummary[]>([])
   const [loadingInvitations, setLoadingInvitations] = useState(false)
-  const [loadedScope, setLoadedScope] = useState<number | 'all' | 'none'>('none')
+  const [loadedScope, setLoadedScope] = useState<'current' | 'all' | 'none'>('none')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const [loadError, setLoadError] = useState<string>()
@@ -92,13 +116,34 @@ export function ProjectManagerModal({
   const readSequence = useRef(0)
   const actionFocus = useRef<Element | null>(null)
   const memberContent = useRef<HTMLDivElement>(null)
+  const [computers, setComputers] = useState<CollaborationComputer[]>([])
+  const [nodeId, setNodeId] = useState<CollaborationComputerId | ''>('')
+  const [loadingComputers, setLoadingComputers] = useState(false)
+  const capturedNodeId = mode === 'create' && nodeId !== '' ? nodeId : initialNodeId
+  const unavailableComputer = capturedNodeId !== undefined && allowedNodeId !== undefined && capturedNodeId !== allowedNodeId
+    || mode === 'create' && nodeId !== '' && listComputers !== undefined && !loadingComputers
+      && !computers.some(computer => computer.nodeId === nodeId && computer.status === 'active')
   const canInvite = canManage && !steward && projectId !== undefined && inviteMember !== undefined
-  const queryProjectId = scope === 'current' ? projectId : undefined
-  const hasLoadedScope = loadedScope === (queryProjectId ?? 'all')
+  const hasLoadedScope = loadedScope === scope
 
+  useEffect(() => {
+    if (!open || mode !== 'create' || listComputers === undefined) return
+    let active = true
+    setLoadingComputers(true)
+    void listComputers().then((next) => {
+      if (!active) return
+      setComputers(next)
+      setNodeId(current => current !== '' ? current
+        : next.find(item => item.nodeId === initialNodeId && item.status === 'active')?.nodeId
+          ?? next.find(item => item.status === 'active')?.nodeId ?? '')
+    }).catch(() => { if (active) setError(t('manager.computersFailed')) })
+      .finally(() => { if (active) setLoadingComputers(false) })
+    return () => { active = false }
+  }, [open, mode, listComputers, initialNodeId, t])
   useEffect(() => {
     if (!open) return
     setName('')
+    if (mode === 'create') setNodeId('')
     setUsername('')
     setMemberMode('rw')
     setError(undefined)
@@ -129,36 +174,52 @@ export function ProjectManagerModal({
     const sequence = ++readSequence.current
     setLoadingInvitations(true)
     setLoadError(undefined)
-    void listInvitations(queryProjectId)
-      .then((next) => { if (active && sequence === readSequence.current) { setInvitations(next); setLoadedScope(queryProjectId ?? 'all') } })
+    const managedProjectId = scope === 'current' && canManage ? projectId : undefined
+    const read = scope === 'current' ? readInvitations(listInvitations, managedProjectId)
+      : listInvitations(undefined).then(next => ({ invitations: next, failures: [] as unknown[] }))
+    void read
+      .then((next) => {
+        if (active && sequence === readSequence.current) {
+          if (next.failures.length === 0 || next.invitations.length > 0) {
+            setInvitations(next.invitations)
+            setLoadedScope(scope)
+          }
+          if (next.failures.length > 0) setLoadError(errorText(next.failures[0], t, 'manager.invitationReadFailed'))
+        }
+      })
       .catch((cause: unknown) => {
         if (active && sequence === readSequence.current) setLoadError(errorText(cause, t, 'manager.invitationReadFailed'))
       })
       .finally(() => { if (active && sequence === readSequence.current) setLoadingInvitations(false) })
     return () => { active = false }
-  }, [open, mode, listInvitations, queryProjectId, reload, t])
+  }, [open, mode, listInvitations, scope, canManage, projectId, reload, t])
   useEffect(() => {
     if (!open || mode !== 'members' || !canInvite || listUsers === undefined) return
     let active = true
     setLoadingUsers(true)
     setUsersError(false)
-    void listUsers()
+    void listUsers(projectId)
       .then((next) => { if (active) setUsers(next) })
       .catch(() => { if (active) setUsersError(true) })
       .finally(() => { if (active) setLoadingUsers(false) })
     return () => { active = false }
   }, [open, mode, canInvite, listUsers, usersReload])
 
-  const refreshAfterMutation = async (scopeId: number | undefined, failure: CollaborationKey): Promise<void> => {
+  const refreshAfterMutation = async (failure: CollaborationKey): Promise<void> => {
     if (listInvitations === undefined) return
     const sequence = ++readSequence.current
     setLoadingInvitations(true)
     setLoadError(undefined)
+    const managedProjectId = scope === 'current' && canManage ? projectId : undefined
     try {
-      const next = await listInvitations(scopeId)
+      const next = scope === 'current' ? await readInvitations(listInvitations, managedProjectId)
+        : { invitations: await listInvitations(undefined), failures: [] as unknown[] }
       if (sequence !== readSequence.current) return
-      setInvitations(next)
-      setLoadedScope(scopeId ?? 'all')
+      if (next.failures.length === 0 || next.invitations.length > 0) {
+        setInvitations(next.invitations)
+        setLoadedScope(scope)
+      }
+      if (next.failures.length > 0) setLoadError(t(failure))
     } catch {
       if (sequence === readSequence.current) setLoadError(t(failure))
     } finally {
@@ -168,11 +229,13 @@ export function ProjectManagerModal({
 
   const submitCreate = async (event: SyntheticEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
-    if (busy || createProject === undefined || name.trim() === '') return
+    if (busy || unavailableComputer || createProject === undefined || name.trim() === ''
+      || listComputers !== undefined && (loadingComputers || nodeId === '')) return
     setBusy(true)
     setError(undefined)
     try {
-      onCreated(await createProject(name.trim()), name.trim())
+      onCreated(await (listComputers === undefined && initialNodeId === undefined
+        ? createProject(name.trim()) : createProject(name.trim(), nodeId === '' ? undefined : nodeId)))
     } catch (nextError) {
       setError(errorText(nextError, t))
     } finally {
@@ -182,7 +245,7 @@ export function ProjectManagerModal({
 
   const submitInvite = async (event: SyntheticEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
-    if (busy || projectId === undefined || inviteMember === undefined || username.trim() === '') return
+    if (busy || unavailableComputer || projectId === undefined || inviteMember === undefined || username.trim() === '') return
     setBusy(true)
     setError(undefined)
     setOutcome(undefined)
@@ -190,8 +253,7 @@ export function ProjectManagerModal({
       const sent = await inviteMember(projectId, username.trim(), memberMode)
       setUsername('')
       setInvitations(current => [...current.filter(row => row.projectId === projectId && row.id !== sent.id), sent])
-      setLoadedScope(projectId)
-      await refreshAfterMutation(projectId, 'manager.inviteRefreshFailed')
+      await refreshAfterMutation('manager.inviteRefreshFailed')
       setDirection('sent')
       setScope('current')
       setView('list')
@@ -204,7 +266,7 @@ export function ProjectManagerModal({
   }
 
   const accept = async (id: string): Promise<void> => {
-    if (busy || acceptInvitation === undefined) return
+    if (busy || unavailableComputer || acceptInvitation === undefined) return
     setBusy(true)
     setError(undefined)
     setOutcome(undefined)
@@ -213,7 +275,7 @@ export function ProjectManagerModal({
       await acceptInvitation(id)
       setInvitations(current => current.map(row => row.id === id ? { ...row, status: 'accepted' } : row))
       setOutcome('manager.invitationAccepted')
-      await refreshAfterMutation(queryProjectId, 'manager.acceptRefreshFailed')
+      await refreshAfterMutation('manager.acceptRefreshFailed')
     } catch (nextError) {
       setError(errorText(nextError, t))
     } finally {
@@ -251,8 +313,10 @@ export function ProjectManagerModal({
       {...mode === 'members' && view === 'compose' ? { onBack: backToList, backLabel: t('manager.backInvitations') } : {}}
       footer={mode === 'create' ? (
         <><Button onClick={onClose} disabled={busy}>{t('manager.cancel')}</Button>
-          <Button variant="primary" type="submit" form={`${id}-create`} disabled={busy || name.trim() === ''}>
-            {busy ? t('manager.creating') : t('manager.createEnter')}
+          <Button variant="primary" type="submit" form={`${id}-create`}
+            disabled={busy || unavailableComputer || name.trim() === ''
+              || listComputers !== undefined && (loadingComputers || nodeId === '')}>
+            {busy ? t('manager.creating') : t('manager.create')}
           </Button></>
       ) : view === 'compose' ? (
         <><span className={css.footerHint}>{canInvite ? t('manager.awaitAcceptance') : inviteReason}</span>
@@ -274,6 +338,21 @@ export function ProjectManagerModal({
           <Input className={css.textField as string} id={`${id}-name`} value={name} onChange={(event) => { setName(event.target.value) }}
             placeholder={t('manager.namePlaceholder')} aria-describedby={`${id}-name-help`} maxLength={120} required disabled={busy} />
           <div id={`${id}-name-help`} className={css.fieldMeta}><span>{t('manager.nameHelp')}</span><span>{name.length} / 120</span></div>
+          {listComputers !== undefined && <>
+            <label className={css.label} htmlFor={`${id}-computer`}>{t('manager.computerLabel')}</label>
+            <select id={`${id}-computer`} className={css.select} value={nodeId}
+              disabled={busy || loadingComputers} required onChange={(event) => { setNodeId(computers.find(computer => computer.nodeId === event.target.value)?.nodeId ?? '') }}>
+              <option value="">{t(loadingComputers ? 'manager.computersLoading' : 'manager.computerPlaceholder')}</option>
+              {nodeId !== '' && !computers.some(computer => computer.nodeId === nodeId) && <option value={nodeId} disabled>
+                {t('manager.targetUnavailable')}
+              </option>}
+              {computers.map(computer => <option key={computer.nodeId} value={computer.nodeId} disabled={computer.status !== 'active'}>
+                {computer.name}{computer.status === 'active' ? '' : ` · ${t('manager.computerOffline')}`}
+              </option>)}
+            </select>
+            <p className={css.muted}>{t('manager.computerNote')}</p>
+          </>}
+          {unavailableComputer && <div className={css.error} role="alert">{t('manager.targetUnavailable')}</div>}
           <dl className={css.creationFacts}><div><dt>{t('manager.creationOrigin')}</dt><dd>{t('manager.userCreated')}</dd></div>
             <div><dt>{t('manager.ownerLabel')}</dt><dd>{t('scope.you')}</dd></div></dl>
           <p className={css.pathNote}><IconFolderOpenOutline16 size={16} /><span>{t('manager.folderNote')}</span></p>
@@ -309,7 +388,8 @@ export function ProjectManagerModal({
                 }))}
               onSelect={(value) => { setUsername(value); setPickerOpen(false) }} />
             {loadingUsers && <div className={css.queryStatus} role="status"><IconLoadingOutline16 size={16} />{t('manager.loading')}</div>}
-            {usersError && <div className={css.error} role="alert">{t('manager.usersFailed')}<Button size="sm" onClick={() => { setUsersReload(value => value + 1) }}>{t('scope.retry')}</Button></div>}
+            {usersError && <div className={css.error} role="alert">{t('manager.usersFailed')}</div>}
+            {usersError && <Button size="sm" onClick={() => { setUsersReload(value => value + 1) }}>{t('manager.retry')}</Button>}
             <fieldset className={css.permissionOptions}><legend>{t('manager.modeLabel')}</legend>
               {(['rw', 'ro'] as const).map(value => (
                 <label key={value} className={css.permissionOption} data-selected={memberMode === value}>
@@ -320,12 +400,14 @@ export function ProjectManagerModal({
                 </label>
               ))}
             </fieldset>
-            {loadError !== undefined && <div className={css.error} role="alert">{loadError}<Button size="sm" onClick={() => { setReload(value => value + 1) }}>{t('scope.retry')}</Button></div>}
+            {loadError !== undefined && <div className={css.error} role="alert">{loadError}</div>}
+            {loadError !== undefined && <Button size="sm" onClick={() => { setReload(value => value + 1) }}>{t('manager.retry')}</Button>}
             {error !== undefined && <div className={css.error} role="alert">{error}</div>}
           </form>
         ) : <p className={css.notice}>{inviteReason}</p>
       ) : (
         <div ref={memberContent} className={css.members}>
+          <h3 className={css.membersTitle}>{t('manager.membersTitle')}</h3>
           {outcome !== undefined && <p className={css.queryStatus} role="status">{t(outcome)}</p>}
           <div className={css.filters}>
             {projectId !== undefined ? <div className={css.scopeFilters} aria-label={t('manager.invitationScope')}>
@@ -341,7 +423,8 @@ export function ProjectManagerModal({
               { value: 'received', label: t('manager.received'), id: `${id}-received-tab`, panelId: `${id}-received` },
               { value: 'sent', label: t('manager.sent'), id: `${id}-sent-tab`, panelId: `${id}-sent` },
             ]} />
-          {loadError !== undefined && <div className={css.error} role="alert">{loadError}<Button size="sm" onClick={() => { setReload(value => value + 1) }}>{t('scope.retry')}</Button></div>}
+          {loadError !== undefined && <div className={css.error} role="alert">{loadError}</div>}
+          {loadError !== undefined && <Button size="sm" onClick={() => { setReload(value => value + 1) }}>{t('manager.retry')}</Button>}
           <section className={css.invitationSection} id={`${id}-${direction}`} role="tabpanel" aria-labelledby={`${id}-${direction}-tab`}>
             {loadingInvitations && !hasLoadedScope && <div className={css.skeleton} role="status" aria-label={t('manager.loading')}><span /><span /><span /></div>}
             {loadingInvitations && hasLoadedScope && <p className={css.queryStatus} role="status">{t('manager.loading')}</p>}
@@ -360,7 +443,7 @@ export function ProjectManagerModal({
                     <span>{received ? t('manager.invitedBy', { name: invitation.inviter.displayName })
                       : t('manager.sentBy', { project: invitation.projectName, name: invitation.inviter.id === currentUserId ? t('scope.you') : invitation.inviter.displayName })}</span>
                   </div>
-                  {received && invitation.status === 'pending' && acceptInvitation !== undefined
+                  {received && invitation.status === 'pending'
                     ? <Button variant="soft" size="sm" disabled={busy} onClick={() => { void accept(invitation.id) }}>{t('manager.accept')}</Button>
                     : <span className={css.invitationStatus} data-status={invitation.status}>{t(`manager.status.${invitation.status}`)}</span>}
                 </div>

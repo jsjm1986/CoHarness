@@ -1,0 +1,14 @@
+{
+  "name": "archive-sdk-markdown-anchor-current",
+  "cwd": ".",
+  "command": "pnpm run verify-md-links",
+  "startedAt": "2026-10-26T09:54:17.323221+00:00",
+  "seconds": 37.153,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "56f778c2ab5cc631539c3ab7bda0b16c5555506832e35f9983b4cbce55b09e73",
+  "inputsAfter": "56f778c2ab5cc631539c3ab7bda0b16c5555506832e35f9983b4cbce55b09e73",
+  "postgresToolDirectory": null,
+  "outputSha256": "d032d2b18dac9ec13564cbb23d8fbf2506d839f2a22a0878db6344262699eb3e",
+  "outputTail": "$ tsx scripts/verify-md-links.ts\nverify-md-links: 3853 file(s) checked, all relative cross-links and fragments resolve.\n"
+}

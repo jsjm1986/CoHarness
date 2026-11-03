@@ -32,7 +32,7 @@ import { bindScopeParent, createScope, scopeOf, scopeParentOf, type Scope, type 
 import type { Agent } from '@deepseek-ai/dsh-agent'
 // Type-only: resolves ctx.pluginPackages for the resolution-generation package lookup.
 import type {} from '@deepseek-ai/dsh-app-boot'
-import { collaborationRemoteRefusal } from '@deepseek-ai/dsh-collaboration'
+import { collaborationOf, collaborationRemoteRefusal } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import { hasConversationContent } from '@deepseek-ai/dsh-session/surface'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -471,8 +471,8 @@ export class AgentPresetRegistry extends TypertRemoteService {
     const preset = await this.resolveMountable(id)
     const record = this.declarations.get(preset.id)
     if (record !== undefined) {
-      const generation = await this.retainDeclared(record, realm)
-      await this.bindDeclared(agentCtx, agentKey, generation)
+      const lease = await this.retainDeclared(record, realm)
+      await this.bindDeclared(agentCtx, agentKey, lease)
       return preset
     }
     const standing = await this.ensureStanding(preset as FileAgentPreset, realm)
@@ -480,7 +480,7 @@ export class AgentPresetRegistry extends TypertRemoteService {
     // authority, held privately so nothing outside this roster can move a
     // composed agent to another preset; a later recompose layer re-links
     // through it under the caller-owned blank-session contract.
-    this.bindings.set(agentKey, { parent: bindScopeParent(agentKey, standing.key) })
+    this.joinScope(agentCtx, agentKey, standing.key)
     return preset
   }
 
@@ -519,10 +519,10 @@ export class AgentPresetRegistry extends TypertRemoteService {
     if (standing === undefined) return undefined
     const generation = this.declaredGenerations.get(standing.key)
     if (generation !== undefined) {
-      this.joinDeclared(agentCtx, agentKey, generation)
+      this.joinScope(agentCtx, agentKey, generation.key, generation)
       return standing.presetId
     }
-    this.bindings.set(agentKey, { parent: bindScopeParent(agentKey, standing.key) })
+    this.joinScope(agentCtx, agentKey, standing.key)
     return standing.presetId
   }
 
@@ -567,10 +567,9 @@ export class AgentPresetRegistry extends TypertRemoteService {
    */
   @Remote('list')
   async remoteExportList(): Promise<AgentPresetRoster> {
-    const collaboration = this.ctx.get('collaboration')
     let authority: CollaborationAuthority | undefined
     try {
-      authority = collaboration?.capture()
+      authority = collaborationOf(this.ctx)?.capture()
     } catch (error: unknown) {
       throw collaborationRemoteRefusal(error, 'read')
     }
@@ -897,15 +896,15 @@ export class AgentPresetRegistry extends TypertRemoteService {
     const realm = parent !== undefined && 'realm' in parent && typeof parent.realm === 'string' ? parent.realm : undefined
     const declared = this.declarations.get(preset.id)
     if (declared !== undefined) {
-      const generation = await this.retainDeclared(declared, realm)
-      await this.bindDeclared(agentCtx, agentKey, generation)
+      const lease = await this.retainDeclared(declared, realm)
+      await this.bindDeclared(agentCtx, agentKey, lease)
       agentCtx.emit('agent-preset/recomposed')
       return preset
     }
     const standing = await this.ensureStanding(preset as FileAgentPreset, realm)
     const binding = this.bindings.get(agentKey)
     if (binding === undefined) {
-      this.bindings.set(agentKey, { parent: bindScopeParent(agentKey, standing.key) })
+      this.joinScope(agentCtx, agentKey, standing.key)
     } else {
       binding.parent.rebind(standing.key)
       const released = binding.generation
@@ -937,10 +936,10 @@ export class AgentPresetRegistry extends TypertRemoteService {
     const preset = await this.resolveMountable(id)
     const record = this.declarations.get(preset.id)
     if (record !== undefined) {
-      const generation = await this.retainDeclared(record)
-      generation.users--
-      await this.collectDeclared(generation)
-      return generation.key
+      const lease = await this.retainDeclared(record)
+      const key = lease.generation.key
+      await lease.dispose()
+      return key
     }
     return (await this.ensureStanding(preset as FileAgentPreset)).key
   }
@@ -951,21 +950,15 @@ export class AgentPresetRegistry extends TypertRemoteService {
    * The returned lease is a read boundary, not a mount: release it when the
    * cold read ends so a retired generation can collect.
    * @param id - the preset id, or `undefined` for {@link defaultId}.
-   * @returns the scope key and its release.
+   * @returns the scope key and an idempotent release that joins generation disposal when retired and unused.
    * @throws when the preset is unknown or its composition is unusable.
    */
   async acquireScope(id?: string): Promise<{ key: ScopeKey; dispose: () => Promise<void> }> {
     const preset = await this.resolveMountable(id)
     const record = this.declarations.get(preset.id)
     if (record !== undefined) {
-      const generation = await this.retainDeclared(record)
-      return {
-        key: generation.key,
-        dispose: async () => {
-          generation.users--
-          await this.collectDeclared(generation)
-        },
-      }
+      const lease = await this.retainDeclared(record)
+      return { key: lease.generation.key, dispose: lease.dispose }
     }
     return { key: (await this.ensureStanding(preset as FileAgentPreset)).key, dispose: async () => {} }
   }
@@ -1091,7 +1084,7 @@ export class AgentPresetRegistry extends TypertRemoteService {
   }
 
   /** Ensure the declared record's generation under `realm`, audited and user-counted. */
-  private async retainDeclared(record: DeclaredRecord, realm?: string): Promise<DeclaredGeneration> {
+  private async retainDeclared(record: DeclaredRecord, realm?: string): Promise<DeclaredLease> {
     let generation = record.generations.get(realm)
     if (generation === undefined) {
       generation = await this.activateDeclared(record, realm)
@@ -1101,38 +1094,59 @@ export class AgentPresetRegistry extends TypertRemoteService {
       }
     }
     generation.users++
-    return generation
+    const retained = generation
+    let disposing: Promise<void> | undefined
+    return { generation: retained, dispose: () => disposing ??= (async () => {
+      retained.users--
+      await this.collectDeclared(retained)
+    })() }
   }
 
-  /** Join `ctx`'s scope to a declared generation; agent teardown releases its user count. */
-  private joinDeclared(ctx: Context, key: ScopeKey, generation: DeclaredGeneration): void {
-    const binding = { parent: bindScopeParent(key, generation.key), generation }
-    generation.users++
+  /** Join a standing scope; teardown releases the generation currently bound to the agent. */
+  private joinScope(ctx: Context, key: ScopeKey, parent: ScopeKey, generation?: DeclaredGeneration): void {
+    const binding: { parent: ScopeParentBinding; generation?: DeclaredGeneration } = {
+      parent: bindScopeParent(key, parent), ...generation === undefined ? {} : { generation },
+    }
+    if (generation !== undefined) generation.users++
     this.bindings.set(key, binding)
     ctx.effect(() => async () => {
       if (this.bindings.get(key) !== binding) return
       this.bindings.delete(key)
-      generation.users--
-      await this.collectDeclared(generation)
-    }, 'agent-preset.binding')
-  }
-
-  /** Bind `ctx` to a declared generation, releasing any generation it leaves. */
-  private async bindDeclared(ctx: Context, key: ScopeKey, generation: DeclaredGeneration): Promise<void> {
-    const binding = this.bindings.get(key)
-    if (binding?.generation === generation) return
-    if (binding !== undefined) {
-      binding.parent.rebind(generation.key)
       const released = binding.generation
-      generation.users++
-      binding.generation = generation
       if (released !== undefined) {
+        delete binding.generation
         released.users--
         await this.collectDeclared(released)
       }
-      return
+    }, 'agent-preset.binding')
+  }
+
+  /** Transfer a temporary lease into the agent's binding and release its reservation. */
+  private async bindDeclared(ctx: Context, key: ScopeKey, lease: DeclaredLease): Promise<void> {
+    try {
+      const generation = lease.generation
+      const binding = this.bindings.get(key)
+      if (binding?.generation !== generation) {
+        if (binding === undefined) {
+          this.joinScope(ctx, key, generation.key, generation)
+        } else {
+          binding.parent.rebind(generation.key)
+          const released = binding.generation
+          generation.users++
+          binding.generation = generation
+          if (released !== undefined) {
+            released.users--
+            await this.collectDeclared(released)
+          }
+        }
+      }
+    } catch (error) {
+      try { await lease.dispose() } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], 'Preset binding and reservation cleanup failed.')
+      }
+      throw error
     }
-    this.joinDeclared(ctx, key, generation)
+    await lease.dispose()
   }
 
   /** Resolve (or create, single-flight) the standing mount of one preset. */
@@ -1278,6 +1292,12 @@ interface DeclaredGeneration {
   users: number
   /** Set once the declaring plugin unregisters. */
   retired: boolean
+}
+
+/** One idempotently releasable reservation against a declared generation. */
+interface DeclaredLease {
+  readonly generation: DeclaredGeneration
+  readonly dispose: () => Promise<void>
 }
 
 export default AgentPresetRegistry

@@ -1,0 +1,35 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, memoryCurationFixtureReady]
+- insert:
+    - id: curation-settings
+      name: '@deepseek-ai/dsh-settings-file'
+      config:
+        path: './memory-settings.json'
+    - id: curation-storage
+      name: '@deepseek-ai/dsh-storage'
+    - id: curation-json
+      name: '@deepseek-ai/dsh-storage-json'
+      config:
+        root: !!js process.cwd() + '/.memory-store'
+    - id: curation-domains
+      name: '@deepseek-ai/dsh-storage-domain'
+      config:
+        backend: json
+    - id: memory
+      name: '@deepseek-ai/dsh-memory'
+      config:
+        extraction: !!js "process.env.DSH_CURATION_FIXTURE_KIND === 'extraction' && process.env.DSH_CURATION_FIXTURE_CHANGE !== 'detach'"
+        consolidation: !!js "process.env.DSH_CURATION_FIXTURE_KIND === 'consolidation' && process.env.DSH_CURATION_FIXTURE_CHANGE !== 'detach'"
+        recall: !!js "process.env.DSH_CURATION_FIXTURE_KIND === 'recall' && process.env.DSH_CURATION_FIXTURE_CHANGE !== 'detach'"
+    - id: memory-context
+      name: '@deepseek-ai/dsh-memory-context'
+    - id: tool-memory
+      name: '@deepseek-ai/dsh-tool-memory'
+    - id: memory-curation
+      name: '@deepseek-ai/dsh-memory-curation'
+      config:
+        consolidationMinChanges: 1
+    - id: curation-settings-model
+      name: './model.mjs'

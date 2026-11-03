@@ -17,7 +17,7 @@ kind: "package-reference"
 
 对于每条可到达本地根 Agent 或可继续子 Agent 的提示词，运行时都会采样浏览器当前的 `Intl.DateTimeFormat().resolvedOptions().timeZone`，并只把该值附加到这一次 Session 或 subagent 提示词 RPC。该值既不缓存，也不包含在 Session 创建或 fork 状态中，因此旅行与并发标签页都能保留消息本地的来源信息。浏览器若无法提供非空时区，会在本地拒绝该提示词，而不会悄然使用部署状态代替。
 
-设置所有者共用本包定义的不依赖 React 的 `SettingsScopeSpec`、`SettingsScope` 与快照类型。ui-settings 拥有 `ctx.settingsScope.bind(spec)`、对应的 Host 传输、schema 校验与生命周期；详见[该包的约定](../ui-settings/README.zh.md)。
+设置所有者共用本包定义的不依赖 React 的 `SettingsScopeSpec`、`SettingsScope` 与快照类型。`settingsFieldControlState(scope, field)` 解析存储该字段的来源；复合 scope 提供 `getFieldControlState`，单一来源的 scope 使用命名空间快照。ui-settings 拥有 `ctx.settingsScope.bind(spec)`、对应的 Host 传输、schema 校验与生命周期；详见[该包的约定](../ui-settings/README.zh.md)。
 
 `SlotRegistry.bindStore(handle, sessionId?)` 解析已注册 handle 对应的框架实例。服务消费方与渲染入口共享该实例，并通过已声明的 actions 写入；未注册的 handle 或缺失的 Session 作用域会抛错。
 
@@ -25,13 +25,21 @@ kind: "package-reference"
 
 池化浏览器 Session 键编码所属 runtime 与原始 Host ID。列表、作用域 store、Workbench 窗格、保留的 binding、文件观察及已声明的 Remote 事件地址使用该键；runtime 保留原始 wire ID 和持久事件。多个 runtime 共有的裸 ID 会被拒绝，不会任意选择归属。`host.describe.runtimeTarget` 在打开历史前固定引导连接身份。已保留的 generation 不能改标为另一个 runtime。
 
-`usingRuntime` 在发现、异步操作和后续 Session 引用接管期间持有目标，不授予权限。消费者合并导航与所有者生命周期；取消只释放本次操作的持有，不释放其他消费者。引导目标和其他目标都等待各自的首个 Session 列表基线。
+`runtimeEnvironments` 只发布已授权的管理目标，不打开连接。显式管理页面只准备并保留所选 Runtime。工作区资源提供者、文件元数据缓存和变更观察器都包含 Runtime UUID，因此不同电脑上同名的个人 Session ID 与路径保持独立。
+
+`usingRuntime` 在发现、异步操作和后续 Session 引用接管期间持有目标，不授予权限。消费者合并导航与所有者生命周期；取消只释放本次操作的持有，不释放其他消费者。引导目标和其他目标都等待各自的首个 Session 列表基线。其他目标的发现过程使用其连接配置的就绪时限，并将首次 Session 列表读取计入该时限。
+
+明确打开目录或 Session 时，通过现有账号范围接口准备已停止的受管 Runtime，目标为操作捕获的 UUID。请求不导航页面，也不更新共享选择 Cookie；元数据发现保持被动。取消信号与引导连接配置的元数据时限共同约束准备过程；返回其他目标时直接失败，不替换分配。
+
+从电脑入口新建对话时，`WorkspaceRuntime.createRuntimeSession` 使用操作捕获的 Runtime 和所选工作区。空电脑先注册目标 Host 的默认目录，再创建 Session。创建请求明确包含工作区归属，属于其他 Runtime 的工作区会被拒绝。导航持有目标直到历史打开；后续目录元数据刷新不延长对话的就绪等待。
 
 同一运行时的并发 `ensureSession` 调用只共享尚未完成的 Workspace 归档读取，包括其他运行时的初始归档同步。读取完成后即丢弃，后续验证重新拉取。每个调用者可独立取消，最后一个调用者取消未完成的读取；重连、目标释放、账号撤回或销毁阻止迟到响应安装归档事实。带版本的归档帧优先于较旧响应。
 
 引导连接明确失去授权时，先撤下池内所有 Session，再由 Connection 执行页面清理与重载。其他 runtime 被拒绝只撤下该 runtime。普通重连失败保留当前账号已授权的缓存。
 
 Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除 Session 列表归属，再允许连接释放发布后续目录变化。未解析或已撤权的 Session 没有目录，不会回退到其他 runtime 的选项；在途读取在返回前复核归属。
+
+`addressRuntimeUrl(URL, target)` 将固定的 Runtime 选择参数写入现有 URL。电脑元数据尚未获得时，消费方仍据此绑定目标；明确的文档位置继续独立按账号和电脑寻址。
 
 ## 概述
 
@@ -85,15 +93,16 @@ Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除
 <a id="session-ownership"></a>
 ## Session 所有权
 
-`retain(target, { source, signal? })` 持有确切的本地代次，并启动共享历史打开过程。`binding` 可立即使用；`ready` 等待当前引用的打开尝试。取消等待不会释放引用，也不会取消其他消费方。清理时调用 `release()`、使用 disposal 协议，或者通过 `using(target, options, operation)` 在回调结束后释放。根节点销毁会使所有引用失效，包括尚未完成的就绪等待。
+`retain(target, { source, signal? })` 持有确切的本地代次，并启动共享历史打开过程。`binding` 可立即使用；`ready` 等待当前引用的打开尝试，重连中断首次加载时会继续等待替代读取。当前读取失败仍会使就绪等待完成，其错误保留在 binding 中。取消等待不会释放引用，也不会取消其他消费方。清理时调用 `release()`、使用 disposal 协议，或者通过 `using(target, options, operation)` 在回调结束后释放。根节点销毁会使所有引用失效，包括尚未完成的就绪等待。
 
 `binding()`、`scope()` 和 `provideInfoFor()` 只借用仍被持有的代次。`retainInfo(id)` 观察不可变的来源计数，不创建 scope 或读取历史；同 ID 重建后，观察源身份仍稳定。会话选择与 Workbench 适配器共用这一分配器。输入草稿和正在提交的操作分别持有引用，使切换视图不会丢失输入。目录移除不释放这些所有者；明确撤权仍必须销毁所属运行时。
 
 `provideInfoRevision` 通知 provide bundle 的安装、退役或重建，也覆盖运行时池中的非当前 Session。其数字快照不含历史或绑定对象。显式渲染选择器随该数据源变化解析自身 bundle；`currentProvideInfo` 保持由当前选择确定的身份。
+私有浏览器呈现记录的所有者通过 `sessionPersistenceKey` 区分已验证主体、运行时和原始 Session id。读取要求会话当前在目录中可见。按代次发布的 Host 元数据重新连接时，文档已确认的 Gateway 账号保留私有键；账号失效时撤销该归属。明确的 `forget` 意图允许在目录撤下后，以当前主体清理已退役记录；它不恢复读取权限，也不允许未验证账号删除数据。
 
 每个 scope 的对象身份独立于持久 Session id。作用域事件分发与 `sessionOf()` 必须匹配确切代次，因此异步清理不会把旧 context 路由到替代对象。详见[所有权决策](../../../.agents/notes/implemented/architecture/2026-09-23-client-session-references.zh.md)。
 
-`beginNavigation()` 取代尚未完成的视图选择意图，并返回取消信号。异步导航在加载完成后、选择视图前检查信号；`open`、`openSubagent`、`clear`、目标切换与明确拒绝访问都会使旧意图失效。被取代的请求仍将已完成的 Host 操作保留在目录中，并保留当前视图和草稿。插件发起的请求还须响应插件销毁。
+`beginNavigation()` 取代尚未完成的视图选择意图，并返回取消信号。传入 `{ blockInputFor: sessionId }` 会为来源 Session 发布当前标签页内的输入锁定；`finishNavigation(signal)` 只解除该意图自己的锁定。新会话准备期间保留原视图、草稿和运行任务，同时拒绝向原对话提交，直至准备结束。异步导航在加载完成后、选择视图前检查信号；`open`、`openSubagent`、`clear`、目标切换与明确拒绝访问都会使旧意图失效。被取代的请求仍将已完成的 Host 操作保留在目录中，并保留当前视图和草稿。插件发起的请求还须响应插件销毁。
 
 每次连接通过校验后，在 connected 状态与 Host 描述可见前先发出 `connection/will-reset`。消费者同步撤回旧的客户端验证，描述订阅者才能恢复私有布局。Runtime 随后发出 `connection/reset`，再准备新的 Workspace／Session 列表基线或已保存历史的所有权。首次连接通过校验后，Runtime 会在读取 Session 列表基线的同时打开已保存普通根 Session 的会话尾页。这一个尚未展示的窗口不创建 Client scope、引用、历史索引或 Agent。目录与 Workspace 归档投影仍决定最终选择；首次获准获取的引用接管同一次打开。导航、目标或账号撤销、断连、基线缺失或失败，以及根节点销毁都会释放尚未接管的窗口。Runtime 持有尚未完成的读取直到结束，根节点销毁会等待它。带地址的子会话仍走目录确认后的恢复路径。
 
@@ -152,7 +161,7 @@ SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 
 
 `ConversationSnapshot.queue` 是 Host 提供的 `agent.inbox.nextTurn` 权威瞬态快照；待处理的 next-step steering（中途引导）不进入此投影。每行携带其 `MessageId`、所有内容块均为文本时的完整可编辑文本，以及扁平化预览；图片块会从预览中省略，因为对话 dock 会单独渲染其持久化缩略图。Host 根据持久 `agent/inbox/spliced` 变更派生完整 `session/queue` 快照，并在重连时发送基线；面向单条消息的 `agent/inbox/inserted`、`claimed` 与 `discarded` 通知不用于重建该投影。`Session.updateQueue()` 经 Host 侧 `Inbox.splice()` 发送编辑／移除操作，客户端不做乐观变更，因此下一份 Host 快照是唯一可见的提交结果，claim 竞态则可能呈现 `queue-item-not-found`。
 
-`session.beginSubmission` 在调用方开始序列化和发送之前，同步地把一条本地回显写入 `SessionSnapshot.pendingSubmissions`，使会话界面能在提交点击的同一帧渲染该消息。Session 依据自身实时 running 状态与请求 mode 固定 `transcript`、`queued` 或 `steering` 位置；prompt 的 `requestId` 即关联身份，Host 会把它回显为持久 user source 的 `rpcId`。每个身份都会跟踪其队列与 splice 位置：queued 位置的回显在被队列接受后延迟一个动画帧退役；transcript 与 steering 回显等待持久录取——已录取回显会一直登记到携带它的队列发布移除其行为止。仅从队列移除并不构成失败证据：`canceled` splice 会立即使被移除的回显失败，而已离开队列且未录取的回显会在移除之后记录的下一条 `request/context` 或 `turn/end` 边界处失败。新的 follow 基线会把所有在 `asOfSeq` 及之前已被队列观察到的身份按已观察接受，即使其持久录取不在已加载窗口内。已识别的 prompt 失败与 `abandon()` 会立即使未录取回显退役；销毁则按已观察处理已录取回显、按失败处理其余未决回显。每次退役恰好触发一次 `onRetire`；已观察的退役携带按内容顺序排列的持久图片引用，以便 composer 释放成功的草稿。回显只存在于 Client 内存中；重新加载与重连后，会话仅从持久事件重建。
+`session.beginSubmission` 在调用方开始序列化和发送之前，同步地把一条本地回显写入 `SessionSnapshot.pendingSubmissions`，使会话界面能在提交点击的同一帧渲染该消息。Session 依据自身实时 running 状态与请求 mode 固定 `transcript`、`queued` 或 `steering` 位置；prompt 的 `requestId` 即关联身份，Host 会把它回显为持久 user source 的 `rpcId`。每个身份都会跟踪其队列与 splice 位置：queued 与 steering 回显在 Host 发布已接受的队列身份后延迟一个动画帧退役；transcript 回显等待持久录取——已录取回显会一直登记到携带它的队列发布移除其行为止。仅从队列移除并不构成失败证据：`canceled` splice 会立即使被移除的回显失败，而已离开队列且未录取的回显会在移除之后记录的下一条 `request/context` 或 `turn/end` 边界处失败。新的 follow 基线会把所有在 `asOfSeq` 及之前已被队列观察到的身份按已观察接受，即使其持久录取不在已加载窗口内。缓冲、重放或从更早历史页补入的持久用户消息即使早于已安装历史窗口，也会确认身份匹配的提交；处理该回执不会追加旧内容或重放旧队列变更。已识别的 prompt 失败与 `abandon()` 会立即使未录取回显退役；销毁则按已观察处理已录取回显、按失败处理其余未决回显。每次退役恰好触发一次 `onRetire`；已观察的退役携带按内容顺序排列的持久图片引用，以便 composer 释放成功的草稿。回显只存在于 Client 内存中；重新加载与重连后，会话仅从持久事件重建。
 
 <a id="conversation-assembly"></a>
 ## Conversation 组装
@@ -229,3 +238,5 @@ reason 为 `max-tokens` 的 `turn/end` 会在该轮位置投影出一个 `turn-m
 无。
 
 </details>
+
+入口所属的 `deploymentContext` 服务在资源转发前读取 Gateway 策略，为个人目录、文档和协作界面提供展示与聚合信息，与选中的 Runtime 分离。同源消息只通知策略修订号失效；刷新不改变当前选择或草稿。本机入口保留当前本机 Runtime 的私有工作区隔离。参见[部署模式](../../../gateway/docs/deployment-topology/README.zh.md)。

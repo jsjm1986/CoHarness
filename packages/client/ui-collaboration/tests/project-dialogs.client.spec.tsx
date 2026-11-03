@@ -43,7 +43,7 @@ describe('project configuration navigation', () => {
     expect(screen.getByText('组织管理员')).toBeTruthy()
     fireEvent.click(screen.getByRole<HTMLButtonElement>('button', { name: '界面主题' }))
     expect((screen.getByRole<HTMLInputElement>('radio', { name: /浅色/ })).disabled).toBe(true)
-    expect(screen.getByText('只有项目所有者或组织管理员可以修改项目设置。')).toBeTruthy()
+    expect(screen.getByText('只有项目 owner 或组织管理员可以修改项目策略。')).toBeTruthy()
     expect(props.setThemePolicy).not.toHaveBeenCalled()
     expect(screen.queryByText('/private/server')).toBeNull()
   })
@@ -228,12 +228,12 @@ describe('project invitation views', () => {
     fireEvent.click(picker, { detail: 1 })
     expect(await screen.findByRole('menuitem', { name: /周工/ })).toBeTruthy()
     expect(document.activeElement).not.toBe(screen.getByRole('searchbox'))
-    expect(listInvitations.mock.calls).toEqual([[undefined], [9], [9]])
+    expect(listInvitations.mock.calls).toEqual([[undefined], [], [9], [], [9]])
   })
 
   it('shows a confirmed sent invitation even if its list refresh fails', async () => {
-    const listInvitations = vi.fn().mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('offline'))
-      .mockResolvedValue([outgoing])
+    const listInvitations = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error('offline')).mockResolvedValue([outgoing])
     const props = managerProps({ initialView: 'compose', listInvitations })
     render(<ProjectManagerModal {...props} />)
     const picker = screen.getByRole<HTMLButtonElement>('button', { name: /选择成员/ })
@@ -307,7 +307,7 @@ describe('project invitation views', () => {
     expect(document.activeElement).not.toBe(name)
     fireEvent.change(name, { target: { value: '  新业务空间  ' } })
     fireEvent.submit(name.closest('form')!)
-    await waitFor(() => { expect(props.onCreated).toHaveBeenCalledWith(20, '新业务空间') })
+    await waitFor(() => { expect(props.onCreated).toHaveBeenCalledWith(20) })
     expect(createProject).toHaveBeenCalledWith('新业务空间')
   })
 
@@ -317,7 +317,7 @@ describe('project invitation views', () => {
     await screen.findByRole('alert')
     fireEvent.click(screen.getByRole<HTMLButtonElement>('button', { name: '重试' }))
     await screen.findByText('业务空间', { selector: 'strong' })
-    expect(listInvitations.mock.calls).toEqual([[9], [9]])
+    expect(listInvitations.mock.calls).toEqual([[], [9], [], [9]])
   })
 
   it('explains maintenance qualification and keeps ordinary invitations unavailable', async () => {

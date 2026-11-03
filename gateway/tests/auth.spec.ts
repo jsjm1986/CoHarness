@@ -1,7 +1,7 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { AuthService } from '../src/auth.ts'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
@@ -10,6 +10,7 @@ import { hashPassword } from '../src/password.ts'
 async function setup() {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   const db = openDb(join(root, 'g.sqlite'))
+  onTestFinished(() => { db.close(); rmSync(root, { recursive: true, force: true }) })
   const now = Date.now()
   db.prepare(`INSERT INTO users(username, password_hash, home_path, role, must_change_password, created_at, updated_at)
               VALUES('alice', ?, '/tmp/alice', 'user', 0, ?, ?)`)
@@ -18,6 +19,21 @@ async function setup() {
 }
 
 describe('AuthService', () => {
+  it.each(['idle', 'absolute'])('refuses a token exactly at its %s deadline without renewing it', async (kind) => {
+    const { auth, db } = await setup()
+    const login = await auth.login('alice', 'secret-1', '127.0.0.1', 'fixture')
+    if (typeof login === 'string') throw new Error(login)
+    const now = Date.now()
+    const time = vi.spyOn(Date, 'now').mockReturnValue(now)
+    try {
+      db.prepare('UPDATE auth_sessions SET expires_at=?,absolute_expires_at=?')
+        .run(kind === 'idle' ? now : now + 10_000, kind === 'absolute' ? now : now + 10_000)
+      const before = db.prepare('SELECT expires_at,absolute_expires_at,last_seen_at FROM auth_sessions').get()
+      expect(auth.validate(login.token)).toBeNull()
+      expect(db.prepare('SELECT expires_at,absolute_expires_at,last_seen_at FROM auth_sessions').get()).toEqual(before)
+    } finally { time.mockRestore() }
+  })
+
   it('logs in, validates with sliding expiry, revokes', async () => {
     const { auth } = await setup()
     const result = await auth.login('alice', 'secret-1', '1.2.3.4', 'ua')

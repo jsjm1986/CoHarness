@@ -10,7 +10,7 @@ import z from '@deepseek-ai/schemastery'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import { randomBytes, randomUUID } from 'node:crypto'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { mkdir, readFile, stat } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { createWriteStream, type WriteStream } from 'node:fs'
 import { connect } from 'node:net'
 import { join } from 'node:path'
@@ -38,7 +38,7 @@ import type {
 } from '@deepseek-ai/dsh-remote-desktop'
 import { pumpRfb, type RfbPump } from './bridge.ts'
 import { managedHandshake } from './managed.ts'
-import { matchingGrants, VncGrantStore } from './grants.ts'
+import { matchingGrants, remoteDesktopFileRevision, VncGrantStore } from './grants.ts'
 import { VncAuditLog } from './audit.ts'
 import { credentialRef, isCredentialRefName } from '@deepseek-ai/dsh-credentials'
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
@@ -195,7 +195,7 @@ export class VncRemoteDesktop extends RemoteDesktop {
   })
 
   private readonly endpoints = new Map<string, VncEndpoint>()
-  private endpointsMtimeMs = 0
+  private endpointsRevision: string | undefined
   private readonly pending = new Map<RemoteDesktopToken, PendingAttach>()
   private readonly live = new Map<RemoteDesktopSessionId, LiveSession>()
   private consents: ConsentRecord[] = []
@@ -230,17 +230,16 @@ export class VncRemoteDesktop extends RemoteDesktop {
   }
 
   /**
-   * Re-read `endpointsFile` when its mtime advanced; a missing or empty file
+   * Re-read `endpointsFile` when its identity or metadata changes; a missing or empty file
    * means no endpoints. A failed read keeps the last good map and leaves the
-   * mtime unconsumed so every call retries until the file parses.
+   * revision unconsumed so every call retries until the file parses.
    */
   private async syncEndpoints(): Promise<void> {
     const file = this.config.endpointsFile
     if (file === '') return
-    const info = await stat(file).catch(() => undefined)
-    const mtimeMs = info?.mtimeMs ?? -1
-    if (mtimeMs === this.endpointsMtimeMs) return
-    const text = info === undefined
+    const revision = await remoteDesktopFileRevision(file)
+    if (revision === this.endpointsRevision) return
+    const text = revision === undefined
       ? ''
       : await readFile(file, 'utf8').catch((error: unknown) => {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return ''
@@ -248,13 +247,13 @@ export class VncRemoteDesktop extends RemoteDesktop {
       })
     if (text.trim() === '') {
       this.endpoints.clear()
-      this.endpointsMtimeMs = mtimeMs
+      this.endpointsRevision = revision
       return
     }
     const parsed = parseEndpointsFile(text, file)
     this.endpoints.clear()
     for (const [key, endpoint] of parsed) this.endpoints.set(key, endpoint)
-    this.endpointsMtimeMs = mtimeMs
+    this.endpointsRevision = revision
   }
 
   override async resolve(request: RemoteDesktopAttachRequest): Promise<RemoteDesktopSpec> {

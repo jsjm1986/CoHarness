@@ -1,0 +1,14 @@
+{
+  "name": "runtime-control-handoff-final-unit",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/local-runtime-launcher.spec.ts tests/local-runtime-owner.spec.ts tests/launcher.spec.ts tests/instances.spec.ts tests/runtime-capacity.spec.ts tests/config.spec.ts tests/deployment-data.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T19:54:10.608737+00:00",
+  "seconds": 20.398,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "19eba6a5ef00556143f7eda8dd1b81e947b4bfe787ad269d79ae007e1cb0e1d7",
+  "inputsAfter": "19eba6a5ef00556143f7eda8dd1b81e947b4bfe787ad269d79ae007e1cb0e1d7",
+  "postgresToolDirectory": null,
+  "outputSha256": "bd84284bb0022527a41af5faf8678b0c448c57f3c3bd66b43da6218a0ec3b3ae",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  7 passed (7)\n      Tests  129 passed (129)\n   Start at  03:54:13\n   Duration  17.95s (transform 1.43s, setup 0ms, import 2.17s, tests 21.52s, environment 0ms)\n\n"
+}

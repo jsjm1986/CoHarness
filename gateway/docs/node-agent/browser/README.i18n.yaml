@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write gateway/docs/node-agent/browser/README.md
+document:
+  en: b696c677620ab7cd218cb1dbd252b97349e325af
+  zh: 278631ba78d7aa0f278c25eadfed0e29ef6cfa66
+/:
+  en: 688a96f55c9e991c
+  zh: 1bb5cb710e93b5dd
+/browser-environments-and-document-locations:
+  en: 549e8bc823a12b5f
+  zh: 986cfee2e1809027
+/browser-environments-and-document-locations/summary:
+  en: 3cbf0bf54abf5d69
+  zh: 5ba623873dda9ea1
+/browser-environments-and-document-locations/identity-and-permissions:
+  en: d628085221869e7d
+  zh: 518f68ac04467c21
+/browser-environments-and-document-locations/user-navigation:
+  en: 80c9571c9a3f32e8
+  zh: c9c3c985480302cb
+/browser-environments-and-document-locations/admin-navigation:
+  en: 3d0a267c9b371044
+  zh: a03a84c3cae21e15
+/browser-environments-and-document-locations/browser-api:
+  en: 90ad4b8e0498a9ca
+  zh: be10acaa0a7a1710

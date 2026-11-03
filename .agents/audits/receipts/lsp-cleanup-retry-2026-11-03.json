@@ -1,0 +1,253 @@
+{
+  "id": "lsp-cleanup-retry-2026-11-03",
+  "findings": [
+    "B488"
+  ],
+  "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+  "verifiedAt": "2026-11-02T20:00:42.770649+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T194557Z",
+  "delivery": {
+    "findings": [
+      "B488"
+    ],
+    "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T194557Z/B488-lsp-cleanup-retry.delta.tar.gz",
+    "archiveSha256": "15520c0f89d708c4f257fda85dd2e9a3f76c99dc2731caa3ac175543cb4bfbeb",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T194557Z/B488-lsp-cleanup-retry-capsule-wqlb5dy3",
+    "manifestSha256": "c0e3935729aeaaf71edbffc38e60703aba9f2627e71aaba781f39e655d111fc4",
+    "ownedChanges": 13,
+    "verification": {
+      "normalDifferentNamedCases": 224,
+      "normalCompleteChangedFileCoverage": {
+        "total": {
+          "lines": {
+            "total": 231,
+            "covered": 231,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 267,
+            "covered": 267,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 61,
+            "covered": 61,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 89,
+            "covered": 89,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/lsp/lsp-stdio/src/index.ts": {
+          "lines": {
+            "total": 135,
+            "covered": 135,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 32,
+            "covered": 32,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 156,
+            "covered": 156,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 54,
+            "covered": 54,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/lsp/lsp-stdio/src/instance.ts": {
+          "lines": {
+            "total": 96,
+            "covered": 96,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 29,
+            "covered": 29,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 111,
+            "covered": 111,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 35,
+            "covered": 35,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      },
+      "originalNativeCounterproof": "Actual Loader, stdio server and LocalSubprocess with a controlled retryable cleanup-observation failure: a real old server is live when original code enters a second allocation.",
+      "nativeSourceExample": "passed in the complete normal roster",
+      "normalBuiltNode24LoaderExample": 1,
+      "builtRepeatNotAdded": true,
+      "focusedCaseAfterLintOnlyFactoryBinding": "one affected cancellation case rerun successfully; not added to224",
+      "normalStrictDeclarations": "passed",
+      "normalPublicHostBundle": "passed",
+      "scopedLint": "passed",
+      "ownedBilingualPairs": "two consistent",
+      "documentationLeavesPassed": 8,
+      "coverageExclusionsAdded": false,
+      "coverageThresholdChanged": false,
+      "newDependency": false,
+      "configurationOrWireChanged": false,
+      "excludedIntermediateResults": [
+        "The first fixed58-case run passed57but an old test still required forgetting failed slots; its expectation now retains and retries them.",
+        "The first221-case coverage run passed every assertion but correctly failed incomplete entry coverage; three meaningful allocation/cancellation cases completed both source files.",
+        "An unbound test factory reference failed lint; binding it leaves product source unchanged and its affected case was rerun."
+      ],
+      "platformLimits": "Named native macOS process cleanup and normal Node24 product artifacts only; no Linux/Windows containment or whole-Host crash-recovery claim.",
+      "productionAcceptanceClaimed": false,
+      "paidModelApiCalls": 0
+    },
+    "wholeProjectComplete": false
+  },
+  "checks": {
+    "normalDifferentNamedCases": 224,
+    "normalCompleteChangedFileCoverage": {
+      "total": {
+        "lines": {
+          "total": 231,
+          "covered": 231,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 267,
+          "covered": 267,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 61,
+          "covered": 61,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 89,
+          "covered": 89,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/lsp/lsp-stdio/src/index.ts": {
+        "lines": {
+          "total": 135,
+          "covered": 135,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 32,
+          "covered": 32,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 156,
+          "covered": 156,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 54,
+          "covered": 54,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/lsp/lsp-stdio/src/instance.ts": {
+        "lines": {
+          "total": 96,
+          "covered": 96,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 29,
+          "covered": 29,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 111,
+          "covered": 111,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 35,
+          "covered": 35,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "originalNativeCounterproof": "Actual Loader, stdio server and LocalSubprocess with a controlled retryable cleanup-observation failure: a real old server is live when original code enters a second allocation.",
+    "nativeSourceExample": "passed in the complete normal roster",
+    "normalBuiltNode24LoaderExample": 1,
+    "builtRepeatNotAdded": true,
+    "focusedCaseAfterLintOnlyFactoryBinding": "one affected cancellation case rerun successfully; not added to224",
+    "normalStrictDeclarations": "passed",
+    "normalPublicHostBundle": "passed",
+    "scopedLint": "passed",
+    "ownedBilingualPairs": "two consistent",
+    "documentationLeavesPassed": 8,
+    "coverageExclusionsAdded": false,
+    "coverageThresholdChanged": false,
+    "newDependency": false,
+    "configurationOrWireChanged": false,
+    "excludedIntermediateResults": [
+      "The first fixed58-case run passed57but an old test still required forgetting failed slots; its expectation now retains and retries them.",
+      "The first221-case coverage run passed every assertion but correctly failed incomplete entry coverage; three meaningful allocation/cancellation cases completed both source files.",
+      "An unbound test factory reference failed lint; binding it leaves product source unchanged and its affected case was rerun."
+    ],
+    "platformLimits": "Named native macOS process cleanup and normal Node24 product artifacts only; no Linux/Windows containment or whole-Host crash-recovery claim.",
+    "productionAcceptanceClaimed": false,
+    "paidModelApiCalls": 0
+  },
+  "limitations": [
+    "Only named stdio server allocation, retry and cleanup cases are accepted; other LSP semantics and the complete project remain open.",
+    "The wire peer fixture is explicitly launched as source under tsx; the Node24 parent and production services load normal built artifacts.",
+    "No new dependency, wire/Session format, configuration, deployment or production write.",
+    "Core Host-work and Runtime automatic stopping changes remain with the peer; they are not integrated or accepted here.",
+    "Official Responses remains deferred."
+  ],
+  "wholeProjectComplete": false,
+  "all12DomainsComplete": false,
+  "handoff": "Delivered once together with B487 on2026-11-02T20:00UTC; no reply or immediate deployment requested."
+}

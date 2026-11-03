@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-token-arguments-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/tsx --tsconfig tsconfig.run.json ../.agents/audits/.local/tunnel-token-args-probe.mjs",
+  "startedAt": "2026-10-24T21:53:42.864821+00:00",
+  "seconds": 2.343,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "29574b9757bb5cc6980170648e4517bac307e2089d7b1b79f824b4449f40b449",
+  "inputsAfter": "29574b9757bb5cc6980170648e4517bac307e2089d7b1b79f824b4449f40b449",
+  "postgresToolDirectory": null,
+  "outputSha256": "52e5d5df0abc811c7067e7f770bee6a1c7b979a42c9e1ef71984e1122d710c2b",
+  "outputTail": "Named tunnel receives its explicit token without exposing it in process arguments.\n"
+}

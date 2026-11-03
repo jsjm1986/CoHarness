@@ -1,0 +1,36 @@
+{
+  "status": "isolated_r44_matching_core_verified_exact_patch_frozen_peer_r45_integration_open",
+  "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/integration-r44-20261102T162858Z/R44-question-command-minimal-core.delta.tar.gz",
+  "archiveSha256": "cdcfce7e361519e959032b75b32d7da686c78576585a0c1aa1321ce4eff4f73e",
+  "archiveBytes": 2059476,
+  "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/integration-r44-20261102T162858Z/minimal-core-capsule-ycx00um5",
+  "manifestSha256": "e004c482958ba454fc72020ea7fab440e107aa7dec3a62bb90f8153d94081659",
+  "counts": {
+    "docs": 51,
+    "verification": 44,
+    "metadata": 10,
+    "runtime": 10
+  },
+  "differentNamedCases": 690,
+  "normalWholeFileCoverageEntries": 7,
+  "beforeImagesStillMatchPhysicalR44": true,
+  "productionWrites": false,
+  "wholeProjectComplete": false,
+  "recordedAt": "2026-11-02T17:03:43.373243+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/integration-r44-20261102T162858Z",
+  "matchingRuntimePackages": [
+    "commands",
+    "user-questions",
+    "plan-mode",
+    "command-compact",
+    "command-goal",
+    "gateway-execution",
+    "collaboration-context",
+    "host-apiproxy"
+  ],
+  "remaining": [
+    "Peer R45 Client/PG directory and actual two-Gateway release integration remain open.",
+    "Global whole-project, GUI/native platform and remaining resource/permission review remain open.",
+    "Official Responses validation remains deferred."
+  ]
+}

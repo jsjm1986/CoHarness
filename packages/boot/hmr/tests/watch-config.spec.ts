@@ -160,8 +160,8 @@ describe('HMR exact config paths', () => {
     symlinkSync(target, alias, process.platform === 'win32' ? 'junction' : 'dir')
     const ctx = await bootHmr(alias)
     try {
-      await watchConfig(ctx, join(alias, 'plugins.yml'), {}, () => {})
-      await expect(watchConfig(ctx, join(await realpath(target), 'plugins.yml'), {}, () => {}))
+      await ctx.hmr.watchConfig(join(alias, 'plugins.yml'), async () => {})
+      await expect(ctx.hmr.watchConfig(join(await realpath(target), 'plugins.yml'), async () => {}))
         .rejects.toThrow('config path already registered')
     } finally {
       await ctx.fiber.dispose()
@@ -381,6 +381,27 @@ describe('HMR exact config paths', () => {
     ))).not.toThrow()
   })
 
+  it('retains the watcher startup error when closing that failed watcher also fails', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-patch-close-failure-'))
+    hmrRoots.push(dir)
+    const ctx = await bootHmr(dir)
+    const watcher = new FSWatcher()
+    const failure = new Error('watcher startup failed'), cleanup = new Error('watcher close failed')
+    const close = vi.spyOn(watcher, 'close').mockRejectedValue(cleanup)
+    const previousFactory = configWatch.create
+    configWatch.create = () => { queueMicrotask(() => { watcher.emit('error', failure) }); return watcher }
+    try {
+      const error: unknown = await ctx.hmr.watchConfig(join(dir, 'plugins.yml'), async () => {}).catch((reason: unknown) => reason)
+      expect(error).toBeInstanceOf(AggregateError)
+      expect((error as AggregateError).errors).toEqual([failure, cleanup])
+    } finally {
+      close.mockRestore()
+      configWatch.create = previousFactory
+      await watcher.close()
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('closes a ready watcher when its context has already been disposed', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-patch-disposed-'))
     hmrRoots.push(dir)
@@ -397,6 +418,41 @@ describe('HMR exact config paths', () => {
     await expect(watchConfig(ctx, join(dir, 'plugins.yml'), {}, () => {}))
       .rejects.toThrow('cannot create effect on inactive context')
     expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('closes an allocated native configuration watch while readiness is pending', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-patch-pending-ready-'))
+    hmrRoots.push(dir)
+    const filename = join(dir, 'plugins.yml')
+    writeFileSync(filename, '[]')
+    const ctx = await bootHmr(dir)
+    const watcher = new FSWatcher()
+    const emit = watcher.emit.bind(watcher)
+    const nativeReady = Promise.withResolvers<undefined>()
+    vi.spyOn(watcher, 'emit').mockImplementation((event, ...args) => {
+      if (event === 'ready') { nativeReady.resolve(undefined); return false }
+      return Boolean(Reflect.apply(emit, watcher, [event, ...args]))
+    })
+    const close = vi.spyOn(watcher, 'close')
+    const previousFactory = configWatch.create
+    configWatch.create = paths => watcher.add(paths)
+    const starting = ctx.hmr.watchConfig(filename, async () => {})
+    const outcome = starting.then(dispose => ({ dispose }), (error: unknown) => ({ error }))
+    try {
+      await nativeReady.promise
+      expect(Object.values(watcher.getWatched()).flat()).toContain('plugins.yml')
+      await ctx.fiber.dispose()
+      expect(close).toHaveBeenCalledOnce()
+      expect(watcher.getWatched()).toEqual({})
+      expect(await outcome).toHaveProperty('error.message', 'Configuration watch stopped during startup')
+    } finally {
+      emit('ready')
+      const result = await outcome
+      if ('dispose' in result) await result.dispose()
+      await watcher.close()
+      configWatch.create = previousFactory
+      await ctx.fiber.dispose()
+    }
   })
 
   it.each([42, new Error('42')])('logs refresh failure %s and continues processing later events', async (failure) => {

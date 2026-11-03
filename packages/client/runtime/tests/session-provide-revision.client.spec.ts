@@ -26,6 +26,7 @@ function seedList(api: FakeApiClient, ids: readonly SessionId[]): void {
 function connection(api: FakeApiClient, target?: ConnectionRuntimeTarget): ConnectionHandle {
   return {
     api, isLoopback: true, interactions: 'none',
+    metadataTiming: { requestTimeoutMs: 15000, retryAfterMs: 10000 },
     hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
     state: { getSnapshot: () => undefined, subscribe: () => () => {} },
     rpc: { call: () => Promise.reject(new Error('unexpected rpc')) },

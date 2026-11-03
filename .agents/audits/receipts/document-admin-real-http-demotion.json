@@ -1,0 +1,14 @@
+{
+  "name": "document-admin-real-http-demotion",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/admin-business-postgres.spec.ts -t 'refuses a queued administrator document action through authenticated' --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T00:20:11.377722+00:00",
+  "seconds": 3.13,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "67429d37b87f3d70f6ed9cbe277ed97dbc422118c22263ea628685e8f59a118b",
+  "inputsAfter": "67429d37b87f3d70f6ed9cbe277ed97dbc422118c22263ea628685e8f59a118b",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "69f0201be57a48497232d7dcab27fd139f0458610dbbac720d5433d7ec0143b7",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  1 passed | 67 skipped (68)\n   Start at  08:20:13\n   Duration  1.14s (transform 691ms, setup 0ms, import 871ms, tests 194ms, environment 0ms)\n\n"
+}

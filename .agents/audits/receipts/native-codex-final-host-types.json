@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-final-host-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-25T02:54:36.630681+00:00",
+  "seconds": 81.53,
+  "exitCode": 2,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "25a8045670b0c34322ecbce37ebc81083f92b09922a7dd5cc3ca27b1c5f058c2",
+  "inputsAfter": "25a8045670b0c34322ecbce37ebc81083f92b09922a7dd5cc3ca27b1c5f058c2",
+  "postgresToolDirectory": null,
+  "outputSha256": "4baff050498a403504c5585a37a79eaaaabb958d0231720fc2b421b362ca1fb5",
+  "outputTail": "examples/headless-agent/tests/managed-codex-model.snapshot.ts(18,55): error TS2367: This comparison appears to be unintentional because the types '\"turn/start\" | \"turn/end\" | \"step/start\" | \"step/end\" | \"user/message\" | \"developer/message\" | \"system/message\" | \"assistant/message\" | \"assistant/attempt\" | \"tool/call\" | ... 68 more ... | \"tool-workflow/run-end\"' and '\"subagent/codex-model-request\"' have no overlap.\nexamples/headless-agent/tests/managed-codex-model.snapshot.ts(25,13): error TS2367: This comparison appears to be unintentional because the types '\"turn/start\" | \"turn/end\" | \"step/start\" | \"step/end\" | \"user/message\" | \"developer/message\" | \"system/message\" | \"assistant/message\" | \"assistant/attempt\" | \"tool/call\" | ... 68 more ... | \"tool-workflow/run-end\"' and '\"subagent/codex-model-request\"' have no overlap.\nexamples/headless-agent/tests/managed-codex-model.snapshot.ts(25,92): error TS2339: Property 'data' does not exist on type 'never'.\nexamples/headless-agent/tests/managed-codex-model.snapshot.ts(25,120): error TS2339: Property 'data' does not exist on type 'never'.\nexamples/headless-agent/tests/managed-codex-model.snapshot.ts(26,27): error TS2339: Property 'data' does not exist on type 'never'.\nexamples/headless-agent/tests/managed-codex-model.snapshot.ts(26,67): error TS2339: Property 'data' does not exist on type 'never'.\npackages/subagent/subagent-acp/tests/managed-model-control.spec.ts(25,27): error TS2345: Argument of type '{ stateDir: string; resume: true; command: string; }' is not assignable to parameter of type 'Config'.\n  Type '{ stateDir: string; resume: true; command: string; }' is missing the following properties from type 'Config': providerName, args, permission, env\npackages/subagent/subagent-codex/tests/real-product.spec.ts(291,64): error TS2367: This comparison appears to be unintentional because the types '\"turn/start\" | \"turn/end\" | \"step/start\" | \"step/end\" | \"user/message\" | \"developer/message\" | \"system/message\" | \"assistant/message\" | \"assistant/attempt\" | \"tool/call\" | ... 68 more ... | \"tool-workflow/run-end\"' and '\"subagent/codex-model-request\"' have no overlap.\n"
+}

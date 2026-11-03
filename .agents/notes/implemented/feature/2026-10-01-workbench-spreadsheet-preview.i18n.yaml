@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-01-workbench-spreadsheet-preview.md
 document:
-  en: 1ad9092a78f3affb2b2b6711c3527e70fd09bcd7
-  zh: 7503aa32b1d18b466cc056f719fe6f90df833762
+  en: 9fd250251b4dc33e65d28e6892949c1d29ea1096
+  zh: 86b06d63853c5ac3c4cdf075aa96d845f2818177
 /agent-note-workbench-spreadsheet-preview:
   en: b6a5bf5efeb444ae
   zh: 4c2a8cf250a37610
@@ -18,11 +18,11 @@ document:
   en: f0223c7c5e6b6083
   zh: 485509d21f8907d6
 /agent-note-workbench-spreadsheet-preview/consequences:
-  en: fac4f8bfe3a6039b
-  zh: ac7ab6fedfcc59a3
+  en: 12ac3987a454dcd8
+  zh: 0d99fb2748f6d012
 /agent-note-workbench-spreadsheet-preview/testing:
-  en: a97072160fadf4d7
-  zh: 523a0812ce6c9396
+  en: d5dc1aa3a6268d58
+  zh: dfb2c2ef9760ac98
 /agent-note-workbench-spreadsheet-preview/related:
   en: c633f28f2f7ae0be
   zh: b4da18b01c349c81

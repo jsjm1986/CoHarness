@@ -2,6 +2,7 @@ import { setSandboxMode } from '@deepseek-ai/dsh-sandbox-policy'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import type { ExecutionInheritance, ExecutionInputId, ExecutionScopeId } from '@deepseek-ai/dsh-execution-authority'
 import { Context } from '@deepseek-ai/cordis'
+import { setImmediate as nextTurn } from 'node:timers/promises'
 import { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
 import type { PtcBindingFunction, PtcRunRequest, PtcRunResult, PtcRunSpec } from '@deepseek-ai/dsh-ptc-runtime'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
@@ -38,7 +39,7 @@ async function setup(execute?: (bindings: HostBindings, spec: PtcRunSpec) => Pro
   await ctx.plugin(SandboxPolicy, { mode: 'read-only' })
   provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
-  ctx.subagents.registerProvider({
+  const removeProvider = ctx.subagents.registerProvider({
     name: 'stub',
     capabilities: { agentOptions: true, agentPreset: false, outputSchema: true, depthLimit: false },
     inheritsParentContext: false,
@@ -58,10 +59,214 @@ async function setup(execute?: (bindings: HostBindings, spec: PtcRunSpec) => Pro
   const start = () => ctx.workflowEngine.start({
     script: 'return null', meta: { name: 'host-test', description: 'workflow callbacks' }, parent,
   })
-  return { ctx, runtime, start, parent }
+  return { ctx, runtime, start, parent, removeProvider }
 }
 
 describe('workflow host callback validation', () => {
+  it('confirms retained child cleanup through the original subagent service', async () => {
+    let allowCleanup = false
+    const f = await setup(async (bindings) => {
+      await bindings.startChild!({ prompt: 'owned child' })
+      return completed
+    })
+    f.removeProvider()
+    let starts = 0
+    f.ctx.subagents.registerProvider({ name: 'stub', inheritsParentContext: false,
+      capabilities: { agentOptions: true, agentPreset: false, outputSchema: true, depthLimit: true },
+      start: async () => ({ id: SessionId(`retained-child-${++starts}`), localAgent: undefined,
+        result: Promise.resolve({ output: [], stopReason: 'completed' }),
+        dispose: async () => { if (!allowCleanup) throw new Error('child remains live') } }) })
+    const run = f.start()
+    try {
+      await run.result
+      await expect(run.dispose()).rejects.toThrow('cleanup')
+      const retained = run.retainFailedCleanup()
+      allowCleanup = true
+      const next = await f.ctx.subagents.start('stub', { parent: f.parent,
+        signal: new AbortController().signal, prompt: [{ type: 'text', text: 'next' }] })
+      await retained
+      await run.retainFailedCleanup()
+      await next.dispose()
+      expect(starts).toBe(2)
+    } finally {
+      allowCleanup = true
+      await run.dispose()
+    }
+  })
+
+  it.each(['inheriting', 'fresh', 'removed'] as const)('refuses a %s provider change before its first child', async (change) => {
+    const entered = Promise.withResolvers<undefined>(), proceed = Promise.withResolvers<undefined>()
+    const f = await setup(async (bindings) => {
+      entered.resolve(undefined)
+      await proceed.promise
+      await bindings.startChild!({ prompt: 'fresh child' })
+      return completed
+    })
+    const selected = f.ctx.subagents.getProvider('stub')!
+    const oldStart = vi.spyOn(selected, 'start')
+    const replacementStart = vi.fn(selected.start.bind(selected))
+    const replacement = { ...selected, inheritsParentContext: change === 'inheriting', start: replacementStart }
+    const run = f.start()
+    try {
+      await entered.promise
+      f.removeProvider()
+      if (change !== 'removed') f.ctx.subagents.registerProvider(replacement)
+      proceed.resolve(undefined)
+      const result = await run.result
+      expect(result.stopReason).toBe('error')
+      expect(result.error).toContain('changed after workflow admission')
+      expect(oldStart).not.toHaveBeenCalled()
+      expect(replacementStart).not.toHaveBeenCalled()
+    } finally {
+      proceed.resolve(undefined)
+      await run.dispose()
+    }
+  })
+
+  it.each(['inheriting', 'fresh', 'removed'] as const)('finishes an owned child but refuses the next on a %s provider change', async (change) => {
+    const entered = Promise.withResolvers<undefined>(), proceed = Promise.withResolvers<undefined>()
+    const f = await setup(async (bindings) => {
+      await bindings.startChild!({ prompt: 'admitted child' })
+      entered.resolve(undefined)
+      await proceed.promise
+      await bindings.childResult!({ callId: 1 })
+      await bindings.disposeChild!({ callId: 1 })
+      await bindings.startChild!({ prompt: 'next child' })
+      return completed
+    })
+    const selected = f.ctx.subagents.getProvider('stub')!
+    const oldStart = vi.spyOn(selected, 'start')
+    const replacementStart = vi.fn(selected.start.bind(selected))
+    const replacement = { ...selected, inheritsParentContext: change === 'inheriting', start: replacementStart }
+    const run = f.start()
+    try {
+      await entered.promise
+      f.removeProvider()
+      if (change !== 'removed') f.ctx.subagents.registerProvider(replacement)
+      proceed.resolve(undefined)
+      const result = await run.result
+      expect(result.stopReason).toBe('error')
+      expect(result.error).toContain('changed after workflow admission')
+      expect(oldStart).toHaveBeenCalledOnce()
+      expect(replacementStart).not.toHaveBeenCalled()
+      await run.dispose()
+      if (change === 'removed') f.ctx.subagents.registerProvider(replacement)
+      f.runtime.execute = async (spec) => {
+        await spec.bindings[0]!.functions.startChild!({ prompt: 'new workflow child' })
+        return completed
+      }
+      const freshRun = f.start()
+      try {
+        expect((await freshRun.result).stopReason).toBe('completed')
+        expect(replacementStart).toHaveBeenCalledOnce()
+      } finally { await freshRun.dispose() }
+    } finally {
+      proceed.resolve(undefined)
+      await run.dispose()
+    }
+  })
+
+  it('joins cancellation with an in-flight worker child disposal', async () => {
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    let active = true
+    const childDispose = vi.fn(async () => {
+      entered.resolve(undefined)
+      await release.promise
+      active = false
+    })
+    const f = await setup(async (bindings) => {
+      await bindings.startChild!({ prompt: 'owned child' })
+      await bindings.disposeChild!({ callId: 1 })
+      return completed
+    })
+    vi.spyOn(f.ctx.subagents, 'start').mockResolvedValue({
+      id: SessionId('overlapping-cleanup-child'), localAgent: undefined,
+      result: Promise.resolve({ output: [], stopReason: 'completed' }), dispose: childDispose,
+    })
+    const run = f.start()
+    try {
+      await entered.promise
+      run.cancel('cancel during child disposal')
+      let settled = false
+      const stopping = run.dispose().then(() => { settled = true })
+      await nextTurn()
+      expect(childDispose).toHaveBeenCalledOnce()
+      expect(settled).toBe(false)
+      expect(active).toBe(true)
+      release.resolve(undefined)
+      await stopping
+      expect(active).toBe(false)
+      expect((await run.result).stopReason).toBe('cancelled')
+    } finally {
+      release.resolve(undefined)
+      await run.dispose()
+    }
+  })
+
+  it('retains failed child cleanup for shared disposal retries', async () => {
+    const f = await setup(async (bindings) => {
+      await bindings.startChild!({ prompt: 'owned child' })
+      return completed
+    })
+    let allowCleanup = false, active = true
+    const childDispose = vi.fn(async () => {
+      if (!allowCleanup) throw new Error('child cleanup remains unconfirmed')
+      active = false
+    })
+    vi.spyOn(f.ctx.subagents, 'start').mockResolvedValue({
+      id: SessionId('cleanup-owned-child'), localAgent: undefined,
+      result: Promise.resolve({ output: [], stopReason: 'completed' }), dispose: childDispose,
+    })
+    const run = f.start()
+    try {
+      expect((await run.result).stopReason).toBe('completed')
+      const first = run.dispose()
+      expect(run.dispose()).toBe(first)
+      await expect(first).rejects.toThrow(/cleanup/i)
+      expect(active).toBe(true)
+      allowCleanup = true
+      const retry = run.dispose()
+      expect(retry).not.toBe(first)
+      await retry
+      expect(active).toBe(false)
+      expect(run.dispose()).toBe(retry)
+    } finally {
+      allowCleanup = true
+      await run.dispose()
+      await childDispose()
+    }
+  })
+
+  it('preserves a failed explicit child disposal for the next worker request', async () => {
+    let allowCleanup = false, active = true
+    const childDispose = vi.fn(async () => {
+      if (!allowCleanup) throw new Error('child cleanup remains unconfirmed')
+      active = false
+    })
+    const f = await setup(async (bindings) => {
+      await bindings.startChild!({ prompt: 'owned child' })
+      await expect(bindings.disposeChild!({ callId: 1 })).rejects.toThrow('child cleanup remains unconfirmed')
+      expect(active).toBe(true)
+      allowCleanup = true
+      await bindings.disposeChild!({ callId: 1 })
+      return completed
+    })
+    vi.spyOn(f.ctx.subagents, 'start').mockResolvedValue({
+      id: SessionId('explicit-cleanup-child'), localAgent: undefined,
+      result: Promise.resolve({ output: [], stopReason: 'completed' }), dispose: childDispose,
+    })
+    const run = f.start()
+    try {
+      expect((await run.result).stopReason).toBe('completed')
+      expect(active).toBe(false)
+      expect(childDispose).toHaveBeenCalledTimes(2)
+    } finally {
+      allowCleanup = true
+      await run.dispose()
+      await childDispose()
+    }
+  })
+
   it('runs an unconfined provider under full access without forwarding a sandbox policy', async () => {
     const { runtime, parent, start } = await setup(async (_bindings, spec) => {
       expect(spec.sandboxPolicy).toBeUndefined()

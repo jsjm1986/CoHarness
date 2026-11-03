@@ -1,0 +1,13 @@
+{
+  "name": "activity-performance-note-pair",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-17-project-activity-feed.md",
+  "startedAt": "2026-10-23T20:21:16.593609+00:00",
+  "seconds": 2.042,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "200f0aff5440021d09e89a0432937be2ed9452e22ad909d19d320158eeb04b45",
+  "inputsAfter": "200f0aff5440021d09e89a0432937be2ed9452e22ad909d19d320158eeb04b45",
+  "outputSha256": "6a94e29c171d9c831d8c989db2c5d739a824a380bf72672668faee0ecf58ec22",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/feature/2026-10-17-project-activity-feed.md\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-10-17-project-activity-feed.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

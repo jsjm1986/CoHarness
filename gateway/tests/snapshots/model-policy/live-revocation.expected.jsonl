@@ -1,0 +1,4 @@
+{"type":"default","provider":"p","model":"m"}
+{"type":"adapter-request"}
+{"type":"request-before","finish":"stop"}
+{"type":"request-after","finish":"error","code":"MODEL_FORBIDDEN"}

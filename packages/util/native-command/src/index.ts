@@ -23,3 +23,5 @@ export { nativeFileApplications, openNativeFileApplication } from './file-applic
 export type { NativeFileApplication } from './types.ts'
 
 export { desktopEntryFields, desktopDataDirectories, desktopApplicationIcon } from './desktop-entry.ts'
+export { inspectDesktopEnvironment } from './desktop-environment.ts'
+export type { DesktopEnvironment, DesktopEnvironmentInternals } from './desktop-environment.ts'

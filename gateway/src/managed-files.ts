@@ -9,6 +9,8 @@ interface FileMetadata {
   mode: number
   uid: number
   gid: number
+  /** Original kernel evidence; content comparison deliberately excludes this restore-varying value. */
+  object?: { device: string; inode: string }
 }
 
 /** One regular file captured alongside a database dump. */
@@ -17,6 +19,8 @@ export interface ManagedFileEntry extends FileMetadata {
   sourcePath: string
   sizeBytes: number
   sha256: string
+  /** Original nanosecond timestamp expressed in milliseconds for identity-aware restoration. */
+  modifiedAt?: number
 }
 
 /** Complete directory membership, including empty directories and absent declared roots. */
@@ -79,16 +83,20 @@ export async function normalizeManagedRoots(paths: readonly ManagedDataPath[]): 
   return result
 }
 
-function metadata(info: { mode: number; uid: number; gid: number }): FileMetadata {
-  return { mode: info.mode & 0o777, uid: info.uid, gid: info.gid }
+function metadata(info: { mode: bigint; uid: bigint; gid: bigint; dev: bigint; ino: bigint }): FileMetadata {
+  return { mode: Number(info.mode & 0o7777n), uid: Number(info.uid), gid: Number(info.gid),
+    object: { device: String(info.dev), inode: String(info.ino) } }
 }
 
-async function fingerprint(path: string, destination?: string, signal?: AbortSignal): Promise<{ sizeBytes: number; sha256: string }> {
+async function fingerprint(path: string, destination?: string, signal?: AbortSignal): Promise<{
+  sizeBytes: number; sha256: string; object: { device: string; inode: string }; modifiedAt: number
+}> {
   signal?.throwIfAborted()
   const source = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
   let copied: Awaited<ReturnType<typeof open>> | undefined
   try {
     const before = await source.stat()
+    const original = await source.stat({ bigint: true })
     if (!before.isFile()) throw new Error(`Managed data is not a regular file: ${path}`)
     if (destination !== undefined) copied = await open(destination, 'wx', 0o600)
     const hash = createHash('sha256'), buffer = Buffer.allocUnsafe(1024 * 1024)
@@ -102,7 +110,12 @@ async function fingerprint(path: string, destination?: string, signal?: AbortSig
       sizeBytes += bytesRead
       if (copied !== undefined) {
         let position = 0
-        while (position < bytesRead) position += (await copied.write(bytes.subarray(position))).bytesWritten
+        while (position < bytesRead) {
+          signal?.throwIfAborted()
+          const { bytesWritten } = await copied.write(bytes.subarray(position))
+          if (bytesWritten === 0) throw new Error('Managed file write made no progress')
+          position += bytesWritten
+        }
       }
     }
     const after = await source.stat(), current = await lstat(path)
@@ -111,7 +124,9 @@ async function fingerprint(path: string, destination?: string, signal?: AbortSig
       throw new Error(`Managed file changed during backup: ${path}`)
     }
     await copied?.sync()
-    return { sizeBytes, sha256: hash.digest('hex') }
+    signal?.throwIfAborted()
+    return { sizeBytes, sha256: hash.digest('hex'),
+      object: { device: String(original.dev), inode: String(original.ino) }, modifiedAt: Number(original.mtimeNs) / 1e6 }
   } finally {
     await Promise.all([source.close(), copied?.close()])
   }
@@ -121,18 +136,19 @@ async function fingerprint(path: string, destination?: string, signal?: AbortSig
  * Capture a regular artifact through one no-follow descriptor and hash the copied bytes.
  * @param source - caller-authorized file; replacement or mutation during copying fails.
  * @param destination - exclusively created private staging file.
- * @param signal - operation lifetime.
+ * @param signal - operation lifetime, checked between partial writes and after synchronization.
  * @returns the copied size and digest after flushing its bytes.
  */
 export async function copyVerifiedFile(source: string, destination: string, signal?: AbortSignal): Promise<{ sizeBytes: number; sha256: string }> {
-  return fingerprint(source, destination, signal)
+  const { sizeBytes, sha256 } = await fingerprint(source, destination, signal)
+  return { sizeBytes, sha256 }
 }
 
 /**
  * Scan every selected data member and optionally capture its bytes in private storage.
  * @param paths - explicitly owned roots; callers must hold the writer exclusion lease.
  * @param filesDir - new private snapshot directory, or absent for a read-only comparison.
- * @param signal - aborts between reads and entries.
+ * @param signal - aborts between reads, partial writes and entries, and after synchronization.
  * @returns a complete sorted membership and content manifest.
  */
 export async function snapshotManagedFiles(paths: readonly ManagedDataPath[], filesDir?: string, signal?: AbortSignal): Promise<ManagedSnapshot> {
@@ -144,7 +160,10 @@ export async function snapshotManagedFiles(paths: readonly ManagedDataPath[], fi
   const snapshot: ManagedSnapshot = { version: 1, roots, directories: [], absent: [], files: [] }
   async function visit(path: string, root: boolean, declaredKind?: ManagedDataPath['kind']): Promise<void> {
     signal?.throwIfAborted()
-    const info = await infoOrAbsent(path)
+    const info = await lstat(path, { bigint: true }).catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+      throw error
+    })
     if (info === undefined) {
       if (!root) throw new Error(`Managed data disappeared during backup: ${path}`)
       snapshot.absent.push(path)
@@ -153,12 +172,19 @@ export async function snapshotManagedFiles(paths: readonly ManagedDataPath[], fi
     } else if (declaredKind !== undefined && (info.isDirectory() ? 'directory' : 'file') !== declaredKind) {
       throw new Error(`Managed data root has the wrong kind: ${path}`)
     } else if (info.isDirectory()) {
-      const names = (await readdir(path)).sort()
+      const transient = (name: string): boolean => roots.some(row => row.owner.startsWith('gateway-documents/')
+        && (row.owner.endsWith('/metadata') && row.path === path && name === 'mutation.lock'
+          || row.owner.endsWith('/files') && row.path === path && name === 'domain.lock'))
+      const names = (await readdir(path)).filter(name => !transient(name)).sort()
       snapshot.directories.push({ path, ...metadata(info) })
       for (const name of names) await visit(join(path, name), false)
-      const after = await lstat(path)
-      if (after.dev !== info.dev || after.ino !== info.ino || after.ctimeMs !== info.ctimeMs
-        || JSON.stringify((await readdir(path)).sort()) !== JSON.stringify(names)) throw new Error(`Managed directory changed during backup: ${path}`)
+      const after = await lstat(path, { bigint: true })
+      const ignoresLocks = transient('mutation.lock') || transient('domain.lock')
+      if (after.dev !== info.dev || after.ino !== info.ino || after.mode !== info.mode || after.uid !== info.uid || after.gid !== info.gid
+        || !ignoresLocks && after.ctimeNs !== info.ctimeNs
+        || JSON.stringify((await readdir(path)).filter(name => !transient(name)).sort()) !== JSON.stringify(names)) {
+        throw new Error(`Managed directory changed during backup: ${path}`)
+      }
     } else {
       const member = `${snapshot.files.length.toString().padStart(8, '0')}.data`
       const digest = await fingerprint(path, filesDir === undefined ? undefined : join(filesDir, member), signal)
@@ -185,7 +211,12 @@ function integer(value: unknown, max = Number.MAX_SAFE_INTEGER): number {
 }
 
 function parseMetadata(value: Record<string, unknown>): FileMetadata {
-  return { mode: integer(value.mode, 0o777), uid: integer(value.uid), gid: integer(value.gid) }
+  const entry = { mode: integer(value.mode, 0o7777), uid: integer(value.uid), gid: integer(value.gid) }
+  if (value.object === undefined) return entry
+  const original = object(value.object)
+  if (typeof original.device !== 'string' || !/^\d+$/u.test(original.device)
+    || typeof original.inode !== 'string' || !/^[1-9]\d*$/u.test(original.inode)) throw new Error('Invalid managed snapshot object identity')
+  return { ...entry, object: { device: original.device, inode: original.inode } }
 }
 
 /**
@@ -208,23 +239,38 @@ export function parseManagedSnapshot(value: unknown): ManagedSnapshot {
     const entry = object(item)
     if (typeof entry.member !== 'string' || !/^\d{8,}\.data$/u.test(entry.member)
       || typeof entry.sha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(entry.sha256)) throw new Error('Invalid managed snapshot member')
-    return { member: entry.member, sourcePath: absolute(entry.sourcePath), sizeBytes: integer(entry.sizeBytes), sha256: entry.sha256, ...parseMetadata(entry) }
+    if (entry.modifiedAt !== undefined && (typeof entry.modifiedAt !== 'number' || !Number.isFinite(entry.modifiedAt)
+      || entry.modifiedAt < 0)) throw new Error('Invalid managed snapshot modification time')
+    return { member: entry.member, sourcePath: absolute(entry.sourcePath), sizeBytes: integer(entry.sizeBytes), sha256: entry.sha256,
+      ...parseMetadata(entry), ...entry.modifiedAt === undefined ? {} : { modifiedAt: entry.modifiedAt } }
   })
   const allPaths = [...absent, ...directories.map(dir => dir.path), ...files.map(file => file.sourcePath)]
-  if (new Set(roots.map(root => root.path)).size !== roots.length
-    || new Set(allPaths).size !== allPaths.length || new Set(files.map(file => file.member)).size !== files.length) throw new Error('Duplicate managed snapshot member')
+  const rootsByPath = new Map(roots.map(root => [root.path, root]))
+  const directoryPaths = new Set(directories.map(dir => dir.path))
+  const filePaths = new Set(files.map(file => file.sourcePath))
+  const absentPaths = new Set(absent)
+  if (rootsByPath.size !== roots.length || new Set(allPaths).size !== allPaths.length
+    || new Set(files.map(file => file.member)).size !== files.length) throw new Error('Duplicate managed snapshot member')
+  const directoryRootAbove = (path: string): ManagedDataPath | undefined => {
+    for (let parent = dirname(path); parent !== path; parent = dirname(path)) {
+      const root = rootsByPath.get(parent)
+      if (root?.kind === 'directory') return root
+      path = parent
+    }
+    return undefined
+  }
   for (const root of roots) {
-    if (roots.some(other => other !== root && other.kind === 'directory' && beneath(other.path, root.path))) throw new Error('Overlapping managed snapshot roots')
-    if (!absent.includes(root.path) && !(root.kind === 'file' ? files.some(file => file.sourcePath === root.path) : directories.some(dir => dir.path === root.path))) throw new Error('Managed snapshot root is missing')
+    if (directoryRootAbove(root.path) !== undefined) throw new Error('Overlapping managed snapshot roots')
+    if (!absentPaths.has(root.path) && !(root.kind === 'file' ? filePaths.has(root.path) : directoryPaths.has(root.path))) throw new Error('Managed snapshot root is missing')
   }
   for (const path of allPaths) {
-    const root = roots.find(root => path === root.path || (root.kind === 'directory' && beneath(root.path, path)))
-    if (root === undefined || (absent.includes(root.path) && path !== root.path)) throw new Error('Managed snapshot member is outside its root')
-    if (path !== root.path && !directories.some(dir => dir.path === dirname(path))) throw new Error('Managed snapshot parent is missing')
-    if (root.kind === 'file' && directories.some(dir => dir.path === path)) throw new Error('File root cannot contain a directory')
-    if (root.kind === 'directory' && path === root.path && files.some(file => file.sourcePath === path)) throw new Error('Directory root cannot contain a file at its root')
+    const root = rootsByPath.get(path) ?? directoryRootAbove(path)
+    if (root === undefined || (absentPaths.has(root.path) && path !== root.path)) throw new Error('Managed snapshot member is outside its root')
+    if (path !== root.path && !directoryPaths.has(dirname(path))) throw new Error('Managed snapshot parent is missing')
+    if (root.kind === 'file' && directoryPaths.has(path)) throw new Error('File root cannot contain a directory')
+    if (root.kind === 'directory' && path === root.path && filePaths.has(path)) throw new Error('Directory root cannot contain a file at its root')
   }
-  if (absent.some(path => !roots.some(root => root.path === path))) throw new Error('Only a managed root may be recorded as absent')
+  if (absent.some(path => !rootsByPath.has(path))) throw new Error('Only a managed root may be recorded as absent')
   return { version: 1, roots, directories, absent, files }
 }
 

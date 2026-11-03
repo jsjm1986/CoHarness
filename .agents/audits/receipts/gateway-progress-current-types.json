@@ -1,0 +1,13 @@
+{
+  "name": "gateway-progress-current-types",
+  "cwd": "gateway",
+  "command": "npm run typecheck",
+  "startedAt": "2026-10-23T21:20:34.449571+00:00",
+  "seconds": 5.156,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bd9a15ab2ed290a82718a807ac0f28b1c39a7459fbe333ef38882e9333ec78e1",
+  "inputsAfter": "bd9a15ab2ed290a82718a807ac0f28b1c39a7459fbe333ef38882e9333ec78e1",
+  "outputSha256": "8fa1cf5506304e8abac55868e7f1a136c9b1dde57a3981a382da4c21ea129a6f",
+  "outputTail": "\n> typecheck\n> tsc --noEmit\n\n"
+}

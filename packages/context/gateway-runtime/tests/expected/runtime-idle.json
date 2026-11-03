@@ -1,0 +1,10 @@
+{
+  "waiting": {
+    "policy": "on-demand",
+    "canStop": false
+  },
+  "afterDeletion": {
+    "policy": "on-demand",
+    "canStop": true
+  }
+}

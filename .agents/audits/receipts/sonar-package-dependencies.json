@@ -1,0 +1,14 @@
+{
+  "name": "sonar-package-dependencies",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-package-dependencies.ts",
+  "startedAt": "2026-10-24T09:33:52.916337+00:00",
+  "seconds": 174.076,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "inputsAfter": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "postgresToolDirectory": null,
+  "outputSha256": "1d1a928deeadaa4c69c0c615d25f1cecfeda129a4a7384b629264350dd004013",
+  "outputTail": "verify-package-dependencies: 70 package(s) match the published dependency policy (5 Client-only, 63 Client/Host, 2 configured Host).\n"
+}

@@ -1,0 +1,4 @@
+{"scenario":"local-sweep-only","localRequests":1,"foreignRequests":0,"foreignLeaseRows":0}
+{"scenario":"owning-node-request-and-usage","projects":2,"requests":2,"requestNodesMatchProjects":true,"deliveredUsagePerProject":17,"activeAfterCompletion":0}
+{"scenario":"source-receipt-replay","repeatedSweeps":2,"extraRequests":0}
+{"scenario":"nul-source-and-progress","originalEvents":true,"activityRows":2,"questionCorrelated":true,"pendingConsumed":2,"exactRequestAndSession":true,"citedTitleOriginal":true,"summaryContainsNul":true,"projectUsageTokens":34,"extraReplayRequests":0,"activeAfter":0}

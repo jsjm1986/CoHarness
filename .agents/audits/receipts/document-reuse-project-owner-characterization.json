@@ -1,0 +1,14 @@
+{
+  "name": "document-reuse-project-owner-characterization",
+  "cwd": ".",
+  "command": "node .agents/audits/.local/document-reuse-project-probe.mjs",
+  "startedAt": "2026-10-25T03:50:02.063530+00:00",
+  "seconds": 0.521,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4817d936b1e9aac3dd128d3bdfdecc7917eab9942b7a27da87a59054af2b50f7",
+  "inputsAfter": "4817d936b1e9aac3dd128d3bdfdecc7917eab9942b7a27da87a59054af2b50f7",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "9aa01ed6a6ba5134a72d00a76416fc87d22e9c7b5e184b7cd8abb54a62dba396",
+  "outputTail": "node:internal/fs/promises:953\n  const result = await PromisePrototypeThen(\n                 ^\n\nError: ENOENT: no such file or directory, scandir '/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/deploy/postgres/migrations'\n    at async readdir (node:internal/fs/promises:953:18)\n    at async migrationFiles (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/postgres/database.js:360:20)\n    at async runMigrations (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/postgres/database.js:413:24)\n    at async file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/.agents/audits/.local/document-reuse-project-probe.mjs:26:3 {\n  errno: -2,\n  code: 'ENOENT',\n  syscall: 'scandir',\n  path: '/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/deploy/postgres/migrations'\n}\n\nNode.js v25.8.1\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-native-node24-isolated",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/run-managed-native-ssh.py lib /Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+  "startedAt": "2026-10-25T13:11:03.469105+00:00",
+  "seconds": 17.332,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "inputsAfter": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "postgresToolDirectory": null,
+  "outputSha256": "13d33213bad44ab50114cad6c245bb3045e63617fe106d1751b21536e581c519",
+  "outputTail": "{\"artifact\":\"lib\",\"node\":\"v24.19.0\",\"nativeOpenSSH\":true,\"scenarios\":[{\"mode\":\"one-shot\",\"outcome\":\"completed\",\"nativeRequests\":2,\"modelAdmissions\":2,\"usageOwners\":[\"ssh-model-parent\"],\"originalActor\":true,\"allPermitsSettled\":true,\"upstreamKeyStayedInParent\":true,\"nativeProcessesStopped\":true,\"remoteModelListenersClosed\":true,\"memberColdResume\":false},{\"mode\":\"member\",\"outcome\":\"completed\",\"nativeRequests\":4,\"modelAdmissions\":4,\"usageOwners\":[\"ssh-model-member\"],\"originalActor\":true,\"allPermitsSettled\":true,\"upstreamKeyStayedInParent\":true,\"nativeProcessesStopped\":true,\"remoteModelListenersClosed\":true,\"memberColdResume\":true},{\"mode\":\"revoked\",\"outcome\":\"error\",\"nativeRequests\":1,\"modelAdmissions\":2,\"usageOwners\":[\"ssh-model-parent\"],\"originalActor\":true,\"allPermitsSettled\":true,\"upstreamKeyStayedInParent\":true,\"nativeProcessesStopped\":true,\"remoteModelListenersClosed\":true,\"memberColdResume\":false},{\"mode\":\"quota\",\"outcome\":\"error\",\"nativeRequests\":1,\"modelAdmissions\":2,\"usageOwners\":[\"ssh-model-parent\"],\"originalActor\":true,\"allPermitsSettled\":true,\"upstreamKeyStayedInParent\":true,\"nativeProcessesStopped\":true,\"remoteModelListenersClosed\":true,\"memberColdResume\":false},{\"mode\":\"durability\",\"outcome\":\"error\",\"nativeRequests\":0,\"modelAdmissions\":0,\"usageOwners\":[],\"originalActor\":null,\"allPermitsSettled\":true,\"upstreamKeyStayedInParent\":true,\"nativeProcessesStopped\":true,\"remoteModelListenersClosed\":true,\"memberColdResume\":false}]}\n"
+}

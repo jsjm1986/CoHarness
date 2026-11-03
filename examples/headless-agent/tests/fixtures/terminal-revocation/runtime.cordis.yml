@@ -1,0 +1,7 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, terminalRevocationReady]
+- insert:
+    - id: terminal-revocation-model
+      name: './model.mjs'

@@ -1,0 +1,14 @@
+{
+  "name": "memory-recall-disposal-before",
+  "cwd": ".",
+  "command": "pnpm exec vitest run packages/memory/memory-context/tests/memory-context.spec.ts -t 'joins real selector cleanup' --retry=0",
+  "startedAt": "2026-10-24T01:27:46.167293+00:00",
+  "seconds": 5.858,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9ac8a0ad8a472f4cb8b8d46f71cfcbe749965bf075e0894a79d3593819eae6bd",
+  "inputsAfter": "9ac8a0ad8a472f4cb8b8d46f71cfcbe749965bf075e0894a79d3593819eae6bd",
+  "postgresToolDirectory": null,
+  "outputSha256": "6a6b7813f6a6295163a690257da3a3b9d0a36ed01bb0cb056c550fb38e479dc6",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/memory/memory-context/tests/memory-context.spec.ts (44 tests | 2 failed | 42 skipped) 30ms\n     × joins real selector cleanup during unload (Session already disposed: false) 25ms\n     × joins real selector cleanup during unload (Session already disposed: true) 4ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/memory/memory-context/tests/memory-context.spec.ts > memory recall > joins real selector cleanup during unload (Session already disposed: false)\n FAIL  |thread-safe| packages/memory/memory-context/tests/memory-context.spec.ts > memory recall > joins real selector cleanup during unload (Session already disposed: true)\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ packages/memory/memory-context/tests/memory-context.spec.ts:572:36\n    570|       closing = h.contextFiber.dispose().then(() => { disposed = true …\n    571|       await setImmediate()\n    572|       expect(modelSignal?.aborted).toBe(true)\n       |                                    ^\n    573|       await cleanup.promise\n    574|       expect(disposed).toBe(false)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 42 skipped (44)\n   Start at  09:27:50\n   Duration  1.92s (transform 1.45s, setup 46ms, import 1.74s, tests 30ms, environment 0ms)\n\n"
+}

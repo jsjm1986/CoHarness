@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-supervisor-first-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p gateway/tsconfig.build.json --noEmit",
+  "startedAt": "2026-10-24T19:04:29.100139+00:00",
+  "seconds": 4.44,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cce6f46be5dfaed19117077205ada6ff8a42111f2df159725fb014cbaa7978de",
+  "inputsAfter": "cce6f46be5dfaed19117077205ada6ff8a42111f2df159725fb014cbaa7978de",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

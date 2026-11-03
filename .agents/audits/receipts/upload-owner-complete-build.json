@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-complete-build",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/build.ts",
+  "startedAt": "2026-10-25T10:13:20.956594+00:00",
+  "seconds": 25.834,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "dd33c31813b258c904f72ddf9ac9b2fc7af230447c0beb1f413d6ed53b62a919",
+  "inputsAfter": "dd33c31813b258c904f72ddf9ac9b2fc7af230447c0beb1f413d6ed53b62a919",
+  "postgresToolDirectory": null,
+  "outputSha256": "cecbd4ced2b2291c1342df88ac08e382c5fbbfb6598ed01a3cfea8fb30c25580",
+  "outputTail": "run-gates: build running 8 gate(s) with 8 worker(s) from 10 local default worker(s) of 10 CPU(s).\nrun-gates: start native addon\nrun-gates: PASS native addon (1.01s)\nrun-gates: start host compiler\nrun-gates: PASS host compiler (1.94s)\nrun-gates: start Host bundle\nrun-gates: start host aggregate check\nrun-gates: PASS Host bundle (9.51s)\nrun-gates: start client compiler\nrun-gates: PASS client compiler (0.55s)\nrun-gates: start Client bundle\nrun-gates: start client aggregate check\n\n== FAILED host aggregate check (11.73s) ==\ncommand: tsc -p tsconfig.host.json\noutcome: exit 2\npackages/attachment/userdoc-local/tests/upload.spec.ts(77,17): error TS2445: Property 'ctx' is protected and only accessible within class 'Service<T>' and its subclasses.\nrun-gates: PASS client aggregate check (3.76s)\nrun-gates: PASS Client bundle (6.00s)\nrun-gates: start Web build\nrun-gates: PASS Web build (3.83s)\n\nrun-gates: 7 passed, 1 failed, 0 skipped in 22.83s.\nrun-gates: unsuccessful gates:\n  - FAILED host aggregate check (11.73s, exit 2)\n    tsc -p tsconfig.host.json\n"
+}

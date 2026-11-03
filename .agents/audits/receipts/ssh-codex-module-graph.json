@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-module-graph",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-module-graph.ts",
+  "startedAt": "2026-10-25T12:33:59.513831+00:00",
+  "seconds": 1.616,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4ec14dcb9a48d99a3fd4a789051b7db2011757e8a0daaed8efe02ca7ed7b0cd5",
+  "inputsAfter": "4ec14dcb9a48d99a3fd4a789051b7db2011757e8a0daaed8efe02ca7ed7b0cd5",
+  "postgresToolDirectory": null,
+  "outputSha256": "6d979a28bd6ad09f46a132db644bbcf304f8debbfc2fcd9110794a092eacb6a7",
+  "outputTail": "gen-module-graph: 3 artifact(s) computed, 3 written.\n"
+}

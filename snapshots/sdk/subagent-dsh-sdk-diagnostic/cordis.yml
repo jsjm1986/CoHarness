@@ -23,6 +23,8 @@
     enabled: true
 
 - insert:
+    - id: throwing-core-observers
+      name: '../../../examples/jsonrpc-agent/tests/fixtures/subagent/subagent-dsh-sdk/throwing-observers.ts'
     - id: subagent-dsh-sdk-diagnostic
       name: '@deepseek-ai/dsh-subagent-dsh-sdk'
       config:

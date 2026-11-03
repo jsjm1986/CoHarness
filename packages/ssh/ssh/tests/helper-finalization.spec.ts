@@ -53,7 +53,7 @@ async function harness(child: ReturnType<typeof nativeProcess>, control: boolean
   })
   await ctx.plugin(LocalFileSystem)
   await ctx.plugin(LocalSubprocessRuntime)
-  vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue(child.handle)
+  vi.spyOn(ctx.subprocess, 'spawn').mockResolvedValue(child.handle)
   const prepared = await owner.prepare({
     argv: ['fixture-native-process'], cwd: root, graceMs: 100,
     stdio: { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', ...(control ? { control: 'pipe' } : {}) },

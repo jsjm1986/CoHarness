@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-02-scoped-model-request-origin.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-02-scoped-model-request-origin.md
+document:
+  en: f45eff9c8aca5dc721a2c2cda49f4c62989b960d
+  zh: 21ff36128b15e2deb49d1a213ab80d3d85e2c1ed
+/agent-note-scope-main-requests-to-their-live-llm-service:
+  en: bd1d224346685841
+  zh: cbad74e57ec1da6d
+/agent-note-scope-main-requests-to-their-live-llm-service/problem:
+  en: 8b8dd4456764fee6
+  zh: db45cd235fcafd56
+/agent-note-scope-main-requests-to-their-live-llm-service/decision:
+  en: 89e3648d0eeecf55
+  zh: 716c3b9606f13ec2
+/agent-note-scope-main-requests-to-their-live-llm-service/alternatives-considered:
+  en: ee4b2b406c8b44c5
+  zh: dfe2721f73e9bbe7
+/agent-note-scope-main-requests-to-their-live-llm-service/consequences:
+  en: 1146d720f3173775
+  zh: f9b4c16bc007f0e0

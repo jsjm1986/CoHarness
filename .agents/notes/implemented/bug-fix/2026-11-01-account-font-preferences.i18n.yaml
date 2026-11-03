@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-account-font-preferences.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-account-font-preferences.md
+document:
+  en: aaba6c780aaee6a6fd2d64137aa80721d087a8be
+  zh: 5f59deafe3202ca208951e03e61c42ddf12784e2
+/agent-note-shared-project-font-controls-retain-account-ownership:
+  en: 52a4e28633d34b1f
+  zh: b8beb7c781f5b2ab
+/agent-note-shared-project-font-controls-retain-account-ownership/problem:
+  en: 020c94613773bc77
+  zh: 0d75237e439fbfa6
+/agent-note-shared-project-font-controls-retain-account-ownership/decision:
+  en: 28c4326ca1bf121f
+  zh: a51b50e106efcf97
+/agent-note-shared-project-font-controls-retain-account-ownership/alternatives-considered:
+  en: a07703878594ad81
+  zh: 1c0b5da34493d0bc
+/agent-note-shared-project-font-controls-retain-account-ownership/consequences:
+  en: c4a7beb10b5463cf
+  zh: 21f2c5d1a47f6a92
+/agent-note-shared-project-font-controls-retain-account-ownership/verification:
+  en: a257a737935981b4
+  zh: 944b9b352704a2cf

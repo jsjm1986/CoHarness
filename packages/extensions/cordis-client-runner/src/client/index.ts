@@ -11,6 +11,8 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ConnectionHandle, ConnectionRuntimeTarget, SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import type { Config } from '../index.ts'
 import type {
   ApprovalRequestId, CordisDynamicPluginId, DynamicCordisInvokeResult, JsonValue,
@@ -24,10 +26,11 @@ import type { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { DynamicCordisLivePackage } from './runtime.ts'
 import { DynamicCordisPackageRunner } from './runtime.ts'
 import { CordisRunOrchestrator } from './orchestrator.ts'
+import type { ClientCordisInspectHost } from './inspect-registry.ts'
 import { ClientCordisInspectRegistry, provideClientCordisInspect } from './inspect-registry.ts'
 import { clientInspectProviders } from './providers.ts'
 import { provideClientTimer } from './timer.ts'
-import type { CordisRunActivity, CordisRunFailure, CordisUserRunRequest } from './orchestrator.ts'
+import type { CordisRunActivity, CordisRunFailure, CordisRunRequest, CordisUserRunRequest } from './orchestrator.ts'
 import type { CordisObservable, DynamicCordisRenderFailure } from './runtime.ts'
 
 export { CordisRunOrchestrator } from './orchestrator.ts'
@@ -64,6 +67,22 @@ export type {
  * makes it survive a remount.
  */
 export interface CordisRunnerFace {
+  /**
+   * Capture a Session's Runtime without starting it.
+   * @param sessionId - qualified Session identity from the document directory.
+   * @returns runner whose calls and contributions belong to that Runtime.
+   */
+  forSession(sessionId: SessionId): CordisRunnerFace
+  /**
+   * Capture an authorized Runtime without starting it.
+   * @param target - exact destination; omission keeps the bootstrap Runtime.
+   * @returns runner whose calls and contributions belong to the captured Runtime.
+   */
+  forTarget(target?: ConnectionRuntimeTarget): CordisRunnerFace
+  /** Namespace browser contributions without changing Host Plugin identities. */
+  readonly viewPrefix: string
+  /** Pending requests across already-connected Runtime runners in this document. */
+  readonly pendingApprovals: CordisObservable<readonly CordisPendingApproval[]>
   /** Each definition's in-flight run activity. */
   readonly activeRuns: CordisObservable<ReadonlyMap<CordisDynamicPluginId, CordisRunActivity>>
   /** The last failure of this page's own run attempt, per definition. */
@@ -123,6 +142,12 @@ export interface CordisRunnerFace {
   isLoaded(pluginId: CordisDynamicPluginId): boolean
 }
 
+/** A pending approval and the Session whose Runtime must answer it. */
+export interface CordisPendingApproval {
+  readonly sessionId: SessionId
+  readonly requestId: ApprovalRequestId
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Run orchestration and page-local load state: what run surfaces read and call. */
@@ -179,7 +204,7 @@ export const name = 'cordis-client-runner'
  * namespace parks this plugin until the host side exists, so a page never loads
  * a browser half whose host half it could not reach.
  */
-export const inject = ['loader', 'modules', 'slots', 'remote', 'remote.dynamicCordisRunner']
+export const inject = ['loader', 'modules', 'slots', 'remote', 'remote.dynamicCordisRunner', 'connection', 'sessions']
 
 /**
  * Client plugin body: build the runner and subscribe the dispatch family.
@@ -187,24 +212,102 @@ export const inject = ['loader', 'modules', 'slots', 'remote', 'remote.dynamicCo
  */
 export function apply(ctx: Context, config?: Config): void {
   provideClientTimer(ctx)
-  const inspect = new ClientCordisInspectRegistry({
+  const connection = ctx.get('connection') as ConnectionHandle
+  const scopes = new Map<ConnectionHandle, ReturnType<typeof createRuntimeRunner>>()
+  const sessionRunners = new Map<SessionId, CordisRunnerFace>()
+  let nextPriority = 0
+  const listeners = new Set<() => void>()
+  let pendingCache: readonly CordisPendingApproval[] | undefined
+  const pendingApprovals: CordisObservable<readonly CordisPendingApproval[]> = {
+    getSnapshot: () => pendingCache ??= [...scopes.values()].flatMap(scope =>
+      [...scope.face.activeRuns.getSnapshot().values()].flatMap(activity => activity.phase === 'awaiting-approval'
+        ? [{ sessionId: activity.agentId, requestId: activity.requestId }] : [])),
+    subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener) } },
+  }
+  const changed = (): void => { pendingCache = undefined; for (const listener of listeners) listener() }
+  const inspectHostFor = (remote: ClientRemote, transport: ConnectionHandle): ClientCordisInspectHost => ({
     sync: async (providers) => {
-      const answered = await ctx.remote.dynamicCordisRunner.syncInspectManifest(providers)
-      if (!answered.ok) throw new Error(`${answered.error.code}: ${answered.error.message}`)
+      if (transport.state.getSnapshot() !== 'connected') return
+      const result = await remote.dynamicCordisRunner.syncInspectManifest(providers)
+      if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`)
     },
-    resolve: async (agentId, requestId, resolution) => {
-      const answered = await ctx.remote.dynamicCordisRunner.resolveInspectQuery(agentId, requestId, resolution)
-      if (!answered.ok) throw new Error(`${answered.error.code}: ${answered.error.message}`)
+    resolve: async (sessionId, requestId, resolution) => {
+      const result = await remote.dynamicCordisRunner.resolveInspectQuery(sessionId, requestId, resolution)
+      if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`)
     },
   })
+  const baseRemote = ctx.remote.$forTarget()
+  const baseHost = inspectHostFor(baseRemote, connection)
+  const inspect = new ClientCordisInspectRegistry(baseHost)
+  ctx.effect(() => () => { inspect.dispose() }, 'cordis-client-runner: inspect query lifetime')
   provideClientCordisInspect(ctx, inspect)
   for (const provider of clientInspectProviders(ctx)) {
     ctx.effect(() => inspect.register(provider), `cordis-client-runner: inspect ${provider.manifest.id}`)
   }
-  ctx.on('connection/reset', () => { inspect.publish() })
+  const forTarget = (target?: ConnectionRuntimeTarget): CordisRunnerFace => {
+    const transport = target === undefined ? connection : connection.forTarget?.(target)
+    if (transport === undefined) throw new Error('Dynamic Plugin Runtime transport is unavailable')
+    const previous = scopes.get(transport)
+    if (previous !== undefined) return previous.face
+    const remote = target === undefined || transport === connection ? baseRemote : ctx.remote.$forTarget(target)
+    const host = transport === connection ? baseHost : inspectHostFor(remote, transport)
+    if (host !== baseHost) ctx.effect(() => inspect.addHost(host), 'cordis-client-runner: Runtime inspect transport')
+    const scope = createRuntimeRunner({
+      ctx, remote, inspect, inspectHost: host, forTarget, forSession, pendingApprovals, target,
+      allocatePriority: () => --nextPriority,
+      namespace: transport === connection || target === undefined ? undefined
+        : `runtime-${target.runtimeId ?? (target.kind === 'project' ? `project-${target.projectId}` : 'personal')}`,
+      config,
+    })
+    scopes.set(transport, scope)
+    ctx.effect(() => scope.face.activeRuns.subscribe(changed), 'cordis-client-runner: pending Runtime approvals')
+    changed()
+    ctx.effect(() => transport.state.subscribe(() => {
+      if (transport.state.getSnapshot() === 'connected') inspect.publish(host)
+    }), 'cordis-client-runner: Runtime inspect reconnect')
+    return scope.face
+  }
+  const forSession = (sessionId: SessionId): CordisRunnerFace => {
+    const captured = sessionRunners.get(sessionId)
+    if (captured !== undefined) return captured
+    const face = forTarget(ctx.sessions.runtimeTargetFor?.(sessionId))
+    sessionRunners.set(sessionId, face)
+    return face
+  }
+  const base = forTarget()
+  ctx.provide('dynamicCordisRunner', base)
+  ctx.effect(() => () => { scopes.clear(); sessionRunners.clear(); listeners.clear() }, 'cordis-client-runner: Runtime runner identities')
+  ctx.on('connection/reset', () => { inspect.publish(baseHost) })
+  ctx.remote.$on('@deepseek-ai/cordis/request-run', (request) => {
+    const face = forSession(request.agentId)
+    for (const scope of scopes.values()) {
+      if (scope.face === face) { scope.open(request); break }
+    }
+  })
+}
 
+/** One Runtime's Host calls, approvals, browser contributions and event subscriptions. */
+interface RuntimeRunnerOptions {
+  readonly ctx: Context
+  readonly remote: ClientRemote
+  readonly inspect: ClientCordisInspectRegistry
+  readonly inspectHost: ClientCordisInspectHost
+  readonly forTarget: (target?: ConnectionRuntimeTarget) => CordisRunnerFace
+  readonly forSession: (sessionId: SessionId) => CordisRunnerFace
+  readonly pendingApprovals: CordisObservable<readonly CordisPendingApproval[]>
+  readonly allocatePriority: () => number
+  readonly target?: ConnectionRuntimeTarget | undefined
+  readonly namespace?: string | undefined
+  readonly config?: Config | undefined
+}
+
+function createRuntimeRunner({ ctx, remote, inspect, inspectHost, forTarget, forSession,
+  pendingApprovals, allocatePriority, target, namespace, config }: RuntimeRunnerOptions) {
   const runner = new DynamicCordisPackageRunner({
     ctx,
+    namespace,
+    runtime: { target },
+    allocatePriority,
     evaluationTimeoutMs: config?.evaluationTimeoutMs ?? 5000,
     loader: ctx.loader,
     modules: ctx.get('modules') as ClientModuleSystem,
@@ -214,7 +317,7 @@ export function apply(ctx: Context, config?: Config): void {
       // generated codec is what validates them as JSON, and its rejection is a
       // bare field name — this is the only place that still knows which call it
       // belonged to, so the teaching has to be added here.
-      const answered = await ctx.remote.dynamicCordisRunner.invoke(pluginId, pluginRunId, method, args as JsonValue)
+      const answered = await remote.dynamicCordisRunner.invoke(pluginId, pluginRunId, method, args as JsonValue)
         .catch((error: unknown) => { throw new Error(wireFailure(pluginId, method, error)) })
       // Two failure layers, and they teach different things: the carrier's error
       // branch means the call never reached the host half, while the namespace's
@@ -228,7 +331,7 @@ export function apply(ctx: Context, config?: Config): void {
     // belongs to was answered before it ever rendered, so nothing waits on this
     // and a failed report must not turn one crash into two.
     reportRenderFailure: (agentId, pluginId, pluginRunId, failure) => {
-      void ctx.remote.dynamicCordisRunner.reportRenderFailure(agentId, pluginId, pluginRunId, failure).then((result) => {
+      void remote.dynamicCordisRunner.reportRenderFailure(agentId, pluginId, pluginRunId, failure).then((result) => {
         if (!result.ok) {
           console.error(`[cordis-client-runner] reporting a render failure of ${pluginId} failed:`, result.error)
         }
@@ -237,7 +340,7 @@ export function apply(ctx: Context, config?: Config): void {
       })
     },
     reportGuardFailure: (agentId, pluginId, pluginRunId, failure) => {
-      void ctx.remote.dynamicCordisRunner.reportClientGuardFailure(agentId, pluginId, pluginRunId, failure).then((result) => {
+      void remote.dynamicCordisRunner.reportClientGuardFailure(agentId, pluginId, pluginRunId, failure).then((result) => {
         if (!result.ok) {
           console.error(`[cordis-client-runner] reporting a guard failure of ${pluginId} failed:`, result.error)
         }
@@ -253,31 +356,35 @@ export function apply(ctx: Context, config?: Config): void {
       // here into whatever each verb already does with one: the short-circuit
       // message for a start, a throw where the caller has a catch of its own.
       runHostHalf: async (agentId, pluginId, packageId, mode, requestId, approveFutureVersions) => {
-        const answered = await ctx.remote.dynamicCordisRunner.runHostHalf(
+        const answered = await remote.dynamicCordisRunner.runHostHalf(
           agentId, pluginId, packageId, mode, requestId, approveFutureVersions,
         )
         return answered.ok ? answered.value : { ok: false, message: `${answered.error.code}: ${answered.error.message}` }
       },
       getClientCode: async (agentId, pluginId, pluginRunId) => {
-        const answered = await ctx.remote.dynamicCordisRunner.getClientCode(agentId, pluginId, pluginRunId)
+        const answered = await remote.dynamicCordisRunner.getClientCode(agentId, pluginId, pluginRunId)
         if (!answered.ok) throw new Error(`${answered.error.code}: ${answered.error.message}`)
         return answered.value
       },
       resolveRequestRun: async (requestId, resolution) => {
-        const answered = await ctx.remote.dynamicCordisRunner.resolveRequestRun(requestId, resolution)
+        const answered = await remote.dynamicCordisRunner.resolveRequestRun(requestId, resolution)
         // Thrown rather than returned: `answer` logs and drops a failed answer,
         // and the host settles the request on its own either way.
         if (!answered.ok) throw new Error(`${answered.error.code}: ${answered.error.message}`)
         return answered.value
       },
       settleUserRun: async (agentId, pluginId, resolution) => {
-        const answered = await ctx.remote.dynamicCordisRunner.settleUserRun(agentId, pluginId, resolution)
+        const answered = await remote.dynamicCordisRunner.settleUserRun(agentId, pluginId, resolution)
         if (!answered.ok) throw new Error(`${answered.error.code}: ${answered.error.message}`)
         return answered.value
       },
     },
   })
   const face: CordisRunnerFace = {
+    forTarget,
+    forSession,
+    viewPrefix: namespace === undefined ? '' : `${namespace}/`,
+    pendingApprovals,
     activeRuns: orchestrator.activeRuns,
     lastRunError: orchestrator.lastRunError,
     renderFailures: runner.renderFailures,
@@ -289,22 +396,20 @@ export function apply(ctx: Context, config?: Config): void {
     getSnapshot: () => runner.getSnapshot(),
     isLoaded: id => runner.isLoaded(id),
   }
-  ctx.provide('dynamicCordisRunner', face)
   ctx.effect(() => async () => { await runner.dispose() }, 'cordis-client-runner: dynamic package runner')
 
   // Forwarded Host events: `$on` hands the listener the Host's own argument list,
   // so these read the request itself rather than a transport envelope.
-  ctx.remote.$on('@deepseek-ai/cordis/request-run', (request) => {
-    orchestrator.open(request)
-  })
-  ctx.remote.$on('@deepseek-ai/cordis/request-run-resolved', (resolved) => { orchestrator.close(resolved.requestId) })
-  ctx.remote.$on('@deepseek-ai/cordis/dynamic-retract', (retracted) => {
+
+  remote.$on('@deepseek-ai/cordis/request-run-resolved', (resolved) => { orchestrator.close(resolved.requestId) })
+  remote.$on('@deepseek-ai/cordis/dynamic-retract', (retracted) => {
     runner.retract(retracted.pluginId, retracted.pluginRunId)
   })
-  ctx.remote.$on('@deepseek-ai/cordis/inspect-query', (request) => {
-    void inspect.query(request).catch((error: unknown) => {
+  remote.$on('@deepseek-ai/cordis/inspect-query', (request) => {
+    void inspect.query(request, inspectHost).catch((error: unknown) => {
       console.error(`[cordis-client-runner] inspect query ${request.provider}.${request.method} failed:`, error)
     })
   })
-  ctx.remote.$on('@deepseek-ai/cordis/inspect-query-resolved', (resolved) => { inspect.close(resolved.requestId) })
+  remote.$on('@deepseek-ai/cordis/inspect-query-resolved', (resolved) => { inspect.close(resolved.requestId, inspectHost) })
+  return { face, open: (request: CordisRunRequest) => { orchestrator.open(request) } }
 }

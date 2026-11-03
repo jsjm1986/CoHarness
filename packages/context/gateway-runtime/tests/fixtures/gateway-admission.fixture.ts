@@ -47,12 +47,14 @@ export interface GatewayComposition {
 
 /**
  * Boot the deployed runtime composition under a private credential and port.
- * @param options - private test transport, renewal pacing and event-admission observer.
+ * @param options - shared-project identity, private test transport, renewal pacing, and event-admission observer.
  * @returns the composed context, its assertion issuer, and its loopback origin.
  */
 export async function loadGatewayComposition(options: {
   runtime?: GatewayRuntimeCredential['runtime']
+  projectId?: number
   gatewayUrl?: string
+  requiredPlugins?: string[]
   streamPrincipalRenewal?: GatewayRuntimeCredential['streamPrincipalRenewal']
   onEvent?: (principal: GatewayRequestPrincipal, signal: AbortSignal) => void
 } = {}): Promise<GatewayComposition> {
@@ -62,7 +64,9 @@ export async function loadGatewayComposition(options: {
     gatewayUrl: options.gatewayUrl ?? 'http://127.0.0.1:8899',
     ...(options.streamPrincipalRenewal === undefined ? {} : { streamPrincipalRenewal: options.streamPrincipalRenewal }),
     organization: 'acme',
-    runtime: options.runtime ?? { kind: 'user', id: 9, generation: 7 },
+    runtime: options.runtime ?? (options.projectId === undefined
+      ? { kind: 'user', id: 9, generation: 7 }
+      : { kind: 'project', id: options.projectId, generation: 7 }),
     token: 'runtime-secret',
     principalPublicKey: pair.publicKey.export({ format: 'pem', type: 'spki' }).toString(),
   }
@@ -74,9 +78,10 @@ export async function loadGatewayComposition(options: {
       audience: 'dsh-runtime',
       organization: 'acme',
       user: { id: 9, username: 'lin', displayName: 'Lin', role: 'user' },
-      scope: credential.runtime.kind === 'user' ? { kind: 'personal' }
-        : { kind: 'project', projectId: credential.runtime.id, projectName: 'Fixture project', mode: 'rw' },
-      runtime: { ...credential.runtime },
+      scope: credential.runtime.kind === 'project'
+        ? { kind: 'project', projectId: credential.runtime.id, projectName: 'Fixture project', mode: 'rw' }
+        : { kind: 'personal' },
+      runtime: credential.runtime,
       issuedAt: now,
       expiresAt: now + 30_000,
       nonce: 'nonce-1',
@@ -107,6 +112,7 @@ export async function loadGatewayComposition(options: {
     '  config:',
     `    distIndex: '${join(dist, 'index.html')}'`,
     "- name: '@deepseek-ai/dsh-gateway-runtime'",
+    ...(options.requiredPlugins === undefined ? [] : ['  config:', `    requiredPlugins: ${JSON.stringify(options.requiredPlugins)}`]),
     "- name: 'probe'",
     '',
   ].join('\n'))

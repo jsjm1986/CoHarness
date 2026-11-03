@@ -1,0 +1,13 @@
+{
+  "name": "resource-root-smoke-lint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts gateway/tests/fixtures/runtime-start-built.mjs gateway/tests/run-built-resource-admission.mjs scripts/ci-workflow.spec.ts",
+  "startedAt": "2026-10-23T12:45:15.862345+00:00",
+  "seconds": 2.784,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "73ae11289157211de8905719dd7c69bdafb7ea59fad95347e48ee7b842e85d4d",
+  "inputsAfter": "73ae11289157211de8905719dd7c69bdafb7ea59fad95347e48ee7b842e85d4d",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -51,16 +51,16 @@ try {
   checks.push('guarded-files-and-streams')
 
   const options = { cwd: root, graceMs: 1000, stdio: { stdin: 'ignore', stdout: { maxBytes: 65_536 }, stderr: { maxBytes: 65_536 } } } as const
-  const ordinary = ctx.subprocess.spawn({ ...options, argv: ['/bin/sh', '-c', 'printf "ordinary"; printf "diagnostic" >&2'] })
+  const ordinary = await ctx.subprocess.spawn({ ...options, argv: ['/bin/sh', '-c', 'printf "ordinary"; printf "diagnostic" >&2'] })
   assert.equal(await completed(ordinary), 'ordinary')
   assert.equal(ordinary.collected.stderr?.readFrom(0).text, 'diagnostic')
   checks.push('managed-process-output')
   if (process.env.DSH_VERIFY_NO_NODE === '1') {
-    assert.equal(await completed(ctx.subprocess.spawn({ ...options, argv: ['/bin/sh', '-c', 'set -e; if command -v node; then exit 90; fi; test ! -e /usr/bin/node; test ! -e /usr/local/bin/node; printf no-node'] })), 'no-node')
+    assert.equal(await completed(await ctx.subprocess.spawn({ ...options, argv: ['/bin/sh', '-c', 'set -e; if command -v node; then exit 90; fi; test ! -e /usr/bin/node; test ! -e /usr/local/bin/node; printf no-node'] })), 'no-node')
     checks.push('target-has-no-node')
   }
 
-  const sleeping = ctx.subprocess.spawn({ ...options, stdio: { ...options.stdio, stdout: 'pipe' }, argv: ['/bin/sh', '-c', 'printf ready; exec /bin/sleep 60'] })
+  const sleeping = await ctx.subprocess.spawn({ ...options, stdio: { ...options.stdio, stdout: 'pipe' }, argv: ['/bin/sh', '-c', 'printf ready; exec /bin/sleep 60'] })
   await new Promise<void>((resolve, reject) => {
     const stdout = sleeping.stdout!
     let text = ''

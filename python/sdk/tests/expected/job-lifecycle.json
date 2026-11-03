@@ -1,0 +1,16 @@
+{
+  "final_response": "PARENT_OBSERVED_DSH_SDK_DIAGNOSTIC",
+  "finish_reason": "completed",
+  "kind": "subagent",
+  "label": "Observe DSH SDK background failure",
+  "tool_call": {
+    "callId": "call_dsh_sdk_background",
+    "rootCallId": "call_dsh_sdk_background"
+  },
+  "terminal": {
+    "status": "failed",
+    "cause": "producer",
+    "producerReported": true,
+    "detail": "error; diagnostic: Subagent failure (provider: DSH SDK; stage: session-run; category: child-error)"
+  }
+}

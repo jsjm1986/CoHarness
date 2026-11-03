@@ -51,6 +51,8 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 `request(req)` names the agent, tool, optional call id and reason, and an abort signal. It requires an open turn: an idle or between-turn caller throws before auditing anything. Aborting withdraws the question — the request settles `cancelled` and a late answer is discarded. A failure that prevents either audit append from committing rejects instead of returning an unlogged decision.
 
+Cancellation is checked before each answerer, including after dispatch observers or a delayed middleware continuation. Service withdrawal cancels accepted requests and waits for their audit completion; late grants cannot dispatch the tool or open another answerer. References to a withdrawn service reject requests and policy writes before changing the Session, including after a replacement provider starts with a different default policy.
+
 ### What the model and user see
 
 The model sees only the asking consumer's eventual tool outcome — allowed, rejected, cancelled, or unavailable — plus the current policy in the runtime-context snapshot; the audit events and the human permission UI are not model context. A `never` switch is announced to the model by a sourced user message, and both policies contribute their complete current meaning to the snapshot.

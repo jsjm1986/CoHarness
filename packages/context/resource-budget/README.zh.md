@@ -1,5 +1,5 @@
 ---
-description: "模型请求与受管进程的执行资源准入及静止后释放义务。"
+description: "节点级执行准入提供方与消费方的资源许可义务。"
 kind: "package-reference"
 ---
 
@@ -9,71 +9,59 @@ kind: "package-reference"
 
 ## 概述
 
-执行消费者需要在启动工作前预留模型或进程容量时，使用此定义。具体提供方负责准入与调度；此包不提供调度器或部署配额。消费者保留预留，直到执行停止；取消或传输失败导致清理结果不确定时，也继续保留。
+在启动模型请求或进程前申请许可，并在执行停止前保留其占用记录。本包声明服务接口；组合中的提供方必须实现准入。托管 Gateway 组合提供该 provider；LLM adapter 派发、已注册的原生 Messages 搜索和子进程分配会申请其许可。
 
 ## 目录
 
-- [使用此包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
+- [许可所有权](#permit-ownership)
+- [远程协调](#remote-coordination)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
------
+<a id="permit-ownership"></a>
+## 许可所有权
 
-<a id="use-this-package"></a>
-## 使用此包
+抽象 `ResourceBudget` 服务提供 `acquire(request)`。请求指定 `model` 或 `process`，并可携带取消信号和执行中的 Session id。提供方解析已验证的操作者与项目，不接受消费方提交这些身份。
 
-消费者从包根导入 Service Definition，并从 `@deepseek-ai/dsh-resource-budget/types` 导入请求类型。组合需要具体的 `ResourceBudget` 提供方；挂载此抽象定义不会实现准入。此定义没有配置字段。
+组合必须挂载具体提供方；直接挂载此抽象定义会在构造时失败。
 
-启动资源前先预留容量。取消成功本身不能证明进程、模型请求或其清理已经停止。只有证明静止后才释放；清理结果不确定时进行报告，预留仍保持占用。最终记账决定由提供方确认。
+提供方为每个操作分配独立的 `ResourceOperationId`，并在重试时保留。仅有有序注册序号，无法在提供方替换后区分重试和另一个操作。
 
------
+消费方先等待准入，监听许可的取消 `signal`，并在确认静止后等待 `release()`，无法确认清理时等待 `uncertain()`。不确定状态保留占用以及许可与调用方、提供方之间的取消关联，之后仍可报告精确完成。请求通过 `origin` 选择捕获的执行、签名交互调用者或 Runtime 基础设施；这些元数据不进入模型输入。部署限制与调度由提供方负责。
 
-<a id="understand-the-implementation"></a>
-## 理解实现
+<a id="remote-coordination"></a>
+## 远程协调
 
-<details>
-<summary>实现内部细节——点击展开</summary>
+`./wire` 入口校验操作引用、来源、资源状态、完成报告和已提交的节点策略。UUID 在比较前规范化。请求只能携带 Session／scope 引用、签名 principal 或明确的 Runtime 基础设施来源，禁止指定操作者和项目编号。每批轮询最多包含 512 个精确操作引用，HTTP 消息不超过 64 KiB。
 
-[`src/index.ts`](src/index.ts) 声明 `ctx.resourceBudget`；[`src/types.ts`](src/types.ts) 声明调用方元数据和释放义务。已验证的操作者与项目归属由具体提供方负责，而非由调用方提交身份字段。[子系统参考](../../../docs/subsystems/resource-budget.zh.md) 负责类型与生成的服务 API。
-
-</details>
-
------
-
-<a id="further-exploration"></a>
-## 进一步探索
-
-- [资源准入参考](../../../docs/subsystems/resource-budget.zh.md)——资源种类和预留生命周期。
-- [Execution Authority](../execution-authority/README.zh.md)——已验证的执行身份与权限。
-- [Gateway](../../../gateway/README.zh.md)——受管部署和节点配置。
-
------
+Gateway 在 `/internal/runtime/resources/` 下实现已鉴权的注册、请求、批量状态与完成接口。注册返回已提交的策略，不清除既有任务。账户权限撤销或 Runtime 停止期间，只有精确的完成接口接受当前 bearer；其他接口仍使用普通 Runtime 认证。supervisor 确认进程范围停止后，只回收句柄捕获代次的资源，即使实例行已推进至更新代次。状态读取在排队派发前，按已保存的来源重新检查当前权限；带执行范围的 Session 不能省略该范围。[Gateway 提供方](../gateway-runtime/README.zh.md#resource-admission)负责 Runtime 注册与传输。
 
 <a id="model-experience"></a>
 ## 模型体验
 
-无，因为此定义不贡献提示词、工具 schema 或模型可见结果。
+### 资源许可
+
+#### 模型看到什么
+
+无。`ResourceBudget` 接口不声明 prompt section、工具 schema 或模型可见结果。
+
+#### Token 影响
+
+无。许可请求包含执行元数据，不包含模型输入。
 
 #### KV Cache 影响
 
-无；资源准入不构造模型请求内容。
+无。服务调用不改变模型请求内容。
 
-## 已知限制与延期工作
+## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- 具体提供方与执行消费者必须实现调度和预留所有权；导入此包不会施加容量限制。
-- 声明的资源种类覆盖模型和进程，工作线程没有独立资源种类。
+- 准入覆盖实际 LLM 派发与 subprocess 服务。绕过这些服务直接分配 worker 或进程的入口需要各自的消费方；导入本定义不能约束这些入口。
+- 托管 Runtime 进程限制是另一项已实现的机制；参见 [Runtime 准入](../../../gateway/README.zh.md#performance-and-runtime-admission)。
 
 <a id="dev-note"></a>
 ### 开发备注
 
-<details>
-<summary>维护者工作上下文——点击展开</summary>
-
 无。
-
-</details>

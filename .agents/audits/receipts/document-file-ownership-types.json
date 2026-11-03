@@ -1,0 +1,14 @@
+{
+  "name": "document-file-ownership-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/attachment/userdoc-local packages/host/userdoc-http",
+  "startedAt": "2026-10-25T20:57:31.169918+00:00",
+  "seconds": 2.881,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "78f74b5f03706a43b31f1dcb56b5bf6708a2858f7d069cf3c4728fbf85086765",
+  "inputsAfter": "78f74b5f03706a43b31f1dcb56b5bf6708a2858f7d069cf3c4728fbf85086765",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/llm/deepseek-llm-api-extensions/README.md
 document:
-  en: 2e2bd48029d2f0f1897f90f5134935489a168777
-  zh: 0511dc09c52f5af5f177ccc5d8388b129152be63
+  en: f130c52ab8d8c14ffaa6f17c4f1594e6851c8121
+  zh: 3a7e79d936ef29570b3abd2564bf7daba8a94689
 /:
   en: 8805672f8507e16d
   zh: 07696ec60f8d86e8
@@ -18,8 +18,8 @@ document:
   en: 6b7f62c318c9aad6
   zh: 5e22d58884e60c87
 /deepseek-ai-dsh-deepseek-llm-api-extensions/service:
-  en: 4ab300156f7e13d9
-  zh: c7887981576c910c
+  en: a07f886e2e842a25
+  zh: 10e979e263c999bf
 /deepseek-ai-dsh-deepseek-llm-api-extensions/model-experience:
   en: 88a785350ced5c14
   zh: 755349be023a3f5c

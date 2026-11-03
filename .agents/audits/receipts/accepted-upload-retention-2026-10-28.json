@@ -1,0 +1,253 @@
+{
+  "status": "completed_named_scenarios_only",
+  "recordedAt": "2026-10-27T16:22:12.077635+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "checks": [
+    {
+      "name": "accepted-upload-affected-source-final",
+      "status": "passed",
+      "startedAt": "2026-10-27T15:56:47.206291+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/attachment/userdoc-local/tests",
+        "packages/attachment/userdoc-gateway/tests",
+        "packages/host/userdoc-http/tests",
+        "packages/client/userdoc-upload/tests",
+        "packages/client/ui-documents/tests/userdoc-client.client.spec.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T15:56:53.936921+00:00"
+    },
+    {
+      "name": "active-upload-private-cleanup-final",
+      "status": "passed",
+      "startedAt": "2026-10-27T16:02:33.942139+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/attachment/userdoc-local/tests/private-upload-paths.spec.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T16:02:39.105855+00:00"
+    },
+    {
+      "name": "accepted-upload-browser-budget-final",
+      "status": "passed",
+      "startedAt": "2026-10-27T15:46:33.870004+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/client/userdoc-upload/tests/uploader.client.spec.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T15:46:37.363384+00:00"
+    },
+    {
+      "name": "build-accepted-upload-retention",
+      "status": "passed",
+      "startedAt": "2026-10-27T15:52:07.503396+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=4",
+        "pnpm",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T15:53:34.749195+00:00"
+    },
+    {
+      "name": "accepted-upload-built-http-complete",
+      "status": "passed",
+      "startedAt": "2026-10-27T16:00:42.846640+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "npm",
+        "run",
+        "test:built-document-maintenance"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T16:00:44.451707+00:00"
+    },
+    {
+      "name": "accepted-upload-emitted-browser-final",
+      "status": "passed",
+      "startedAt": "2026-10-27T16:03:53.078545+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "node",
+        "tests/fixtures/document-upload-expiry-client.mjs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T16:03:54.817425+00:00"
+    },
+    {
+      "name": "upload-browser-web-snapshot",
+      "status": "passed",
+      "startedAt": "2026-10-27T15:54:05.846988+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_SNAPSHOT=replay",
+        "node_modules/.bin/vitest",
+        "run",
+        "--config",
+        "vitest.web.config.ts",
+        "apps/web/tests/file-upload-round.e2e.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T15:54:14.784814+00:00"
+    },
+    {
+      "name": "gateway-types-accepted-retention",
+      "status": "passed",
+      "startedAt": "2026-10-27T16:00:43.918170+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T16:00:48.250999+00:00"
+    },
+    {
+      "name": "accepted-upload-production-package-links",
+      "status": "passed",
+      "startedAt": "2026-10-27T16:08:07.303132+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "scripts/gateway-runtime-packages.spec.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T16:08:09.895476+00:00"
+    },
+    {
+      "name": "docs-accepted-upload-retention",
+      "status": "passed",
+      "startedAt": "2026-10-27T16:02:35.189603+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=4",
+        "pnpm",
+        "run",
+        "doc-sync"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T16:04:34.620401+00:00"
+    },
+    {
+      "name": "accepted-upload-cleanup-ownership-final",
+      "status": "passed",
+      "startedAt": "2026-10-27T16:14:35.471938+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/attachment/userdoc-local/tests/private-upload-paths.spec.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T16:14:39.803732+00:00"
+    },
+    {
+      "name": "accepted-upload-cleanup-browser-final",
+      "status": "passed",
+      "startedAt": "2026-10-27T16:14:35.471938+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "node",
+        "tests/fixtures/document-upload-expiry-client.mjs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T16:14:36.767155+00:00"
+    }
+  ],
+  "controlledNegativeReplays": [
+    {
+      "name": "active-upload-expiry-negative",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T15:36:36.931007+00:00"
+    },
+    {
+      "name": "accepted-upload-http-expiry-negative",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T15:42:56.823524+00:00"
+    },
+    {
+      "name": "accepted-upload-browser-expiry-negative",
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T15:44:43.747388+00:00"
+    }
+  ],
+  "sourceRegression": {
+    "passed": 709,
+    "skipped": 5,
+    "filesPassed": 40,
+    "filesSkipped": 1,
+    "note": "The broader suite passes709 cases with5 platform skips. Final cleanup-only refinements pass24 owning cases with1 Linux-specific skip, and the emitted-browser real HTTP replay completes with writers0."
+  },
+  "browserSnapshot": {
+    "passed": 8,
+    "mode": "DSH_SNAPSHOT=replay",
+    "realModelAPI": false
+  },
+  "emittedHTTP": {
+    "sameUpload": true,
+    "polled": true,
+    "completed": true,
+    "writers": 0,
+    "publicBytes": 0
+  },
+  "resources": "No database, VM or container created in this goal turn. All owned HTTP/Chromium fixtures completed cleanup.",
+  "constraints": [
+    "Whole project audit remains in progress",
+    "Real model API verification remains user-deferred",
+    "Directory source-leaf substitution remains open",
+    "No subagents, commits, pushes, PRs or resets",
+    "No new100%coverage claim"
+  ],
+  "supplementalChecks": [
+    {
+      "command": "changed-file oxlint",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm run verify-upgrade-records",
+      "exitCode": 0,
+      "note": "22 existing upgrade alignment records, not a dedicated guide validator."
+    },
+    {
+      "command": "current-version guide triplet, exact sections and500-word bound check",
+      "exitCode": 0,
+      "englishWords": 456
+    },
+    {
+      "command": "changed-file oxlint, git diff --check, pnpm run verify-repository-references",
+      "exitCode": 0,
+      "note": "Completed after the final fixture cleanup refinement; the reference check was rerun after its terminal handle was lost across context recovery."
+    }
+  ],
+  "toolingLimitations": [
+    "The skill-named verify-upgrade-guides command is absent in this fork; docs41/41, available upgrade-record checks and the explicit guide section/word checks are the executed evidence."
+  ],
+  "baseline": {
+    "reference": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "checkedAt": "2026-10-27T16:13:50.619046+00:00",
+    "evidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/baseline-accepted-upload-retention-current.json"
+  }
+}

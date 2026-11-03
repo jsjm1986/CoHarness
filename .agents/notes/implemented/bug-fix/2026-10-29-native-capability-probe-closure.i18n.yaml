@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-29-native-capability-probe-closure.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-29-native-capability-probe-closure.md
+document:
+  en: ef0baf1d10039a9350a2dcad6961b54dfcc2a7f2
+  zh: 53562759b237d8bc628cbce852d74dd9e5a14d75
+/agent-note-native-capability-probes-retain-their-clients-through-closure:
+  en: 3c724e99d212e5a4
+  zh: 1cefda1af2d98d2d
+/agent-note-native-capability-probes-retain-their-clients-through-closure/problem:
+  en: cbdda7be3932734d
+  zh: d54aa838cde599d3
+/agent-note-native-capability-probes-retain-their-clients-through-closure/decision:
+  en: 37e3bef626c1f17c
+  zh: d1be39b76e5dda03
+/agent-note-native-capability-probes-retain-their-clients-through-closure/alternatives-considered:
+  en: aec6dc61b68aca0d
+  zh: 8e811d77579f78ae
+/agent-note-native-capability-probes-retain-their-clients-through-closure/consequences:
+  en: 38c879300378e68e
+  zh: 762b5fdc31c31fb1

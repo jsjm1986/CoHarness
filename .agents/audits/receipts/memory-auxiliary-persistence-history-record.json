@@ -1,0 +1,14 @@
+{
+  "name": "memory-auxiliary-persistence-history-record",
+  "cwd": ".",
+  "command": "pnpm run persistence-changes --record 2026-10-24-memory-auxiliary-requests --decision same-version --prose .agents/audits/.local/memory-auxiliary-persistence-prose.json",
+  "startedAt": "2026-10-24T01:52:40.945283+00:00",
+  "seconds": 16.625,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b51d366b36f3c9202639e34f6306d2e217e80cbfcff477bf489dcd9ef807e60b",
+  "inputsAfter": "b51d366b36f3c9202639e34f6306d2e217e80cbfcff477bf489dcd9ef807e60b",
+  "postgresToolDirectory": null,
+  "outputSha256": "42484d9e9348b5ea617b55fa547719bde42d0badfdc95c753892924f7467fd34",
+  "outputTail": "$ tsx scripts/persistence-changes.ts --record 2026-10-24-memory-auxiliary-requests --decision same-version --prose .agents/audits/.local/memory-auxiliary-persistence-prose.json\nCreated docs/persistence-changes/2026-10-24-memory-auxiliary-requests.md; schema artifacts and bilingual pairing are current.\n"
+}

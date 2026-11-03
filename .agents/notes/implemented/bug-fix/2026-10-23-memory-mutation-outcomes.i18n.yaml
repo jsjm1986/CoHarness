@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-23-memory-mutation-outcomes.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-memory-mutation-outcomes.md
+document:
+  en: 1c6d9c3214f167a8e97bb51894c17f8835304194
+  zh: 60078d92a5d16d33a13d868952feeae9dfa79e5a
+/agent-note-durable-memory-mutation-outcomes:
+  en: 27bcf9fd174e2547
+  zh: ef8e59056518ae44
+/agent-note-durable-memory-mutation-outcomes/problem:
+  en: ffec784bff2a16de
+  zh: fc75ea913b5c8a48
+/agent-note-durable-memory-mutation-outcomes/decision:
+  en: 13fe152b80fb9901
+  zh: fdda866249a3adcf
+/agent-note-durable-memory-mutation-outcomes/alternatives-considered:
+  en: 9599db6b9d20b36f
+  zh: c9232737405b2d22
+/agent-note-durable-memory-mutation-outcomes/consequences:
+  en: 5dfdacefd3746b25
+  zh: 9467b31039d8de5b
+/agent-note-durable-memory-mutation-outcomes/verification:
+  en: 1957a90f5c12e562
+  zh: 3711b26a7aa1d13f

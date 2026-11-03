@@ -1,0 +1,14 @@
+{
+  "name": "document-parent-swap-lint-repaired",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/rooted-fs.ts packages/attachment/userdoc-local/src/store.ts packages/attachment/userdoc-local/tests/private-upload-paths.spec.ts",
+  "startedAt": "2026-10-26T01:25:10.688226+00:00",
+  "seconds": 4.833,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "91d72fe41bc12d4182ccfa2e4b1c74ed3d68dda507c5675ffc2f1c6aad183fc4",
+  "inputsAfter": "91d72fe41bc12d4182ccfa2e4b1c74ed3d68dda507c5675ffc2f1c6aad183fc4",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

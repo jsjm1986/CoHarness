@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-gateway-before",
+  "cwd": "gateway",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 ../node_modules/.bin/vitest run tests/document-transfer.spec.ts -t 'retains document incarnation metadata'",
+  "startedAt": "2026-10-26T22:17:14.166828+00:00",
+  "seconds": 4.246,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "25308f6cb4c44e9e358b8da4f2d2941e24420efe1c6afba20de6e5a9f6f43744",
+  "inputsAfter": "25308f6cb4c44e9e358b8da4f2d2941e24420efe1c6afba20de6e5a9f6f43744",
+  "postgresToolDirectory": null,
+  "outputSha256": "117abb9e4a87457c09756f18f2f17656aab9db29c961be8c51cd217aa823ea32",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/document-transfer.spec.ts (32 tests | 1 failed | 31 skipped) 9ms\n   × retains document incarnation metadata in sanitized upload completions 8ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/document-transfer.spec.ts > retains document incarnation metadata in sanitized upload completions\nAssertionError: expected { …(10) } to match object { ref: { path: '', …(1) } }\n(14 matching properties omitted from actual)\n\n- Expected\n+ Received\n\n  {\n    \"ref\": {\n-     \"identity\": {\n-       \"createdBy\": \"user:7\",\n-       \"incarnationId\": \"upload-incarnation\",\n-       \"origin\": \"upload\",\n-       \"revision\": 1,\n-     },\n      \"path\": \"\",\n    },\n  }\n\n ❯ tests/document-transfer.spec.ts:28:18\n     26|     state: 'complete', ref: { docId: 'report.txt', path: '/private/rep…\n     27|       bytes: 5, mediaType: 'text/plain', modifiedAt: 1, identity } })\n     28|   expect(result).toMatchObject({ ref: { path: '', identity } })\n       |                  ^\n     29| })\n     30|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 31 skipped (32)\n   Start at  06:17:17\n   Duration  431ms (transform 187ms, setup 0ms, import 288ms, tests 9ms, environment 1ms)\n\n"
+}

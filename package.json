@@ -133,7 +133,7 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:expected": "vitest run --config vitest.expected.config.ts",
     "test:expected:refresh": "DSH_SNAPSHOT=refresh vitest run --config vitest.expected.config.ts",
-    "test:gateway:execution": "node -e \"if (!process.env.HGW_TEST_DATABASE_URL) throw new Error('HGW_TEST_DATABASE_URL must select a disposable test database')\" && vitest run --config vitest.e2e.config.ts packages/context/gateway-execution/tests/pg-composition.e2e.ts --retry=0",
+    "test:gateway:execution": "node -e \"if (!process.env.HGW_TEST_DATABASE_URL) throw new Error('HGW_TEST_DATABASE_URL must select a disposable test database')\" && npm --prefix gateway run test:built-resource-admission && vitest run --config vitest.e2e.config.ts packages/context/gateway-execution/tests/pg-composition.e2e.ts --retry=0",
     "test:gui": "pnpm run build:native-system && vitest run packages/client packages/host",
     "test:issue-management": "node .github/issue-management/policy.test.mjs",
     "test:plugins": "pnpm exec vitest run --config plugins/dsh-directory-guard/vitest.config.ts && pnpm exec vitest run --config plugins/dsh-model-governance/vitest.config.ts",
@@ -278,6 +278,7 @@
     "papaparse": "5.5.3",
     "pnpm": "11.28.5",
     "publint": "^0.3.24",
+    "punycode": "2.3.1",
     "semver": "^7.8.5",
     "smol-toml": "^1.9.0",
     "spdx-expression-parse": "^5.0.0",
@@ -289,6 +290,7 @@
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.12",
     "zod": "^4.4.3",
-    "vite": "8.2.4"
+    "vite": "8.2.4",
+    "@deepseek-ai/dsh-llm": "workspace:*"
   }
 }

@@ -34,7 +34,7 @@ Complete and blocked accept either direct-human authority or the exact current g
 
 ### Blocking threshold
 
-`blockedAfterConsecutiveRounds` is a validated positive safe-integer configuration with default `3`. When an autonomous goal round calls `blocked`, the plugin mechanically requires at least that many admitted rounds and a non-empty explanation; the configured value also appears in model guidance. The runtime cannot determine whether those rounds encountered the same blocking condition, so semantic equivalence remains a model judgment. This count is deliberately separate from the goal's generous continuation cap.
+`blockedAfterConsecutiveRounds` is a validated positive safe-integer configuration with default `3`. When an autonomous goal round calls `blocked`, the plugin mechanically requires at least that many admitted rounds and a non-empty explanation; the configured value also appears in model guidance. The runtime cannot determine whether those rounds encountered the same blocking condition, so semantic equivalence remains a model judgment. The count begins at creation or the latest explicit resume of this exact goal. Paused, blocked and disarmed goals therefore require a fresh interval before autonomous self-blocking after resume. Earlier goals and earlier continuation intervals do not contribute. The lifetime admitted-round count and total continuation cap remain unchanged. The real Loader transcript drives the automatic goal driver and human `/goal resume`: an initial block at round 3 is followed by refusals at rounds 4 and 5, then a new block at round 6.
 
 ## Testing
 

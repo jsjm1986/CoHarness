@@ -1,0 +1,64 @@
+{
+  "name": "document-restore-parent-paths-2026-10-27",
+  "verifiedAt": "2026-10-27T00:46:05.846153+00:00",
+  "headReference": "codex/business-logic-audit-2026-10-23",
+  "originReference": "origin/master",
+  "currentInputsSha256": "4ded8188980f3bc3228af069674932aad43b68ef07530e6cc52932ebeb487d43",
+  "negativeControls": [
+    {
+      "case": "ordinary-restore",
+      "exitCode": 1,
+      "observed": "The original restore created source.txt in the outside replacement directory and consumed its trash entry."
+    },
+    {
+      "case": "restore-directory",
+      "exitCode": 1,
+      "observed": "The original restore created a missing directory below the outside replacement parent before refusing restoration."
+    }
+  ],
+  "reports": {
+    "linuxSource": {
+      "passed": 479,
+      "failed": 0,
+      "skipped": 0,
+      "success": true,
+      "reportSha256": "9e1f7f03adbb0d7ca17dbc0c9f7db44e1df72529afda86b14516d22639e6581c"
+    },
+    "linuxBuilt": {
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "success": true,
+      "reportSha256": "dae9871700a87c8dec24db19a099521d9bf171c8303dff7d5629b49b897f3d6c"
+    },
+    "linuxFinalFixture": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "success": true,
+      "reportSha256": "2bc00c2e9886b929855f0de084cdf242c69ade9ace989ce2e44bc348f757f5f7"
+    }
+  },
+  "evidenceTiming": "The complete Linux package run covers the final production runtime behavior. Subsequent changes are the test mkdir overload declaration/line wrapping and source JSDoc. The final two Linux fixture cases and four built Loader cases pass after the declaration repair.",
+  "build": {
+    "command": "env NODE_DISABLE_COMPILE_CACHE=1 DSH_GATE_CONCURRENCY=2 pnpm run build",
+    "exitCode": 0,
+    "gatesPassed": 8,
+    "logSha256": "8e339c30440ed80a35d2e20cb921094b569f2e7adcf6461994a935fbf5e84fa5"
+  },
+  "documentation": {
+    "quickGatesPassed": 19,
+    "quickGateInitiallyFailed": "repository references rejected newly recorded commit identifiers in audit JSON",
+    "repair": "Audit records now retain maintained branch references and source-input fingerprints. The repository-reference gate passes after removal of the commit identifiers.",
+    "finalRepositoryReferenceExitCode": 0,
+    "exportJSDocExitCode": 0
+  },
+  "lintExitCode": 0,
+  "diffCheckExitCode": 0,
+  "limitations": [
+    "Production Gateway managed backend and accessible cross-UID ordinary files remain unintegrated (B157).",
+    "B131 incarnation/catalog ownership is unintegrated. B159 remains open for remaining private-state, purge/directory and non-Linux paths.",
+    "Store whole-file diagnostic coverage remains below 100%; no exclusion or threshold was changed.",
+    "Real model endpoint verification remains user-deferred."
+  ]
+}

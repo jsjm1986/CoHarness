@@ -1,0 +1,14 @@
+{
+  "name": "orchestration-consumers-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/session/session-checkpoint-policy/tests packages/session/session-title/tests packages/test-support/llm-replay/tests --retry=0 --maxWorkers=2 --coverage --coverage.include=packages/session/session-checkpoint-policy/src/index.ts --coverage.reportsDirectory=.agents/audits/.local/orchestration-consumer-coverage",
+  "startedAt": "2026-10-25T06:59:54.184087+00:00",
+  "seconds": 13.499,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "e0cd2a6f3e2677019fe7d5a89945739465ade37cc086fa977f5ae095a4b63ce5",
+  "inputsAfter": "e0cd2a6f3e2677019fe7d5a89945739465ade37cc086fa977f5ae095a4b63ce5",
+  "postgresToolDirectory": null,
+  "outputSha256": "82628a5b764e9d9cd05bb80b38f636ed471d149c0191021ca23ddc9ba07adb18",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  8 passed (8)\n      Tests  191 passed (191)\n   Start at  15:00:05\n   Duration  2.11s (transform 883ms, setup 139ms, import 1.55s, tests 679ms, environment 0ms)\n\n % Coverage report from v8\n----------|---------|----------|---------|---------|-------------------\nFile      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n----------|---------|----------|---------|---------|-------------------\n----------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 22/22 )\nBranches     : 100% ( 10/10 )\nFunctions    : 100% ( 7/7 )\nLines        : 100% ( 19/19 )\n================================================================================\n"
+}

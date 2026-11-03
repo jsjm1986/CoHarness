@@ -1,0 +1,13 @@
+{
+  "name": "progress-real-http-postgres-policies",
+  "cwd": "gateway",
+  "command": "npm exec vitest run tests/project-progress-postgres.spec.ts -- --no-file-parallelism",
+  "startedAt": "2026-10-23T21:18:11.210369+00:00",
+  "seconds": 8.324,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3788bddc1c59f5c58e85bf6be0dd9581548f204612809a2c96d6a3766231f5bd",
+  "inputsAfter": "3788bddc1c59f5c58e85bf6be0dd9581548f204612809a2c96d6a3766231f5bd",
+  "outputSha256": "72821c23851a3c7193513c14dbfa5ef60efeb0b5c8db23041a907fb499b3b8e3",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/project-progress-postgres.spec.ts (12 tests | 1 failed) 4634ms\n     × rechecks source-private after a queued grant 336ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/project-progress-postgres.spec.ts > project digest governed model path > rechecks source-private after a queued grant\nAssertionError: expected null not to be null\n ❯ tests/project-progress-postgres.spec.ts:167:49\n    165|       await expect.poll(async () => (await f.state())?.generating).toB…\n    166|       expect(f.requests).toHaveLength(0)\n    167|       expect((await f.state())?.last_error).not.toBeNull()\n       |                                                 ^\n    168|       expect((await f.budget.snapshot()).kinds.model).toMatchObject({ …\n    169|       expect((await pool.query('SELECT 1 FROM harness.model_usage WHER…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n  Snapshots  3 written\n Test Files  1 failed (1)\n      Tests  1 failed | 11 passed (12)\n   Start at  05:18:14\n   Duration  5.28s (transform 372ms, setup 0ms, import 560ms, tests 4.63s, environment 0ms)\n\n"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "python-bootstrap-coverage",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/ptc-runtime-python/tests/resource-admission.spec.ts --coverage --coverage.include=packages/experimental/ptc-runtime-python/src/launch.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-23T16:06:14.296387+00:00",
+  "seconds": 11.252,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d090cb02165998aeb73aca36d26874ce985ad4a3ace5b3444559ef7021e61dbe",
+  "inputsAfter": "d090cb02165998aeb73aca36d26874ce985ad4a3ace5b3444559ef7021e61dbe",
+  "outputSha256": "e2a2d0c1aad0933e7185638f7e7c9d39b5776aa3600f597bc452e8158f9b0e9b",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  1 passed (1)\n      Tests  5 passed (5)\n   Start at  00:06:24\n   Duration  916ms (transform 332ms, setup 39ms, import 400ms, tests 123ms, environment 0ms)\n\n % Coverage report from v8\n-----------|---------|----------|---------|---------|-------------------\nFile       | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-----------|---------|----------|---------|---------|-------------------\n-----------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 2/2 )\nBranches     : 100% ( 0/0 )\nFunctions    : 100% ( 1/1 )\nLines        : 100% ( 2/2 )\n================================================================================\n"
+}

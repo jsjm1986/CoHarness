@@ -1,0 +1,14 @@
+{
+  "name": "python-sdk-subscription-and-ancestry-current",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_client.py -k 'filter_cannot_publish_after_closing or filter_does_not_run_for_a_subscription_closed or session_ancestry_is_independent' -q",
+  "startedAt": "2026-10-24T10:57:38.506880+00:00",
+  "seconds": 1.255,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d29dcf1de5354d98b5f406f622db2dfd77d5426fc6acb5f714d67ae90693655a",
+  "inputsAfter": "d29dcf1de5354d98b5f406f622db2dfd77d5426fc6acb5f714d67ae90693655a",
+  "postgresToolDirectory": null,
+  "outputSha256": "c4b808d34f4db00b333696dec1f3a43a2887d8bfe0cb7af07a3cb98ff43a7830",
+  "outputTail": "....                                                                     [100%]\n"
+}

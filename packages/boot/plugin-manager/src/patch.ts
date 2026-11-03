@@ -43,8 +43,8 @@ export async function writePluginEnabled(filename: string, id: string, name: str
 }
 
 /**
- * Write a managed row's `config` object, replacing any earlier override for
- * the same entry. `null` removes the config key so composition defaults apply.
+ * Replace a managed row's effective `config` object. `null` clears every
+ * matching config override in this profile patch so composition defaults apply.
  * @param filename Current profile patch file.
  * @param id Unique composition entry id.
  * @param name Module name used to match name-qualified overrides.
@@ -69,25 +69,25 @@ export async function writePluginConfig(
   if (!isSeq(document.contents)) throw new Error('Profile patch must be a YAML sequence')
   loadOptionalPatches('dsh', filename)
   const items = document.contents.items
-  const target = items.findLast((item, index) => {
+  const matches = (item: unknown, index: number): boolean => {
     if (!isMap(item) || document.getIn([index, 'id']) !== id || item.has('insert')) return false
     const expectedName = document.getIn([index, 'name'])
     return !expectedName || expectedName === name
-  })
-  if (isMap(target)) {
-    const index = items.indexOf(target)
-    if (config === null) {
-      if (!target.has('config')) return false
-      target.delete('config')
-      // A row created only to carry the override leaves a no-op entry behind;
-      // rows that also disable or otherwise annotate the plugin stay.
-      if (target.items.every(pair => pair.key?.toString() === 'id' || pair.key?.toString() === 'name')) items.splice(index, 1)
-    } else {
-      document.setIn([index, 'config'], config)
+  }
+  if (config === null) {
+    let changed = false
+    for (let index = items.length - 1; index >= 0; index--) {
+      const item = items[index]
+      if (!isMap(item) || !matches(item, index) || !item.has('config')) continue
+      item.delete('config')
+      if (item.items.every(pair => String(pair.key) === 'id' || String(pair.key) === 'name')) items.splice(index, 1)
+      changed = true
     }
+    if (!changed) return false
   } else {
-    if (config === null) return false
-    document.add({ id, name, config })
+    const target = items.findLast(matches)
+    if (isMap(target)) document.setIn([items.indexOf(target), 'config'], config)
+    else document.add({ id, name, config })
   }
   await writeFileAtomic(filename, String(document), { mode: 0o600 })
   return true

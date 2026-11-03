@@ -199,9 +199,9 @@ async function realRuntime(): Promise<RealRuntime> {
   const handles: SubprocessHandle[] = []
   const spawnSpecs: SubprocessSpawnSpec[] = []
   const spawn = ctx.subprocess.spawn.bind(ctx.subprocess)
-  vi.spyOn(ctx.subprocess, 'spawn').mockImplementation((spec) => {
+  vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async (spec) => {
     spawnSpecs.push(spec)
-    const handle = spawn(spec)
+    const handle = await spawn(spec)
     handles.push(handle)
     return handle
   })

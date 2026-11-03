@@ -31,7 +31,7 @@
  * @module @deepseek-ai/dsh-subagent
  */
 
-import { Context } from '@deepseek-ai/cordis'
+import { Context, FiberState } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
@@ -41,14 +41,18 @@ import type { ContentBlock, MessageId, MessageSource } from '@deepseek-ai/dsh-ll
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { AdmittedPromptContentPart } from '@deepseek-ai/dsh-attachment'
-import { collaborationRemoteRefusal } from '@deepseek-ai/dsh-collaboration'
+import { collaborationOf, collaborationRemoteRefusal } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority, CollaborationParticipant } from '@deepseek-ai/dsh-collaboration'
 import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import { retainSubagentRun, retryFailedSubagentRuns } from './run-lease.ts'
+import type { SubagentRunLease } from './run-lease.ts'
+import { createSubagentCleanupRecovery, retryRetainedSubagentCleanup } from './retained-cleanup.ts'
 import {
-  catalogView, rejectCatalogRead, rejectPrompt, validateControlRequest,
+  assertControlAuthority, catalogView, controlAuthorityFailure, controlAuthoritySignal,
+  rejectCatalogRead, rejectPrompt, validateControlRequest,
 } from './control.ts'
 import type {
   SubagentCatalog,
@@ -74,7 +78,7 @@ import type {
   SubagentStartRequest,
 } from './types.ts'
 import type { SubagentDelivery } from './inbox.ts'
-import { SubagentError } from './error.ts'
+import { SubagentError, renderSubagentFailure } from './error.ts'
 import { assertSubagentMaxDepth } from './depth.ts'
 import { createActivationObserver, createLifecycleEmitter, observeRun } from './lifecycle.ts'
 import type { ActivationObserver, LifecycleEmitter } from './lifecycle.ts'
@@ -84,7 +88,8 @@ import type { SubagentDescendantListEntry, SubagentListEntry } from './list-chil
 import { snapshotSubagentDescriptor } from './descriptor.ts'
 import { establishCatalogChild, establishExternalCatalogChild, subagentCatalogProjectionDefinition } from './catalog.ts'
 import { subagentIdentityProjectionDefinition, subagentTimingProjectionDefinition } from './projection.ts'
-import { deliverSubagentPrompt, subagentPendingDirectChildren } from './internal.ts'
+import { deliverSubagentPrompt, subagentForegroundOperation, subagentPendingDirectChildren } from './internal.ts'
+import { installSubagentArchiveAdmission } from './archive-admission.ts'
 
 export * from './out-of-process.ts'
 export { AssistantOutputFold, finalAssistantOutput } from './assistant-output.ts'
@@ -115,7 +120,7 @@ export type {
   SubagentDescriptorInput,
 } from './descriptor.ts'
 export { seedDescriptorTurn } from './descriptor-seed.ts'
-export { SubagentError } from './error.ts'
+export { SubagentError, renderSubagentFailure } from './error.ts'
 export { settleRun } from './run-settlement.ts'
 export { assertSubagentMaxDepth, delegationDepthOf } from './depth.ts'
 export {
@@ -154,6 +159,27 @@ declare module '@deepseek-ai/cordis' {
   }
 
   interface Events {
+    /**
+     * Collect retry operations owned by the exact parent's retained cleanup.
+     * Listeners register operations synchronously without starting them; the
+     * admitting runtime joins every attempt before refusing new work.
+     * Run handles and cleanup authority remain with their original owners.
+     * @param parent - exact Agent requesting new allocation.
+     * @param register - collect one recovery operation for this admission.
+     * @mode emit
+     */
+    'subagent/cleanup-retry'(parent: Agent, register: (retry: () => Promise<void>) => void): void
+    /**
+     * Offer failed cleanup to an existing exact-parent recovery, including one
+     * already draining. Accepting recovery keeps the original owner's operation
+     * reachable without registering effects in a departing parent.
+     * @param parent - exact Agent that owns the failed child.
+     * @param retry - original owner's coalescing cleanup operation.
+     * @param released - non-rejecting confirmation of physical release.
+     * @param claim - atomically accept this offer once; false leaves it to the accepting listener.
+     * @mode emit
+     */
+    'subagent/cleanup-retain'(parent: Agent, retry: () => Promise<void>, released: Promise<void>, claim: () => boolean): void
     /**
      * A provider became resolvable in the registry.
      * @param provider - the registered provider.
@@ -255,9 +281,13 @@ export class SubagentRuntime extends TypertRemoteService {
 
   private settingsSource: () => Config
 
-  private providers = new Map<string, SubagentProvider>()
+  private providers = new Map<string, { readonly provider: SubagentProvider }>()
   private readonly pendingParents = new WeakMap<Agent, number>()
-  private readonly leasedRuns = new WeakMap<Agent, Set<SubagentRun>>()
+  private readonly leasedRuns = new WeakMap<Agent, Set<SubagentRunLease>>()
+  private readonly runLeases = new WeakMap<SubagentRun, { readonly parent: Agent; readonly lease: SubagentRunLease }>()
+  private readonly adoptedRuns = new Set<SubagentRunLease>()
+  private readonly admission = new AbortController()
+  private readonly pendingOperations = new Map<Promise<void>, AbortController>()
   private continuations: SubagentContinuationManager | undefined
   /**
    * The contained lifecycle-edge publisher. Built here because scoped dispatch
@@ -268,8 +298,20 @@ export class SubagentRuntime extends TypertRemoteService {
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'subagents')
-    ctx.on('agent/idle-release-check', ({ agent }) => (this.pendingParents.get(agent) ?? 0) > 0
-      || (this.leasedRuns.get(agent)?.size ?? 0) > 0 ? 'busy' : undefined, { global: true })
+    ctx.effect(() => {
+      const releaseCheck = ctx.on('agent/idle-release-check', ({ agent }) => (this.pendingParents.get(agent) ?? 0) > 0
+        || (this.leasedRuns.get(agent)?.size ?? 0) > 0 ? 'busy' : undefined, { global: true })
+      return [releaseCheck, async () => {
+        this.admission.abort(new SubagentError('Subagent runtime is being withdrawn', 'DRAINING'))
+        try {
+          for (const controller of this.pendingOperations.values()) controller.abort(this.admission.signal.reason)
+          await Promise.all(this.pendingOperations.keys())
+          while (this.adoptedRuns.size > 0) await retryFailedSubagentRuns(this.adoptedRuns)
+        } finally {
+          releaseCheck()
+        }
+      }]
+    }, 'subagent: admitted operations and retained cleanup')
     assertSubagentMaxDepth(config.maxDepth)
     positiveLimit(
       config.maxContinuableActivations,
@@ -295,6 +337,7 @@ export class SubagentRuntime extends TypertRemoteService {
     })
     this.emitLifecycle = createLifecycleEmitter(this.ctx, parent => scopeTarget(this, parent))
     ctx.inject(['agents'], (childCtx: Context) => {
+      installSubagentArchiveAdmission(childCtx)
       const resolved = (): Required<Config> => this.settingsSource() as Required<Config>
       const manager = new SubagentContinuationManager(childCtx, {
         prepareContinuable: (name, request) => this.prepareContinuable(name, request),
@@ -402,6 +445,20 @@ export class SubagentRuntime extends TypertRemoteService {
     return delivery === 'steer'
       ? this.requireContinuations().steerPrompt(parent, childId, content, source, signal)
       : this.requireContinuations().queuePrompt(parent, childId, content, source, signal)
+  }
+
+  /**
+   * Join a foreground Consumer through collection and cleanup hand-back during withdrawal.
+   * @param parent - exact live parent retaining foreground occupation.
+   * @param signal - caller cancellation.
+   * @param operation - complete collection and cleanup transfer before settling.
+   * @returns the Consumer result, preserving its independent failure.
+   * @internal
+   */
+  [subagentForegroundOperation]<T>(
+    parent: Agent, signal: AbortSignal, operation: (signal: AbortSignal) => Promise<T>,
+  ): Promise<T> {
+    return this.withPendingParent(parent, admissionSignal => operation(AbortSignal.any([signal, admissionSignal])))
   }
 
   /**
@@ -523,6 +580,8 @@ export class SubagentRuntime extends TypertRemoteService {
    * Parent availability is a hint; {@link prompt} performs the authoritative
    * check. Named apart from the provider-name {@link list}, which owns the
    * member.
+   * The captured collaboration provider cancels the read on withdrawal; data
+   * is withheld even when a backing read finishes afterward.
    * @param parentSessionId - parent session whose direct children are listed.
    * @param signal - carrier cancellation forwarded to Session queries.
    * @returns the catalog view for that parent.
@@ -535,11 +594,15 @@ export class SubagentRuntime extends TypertRemoteService {
   @Remote('list')
   async remoteExportList(parentSessionId: SessionId, signal: AbortSignal): Promise<SubagentCatalog> {
     validateControlRequest('subagent.list', { parentSessionId })
-    await this.authorizeControlTier(parentSessionId, 'read')
+    const authority = await this.authorizeControlTier(parentSessionId, 'read')
+    const operationSignal = controlAuthoritySignal(signal, authority)
     try {
-      return catalogView(this.ctx, parentSessionId, await this.listChildren(parentSessionId, signal))
+      assertControlAuthority(authority)
+      const entries = await this.listChildren(parentSessionId, operationSignal)
+      assertControlAuthority(authority)
+      return catalogView(this.ctx, parentSessionId, entries)
     } catch (error: unknown) {
-      return rejectCatalogRead(error, signal)
+      return rejectCatalogRead(controlAuthorityFailure(error, authority), signal, parentSessionId)
     }
   }
 
@@ -548,7 +611,9 @@ export class SubagentRuntime extends TypertRemoteService {
    * exact live direct parent, retaining the caller-minted request identity,
    * validated browser zone, and authenticated project participant on the
    * accepted message. Success identifies the message the child's inbox
-   * accepted; later execution is independent of this call. Queue delivery
+   * accepted; later execution is independent of this call. The captured
+   * collaboration provider cancels admission and delivery until that acceptance;
+   * a replacement cannot authorize this request. Queue delivery
    * targets a later turn; steer delivery targets the nearest step and retains
    * the Agent loop's best-effort fallback semantics. Image parts are admitted
    * and persisted through the attachment store before delivery, and the
@@ -596,6 +661,7 @@ export class SubagentRuntime extends TypertRemoteService {
     if (authority !== undefined) {
       try {
         await authority.authorize(childSessionId, 'write')
+        assertControlAuthority(authority)
       } catch (error: unknown) {
         throw collaborationRemoteRefusal(error, 'write', childSessionId)
       }
@@ -607,7 +673,10 @@ export class SubagentRuntime extends TypertRemoteService {
       ...(canonicalTimeZone === undefined ? {} : { clientTimeZone: canonicalTimeZone }),
       ...(participant === undefined ? {} : { participant }),
     }
+    const operationSignal = controlAuthoritySignal(signal, authority)
     try {
+      assertControlAuthority(authority)
+      operationSignal.throwIfAborted()
       // Admission precedes delivery: image parts become durable references
       // here, so the child inbox only ever accepts Host-persisted attachments.
       let content: ContentBlock[] | undefined = await this.ctx.serial(
@@ -615,6 +684,8 @@ export class SubagentRuntime extends TypertRemoteService {
         parent,
         request.content,
       )
+      assertControlAuthority(authority)
+      operationSignal.throwIfAborted()
       if (content === undefined) {
         if (request.content.every((part): part is Extract<SubagentPromptContentPart, { type: 'text' }> => part.type === 'text')) {
           content = request.content.map(part => ({ type: 'text', text: part.text }))
@@ -624,18 +695,20 @@ export class SubagentRuntime extends TypertRemoteService {
           content = await attachments.admitPromptContent(request.content)
         }
       }
+      assertControlAuthority(authority)
+      operationSignal.throwIfAborted()
       return {
         messageId: await this[deliverSubagentPrompt](
           parent,
           childSessionId,
           content,
           source,
-          signal,
+          operationSignal,
           delivery,
         ),
       }
     } catch (error: unknown) {
-      return rejectPrompt(error, childSessionId, signal)
+      return rejectPrompt(controlAuthorityFailure(error, authority), childSessionId, signal)
     }
   }
 
@@ -645,7 +718,8 @@ export class SubagentRuntime extends TypertRemoteService {
    * authorization tiers and the core primitive's lineage check together
    * authorize the address, which is what keeps a live child interruptible
    * while its parent Agent is offline. Absent, idle, and already-completed
-   * targets are accepted no-ops there.
+   * targets are accepted no-ops there. Withdrawal of the captured collaboration
+   * provider before interrupt admission refuses the request.
    * @param childSessionId - durable child session id to interrupt.
    * @param parentSessionId - durable direct parent whose authority is claimed.
    * @param mode - required continuable-address discriminator.
@@ -666,6 +740,7 @@ export class SubagentRuntime extends TypertRemoteService {
     if (authority !== undefined) {
       try {
         await authority.authorize(childSessionId, 'write')
+        assertControlAuthority(authority)
       } catch (error: unknown) {
         throw collaborationRemoteRefusal(error, 'write', childSessionId)
       }
@@ -699,12 +774,14 @@ export class SubagentRuntime extends TypertRemoteService {
     sessionId: SessionId,
     action: 'read' | 'write',
   ): Promise<CollaborationAuthority | undefined> {
-    const collaboration = this.ctx.get('collaboration')
-    if (collaboration === undefined) return undefined
     try {
+      const collaboration = collaborationOf(this.ctx)
+      if (collaboration === undefined) return undefined
       const authority = collaboration.capture()
+      assertControlAuthority(authority)
       if (authority.participant.scope.kind === 'personal') {
         await authority.authorize(sessionId, action)
+        assertControlAuthority(authority)
       }
       return authority
     } catch (error: unknown) {
@@ -726,7 +803,7 @@ export class SubagentRuntime extends TypertRemoteService {
       if (this.providers.has(name)) {
         throw new SubagentError(`a subagent provider named "${name}" is already registered`, 'DUPLICATE_PROVIDER')
       }
-      this.providers.set(name, provider)
+      this.providers.set(name, { provider })
       yield () => {
         this.providers.delete(name)
         this.emitLifecycle('subagent/provider-removed', name)
@@ -743,7 +820,7 @@ export class SubagentRuntime extends TypertRemoteService {
    * @returns the provider, or undefined when absent.
    */
   getProvider(name: string): SubagentProvider | undefined {
-    return this.providers.get(name)
+    return this.providers.get(name)?.provider
   }
 
   /**
@@ -762,13 +839,21 @@ export class SubagentRuntime extends TypertRemoteService {
    * failures settle through the returned run.
    * A catalog append failure disposes the run and handles its result rejection;
    * the caller receives the catalog error even if disposal also fails.
+   * Another start for the same exact parent retries handed-back failed cleanup before
+   * provider admission. Unconfirmed cleanup refuses the new start; unrelated
+   * parents and holder-owned, successful or pending-only leases are not retried.
+   * Runtime withdrawal stops admission, cancels and joins pending starts, and
+   * disposes a provider publication received after cancellation. Published
+   * holder-owned runs retain caller cancellation and are not revoked by withdrawal.
    * @param name - the provider to use.
    * @param request - child label, prompt, parent, signal, and optional capabilities.
    * @returns the published holder-owned run.
    */
   async start(name: string, request: SubagentStartRequest): Promise<SubagentRun> {
-    return this.withPendingParent(request.parent, async () => {
-      const provider = this.expectProvider(name)
+    return this.withPendingParent(request.parent, async (admissionSignal, publish) => {
+      const signal = AbortSignal.any([request.signal, admissionSignal])
+      const registration = this.expectProviderRegistration(name)
+      const provider = registration.provider
       this.assertCapabilities(provider, request)
       assertSubagentMaxDepth(request.maxDepth)
       if (request.outputSchema !== undefined) assertObjectJsonSchema(request.outputSchema)
@@ -778,46 +863,114 @@ export class SubagentRuntime extends TypertRemoteService {
         ...request.label !== undefined ? { label: request.label } : {},
       })
       const cwd = request.cwd === undefined
-        ? await this.ctx.workingDirectory.ensure(request.parent, request.signal)
-        : await this.ctx.workingDirectory.resolve(request.parent, request.cwd, request.signal)
-      request.signal.throwIfAborted()
-      const resolved: ResolvedSubagentStartRequest = { ...request, cwd, descriptor }
+        ? await this.ctx.workingDirectory.ensure(request.parent, signal)
+        : await this.ctx.workingDirectory.resolve(request.parent, request.cwd, signal)
+      signal.throwIfAborted()
+      await retryRetainedSubagentCleanup(this.ctx, request.parent)
+      let cleanup = this.leasedRuns.get(request.parent)
+      while (cleanup !== undefined && [...cleanup].some(lease => lease.cleanupFailed && lease.retryOnAdmission)) {
+        await retryFailedSubagentRuns(cleanup)
+        cleanup = this.leasedRuns.get(request.parent)
+      }
+      signal.throwIfAborted()
+      if (this.providers.get(name) !== registration) {
+        throw new SubagentError(`subagent provider "${name}" changed while preparing the child; retry delegation`, 'PROVIDER_CHANGED')
+      }
+      const resolved: ResolvedSubagentStartRequest = { ...request, signal, cwd, descriptor }
       const run = await provider.start(resolved)
-      const owned = this.leasedRuns.get(request.parent) ?? new Set<SubagentRun>()
+      const owned = this.leasedRuns.get(request.parent) ?? new Set<SubagentRunLease>()
       this.leasedRuns.set(request.parent, owned)
-      owned.add(run)
+      const lease = retainSubagentRun(owned, this.adoptedRuns, run)
       const child = run.localAgent?.session
       try {
+        signal.throwIfAborted()
         if (child !== undefined) establishCatalogChild(request.parent.session, child.header, descriptor)
         else establishExternalCatalogChild(request.parent.session, run.id, request.label ?? name)
       } catch (error: unknown) {
-        // No caller receives this run; the catalog error owns the failed start.
+        // No caller receives a run refused after provider publication.
+        const stage = signal.aborted ? 'start refusal' : 'catalog append failure'
         void run.result.catch(() => undefined)
         try {
-          await run.dispose()
-          owned.delete(run)
+          await lease.dispose()
         } catch (cleanupError: unknown) {
+          this.adoptFailedCleanup(request.parent, lease)
           this.ctx.logger.warn(
-            `subagent: disposal after catalog append failure also failed: ${String(cleanupError)}`,
+            `subagent: disposal after ${stage} also failed: ${renderSubagentFailure(cleanupError)}`,
           )
         }
         throw error
       }
+      publish()
       const observed = observeRun(this.emitLifecycle, name, request.parent, run)
-      const dispose = observed.dispose.bind(observed)
-      let disposal: Promise<void> | undefined
-      return { ...observed, dispose: () => disposal ??= dispose().then(() => { owned.delete(run) }) }
+      const handle = { ...observed, dispose: lease.dispose }
+      this.runLeases.set(handle, { parent: request.parent, lease })
+      return handle
     })
   }
 
-  private async withPendingParent<T>(parent: Agent, operation: () => Promise<T>): Promise<T> {
+  /**
+   * Retain failed cleanup after a foreground caller gives up its one-shot handle.
+   * Another start for the exact parent retries it before allocation; service
+   * disposal also joins retained cleanup. Holder-owned background work keeps
+   * its existing completion and cancellation controls.
+   * A live parent's recovery outlives this runtime's registration.
+   * Parent teardown retries retained cleanup and joins late transfers. A
+   * departing parent adds no effects; an unaccepted transfer retries its original lease.
+   * @param parent - exact Agent that originally started the run.
+   * @param run - handle returned by this service for that parent.
+   * @returns fulfillment after confirmed release; failed attempts keep it pending.
+   * @throws {SubagentError} `UNAUTHORIZED` for another runtime's or parent's handle.
+   */
+  retainFailedCleanup(parent: Agent, run: SubagentRun): Promise<void> {
+    const retained = this.runLeases.get(run)
+    if (retained === undefined || retained.parent !== parent) {
+      throw new SubagentError('failed subagent cleanup belongs to another runtime or parent', 'UNAUTHORIZED')
+    }
+    this.adoptFailedCleanup(parent, retained.lease)
+    return retained.lease.whenReleased()
+  }
+
+  /** Retain exact-parent retry access independently of this service's registration. */
+  private adoptFailedCleanup(parent: Agent, lease: SubagentRunLease): void {
+    lease.adopt()
+    if (!lease.retryOnAdmission) return
+    const released = lease.whenReleased()
+    const offer = { accepted: false }
+    this.ctx.emit('subagent/cleanup-retain', parent, lease.dispose, released, () => {
+      if (offer.accepted) return false
+      offer.accepted = true
+      return true
+    })
+    if (offer.accepted) return
+    // A departing parent cannot accept new effects. The adopted lease owns this
+    // attempt; its holder's confirmation and runtime drainage join the same disposal.
+    if (parent.ctx.fiber.uid === null || parent.ctx.fiber.state === FiberState.UNLOADING) {
+      void lease.dispose().catch((error: unknown) => {
+        this.ctx.logger.warn(`subagent: late parent cleanup failed: ${renderSubagentFailure(error)}`)
+      })
+      return
+    }
+    createSubagentCleanupRecovery(parent).retain(lease.dispose, released)
+  }
+
+  private async withPendingParent<T>(
+    parent: Agent, operation: (signal: AbortSignal, publish: () => void) => Promise<T>,
+  ): Promise<T> {
+    this.admission.signal.throwIfAborted()
     if (this.ctx.get('agents')?.isRemoving(parent.id) === true) throw new SubagentError('Parent Session is being removed', 'DRAINING')
     const pending = this.pendingParents
+    const completion = Promise.withResolvers<undefined>()
+    const controller = new AbortController()
+    this.pendingOperations.set(completion.promise, controller)
     pending.set(parent, (pending.get(parent) ?? 0) + 1)
-    try { return await operation() } finally {
+    try {
+      return await operation(controller.signal, () => { this.pendingOperations.delete(completion.promise) })
+    } finally {
       const count = pending.get(parent) as number
       if (count === 1) pending.delete(parent)
       else pending.set(parent, count - 1)
+      this.pendingOperations.delete(completion.promise)
+      completion.resolve(undefined)
     }
   }
 
@@ -843,11 +996,16 @@ export class SubagentRuntime extends TypertRemoteService {
 
   /** Look up a provider for dispatch or fail loud. */
   private expectProvider(name: string): SubagentProvider {
-    const provider = this.providers.get(name)
-    if (provider === undefined) {
+    return this.expectProviderRegistration(name).provider
+  }
+
+  /** Capture the exact effect-scoped registration used by an asynchronous admission. */
+  private expectProviderRegistration(name: string): { readonly provider: SubagentProvider } {
+    const registration = this.providers.get(name)
+    if (registration === undefined) {
       throw new SubagentError(`no subagent provider registered for "${name}"`, 'NO_PROVIDER')
     }
-    return provider
+    return registration
   }
 
   /** Resolve the optional continuable-subagent manager or fail loud. */

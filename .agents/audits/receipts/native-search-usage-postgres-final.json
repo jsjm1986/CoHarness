@@ -1,0 +1,14 @@
+{
+  "name": "native-search-usage-postgres-final",
+  "cwd": "gateway",
+  "command": "node_modules/.bin/vitest run tests/postgres.spec.ts --retry=0",
+  "startedAt": "2026-10-24T07:25:40.941075+00:00",
+  "seconds": 9.359,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b4b41fde1551170987bb07c9e670e15d5f9c5fdd1cf50ba7ea494acb267f816e",
+  "inputsAfter": "b4b41fde1551170987bb07c9e670e15d5f9c5fdd1cf50ba7ea494acb267f816e",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "74b36830c422af96290ccf0afdaf6ec7c13619b8e0fdf4b9c71781fb1efdcdcb",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  41 passed (41)\n   Start at  15:25:43\n   Duration  7.22s (transform 1.71s, setup 0ms, import 2.09s, tests 5.05s, environment 0ms)\n\n"
+}

@@ -88,6 +88,35 @@ describe('deployment tunnel key ownership', () => {
     await expect(previewBackupNodeConfiguration('backup', snapshot, directory, context, cfg, {}))
       .rejects.toThrow('backup-tunnel-credential-key-identity-ambiguous')
   })
+
+  it.each(['local-runtime-supervisors', 'gateway-model-locks'].flatMap(control =>
+    ['directory', 'ancestor', 'file'].map(kind => ({ control, kind }))))(
+    'rejects an approved $kind root overlapping node control $control', async ({ control, kind }) => {
+      const cfg = testConfig(directory, { HGW_MANAGED_DATA_APPROVAL_FILE: join(directory, 'approved.jsonl') })
+      const controlRoot = join(cfg.stateRoot, control), witness = join(controlRoot, 'generation.json')
+      const dshHome = join(cfg.usersRoot, 'fixture', 'dsh'), home = join(cfg.usersRoot, 'fixture', 'home')
+      await Promise.all([mkdir(controlRoot, { recursive: true }), mkdir(home, { recursive: true })])
+      await writeFile(witness, '{"phase":"stopped"}\n')
+      const row = { owner: 'fixture-plugin', kind: kind === 'file' ? 'file' as const : 'directory' as const,
+        path: kind === 'ancestor' ? cfg.stateRoot : kind === 'file' ? witness : controlRoot }
+      registerManagedDataPath(row, join(dshHome, 'managed-data.jsonl'))
+      registerManagedDataPath({ ...row, owner: `user:1/${row.owner}` }, cfg.managedDataApprovalFile)
+      vi.mocked(context.pool.query).mockImplementation(async sql => {
+        const query = String(sql)
+        const rows = query.includes('count(*)::text FROM harness.organizations') ? [{ organizations: '1', nodes: '1' }]
+          : query.includes('SELECT u.public_id::text') ? [{ public_id: '1', username: 'fixture', home_path: home, generation: 1 }] : []
+        return { rows, command: 'SELECT', rowCount: rows.length, oid: 0, fields: [] }
+      })
+      await expect(collectDeploymentData(context, cfg)).rejects.toThrow('managed-data-root-overlaps-runtime-control')
+      expect(await readFile(witness, 'utf8')).toBe('{"phase":"stopped"}\n')
+    },
+  )
+
+  it.each(['local-runtime-supervisors', 'gateway-model-locks'])('refuses credential relocation into node control %s', async control => {
+    const cfg = testConfig(directory)
+    const next = { ...cfg, principalKeyDir: join(cfg.stateRoot, control) }
+    await expect(planDeploymentDataRelocation(context, cfg, next)).rejects.toThrow('managed-data-root-overlaps-runtime-control')
+  })
 })
 
 describe('released preset inventory owners', () => {

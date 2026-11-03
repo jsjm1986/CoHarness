@@ -24,6 +24,10 @@ The [boot package group](../../packages/boot/README.md) owns launcher-provided p
 
 `PluginManagementCatalog` adds `managementAvailable`, `bundles`, and `plugins` to the access result for one authorized read. The separate Web catalog entry returns empty lists and false availability without a manager; with a manager, its values are live reads rather than an atomic profile revision.
 
+`ParsedInstallSpec` retains the submitted `spec` and discriminates registry, path, tarball, and git sources. Registry sources carry `name` and an optional `range`; path sources carry `path`; tarballs carry an optional `path` or `host`; git sources carry `host`. Installation authorization can restrict the actual fetch source before package operations begin.
+
+`PluginConfigValue` is a recursive JSON value. `PluginConfigDescription.config` contains the entry's configuration or `null` when none is declared; optional `schema` contains the plugin's Schemastery `toJSON` serialization for configuration forms.
+
 `PluginDesiredState` is the deployment's desired composition for one profile: verbatim patch `entries` whose keys stay within `id`, `name`, `disabled`, plus the ordered `bundles` selection. `PluginDesiredStateSnapshot` pairs a saved state with the store's optimistic-concurrency `revision` (`'0'` while none is saved), and `PluginDesiredStatePublish` answers `applied` with the new revision or `conflict` with the store's current snapshot.
 
 ## Profile reconciliation
@@ -228,7 +232,7 @@ async authorize(capability: PluginManagementCapability = 'manage'): Promise<void
 @Remote async describePluginConfig(id: PluginEntryId): Promise<PluginConfigDescription>
 
 /** Replace one plugin row's config in the profile patch, validated against its schema.
- * `config: null` removes the override so composition defaults apply. The loader
+ * `config: null` clears all matching profile config overrides so composition defaults apply. The loader
  * rejects a failing schema at reload as well; validating here first reports a
  * readable error instead of a broken reload.
  * @param id Loader entry identity returned by listPlugins.

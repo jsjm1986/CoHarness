@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { Scope } from '@deepseek-ai/dsh-scope'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { agentCarrier, type Agent } from '@deepseek-ai/dsh-agent'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import CommandRuntime, { CommandDefinitionId, parseCommand, type CommandDefinition } from '@deepseek-ai/dsh-commands'
-import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import { AttachmentId, AttachmentStore } from '@deepseek-ai/dsh-attachment'
 
 function command(name: string, text = `ran:${name}`): CommandDefinition {
   return {
@@ -54,6 +54,134 @@ describe('parseCommand()', () => {
 })
 
 describe('CommandRuntime', () => {
+  it.each([false, true])('keeps an unloading service accountable for pending handler cleanup after UI cancellation: %s', async (cancelled) => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(CommandRuntime)
+    const commands = ctx.commands
+    const session = ctx.sessions.create(SessionId('unloading-command'))
+    const agent = { id: session.id, session } as Agent
+    const cleanup = Promise.withResolvers<{ kind: 'success' }>()
+    const aborted = Promise.withResolvers<undefined>()
+    const entered = Promise.withResolvers<undefined>()
+    let signal: AbortSignal | undefined
+    commands.register({ name: 'pending', description: 'Owned asynchronous cleanup', handler: (invocation) => {
+      signal = invocation.signal
+      signal.addEventListener('abort', () => { aborted.resolve(undefined) }, { once: true })
+      entered.resolve(undefined)
+      return cleanup.promise
+    } })
+    const request = new AbortController()
+    const operation = commands.execute(agent, '/pending', [], request.signal)
+    const outcome = operation.then(result => ({ result }), (error: unknown) => ({ error }))
+    let unloading: Promise<void> | undefined
+    try {
+      await entered.promise
+      if (cancelled) {
+        request.abort(new Error('UI request cancelled'))
+        expect(await outcome).toHaveProperty('error')
+      }
+      unloading = fiber.dispose()
+      expect(await Promise.race([unloading.then(() => 'disposed'), aborted.promise.then(() => 'aborted')])).toBe('aborted')
+      expect(signal?.aborted).toBe(true)
+      expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBe('busy')
+      expect(await outcome).toHaveProperty('error')
+      cleanup.resolve({ kind: 'success' })
+      await unloading
+      expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBeUndefined()
+      expect(lifecycleOf(agent)).toMatchObject([
+        { type: 'command/run' }, { type: 'command/done', data: { kind: 'error' } },
+      ])
+    } finally {
+      cleanup.resolve({ kind: 'success' })
+      await Promise.allSettled([operation, unloading])
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('refuses calls through a retained service after withdrawal', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(CommandRuntime)
+    const commands = ctx.commands
+    const session = ctx.sessions.create(SessionId('withdrawn-command'))
+    const agent = { id: session.id, session } as Agent
+    const handler = vi.fn(() => ({ kind: 'success' as const }))
+    commands.register({ name: 'retained', description: 'Retained service reference', handler })
+    try {
+      await fiber.dispose()
+      await expect(commands.execute(agent, '/retained', [], new AbortController().signal)).rejects.toThrow('commands service was withdrawn')
+      expect(handler).not.toHaveBeenCalled()
+      expect(lifecycleOf(agent)).toEqual([])
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('retains idle admission until every concurrent command for the Agent settles', async () => {
+    const ctx = await mount()
+    const { agent } = await mintAgentScope(ctx, 'parallel-command-owner')
+    const first = Promise.withResolvers<{ kind: 'success' }>()
+    const second = Promise.withResolvers<{ kind: 'success' }>()
+    let calls = 0
+    ctx.commands.register({ name: 'parallel', description: 'Concurrent operation', handler: () => ++calls === 1 ? first.promise : second.promise })
+    const one = ctx.commands.execute(agent, '/parallel', [], new AbortController().signal)
+    const two = ctx.commands.execute(agent, '/parallel', [], new AbortController().signal)
+    try {
+      expect(calls).toBe(2)
+      first.resolve({ kind: 'success' })
+      await one
+      expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBe('busy')
+      second.resolve({ kind: 'success' })
+      await two
+      expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBeUndefined()
+    } finally {
+      first.resolve({ kind: 'success' })
+      second.resolve({ kind: 'success' })
+      await Promise.allSettled([one, two])
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it.each(['completed', 'cancelled', 'failed'] as const)('retains exact-owner idle admission until a %s handler settles', async (finish) => {
+    const ctx = await mount()
+    const { agent } = await mintAgentScope(ctx, 'command-owner')
+    const other = (await mintAgentScope(ctx, 'other-owner')).agent
+    const entered = Promise.withResolvers<undefined>()
+    const handler = Promise.withResolvers<{ kind: 'success' }>()
+    const controller = new AbortController()
+    const reason = new Error('Command operation stopped')
+    let busyAtPublication = false
+    ctx.on('session/event', (session, event) => {
+      if (session === agent.session && event.type === 'command/run') {
+        busyAtPublication = ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent }) === 'busy'
+      }
+    })
+    ctx.commands.register({ name: 'pending', description: 'Pending operation', handler: () => {
+      entered.resolve(undefined)
+      return handler.promise
+    } })
+    const operation = ctx.commands.execute(agent, '/pending', [], controller.signal)
+    const outcome = operation.then(result => ({ result }), (error: unknown) => ({ error }))
+    try {
+      await entered.promise
+      expect(busyAtPublication).toBe(true)
+      expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBe('busy')
+      expect(ctx.bail(agentCarrier(other), 'agent/idle-release-check', { agent: other })).toBeUndefined()
+      if (finish === 'cancelled') {
+        controller.abort(reason)
+        expect(await outcome).toEqual({ error: reason })
+        expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBe('busy')
+      }
+      if (finish === 'failed') handler.reject(reason)
+      else handler.resolve({ kind: 'success' })
+      await outcome
+      expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBeUndefined()
+    } finally {
+      handler.resolve({ kind: 'success' })
+      await outcome
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('lists immutable global descriptors with input metadata', async () => {
     const ctx = await mount()
     const { agent } = await mintAgentScope(ctx, 'a')
@@ -177,7 +305,7 @@ describe('CommandRuntime', () => {
   it('passes exact invocation context and detaches valid handler results', async () => {
     const ctx = await mount()
     const { agent } = await mintAgentScope(ctx, 'a')
-    const seen = vi.fn(() => ({ kind: 'success' as const, text: 'ok' }))
+    const seen = vi.fn<CommandDefinition['handler']>(() => ({ kind: 'success', text: 'ok' }))
     ctx.commands.register({ name: 'run', description: 'Run it', handler: seen })
     const controller = new AbortController()
 
@@ -190,8 +318,8 @@ describe('CommandRuntime', () => {
     expect(seen).toHaveBeenCalledWith(expect.objectContaining({
       agent,
       rawInput: '  untouched ',
-      signal: controller.signal,
     }))
+    expect(seen.mock.calls[0]?.[0].signal).toBeInstanceOf(AbortSignal)
     await expect(ctx.commands.execute(agent, 'run', [], controller.signal)).resolves.toBeUndefined()
     await expect(ctx.commands.execute(agent, '/missing', [], controller.signal)).resolves.toBeUndefined()
   })
@@ -252,6 +380,28 @@ describe('CommandRuntime', () => {
         message: 'command handler rejected with a non-Error value: <unrenderable thrown value>',
         cause: hostile,
       })
+  })
+
+  it.each([false, true])('refuses cancellation during run publication before handler entry (remove=%s)', async (removeToo) => {
+    const ctx = await mount()
+    try {
+      const { agent } = await mintAgentScope(ctx, 'cancelled-command')
+      const controller = new AbortController()
+      const failure = new Error('operator cancelled before handler entry')
+      const handler = vi.fn(() => ({ kind: 'success' as const }))
+      const remove = ctx.commands.register({ name: 'cancelled', description: 'Cancelled command', handler })
+      ctx.on('session/event', (_session, event) => {
+        if (event.type !== 'command/run') return
+        controller.abort(failure)
+        if (removeToo) remove()
+      }, { global: true })
+      await expect(ctx.commands.execute(agent, '/cancelled', [], controller.signal)).rejects.toBe(failure)
+      expect(handler).not.toHaveBeenCalled()
+      expect(lifecycleOf(agent)).toMatchObject([
+        { type: 'command/run', data: { name: 'cancelled' } },
+        { type: 'command/done', data: { kind: 'error', text: failure.message } },
+      ])
+    } finally { await ctx.fiber.dispose() }
   })
 
   it('observes an abort triggered synchronously inside the handler', async () => {
@@ -517,6 +667,50 @@ describe('command attachments', () => {
     }
   }
 
+  it('cancels pending attachment admission when its service is withdrawn', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(CommandRuntime)
+    const commands = ctx.commands
+    const session = ctx.sessions.create(SessionId('unloading-command-admission'))
+    const agent = { id: session.id, session } as Agent
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const withdrawn = Promise.withResolvers<undefined>()
+    const store = storeOf()
+    const save = store.saveImages.bind(store)
+    store.saveImages = vi.fn(async (inputs: readonly unknown[]) => {
+      entered.resolve(undefined)
+      await release.promise
+      return save(inputs)
+    })
+    ctx.provide('attachments', store)
+    ctx.on('internal/service', (name, value) => { if (name === 'commands' && value === undefined) withdrawn.resolve(undefined) })
+    const handler = vi.fn(() => ({ kind: 'success' as const }))
+    commands.register(accepting(handler))
+    const operation = commands.execute(agent, '/vision', [{ type: 'image', mediaType: 'image/png', data: PNG }], new AbortController().signal)
+    const outcome = operation.catch((error: unknown) => error)
+    let unloading: Promise<void> | undefined
+    try {
+      await entered.promise
+      unloading = fiber.dispose()
+      await withdrawn.promise
+      expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBe('busy')
+      expect(handler).not.toHaveBeenCalled()
+      release.resolve(undefined)
+      expect(await outcome).toEqual(new Error('commands service was withdrawn'))
+      await unloading
+      expect(handler).not.toHaveBeenCalled()
+      expect(lifecycleOf(agent)).toMatchObject([
+        { type: 'command/run' }, { type: 'command/done', data: { kind: 'error' } },
+      ])
+    } finally {
+      release.resolve(undefined)
+      await Promise.allSettled([operation, unloading])
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('rejects a boolean-typed images flag violation at registration', async () => {
     const ctx = await mount()
     expect(() => ctx.commands.register({
@@ -587,6 +781,25 @@ describe('command attachments', () => {
     expect((seen.mock.calls[1]?.[0] as { attachments: readonly unknown[] }).attachments).toEqual([])
   })
 
+  it('admits a file-only submission without invoking image storage', async () => {
+    const ctx = await mount()
+    try {
+      const store = storeOf()
+      ctx.provide('attachments', store)
+      const { agent } = await mintAgentScope(ctx, 'a')
+      const file = { attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`), name: 'notes.txt', bytes: 5 }
+      ctx.commands.registerFileReceiptResolver((owner, receiptId) => owner === agent && receiptId === 'ready-file' ? file : undefined)
+      const handler = vi.fn((_invocation: { attachments: readonly unknown[] }) => ({ kind: 'success' as const }))
+      ctx.commands.register(accepting(handler))
+      await expect(ctx.commands.execute(
+        agent, '/vision', [{ type: 'file', receiptId: 'ready-file' }], new AbortController().signal,
+      )).resolves.toMatchObject({ result: { kind: 'success' } })
+      expect(handler.mock.calls[0]?.[0].attachments).toEqual([{ type: 'file', attachment: file }])
+      expect(store.saveImage).not.toHaveBeenCalled()
+      expect(store.saveFile).not.toHaveBeenCalled()
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('requires a same-session file receipt resolver and keeps its registration single-owner', async () => {
     const ctx = await mount()
     const store = storeOf()
@@ -634,6 +847,105 @@ describe('command attachments', () => {
     expect(lifecycleOf(agent).at(-1)).toMatchObject({ type: 'command/done', data: { kind: 'error' } })
   })
 
+  it.each(['removed', 'replaced', 'registry-unloaded'] as const)('refuses an Agent %s during attachment admission', async (change) => {
+    const ctx = await mount()
+    const registry = await ctx.plugin(AgentRegistry)
+    const { agent } = await mintAgentScope(ctx, 'retired-command-owner')
+    const detach = ctx.agents.register(agent)
+    await detach
+    const store = storeOf()
+    const save = store.saveImage.getMockImplementation()!
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    store.saveImage.mockImplementationOnce(async (input) => {
+      entered.resolve(undefined)
+      await release.promise
+      return save(input)
+    })
+    ctx.provide('attachments', store)
+    const handler = vi.fn(() => ({ kind: 'success' as const }))
+    ctx.commands.register(accepting(handler))
+    const operation = ctx.commands.execute(agent, '/vision x', [{ type: 'image', mediaType: 'image/png', data: PNG }], new AbortController().signal)
+    try {
+      await entered.promise
+      if (change === 'registry-unloaded') await registry.dispose()
+      else {
+        await detach()
+        if (change === 'replaced') await ctx.agents.register({ ...agent })
+      }
+      release.resolve(undefined)
+      await expect(operation).resolves.toMatchObject({ result: {
+        kind: 'error', text: '/vision cannot run because its Agent is no longer active.',
+      } })
+      expect(handler).not.toHaveBeenCalled()
+      expect(lifecycleOf(agent).at(-1)).toMatchObject({ type: 'command/done', data: { kind: 'error' } })
+    } finally {
+      release.resolve(undefined)
+      await Promise.allSettled([operation])
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it.each(['removed', 'replaced', 'shadowed'] as const)(
+    'refuses a command %s while its attachments are being admitted', async (change) => {
+      const ctx = await mount()
+      const store = storeOf()
+      const save = store.saveImage.getMockImplementation()!
+      const entered = Promise.withResolvers<undefined>()
+      const release = Promise.withResolvers<undefined>()
+      store.saveImage.mockImplementationOnce(async (input) => {
+        entered.resolve(undefined)
+        await release.promise
+        return save(input)
+      })
+      ctx.provide('attachments', store)
+      const { scope, agent } = await mintAgentScope(ctx, 'a')
+      const original = vi.fn(() => ({ kind: 'success' as const }))
+      const replacement = vi.fn(() => ({ kind: 'success' as const }))
+      const remove = ctx.commands.register(accepting(original))
+      const pending = ctx.commands.execute(
+        agent, '/vision x', [{ type: 'image', mediaType: 'image/png', data: PNG }], new AbortController().signal,
+      )
+      try {
+        await entered.promise
+        if (change === 'shadowed') scope.ctx.commands.register(accepting(replacement))
+        else {
+          remove()
+          if (change === 'replaced') ctx.commands.register(accepting(replacement))
+        }
+        release.resolve(undefined)
+        const result = { kind: 'error', text: '/vision changed while preparing the command. Try it again.' }
+        await expect(pending).resolves.toMatchObject({ result })
+        expect(original).not.toHaveBeenCalled()
+        expect(replacement).not.toHaveBeenCalled()
+        expect(lifecycleOf(agent)).toMatchObject([
+          { type: 'command/run', data: { name: 'vision' } },
+          { type: 'command/done', data: result },
+        ])
+      } finally {
+        release.resolve(undefined)
+        await Promise.allSettled([pending])
+        await ctx.fiber.dispose()
+      }
+    },
+  )
+
+  it('refuses a command removed by its run-event listener before handler entry', async () => {
+    const ctx = await mount()
+    try {
+      const { agent } = await mintAgentScope(ctx, 'a')
+      const handler = vi.fn(() => ({ kind: 'success' as const }))
+      const remove = ctx.commands.register(accepting(handler))
+      ctx.on('session/event', (_session, event) => {
+        if (event.type === 'command/run') remove()
+      }, { global: true })
+      await expect(ctx.commands.execute(agent, '/vision', [], new AbortController().signal))
+        .resolves.toMatchObject({ result: { kind: 'error', text: '/vision changed while preparing the command. Try it again.' } })
+      expect(handler).not.toHaveBeenCalled()
+      expect(lifecycleOf(agent)).toHaveLength(2)
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('honors a cancellation that lands during admission before entering the handler', async () => {
     const ctx = await mount()
     const controller = new AbortController()
@@ -656,6 +968,43 @@ describe('command attachments', () => {
       type: 'command/done',
       data: { kind: 'error', text: 'operator cancelled during admission' },
     })
+  })
+
+  it('records a non-Error storage rejection without entering the command handler', async () => {
+    const ctx = await mount()
+    try {
+      const store = storeOf()
+      store.saveImage.mockRejectedValueOnce('storage reply missing')
+      ctx.provide('attachments', store)
+      const { agent } = await mintAgentScope(ctx, 'a')
+      const handler = vi.fn(() => ({ kind: 'success' as const }))
+      ctx.commands.register(accepting(handler))
+      await expect(ctx.commands.execute(
+        agent, '/vision', [{ type: 'image', mediaType: 'image/png', data: PNG }], new AbortController().signal,
+      )).rejects.toBe('storage reply missing')
+      expect(handler).not.toHaveBeenCalled()
+      expect(lifecycleOf(agent).at(-1)).toMatchObject({
+        type: 'command/done', data: { kind: 'error', text: 'storage reply missing' },
+      })
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('preserves the handler failure when its error lifecycle append also fails', async () => {
+    const ctx = await mount()
+    let restore: (() => void) | undefined
+    try {
+      const { agent } = await mintAgentScope(ctx, 'a')
+      const failure = new Error('command handler failed')
+      ctx.commands.register(accepting(() => {
+        const append = vi.spyOn(agent.session, 'append').mockImplementation(() => { throw new Error('log storage unavailable') })
+        restore = () => { append.mockRestore() }
+        throw failure
+      }))
+      await expect(ctx.commands.execute(agent, '/vision', [], new AbortController().signal)).rejects.toBe(failure)
+    } finally {
+      restore?.()
+      await ctx.fiber.dispose()
+    }
   })
 
   it('logs and rethrows a non-attachment admission failure', async () => {

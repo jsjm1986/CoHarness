@@ -1,0 +1,8 @@
+- main:
+  - text: COHARNESS
+  - heading "工作台未能打开" [level=1]
+  - alert: 电脑暂时繁忙，启动尚未完成。请稍后重试
+  - button "重试启动"
+  - paragraph:
+    - link "返回空间列表":
+      - /url: /?environments=1

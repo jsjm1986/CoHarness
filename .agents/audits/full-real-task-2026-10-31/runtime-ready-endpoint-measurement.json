@@ -1,0 +1,64 @@
+{
+  "status": "measured_source_and_backend_verified_not_deployed_browser_unverified",
+  "workload": "8 concurrent warm Gateway proxy endpoint checks for the existing ready Linux QA project29; real PostgreSQL repository and NodeResourceBudget registration lookup plus real systemd liveness for the captured generation",
+  "entry": "Proxy ensureReady -> InstanceManager.isLive + portOf + generationOf; candidate will return a coherent current ready endpoint from the same manager",
+  "includes": "Fresh process, warm retained supervisor handle, equal pool prewarming, runtime/peak RSS/retained heap; all functional endpoint checks; actual Linux database distance",
+  "excludes": "No Runtime starts/stops, authority writes, lease admission or model execution; not a complete HTTP/browser latency claim",
+  "candidate": "One current row read resolves Runtime association/state/port/generation together; retain accounting and actual supervisor liveness, captured-generation activity admission and all route authorization; no permission cache or timeout widening",
+  "negative": "Known stopped, foreign/ambiguous assignment, generation replacement during attachment/probe, missing accounting and failed supervisor must not yield an admissible endpoint",
+  "comparison": "Three alternating samples per variant against frozen complete R20 artifacts; raw baseline retained before implementation",
+  "cleanup": "Process-local read-only manager and fresh pool; no stopAll on production Runtime; wait all reads and pool.end; remove only exact owned probe artifacts",
+  "equalImports": true,
+  "primaryOwnedHeavyChecksOverlapping": false,
+  "raw": ".artifacts/full-real-task-20261031/r21-secondary-ready-comparison.json",
+  "byVariant": {
+    "old": {
+      "durationMs": [
+        2138,
+        2133,
+        2380
+      ],
+      "medianMs": 2138,
+      "queries": [
+        56,
+        56,
+        56
+      ],
+      "peakRssKiB": [
+        90364,
+        90176,
+        90424
+      ],
+      "retainedHeapBytes": [
+        17016496,
+        17017656,
+        17015760
+      ]
+    },
+    "candidate": {
+      "durationMs": [
+        838,
+        761,
+        942
+      ],
+      "medianMs": 838,
+      "queries": [
+        16,
+        16,
+        16
+      ],
+      "peakRssKiB": [
+        90256,
+        90224,
+        90712
+      ],
+      "retainedHeapBytes": [
+        16994304,
+        17000792,
+        16993440
+      ]
+    }
+  },
+  "medianRatio": 2.551312649164678,
+  "memoryConclusion": "Comparable equal-import fresh children; peak RSS about88–89 MiB for both variants with no material retained-heap growth. Not a whole-browser result."
+}

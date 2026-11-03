@@ -4,6 +4,7 @@
  */
 
 import type { RpcRequest, RpcResponse } from './rpc.ts'
+import type { ComputerUseUnavailableReason } from '@deepseek-ai/dsh-computer-use/types'
 
 /** One directory row of a listing: a child entry or a breadcrumb ancestor. */
 export interface DirectoryEntry {
@@ -57,8 +58,10 @@ export interface HostApi {
     fileManager?: 'finder' | 'explorer' | 'directory' | null
     /** Explicit deployment identity; absence is unknown, never proof of independent local access. */
     executionAuthorityRequired?: boolean
+    /** Known driver or environment limitation; absence grants no desktop authority. */
+    computerUseUnavailableReason?: ComputerUseUnavailableReason
     /** Runtime pinned by the launch credential, independent of the viewer's current project selection. */
-    runtimeTarget?: { kind: 'personal' } | { kind: 'project'; projectId: number }
+    runtimeTarget?: import('./client-session.ts').ClientRuntimeTarget
     /** Present only when a filesystem provider serves read-only Workspace resources. */
     workspaceFiles?: { maxBytes: number; maxLines: number; maxEntries: number; maxResources: number }
   }>>

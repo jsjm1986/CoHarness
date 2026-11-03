@@ -1,0 +1,76 @@
+{
+  "patches": [
+    {
+      "at": 0,
+      "entry": {
+        "kind": "chunks",
+        "chunks": [
+          {
+            "type": "block-start",
+            "index": 0,
+            "blockType": "tool-call"
+          },
+          {
+            "type": "tool-call-delta",
+            "index": 0,
+            "id": "diff-context-read",
+            "name": "read",
+            "argumentsDelta": "{\"file_path\":\"config.txt\"}"
+          },
+          {
+            "type": "block-end",
+            "index": 0,
+            "block": {
+              "type": "tool-call",
+              "id": "diff-context-read",
+              "name": "read",
+              "arguments": "{\"file_path\":\"config.txt\"}"
+            }
+          },
+          {
+            "type": "finish",
+            "reason": {
+              "kind": "tool-calls"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "at": 1,
+      "entry": {
+        "kind": "chunks",
+        "chunks": [
+          {
+            "type": "block-start",
+            "index": 0,
+            "blockType": "tool-call"
+          },
+          {
+            "type": "tool-call-delta",
+            "index": 0,
+            "id": "diff-context-edit",
+            "name": "edit",
+            "argumentsDelta": "{\"file_path\":\"config.txt\",\"old_string\":\"DEBUG\",\"new_string\":\"RELEASE\"}"
+          },
+          {
+            "type": "block-end",
+            "index": 0,
+            "block": {
+              "type": "tool-call",
+              "id": "diff-context-edit",
+              "name": "edit",
+              "arguments": "{\"file_path\":\"config.txt\",\"old_string\":\"DEBUG\",\"new_string\":\"RELEASE\"}"
+            }
+          },
+          {
+            "type": "finish",
+            "reason": {
+              "kind": "tool-calls"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

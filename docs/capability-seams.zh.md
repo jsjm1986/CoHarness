@@ -9,11 +9,16 @@
 
 ```mermaid
 flowchart LR
+  pkg_client_connection["client-connection"]
+  svc_connection["ctx.connection<br/>Host RPC transport and request authentication"]
+  pkg_api_gateway["api-gateway"]
+  pkg_host_apiproxy["host-apiproxy"]
+  pkg_resource_budget["resource-budget"]
+  svc_resourceBudget["ctx.resourceBudget<br/>Node resource permit definition"]
   pkg_experimental_client_ui_cot_translation["experimental-client-ui-cot-translation"]
   svc_cotTranslation["ctx.cotTranslation<br/>Reasoning translation Remote"]
   pkg_experimental_translator["experimental-translator"]
   svc_translator["ctx.translator<br/>Anonymous text translation"]
-  pkg_host_apiproxy["host-apiproxy"]
   svc_hostSessionLifecycle["ctx.hostSessionLifecycle<br/>Host ownership and idle release of Session handles"]
   pkg_archive_gateway["archive-gateway"]
   pkg_execution_authority["execution-authority"]
@@ -56,6 +61,8 @@ flowchart LR
   pkg_experimental_browser_use_chrome_devtools_mcp["experimental-browser-use-chrome-devtools-mcp"]
   pkg_experimental_browser_use_stagehand_native["experimental-browser-use-stagehand-native"]
   pkg_computer_use["computer-use"]
+  svc_computerUseEnvironment["ctx.computerUseEnvironment<br/>Desktop environment availability"]
+  pkg_apiproxy["apiproxy"]
   svc_computerUseAuthorization["ctx.computerUseAuthorization<br/>Desktop execution authorization"]
   svc_computerUse["ctx.computerUse<br/>Computer-use provider registration"]
   pkg_experimental_computer_use_cua_driver_mcp["experimental-computer-use-cua-driver-mcp"]
@@ -84,7 +91,6 @@ flowchart LR
   pkg_plugin_package_inventory_deepseek["plugin-package-inventory-deepseek"]
   pkg_model_access["model-access"]
   svc_modelAccess["ctx.modelAccess<br/>Model-route authorization policy"]
-  pkg_apiproxy["apiproxy"]
   pkg_model_provider_config["model-provider-config"]
   svc_modelProviderConfig["ctx.modelProviderConfig<br/>Organization-managed model provider configuration"]
   pkg_token_meter["token-meter"]
@@ -101,7 +107,6 @@ flowchart LR
   pkg_typert_registry["typert-registry"]
   svc_typert["ctx.typert<br/>Runtime type registry"]
   pkg_typert_loader["typert-loader"]
-  pkg_api_gateway["api-gateway"]
   svc_typertGateway["ctx.typertGateway<br/>Typert Host invocation gateway"]
   svc_sessionPersistence["ctx.sessionPersistence<br/>Durable session persistence seam"]
   pkg_session_persistence_jsonl["session-persistence-jsonl"]
@@ -336,6 +341,7 @@ flowchart LR
   pkg_bash_local --> svc_shell
   pkg_bash_sandbox --> svc_shell
   pkg_browser_use --> svc_browserUse
+  pkg_client_connection --> svc_connection
   pkg_client_file_upload --> svc_fileUploads
   pkg_collaboration --> svc_collaboration
   pkg_collaboration_gateway --> svc_collaboration
@@ -345,6 +351,7 @@ flowchart LR
   pkg_compaction_tool_result_pruner --> svc_toolResultPruner
   pkg_computer_use --> svc_computerUse
   pkg_computer_use --> svc_computerUseAuthorization
+  pkg_computer_use --> svc_computerUseEnvironment
   pkg_cordis_host_runner --> svc_cordisInspect
   pkg_cordis_host_runner --> svc_dynamicCordisRunner
   pkg_credentials --> svc_credentials
@@ -374,6 +381,7 @@ flowchart LR
   pkg_fs_local --> svc_fs
   pkg_fs_sandbox --> svc_fs
   pkg_fs_ssh --> svc_fs
+  pkg_gateway_execution --> svc_computerUseEnvironment
   pkg_gateway_execution --> svc_executionAuthority
   pkg_gateway_execution --> svc_pluginManagementAuthorization
   pkg_gateway_execution --> svc_userTerminalAdministration
@@ -505,6 +513,10 @@ flowchart LR
   svc_computerUse --> pkg_experimental_computer_use_cua_driver_mcp
   svc_computerUse --> pkg_experimental_computer_use_cua_driver_native
   svc_computerUseAuthorization --> pkg_computer_use
+  svc_computerUseEnvironment --> pkg_apiproxy
+  svc_computerUseEnvironment --> pkg_computer_use
+  svc_connection --> pkg_api_gateway
+  svc_connection --> pkg_host_apiproxy
   svc_cordisInspect --> pkg_tool_cordis
   svc_credentials --> pkg_apiproxy
   svc_credentials --> pkg_llm_deepseek
@@ -673,6 +685,8 @@ flowchart LR
 
 | ctx 键 | 角色 | 所属包 | 实现 | 直接消费方 | 配套插件 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.connection` | `core` | [`client-connection`](../packages/client/connection) | - | [`api-gateway`](../packages/api/gateway), [`host-apiproxy`](../packages/host/apiproxy) | - | 在 Web 监听器上注册类型化 RPC 处理器与请求上下文中间件，在业务分发前执行部署鉴权。 |
+| `ctx.resourceBudget` | `seam` | [`resource-budget`](../packages/context/resource-budget) | - | - | - | 声明许可请求和执行静止状态报告。提供方组合与执行支持见[包限制](../packages/context/resource-budget/README.zh.md#known-limitations-and-deferred-work)。 |
 | `ctx.cotTranslation` | `service` | [`experimental-client-ui-cot-translation`](../packages/experimental/client-ui-cot-translation) | - | - | - | 提供推理内容翻译，复用已保存的结果，并对未缓存的非活跃 Session 走常规 Session 激活。 |
 | `ctx.translator` | `service` | [`experimental-translator`](../packages/experimental/translator) | - | [`experimental-client-ui-cot-translation`](../packages/experimental/client-ui-cot-translation) | - | 解析 Google 或 Bing 请求，并通过活跃 Session 写入器保留共享的实验性记录。 |
 | `ctx.hostSessionLifecycle` | `core` | [`host-apiproxy`](../packages/host/apiproxy) | - | [`host-apiproxy`](../packages/host/apiproxy), [`archive-gateway`](../packages/context/archive-gateway) | - | Host 保存自身的工厂句柄，在清理期间预留 Session 标识，并在删除持久归档之前仅释放已确认空闲的资源。 |
@@ -690,6 +704,7 @@ flowchart LR
 | `ctx.worktrees` | `seam` | [`experimental-worktree`](../packages/experimental/worktree) | [`experimental-worktree`](../packages/experimental/worktree) | [`experimental-tool-worktree`](../packages/experimental/tool-worktree) | - | 显式实验组合从固定的本地提交创建工作树。检出目录与共享 Git 元数据受现有写权限约束；工作目录服务拥有创建后的 Session 目录。 |
 | `ctx.mcpResources` | `seam` | [`mcp-resources`](../packages/mcp/mcp-resources) | [`mcp-client`](../packages/mcp/mcp-client) | [`mcp-resources`](../packages/mcp/mcp-resources) | - | 连接持有的提供方在调用方 agent 作用域内提供共享资源工具。 |
 | `ctx.browserUse` | `seam` | [`browser-use`](../packages/browser-use/browser-use) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | - | 每个服务实例对应一个提供方拥有的名称。提供方按存活 Session 管理各自的工具与浏览器资源；共享服务本身没有浏览器操作 API。 |
+| `ctx.computerUseEnvironment` | `core` | [`computer-use`](../packages/computer-use/computer-use) | [`gateway-execution`](../packages/context/gateway-execution) | [`computer-use`](../packages/computer-use/computer-use), `apiproxy` | - | 只读环境限制不预留驱动，也不授予桌面权限。已注册提供方负责报告自己的实际可用性。 |
 | `ctx.computerUseAuthorization` | `core` | [`computer-use`](../packages/computer-use/computer-use) | - | [`computer-use`](../packages/computer-use/computer-use) | - | 部署政策在实际原生和 MCP 操作前后执行授权与取消控制；受管运行时在政策缺失时拒绝操作。 |
 | `ctx.computerUse` | `seam` | [`computer-use`](../packages/computer-use/computer-use) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | - | 每个服务实例对应一个提供方拥有的名称。各提供方也拥有自己的模型工具；服务没有通用操作 API、运行时选择或 Session 工作流锁。 |
 | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | `host-runtime`, [`llm-pi-ai`](../packages/llm/llm-pi-ai) | - | 宿主会在会话事件之前提交已接受的图片；提供方适配器将已授权的持久引用解析为提供方原生内容。 |

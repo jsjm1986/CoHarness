@@ -1,0 +1,13 @@
+{
+  "name": "local-owner-sigkill-repro",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/probe-local-owner.py",
+  "startedAt": "2026-10-23T13:07:33.683155+00:00",
+  "seconds": 1.759,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9504be8cad3ef06e7d7ee92c90bb4ced818bfa41c7ea3becffc7c3c22b36728c",
+  "inputsAfter": "9504be8cad3ef06e7d7ee92c90bb4ced818bfa41c7ea3becffc7c3c22b36728c",
+  "outputSha256": "0ebb1eb3ca3ba1008ac295a7fdb1d1a2d63432ee5c89976092d3c82071cc75ab",
+  "outputTail": "{\"launcher\": \"compiled LocalLauncher\", \"parentTermination\": \"SIGKILL\", \"parentExited\": true, \"runtimeHttpSurvives\": true, \"recoveryOwnerAvailable\": false}\n"
+}

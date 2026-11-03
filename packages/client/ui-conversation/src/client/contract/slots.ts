@@ -268,6 +268,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * Root scope: the picker reads the global Workspace list.
      */
     'conversation.hero.workspace': { kind: 'single'; scope: 'root'; owner: EmptyWorkspaceOwnerProps }
+    /** Passive metadata for the blank conversation's Workspace and execution location. */
+    'conversation.hero.context': { kind: 'list'; scope: 'root'; owner: { conversationId?: SessionId; compact: boolean } }
     /**
      * Brand mark leading the blank-session headline. Declared by this
      * package's `conversation` entry; the shell supplies the CoHarness mark as
@@ -410,6 +412,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         'conversation.input.right': { kind: 'list'; scope: 'session' }
         'conversation.hero.brand.mark': { kind: 'single'; scope: 'root' }
         'conversation.hero.workspace': { kind: 'single'; scope: 'root' }
+        'conversation.hero.context': { kind: 'list'; scope: 'root' }
         'conversation.hero.agentPreset': { kind: 'single'; scope: 'root' }
       }
       inject: ConversationInjected
@@ -763,9 +766,8 @@ export interface ComposerBarOwnerProps {
   /**
    * A block another plugin raised for this session: the bar refuses input and
    * shows the blocker's reason as the placeholder, but — unlike `disabled` —
-   * keeps the model seat live. Every block this contract has is one the user
-   * clears by choosing a model, so locking that seat too would leave the
-   * composer telling them to do the one thing it prevents.
+   * keeps the model seat live. Model availability and pending conversation
+   * preparation can hold input; stopping an existing run remains available.
    */
   blocked?: { readonly reason: string }
   /**
@@ -1142,8 +1144,9 @@ export interface ChatViewInjected {
   inspectCall: (callId: ToolCallId) => void
   /**
    * Per-session scroll memory surviving view switches (in-memory, never
-   * persisted): the view saves on every scroll and restores on remount; a
-   * fresh page load starts empty and keeps the open-jump-to-bottom default.
+   * persisted): the view samples reader scrolls and restores on remount.
+   * Subsequent reflow preserves the restored row until the reader moves or
+   * navigates. A fresh page load keeps the open-jump-to-bottom default.
    */
   chatScroll: {
     /** Record a semantic reader position; null clears it when pinned. */

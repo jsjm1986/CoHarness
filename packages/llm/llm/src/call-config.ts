@@ -6,11 +6,7 @@
  * @module dsh-llm/call-config
  */
 
-import type { GenerateOptions } from './types.ts'
 import type { ReasoningEffortId } from './brand.ts'
-
-/** Process-local identities of request objects assembled by dsh-agent-loop. */
-const AGENT_LOOP_REQUESTS = new WeakSet<GenerateOptions>()
 
 // TODO(call-config-shape): Revisit which fields are epoch-level for cache reuse
 // and where provider-specific request options belong.
@@ -56,25 +52,6 @@ export function callConfigEquals(a: LlmCallConfig, b: LlmCallConfig): boolean {
   ) return false
   if (a.stop === undefined || b.stop === undefined) return a.stop === b.stop
   return a.stop.length === b.stop.length && a.stop.every((s, i) => s === b.stop?.[i])
-}
-
-/**
- * Mark one exact request object as assembled by dsh-agent-loop.
- * @param request - loop-owned request envelope before LLM dispatch.
- * @returns the same request object marked as created by the process-local agent loop.
- */
-export function markAgentLoopRequest<T extends GenerateOptions>(request: T): T {
-  AGENT_LOOP_REQUESTS.add(request)
-  return request
-}
-
-/**
- * Test whether the exact request object was assembled by dsh-agent-loop.
- * @param request - request envelope observed at the LLM waterfall.
- * @returns whether {@link markAgentLoopRequest} recorded this object.
- */
-export function isAgentLoopRequest(request: GenerateOptions): boolean {
-  return AGENT_LOOP_REQUESTS.has(request)
 }
 
 // LLM request objects are client-facing; this local freezer avoids loading the

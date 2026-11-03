@@ -1,5 +1,6 @@
 /** Supersession and disposal for asynchronous view-selection intents. */
 import type { ISessions, SessionTarget } from './contract/sessions.ts'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
 /**
  * Load an owned Session before committing a current navigation intent.
@@ -40,16 +41,31 @@ export async function commitSessionNavigation(
 export class NavigationController {
   private current: AbortController | undefined
   private closed = false
+  /** Composer held until this intent settles; other panes and windows remain independent. */
+  blockedSessionId: SessionId | undefined
 
   /**
    * Supersede the previous intent without cancelling its Host-side mutation.
+   * @param blockedSessionId - Composer to hold during preparation; omission leaves input available.
    * @returns cancellation used to suppress stale view updates.
    */
-  begin(): AbortSignal {
+  begin(blockedSessionId?: SessionId): AbortSignal {
     if (this.closed) throw new Error('navigation owner is disposed')
     this.current?.abort(new Error('navigation superseded'))
     this.current = new AbortController()
+    this.blockedSessionId = blockedSessionId
     return this.current.signal
+  }
+
+  /**
+   * Release input only for the intent that still owns its hold.
+   * @param signal - Intent returned by begin.
+   * @returns whether an input hold was released.
+   */
+  finish(signal: AbortSignal): boolean {
+    if (this.current?.signal !== signal || this.blockedSessionId === undefined) return false
+    this.blockedSessionId = undefined
+    return true
   }
 
   /** Permanently cancel pending view updates when their owner unloads. */
@@ -57,5 +73,6 @@ export class NavigationController {
     this.closed = true
     this.current?.abort(new Error('navigation owner is disposed'))
     this.current = undefined
+    this.blockedSessionId = undefined
   }
 }

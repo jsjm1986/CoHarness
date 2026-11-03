@@ -1,0 +1,2 @@
+{"operation":"before-exit","pending":true,"childAlive":true,"forceSignal":"SIGKILL"}
+{"operation":"complete","childClosed":true,"aborted":true}

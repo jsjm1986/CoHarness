@@ -1,0 +1,182 @@
+{
+  "id": "media-read-listeners-2026-11-03",
+  "findings": [
+    "B487"
+  ],
+  "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+  "verifiedAt": "2026-11-02T19:39:36.456752+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T193229Z",
+  "delivery": {
+    "findings": [
+      "B487"
+    ],
+    "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T193229Z/B487-media-read-listeners.delta.tar.gz",
+    "archiveSha256": "c0bc67e39527ac3d68d0441ead34fe2911e888a1f5e654f92a5ace7d91bbfae2",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T193229Z/B487-media-read-listeners-capsule-bwsbz79a",
+    "manifestSha256": "9440dbd6046af26679f0e0e9daffaa38b8913c57810fdc46c2b6e7023a1af93f",
+    "ownedChanges": 11,
+    "verification": {
+      "normalNamedCases": 150,
+      "completeChangedFileCoverage": {
+        "total": {
+          "lines": {
+            "total": 50,
+            "covered": 50,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 53,
+            "covered": 53,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 7,
+            "covered": 7,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 32,
+            "covered": 32,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/api/gateway/src/media-references.ts": {
+          "lines": {
+            "total": 50,
+            "covered": 50,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 7,
+            "covered": 7,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 53,
+            "covered": 53,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 32,
+            "covered": 32,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      },
+      "normallyBuiltNode24LoaderNativeExample": 1,
+      "builtRepeatNotAdded": true,
+      "counterproof": "Four original named listener failures; actual authenticated native keep-alive16previews leave16listeners and trigger Node warning.",
+      "excludedExploration": "The first native fixture incorrectly expected302instead of the existing303login redirect; not causal evidence.",
+      "normalHostStrictDeclarationBuild": "passed",
+      "normalHostBundle": "passed",
+      "scopedLint": "passed",
+      "documentationLeaves": "six passed including two named bilingual pairs",
+      "readPolicyChange": false,
+      "newDependency": false,
+      "configurationOrWireChange": false,
+      "productionAcceptanceClaimed": false,
+      "paidModelApiCalls": 0
+    },
+    "wholeProjectComplete": false
+  },
+  "checks": {
+    "normalNamedCases": 150,
+    "completeChangedFileCoverage": {
+      "total": {
+        "lines": {
+          "total": 50,
+          "covered": 50,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 53,
+          "covered": 53,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 7,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 32,
+          "covered": 32,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": "Unknown"
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/api/gateway/src/media-references.ts": {
+        "lines": {
+          "total": 50,
+          "covered": 50,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 7,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 53,
+          "covered": 53,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 32,
+          "covered": 32,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "normallyBuiltNode24LoaderNativeExample": 1,
+    "builtRepeatNotAdded": true,
+    "counterproof": "Four original named listener failures; actual authenticated native keep-alive16previews leave16listeners and trigger Node warning.",
+    "excludedExploration": "The first native fixture incorrectly expected302instead of the existing303login redirect; not causal evidence.",
+    "normalHostStrictDeclarationBuild": "passed",
+    "normalHostBundle": "passed",
+    "scopedLint": "passed",
+    "documentationLeaves": "six passed including two named bilingual pairs",
+    "readPolicyChange": false,
+    "newDependency": false,
+    "configurationOrWireChange": false,
+    "productionAcceptanceClaimed": false,
+    "paidModelApiCalls": 0
+  },
+  "limitations": [
+    "Only the named file-preview listener scope is closed; the documented filesystem read policy and managed OS/provider isolation matrix are unchanged.",
+    "No Root production deployment or whole-project acceptance.",
+    "Native example repeats are not added to the150named tests.",
+    "Official Responses remains deferred."
+  ],
+  "wholeProjectComplete": false,
+  "all12DomainsComplete": false,
+  "handoff": "Delivered once together with B488 on2026-11-02T20:00UTC; no reply or immediate deployment requested."
+}

@@ -1,0 +1,13 @@
+{
+  "name": "chromium-doc-pairing",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write packages/experimental/browser-use-stagehand-native/README.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+  "startedAt": "2026-10-23T17:17:11.783354+00:00",
+  "seconds": 2.807,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5e175a03738ed3470f00d01d5ad95d56c8c4abae15708293cfb5ef9e295aa660",
+  "inputsAfter": "f4192c64560ff742ca4a265ec9571c6791166a61611b8769031ecb7d588d13d7",
+  "outputSha256": "b50ea344259b2df56f2fbc6b1f13eab5b18db128c6c9530547182b4e44c9ac74",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write packages/experimental/browser-use-stagehand-native/README.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md\nverify-translation-pairing: recorded .agents/notes/proposed/feature/2026-10-23-node-resource-admission.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml\nverify-translation-pairing: recorded packages/experimental/browser-use-stagehand-native/README.i18n.yaml\nverify-translation-pairing: 3 record(s) written; run the check to validate the pairs.\n"
+}

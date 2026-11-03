@@ -16,6 +16,7 @@ import type {} from '@deepseek-ai/dsh-execution-authority'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 import {
   MemoryRevision,
+  memoryScopeId,
   type MemoryKind,
   type MemoryRefusalCode,
   type MemoryScope,
@@ -70,23 +71,29 @@ export function apply(ctx: Context): void {
   /**
    * Resolve the model's `scope` argument into a concrete MemoryScope via
    * `scopesFor(exec.agent)`. Missing agent throws the fixed wiring error;
-   * `workspace` without a session workspace is `scope-unavailable`.
+   * disabled scopes and unavailable workspaces refuse before reading storage.
    */
   const resolveScope = (args: ScopedArgs, exec: ToolRunContext): { agent: Agent; scope: MemoryScope } => {
     const agent = exec.agent
     if (agent === undefined) throw new Error('memory tools require a calling agent')
-    if (!twoScopes) return { agent, scope: { kind: 'project' } }
-    if (args.scope === 'workspace') {
-      const workspace = ctx.memory.scopesFor(agent).find(candidate => candidate.kind === 'workspace')
-      if (workspace === undefined) {
-        throw new MemoryToolError(
-          'This conversation has no working directory, so the workspace scope is unavailable.',
-          'memory_invalid',
-        )
-      }
-      return { agent, scope: workspace }
+    const kind = twoScopes ? args.scope ?? 'personal' : 'project'
+    const scope = ctx.memory.scopesFor(agent).find(candidate => candidate.kind === kind)
+    if (scope === undefined) {
+      throw new MemoryToolError(
+        kind === 'workspace' && ctx.memory.switches().enabled
+          ? 'This conversation has no working directory, so the workspace scope is unavailable.'
+          : 'Saved memories are unavailable to this conversation.',
+        'memory_invalid',
+      )
     }
-    return { agent, scope: { kind: 'personal' } }
+    return { agent, scope }
+  }
+
+  const assertScopesOffered = (agent: Agent, scopes: readonly MemoryScope[]): void => {
+    const offered = new Set(ctx.memory.scopesFor(agent).map(memoryScopeId))
+    if (scopes.some(scope => !offered.has(memoryScopeId(scope)))) {
+      throw new MemoryToolError('Saved memories are unavailable to this conversation.', 'memory_invalid')
+    }
   }
 
   /** Render a service refusal as the thrown model-facing error for this tool call. */
@@ -232,6 +239,7 @@ export function apply(ctx: Context): void {
         ? ctx.memory.scopesFor(agent)
         : [scope]
       const result = await ctx.memory.search(scopes, args.query)
+      assertScopesOffered(agent, scopes)
       if (!Array.isArray(result)) {
         throw new MemoryToolError('The query must contain at least one word.', 'memory_invalid')
       }
@@ -279,8 +287,9 @@ export function apply(ctx: Context): void {
     },
     isConcurrencySafe: () => true,
     async execute(args: ScopedArgs & { key: string }, exec) {
-      const { scope } = resolveScope(args, exec)
+      const { agent, scope } = resolveScope(args, exec)
       const entry = await ctx.memory.read(scope, args.key)
+      assertScopesOffered(agent, [scope])
       if (entry === undefined) {
         throw new MemoryToolError(`No saved memory has the key "${args.key}"${scopeSuffix(scope.kind)}.`, 'memory_not_found')
       }

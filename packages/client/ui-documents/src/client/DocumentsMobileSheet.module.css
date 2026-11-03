@@ -101,3 +101,12 @@
   .footer { padding-bottom: calc(var(--dsw-space-3) + var(--dsw-safe-bottom)); }
   .footer > button { min-height: var(--dsw-touch-target); font-size: 14px; }
 }
+
+@media (pointer: coarse) { .footer > button { min-height: var(--dsw-touch-target); } }
+@media (max-width: 767px) {
+  .dialog.dialog { max-height: min(88dvh, calc(var(--dsw-viewport-height, 100vh) - 24px - var(--dsw-safe-top))); }
+  .header { box-sizing: border-box; min-height: 52px; padding-inline: var(--dsw-space-4) var(--dsw-space-2); }
+  .body { scrollbar-gutter: auto; }
+  .footer { flex-wrap: nowrap; }
+  .footer > button { flex: 1 1 0; min-width: 0; white-space: normal; }
+}

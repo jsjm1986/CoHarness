@@ -1,0 +1,14 @@
+{
+  "name": "hmr-pending-native-watcher-before",
+  "cwd": ".",
+  "command": "pnpm exec vitest run packages/boot/hmr/tests/watch-config.spec.ts -t 'allocated native configuration watch' --retry=0",
+  "startedAt": "2026-10-24T02:21:08.036312+00:00",
+  "seconds": 7.872,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d691f0be419dc5a772dd6ad3b8f68248729c4a98776472e74ee32447768aa77f",
+  "inputsAfter": "d691f0be419dc5a772dd6ad3b8f68248729c4a98776472e74ee32447768aa77f",
+  "postgresToolDirectory": null,
+  "outputSha256": "8811ff09db061601f8f3117e954d9fcf00ccec8103f9aaf3daadaa1c5ba6b4d3",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/boot/hmr/tests/watch-config.spec.ts (20 tests | 1 failed | 19 skipped) 22ms\n     × closes an allocated native configuration watch while readiness is pending 21ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/boot/hmr/tests/watch-config.spec.ts > HMR exact config paths > closes an allocated native configuration watch while readiness is pending\nAssertionError: expected \"close\" to be called once, but got 0 times\n ❯ packages/boot/hmr/tests/watch-config.spec.ts:424:21\n    422|       expect(Object.values(watcher.getWatched()).flat()).toContain('pl…\n    423|       await ctx.fiber.dispose()\n    424|       expect(close).toHaveBeenCalledOnce()\n       |                     ^\n    425|       expect(watcher.getWatched()).toEqual({})\n    426|       expect(await outcome).toHaveProperty('error')\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 19 skipped (20)\n   Start at  10:21:15\n   Duration  607ms (transform 387ms, setup 42ms, import 453ms, tests 22ms, environment 0ms)\n\n"
+}

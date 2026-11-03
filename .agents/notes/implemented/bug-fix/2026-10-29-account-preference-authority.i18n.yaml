@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-29-account-preference-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-29-account-preference-authority.md
+document:
+  en: f00e857a30c8cd2f535dd1749f4f26e136f866d5
+  zh: 05718b6588d3881266757807cb32d91ae0b3bf8c
+/agent-note-account-preferences-retain-current-eligibility-and-retry-failed-migration:
+  en: a51d984607a98f79
+  zh: a89ec9ea54d066d6
+/agent-note-account-preferences-retain-current-eligibility-and-retry-failed-migration/problem:
+  en: f659bb9aab894576
+  zh: 18038819a762e6af
+/agent-note-account-preferences-retain-current-eligibility-and-retry-failed-migration/decision:
+  en: 63948934642e1d1f
+  zh: d964e0b9e3b21836
+/agent-note-account-preferences-retain-current-eligibility-and-retry-failed-migration/alternatives-considered:
+  en: bf2a9da32f087634
+  zh: b49f8e0f1117a6a3
+/agent-note-account-preferences-retain-current-eligibility-and-retry-failed-migration/consequences:
+  en: 72a6ad334045bf62
+  zh: 10bc8c43a4d33778
+/agent-note-account-preferences-retain-current-eligibility-and-retry-failed-migration/verification:
+  en: 791d386d9528cd3a
+  zh: 31f8f9d25ea78dac

@@ -1,0 +1,13 @@
+{
+  "name": "inspector-admission-before",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/inspector/tests/resource-admission.host.spec.ts --retry=0",
+  "startedAt": "2026-10-23T14:35:48.500393+00:00",
+  "seconds": 1.764,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "187ef8ad19d0448dbda1b6fb1d3c19c57460b2ac47b5033508c2c1ff24e586fc",
+  "inputsAfter": "065872f849203e3f737700f891d0821f8e4b3c972108538fe802653771f9fc73",
+  "outputSha256": "2903253f39de240d762fa52facaa1e1a22dc0c57d5adcab7d183ef19bae9e1fc",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/experimental/inspector/tests/resource-admission.host.spec.ts (1 test | 1 failed) 162ms\n   × refuses a denied infrastructure Worker before publishing an endpoint 162ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/experimental/inspector/tests/resource-admission.host.spec.ts > refuses a denied infrastructure Worker before publishing an endpoint\nRangeError: Maximum call stack size exceeded\n ❯ packages/experimental/inspector/tests/resource-admission.host.spec.ts:18:24\n     16|     return inspector\n     17|   })\n     18|   await expect(opening).rejects.toThrow('node process queue full')\n       |                        ^\n     19|   expect(acquire).toHaveBeenCalledWith({ kind: 'process', origin: 'inf…\n     20| })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  22:35:49\n   Duration  340ms (transform 93ms, setup 26ms, import 90ms, tests 162ms, environment 0ms)\n\n"
+}

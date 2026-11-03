@@ -1197,11 +1197,14 @@ export function installLlmReplay(ctx: Context, config: ReplayConfig): ReplayHand
     })()
   }
   const providers = config.providers ?? []
-  const dispose = providers.length > 0
-    ? ctx.llm.registerAdapter(providers.map(provider => provider.id), new ReplayAdapter(providers, replay))
-    : ctx.on('llm/stream', (options: GenerateOptions, _next) => replay(options))
+  const disposers = providers.length > 0
+    ? [ctx.llm.registerAdapter(providers.map(provider => provider.id), new ReplayAdapter(providers, replay))]
+    : [
+      ctx.on('llm/stream', (options: GenerateOptions, _next) => replay(options)),
+      ctx.on('llm/orchestration', (options: GenerateOptions, _next) => replay(options)),
+    ]
   return {
-    dispose,
+    dispose() { for (const dispose of disposers) dispose() },
     assertConsumed(): void {
       const problems: string[] = []
       if (nextScript < scripts.length) {

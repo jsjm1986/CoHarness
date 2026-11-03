@@ -1,0 +1,14 @@
+{
+  "name": "audit-auth-types-final",
+  "cwd": "gateway",
+  "command": "npm run typecheck",
+  "startedAt": "2026-10-24T02:02:14.521645+00:00",
+  "seconds": 4.363,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "81b2d1574e9d05b29fa612f1a49491f7fed8ea7dcb7a2b8bccb35b3cd6961528",
+  "inputsAfter": "81b2d1574e9d05b29fa612f1a49491f7fed8ea7dcb7a2b8bccb35b3cd6961528",
+  "postgresToolDirectory": null,
+  "outputSha256": "8fa1cf5506304e8abac55868e7f1a136c9b1dde57a3981a382da4c21ea129a6f",
+  "outputTail": "\n> typecheck\n> tsc --noEmit\n\n"
+}

@@ -5,7 +5,7 @@ import { AdminRequestError, pluginManagementInvoke } from '../api.ts'
 import type { PluginInstallFrame, PluginInstallRequestId } from '../../../../packages/boot/plugin-manager/src/types.ts'
 
 vi.mock('../api.ts', async importOriginal => ({ ...await importOriginal<typeof import('../api.ts')>(), pluginManagementInvoke: vi.fn() }))
-afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks() })
+afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); window.history.replaceState({}, '', '/admin/') })
 const target = { nodeId: 'node', target: { kind: 'user' as const, id: 4 }, generation: 2 }
 const requestId = '00000000-0000-4000-8000-000000000002' as PluginInstallRequestId
 const complete: PluginInstallFrame = { type: 'result', value: { changed: true, application: 'applied', stage: 'install', target: 'bundle', bundle: 'bundle' } }
@@ -76,6 +76,8 @@ it('validates correlation and the generated result while preserving exact target
 })
 
 it('delivers installation progress then resolves only after the correlated clean end', async () => {
+  const node = '61f22202-1c02-4a3c-8d34-f11222333444'
+  window.history.replaceState({}, '', `/admin/computers/${node}/plugins`)
   const frames: PluginInstallFrame[] = []
   const send = vi.fn(async (_url: string, init: RequestInit) => {
     const input = JSON.parse(String(init.body))
@@ -88,6 +90,18 @@ it('delivers installation progress then resolves only after the correlated clean
   expect(await remote.pluginManager.installBundle('bundle', { requestId, enabled: false })).toEqual({ ok: true, value: complete.value })
   expect(frames).toEqual([{ type: 'progress', progress: { requestId, phase: 'installing' } }])
   expect(send).toHaveBeenCalledOnce()
+  expect(send.mock.calls[0]![0]).toBe(`/admin/api/plugins/invoke?dshNode=${node}`)
+})
+
+it('reports a disconnected installation target without replaying or invalidating the browser identity', async () => {
+  const send = vi.fn(async () => Response.json({ error: 'node-service/unavailable' }, { status: 503 }))
+  vi.stubGlobal('fetch', send)
+  const invalidate = vi.fn()
+  const remote = pluginManagementRemote(target, new AbortController().signal, () => {}, invalidate)
+  expect(await remote.pluginManager.installBundle('bundle', { requestId })).toMatchObject({ ok: false,
+    error: { message: '无法连接所选电脑，请检查连接后重试' } })
+  expect(send).toHaveBeenCalledTimes(1)
+  expect(invalidate).not.toHaveBeenCalled()
 })
 
 it('refuses truncated or extra results instead of retrying a possibly completed install', async () => {

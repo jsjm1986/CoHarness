@@ -47,6 +47,12 @@ export const inject = [
  */
 export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
+  const transportFor = (sessionId: SessionId): ConnectionHandle => {
+    const target = ctx.sessions.runtimeTargetFor?.(sessionId)
+    const transport = target === undefined ? connection : connection.forTarget?.(target)
+    if (transport === undefined) throw new Error('Workspace review runtime is unavailable')
+    return transport
+  }
   ctx.conversationEvents.register(deliverablesDefinition)
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-deliverables: dictionaries')
   ctx.slots.inject(
@@ -56,10 +62,13 @@ export function apply(ctx: ClientContext): void {
       id: '@deepseek-ai/dsh-client-ui-deliverables/produced-files',
       order: 10,
       locale: NS,
-      inject: () => ({
-        isLoopback: connection.isLoopback,
-        hooks: { hostDescription: connection.hostDescription },
-      }),
+      inject: (sessionId) => {
+        const transport = transportFor(sessionId)
+        return {
+          isLoopback: transport === connection && transport.isLoopback,
+          hooks: { hostDescription: transport.hostDescription },
+        }
+      },
     }, ProducedFiles),
   )
   // The prose side of the same vocabulary: the chat view reaches this face
@@ -71,8 +80,7 @@ export function apply(ctx: ClientContext): void {
     const scope = ctx.sessions.scope(sessionId)
     if (scope === undefined) throw new Error('Workspace review requires a retained Session')
     const target = ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const }
-    const transport = target.kind === 'base' ? connection : connection.forTarget?.(target)
-    if (transport === undefined) throw new Error('Workspace review runtime is unavailable')
+    const transport = transportFor(sessionId)
     const fetchRecord = async (url: string, signal: AbortSignal): Promise<Response> => {
       const parsed = new URL(url, 'https://workspace.invalid')
       if (parsed.searchParams.get('sessionId') !== sessionId) throw new Error('Review request belongs to another Session')

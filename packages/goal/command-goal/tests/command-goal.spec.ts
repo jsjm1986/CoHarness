@@ -109,6 +109,46 @@ describe('@deepseek-ai/dsh-command-goal registration', () => {
 })
 
 describe('/goal human command', () => {
+  it.each((['create', 'edit', 'resume'] as const).flatMap(action =>
+    (['cancelled', 'replaced'] as const).map(change => ({ action, change }))))(
+    'keeps the goal unchanged when $action admission is $change', async ({ action, change }) => {
+      const test = await harness()
+      if (action !== 'create') await run(test, ' existing objective')
+      if (action === 'resume') test.ctx.goals.pause(test.agent, ref(test.ctx.goals.get(test.agent)!))
+      const previous = test.ctx.goals.get(test.agent)
+      const entered = Promise.withResolvers<undefined>()
+      const proceed = Promise.withResolvers<undefined>()
+      const finished = Promise.withResolvers<undefined>()
+      const authority = { async runRequest(_agent: Agent, _input: unknown, work: () => unknown) {
+        entered.resolve(undefined)
+        await proceed.promise
+        try { return await work() } finally { finished.resolve(undefined) }
+      } }
+      const remove = test.ctx.provide('executionAuthority', authority as never)
+      const controller = new AbortController()
+      const cancelled = new Error('Cancel the pending goal command')
+      const input = action === 'create' ? '/goal new objective' : action === 'edit' ? '/goal edit updated objective' : '/goal resume'
+      const operation = test.ctx.commands.execute(test.agent, input, [], controller.signal)
+      const outcome = operation.then(result => ({ result, error: undefined }), (error: unknown) => ({ result: undefined, error }))
+      try {
+        await entered.promise
+        if (change === 'cancelled') controller.abort(cancelled)
+        else {
+          remove()
+          test.ctx.provide('executionAuthority', { ...authority } as never)
+        }
+        proceed.resolve(undefined)
+        await finished.promise
+        expect(test.ctx.goals.get(test.agent)).toEqual(previous)
+        if (change === 'cancelled') expect((await outcome).error).toBe(cancelled)
+        else expect((await outcome).error).toMatchObject({ message: 'The execution authority changed before applying the goal command.' })
+      } finally {
+        proceed.resolve(undefined)
+        await outcome
+        await test.ctx.fiber.dispose()
+      }
+    })
+
   it('attests execution-producing commands while keeping status and stopping available', async () => {
     const test = await harness()
     const runRequest = vi.fn(async (_agent: Agent, _input: unknown, operation: () => unknown) => operation())

@@ -1,0 +1,179 @@
+{
+  "id": "file-upload-authorization-2026-11-03",
+  "findings": [
+    "B485",
+    "B486"
+  ],
+  "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+  "verifiedAt": "2026-11-02T19:30:03.436664+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T183908Z",
+  "delivery": {
+    "findings": [
+      "B485",
+      "B486"
+    ],
+    "status": "fixed_named_scenarios_verified_frozen_global_review_open",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T183908Z/B485-B486-file-upload-authorization.delta.tar.gz",
+    "archiveSha256": "3499579ee681afc5aad199072078cc6dd6dc29a343010f71b78f1219f5492b48",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T183908Z/B485-B486-file-upload-authorization-capsule-cs45k2vx",
+    "manifestSha256": "b72cee840fc52a34574d596eed375553789a663d27e93ec664fe5ec67fc9b4ab",
+    "ownedChanges": 20,
+    "verification": {
+      "normalDifferentNamedCases": 146,
+      "ownPackageCases": 60,
+      "coveragePolicyCases": 86,
+      "normalCompleteChangedFileCoverage": {
+        "total": {
+          "lines": {
+            "total": 153,
+            "covered": 153,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 179,
+            "covered": 179,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 43,
+            "covered": 43,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 85,
+            "covered": 85,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/client/file-upload/src/http-route.ts": {
+          "lines": {
+            "total": 27,
+            "covered": 27,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 2,
+            "covered": 2,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 29,
+            "covered": 29,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 22,
+            "covered": 22,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/client/file-upload/src/index.ts": {
+          "lines": {
+            "total": 126,
+            "covered": 126,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 41,
+            "covered": 41,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 150,
+            "covered": 150,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 63,
+            "covered": 63,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      },
+      "nativePostgresSourceExamples": 1,
+      "normallyBuiltNode25HostExamples": 1,
+      "builtRepeatNotAdded": true,
+      "realNativeScope": "Actual Loader, signed Gateway principals, disposable PostgreSQL collaboration, LocalAttachments, real Agent.tryDisposeIdle, native streamed HTTP bodies, revocation, abort and service disposal",
+      "originalCounterproofs": [
+        "Three original authorization assertions fail before storage denial is added; independent local positive control passes.",
+        "Independent Session write403 while original raw upload succeeds.",
+        "True original source permits actual idle disposal while a temporary file is active.",
+        "True original service withdrawal returns with one active temporary file."
+      ],
+      "fullHostStrictTypes": "passed",
+      "normalHostDeclarationsAndBundle": "passed",
+      "scopedLint": "passed",
+      "workspaceDependencyConstraints": "passed",
+      "coveragePolicy": "Two pre-existing changed-file exclusions removed; no threshold reduced or exclusion added.",
+      "newDependency": "@deepseek-ai/dsh-collaboration peer/dev plus one lockfile link; no install",
+      "ownedBilingualPairs": "three consistent",
+      "guide": "Current-version triplet directly validated,221English words; this fork has no repository-wide upgrade-guide checker.",
+      "documentationLeaves": {
+        "passed": 12,
+        "failedOutsideOwnedPaths": [
+          "peer-owned packages/client/ui-workbench/README.md model-experience format; no owned upload diagnostic"
+        ]
+      },
+      "excludedExploration": [
+        "Gateway Vite lane declaration import collected zero tests.",
+        "Initial fixture migration path used encoded URL.pathname.",
+        "Initial coverage with old exclusions measured no changed files.",
+        "The intermediate reservation-only implementation still permitted idle disposal; it is not final acceptance."
+      ],
+      "newConfiguration": false,
+      "wireOrSessionFormatChanged": false,
+      "paidModelApiCalls": 0,
+      "productionAcceptance": "No Root production write or deployment; handoff remains separate from peer R46 acceptance."
+    },
+    "wholeProjectComplete": false
+  },
+  "checks": {
+    "normalDifferentNamedCases": 146,
+    "uploadPackageCases": 60,
+    "coveragePolicyCases": 86,
+    "completeChangedFiles": 2,
+    "coverage": "100% statements,branches,functions,lines;179statements,85branches,43functions,153lines",
+    "sourceRealGatewayPostgresExample": 1,
+    "normalBuiltHostNode25Example": 1,
+    "builtRepeatNotAdded": true,
+    "fullHostStrictTypes": "passed",
+    "normalHostBuild": "passed",
+    "scopedLint": "passed",
+    "workspaceDependencies": "passed",
+    "ownedPairs": "three consistent",
+    "documentationLeaves": "12passed; one peer Workbench README format failure outside this batch",
+    "upgradeGuide": "Direct triplet/frontmatter/headings/current-version/newline/221word validation; checker absent in this fork"
+  },
+  "counterproofs": [
+    "Original raw upload succeeds despite independent write403 in actual signed Gateway/PG permissions.",
+    "Three original authorization tests fail; independent positive control passes.",
+    "Original active native stream permits actual Agent idle disposal.",
+    "Original service withdrawal returns with one active temporary upload."
+  ],
+  "limitations": [
+    "Only named upload and dependent command/receipt scenarios are verified.",
+    "Immutable bytes committed before cancellation or final revocation can remain without a staged receipt.",
+    "Custom iterable producers own settling pending reads; the service joins accepted storage.",
+    "No Root deployment, production write, GUI acceptance, paid model request or official Responses validation."
+  ],
+  "wholeProjectComplete": false,
+  "all12DomainsComplete": false
+}

@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-final-pairs-aligned",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write gateway/README.md .agents/notes/implemented/feature/2026-10-18-admin-managed-public-access-tunnel.md",
+  "startedAt": "2026-10-24T21:49:00.537783+00:00",
+  "seconds": 2.187,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9fe24c3dc9c6a071e1b2f78935a230c7552fcb8d5016dbfc337d2d9a286299f4",
+  "inputsAfter": "ee387131d760802680f97a753e6c970f83b99ddae1bbbd21aaa17351d4e37737",
+  "postgresToolDirectory": null,
+  "outputSha256": "61eac2ac2cc4c0c22d8fbb94e635edfac41c289dc9f3762eaf34ed82a5aab468",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/feature/2026-10-18-admin-managed-public-access-tunnel.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 2 record(s) written; run the check to validate the pairs.\n"
+}

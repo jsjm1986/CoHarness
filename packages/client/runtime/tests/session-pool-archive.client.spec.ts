@@ -19,19 +19,36 @@ async function fixture() {
   api.workspace.list = (args, signal) => { signals.push(signal); return list(args, signal) }
   api.onList = async () => ok({ items: ids.map(sessionId => ({ sessionId, updatedAt: 1, running: false, blank: false })) })
   let sinks: Parameters<ConnectionHandle['start']>[0] | undefined
+  let connected = false
+  const delivered = new WeakSet<object>()
   const connection: ConnectionHandle = {
     api, isLoopback: true, interactions: 'none',
+    metadataTiming: { requestTimeoutMs: 15000, retryAfterMs: 10000 },
     hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
     state: { getSnapshot: () => undefined, subscribe: () => () => {} },
     rpc: { call: () => Promise.reject(new Error('Unexpected RPC')) },
     reconnect: () => {},
-    start: (next) => { sinks = next; return { stop: () => {} } },
+    start: (next) => {
+      sinks = next
+      // Runtime preparation can defer `start` past an earlier connect(): a
+      // freshly registered loop on an already-connected transport reports
+      // the established handshake itself, once.
+      if (connected) queueMicrotask(() => { if (!delivered.has(next)) { delivered.add(next); next.onConnected?.(description) } })
+      return { stop: () => {} }
+    },
   }
   const baseApi = new FakeApiClient()
   const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
   const pool = new SessionRuntimePool(ctx, base, { ...connection, api: baseApi, forTarget: () => connection }, fakeRemote())
   return { ctx, api, pool, signals,
-    connect: () => sinks?.onConnected?.(description),
+    connect: () => {
+      connected = true
+      const fire = (): void => {
+        if (sinks === undefined) queueMicrotask(fire)
+        else { delivered.add(sinks); sinks.onConnected?.(description) }
+      }
+      fire()
+    },
     disconnect: () => sinks?.onStateChange?.('reconnecting'),
     archive: (archivedSessionIds: SessionId[], archiveRevision: number) => sinks?.onHostEnvelope?.({
       rpcId: 'archive-frame' as never,

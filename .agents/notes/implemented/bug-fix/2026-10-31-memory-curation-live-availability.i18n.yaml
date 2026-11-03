@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-memory-curation-live-availability.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-memory-curation-live-availability.md
+document:
+  en: 722f65bdf899573be0db6eb90aa1cb9f526d012a
+  zh: da30a77d97b43c712fb26b3d2604e3272719629c
+/agent-note-live-curation-switches-own-independent-operation-lifetimes:
+  en: 943b9bd7b6372b76
+  zh: b6f6d6cf7b8ce131
+/agent-note-live-curation-switches-own-independent-operation-lifetimes/problem:
+  en: 470cf397f3047063
+  zh: 31010f9dbc9c438b
+/agent-note-live-curation-switches-own-independent-operation-lifetimes/decision:
+  en: 67e314624d6305e3
+  zh: ac92bc0624f1bdf1
+/agent-note-live-curation-switches-own-independent-operation-lifetimes/alternatives-considered:
+  en: d2eba5598f628320
+  zh: 3298926f353b403a
+/agent-note-live-curation-switches-own-independent-operation-lifetimes/consequences:
+  en: 71092f42b3ab4a28
+  zh: 1b77a1c3f8af5e57
+/agent-note-live-curation-switches-own-independent-operation-lifetimes/verification:
+  en: e869c8a049125c48
+  zh: 696b1ba8d3665ab9

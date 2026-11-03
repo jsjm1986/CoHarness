@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-28-project-deletion-lifecycle.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-28-project-deletion-lifecycle.md
+document:
+  en: ac2b1147360919a0596a3e5fdbaa4f0ed2b7d1f4
+  zh: d9d3f391ece0d906429deb121f1af474ee26568c
+/agent-note-project-deletion-retains-authority-and-stop-ownership:
+  en: f97fa754685cf604
+  zh: 747086e610e01e48
+/agent-note-project-deletion-retains-authority-and-stop-ownership/problem:
+  en: 5a75a9d4e33485c7
+  zh: bb610710b0c05ac4
+/agent-note-project-deletion-retains-authority-and-stop-ownership/decision:
+  en: 1c7dcfd27ac2bc80
+  zh: a68c7fd26ace6244
+/agent-note-project-deletion-retains-authority-and-stop-ownership/alternatives-considered:
+  en: 94ce948488ed6de5
+  zh: eace7b8a3fc8334f
+/agent-note-project-deletion-retains-authority-and-stop-ownership/consequences:
+  en: d5d2c60fff749fc5
+  zh: 693cf015fcf2c817

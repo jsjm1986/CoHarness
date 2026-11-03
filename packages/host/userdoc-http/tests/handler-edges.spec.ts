@@ -11,6 +11,7 @@ import {
   DOCUMENT_MOVE_FAILED_CODE,
   DOCUMENT_NAME_EXHAUSTED_CODE,
   DOCUMENT_NOT_FOUND_CODE,
+  DOCUMENT_STORE_UNAVAILABLE_CODE,
   DOCUMENT_READ_FAILED_CODE,
   DOCUMENT_TARGET_CONFLICT_CODE,
   DOCUMENT_TOO_LARGE_CODE,
@@ -22,11 +23,14 @@ import {
   UserDocDirectoryId,
   UserDocError,
   UserDocId,
+  UserDocIncarnationId,
+  UserDocUploadId,
+  UserDocUploadOwnerId,
   type UserDocErrorCode,
   type UserDocRef,
   type UserDocStore,
 } from '@deepseek-ai/dsh-userdoc'
-import { handleUserDocHttp, USERDOC_HTTP_PATH, USERDOC_UPLOADS_PATH, type UserDocHttpHost } from '../src/index.ts'
+import { handleUserDocHttp, UserDocHttpScope, USERDOC_HTTP_PATH, USERDOC_UPLOADS_PATH, USERDOC_IDENTITY_HEADER, type UserDocHttpHost } from '../src/index.ts'
 
 const LIMITS = {
   maxFileBytes: 8,
@@ -136,6 +140,94 @@ function response(options: ResponseOptions = {}): { res: ServerResponse; state: 
 }
 
 describe('user-document HTTP handler edges', () => {
+  it('refuses requests after an HTTP scope closes', async () => {
+    let reads = 0
+    const scope = new UserDocHttpScope(context(store({ list: async () => { reads += 1; return [] } })))
+    const stopping = scope.dispose()
+    expect(scope.dispose()).toBe(stopping)
+    await stopping
+    const { res, state } = response()
+    await scope.handle(request('GET', USERDOC_HTTP_PATH), res)
+    expect(state.status).toBe(503)
+    expect(JSON.parse(state.body)).toMatchObject({ error: { code: DOCUMENT_STORE_UNAVAILABLE_CODE } })
+    expect(reads).toBe(0)
+  })
+
+  it('continues catalog delivery after a queued service lookup fails', async () => {
+    let inventories = 0
+    let firstDelivery = true
+    let delivered = 0
+    const failed = Promise.withResolvers<undefined>()
+    const scope = new UserDocHttpScope({
+      userDocs: store({ list: async () => { inventories += 1; return [] } }),
+      get: (name) => {
+        if (name !== 'gatewayRuntime') return undefined
+        if (inventories === 1 && firstDelivery) {
+          firstDelivery = false
+          failed.resolve(undefined)
+          throw new Error('catalog lookup unavailable')
+        }
+        return { identity: { kind: 'user', id: 7, generation: 1 }, request: async () => {
+          delivered += 1
+          return Response.json({ version: 1, accepted: 0 })
+        } }
+      },
+    })
+    try {
+      const first = response()
+      await scope.handle(request('GET', USERDOC_HTTP_PATH), first.res)
+      await failed.promise
+      const next = response()
+      await scope.handle(request('GET', USERDOC_HTTP_PATH), next.res)
+      await scope.dispose()
+      expect([first.state.status, next.state.status]).toEqual([200, 200])
+      expect(delivered).toBe(1)
+    } finally {
+      await scope.dispose()
+    }
+  })
+
+  it('keeps an earlier catalog delivery ordered when a later admission is refused', async () => {
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const events: string[] = []
+    let admissions = 0, deliveries = 0
+    const scope = new UserDocHttpScope({
+      userDocs: store(),
+      admitCatalogWrite: (operation) => {
+        admissions += 1
+        if (admissions === 2) return Promise.reject(new Error('maintenance admission'))
+        const pending = operation()
+        if (admissions === 3) queueMicrotask(() => { release.resolve(undefined) })
+        return pending
+      },
+      get: name => name !== 'gatewayRuntime' ? undefined : {
+        identity: { kind: 'user', id: 7, generation: 1 },
+        request: async () => {
+          deliveries += 1
+          if (deliveries === 1) {
+            events.push('first-start')
+            entered.resolve(undefined)
+            await release.promise
+            events.push('first-end')
+          } else events.push('next-delivery')
+          return Response.json({ version: 1, accepted: 0 })
+        },
+      },
+    })
+    try {
+      await scope.handle(request('GET', USERDOC_HTTP_PATH), response().res)
+      await entered.promise
+      await scope.handle(request('GET', USERDOC_HTTP_PATH), response().res)
+      await scope.handle(request('GET', USERDOC_HTTP_PATH), response().res)
+      await scope.dispose()
+      expect(admissions).toBe(3)
+      expect(events).toEqual(['first-start', 'first-end', 'next-delivery'])
+    } finally {
+      release.resolve(undefined)
+      await scope.dispose()
+    }
+  })
+
   it('rejects the removed one-request upload protocol', async () => {
     const req = request('POST', `${USERDOC_HTTP_PATH}?name=report.txt`)
     const { res, state } = response()
@@ -191,6 +283,7 @@ describe('user-document HTTP handler edges', () => {
   })
 
   it.each<readonly [UserDocErrorCode, number]>([
+    [DOCUMENT_STORE_UNAVAILABLE_CODE, 503],
     [DOCUMENT_NOT_FOUND_CODE, 404],
     [DOCUMENT_DIRECTORY_NOT_FOUND_CODE, 404],
     [DOCUMENT_TOO_LARGE_CODE, 413],
@@ -248,6 +341,27 @@ describe('user-document HTTP handler edges', () => {
     expect(state.status).toBeUndefined()
   })
 
+  it('refuses a chunk when the response closes during upload inspection', async () => {
+    const uploadId = UserDocUploadId('00000000-0000-4000-8000-000000000000')
+    const session = { uploadId, name: 'x.txt', directoryId: UserDocDirectoryId(''), bytes: 1, fingerprint: 'x',
+      chunkBytes: 65536, receivedBytes: 0, expiresAt: 1000, state: 'uploading' as const }
+    const { res, state } = response()
+    let stored = false
+    const userDocs = store({
+      inspectUpload: async () => { res.destroy(); return session },
+      writeUploadChunk: async (_uploadId, _chunk, signal) => {
+        signal?.throwIfAborted()
+        stored = true
+        return session
+      },
+    })
+    await handleUserDocHttp(context(userDocs), request('PUT', `${USERDOC_UPLOADS_PATH}/${uploadId}/chunks/0`, {
+      'content-range': 'bytes 0-0/1', 'content-length': '1', 'x-dsh-chunk-sha256': 'a'.repeat(64),
+    }), res)
+    expect(stored).toBe(false)
+    expect(state.status).toBeUndefined()
+  })
+
   it('does not replace a response that ended while a store failure settled', async () => {
     const { res, state } = response()
     const userDocs = store({
@@ -261,6 +375,19 @@ describe('user-document HTTP handler edges', () => {
 
     expect(state.status).toBeUndefined()
     expect(res.writableEnded).toBe(true)
+  })
+
+  it.each(['GET', 'HEAD'])('returns the opened file incarnation in %s content headers', async (method) => {
+    const identity = { incarnationId: UserDocIncarnationId('11111111-1111-4111-8111-111111111111'),
+      revision: 4, origin: 'upload' as const, createdBy: UserDocUploadOwnerId('user:7') }
+    const userDocs = store({ openRead: async () => ({ ref: { ...REF, identity }, body: stream() }) })
+    const { res, state } = response()
+    await handleUserDocHttp(context(userDocs), request(method, `${USERDOC_HTTP_PATH}/content?id=report`), res)
+    expect(state.status).toBe(200)
+    const encoded = state.headers?.[USERDOC_IDENTITY_HEADER]
+    expect(encoded).toBeDefined()
+    expect(JSON.parse(Buffer.from(encoded ?? '', 'base64url').toString('utf8'))).toEqual(identity)
+    expect(state.body).toBe(method === 'HEAD' ? '' : 'body')
   })
 
   it('stops a backpressured download when the response closes', async () => {

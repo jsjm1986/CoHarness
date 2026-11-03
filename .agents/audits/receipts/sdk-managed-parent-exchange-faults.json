@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-parent-exchange-faults",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-dsh-sdk/tests/control.spec.ts --retry=0",
+  "startedAt": "2026-10-24T15:53:50.967932+00:00",
+  "seconds": 7.073,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "22e1c95a2dd6c66b03deedd7dc9e3041eabb6e0aa335fb188c286d0a99add97c",
+  "inputsAfter": "22e1c95a2dd6c66b03deedd7dc9e3041eabb6e0aa335fb188c286d0a99add97c",
+  "postgresToolDirectory": null,
+  "outputSha256": "d16fdc8ce76050974edce0fb55b05aa8e021932aea68d2d36ada7c8c8c8ebb70",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/subagent/subagent-dsh-sdk/tests/control.spec.ts (71 tests | 1 failed) 1535ms\n   × refuses a malformed or failed parent output exchange 7ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/subagent/subagent-dsh-sdk/tests/control.spec.ts > refuses a malformed or failed parent output exchange\nAssertionError: expected LlmError: Owned parent exchange failure. { …(2) } to match object { code: 'SDK_PARENT_CONTROL_ERROR' }\n(4 matching properties omitted from actual)\n\n- Expected\n+ Received\n\n- {\n-   \"code\": \"SDK_PARENT_CONTROL_ERROR\",\n+ LlmError {\n+   \"code\": \"OWNED_PARENT_EXCHANGE_FAILED\",\n  }\n\n ❯ packages/subagent/subagent-dsh-sdk/tests/control.spec.ts:319:24\n    317|   ctx.effect(() => ctx.llm.registerAdapter(['wire-fixture'], new Adapt…\n    318|   const drain = async () => { for await (const _chunk of ctx.llm.strea…\n    319|   await expect(drain()).rejects.toMatchObject({\n       |                        ^\n    320|     code: fault === 'readiness' || fault === 'output' ? 'SDK_PARENT_CO…\n    321|   })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 70 passed (71)\n   Start at  23:53:55\n   Duration  2.75s (transform 887ms, setup 35ms, import 1.09s, tests 1.54s, environment 0ms)\n\n"
+}

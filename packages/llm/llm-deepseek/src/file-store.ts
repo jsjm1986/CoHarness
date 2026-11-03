@@ -1,7 +1,7 @@
 /** DeepSeek Files API upload reuse, invalidation, and quota recovery. @module dsh-llm-deepseek/file-store */
 
 import type { RequestImageAttachment } from '@deepseek-ai/dsh-attachment'
-import { LlmError } from '@deepseek-ai/dsh-llm'
+import { LlmError, type LlmOperationDispatch } from '@deepseek-ai/dsh-llm'
 import { DeepSeekFilesClient, isFilesQuotaError } from './files-api.ts'
 import type { DeepSeekFileId } from './file-id.ts'
 import { messagesApiRoot } from './messages-api.ts'
@@ -24,6 +24,8 @@ export interface DeepSeekFileConnection {
   baseURL: string
   /** Provider-resolved authentication headers for this endpoint. */
   headers: Readonly<Record<string, string>>
+  /** Present for governed model calls; absent uses direct Files transport. */
+  dispatchRequest?: LlmOperationDispatch
 }
 
 /** Result of one file-id resolution. */
@@ -137,6 +139,7 @@ export class DeepSeekFileStore {
     return new DeepSeekFilesClient({
       baseURL: connection.baseURL,
       headers: connection.headers,
+      ...connection.dispatchRequest === undefined ? {} : { dispatchRequest: connection.dispatchRequest },
       ...this.fetchImpl === undefined ? {} : { fetch: this.fetchImpl },
     })
   }

@@ -1,0 +1,14 @@
+{
+  "name": "native-search-model-admission-lifecycle",
+  "cwd": ".",
+  "command": "pnpm exec vitest run packages/web/web-search-deepseek/tests/admission.spec.ts --retry=0",
+  "startedAt": "2026-10-24T03:22:05.934081+00:00",
+  "seconds": 3.653,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4c767766135ac208cea641f189545654b5b64734cf8f12318736236dea47d393",
+  "inputsAfter": "4c767766135ac208cea641f189545654b5b64734cf8f12318736236dea47d393",
+  "postgresToolDirectory": null,
+  "outputSha256": "32878e0a52021256050482ef96731e63f68f3d48c203313e115c0e190da6ad3e",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/web/web-search-deepseek/tests/admission.spec.ts (7 tests | 1 failed) 49ms\n   × joins a late model grant during provider unload without contacting HTTP 5ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/web/web-search-deepseek/tests/admission.spec.ts > joins a late model grant during provider unload without contacting HTTP\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ packages/web/web-search-deepseek/tests/admission.spec.ts:114:37\n    112|     const request = await entered.promise\n    113|     disposal = provider.dispose()\n    114|     expect(request.signal?.aborted).toBe(true)\n       |                                     ^\n    115|     let disposed = false\n    116|     void disposal.then(() => { disposed = true })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 6 passed (7)\n   Start at  11:22:08\n   Duration  613ms (transform 402ms, setup 39ms, import 445ms, tests 49ms, environment 0ms)\n\n"
+}

@@ -1,0 +1,15 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "lib/types" },
+  "include": ["src"],
+  "references": [
+    { "path": "../userdoc" },
+    { "path": "../../context/execution-authority" },
+    { "path": "../../context/gateway-runtime" },
+    { "path": "../../core/session" },
+    { "path": "../../util/values" },
+    { "path": "../../util/home-paths" },
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/schemastery" }
+  ]
+}

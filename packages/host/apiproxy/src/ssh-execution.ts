@@ -93,16 +93,12 @@ async function mountSshProviders(scopeCtx: Context, targetId: number, retire: ()
   const connection = new SshConnection(scopeCtx, resolved.config)
   const revoke = (): void => {
     retire()
-    void connection.dispose()
+    void connection.dispose().catch((error: unknown) => { scopeCtx.logger.error('SSH target cleanup after revocation failed', error) })
   }
   resolved.signal.addEventListener('abort', revoke, { once: true })
   scopeCtx.effect(() => () => { resolved.signal.removeEventListener('abort', revoke) })
   try {
-    // The constructor already launched OpenSSH; awaiting `ready` performs the
-    // service's init contract (remote identity + helper digest) before
-    // dependents can answer. A rejection propagates into generation rollback,
-    // and the abort check closes the window between resolve() and listener
-    // registration, which an already-aborted signal would never re-fire.
+    // Revocation can precede listener registration; readiness does not renew its authority.
     await connection.ready
     resolved.signal.throwIfAborted()
     new SshFileSystem(scopeCtx)

@@ -1,9 +1,11 @@
+import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Pool } from 'pg'
+import type { RuntimeId } from '../src/runtime-catalog.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
 import {
@@ -11,7 +13,7 @@ import {
   type PluginDesiredState,
 } from '../src/plugin-state.ts'
 
-const DATABASE_URL = process.env.HGW_TEST_DATABASE_URL
+const DATABASE_URL = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = DATABASE_URL === undefined ? describe.skip : describe
 const MIGRATIONS = resolve(import.meta.dirname, '../deploy/postgres/migrations')
 
@@ -169,6 +171,27 @@ describePg('PostgreSQL plugin_states', () => {
     const next = await state.projection(owner)
     if (next === null || next === 'current') throw new Error('expected the newer revision to project')
     expect(next.state).toEqual({ entries: [], bundles: ['next'] })
+  })
+
+  it('keeps retired Runtime configuration separate and refuses a mismatched live publisher', async () => {
+    const row = (await pool.query<{ runtime_id: RuntimeId; assigned_node_id: string }>(
+      'SELECT runtime_id,assigned_node_id FROM harness.instances WHERE organization_id=$1 AND user_id=$2',
+      [organizationId, userInternalId])).rows[0]!
+    const retired = randomUUID() as RuntimeId
+    await pool.query(`INSERT INTO harness.runtime_environments(id,organization_id,owner_kind,owner_id,node_id,retired_at)
+      VALUES($1,$2,'user',$3,$4,clock_timestamp())`, [retired, organizationId, userInternalId, row.assigned_node_id])
+    await pool.query(`INSERT INTO harness.plugin_states(organization_id,user_id,runtime_id,revision,entries,bundles)
+      VALUES($1,$2,$3,1,'[]','["retired-only"]')`, [organizationId, userInternalId, retired])
+    const target = { kind: 'user' as const, id: userPublicId, runtimeId: row.runtime_id }
+    const before = await state.get(target)
+    await state.set(target, { entries: [], bundles: ['current-only'] }, before.revision)
+    const wrong = { ...target, runtimeId: retired }
+    await expect(state.get(wrong)).rejects.toMatchObject({ status: 404 })
+    await expect(state.publishForSubject({ organizationId, target: wrong, generation: 1, userInternalId }, desired, '1'))
+      .rejects.toMatchObject({ status: 409 })
+    expect((await state.readForSubject({ organizationId, target, userInternalId })).state?.bundles).toEqual(['current-only'])
+    expect((await pool.query('SELECT bundles FROM harness.plugin_states WHERE runtime_id=$1', [retired])).rows)
+      .toEqual([{ bundles: ['retired-only'] }])
   })
 
   it('materializes the projected state into the profile files under dshHome', async () => {

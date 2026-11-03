@@ -1,0 +1,14 @@
+{
+  "name": "audit-auth-lint-final",
+  "cwd": "gateway",
+  "command": "npx oxlint --deny-warnings src/auth.ts src/postgres/auth-service.ts src/services.ts tests/auth.spec.ts tests/auth-postgres.spec.ts tests/runtime-resource-provider.spec.ts tests/runtime-resource-api.spec.ts",
+  "startedAt": "2026-10-24T02:06:09.408727+00:00",
+  "seconds": 1.684,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "4c95f572c8f0b673f080833fc63c67980cd06bcd643f3db5f655e3aa262a1542",
+  "inputsAfter": "4c95f572c8f0b673f080833fc63c67980cd06bcd643f3db5f655e3aa262a1542",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

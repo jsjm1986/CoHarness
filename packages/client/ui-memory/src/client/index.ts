@@ -4,6 +4,7 @@
  * card switching the `memory` settings namespace.
  */
 import type { Context } from '@deepseek-ai/cordis'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -39,7 +40,7 @@ const TAB_ID = '@deepseek-ai/dsh-client-ui-memory'
 
 /** Required services: slots, copy, Remote carrier, memory proxy, settings, tab registry, session navigation, session list. */
 export const inject = [
-  'slots', 'locale', 'remote', 'remote.memory', 'settingsScope', 'uiWorkspace', 'sessions', 'sidebarRightTabs',
+  'slots', 'locale', 'remote', 'remote.memory', 'connection', 'settingsScope', 'uiWorkspace', 'sessions', 'sidebarRightTabs',
 ]
 
 /**
@@ -51,20 +52,27 @@ export const inject = [
 export function apply(ctx: Context): void {
   const t = ctx.locale.bind(namespace)
   ctx.effect(() => ctx.locale.register(namespace, { zh, en }), 'ui-memory: dictionaries')
-  const sourceFor = (sessionId: SessionId): MemoryInjected => createMemorySource({
-    scopes: () => ctx.remote.memory.scopes(),
-    list: scope => ctx.remote.memory.list({ scope }),
-    save: request => ctx.remote.memory.save(request),
-    remove: request => ctx.remote.memory.delete(request),
-    subscribeChanged: listener => ctx.remote.$on('memory/changed', listener),
-    subscribeReset: listener => ctx.on('connection/reset', listener),
-    // Entries attribute writes by Host Session id; the session list keys rows
-    // by the runtime-scoped client identity, so translate once at navigation.
-    openSource: (sessionId: SessionId) => {
-      ctx.uiWorkspace.openSession(ctx.sessions.keyFor?.(sessionId) ?? sessionId)
-    },
-    sessionDirectory: () => ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd,
-  })
+  const sourceFor = (sessionId: SessionId): MemoryInjected => {
+    const runtime = ctx.sessions.runtimeTargetFor?.(sessionId)
+    const remote = ctx.remote.$forTarget(runtime)
+    const connection = ctx.get('connection') as ConnectionHandle
+    const transport = runtime === undefined ? connection : connection.forTarget?.(runtime)
+    if (transport === undefined) throw new Error('Memory Runtime connection is unavailable')
+    return createMemorySource({
+      scopes: () => remote.memory.scopes(),
+      list: scope => remote.memory.list({ scope }),
+      save: request => remote.memory.save(request),
+      remove: request => remote.memory.delete(request),
+      subscribeChanged: listener => remote.$on('memory/changed', listener),
+      subscribeReset: listener => transport.state.subscribe(listener),
+      // Entries attribute writes by Host Session id; the session list keys rows
+      // by the runtime-scoped client identity, so translate once at navigation.
+      openSource: (sourceSessionId: SessionId) => {
+        ctx.uiWorkspace.openSession(ctx.sessions.keyFor?.(sourceSessionId, runtime) ?? sourceSessionId)
+      },
+      sessionDirectory: () => ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd,
+    })
+  }
   const card = new MemoryCardController(ctx.settingsScope.bind({ namespace: MEMORY_NS }))
   ctx.effect(() => ctx.sidebarRightTabs.register({
     id: TAB_ID,

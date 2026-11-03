@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/context/gateway-execution/README.md
 document:
-  en: 0d6dae8817b8e9d28bf18153b19ab338403cfd84
-  zh: adfb8286b5abe2267c6077539ca73a077610a088
+  en: 59d0f2c118b949b56578cdf0aaa26b6a801b0979
+  zh: 6c33bae746ea05ab4836531ce8ff6728a684675d
 /:
   en: fac8cbb2998d64a0
   zh: 96bfcdf5e0641881
@@ -18,23 +18,32 @@ document:
   en: 34dbf8456856eed6
   zh: 3b28f27d906fa2a7
 /deepseek-ai-dsh-gateway-execution/use-this-package:
-  en: ce9f3c788956c5cd
-  zh: 53b7f653119efd10
+  en: 0ff13443186fc7a1
+  zh: 8c86ace6930e775e
 /deepseek-ai-dsh-gateway-execution/execution-authorization:
   en: 320e328f4f06e2e2
   zh: 7591f204acda32c7
 /deepseek-ai-dsh-gateway-execution/revocation-and-cancellation:
-  en: 6b62abc47c063230
-  zh: aaf2d0c9a9698fd7
+  en: bad6cca48aa0b369
+  zh: f015da057bb7ceb1
 /deepseek-ai-dsh-gateway-execution/further-exploration:
   en: 44022536a86642dc
   zh: ad8b2c62a5d83e6c
 /deepseek-ai-dsh-gateway-execution/model-experience:
-  en: db9c20095c937ee6
-  zh: dd2b1065bc348771
-/deepseek-ai-dsh-gateway-execution/model-experience/kv-cache-effect:
-  en: e0f43fa3097d9464
-  zh: 9327bb0b2d05365b
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-gateway-execution/model-experience/desktop-environment-guidance:
+  en: 2e26b3fa920a6fbc
+  zh: 368a57d0a054fa0c
+/deepseek-ai-dsh-gateway-execution/model-experience/desktop-environment-guidance/what-the-model-sees:
+  en: fcdf09ef10d75eb3
+  zh: 143937b2a4a25c71
+/deepseek-ai-dsh-gateway-execution/model-experience/desktop-environment-guidance/token-effect:
+  en: ada78b5a6d2c797d
+  zh: ffacaeb465fc4424
+/deepseek-ai-dsh-gateway-execution/model-experience/desktop-environment-guidance/kv-cache-effect:
+  en: b1c0e9ddc5724f83
+  zh: aa5e07453cb10a2a
 /deepseek-ai-dsh-gateway-execution/known-limitations-and-deferred-work:
   en: ddcd12ed8f047383
   zh: 85cf5925b5efe9a5

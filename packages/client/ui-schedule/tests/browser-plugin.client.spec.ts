@@ -1,7 +1,8 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi, type Mock } from 'vitest'
-import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+import { SlotRegistry, createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionListState, WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConnectionHandle, ConnectionRuntimeTarget } from '@deepseek-ai/dsh-client-connection/client'
 import { resolveSlotLabel, type HostObservable, type StoredEntry } from '@deepseek-ai/dsh-client-ui-slots'
 import { stubDeveloperTools, stubSettingsScope, workspaceListState } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as applyLocale, inject as localeInject } from '@deepseek-ai/dsh-client-locale/client'
@@ -27,7 +28,7 @@ const Empty = () => null
 
 /** Raw inject face of an ambient row seat: the shared Host catalog observable. */
 interface SessionCatalogFace {
-  readonly hooks: { readonly catalog: HostObservable<unknown> }
+  readonly keyedHooks: { readonly runtimeCatalog: (key: string) => HostObservable<unknown> }
 }
 
 function headerEntryIds(ctx: Context): (string | undefined)[] {
@@ -78,6 +79,7 @@ class RemoteStub extends Service {
   constructor(ctx: Context, readonly $on: RemoteStubInput['$on']) {
     super(ctx, 'remote')
   }
+  $forTarget(): Context['remote'] { return this.ctx.remote }
 }
 
 async function baseContext(
@@ -86,7 +88,9 @@ async function baseContext(
 ): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
-  ctx.provide('connection', { api: { settings: {} }, isLoopback: false } as never)
+  ctx.provide('connection', { api: { settings: {} }, isLoopback: false,
+    hostDescription: { getSnapshot: () => ({ executionAuthorityRequired: false }), subscribe: () => () => {} },
+  } as never)
   ctx.provide('settingsScope', {
     bind: () => stubSettingsScope().scope,
     developerTools: stubDeveloperTools().preference,
@@ -97,7 +101,7 @@ async function baseContext(
   await ctx.plugin({ apply(provider: Context) {
     provider.provide('remote.schedule', (remote.schedule ?? {}) as never)
   } }).await()
-  ctx.provide('uiWorkspace', { openSession: vi.fn(), startSession: vi.fn() } as never)
+  ctx.provide('uiWorkspace', { openSession: vi.fn(), startSession: vi.fn(), startRuntimeSession: vi.fn() } as never)
   ctx.provide('sidebarRightTabs', { register: sidebar.register } as never)
   ctx.provide('sidebarRight', { openTab: sidebar.openTab, tabsIn: sidebar.tabsIn } as never)
   const id = 'cold-original' as SessionId
@@ -117,7 +121,8 @@ async function baseContext(
   ctx.provide('sessions', {
     list: { getSnapshot: () => sessions, subscribe: () => () => {} },
   } as never)
-  ctx.provide('workspaces', { list: { getSnapshot: () => workspaces } } as never)
+  ctx.provide('runtimeEnvironments',createSnapshotStore({ showComputer:false,choices:[{ key:'base',available:true }],status:'ready' as const }))
+  ctx.provide('workspaces', { list: { getSnapshot: () => workspaces, subscribe: () => () => {} } } as never)
   ctx.provide('conversation', {} as never)
   ctx.provide('conversationEvents', { register: vi.fn(() => () => {}) } as never)
   await ctx.plugin({ inject: localeInject, apply: applyLocale }).await()
@@ -147,7 +152,7 @@ describe('ui-schedule browser half', () => {
   it('declares only the services used by registration', () => {
     expect(inject).toEqual([
       'slots', 'locale', 'remote', 'remote.schedule', 'conversation', 'conversationEvents', 'uiWorkspace', 'sessions',
-      'workspaces', 'sidebarRightTabs', 'sidebarRight',
+      'workspaces', 'sidebarRightTabs', 'sidebarRight', 'runtimeEnvironments',
     ])
   })
 
@@ -339,13 +344,59 @@ describe('ui-schedule browser half', () => {
       expect(chip.hooks.catalog).toBe(body.hooks.catalog)
       // The panel starts a new reminder in a Session rather than opening a creation form.
       const panel = injectedFace(ctx.slots.entries('main')[0]!, undefined as never) as TaskManagerInjected
-      panel.onNewTask()
+      await panel.onNewTask()
       expect(startSession).toHaveBeenCalledOnce()
     } finally {
       await fiber.dispose()
       owner()
       await ctx.fiber.dispose()
     }
+  })
+
+  it('creates a task on the page Runtime while another Runtime owns the selected conversation', async () => {
+    const ctx = await baseContext()
+    const startRuntimeSession = vi.spyOn(ctx.uiWorkspace, 'startRuntimeSession')
+    const startSession = vi.spyOn(ctx.uiWorkspace, 'startSession')
+    const target: ConnectionRuntimeTarget = {
+      kind: 'personal', runtimeId: '11111111-1111-4111-8111-111111111111' as NonNullable<ConnectionRuntimeTarget['runtimeId']>,
+    }
+    const selected = 'cold-original' as SessionId
+    const state = ctx.sessions.list.getSnapshot()
+    vi.spyOn(ctx.sessions.list, 'getSnapshot').mockReturnValue({ ...state, current: selected })
+    Object.assign(ctx.sessions, { runtimeIdentityFor: () => ({ ...target,
+      runtimeId: '22222222-2222-4222-8222-222222222222' as NonNullable<ConnectionRuntimeTarget['runtimeId']>,
+    }) })
+    vi.spyOn(ctx.runtimeEnvironments, 'getSnapshot').mockReturnValue({
+      showComputer: true, status: 'ready', choices: [{ key: 'base', target, available: true }],
+    })
+    const owner = ctx.slots.register({ name: 'root', children: { main: { kind: 'keyed', scope: 'root' } } } as never, Empty)
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    try {
+      await fiber.await()
+      const panel = injectedFace(ctx.slots.entries('main')[0]!, undefined as never) as TaskManagerInjected
+      const controller = new AbortController()
+      await panel.onNewTask(controller.signal)
+      expect(startRuntimeSession).toHaveBeenCalledExactlyOnceWith(target, undefined, controller.signal)
+      expect(startSession).not.toHaveBeenCalled()
+    } finally { await fiber.dispose(); owner(); await ctx.fiber.dispose() }
+  })
+
+  it.each(['unknown', 'managed'] as const)('refuses task creation with %s bootstrap identity instead of using the active conversation', async (kind) => {
+    const ctx = await baseContext()
+    const startRuntimeSession = vi.spyOn(ctx.uiWorkspace, 'startRuntimeSession')
+    const startSession = vi.spyOn(ctx.uiWorkspace, 'startSession')
+    const connection = ctx.get('connection') as ConnectionHandle
+    vi.spyOn(connection.hostDescription, 'getSnapshot').mockReturnValue(kind === 'unknown'
+      ? undefined : { version: 'test', cwd: '/home', home: '/home', attachedSessions: 0, canOpenPath: false, executionAuthorityRequired: true })
+    const owner = ctx.slots.register({ name: 'root', children: { main: { kind: 'keyed', scope: 'root' } } } as never, Empty)
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    try {
+      await fiber.await()
+      const panel = injectedFace(ctx.slots.entries('main')[0]!, undefined as never) as TaskManagerInjected
+      expect(() => panel.onNewTask()).toThrow('Task Runtime identity is unavailable')
+      expect(startSession).not.toHaveBeenCalled()
+      expect(startRuntimeSession).not.toHaveBeenCalled()
+    } finally { await fiber.dispose(); owner(); await ctx.fiber.dispose() }
   })
 
   it('opens the task tab with the entry Session and the chosen task id', async () => {
@@ -505,12 +556,12 @@ describe('ui-schedule browser half', () => {
       expect(hover.options).toMatchObject({ id: 'schedule-tasks', order: 10 })
       expect(hover.locale).toBe(NS)
       // A root-scope list entry receives no owner values in `inject`. Both row
-      // seats inject the one Host catalog the page reads, and neither creates a
-      // per-Session Remote source, so N visible rows issue one query.
-      const page = injectedFace(ctx.slots.entries('main')[0]!, undefined as never) as SessionCatalogFace
+      // seats resolve the shared catalog of the row's Runtime, so N visible rows
+      // on the same Runtime issue one query.
+      const page = injectedFace(ctx.slots.entries('main')[0]!, undefined as never) as TaskManagerInjected
       for (const entry of [mark, hover]) {
         const face = injectedFace(entry) as SessionCatalogFace
-        expect(face.hooks.catalog).toBe(page.hooks.catalog)
+        expect(face.keyedHooks.runtimeCatalog('cold-original')).toBe(page.hooks.catalog)
         expect(face).not.toHaveProperty('createSource')
       }
       await fiber.dispose()

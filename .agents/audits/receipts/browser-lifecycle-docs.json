@@ -1,0 +1,10 @@
+{
+  "name": "browser-lifecycle-docs",
+  "command": "pnpm run doc-sync",
+  "cwd": ".",
+  "exitCode": null,
+  "status": "interrupted_before_terminal_result",
+  "evidence": "Tool process handle missing and no matching runner or gate process is live; partial log lacks final outcome. This receipt is not a failed or passed documentation aggregate.",
+  "outputSha256": "1114cee67a41abb78158d989165c94a7e3d8134c0980cd2eeb0ba326737d4f93",
+  "outputTail": "$ tsx scripts/run-gates.ts doc-sync\nrun-gates: doc-sync running 41 gate(s) with 8 worker(s) from 10 local default worker(s) of 10 CPU(s), doc-sync cap 8.\nrun-gates: start doc-typecheck\nrun-gates: start documentation build\nrun-gates: start doc graphs\nrun-gates: start markdown links\nrun-gates: start type equivalence\nrun-gates: start cordis catalog\nrun-gates: start Cordis inspect catalog\nrun-gates: start workflow guest source\nrun-gates: PASS workflow guest source (2.13s)\nrun-gates: start verify-mermaid\nrun-gates: PASS Cordis inspect catalog (27.43s)\nrun-gates: start translation pairing\nrun-gates: PASS cordis catalog (43.71s)\nrun-gates: start markdown wrap\n"
+}

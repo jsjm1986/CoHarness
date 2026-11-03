@@ -28,6 +28,10 @@ Path canonicalization belongs where the files exist. The shared policy resolver 
 
 A lost connection invalidates pending operations without reconnect or replay. Helper EOF, signals and a heartbeat lease initiate remote native cleanup. The client cannot turn lease expiry into an observed successful termination: an interrupted mutation or launch can have an unknown outcome. Administrative request deadlines, consumer execution deadlines and cleanup remain separate owners.
 
+The OpenSSH carrier and forwarding-control processes use a privately isolated local subprocess provider. This keeps transport allocation local when the public subprocess service is remote, applies infrastructure admission and environment scrubbing, and retains native managed-range ownership. The connection retains each subprocess consumer until its shared cleanup settles, including a consumer already disposing outside Cordis' live registry. Closing rejects ordinary work while accepted process termination and wait remain usable; consumers drain before helper shutdown and local transport termination. Local provider disposal runs even if remote cleanup fails.
+
+Remote process preparation explicitly projects the helper's execution fields. Host Session attribution, resource origin and cancellation remain local. Spreading a host spawn specification into RPC would couple strict remote JSON validation to local admission metadata and reject otherwise valid execution requests.
+
 ### Helper deployment
 
 The explicit `launch.kind` selects remote `node-script` or `executable` invocation independently of the local Harness carrier. A local `process.pkg` flag cannot describe the remote installation. Protocol 2 includes the remote runtime kind in its readiness response and rejects protocol or launch-kind mismatches, so a client cannot apply script bootstrap rules to an embedded worker. Client and helper protocol upgrades must be deployed together.
@@ -45,6 +49,10 @@ The four release targets cover Linux and macOS on x64 and arm64, matching the PO
 **Expose TCP or HTTP endpoints for program streams.** This permits independent transports but introduces remote port exposure, endpoint authentication and server deployment beyond the existing SSH connection. Forwarded Unix sockets use the authenticated SSH session and additionally authenticate both stream endpoints with TLS-PSK against same-user connections or pathname replacement.
 
 **Move the complete Harness to the remote host.** That is a separate deployment model. It moves model credentials, Session storage and plugin state with execution rather than supplying remote implementations of existing capabilities.
+
+**Use the public subprocess service for the local carrier.** In an SSH realm that service already delegates to this connection, creating a startup dependency cycle. A private local provider retains the same admission and process-ownership implementation without changing the payload execution world.
+
+**Rely on service withdrawal alone.** Cordis removes a disposing consumer from its live registry before that cleanup settles. Explicitly retained cleanup keeps the transport available through the consumer's last acknowledged operation.
 
 ## Consequences
 

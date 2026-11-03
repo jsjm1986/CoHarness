@@ -3,26 +3,29 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/context/gateway-runtime/README.md
 document:
-  en: b6fb28c5ce95a70be57395634e38e2fcd6060fd8
-  zh: 54e76963169231becbbd19970e59cdc081cd047b
+  en: 5badf2234ab012274d19f430aedf0cccad2f1be4
+  zh: 7bafea5e4847fd024bac234df71f071e462ad03a
 /:
   en: dcc9184d9f94910d
   zh: 61495d48365178df
 /deepseek-ai-dsh-gateway-runtime:
-  en: a65dfb67272f8287
-  zh: 1a75f1b71c4f8583
+  en: 9ee8c8cdbfc37704
+  zh: 3734484433e95001
 /deepseek-ai-dsh-gateway-runtime/summary:
   en: e0b636cb421a16a0
   zh: 872b4692833112a4
 /deepseek-ai-dsh-gateway-runtime/table-of-contents:
-  en: e57b6808315759d6
-  zh: b66d6b5ec6ece109
+  en: b85f72616ea581f6
+  zh: 59d9ff8994568562
 /deepseek-ai-dsh-gateway-runtime/runtime-contract:
-  en: 4d281f6b26124154
-  zh: af5967409ef364d8
+  en: f12b3fa6c83c2415
+  zh: de757e58242dbaf3
 /deepseek-ai-dsh-gateway-runtime/runtime-contract/execution-authorization:
-  en: 640fe5b4bcb17209
-  zh: 882b67f43a1a8223
+  en: 82edbea79a6d3a99
+  zh: f221e1d427035ada
+/deepseek-ai-dsh-gateway-runtime/resource-admission:
+  en: df71ffc5323adfa1
+  zh: b0281f69fda4f026
 /deepseek-ai-dsh-gateway-runtime/model-experience:
   en: b947e97275aa5f8b
   zh: d0336b8632c879c4

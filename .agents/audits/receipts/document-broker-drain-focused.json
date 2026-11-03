@@ -1,0 +1,14 @@
+{
+  "name": "document-broker-drain-focused",
+  "cwd": "gateway",
+  "command": "pnpm exec vitest run tests/documents-local.spec.ts",
+  "startedAt": "2026-10-26T10:56:01.771942+00:00",
+  "seconds": 6.162,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5ea82ed88f170e5d39fe61f1e59d35461909278d849586f4634fa54522f2f795",
+  "inputsAfter": "5ea82ed88f170e5d39fe61f1e59d35461909278d849586f4634fa54522f2f795",
+  "postgresToolDirectory": null,
+  "outputSha256": "88fb5c3b41251b352394b2e8ae40af950309166f91fe5525c1f84f5e08e4061c",
+  "outputTail": "✓ Lockfile passes supply-chain policies (verified 9h ago)\nLockfile is up to date, resolution step is skipped\nAlready up to date\n\n[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: argon2@0.44.0, better-sqlite3@12.11.1, esbuild@0.28.2\n\nRun \"pnpm approve-builds\" to pick which dependencies should be allowed to run scripts.\n[WARN] The install that runs before scripts failed, so your node_modules may be out of sync with your lockfile. Set \"verifyDepsBeforeRun: false\" to skip this install.\n\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  23 passed (23)\n   Start at  18:56:06\n   Duration  1.70s (transform 881ms, setup 0ms, import 1.10s, tests 496ms, environment 0ms)\n\n"
+}

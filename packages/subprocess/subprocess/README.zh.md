@@ -42,7 +42,7 @@ kind: "package-reference"
 
 ```text
 const executable = await ctx.subprocess.resolveExecutable('bash')
-const handle = ctx.subprocess.spawn({
+const handle = await ctx.subprocess.spawn({
   argv: [executable, '-c', 'echo hello'],
   cwd: '/workspace',
   stdio: { stdin: 'ignore', stdout: { maxBytes: 64 * 1024 }, stderr: 'inherit' },
@@ -67,9 +67,17 @@ const output = handle.collected.stdout?.readFrom(0)
 
 ### 管理进程生命周期
 
+两种分配方法均先等待资源准入，再调用提供方。`sessionId` 与 `resourceOrigin` 选择执行归属；普通消费方使用捕获的执行，浏览器终端要求签名交互调用者，维护操作可明确选择基础设施。许可保留到整个进程范围退出或终端终止，包括仍存活的后代。无法确认分配清理时保留不确定状态；已确认回滚时归还许可。独立组合可省略准入；托管组合缺少必需的提供方时拒绝执行。
+
+准入在排队和许可交接期间保留原资源提供方。紧接调用进程或终端提供方之前，若请求已取消或资源所有者变化，会拒绝分配并归还未使用的许可。提供方撤销、替换或新增托管要求后缺少提供方时，抛出原因值为 `unavailable` 的 `ResourceAdmissionError`；旧请求不会获取替代容量。恢复准入后发起新请求。已经分配的进程范围保留原有清理责任。
+
+需要异步预备的提供方在入口捕获 `captureAdmissionCheck(spec)`，在派发物理启动前调用返回的检查。若提供方已证明失败分配完全停稳，使用 `rejectAfterCleanup(failure)`；服务归还许可并保留原始失败。其他分配失败保留不确定占用。若资源完成报告也失败，`AggregateError` 同时保留分配错误与记账错误。
+
 终止与等待使用同一个由提供方管理的范围。`terminate()` 会启动提供方记录的流程，具有幂等性，并在该范围为空后成为空操作；请求的中止信号会启动同一流程。`waitForExit()` 观察同一范围，只在提供方证明它完全停稳后 resolve，因此直接命令结束不会掩盖仍存活的后代。所选 owner 无法再证明完全停稳时，它会 reject。提供方记录其 native owner 与较弱 fallback；时限、拆卸阶梯与原因分类归调用方所有。
 
 ### 运行终端会话
+
+终端请求的 `signal` 仅取消分配。句柄发布后，原调用者结束不会终止终端或释放其许可；资源提供方撤下与子进程提供方销毁仍会取消所属会话。
 
 对于交互式程序，`spawnTerminal` 分配真实 PTY：写入文本、读取 UTF-8 输出、检查当前前台进程组并向其发送信号，以及等待一次 `terminate()`，让提供方仍可观察到的每个会话成员完全停稳。就绪状态、scrollback 与提示符策略仍归 PTY 消费方所有。
 
@@ -81,7 +89,7 @@ const output = handle.collected.stdout?.readFrom(0)
 
 ### 可能出错的地方
 
-无法解析可执行文件时，服务会明确报出稳定的错误。从未启动成功的 spawn 会让 `done` reject；从未运行过的进程没有任何缓冲输出。提供方无法证明所选范围为空时，`waitForExit()` 也会 reject；提供方 fallback 可能无法拥有逃离其进程组或已观察会话的后代。当传输拥有自己的 spawn（SDK 客户端、MCP）时，请绕开本服务并直接导入 `scrubbedParentEnv`，让环境策略保持单一来源。
+无法解析可执行文件时，服务会明确报出稳定的错误。从未启动成功的 spawn 会让 `done` reject；从未运行过的进程没有任何缓冲输出。提供方无法证明所选范围为空时，`waitForExit()` 也会 reject；提供方 fallback 可能无法拥有逃离其进程组或已观察会话的后代。私有传输保留其启动 API 并使用 `scrubbedParentEnv`；受管 Consumer 拥有进程准入和清理证据。参见 [MCP](../../mcp/mcp-client/README.zh.md) 与 [SDK 子代理](../../subagent/subagent-dsh-sdk/README.zh.md)。
 
 -----
 
@@ -106,7 +114,7 @@ const output = handle.collected.stdout?.readFrom(0)
 
 ### 数据模型与流程
 
-spawn 会立即返回活动句柄，而不公开目标身份。`done` 独立报告直接命令的结果或失败，`waitForExit()` 则报告受管范围是否完全停稳。请求的中止信号驱动与 `terminate()` 相同的终止流程。收集模式的读取器无游标：偏移量是调用方拥有的全流字节坐标，因此独立读取器不会消费彼此的输出，偏移量滑出内存尾部的读取标记为 `lossy`，并在 spill 文件存在时指向它。`spawnTerminal` 是一项底层原语，因为普通管道无法分配控制终端或清理终端会话成员。
+准入完成后，普通 spawn 发布活动句柄；提供方此时仍可能在预备目标。目标身份保持为提供方私有。`done` 独立报告直接命令的结果或失败，`waitForExit()` 则报告受管范围是否完全停稳。请求的中止信号驱动与 `terminate()` 相同的终止流程。收集模式的读取器无游标：偏移量是调用方拥有的全流字节坐标，因此独立读取器不会消费彼此的输出，偏移量滑出内存尾部的读取标记为 `lossy`，并在 spill 文件存在时指向它。`spawnTerminal` 是一项底层原语，因为普通管道无法分配控制终端或清理终端会话成员。
 
 ### 生命周期与不变式
 
@@ -146,7 +154,7 @@ spawn 会立即返回活动句柄，而不公开目标身份。`done` 独立报�
 
 这些限制说明该 seam 何时不合适，或何时把工作留给消费方。它们是当前包约束，不是对比或任务积压。
 
-- **由 SDK 管理的 spawn 仍在服务之外**——拥有内部 spawn 的传输（SDK 客户端、MCP）无法把该调用路由到本服务；它仍可导入 `scrubbedParentEnv`，使环境策略保持单一来源。
+- **私有传输启动由 Consumer 拥有准入**：SDK 与 MCP 传输保留各自的启动 API。受管 Consumer 独立申请进程许可并证明清理；纯独立 SDK 客户端没有 Cordis 预算上下文。
 - **拆卸阶梯归消费方所有**——该 seam 只提供信号动词与受管范围等待，不提供现成的完全停稳序列；每个进程外消费方自行编码其子进程的配合方式（ACP 后端以 stdin EOF 打头的阶梯是仓库内模板）。
 - **可观察性取决于提供方**——native 提供方可以通过 systemd scope 或 Windows Job 拥有逃逸后代，fallback 提供方则只暴露较弱的进程组、进程树或会话可见性。该 seam 不新增持续的进程表监视器。
 

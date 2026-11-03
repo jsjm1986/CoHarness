@@ -1,7 +1,7 @@
 import { lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DOCUMENT_MIGRATION_FAILED_CODE } from '@deepseek-ai/dsh-userdoc'
 import { migrateLegacyDocuments } from '../src/migration.ts'
 
@@ -14,6 +14,7 @@ async function roots(): Promise<{ scratch: string; legacy: string; documents: st
 }
 
 afterEach(async () => {
+  vi.restoreAllMocks()
   await Promise.all(temporaries.splice(0).map(path => rm(path, { recursive: true, force: true })))
 })
 
@@ -43,16 +44,64 @@ describe('legacy document migration', () => {
     await expect(lstat(legacy)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('shares concurrent migration work for the same roots', async () => {
+  it('serializes concurrent migrations without moving documents twice', async () => {
     const { legacy, documents } = await roots()
     await mkdir(legacy)
     await writeFile(join(legacy, 'note.txt'), 'hello')
 
     const first = migrateLegacyDocuments(legacy, documents)
     const second = migrateLegacyDocuments(legacy, documents)
-    expect(second).toBe(first)
     await Promise.all([first, second])
     expect(await readFile(join(documents, 'note.txt'), 'utf8')).toBe('hello')
+    await expect(lstat(legacy)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('refuses an incomplete lock record without changing either document tree', async () => {
+    const { scratch, legacy, documents } = await roots()
+    await mkdir(legacy)
+    await writeFile(join(legacy, 'note.txt'), 'keep this document')
+    const lock = join(scratch, '.documents-migration.lock')
+    await writeFile(lock, '')
+
+    const migration = migrateLegacyDocuments(legacy, documents)
+    await expect(migration).rejects.toMatchObject({
+      code: DOCUMENT_MIGRATION_FAILED_CODE,
+    })
+    await expect(migration).rejects.toHaveProperty('cause.message', expect.stringContaining('timed out waiting for the writer lock'))
+    expect(await readFile(lock, 'utf8')).toBe('')
+    expect(await readFile(join(legacy, 'note.txt'), 'utf8')).toBe('keep this document')
+    await expect(lstat(documents)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('retains a live lock holder instead of beginning a second migration', async () => {
+    const { scratch, legacy, documents } = await roots()
+    await mkdir(legacy)
+    await writeFile(join(legacy, 'note.txt'), 'keep this document')
+    const lock = join(scratch, '.documents-migration.lock')
+    const owner = `${process.pid}\n`
+    await writeFile(lock, owner)
+
+    await expect(migrateLegacyDocuments(legacy, documents)).rejects.toMatchObject({ code: DOCUMENT_MIGRATION_FAILED_CODE })
+    expect(await readFile(lock, 'utf8')).toBe(owner)
+    expect(await readFile(join(legacy, 'note.txt'), 'utf8')).toBe('keep this document')
+  })
+
+  it('recovers a complete lock whose recorded process is proven absent', async () => {
+    const { scratch, legacy, documents } = await roots()
+    await mkdir(legacy)
+    await writeFile(join(legacy, 'note.txt'), 'recover this document')
+    const lock = join(scratch, '.documents-migration.lock')
+    const exitedPid = process.pid === 123456 ? 123457 : 123456
+    await writeFile(lock, `${exitedPid}\n`)
+    const kill = process.kill.bind(process)
+    vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (pid !== exitedPid || signal !== 0) return kill(pid, signal)
+      throw Object.assign(new Error('recorded process has exited'), { code: 'ESRCH' })
+    })
+
+    await migrateLegacyDocuments(legacy, documents)
+    expect(await readFile(join(documents, 'note.txt'), 'utf8')).toBe('recover this document')
+    await expect(lstat(lock)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('rejects overlapping roots and symbolic legacy storage', async () => {

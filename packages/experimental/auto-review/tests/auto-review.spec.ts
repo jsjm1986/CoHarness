@@ -260,6 +260,56 @@ async function until(predicate: () => boolean): Promise<void> {
 }
 
 describe('native review request', () => {
+  it('logs the exact resolved reviewer input before adapter dispatch', async () => {
+    let loggedBeforeDispatch = false
+    const requests: unknown[] = []
+    const { ctx, adapter } = await harness([async function* () {
+      loggedBeforeDispatch = requests.length === 1
+      yield* decisionChunks('{"risk":"low","decision":"allow"}')
+    }])
+    const probe = registerProbe(ctx)
+    const { session, agent } = autoSession(ctx, 'review-request-record')
+    ctx.on('session/event', (owner, event) => {
+      if (owner === session && event.type === 'auto-review/request') requests.push(event.data)
+    })
+    const callId = ToolCallId('review-request-record-call')
+    appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
+    appendUser(session, 'Inspect the local fixture', { kind: 'user' })
+    appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
+    appendNativeCall(session, callId, 'probe', '{}')
+    const result = await ctx.tools.execute({ signal: new AbortController().signal, agent, callId, name: 'probe', arguments: {} })
+    expect(result.isError).toBe(false)
+    expect(probe.runs()).toBe(1)
+    expect(loggedBeforeDispatch).toBe(true)
+    const { sessionId: _session, signal: _signal, purpose: _purpose,
+      executionIdentity: _execution, resourceOrigin: _origin, ...request } = adapter.requests[0]!
+    expect(requests).toEqual([{ callId, request }])
+    expect(Object.isFrozen(requests[0])).toBe(true)
+  })
+
+  it('attributes the reviewer to execution admission and releases its model permit', async () => {
+    const { ctx } = await harness([decisionChunks('{"risk":"low","decision":"allow"}')])
+    const admissions: Array<Parameters<Context['resourceBudget']['acquire']>[0]> = []
+    const release = vi.fn(async () => {})
+    ctx.provide('resourceBudget', {
+      async acquire(request: Parameters<Context['resourceBudget']['acquire']>[0]) {
+        admissions.push(request)
+        return { signal: new AbortController().signal, release, uncertain: async () => { throw new Error('review stream did not quiesce') } }
+      },
+    })
+    const probe = registerProbe(ctx)
+    const { session, agent } = autoSession(ctx, 'review-execution-admission')
+    const callId = ToolCallId('review-execution-admission-call')
+    appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
+    appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
+    appendNativeCall(session, callId, 'probe', '{}')
+    const result = await ctx.tools.execute({ signal: new AbortController().signal, agent, callId, name: 'probe', arguments: {} })
+    expect(result.isError).toBe(false)
+    expect(probe.runs()).toBe(1)
+    expect(admissions).toEqual([expect.objectContaining({ kind: 'model', sessionId: session.id, origin: 'execution' })])
+    expect(release).toHaveBeenCalledTimes(1)
+  })
+
   it('uses the latest route and exactly the filtered logged five-section input', async () => {
     const { ctx, adapter } = await harness([
       reasoningDecisionChunks('{"risk":"low","decision":"allow"}'),

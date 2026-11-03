@@ -1,0 +1,14 @@
+{
+  "name": "jobs-lifecycle-snapshot-clocks-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/test-support/session-snapshot/tests/normalize.spec.ts packages/test-support/session-snapshot/tests/comparison-integrity.spec.ts",
+  "startedAt": "2026-10-26T08:16:09.814607+00:00",
+  "seconds": 7.4,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a03e3dff58247044e19d5269a661049ce9df606e12ee8bafe5002f2d79648875",
+  "inputsAfter": "a03e3dff58247044e19d5269a661049ce9df606e12ee8bafe5002f2d79648875",
+  "postgresToolDirectory": null,
+  "outputSha256": "11a6427cafbea2dc5a7c01a52b27788c12c1468bbec47add02e333d507199e40",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  2 passed (2)\n      Tests  104 passed (104)\n   Start at  16:16:14\n   Duration  2.23s (transform 3.40s, setup 203ms, import 3.76s, tests 54ms, environment 0ms)\n\n"
+}

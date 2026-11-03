@@ -1,17 +1,20 @@
-# Execution resource admission
+# Resource admission
 
 English | [中文](resource-budget.zh.md)
 
-The [Resource Budget definition](../../packages/context/resource-budget/README.md) describes reservations acquired before execution and retained through cleanup. Its abstract service does not supply a scheduler. The package reference owns provider composition and consumer release obligations.
+The [resource-budget package](../../packages/context/resource-budget/README.md) declares node-wide resource permits and their execution ownership obligations.
 
-<a id="resource-types"></a>
-## Resource types
+## Permit records
 
-[`ResourceKind`](../../packages/context/resource-budget/src/types.ts) distinguishes `model` and `process` reservations. A persistent terminal consumes process capacity; there is no separate worker-thread kind.
+`ResourceKind` selects `model` or `process`; terminals consume process permits.
 
-[`ResourceRequest`](../../packages/context/resource-budget/src/types.ts) contains the resource kind, an optional cancellation signal, and an optional branded Session id. Verified actor and project facts are resolved by the provider.
+`ResourceOperationId` is a branded, provider-generated identity for one queued or admitted operation.
 
-[`ResourceLease`](../../packages/context/resource-budget/src/types.ts) reports either proven quiescence through `release()` or unconfirmed cleanup through `uncertain()`. Uncertainty retains resource occupancy; a disconnected transport is not proof of release.
+`ResourceRequest` carries `kind`, optional cancellation `signal`, optional branded `sessionId`, and `origin` intent (`execution`, `interactive`, or `infrastructure`). The provider captures verified ownership before queueing and never accepts caller-supplied actor or project identities.
+
+`ResourceLease.signal` cancels owned execution without releasing its occupation. Awaited `release()` reports proven quiescence; awaited `uncertain()` retains occupation until a later exact completion or confirmed Runtime stop. Reporting uncertainty preserves cancellation from the caller and provider. Losing a connection does not prove execution stopped.
+
+The `./wire` entry defines the bounded remote messages and committed policy. The [package reference](../../packages/context/resource-budget/README.md#remote-coordination) documents operation ownership and the Gateway's restricted completion authentication.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

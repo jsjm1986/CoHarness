@@ -51,7 +51,9 @@ kind: "package-reference"
 
 `list(scope)` 返回目录行（不含正文的条目），按 kind（`guidance`、`profile`、`background`、`resource`）、`updated.at` 降序、key 升序排列。`read(scope, key)` 返回单个完整条目或 `undefined`。`entries(scope)` 按同一目录顺序返回完整条目——合并遍的摘要与审查输入。
 
-`getCursor(key)` / `writeCursor(key, cursor)` 读取并提交域 `cursors` 表中的耐久整理游标——`extraction-{sessionId}`（`lastSeq`）与 `consolidation-{scopeId}`（`lastRunAt`、`lastDigest`、`changedSince`），键由导出的 `memoryExtractionCursorKey` / `memoryConsolidationCursorKey` 助手给出。游标写入与条目写入共用同一条串行链，每次已提交的 save/delete 都会在该链内递增其作用域的 `changedSince`。
+`getCursor(key)` / `writeCursor(key, cursor)` 读取并提交域 `cursors` 表中的耐久整理游标——`extraction-{sessionId}`（`lastSeq`）与 `consolidation-{scopeId}`（`lastRunAt`、`lastDigest`、`changedSince`），键由导出的 `memoryExtractionCursorKey` / `memoryConsolidationCursorKey` 助手给出。游标写入与条目写入共用同一条串行链。两种游标写入方法均接受可选的操作信号与 `beforeCommit` 授权回调。回调在队列和存储等待结束后授权，并返回在持久化前立即调用的同步检查；拒绝时游标保持不变。回调不得在同一写链上排队记忆写入或游标操作。回调前后均检查取消。每次获准的 save/delete 都在条目修改前持久化其 `changedSince` 标记：游标写入失败会保持条目不变，后续条目写入失败则可能保守地多计变更次数。整理流程在请求审查前比较内容摘要。
+
+`writeCursorIfUnchanged(key, expected, cursor)` 在条目写入队列中比较并提交一个游标。当前记录与 `expected` 不同时返回 `false`，保持存储不变；期望值为 undefined 时要求记录不存在。
 
 <a id="write-rules"></a>
 ## 写入规则
@@ -68,17 +70,19 @@ kind: "package-reference"
 
 来源记录的 `source` 是封闭联合（`agent`、`extraction`、`consolidation`、`member`）；模型工具默认 `agent`，`dsh-memory-curation` 以 `extraction`/`consolidation` 写入，`member` 记录经下述 Remote 表面产生的浏览器编辑。
 
+合并标记持久化后，每次变更都会重新检查作用域是否仍启用。代理写入在授权前及条目变更前检查操作取消信号。project 写入在标记之后通过原执行授权提供方重新核验权限；执行状态改变、提供方替换、资格撤销或授权流不可用都会拒绝变更，Agent 空闲时也不例外。权限检查不预留模型请求额度，也不为模型请求计费。成员写入保留所捕获的有效期及提供方生命周期。拒绝可以留下保守的变更标记，但条目保持不变。参见[写入生命周期决策](../../../.agents/notes/implemented/bug-fix/2026-10-23-memory-member-authority.zh.md)。
+
 <a id="member-remote"></a>
 ## 成员 Remote 表面
 
-`MemoryService` 是 `TypertRemoteService`；五个 `@Remote` 方法服务浏览器记忆页面。`memory/scopes` 返回作用域目录——个人 runtime 中是个人作用域加上有条目的工作区作用域，项目 runtime 中仅项目作用域——每个视图附带实时条目数与调用成员的 `writable` 标志，以及 `memory` 段的 `enabled` 标志。`memory/list` 与 `memory/read` 向全体成员提供读取；API proxy 经 `PROJECT_TYPERT_PROCESS_WIDE_READS` 放行这三个读端点。`memory/save` 与 `memory/delete` 以捕获的协作参与者身份经 `memberWriter()` 写入，经 `PROJECT_TYPERT_REGISTRY_AUTHORIZED` 放行：项目作用域写入要求 `mode: 'rw'` 的项目参与者；个人/工作区作用域要求 `personal` 参与者；缺失主体或只读成员身份以共享的 `collaboration-forbidden` 拒绝。没有协作 provider 的 runtime 保持所有者语义。
+`MemoryService` 是 `TypertRemoteService`；五个 `@Remote` 方法服务浏览器记忆页面。`memory/scopes` 返回作用域目录——个人 runtime 中是个人作用域加上有条目的工作区作用域，项目 runtime 中仅项目作用域——每个视图附带实时条目数与调用成员的 `writable` 标志，以及 `memory` 段的 `enabled` 标志。`memory/list` 与 `memory/read` 向全体成员提供读取；API proxy 经 `PROJECT_TYPERT_PROCESS_WIDE_READS` 放行这三个读端点。`memory/save` 与 `memory/delete` 使用完整捕获的协作授权经 `memberWriter()` 写入，经 `PROJECT_TYPERT_REGISTRY_AUTHORIZED` 放行：项目作用域写入要求 `mode: 'rw'` 的项目参与者；个人/工作区作用域要求 `personal` 参与者；缺失主体或只读成员身份以共享的 `collaboration-forbidden` 拒绝。排队写入在持久化前及条目修改前检查主体有效期和提供方生命周期；授权过期或失效时拒绝修改条目。没有[协作要求](../../context/collaboration/README.zh.md#application-authorization)的独立应用保持所有者语义。
 
 服务注册 `memory` 设置命名空间（`installSettingsSection`，owner `project`，`projectWrite: 'manager'`），含 `enabled` 字段（默认 `true`）与 `extraction`、`consolidation`、`recall` 三个开关（默认 `false`）。`enabled` 置为 `false` 会使 `scopesFor` 返回空——agent 看不到目录且一切写入拒绝 `scope-unavailable`——成员读取与已存条目仍可查看。
 
 <a id="storage"></a>
 ## 存储
 
-`memory` 域声明 `layout: 'per-record'` 与 `invalidRecords: 'backup-and-skip'`：每个条目一个 JSON 文档，位于 `<backend-root>/memory/entries/<recordKey>.json`，每条整理游标一个文档位于 `memory/cursors/`，损坏的记录会被移到一边（`<key>.json.bak.<timestamp>`）而不会阻塞整个域。记录键为 `${scopeId}_${key}`：`_` 作为分隔符，因为作用域 id（`personal`、`project`、`workspace-<sha256(JSON.stringify([sshTarget ?? null, directory])) 前 16 位十六进制>`）和条目键 slug 都不含 `_`，且整体键满足 per-record 单元路径安全的 `[a-zA-Z0-9_-]+` 文法。记录模式是 `MemoryEntry` 的严格 zod 镜像；域在服务构造时打开一次（每次访问都要等待的就绪 promise），在处置时关闭。
+`memory` 域声明 `layout: 'per-record'` 与 `invalidRecords: 'backup-and-skip'`：每个条目一个 JSON 文档，位于 `<backend-root>/memory/entries/<recordKey>.json`，每条整理游标一个文档位于 `memory/cursors/`，损坏的记录会被移到一边（`<key>.json.bak.<timestamp>`）而不会阻塞整个域。记录键为 `${scopeId}_${key}`：`_` 作为分隔符，因为作用域 id（`personal`、`project`、`workspace-<sha256(JSON.stringify([sshTarget ?? null, directory])) 前 16 位十六进制>`）和条目键 slug 都不含 `_`，且整体键满足 per-record 单元路径安全的 `[a-zA-Z0-9_-]+` 文法。记录模式是 `MemoryEntry` 的严格 zod 镜像；域在服务构造时打开一次（每次访问都要等待的就绪 promise），在处置时关闭。提供方卸载会等待待决打开完成，并关闭迟到的域，使替换方能够重新打开；参见[生命周期决策](../../../.agents/notes/implemented/bug-fix/2026-10-24-memory-domain-open-disposal.zh.md)。
 
 该服务要求 `storageDomain`：目前存储族只在 Web 包中挂载，因此 `dsh-memory` 在 `web-app` 包中位于 `storage-domain` 之后挂载；在没有它的组合中，代理侧行保持惰性。
 
@@ -87,10 +91,14 @@ kind: "package-reference"
 
 `search(scopes, query)` 先做 NFKC + 小写归一化，再提取词项（长度 ≥ 2 的拉丁/数字 token；≥ 2 的 CJK 连续段及其二元 bigram），然后按字段为每个条目评分（key ×3、summary ×2、content ×1）：字段包含整个归一化查询时 `+10×weight`，每个被包含词项 `+weight×(1+min(occurrences,5))`。得分为 0 的条目被丢弃；结果按得分降序、`updated.at` 降序、key 升序排列，并以 `searchMaxResults` 封顶。每个命中携带目录行和一段围绕首个匹配词项的空白折叠摘要（至多 160 码点，无匹配时回退 summary），截断边缘以 `…` 标记。修剪后为空的查询返回 `{ ok: false, code: 'memory_invalid', reason: 'query' }`。
 
+摘要通过兼容分解和字素簇边界，将规范化匹配位置对应回原文。兼容字符、组合序列及小写展开均保留原文与匹配上下文；参见[原文位置决策](../../../.agents/notes/implemented/bug-fix/2026-10-28-memory-search-source-offsets.zh.md)。
+
 <a id="events"></a>
 ## 事件
 
-`memory/changed(scopeId, key)` 在写入提交后发出；消费者通过服务重新读取，而不是信任负载。
+`memory/changed(scopeId, key)` 在写入提交后发出；消费者通过服务重新读取，而不是信任负载。同步观察者异常会被记录，不会让已经提交的修改变成失败结果。
+
+`memory/switches-updated` 要求消费者在记忆设置提交，或设置提供者挂载、替换、移除后，重新读取自己注入的服务。通知不携带快照，接线时可能重复。同步订阅者立即取消不可用的工作，异步清理由现有所有者等待。观察者失败不阻止后续订阅者收到通知。提供者丢失时仍使用文档规定的组合配置回退。参见[有效来源决策](../../../.agents/notes/implemented/bug-fix/2026-11-01-memory-provider-availability.zh.md)。
 
 <a id="invariants"></a>
 ## 不变式

@@ -3,38 +3,44 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/context/resource-budget/README.md
 document:
-  en: 9188b2f0aa992f0434054a9d9cb9b1f4a09696c4
-  zh: ed6d52f4a06fbcc1164606489b19d0b6956e89c8
+  en: bcfc39f8ac2ead6a87522b5b0cc9497505637050
+  zh: 381fe35b6b659154ece7a74543338fdd44f80f00
 /:
-  en: ca1478409ebfcda1
-  zh: 51bed408741c4318
+  en: 7c0e9906b97c762d
+  zh: ebd42c9ff4da819d
 /deepseek-ai-dsh-resource-budget:
   en: de6d2c26ea711520
   zh: ff7e8e454f3cdbe9
 /deepseek-ai-dsh-resource-budget/summary:
-  en: 4f356e037b0b0d59
-  zh: 107f9c42756d782a
+  en: c40b7771442ca9f2
+  zh: cc7bcb53da919085
 /deepseek-ai-dsh-resource-budget/table-of-contents:
-  en: d152484eb41ac6b4
-  zh: 364c80ee00a374ff
-/deepseek-ai-dsh-resource-budget/use-this-package:
-  en: c1f9b00fb56f312b
-  zh: 993a7047aba4b20a
-/deepseek-ai-dsh-resource-budget/understand-the-implementation:
-  en: ac8c3229af0d1c1e
-  zh: b45fcd1559a30c16
-/deepseek-ai-dsh-resource-budget/further-exploration:
-  en: 93db3c06f3df3e7b
-  zh: 0371ab473bba05f5
+  en: ea6d302c5a99c88e
+  zh: 0cf531622b576aa8
+/deepseek-ai-dsh-resource-budget/permit-ownership:
+  en: 70d5bc2f30b587b5
+  zh: ad4049f274a6230a
+/deepseek-ai-dsh-resource-budget/remote-coordination:
+  en: 27705df1c5be4869
+  zh: 306ef61f89650e08
 /deepseek-ai-dsh-resource-budget/model-experience:
-  en: 64650dfb358b0823
-  zh: a555eff381eaf57c
-/deepseek-ai-dsh-resource-budget/model-experience/kv-cache-effect:
-  en: 692c089ae7177340
-  zh: 861a7dd5a10c49cb
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-resource-budget/model-experience/resource-permits:
+  en: 16690254f1cbb492
+  zh: 3360acc99b12bf03
+/deepseek-ai-dsh-resource-budget/model-experience/resource-permits/what-the-model-sees:
+  en: a6de5361f19232d1
+  zh: 2534a86938c28ee1
+/deepseek-ai-dsh-resource-budget/model-experience/resource-permits/token-effect:
+  en: a30afbed1d0a3013
+  zh: 6ac7dde8d5b9c7d3
+/deepseek-ai-dsh-resource-budget/model-experience/resource-permits/kv-cache-effect:
+  en: fb7364fa54d4fb0c
+  zh: 047ae065acdc21a1
 /deepseek-ai-dsh-resource-budget/known-limitations-and-deferred-work:
-  en: 738050e2e8b745b2
-  zh: f8f504e4231053d5
+  en: 19640258dcde43db
+  zh: de8e6858f970e767
 /deepseek-ai-dsh-resource-budget/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: e88aeb617ffb74ea
+  en: 0a1253c6f7b5e8b9
+  zh: 9f56528562c7c914

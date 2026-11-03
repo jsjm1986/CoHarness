@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createScope, type Scope } from '@deepseek-ai/dsh-scope'
@@ -7,17 +7,24 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import { agentFor, fakeAuthority, memoryHarness } from '../../memory/tests/harness.ts'
+import type { MemorySwitches } from '@deepseek-ai/dsh-memory'
+import { agentFor, fakeAuthority, memoryHarness, settingsStub } from '../../memory/tests/harness.ts'
 import * as ToolMemory from '../src/index.ts'
 
 const signal = new AbortController().signal
 let callCounter = 0
 
 /** Boot the tool plugin over a memory harness; `space` selects the service space. */
-async function harness(options: { space?: 'personal' | 'project'; authority?: ReturnType<typeof fakeAuthority>; maxEntriesPerScope?: number } = {}) {
+async function harness(options: {
+  space?: 'personal' | 'project'
+  authority?: ReturnType<typeof fakeAuthority>
+  maxEntriesPerScope?: number
+  switches?: MemorySwitches
+} = {}) {
   const h = await memoryHarness({
     config: { space: options.space ?? 'personal', ...(options.maxEntriesPerScope !== undefined ? { maxEntriesPerScope: options.maxEntriesPerScope } : {}) },
     beforeService: (ctx) => {
+      if (options.switches !== undefined) ctx.provide('settings', settingsStub(options.switches) as never)
       if (options.authority !== undefined) ctx.provide('executionAuthority', options.authority)
     },
   })
@@ -45,6 +52,104 @@ function textOf(result: { content: { type: string; text?: string }[] }): string 
 const saveArgs = { scope: 'personal', key: 'release-freeze', kind: 'background', summary: 'freeze window', content: 'No deploys Friday.' }
 
 describe('dsh-tool-memory', () => {
+  it.each((['personal', 'workspace', 'project'] as const).flatMap(kind =>
+    (['memory_read', 'memory_search'] as const).map(name => ({ kind, name }))))('withdraws pending $name in $kind when memory is disabled', async ({ kind, name }) => {
+    const switches = { enabled: true, recall: false, extraction: false, consolidation: false }
+    const h = await harness({ space: kind === 'project' ? 'project' : 'personal', switches, authority: fakeAuthority({ primaryActorUserId: 7 }) })
+    const agent = agentFor(h.ctx, 'pending-memory-agent', { cwd: '/repo' })
+    const args = kind === 'project' ? {} : { scope: kind }
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    try {
+      expect((await call(h.ctx, 'memory_save', { ...saveArgs, ...args }, agent)).isError).toBe(false)
+      if (name === 'memory_read') {
+        const read = h.service.read.bind(h.service)
+        vi.spyOn(h.service, 'read').mockImplementation(async (...input) => {
+          const result = await read(...input)
+          entered.resolve(undefined); await release.promise
+          return result
+        })
+      } else {
+        const search = h.service.search.bind(h.service)
+        vi.spyOn(h.service, 'search').mockImplementation(async (...input) => {
+          const result = await search(...input)
+          entered.resolve(undefined); await release.promise
+          return result
+        })
+      }
+      const pending = call(h.ctx, name, { ...args, ...(name === 'memory_read' ? { key: 'release-freeze' } : { query: 'freeze' }) }, agent)
+      await entered.promise
+      switches.enabled = false
+      release.resolve(undefined)
+      const result = await pending
+      expect(result.isError).toBe(true)
+      expect(textOf(result)).toBe('Error: Saved memories are unavailable to this conversation.')
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it('withdraws an implicit search spanning personal and workspace scopes during storage', async () => {
+    const switches = { enabled: true, recall: false, extraction: false, consolidation: false }
+    const h = await harness({ switches })
+    const agent = agentFor(h.ctx, 'pending-multi-scope-agent', { cwd: '/repo' })
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    try {
+      for (const scope of ['personal', 'workspace']) {
+        expect((await call(h.ctx, 'memory_save', { ...saveArgs, scope }, agent)).isError).toBe(false)
+      }
+      const search = h.service.search.bind(h.service)
+      vi.spyOn(h.service, 'search').mockImplementation(async (...args) => {
+        expect(args[0].map(scope => scope.kind)).toEqual(['personal', 'workspace'])
+        const result = await search(...args)
+        expect(Array.isArray(result) && result.length === 2).toBe(true)
+        entered.resolve(undefined); await release.promise
+        return result
+      })
+      const pending = call(h.ctx, 'memory_search', { query: 'freeze' }, agent)
+      await entered.promise
+      switches.enabled = false
+      release.resolve(undefined)
+      const result = await pending
+      expect(result.isError).toBe(true)
+      expect(textOf(result)).toBe('Error: Saved memories are unavailable to this conversation.')
+    } finally { release.resolve(undefined); await h.ctx.fiber.dispose() }
+  })
+
+  it.each([
+    { space: 'personal', scope: { kind: 'personal' }, args: { scope: 'personal' } },
+    { space: 'personal', scope: { kind: 'workspace', directory: '/repo' }, args: { scope: 'workspace' } },
+    { space: 'project', scope: { kind: 'project' }, args: {} },
+  ] as const)('withdraws every model tool in $scope.kind scope while owner reads retain entries', async ({ space, scope, args }) => {
+    const switches = { enabled: true, extraction: false, consolidation: false, recall: false }
+    const h = await harness({ space, switches, authority: fakeAuthority({ primaryActorUserId: 7 }) })
+    try {
+      const agent = agentFor(h.ctx, 'disabled-memory-agent', { cwd: '/repo' })
+      expect((await call(h.ctx, 'memory_save', { ...saveArgs, ...args }, agent)).isError).toBe(false)
+      switches.enabled = false
+      expect(h.service.scopesFor(agent)).toEqual([])
+      for (const [name, input] of [
+        ['memory_read', { ...args, key: 'release-freeze' }],
+        ['memory_search', { ...args, query: 'freeze' }],
+        ['memory_search', { query: 'freeze' }],
+        ['memory_save', { ...saveArgs, ...args, key: 'blocked-write' }],
+        ['memory_delete', { ...args, key: 'release-freeze' }],
+      ] as const) {
+        const result = await call(h.ctx, name, input, agent)
+        expect(result.isError).toBe(true)
+        expect(textOf(result)).toBe('Error: Saved memories are unavailable to this conversation.')
+      }
+      expect((await h.service.memberRead({ scope, key: 'release-freeze' }))?.content).toBe('No deploys Friday.')
+      expect(await h.service.read(scope, 'blocked-write')).toBeUndefined()
+      switches.enabled = true
+      for (const [name, input] of [
+        ['memory_read', { ...args, key: 'release-freeze' }],
+        ['memory_search', { ...args, query: 'freeze' }],
+      ] as const) {
+        const result = await call(h.ctx, name, input, agent)
+        expect(result.isError).toBe(false)
+        expect(textOf(result)).toContain(name === 'memory_read' ? 'No deploys Friday.' : 'freeze window')
+      }
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
   it('exposes scope enums on the write tools and an optional scope filter on search in personal space', async () => {
     const h = await harness()
     const schemas = h.ctx.tools.schemas()

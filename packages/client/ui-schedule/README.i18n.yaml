@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-schedule/README.md
 document:
-  en: 71ba4de060a1187125f19df5f8ec6bbd15345c51
-  zh: 2a9d1ad9ec0ef0813dac62f6b4e5356d944b588e
+  en: b9a59209338697cb039688a8e6818a49ac17dcc6
+  zh: 1444b56595d48d78636546311c67ba790c4d72ff
 /:
   en: 265778d19fe0dd76
   zh: 78b0a191a4bd4e4e
@@ -18,14 +18,14 @@ document:
   en: d152484eb41ac6b4
   zh: 405b30feaf48c087
 /deepseek-ai-dsh-client-ui-schedule/use-this-package:
-  en: b9f8449e78936e0d
-  zh: 9822c7105d1ed04c
+  en: a52c292671a519f6
+  zh: 1f3cd858fb050075
 /deepseek-ai-dsh-client-ui-schedule/use-this-package/time-zone-data-source:
   en: 6bd6882dbbbefcb0
   zh: 03aa15f1a65d13dc
 /deepseek-ai-dsh-client-ui-schedule/understand-the-implementation:
-  en: a03a551e0ed96c6b
-  zh: a85efe7db56b7df3
+  en: 2d793c7bb7bddf7a
+  zh: 4c046c7ce93d0817
 /deepseek-ai-dsh-client-ui-schedule/further-exploration:
   en: 06e265120b05dbf5
   zh: 08ab1ef979b8ea40

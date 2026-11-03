@@ -1,0 +1,14 @@
+{
+  "name": "gateway-document-phase-owned-newlines",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/verify-document-owned-newlines.py",
+  "startedAt": "2026-10-26T20:45:57.983486+00:00",
+  "seconds": 2.215,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f891f927f149a72d65eb9fbbc7db42ee6f655744354aa5de9f7981b5faf14d6d",
+  "inputsAfter": "f891f927f149a72d65eb9fbbc7db42ee6f655744354aa5de9f7981b5faf14d6d",
+  "postgresToolDirectory": null,
+  "outputSha256": "0c43857221a23edb304f2c5b9982dfdbd63127bc5187832d9db83e8fce27bcfd",
+  "outputTail": "Six new document/release files end with exactly one newline.\n"
+}

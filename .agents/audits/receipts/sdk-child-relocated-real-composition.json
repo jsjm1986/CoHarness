@@ -1,0 +1,14 @@
+{
+  "name": "sdk-child-relocated-real-composition",
+  "cwd": ".",
+  "command": "pnpm run test:e2e packages/subagent/subagent-dsh-sdk/tests/loader-composition.e2e.ts",
+  "startedAt": "2026-10-26T09:20:56.016755+00:00",
+  "seconds": 9.285,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ceb6904e68af9d827c45d600745fd852c513ac4ab9e83b5462e9e97c3c3016f5",
+  "inputsAfter": "ceb6904e68af9d827c45d600745fd852c513ac4ab9e83b5462e9e97c3c3016f5",
+  "postgresToolDirectory": null,
+  "outputSha256": "26a9cf9a2b5b636c9a40c7bab2f26edb1f533804a9d4072f333af58f0a83e45e",
+  "outputTail": "$ vitest run --config vitest.e2e.config.ts packages/subagent/subagent-dsh-sdk/tests/loader-composition.e2e.ts\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  17:20:59\n   Duration  5.81s (transform 467ms, setup 35ms, import 562ms, tests 5.11s, environment 0ms)\n\n"
+}

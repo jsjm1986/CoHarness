@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-parent-failure-pairing",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write packages/subagent/subagent-codex/README.md .agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.md",
+  "startedAt": "2026-10-25T12:59:02.275037+00:00",
+  "seconds": 2.828,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0759c11e49d9106df4bdc218e8fdb6ed32b009fbc4a537c78d39257b0b90d1d7",
+  "inputsAfter": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "postgresToolDirectory": null,
+  "outputSha256": "d22169c754eeaff79e9174e12b76896aab86f6d34843b519d3c17a752dedb261",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.i18n.yaml\nverify-translation-pairing: recorded packages/subagent/subagent-codex/README.i18n.yaml\nverify-translation-pairing: 3 record(s) written; run the check to validate the pairs.\n"
+}

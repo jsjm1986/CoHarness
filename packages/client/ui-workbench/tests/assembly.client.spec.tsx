@@ -36,6 +36,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 describe('assembled workbench', () => {
   it('binds two independent composers and preserves the first pane on focus changes', async () => {
     const runtime = await SlotTestRuntime.create()
+    runtime.provide('deploymentContext', createSnapshotStore({ phase: 'ready', showComputer: false, aggregateComputers: false }))
     runtime.provide('connection', { api: { settings: {} }, isLoopback: false, hostDescription: createSnapshotStore({ executionAuthorityRequired: false }) })
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
@@ -105,6 +106,7 @@ function SidebarFrame({ renderSlot }: PropsRenderSlots<'sidebar.workspaces' | 'm
 describe('assembled workbench sidebar panel', () => {
   it('renders the pane roster, actions, and display controls through the real slot chain', async () => {
     const runtime = await SlotTestRuntime.create()
+    runtime.provide('deploymentContext', createSnapshotStore({ phase: 'ready', showComputer: false, aggregateComputers: false }))
     const scope = stubSettingsScope()
     runtime.provide('connection', {
       api: { settings: {} },

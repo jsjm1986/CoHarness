@@ -51,7 +51,9 @@ const DEFAULT_OPERATIONS: ProcOperations = {
 /**
  * Report whether a Linux process group has an executing member. `false`
  * means the group contains only zombie/dead entries; `undefined` means the
- * process table could not prove either outcome.
+ * process table could not prove either outcome. A failed or malformed row
+ * makes a zombie-only observation incomplete; an observed live member still
+ * establishes occupancy.
  * @param processGroupId - POSIX process-group id to inspect.
  * @param internals - injectable process-table operations.
  * @returns Live-member presence, or `undefined` when unavailable/absent.
@@ -67,17 +69,20 @@ export function linuxProcessGroupHasLiveMembers(
     return undefined
   }
   let matched = false
+  let complete = true
   for (const entry of entries) {
     if (!/^\d+$/.test(entry)) continue
     let stat: ProcStat | undefined
     try {
       stat = parseProcStat(internals.readFile(`/proc/${Number(entry)}/stat`))
     } catch (_unreadableProcEntry) {
+      complete = false
       continue
     }
-    if (stat?.pgrp !== processGroupId) continue
+    if (stat === undefined) { complete = false; continue }
+    if (stat.pgrp !== processGroupId) continue
     matched = true
     if (!/^[ZXx]$/.test(stat.state)) return true
   }
-  return matched ? false : undefined
+  return matched && complete ? false : undefined
 }

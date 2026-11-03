@@ -1,12 +1,14 @@
 /** Shared user component copy: role and state badges, instance controls, and account dialogs. */
 
 export const zh = {
+  multipleRuntimes: '管理 {count} 个 Runtime',
   roleAdmin: '管理员',
   roleUser: '普通用户',
   granted: '已授予',
   notGranted: '未授予',
   accountActive: '正常',
   accountDisabled: '已禁用',
+  stateMultiple: '多个 Runtime', stateUnassigned: '未分配 Runtime',
   stateReady: '运行中',
   stateStarting: '启动中',
   stateStopping: '停止中',
@@ -47,12 +49,14 @@ export type UsersComponentsCopyKey = keyof typeof zh
 
 /** English dictionary checked against the Chinese key set. */
 export const en = {
+  multipleRuntimes: 'Manage {count} Runtimes',
   roleAdmin: 'Admin',
   roleUser: 'User',
   granted: 'Granted',
   notGranted: 'Not granted',
   accountActive: 'Active',
   accountDisabled: 'Disabled',
+  stateMultiple: 'Multiple Runtimes', stateUnassigned: 'No Runtime assigned',
   stateReady: 'Running',
   stateStarting: 'Starting',
   stateStopping: 'Stopping',

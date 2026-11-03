@@ -1,3 +1,4 @@
+import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import assert from 'node:assert/strict'
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
@@ -13,10 +14,10 @@ import { PostgresWebhookEndpointService, WebhookEndpointError, WebhookSecretCiph
 import { PostgresWebhookDeliveryService, type WebhookEndpointId } from '../src/postgres/webhook-delivery-service.ts'
 import { GatewayWebhookIntake, WEBHOOK_DISPATCH_PATH } from '../src/webhook-intake.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
-import { RuntimeStartBlockedError, type RuntimeStopReason } from '../src/instances.ts'
+import { RuntimeStartBlockedError, type RuntimeStopReason, type RuntimeTarget } from '../src/instances.ts'
 import { PRINCIPAL_HEADER } from '../src/principal.ts'
 
-const databaseUrl = process.env.HGW_TEST_DATABASE_URL
+const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
 let pool: Pool
 let cleanup: Array<() => Promise<unknown> | void> = []
@@ -72,6 +73,7 @@ async function intakeFor(f: Awaited<ReturnType<typeof createExecutionFixture>>, 
   const deliveries = new PostgresWebhookDeliveryService(f.context)
   const starts: string[] = []
   const instances = {
+    resolveTarget: (target: RuntimeTarget) => new PostgresInstanceRepository(f.context, 48_000).resolveTarget(target),
     isLive: async () => port !== null && options.offline !== true,
     ensureRunning: async (_subject: unknown, intent?: string) => {
       starts.push(intent ?? 'passive')
@@ -124,10 +126,10 @@ describePg('Gateway webhook endpoints and intake', () => {
     const created = await service.create(f.admin.id, endpointInput(f))
     expect(created).toMatchObject({ name: expect.any(String), provider: 'github', source: 'acme', enabled: false, revision: '1', projectVisibility: 'project' })
     expect(created).not.toHaveProperty('secret')
-    expect(await service.list()).toHaveLength(1)
+    expect(await service.list(f.admin.id)).toHaveLength(1)
 
     await expect(service.intake(created.publicId)).rejects.toMatchObject({ status: 404 })
-    const enabled = await service.mutate({ targetId: created.publicId, revision: created.revision, action: 'enable' })
+    const enabled = await service.mutate({ targetId: created.publicId, revision: created.revision, action: 'enable' }, f.admin.id)
     expect(enabled?.enabled).toBe(true)
     const resolved = await service.intake(created.publicId)
     expect(resolved.secret).toBe(SECRET)
@@ -138,30 +140,30 @@ describePg('Gateway webhook endpoints and intake', () => {
     await expect(service.create(f.admin.id, { ...endpointInput(f), secret: '' })).rejects.toMatchObject({ status: 400 })
     await expect(service.create(f.admin.id, { ...endpointInput(f), name: created.name })).rejects.toMatchObject({ status: 409 })
     const { secret: _secret, ...fields } = endpointInput(f)
-    await expect(service.update({ targetId: created.publicId, revision: '0', fields }))
+    await expect(service.update({ targetId: created.publicId, revision: '0', fields }, f.admin.id))
       .rejects.toMatchObject({ status: 409 })
 
     const renamed = await service.update({
       targetId: created.publicId, revision: enabled!.revision,
       fields: { ...fields, name: 'renamed', projectVisibility: 'private', events: ['push', 'pull_request'], repositories: ['acme/widget'] },
-    })
+    }, f.admin.id)
     expect(renamed).toMatchObject({ name: 'renamed', revision: '3', projectVisibility: 'private', events: ['push', 'pull_request'],
       repositories: ['acme/widget'] })
     await expect(service.intake(created.publicId).then(config => config.events)).resolves.toEqual(['push', 'pull_request'])
     await expect(service.intake(created.publicId).then(config => config.repositories)).resolves.toEqual(['acme/widget'])
     await expect(service.update({ targetId: created.publicId, revision: renamed.revision,
-      fields: { ...fields, repositories: ['no-slash'] } })).rejects.toMatchObject({ status: 400 })
+      fields: { ...fields, repositories: ['no-slash'] } }, f.admin.id)).rejects.toMatchObject({ status: 400 })
 
     const rotated = await service.update({
       targetId: created.publicId, revision: renamed.revision, fields, secret: 'whsec-rotated',
-    })
+    }, f.admin.id)
     expect((await service.intake(created.publicId)).secret).toBe('whsec-rotated')
 
-    const disabled = await service.mutate({ targetId: created.publicId, revision: rotated.revision, action: 'disable' })
+    const disabled = await service.mutate({ targetId: created.publicId, revision: rotated.revision, action: 'disable' }, f.admin.id)
     expect(disabled?.enabled).toBe(false)
     await expect(service.intake(created.publicId)).rejects.toMatchObject({ status: 404 })
-    expect(await service.mutate({ targetId: created.publicId, revision: disabled!.revision, action: 'remove' })).toBeNull()
-    await expect(service.dispatchConfig(created.id)).rejects.toBeInstanceOf(WebhookEndpointError)
+    expect(await service.mutate({ targetId: created.publicId, revision: disabled!.revision, action: 'remove' }, f.admin.id)).toBeNull()
+    await expect(service.dispatchConfig(created.id, f.admin.id)).rejects.toBeInstanceOf(WebhookEndpointError)
   })
 
   it('verifies signatures, deduplicates, filters events, and records ignored receipts', async () => {
@@ -169,7 +171,7 @@ describePg('Gateway webhook endpoints and intake', () => {
     const runtime = await stubRuntime(() => ({ status: 200, body: { sessionId: `webhook-${randomUUID()}` } }))
     const { endpoints, deliveries, base } = await intakeFor(f, runtime.port)
     const endpoint = await endpoints.create(f.admin.id, endpointInput(f))
-    await endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    await endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' }, f.admin.id)
 
     const body = JSON.stringify({ ref: 'refs/heads/main', after: 'abc123' })
     const headers = githubRequest(body)
@@ -194,21 +196,21 @@ describePg('Gateway webhook endpoints and intake', () => {
     expect(claims.user.id).toBe(f.member.id)
     expect(claims.runtime).toMatchObject({ kind: 'project', id: f.project.id })
 
-    const listed = await deliveries.list(endpoint.id)
+    const listed = await deliveries.list(f.admin.id, endpoint.id)
     expect(listed.items).toHaveLength(1)
     expect(listed.items[0]).toMatchObject({ state: 'submitted', sessionId: expect.stringMatching(/^webhook-/) })
 
     const duplicate = await post(base, `/webhook/${String(endpoint.publicId)}`, headers, body)
     expect(duplicate.status).toBe(202)
     expect(runtime.requests).toHaveLength(1)
-    expect((await deliveries.list(endpoint.id)).items).toHaveLength(1)
+    expect((await deliveries.list(f.admin.id, endpoint.id)).items).toHaveLength(1)
 
     const filteredBody = JSON.stringify({ ref: 'refs/heads/main', after: 'def456' })
     const filtered = await post(base, `/webhook/${String(endpoint.publicId)}`,
       githubRequest(filteredBody, SECRET, { 'x-github-event': 'issues' }), filteredBody)
     expect(filtered.status).toBe(202)
     expect(runtime.requests).toHaveLength(1)
-    const ignored = (await deliveries.list(endpoint.id)).items
+    const ignored = (await deliveries.list(f.admin.id, endpoint.id)).items
     expect(ignored.find(row => row.state === 'ignored' && row.errorCode === 'event-unmatched')).toBeDefined()
 
     const forged = await post(base, `/webhook/${String(endpoint.publicId)}`,
@@ -220,6 +222,26 @@ describePg('Gateway webhook endpoints and intake', () => {
     expect((await post(base, '/webhook/999999', githubRequest(body), body)).status).toBe(404)
     expect((await post(base, `/webhook/${String(endpoint.publicId)}`,
       githubRequest('not json'), 'not json')).status).toBe(400)
+  })
+
+  it.each([
+    ['{"value":1e400}', 400],
+    ['{"value":-1e400}', 400],
+    ['{"nested":{"values":[1,1e400]}}', 400],
+    ['{"value":-0}', 400],
+    ['{"ref":"main","after":"commit","values":[1e3,1.5,true,null]}', 202],
+  ] as const)('retains signed JSON through durable receipt storage: %s', async (body, status) => {
+    const f = await fixture(), runtime = await stubRuntime(() => ({ status: 200, body: { sessionId: `webhook-${randomUUID()}` } }))
+    const { endpoints, deliveries, base } = await intakeFor(f, runtime.port)
+    const endpoint = await endpoints.create(f.admin.id, endpointInput(f))
+    await endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' }, f.admin.id)
+    const response = await post(base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)
+    expect(response.status).toBe(status)
+    const receipts = await deliveries.list(f.admin.id, endpoint.id)
+    expect(receipts.items).toHaveLength(status === 202 ? 1 : 0)
+    expect(runtime.requests).toHaveLength(status === 202 ? 1 : 0)
+    if (status === 202) expect((await deliveries.get(receipts.items[0]!.id)).event).toEqual({ name: 'push', payload: JSON.parse(body) })
+    else expect(await response.json()).toEqual({ error: 'webhook payload is not lossless JSON' })
   })
 
   it.each(['project', 'private'] as const)('persists a project webhook root with the signed creator and %s ACL', async (visibility) => {
@@ -246,14 +268,14 @@ describePg('Gateway webhook endpoints and intake', () => {
     })
     const { endpoints, deliveries, base } = await intakeFor(f, runtime.port)
     const endpoint = await endpoints.create(f.admin.id, { ...endpointInput(f), projectVisibility: visibility })
-    await endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    await endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' }, f.admin.id)
     const body = JSON.stringify({ ref: 'refs/heads/main', after: 'created' })
     expect((await post(base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)).status).toBe(202)
-    expect((await deliveries.list(endpoint.id)).items[0]).toMatchObject({ state: 'submitted', sessionId })
+    expect((await deliveries.list(f.admin.id, endpoint.id)).items[0]).toMatchObject({ state: 'submitted', sessionId })
     expect((await pool.query('SELECT creator_user_id,project_id,visibility FROM harness.conversation_sessions WHERE id=$1', [sessionId])).rows)
       .toEqual([{ creator_user_id: f.member.uuid, project_id: f.project.uuid, visibility }])
     const access = new PostgresCollaborationService(f.context)
-    const creator = await access.access(f.member.id, sessionId, 'read')
+    const creator = await access.access(f.member.id, f.project.runtimeId, sessionId, 'read')
     expect(creator.canRead).toBe(true)
   })
 
@@ -262,7 +284,7 @@ describePg('Gateway webhook endpoints and intake', () => {
     const runtime = await stubRuntime(() => ({ status: 200, body: { sessionId: 'unexpected' } }))
     const { endpoints, deliveries, base } = await intakeFor(f, runtime.port)
     const endpoint = await endpoints.create(f.admin.id, endpointInput(f))
-    await endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    await endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' }, f.admin.id)
     if (access === 'ro') {
       await pool.query("UPDATE harness.project_members SET access_mode='ro' WHERE project_id=$1 AND user_id=$2", [f.project.uuid, f.member.uuid])
     } else {
@@ -271,7 +293,7 @@ describePg('Gateway webhook endpoints and intake', () => {
     const body = JSON.stringify({ ref: 'refs/heads/main', after: 'revoked' })
     expect((await post(base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)).status).toBe(202)
     expect(runtime.requests).toHaveLength(0)
-    expect((await deliveries.list(endpoint.id)).items[0]).toMatchObject({ state: 'rejected', errorCode: 'execution-project-access' })
+    expect((await deliveries.list(f.admin.id, endpoint.id)).items[0]).toMatchObject({ state: 'rejected', errorCode: 'execution-project-access' })
   })
 
   it('applies the structured repository filter before dispatch', async () => {
@@ -279,7 +301,7 @@ describePg('Gateway webhook endpoints and intake', () => {
     const runtime = await stubRuntime(() => ({ status: 200, body: { sessionId: `webhook-${randomUUID()}` } }))
     const { endpoints, deliveries, base } = await intakeFor(f, runtime.port)
     const endpoint = await endpoints.create(f.admin.id, { ...endpointInput(f), repositories: ['acme/widget'] })
-    await endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    await endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' }, f.admin.id)
 
     const postDelivery = (body: string) => post(base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)
     const matching = JSON.stringify({ ref: 'refs/heads/main', after: 'abc', repository: { full_name: 'acme/widget' } })
@@ -296,7 +318,7 @@ describePg('Gateway webhook endpoints and intake', () => {
     expect((await postDelivery(casing)).status).toBe(202)
     expect(runtime.requests).toHaveLength(2)
 
-    const rows = (await deliveries.list(endpoint.id)).items
+    const rows = (await deliveries.list(f.admin.id, endpoint.id)).items
     expect(rows.filter(row => row.state === 'submitted')).toHaveLength(2)
     expect(rows.filter(row => row.state === 'ignored' && row.errorCode === 'repository-unmatched')).toHaveLength(2)
   })
@@ -305,18 +327,18 @@ describePg('Gateway webhook endpoints and intake', () => {
     const f = await fixture()
     const offline = await intakeFor(f, null)
     const endpoint = await offline.endpoints.create(f.admin.id, endpointInput(f))
-    await offline.endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    await offline.endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' }, f.admin.id)
     const body = JSON.stringify({ ref: 'refs/heads/main', after: 'abc' })
     expect((await post(offline.base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)).status).toBe(202)
-    const rows = await offline.deliveries.list(endpoint.id)
+    const rows = await offline.deliveries.list(f.admin.id, endpoint.id)
     expect(rows.items[0]).toMatchObject({ state: 'rejected', errorCode: 'runtime-offline' })
 
     const failing = await stubRuntime(() => ({ status: 500 }))
     const second = await intakeFor(f, failing.port)
     const other = await second.endpoints.create(f.admin.id, { ...endpointInput(f), name: 'other-endpoint' })
-    await second.endpoints.mutate({ targetId: other.publicId, revision: other.revision, action: 'enable' })
+    await second.endpoints.mutate({ targetId: other.publicId, revision: other.revision, action: 'enable' }, f.admin.id)
     expect((await post(second.base, `/webhook/${String(other.publicId)}`, githubRequest(body), body)).status).toBe(202)
-    expect((await second.deliveries.list(other.id)).items[0]).toMatchObject({ state: 'unknown', errorCode: 'dispatch-failed' })
+    expect((await second.deliveries.list(f.admin.id, other.id)).items[0]).toMatchObject({ state: 'unknown', errorCode: 'dispatch-failed' })
   })
 
   it('carries preset-invalid through to the receipt when the runtime reports it', async () => {
@@ -324,20 +346,20 @@ describePg('Gateway webhook endpoints and intake', () => {
     const refusing = await stubRuntime(() => ({ status: 400, body: { error: 'preset-invalid' } }))
     const intake = await intakeFor(f, refusing.port)
     const endpoint = await intake.endpoints.create(f.admin.id, endpointInput(f))
-    await intake.endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    await intake.endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' }, f.admin.id)
     const body = JSON.stringify({ ref: 'refs/heads/main', after: 'abc' })
     expect((await post(intake.base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)).status).toBe(202)
-    expect((await intake.deliveries.list(endpoint.id)).items[0]).toMatchObject({ state: 'rejected', errorCode: 'preset-invalid' })
+    expect((await intake.deliveries.list(f.admin.id, endpoint.id)).items[0]).toMatchObject({ state: 'rejected', errorCode: 'preset-invalid' })
   })
 
   it('retains a manual stop after Gateway startup reconciliation and fences automatic start claims', async () => {
     const f = await fixture()
     const repository = new PostgresInstanceRepository(f.context, 48000)
-    await repository.markStopping(f.project, 'manual')
-    await repository.markStopped(f.project)
-    await repository.initialize(false)
-    await repository.markStopping(f.project, 'access-change')
-    await repository.markStopped(f.project)
+    await repository.markStopping(f.project, f.project.generation, 'manual')
+    await repository.markStopped(f.project, f.project.generation)
+    await repository.initialize()
+    await repository.markStopping(f.project, f.project.generation, 'access-change')
+    await repository.markStopped(f.project, f.project.generation)
     expect(await repository.stopReasonOf(f.project)).toBe('manual')
     const hash = randomBytes(32)
     await expect(repository.beginStart(f.project, Date.now(), hash, 'passive')).rejects.toBeInstanceOf(RuntimeStartBlockedError)
@@ -346,8 +368,8 @@ describePg('Gateway webhook endpoints and intake', () => {
     expect(generation).toBe(f.project.generation + 1)
     expect(await repository.stopReasonOf(f.project)).toBeNull()
     await repository.markReady(f.project, generation)
-    await repository.markStopping(f.project, 'idle')
-    await repository.markStopped(f.project)
+    await repository.markStopping(f.project, generation, 'idle')
+    await repository.markStopped(f.project, generation)
     expect(await repository.beginStart(f.project, Date.now(), randomBytes(32), 'webhook')).toBe(generation + 1)
     await pool.query("UPDATE harness.users SET status='disabled' WHERE id=$1", [f.admin.uuid])
     await expect(repository.beginStart(f.personal, Date.now(), hash, 'explicit')).rejects.toBeInstanceOf(RuntimeStartBlockedError)
@@ -358,11 +380,11 @@ describePg('Gateway webhook endpoints and intake', () => {
     const runtime = await stubRuntime(() => ({ status: 200, body: { sessionId: 'woken-session' } }))
     const intake = await intakeFor(f, runtime.port, { offline: true, stopReason })
     const endpoint = await intake.endpoints.create(f.admin.id, endpointInput(f))
-    await intake.endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    await intake.endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' }, f.admin.id)
     const body = JSON.stringify({ ref: 'refs/heads/main', after: 'wake' })
     expect((await post(intake.base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)).status).toBe(202)
     expect(intake.starts).toEqual(['webhook'])
-    const receipt = (await intake.deliveries.list(endpoint.id)).items[0]
+    const receipt = (await intake.deliveries.list(f.admin.id, endpoint.id)).items[0]
     if (stopReason === 'idle') {
       expect(runtime.requests).toHaveLength(1)
       expect(receipt).toMatchObject({ state: 'submitted', sessionId: 'woken-session' })
@@ -377,13 +399,13 @@ describePg('Gateway webhook endpoints and intake', () => {
     const runtime = await stubRuntime(() => ({ status: 200, body: { sessionId: 'unexpected' } }))
     const intake = await intakeFor(f, runtime.port, { offline: true, stopReason: 'idle' })
     const endpoint = await intake.endpoints.create(f.admin.id, { ...endpointInput(f), permissionPreset: condition === 'auto' ? 'auto' : 'default' })
-    await intake.endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    await intake.endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' }, f.admin.id)
     if (condition === 'disabled') await pool.query("UPDATE harness.users SET status='disabled' WHERE id=$1", [f.member.uuid])
     const body = JSON.stringify({ ref: 'refs/heads/main', after: 'denied' })
     expect((await post(intake.base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)).status).toBe(202)
     expect(intake.starts).toEqual([])
     expect(runtime.requests).toHaveLength(0)
-    expect((await intake.deliveries.list(endpoint.id)).items[0]).toMatchObject({ state: 'rejected',
+    expect((await intake.deliveries.list(f.admin.id, endpoint.id)).items[0]).toMatchObject({ state: 'rejected',
       errorCode: condition === 'auto' ? 'execution-auto-ineligible' : 'execution-account' })
   })
 
@@ -392,26 +414,27 @@ describePg('Gateway webhook endpoints and intake', () => {
     const runtime = await stubRuntime(() => ({ status: 200, body: { sessionId: `webhook-${randomUUID()}` } }))
     const { endpoints, deliveries, intake, base } = await intakeFor(f, runtime.port)
     const endpoint = await endpoints.create(f.admin.id, endpointInput(f))
-    await endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    await endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' }, f.admin.id)
     const body = JSON.stringify({ ref: 'refs/heads/main', after: 'abc123' })
     await post(base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)
-    const original = (await deliveries.list(endpoint.id)).items[0]!
+    const original = (await deliveries.list(f.admin.id, endpoint.id)).items[0]!
     expect(original.state).toBe('submitted')
 
-    const rerun = await intake.redispatch(original.id)
+    const rerun = await intake.redispatch(original.id, f.admin.id)
     expect(rerun.state).toBe('submitted')
     expect(rerun.deliveryId).toMatch(/^rerun:/u)
     expect(runtime.requests).toHaveLength(2)
-    const again = await intake.redispatch(original.id)
+    const again = await intake.redispatch(original.id, f.admin.id)
     expect(again.state).toBe('submitted')
-    expect((await deliveries.list(endpoint.id)).items).toHaveLength(3)
+    expect((await deliveries.list(f.admin.id, endpoint.id)).items).toHaveLength(3)
 
     const dispatching = await deliveries.reserve({
       endpointId: endpoint.id as WebhookEndpointId, deliveryId: 'stuck', requestHash: createHash('sha256').update('x').digest('hex'),
-      configurationRevision: '1', executionUserUuid: f.member.uuid, target: { kind: 'project', id: f.project.id },
+      configurationRevision: (await endpoints.intake(endpoint.publicId)).revision, executionUserUuid: f.member.uuid,
+      target: { kind: 'project', id: f.project.id, runtimeId: endpoint.runtimeId! },
       limit: 100, windowMs: 60_000, replayWindowMs: 86_400_000, event: { name: 'push', payload: {} },
     })
-    await expect(intake.redispatch(dispatching.receipt.id)).rejects.toMatchObject({ status: 409 })
-    await expect(intake.redispatch(randomUUID())).rejects.toMatchObject({ status: 404 })
+    await expect(intake.redispatch(dispatching.receipt.id, f.admin.id)).rejects.toMatchObject({ status: 409 })
+    await expect(intake.redispatch(randomUUID(), f.admin.id)).rejects.toMatchObject({ status: 404 })
   })
 })

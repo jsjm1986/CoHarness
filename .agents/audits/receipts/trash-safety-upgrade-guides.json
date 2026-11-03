@@ -1,0 +1,14 @@
+{
+  "name": "trash-safety-upgrade-guides",
+  "cwd": ".",
+  "command": "pnpm run verify-upgrade-guides",
+  "startedAt": "2026-10-24T05:07:46.787853+00:00",
+  "seconds": 1.429,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f468e88eb955ffebb074803a810ce0207a20a06109883dd00744f42634710949",
+  "inputsAfter": "f468e88eb955ffebb074803a810ce0207a20a06109883dd00744f42634710949",
+  "postgresToolDirectory": null,
+  "outputSha256": "83fb4eb439aed49b2a29e2062f0c40276ce82bf90ed25bf81c1ca60fd3f331c9",
+  "outputTail": "[ERR_PNPM_NO_SCRIPT] Missing script: verify-upgrade-guides\n\nCommand \"verify-upgrade-guides\" not found. Did you mean \"pnpm run verify-upgrade-records\"?\n"
+}

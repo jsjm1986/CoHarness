@@ -1,0 +1,14 @@
+{
+  "name": "native-model-operation-persistence-check",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/persistence-changes.ts --check --json",
+  "startedAt": "2026-10-24T07:16:30.429089+00:00",
+  "seconds": 7.521,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6309e4be7142e47d47c15386c8fb023d090853a59f6fe0378120a3c5a6ca856d",
+  "inputsAfter": "6309e4be7142e47d47c15386c8fb023d090853a59f6fe0378120a3c5a6ca856d",
+  "postgresToolDirectory": null,
+  "outputSha256": "942ac2da94cdaa5070c43a228fb41dd2dcfd9c8d01ea1435f3f0e067f5655e37",
+  "outputTail": "{\"schemaVersion\":1,\"ok\":false,\"operation\":\"check\",\"message\":\"docs/persistence-schema.json is stale; regenerate the persistence catalog\",\"code\":\"stale-artifacts\",\"changes\":[{\"root\":\"event:auto-review/request\",\"path\":\"event:auto-review/request.data.request.operation\",\"kind\":\"optional-property-added\",\"description\":\"optional property added\",\"requiresCompatibilityReview\":false},{\"root\":\"event:browser-use/stagehand-llm-request\",\"path\":\"event:browser-use/stagehand-llm-request.data.request.operation\",\"kind\":\"optional-property-added\",\"description\":\"optional property added\",\"requiresCompatibilityReview\":false},{\"root\":\"event:memory/curation-request\",\"path\":\"event:memory/curation-request.data.request.operation\",\"kind\":\"optional-property-added\",\"description\":\"optional property added\",\"requiresCompatibilityReview\":false},{\"root\":\"event:memory/recall-request\",\"path\":\"event:memory/recall-request.data.request.operation\",\"kind\":\"optional-property-added\",\"description\":\"optional property added\",\"requiresCompatibilityReview\":false}],\"roots\":[{\"root\":\"event:auto-review/request\",\"kind\":\"event\",\"before\":\"a8bb4103bb591122b893b2a6a14ac589c8fd2321a1b46f1ee17fad0efdaa4fc8\",\"after\":\"6e59070e2d7a4c6cd66709c880348c31d26582f4fda3e62678b25fe689eb9801\"},{\"root\":\"event:browser-use/stagehand-llm-request\",\"kind\":\"event\",\"before\":\"25c645080c2da89aa1c6f386d7348d315e4c35c76883399268bd5e227495e33e\",\"after\":\"eee6e916744769aa4d025f70eace7dfab7b65e445411941604fbcda02d2cf8e2\"},{\"root\":\"event:memory/curation-request\",\"kind\":\"event\",\"before\":\"e1c43217d6952171eed0632c369ea619ac0aeb700a0f7621f5acec9cc4c654c1\",\"after\":\"0147f9002b0f7cc5c0ef24696529823e5481d76dc6fbc1a497e0cf3605de8037\"},{\"root\":\"event:memory/recall-request\",\"kind\":\"event\",\"before\":\"6a9be45ed50e3a6424d93fcc92c75118efd39781184a1dde7528edb766948f1f\",\"after\":\"f8ab37edf260c0162f665e9e7a6ff6341c772fbc9135a9e07e26fec80580ff55\"}],\"files\":[]}\n"
+}

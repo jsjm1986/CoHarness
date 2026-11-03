@@ -25,6 +25,8 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
+Tool rows and details read Host descriptions from the owning Session’s Runtime. Home-directory abbreviations therefore use that computer’s home instead of the browser’s bootstrap Host.
+
 Tool calls appear in the conversation as cards: a root call tree with its nested subcalls, each atomic call rendered by its owning view. Every lifecycle state retains the tool's ordinary business glyph; failure and interruption remain explicit through the frozen call/result state, accessible status text, and failure summary. Users can open files or inspect calls through the Host callbacks. A collapsed `web_fetch` row links its http(s) URL, which opens in a new browser tab.
 
 Shared Tool rows and Bash rows retain error and warning colors for failed and stopped summaries, including on hover. Hover darkens only summaries without those states.

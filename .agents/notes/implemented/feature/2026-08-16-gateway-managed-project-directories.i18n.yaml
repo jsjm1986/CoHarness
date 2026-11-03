@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-16-gateway-managed-project-directories.md
 document:
-  en: 69bafabd95f6cf3b8632337577f703fb82e0bf1f
-  zh: a5f57e4911ee308252d6fbb772c1a184f2361686
+  en: 765fb61058596e6319c2c8883dac819cf032c137
+  zh: df0b24b0a7d68d481be9a46ce487e26a4365726b
 /agent-note-gateway-managed-project-directories:
   en: 8e5b0d5763b11d7b
   zh: 0245d7aa4eb1ba59
@@ -12,8 +12,8 @@ document:
   en: 251feb1ef028c9d3
   zh: 2e8c8b2b977290d5
 /agent-note-gateway-managed-project-directories/decision:
-  en: 031d14e0c44e1e6f
-  zh: 92ef290aeb2307b6
+  en: b35ae347402f35f5
+  zh: b59f194d9f20b716
 /agent-note-gateway-managed-project-directories/verification:
   en: 148558af02bb784e
   zh: ce612504805009c9

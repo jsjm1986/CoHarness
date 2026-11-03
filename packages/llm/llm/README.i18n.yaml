@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/llm/llm/README.md
 document:
-  en: cdea8d3169d1335f71136a705e0dda7a716b0f25
-  zh: e9d4e620b3fe5e2a10a94eb1d84e436d8d5fcaa0
+  en: d9b18fe4cfb2a82b024523b2978e65ba634f9776
+  zh: dba88ebcf06a3b93733ecc5f9482cd287ee57e38
 /:
   en: 860509fb08c860f4
   zh: b2c4448e8afc1f12
@@ -18,8 +18,8 @@ document:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
 /deepseek-ai-dsh-llm/use-this-package:
-  en: 33738e61ce410ac0
-  zh: 363760460f4d4bed
+  en: c69309d09dfd2dab
+  zh: a93df27d5d9cf333
 /deepseek-ai-dsh-llm/use-this-package/when-to-choose-it:
   en: c3ecb5a1421f27db
   zh: 4bbd3c0e513845e1
@@ -30,20 +30,20 @@ document:
   en: b45d7a414141734e
   zh: a641c8ea3827cee6
 /deepseek-ai-dsh-llm/use-this-package/failures-and-recovery:
-  en: 311d8c92447b7094
-  zh: 68cf5cb1c3853cc1
+  en: 0bd32b4a099b6f34
+  zh: 0055d43156c6e839
 /deepseek-ai-dsh-llm/understand-the-implementation:
   en: 9630d7e26193a512
   zh: 94222c2a487c4b8c
 /deepseek-ai-dsh-llm/understand-the-implementation/design-philosophy:
-  en: 12d0444c18a397c7
-  zh: 9d4a5468b4bb7fcd
+  en: c0bcba38ac7aa847
+  zh: 37209cc62ee9b5b2
 /deepseek-ai-dsh-llm/understand-the-implementation/source-map:
-  en: 2b436590ba3c9d29
-  zh: b0ba58403d145f3b
+  en: 04db3e8b85a87c96
+  zh: e53c9f039d67d60f
 /deepseek-ai-dsh-llm/understand-the-implementation/main-flow:
-  en: d0946160a34a0bf0
-  zh: ddc3ae9567b0ab83
+  en: 0812546b38516bdf
+  zh: bc0956514f424d8f
 /deepseek-ai-dsh-llm/understand-the-implementation/invariants:
   en: 0163a050239248e5
   zh: 885c95bedcbe2ff4

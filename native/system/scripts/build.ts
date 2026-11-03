@@ -11,9 +11,9 @@ import { parseArgs } from 'node:util'
 const root = resolve(import.meta.dirname, '..')
 const { values } = parseArgs({ options: { 'host-addon-only': { type: 'boolean' } }, allowPositionals: false })
 const hostAddonOnly = values['host-addon-only'] === true
-const sources: Record<string, string> = {
-  'landlock-run': 'packages/entry/src/main.c',
-  flock: 'packages/entry/src/flock.c',
+const sources: Record<string, string[]> = {
+  'landlock-run': ['packages/entry/src/main.c'],
+  flock: ['packages/entry/src/flock.c', 'packages/entry/src/directory.c'],
 }
 
 interface Binary {
@@ -77,7 +77,7 @@ for (const name of readdirSync(join(root, 'packages')).sort()) {
     const temporary = mkdtempSync(join(root, '.release', 'native-build-'))
     try {
       const pending = join(temporary, basename(output))
-      const result = spawnSync(compiler, [...flags, '-o', pending, join(root, source)], { stdio: 'inherit' })
+      const result = spawnSync(compiler, [...flags, '-o', pending, ...source.map(path => join(root, path))], { stdio: 'inherit' })
       if (result.error) throw result.error
       if (result.status !== 0) throw new Error(`build: ${compiler} failed for ${binary.path}`)
       // Readers never see a truncated addon when source checks build concurrently.

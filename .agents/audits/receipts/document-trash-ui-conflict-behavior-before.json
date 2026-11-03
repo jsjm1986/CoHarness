@@ -1,0 +1,14 @@
+{
+  "name": "document-trash-ui-conflict-behavior-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/client/ui-documents/tests/components.client.spec.tsx -t 'explains a trash conflict' --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T05:02:21.992281+00:00",
+  "seconds": 3.064,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fe9169310a7ca6c0cb295fa432bb6b19f1b53a4f3943f3101e66a80c06d5b163",
+  "inputsAfter": "fe9169310a7ca6c0cb295fa432bb6b19f1b53a4f3943f3101e66a80c06d5b163",
+  "postgresToolDirectory": null,
+  "outputSha256": "d59781c5bdabb0acae9c6703c1927d0b209d63ece56652e1fcdc590c1e5449a8",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/client/ui-documents/tests/components.client.spec.tsx (73 tests | 1 failed | 72 skipped) 102ms\n     × explains a trash conflict and retains the active document 101ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/client/ui-documents/tests/components.client.spec.tsx > DocumentsModal > explains a trash conflict and retains the active document\nAssertionError: expected '删除失败' to contain '该路径还有较早的回收站文档，当前文档未删除。请刷新列表并检查回收站。'\n\nExpected: \"该路径还有较早的回收站文档，当前文档未删除。请刷新列表并检查回收站。\"\nReceived: \"删除失败\"\n\n ❯ packages/client/ui-documents/tests/components.client.spec.tsx:1123:31\n    1121|     fireEvent.click(within(confirm).getByRole('button', { name: t('del…\n    1122|     const alert = await screen.findByRole('alert')\n    1123|     expect(alert.textContent).toContain(t('error.trashConflict'))\n       |                               ^\n    1124|     expect(screen.getByText('report.pdf')).toBeTruthy()\n    1125|     expect(client.browse).toHaveBeenCalledTimes(2)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 72 skipped (73)\n   Start at  13:02:23\n   Duration  1.65s (transform 595ms, setup 31ms, import 1.01s, tests 102ms, environment 441ms)\n\n"
+}

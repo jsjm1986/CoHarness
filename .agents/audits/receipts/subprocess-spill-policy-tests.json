@@ -1,0 +1,14 @@
+{
+  "name": "subprocess-spill-policy-tests",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run scripts/coverage-selection.spec.ts scripts/incremental-coverage.spec.ts --retry=0 --maxWorkers=1",
+  "startedAt": "2026-10-25T10:56:31.313306+00:00",
+  "seconds": 4.594,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9d2035b35906dc0791d0720ab2822b93ffb889bca8148d7a9b7dba0638b8512c",
+  "inputsAfter": "9d2035b35906dc0791d0720ab2822b93ffb889bca8148d7a9b7dba0638b8512c",
+  "postgresToolDirectory": null,
+  "outputSha256": "3e35b6589d6112b063bd3a695610f8f964667c2e6a85352fdef7b85c38c7b9bb",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  2 passed (2)\n      Tests  15 passed (15)\n   Start at  18:56:33\n   Duration  2.80s (transform 120ms, setup 40ms, import 326ms, tests 2.28s, environment 0ms)\n\n"
+}

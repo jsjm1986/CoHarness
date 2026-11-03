@@ -58,6 +58,12 @@ type WorkspaceViewActions = {
     draft: WorkspaceViewState,
     updates: readonly SessionOrderAccountUpdate[],
   ) => void
+  syncSessionOrderAccount: (
+    draft: WorkspaceViewState,
+    accountKey: string,
+    order: string[],
+    updatedAt: Record<string, number>,
+  ) => void
   setSessionOrder: (draft: WorkspaceViewState, accountKey: string, order: string[]) => void
   pinSessionOrder: (
     draft: WorkspaceViewState,
@@ -104,6 +110,10 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
           d.sessionOrderByAccount[accountKey] = order
           d.sessionUpdatedAtByAccount[accountKey] = updatedAt
         }
+      },
+      syncSessionOrderAccount: (d, accountKey, order, updatedAt) => {
+        d.sessionOrderByAccount[accountKey] = order
+        d.sessionUpdatedAtByAccount[accountKey] = updatedAt
       },
       setSessionOrder: (d, accountKey: string, order: string[]) => {
         d.sessionOrderByAccount[accountKey] = order

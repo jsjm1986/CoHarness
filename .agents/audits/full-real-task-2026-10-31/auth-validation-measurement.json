@@ -1,0 +1,39 @@
+{
+  "userOperation": "Open one authenticated workbench through a connected computer; static assets and bootstrap RPCs validate the same browser session concurrently.",
+  "productionEntry": "R5 PostgresAuthService.validate through real Ubuntu-node PostgreSQL transport; application browser measurements are retained separately.",
+  "workload": {
+    "sameFreshTestAccountSession": true,
+    "concurrentValidations": 8,
+    "poolMax": 8,
+    "warmConnections": 8,
+    "samples": 3,
+    "fixture": "Only generated QA account; no model input or existing user history copied."
+  },
+  "clock": {
+    "clock": "performance.now monotonic",
+    "start": "Immediately before8 service validations",
+    "end": "All8 resolve with expected current principal",
+    "excluded": [
+      "DB connection warm-up",
+      "model latency",
+      "browser rendering"
+    ]
+  },
+  "memory": {
+    "retained": "Bounded8 results and query timing groups; pool closed after run.",
+    "gcOrPeakMemoryClaim": "None"
+  },
+  "verdict": {
+    "type": "threshold-free local/remote diagnostic; no uncalibrated CI time budget",
+    "comparison": "Unchanged R5 reference and candidate under comparable live-node conditions, plus deterministic row-lock and authority barriers."
+  },
+  "behavior": [
+    "Current organization/user/membership/credential authority",
+    "Idle and absolute deadlines checked against database clock after waits",
+    "No revival after revocation",
+    "Role/status fresh after authority change",
+    "Sliding renewal retains absolute cap",
+    "Failed authority read yields no principal"
+  ],
+  "stoppingRule": "Accept a targeted improvement only after focused authority tests and real browser bootstrap retest; continue broader full-function matrix independently."
+}

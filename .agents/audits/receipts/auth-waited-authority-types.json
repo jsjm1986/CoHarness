@@ -1,0 +1,14 @@
+{
+  "name": "auth-waited-authority-types",
+  "cwd": "gateway",
+  "command": "npm run typecheck",
+  "startedAt": "2026-10-24T01:53:51.868822+00:00",
+  "seconds": 6.003,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b51d366b36f3c9202639e34f6306d2e217e80cbfcff477bf489dcd9ef807e60b",
+  "inputsAfter": "a4d52d5cb5205db242ad6509546972618587ae1e459981470abdbb37ca3db91a",
+  "postgresToolDirectory": null,
+  "outputSha256": "8fa1cf5506304e8abac55868e7f1a136c9b1dde57a3981a382da4c21ea129a6f",
+  "outputTail": "\n> typecheck\n> tsc --noEmit\n\n"
+}

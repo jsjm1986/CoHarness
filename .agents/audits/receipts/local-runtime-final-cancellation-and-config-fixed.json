@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-final-cancellation-and-config-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/local-runtime-launcher.spec.ts tests/local-runtime-owner.spec.ts tests/launcher.spec.ts tests/instances.spec.ts tests/runtime-capacity.spec.ts tests/config.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T19:32:41.421312+00:00",
+  "seconds": 20.51,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "6091a617dbee24807a2e948a2eb3ec1e7adc5b5e776ff1d3a676ce544a8deff4",
+  "inputsAfter": "6091a617dbee24807a2e948a2eb3ec1e7adc5b5e776ff1d3a676ce544a8deff4",
+  "postgresToolDirectory": null,
+  "outputSha256": "47b88c79f83e802390540c6ccdbaa210c6ddb581e970061544136b8d093eb535",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  6 passed (6)\n      Tests  114 passed (114)\n   Start at  03:32:43\n   Duration  18.11s (transform 1.38s, setup 0ms, import 1.95s, tests 21.48s, environment 0ms)\n\n"
+}

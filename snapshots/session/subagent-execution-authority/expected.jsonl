@@ -1,0 +1,2 @@
+{"provider":"codex","control":"execution-owner","allowed":true,"parentChecked":true,"upstreamRequests":1,"outcome":"completed","runtimeClosed":true}
+{"provider":"codex","control":"execution-owner","allowed":false,"parentChecked":true,"upstreamRequests":0,"outcome":"error","runtimeClosed":true}

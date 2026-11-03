@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-owner-proposal-pair",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write .agents/notes/proposed/architecture/2026-10-25-local-runtime-supervisor.md",
+  "startedAt": "2026-10-24T18:57:25.954778+00:00",
+  "seconds": 1.632,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "2b2100ad49fb642fc24f31ad5bbdb3318d52a8909df47bdc702003a936729b90",
+  "inputsAfter": "2b2100ad49fb642fc24f31ad5bbdb3318d52a8909df47bdc702003a936729b90",
+  "postgresToolDirectory": null,
+  "outputSha256": "fd37fe134447e9bb522cdce4c0ce749cdd512c16365e247e726e520d02ba9a96",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/proposed/architecture/2026-10-25-local-runtime-supervisor.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

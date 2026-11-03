@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-memory-tool-scopes.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-memory-tool-scopes.md
+document:
+  en: 6675cf7ed40dfa7cb8a7ee400c55c8ec96d5e5d4
+  zh: ce195bac3b344494f52347937f5cbf6f3af11925
+/agent-note-model-memory-tools-use-offered-scopes:
+  en: 10a11de5803d8d51
+  zh: ac4a62a74748cf27
+/agent-note-model-memory-tools-use-offered-scopes/problem:
+  en: 371f03bcbb55afb4
+  zh: b9dd8559c41ecc32
+/agent-note-model-memory-tools-use-offered-scopes/decision:
+  en: e4f25ecb7f554698
+  zh: 4f3f98dd10894a8d
+/agent-note-model-memory-tools-use-offered-scopes/alternatives-considered:
+  en: 3919d0d586966b61
+  zh: e7b7b169bbf5bcc1
+/agent-note-model-memory-tools-use-offered-scopes/consequences:
+  en: 3c0b8ca1f9cf1c0f
+  zh: 3c85ce9c61558fa5
+/agent-note-model-memory-tools-use-offered-scopes/verification:
+  en: adb3e517360bab6d
+  zh: 80adc2e4427b963d

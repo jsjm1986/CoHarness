@@ -1,0 +1,14 @@
+{
+  "name": "native-codex-published-event-host-types",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-25T02:58:54.538820+00:00",
+  "seconds": 63.711,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "eeb3d81512b40d8d28f8f232dffa73e8f630e3b812f96775c9f81da357c70db6",
+  "inputsAfter": "eeb3d81512b40d8d28f8f232dffa73e8f630e3b812f96775c9f81da357c70db6",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

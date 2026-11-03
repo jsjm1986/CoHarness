@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-doc-pairs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/architecture/2026-10-24-model-policy-owner-lifetime.md .agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md .agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md docs/event-producer-consumer.md docs/subsystems/llm-streaming.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md packages/llm/llm/README.md packages/subagent/subagent-dsh-sdk/README.md plugins/dsh-model-governance/README.md",
+  "startedAt": "2026-10-24T15:13:22.070230+00:00",
+  "seconds": 3.553,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3d801670990713a8e216343d21f3a74264574ca6c751d3db0b35c8728f60e97b",
+  "inputsAfter": "fc5c998c46cfb85fd823ecddca82baaa3fa3a26af7a7343f5d0db2ed6f0f0b1e",
+  "postgresToolDirectory": null,
+  "outputSha256": "7185e0c4b9648875ef1cd233d0be070c751cbb6af133c4f608fbe6181ba5e73e",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-model-policy-owner-lifetime.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.i18n.yaml\nverify-translation-pairing: recorded docs/event-producer-consumer.i18n.yaml\nverify-translation-pairing: recorded docs/subsystems/llm-streaming.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml\nverify-translation-pairing: recorded packages/llm/llm/README.i18n.yaml\nverify-translation-pairing: recorded packages/subagent/subagent-dsh-sdk/README.i18n.yaml\nverify-translation-pairing: recorded plugins/dsh-model-governance/README.i18n.yaml\nverify-translation-pairing: 9 record(s) written; run the check to validate the pairs.\n"
+}

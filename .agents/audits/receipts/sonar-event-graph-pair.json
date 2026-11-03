@@ -1,0 +1,14 @@
+{
+  "name": "sonar-event-graph-pair",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write docs/event-producer-consumer.md",
+  "startedAt": "2026-10-24T09:31:49.960810+00:00",
+  "seconds": 0.957,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "inputsAfter": "437848fa61bfd61291cbc2f31249f581bc5293aa5255ea4fb7aa168bfd6ca887",
+  "postgresToolDirectory": null,
+  "outputSha256": "1af1dbb5cfcdaa54b980c9e0c2058719e074e9fc059e823176f8bc2449ae37bb",
+  "outputTail": "verify-translation-pairing: recorded docs/event-producer-consumer.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

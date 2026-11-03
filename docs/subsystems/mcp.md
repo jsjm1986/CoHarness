@@ -13,6 +13,7 @@ Model Context Protocol (MCP) connects the model to tools supplied by external se
 - [Protocol and results](#protocol-and-results)
 - [Resources and instructions](#resources-and-instructions)
 - [Resource provider types](#resource-provider-types)
+- [Connection owner](#connection-owner)
 - [Limits](#limits)
 - [Further reading](#further-reading)
 
@@ -95,10 +96,27 @@ interface McpResourceProvider {
 
 -----
 
+<a id="connection-owner"></a>
+## Connection owner
+
+Programmatic owners mount with `mountMcpClient(ctx, config)` and retain its cleanup handle; see the [client lifecycle](../../packages/mcp/mcp-client/README.md#lifecycle-and-sync) for shutdown and retry semantics.
+
+```ts type-equiv
+/** Programmatic MCP activation with an explicit, retryable cleanup owner. */
+interface McpClientHandle {
+  /** Initial connection and catalog readiness; rejects when strict startup fails. */
+  ready: Promise<void>
+  /** Stop the connection and confirm retained local process cleanup. */
+  dispose(): Promise<void>
+}
+```
+
+-----
+
 <a id="limits"></a>
 ## Limits
 
-MCP prompt templates, human-input elicitation, task-based execution, and resource subscriptions are unsupported. Resource tools require a caller-visible configured server; binary resources remain programmatic data with text descriptions for the model. Servers without a tools capability connect with an empty tool set. Connection and discovery timeouts follow the SDK; the client has no separate settings for them.
+MCP prompt templates, human-input elicitation, task-based execution, and resource subscriptions are unsupported. Resource tools require a caller-visible configured server; binary resources remain programmatic data with text descriptions for the model. Servers without a tools capability connect with an empty tool set. HTTP connection and catalog timeouts follow the SDK. Stdio startup and local process cleanup use the [client deployment limits](../../packages/mcp/mcp-client/README.md#minimal-configuration).
 
 -----
 

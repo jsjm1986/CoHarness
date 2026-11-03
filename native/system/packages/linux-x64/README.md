@@ -1,5 +1,5 @@
 ---
-description: "Prebuilt Landlock launcher and POSIX flock addons for Linux x64."
+description: "Prebuilt Landlock launcher and POSIX lock and directory addons for Linux x64."
 kind: "package-library"
 ---
 # @deepseek-ai/node-addon-system-linux-x64

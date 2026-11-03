@@ -1,0 +1,1 @@
+- alert: Too many unfinished uploads. Reselect a previous file to resume it, or try again later.

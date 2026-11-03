@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-speech-settings-provider-lifetime.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-speech-settings-provider-lifetime.md
+document:
+  en: 3dd995fdada7eb57dcd7defece328e738b965098
+  zh: 86327f13cd5e383a1cbd1256403ee2f32581bcc6
+/agent-note-speech-preferences-follow-their-settings-provider:
+  en: f77c88dbfcb910b8
+  zh: 494e7d4ec1c89f55
+/agent-note-speech-preferences-follow-their-settings-provider/problem:
+  en: 6a5d653ed0710542
+  zh: c7d1b18fa6fe6bd4
+/agent-note-speech-preferences-follow-their-settings-provider/decision:
+  en: 7c9be5a897c65862
+  zh: 43ee86a261d784b4
+/agent-note-speech-preferences-follow-their-settings-provider/alternatives-considered:
+  en: 3687ca1ab87ffa13
+  zh: 534ae80ee5a3f322
+/agent-note-speech-preferences-follow-their-settings-provider/consequences:
+  en: f99ed81d09c3ab2c
+  zh: bbfd207e0c155ce7
+/agent-note-speech-preferences-follow-their-settings-provider/verification:
+  en: 8aa9ca7efa4b6bd5
+  zh: 83cea3ebfaf585f2

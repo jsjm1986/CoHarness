@@ -14,7 +14,9 @@ Retry policy had the same indirect ownership. It was discovered through the stre
 
 ## Decision
 
-`LlmRuntime` is the normalization boundary for one adapter attempt. It catches only final-adapter selection, synchronous dispatch, iterator construction, and `next()` failures, converts the thrown value to immutable `LlmFailure`, and emits one terminal `finish`. Caller cancellation or an `ABORTED` failure selects the aborted reason; every other adapter failure selects error. An adapter may also emit either terminal reason directly.
+`LlmRuntime` is the normalization boundary for one adapter attempt. It catches resource admission, final-adapter selection, synchronous dispatch, iterator construction, and `next()` failures, converts the thrown value to immutable `LlmFailure`, and emits one terminal `finish`. Caller cancellation or an `ABORTED` failure selects the aborted reason; every other adapter failure selects error. An adapter may also emit either terminal reason directly.
+
+Owned `ResourceAdmissionError` reasons map to `RESOURCE_BUDGET_UNAVAILABLE`, `ABORTED`, `RESOURCE_ADMISSION_EXPIRED`, or `RESOURCE_ADMISSION_REFUSED`. Classification reads an own data-backed reason without invoking accessors; foreign SDK reason fields remain outside this taxonomy. Validated carried failure facts take priority. Local queue or authority refusal does not establish an upstream HTTP status or retry policy, so normalization adds neither.
 
 The adapter-owned catch ends before each yielded chunk. Errors from `llm/stream` middleware, nested calls, adapter cleanup, chunk consumers, logging, signal checks, and assembly remain thrown as defects or lifecycle failures; they never enter model-request recovery. A transport failure after partial deltas may leave blocks open before a terminal error or aborted finish. No assistant message or tool call is assembled from that incomplete output.
 

@@ -1,0 +1,14 @@
+{
+  "name": "runtime-relay-systemd-fixture-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts gateway/tests/fixtures/systemctl-client.mjs",
+  "startedAt": "2026-10-25T00:59:23.963656+00:00",
+  "seconds": 2.819,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "658d3ca198fa57f89556bccc6b2a066b4e177c83045834bf1ec2153e840bc210",
+  "inputsAfter": "658d3ca198fa57f89556bccc6b2a066b4e177c83045834bf1ec2153e840bc210",
+  "postgresToolDirectory": null,
+  "outputSha256": "199555da75a83fe0949c501d1cac91995db05712c9befa4b61a7ae062738439c",
+  "outputTail": "No files found to lint. Please check your paths and ignore patterns.\n"
+}

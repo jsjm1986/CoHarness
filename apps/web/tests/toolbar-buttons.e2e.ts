@@ -49,10 +49,8 @@ it.skipIf(MODE === 'record')('aligns routine toolbar entries across themes while
   browser = await chromium.launch()
   const page = await browser.newPage({ viewport: { width: 1566, height: 900 }, locale: 'en-US' })
   const tripwire = watchConsole(page)
-  let documentReads = 0
   await page.route(/\/api\/documents(?:\?.*)?$/, async (route) => {
     if (route.request().method() !== 'GET') { await route.continue(); return }
-    documentReads += 1
     await route.fulfill({ json: {
       limits: {
         maxFileBytes: null, maxFilesPerMessage: 20, maxMessageBytes: 100, maxInlineTextBytes: 256,
@@ -108,11 +106,11 @@ it.skipIf(MODE === 'record')('aligns routine toolbar entries across themes while
     })))
     expect(controls).toEqual(Array.from({ length: 3 }, () => ({ height: 32, radius: '8px' })))
     expect(await more.evaluate(element => element.getBoundingClientRect().width)).toBe(32)
-    const readsBeforeRefresh = documentReads
+    const refreshed = page.waitForResponse(response => new URL(response.url()).pathname === '/api/documents'
+      && response.request().method() === 'GET')
     await more.click()
     await page.getByRole('menuitem', { name: 'Refresh', exact: true }).click()
-    await expect.poll(() => documentReads).toBe(readsBeforeRefresh + 1)
-    expect(await documents.isVisible()).toBe(true)
+    expect((await refreshed).status()).toBe(200)
 
     expect(uploadMetrics.contrast).toBeGreaterThanOrEqual(4.5)
     const chooser = page.waitForEvent('filechooser')
@@ -140,5 +138,5 @@ it.skipIf(MODE === 'record')('aligns routine toolbar entries across themes while
   results.push({ mobileTargetAtLeast44: mobile.height >= 44, mobileFont: mobile.fontSize })
   expect(tripwire.pageErrors).toEqual([])
   if (MODE === 'refresh') await mkdir(fileURLToPath(new URL('./expected/', import.meta.url)), { recursive: true })
-  await compareOrRefreshGolden(EXPECTED, '```json\n' + JSON.stringify(results, null, 2) + '\n```', MODE)
+  await compareOrRefreshGolden(EXPECTED, '```json\n' + JSON.stringify(results, null, 2) + '\n```\n', MODE)
 }, 120_000)

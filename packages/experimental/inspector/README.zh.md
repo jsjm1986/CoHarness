@@ -48,7 +48,9 @@ Host 在相对于应用根目录的 `inspector/devtools/devtools_app.html` 路�
 <a id="runtime-layout"></a>
 ## 运行时布局
 
-Worker 不访问实时 Cordis 对象；共享 Host/Client collector 会在传输前把它们投影成已验证快照。Cordis 负责插件组合、注册 `ctx.inspector`、注入 bootstrap 和 dispose（资源释放）。后加载的 Client 通过已鉴权的 Host 路由获取 bootstrap。Host 在启动 Worker 之前注册该路由，请求会等到 Worker 就绪后返回 bootstrap，启动失败时返回 `503`；请求中止时立即停止等待。当前平台无法运行 Worker 并报告 Node 的 `ERR_FEATURE_UNAVAILABLE_ON_PLATFORM` 时（例如浏览器预览的 Worker host），Host 记录一条警告，插件仍照常启动，只保留该路由并返回 `503`，不提供 `ctx.inspector`、DevTools 路由、bootstrap 注入或 `devtools://` URL；其他任何启动错误仍使插件启动失败。初始注入与主动获取两条路径中，bootstrap 传输或 source 建立失败均记录警告并保留连接重置后的重试；bootstrap 数据非法或服务注册失败则使启动失败。替换 source 会等待旧服务消费者清理完成，再申请新 source；卸载已激活插件会取消其未完成的 bootstrap 刷新。
+Worker 不访问实时 Cordis 对象；共享 Host/Client collector 会在传输前把它们投影成已验证快照。Cordis 负责插件组合、注册 `ctx.inspector`、注入 bootstrap 和 dispose（资源释放）。后加载的 Client 通过已鉴权的 Host 路由获取 bootstrap。Host 在启动 Worker 之前注册该路由，请求会等到 Worker 就绪后返回 bootstrap，启动失败时返回 `503`。读完入站请求体不会结束等待。响应连接关闭只放弃该浏览器的等待，不向已销毁的响应写入数据，共享 Worker 启动继续归服务持有（[决策](../../../.agents/notes/implemented/bug-fix/2026-10-31-inspector-bootstrap-response-lifetime.zh.md)）。当前平台无法运行 Worker 并报告 Node 的 `ERR_FEATURE_UNAVAILABLE_ON_PLATFORM` 时（例如浏览器预览的 Worker host），Host 记录一条警告，插件仍照常启动，只保留该路由并返回 `503`，不提供 `ctx.inspector`、DevTools 路由、bootstrap 注入或 `devtools://` URL；其他任何启动错误仍使插件启动失败。初始注入与主动获取两条路径中，bootstrap 传输或 source 建立失败均记录警告并保留连接重置后的重试；bootstrap 数据非法或服务注册失败则使启动失败。替换 source 会等待旧服务消费者清理完成，再申请新 source；卸载已激活插件会取消其未完成的 bootstrap 刷新。
+
+Host 在基础设施进程准入前保留资源提供者，并在原生分配前核对同一原始 Cordis Service。等待期间提供者被移除或替换时，以 `ResourceAdmissionError` 的 `unavailable` 原因拒绝；未使用的许可归还原所有者。插件释放会取消排队启动。已发布 Worker 在许可撤回时关闭。容量在线程物理退出且记账确认前保持占用；终止失败会保留未确认占用。`InspectorHandle.close()` 或 `InspectorStartupCleanupError.cleanup()` 被拒绝后，调用方仍持有清理责任，包括未使用许可的完成失败，可以在恢复后再次调用。取消与清理失败均予以保留。并行调用共用未完成的清理，已经确认的完成保持幂等（[决策](../../../.agents/notes/implemented/bug-fix/2026-10-29-inspector-resource-completion.zh.md)）。独立调用方可通过 `startInspector` 的可选第二个参数传入记账器、启动取消信号和同步 `assertOwnership` 回调；省略参数仍为独立执行。
 
 Host 插件启动 Worker 并连接专用 `MessagePort`。Client 使用注入或主动获取的浏览器 source 参数，直接向 Worker 打开带鉴权的 WebSocket，不接收 DevTools URL。Chrome DevTools 连接 Worker 的 CDP WebSocket。每条 DevTools 连接在 Worker 中独占一个连接 Host 主线程的 `node:inspector.Session`，因此 Host JavaScript 暂停时仍可调试 Host。
 
@@ -143,8 +145,12 @@ fetch 采集默认开启，记录完整 URL、全部请求与响应 headers、�
 
 response headers 到达后，调用方 abort 可能会终止 observer clone；已采集的字节仍可通过 `Network.getResponseBody` 读取，采集 metadata 记录错误与截断，并且 CDP 因 fetch 已返回 Response 而发送 `Network.loadingFinished`。response headers 到达前发生的 fetch rejection 会发送 `Network.loadingFailed`，其中 abort 对应 `canceled: true`。
 
+停止采集会同步结束新的观察，并等待所属 clone reader 结束。独立的 Inspector 实例可以按任意顺序停止；各自恢复最近仍有效的 fetch 实现，不覆盖无关的替换实现。保留的已停止包装函数和停止后才完成的原生请求保留调用方的结果，不发布新的观察记录（[生命周期决策](../../../.agents/notes/implemented/bug-fix/2026-11-03-inspector-fetch-retirement.zh.md)）。
+
 <a id="security"></a>
 ## 安全
+
+Host 插件只支持独立本地运行时。自身 realm 或根运行时存在 execution-authority provider 或 `executionAuthorityRequired: true` 时，启动会在分配 Worker 前拒绝。启动期间引入任一策略会取消准入；运行后引入时会阻止 bootstrap、前端和 CDP 代理请求，移除 Client bootstrap 注入，并关闭 Worker 和已有代理 socket。清理失败时保留原归属供重试。撤下策略不会重新激活该 Inspector 实例；只能在独立运行时中重新加载。共享 Gateway 账号不能通过项目权限使用这个不受限的调试器。
 
 Client 选择只限制一条 DevTools 连接的 realm session、DOM 投影和诊断查询，不停止采集，也不改变共享观测 API。它是显示筛选，不是授权机制：可信调试用户可以打开不带筛选的连接，Host 求值仍拥有原有权限。
 

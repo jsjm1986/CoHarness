@@ -1,0 +1,14 @@
+{
+  "name": "personal-document-owner-current-loader",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/document-transfer-loader.spec.ts",
+  "startedAt": "2026-10-26T13:15:02.987227+00:00",
+  "seconds": 5.005,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "af008ec6e218e193e7b610f8efacfbfd27ac8a3ae98feba583da19ee4bbb98bd",
+  "inputsAfter": "af008ec6e218e193e7b610f8efacfbfd27ac8a3ae98feba583da19ee4bbb98bd",
+  "postgresToolDirectory": null,
+  "outputSha256": "969a88ff40cdda126056920ea6435498ed56fe2b1fac4f529357ccb76598bcc6",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  21:15:05\n   Duration  2.44s (transform 15ms, setup 0ms, import 29ms, tests 2.29s, environment 0ms)\n\n"
+}

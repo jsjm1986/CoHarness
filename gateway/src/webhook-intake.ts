@@ -1,6 +1,7 @@
 /** Public webhook ingress: provider verification, durable reservation, managed runtime dispatch. */
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { isJsonValue } from '@deepseek-ai/dsh-util-values'
 import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
 import { DISPATCH_BODY_LIMIT, WebhookEndpointError, type PostgresWebhookEndpointService, type WebhookIntakeConfig } from './postgres/webhook-endpoint-service.ts'
@@ -94,7 +95,7 @@ export class GatewayWebhookIntake {
       cfg: Pick<GatewayDeps['cfg'], 'upstreamTimeoutMs'>
       users: Pick<GatewayDeps['users'], 'getById'>
       collaboration: Pick<NonNullable<GatewayDeps['collaboration']>, 'projectForUser'>
-      instances: Pick<GatewayDeps['instances'], 'isLive' | 'generationOf' | 'portOf' | 'operationRef' | 'ensureRunning'>
+      instances: Pick<GatewayDeps['instances'], 'isLive' | 'generationOf' | 'portOf' | 'operationRef' | 'ensureRunning' | 'resolveTarget'>
     },
     private readonly endpoints: Pick<PostgresWebhookEndpointService, 'intake' | 'dispatchConfig'>,
     private readonly deliveries: Pick<PostgresWebhookDeliveryService, 'get' | 'reserve' | 'redispatch' | 'complete'>,
@@ -123,7 +124,7 @@ export class GatewayWebhookIntake {
       const reservation = await this.deliveries.reserve({
         endpointId: config.endpointId as WebhookEndpointId, deliveryId: delivery.deliveryId, requestHash,
         configurationRevision: config.revision, executionUserUuid: config.executionUserUuid,
-        target: { kind: config.runtimeKind, id: config.runtimePublicId },
+        target: { kind: config.runtimeKind, id: config.runtimePublicId, ...(config.runtimeId === undefined ? {} : { runtimeId: config.runtimeId }) },
         limit: config.intakeLimit, windowMs: config.intakeWindowMs, replayWindowMs: config.replayWindowMs,
         event: delivery.event,
       })
@@ -148,16 +149,17 @@ export class GatewayWebhookIntake {
    * Replay one settled receipt's stored event under the endpoint's current
    * configuration; the synthetic delivery id bypasses content deduplication.
    * @param receiptId - settled receipt selected by an administrator.
+   * @param actorUserId - server-authenticated public administrator id, rechecked before reserving new work.
    * @returns the new receipt after dispatch settles, or its recorded failure.
    */
-  async redispatch(receiptId: unknown): Promise<WebhookReceipt> {
+  async redispatch(receiptId: unknown, actorUserId: number): Promise<WebhookReceipt> {
     const stored = await this.deliveries.get(receiptId)
-    const config = await this.endpoints.dispatchConfig(stored.endpointId)
+    const config = await this.endpoints.dispatchConfig(stored.endpointId, actorUserId)
     const rerun = await this.deliveries.redispatch(receiptId, {
       endpointId: stored.endpointId, configurationRevision: config.revision,
       executionUserUuid: config.executionUserUuid,
-      target: { kind: config.runtimeKind, id: config.runtimePublicId },
-    })
+      target: { kind: config.runtimeKind, id: config.runtimePublicId, ...(config.runtimeId === undefined ? {} : { runtimeId: config.runtimeId }) },
+    }, actorUserId)
     if (stored.event === null || typeof stored.event !== 'object' || Array.isArray(stored.event)) {
       const settled = await this.deliveries.complete(stored.endpointId as WebhookEndpointId, rerun.receipt.id,
         { state: 'rejected', errorCode: 'event-unavailable' })
@@ -193,6 +195,7 @@ export class GatewayWebhookIntake {
     if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
       throw new WebhookIntakeError(400, 'webhook payload must be a JSON object')
     }
+    if (!isJsonValue(payload)) throw new WebhookIntakeError(400, 'webhook payload is not lossless JSON')
     return { deliveryId, event: { name: eventName, payload: payload as Record<string, unknown> }, receivedAt: Date.now() }
   }
 
@@ -218,12 +221,13 @@ export class GatewayWebhookIntake {
         return { state: 'ignored', errorCode: 'repository-unmatched' }
       }
     }
-    const target: RuntimeTarget = { kind: config.runtimeKind, id: config.runtimePublicId }
+    let target: RuntimeTarget = { kind: config.runtimeKind, id: config.runtimePublicId, ...(config.runtimeId === undefined ? {} : { runtimeId: config.runtimeId }) }
     const instances = this.deps.instances
     let user: Awaited<ReturnType<GatewayDeps['users']['getById']>>
     let live: boolean
     let generation: number
     try {
+      if (instances.resolveTarget !== undefined) target = await instances.resolveTarget(target)
       user = await this.deps.users.getById(config.executionUserId)
       live = await instances.isLive(target)
       generation = await instances.generationOf(target)
@@ -234,7 +238,7 @@ export class GatewayWebhookIntake {
     if (config.permissionPreset === 'auto' && user.autoReviewEligible !== true) {
       return { state: 'rejected', errorCode: 'execution-auto-ineligible' }
     }
-    let subject: Parameters<GatewayDeps['instances']['ensureRunning']>[0] = user
+    let subject: Parameters<GatewayDeps['instances']['ensureRunning']>[0] = { ...user, runtimeId: target.runtimeId }
     let scope: Parameters<GatewayPrincipalSigner['issueWebhookDispatch']>[0]['scope']
     if (target.kind === 'user') {
       if (target.id !== user.id) return { state: 'rejected', errorCode: 'execution-account' }
@@ -251,7 +255,7 @@ export class GatewayWebhookIntake {
       }
       const steward = membership.kind === 'steward'
       scope = { kind: 'project', projectId: target.id, projectName: membership.name, mode: membership.mode, ...(steward ? { steward: true } : {}) }
-      subject = { kind: 'project', id: target.id, name: membership.name, path: membership.path, steward }
+      subject = { kind: 'project', id: target.id, name: membership.name, path: membership.path, steward, runtimeId: target.runtimeId }
     }
     if (!live) {
       try {

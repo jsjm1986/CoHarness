@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-durable-ownership-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/tunnel-access.spec.ts tests/tunnel-supervisor.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T21:37:33.452043+00:00",
+  "seconds": 8.361,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7bb463f162aff099923ae3324d4bfa56014350890c6fb29e55973290c84fdd18",
+  "inputsAfter": "7bb463f162aff099923ae3324d4bfa56014350890c6fb29e55973290c84fdd18",
+  "postgresToolDirectory": null,
+  "outputSha256": "140a5ff5429d27ffb14e27a47d807497f264d8f98588e409185d5115d16fd266",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  22 passed (22)\n   Start at  05:37:35\n   Duration  6.26s (transform 59ms, setup 0ms, import 113ms, tests 6.08s, environment 0ms)\n\n"
+}

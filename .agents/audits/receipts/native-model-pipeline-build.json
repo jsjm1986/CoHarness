@@ -1,0 +1,14 @@
+{
+  "name": "native-model-pipeline-build",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=1 pnpm run build",
+  "startedAt": "2026-10-24T07:06:50.982143+00:00",
+  "seconds": 74.325,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "59f82acd29060fb55fea581fafbe586db95de3c34560a8fbd42fe806fb81c56d",
+  "inputsAfter": "59f82acd29060fb55fea581fafbe586db95de3c34560a8fbd42fe806fb81c56d",
+  "postgresToolDirectory": null,
+  "outputSha256": "94a4ac9aca24a9246f3eef6406742e279fcc5a82ec1279537aa1a5050507bc9a",
+  "outputTail": "$ tsx scripts/build.ts\nrun-gates: build running 8 gate(s) with 1 worker(s) from $DSH_GATE_CONCURRENCY.\nrun-gates: start native addon\nrun-gates: PASS native addon (0.88s)\nrun-gates: start host compiler\nrun-gates: PASS host compiler (2.55s)\nrun-gates: start Host bundle\nrun-gates: PASS Host bundle (6.38s)\nrun-gates: start client compiler\nrun-gates: PASS client compiler (0.49s)\nrun-gates: start Client bundle\nrun-gates: PASS Client bundle (4.42s)\nrun-gates: start Web build\nrun-gates: PASS Web build (3.23s)\nrun-gates: start host aggregate check\n\n== FAILED host aggregate check (50.23s) ==\ncommand: tsc -p tsconfig.host.json\noutcome: exit 2\nexamples/headless-agent/tests/governed-native-model.snapshot.ts(6,43): error TS6307: File '/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/snapshots/sdk/auxiliary-model-fixture.ts' is not listed within the file list of project '/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/tsconfig.host.json'. Projects must list all files or use an 'include' pattern.\nexamples/headless-agent/tests/governed-native-model.snapshot.ts(23,13): error TS2367: This comparison appears to be unintentional because the types '\"turn/start\" | \"turn/end\" | \"step/start\" | \"step/end\" | \"user/message\" | \"developer/message\" | \"system/message\" | \"assistant/message\" | \"assistant/attempt\" | \"tool/call\" | ... 67 more ... | \"tool-workflow/run-end\"' and '\"plugin:native-model-fixture/complete\"' have no overlap.\nexamples/headless-agent/tests/governed-native-model.snapshot.ts(23,89): error TS2339: Property 'data' does not exist on type 'never'.\nrun-gates: start client aggregate check\nrun-gates: PASS client aggregate check (2.66s)\n\nrun-gates: 7 passed, 1 failed, 0 skipped in 70.82s.\nrun-gates: unsuccessful gates:\n  - FAILED host aggregate check (50.23s, exit 2)\n    tsc -p tsconfig.host.json\n[ELIFECYCLE] Command failed with exit code 1.\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "sonar-persistence-catalog",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-persistence-catalog.ts",
+  "startedAt": "2026-10-24T09:08:06.207816+00:00",
+  "seconds": 16.427,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "53892c43fceebca5a8b9f62b39abb3a2fdc470fe6d3dd67d40a58c1a1445e064",
+  "inputsAfter": "ea9c22360c803401800b1bdb0f2246836ecac58206660076bde1741b452dc55f",
+  "postgresToolDirectory": null,
+  "outputSha256": "2e8d17dfbf5deb728a978773f5c82a3561d04a68b3a464caf39594fcd4154bd2",
+  "outputTail": "gen-persistence-catalog: wrote docs/persistence-catalog.md.\ngen-persistence-catalog: wrote docs/persistence-catalog.zh.md.\ngen-persistence-catalog: wrote docs/persistence-catalog.i18n.yaml.\ngen-persistence-catalog: wrote docs/experimental-persistence-catalog.md.\ngen-persistence-catalog: wrote docs/experimental-persistence-catalog.zh.md.\ngen-persistence-catalog: wrote docs/experimental-persistence-catalog.i18n.yaml.\ngen-persistence-catalog: wrote packages/core/session/src/known-event-types.ts.\ngen-persistence-catalog: wrote docs/persistence-schema.json.\n"
+}

@@ -1,0 +1,5 @@
+- heading "公网访问" [level=2]
+- text: 启动中 未配置
+- paragraph: cloudflared fixture · <fixture>/cloudflared-fixture
+- button "停止隧道"
+- paragraph: 更新于 2026-10-25T00:00:00Z · 由本节点上的 cloudflared 进程承载；网关停止时隧道随之停止

@@ -25,6 +25,7 @@ describe.skipIf(!built)('built index parsing (plain node)', () => {
   it('searches a valid index and reports an invalid one through the bundled Worker', async () => {
     const result = await node(`
       import { Context, Service } from '@deepseek-ai/cordis'
+      import ResourceBudget from '@deepseek-ai/dsh-resource-budget'
       import PluginMarket from './lib/index.js'
 
       const bodies = {
@@ -32,6 +33,19 @@ describe.skipIf(!built)('built index parsing (plain node)', () => {
         'https://m.example/invalid.json': { format: 2 },
       }
       globalThis.fetch = async (url) => new Response(JSON.stringify(bodies[url]))
+      let grant
+      let requested
+      const waiting = new Promise(resolve => { grant = resolve })
+      const entering = new Promise(resolve => { requested = resolve })
+      let admissions = 0, completions = 0
+      class Budget extends ResourceBudget {
+        async acquire() {
+          admissions += 1
+          if (admissions === 1) { requested(); await waiting }
+          return { signal: new AbortController().signal, release: async () => { completions += 1 },
+            uncertain: async () => { throw new Error('unexpected uncertain parser') } }
+        }
+      }
       class Manager extends Service {
         constructor(ctx) { super(ctx, 'pluginManager') }
         listBundles() { return Promise.resolve([]) }
@@ -39,13 +53,23 @@ describe.skipIf(!built)('built index parsing (plain node)', () => {
       }
       const ctx = new Context()
       try {
+        ctx.provide('resourceBudgetRequired', true)
+        await ctx.plugin(Budget)
         await ctx.plugin(Manager)
         await ctx.plugin(PluginMarket, { indexes: Object.keys(bodies) })
         const query = { sort: { kind: 'index' }, offset: 0, limit: 10 }
-        const valid = await ctx.pluginMarket.search('https://m.example/valid.json', query)
+        let settled = false
+        const pending = ctx.pluginMarket.search('https://m.example/valid.json', query)
+        void pending.then(() => { settled = true }, () => { settled = true })
+        await entering
+        const waited = !settled
+        grant()
+        const valid = await pending
         const invalid = await ctx.pluginMarket.search('https://m.example/invalid.json', query).catch(error => error)
-        console.log(JSON.stringify({ entries: valid.entries.map(entry => entry.name), code: invalid.code, details: invalid.details }))
+        console.log(JSON.stringify({ entries: valid.entries.map(entry => entry.name), code: invalid.code, details: invalid.details,
+          waited, admissions, completions }))
       } finally {
+        grant()
         await ctx.fiber.dispose()
       }
     `)
@@ -53,6 +77,7 @@ describe.skipIf(!built)('built index parsing (plain node)', () => {
       entries: ['p'],
       code: 'plugin-market/invalid-index',
       details: { url: 'https://m.example/invalid.json', path: '$.format', reason: 'must be 1' },
+      waited: true, admissions: 2, completions: 2,
     })
   })
 
@@ -65,11 +90,17 @@ describe.skipIf(!built)('built index parsing (plain node)', () => {
 
       const root = await mkdtemp(join(tmpdir(), 'dsh-built-market-worker-'))
       const path = join(root, 'worker.cjs')
-      const run = (workerData, transferList = []) => new Promise((resolve) => {
+      const run = (workerData, transferList = []) => new Promise((resolve, reject) => {
         const worker = new Worker(path, { workerData, transferList })
-        worker.once('message', (value) => { void worker.terminate(); resolve({ message: value }) })
-        worker.once('error', (error) => { resolve({ error: error.message }) })
-        worker.once('exit', (code) => { resolve({ exit: code }) })
+        let settled = false
+        const finish = result => {
+          if (settled) return
+          settled = true
+          void worker.terminate().then(() => { resolve(result) }, reject)
+        }
+        worker.once('message', (value) => { finish({ message: value }) })
+        worker.once('error', (error) => { finish({ error: error.message }) })
+        worker.once('exit', (code) => { finish({ exit: code }) })
       })
       try {
         await copyFile('lib/worker.cjs', path)

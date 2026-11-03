@@ -149,8 +149,8 @@ describe('startPump', () => {
     }
   })
 
-  it('rejects a non-positive poll interval before touching any source', () => {
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, 2_147_483_648])('rejects unsupported poll interval %s before touching any source', (pollMs) => {
     const { sink } = recorder()
-    expect(() => startPump([], sink, 0, Promise.resolve())).toThrow(/invalid pump pollMs/)
+    expect(() => startPump([], sink, pollMs, Promise.resolve())).toThrow(/invalid pump pollMs/)
   })
 })

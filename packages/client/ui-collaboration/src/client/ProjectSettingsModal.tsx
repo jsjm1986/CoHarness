@@ -172,7 +172,7 @@ export function ProjectSettingsModal({
         <div className={css.main}>
           {loading && <p className={css.queryStatus} role="status"><IconLoadingOutline16 size={16} />{t('project.loading')}</p>}
           {loadFailed && <div className={css.error} role="alert">{t('project.loadFailed')}
-            <Button size="sm" onClick={() => { setReload(value => value + 1) }}>{t('scope.retry')}</Button></div>}
+            <Button size="sm" onClick={() => { setReload(value => value + 1) }}>{t('manager.retry')}</Button></div>}
           <section aria-labelledby={`${id}-heading`}>
             <div className={css.sectionHeading}><h3 ref={sectionHeading} tabIndex={-1} id={`${id}-heading`}>{t(selected.title)}</h3>
               <p>{t(selected.hint)}</p></div>
@@ -183,6 +183,7 @@ export function ProjectSettingsModal({
                 <div><dt>{t('project.ownerLabel')}</dt><dd>{ownerName}</dd></div>
                 {configuration !== undefined && <div><dt>{t('project.accessLabel')}</dt><dd>{access}</dd></div>}
               </dl>
+              {configuration !== undefined && !isManager && <p className={css.notice}>{t('project.managedByOwner')}</p>}
               <div className={css.categoryLinks}>{CATEGORIES.filter(value => value.id !== 'overview').map(({ id: value, title, hint, Icon }) => (
                 <button key={value} type="button" disabled={busy} ref={(node) => { categoryLinks.current[value] = node }}
                   onClick={() => { setCategory(value) }}>
@@ -234,7 +235,7 @@ export function ProjectSettingsModal({
                 </label>)}
                 {sshTargets?.length === 0 && <p className={css.notice}>{t('project.sshEmpty')}</p>}
               </div>}
-              {sshLoadFailed && <div className={css.error} role="alert">{t('project.sshLoadFailed')}<Button size="sm" onClick={() => { setSshReload(value => value + 1) }}>{t('scope.retry')}</Button></div>}
+              {sshLoadFailed && <div className={css.error} role="alert">{t('project.sshLoadFailed')}<Button size="sm" onClick={() => { setSshReload(value => value + 1) }}>{t('manager.retry')}</Button></div>}
               {sshError !== undefined && <p className={css.error} role="alert">{sshError}</p>}
               {unavailable(capabilities?.sshTargets && listSshTargets !== undefined && shareSshTarget !== undefined, 'project.sshUnavailable') !== undefined && <p className={css.notice}>{unavailable(capabilities?.sshTargets && listSshTargets !== undefined && shareSshTarget !== undefined, 'project.sshUnavailable')}</p>}
             </>}

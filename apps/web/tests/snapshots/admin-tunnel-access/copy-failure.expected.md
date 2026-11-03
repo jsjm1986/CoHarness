@@ -1,0 +1,11 @@
+- heading "公网访问" [level=2]
+- text: 运行中 临时链接
+- alert: 复制失败，请手动选择并复制链接
+- paragraph: cloudflared fixture · <fixture>/cloudflared-fixture
+- text: 公网地址
+- link "https://fixture.trycloudflare.com":
+  - /url: https://fixture.trycloudflare.com
+- button "复制链接"
+- paragraph: 任何拿到此链接的人都能到达网关登录页；请只分享给需要访问的团队成员。
+- button "停止隧道"
+- paragraph: 更新于 2026-10-25T00:00:00Z · 由本节点上的 cloudflared 进程承载；网关停止时隧道随之停止

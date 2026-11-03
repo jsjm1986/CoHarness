@@ -1,0 +1,14 @@
+{
+  "name": "document-paths-filehandle-regressions",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/attachment/userdoc-local/tests packages/host/userdoc-http/tests/handler-edges.spec.ts",
+  "startedAt": "2026-10-25T20:16:05.948086+00:00",
+  "seconds": 14.719,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5d745836315789ecd8da35ff50f55a4ce8665f60c2598c3dd7101cb968215520",
+  "inputsAfter": "5d745836315789ecd8da35ff50f55a4ce8665f60c2598c3dd7101cb968215520",
+  "postgresToolDirectory": null,
+  "outputSha256": "272fb2ae172aaa44fcc381761834ac71d5253df6cd6d9ee6c0bbff7370eb04f1",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/attachment/userdoc-local/tests/index.spec.ts (13 tests | 1 failed) 1189ms\n     × resumes, verifies, and publishes a resumable upload without exposing session files 426ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/attachment/userdoc-local/tests/index.spec.ts > local user-document service > resumes, verifies, and publishes a resumable upload without exposing session files\nUserDocError: The resumable upload manifest is invalid.\n ❯ invalidManifest packages/attachment/userdoc-local/src/upload.ts:199:9\n    197|\n    198| function invalidManifest(): never {\n    199|   throw new UserDocError('The resumable upload manifest is invalid.', …\n       |         ^\n    200| }\n    201|\n ❯ readManifest packages/attachment/userdoc-local/src/upload.ts:293:81\n ❯ LocalUploadManager.load packages/attachment/userdoc-local/src/upload.ts:841:22\n ❯ LocalUploadManager.inspect packages/attachment/userdoc-local/src/upload.ts:644:22\n ❯ packages/attachment/userdoc-local/tests/index.spec.ts:208:19\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 21 passed (22)\n      Tests  1 failed | 354 passed (355)\n   Start at  04:16:12\n   Duration  7.81s (transform 7.65s, setup 1.63s, import 11.81s, tests 38.86s, environment 2ms)\n\n"
+}

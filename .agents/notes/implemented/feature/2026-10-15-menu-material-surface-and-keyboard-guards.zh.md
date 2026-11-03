@@ -20,6 +20,7 @@
 - `requestAnimationFrame` 追踪取代纯事件驱动定位，锚点在拖动或变换下保持对齐；`setFixedPos` 对相同值短路。
 - `autoFocus` 经 `focusWithoutRing` 打开，与上游的指针式静默聚焦一致；键盘导航照常画环。
 - `selection: 'check' | 'fill'` 选择选中行 affordance;`fill` 把高亮交给行自身。
+- 共享弹窗的 Tab 循环包含内嵌菜单内容；通过 portal 挂载在弹窗之外的菜单保留独立遍历。设置弹层先释放背景的 inert 状态，再恢复触发控件的焦点。
 
 四个消费面——输入触发 `MenuView`、命令 `PopupSelectView`、模型选择器菜单、坞站 `TabMenu`——改经 `MenuSurface` 渲染，各自的背景/圆角规则随之删除。
 

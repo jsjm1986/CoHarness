@@ -1,0 +1,13 @@
+{
+  "name": "resource-root-pairing",
+  "cwd": ".",
+  "command": "pnpm run verify-translation-pairing --write gateway/README.md .agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+  "startedAt": "2026-10-23T12:30:12.990077+00:00",
+  "seconds": 3.226,
+  "exitCode": 0,
+  "inputsBefore": "ae6d3ada920e49aeb584da0ecdede9430a9e42ab7d517cdf5fbedede3d7be8c6",
+  "inputsAfter": "21d8be55fa973d63643223c8bbf283422144d0b28be5f9e80c746f02100b31e2",
+  "outputSha256": "2b53b205b69f5ab288dbca0d2976efead7d00017fee6ceb8b8b8bc4dc2951dae",
+  "outputTail": "$ tsx scripts/verify-translation-pairing.ts --write gateway/README.md .agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.md .agents/notes/proposed/feature/2026-10-23-node-resource-admission.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md\nverify-translation-pairing: recorded .agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/proposed/feature/2026-10-23-node-resource-admission.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 4 record(s) written; run the check to validate the pairs.\n",
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf"
+}

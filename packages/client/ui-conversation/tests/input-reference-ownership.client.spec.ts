@@ -18,7 +18,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map(root => root.fiber.dispose()))
 })
 
-async function bench() {
+async function bench(draftIsSaved?: (id: SessionId) => boolean) {
   const ctx = new Context()
   roots.push(ctx)
   await ctx.plugin(() => {}).await()
@@ -27,7 +27,7 @@ async function bench() {
     sessionId, updatedAt: 1, running: false, blank: true,
   })) }))
   const sessions = new SessionRuntime(ctx, api, fakeRemote(api), undefined, { persistSelection: false })
-  const hub = new InputHub(ctx, makeTranslate(zh, {}))
+  const hub = new InputHub(ctx, makeTranslate(zh, {}), draftIsSaved)
   await ctx.plugin(ConversationController, { input: hub, blocks: new ComposerBlockRegistry() }).await()
   ctx.effect(() => sessions.provide({ hooks: ['input'], resolve: binding => ({ hooks: { input: hub.shellFor(binding).state } }) }))
   await sessions.refresh()
@@ -36,6 +36,29 @@ async function bench() {
 }
 
 describe('composer Session ownership', () => {
+  it('permits recoverable text navigation and protects unmirrored input and attachments', async () => {
+    let saved = true
+    const { hub } = await bench(() => saved)
+    const shell = hub.shell(first)
+    expect(hub.hasUnsavedDrafts()).toBe(false)
+    shell.setDraft('text draft')
+    expect(hub.hasUnsavedDrafts()).toBe(true)
+    const detach = shell.bindMirror(() => {})
+    expect(hub.hasUnsavedDrafts()).toBe(false)
+    saved = false
+    expect(hub.hasUnsavedDrafts()).toBe(true)
+    saved = true
+    shell.addImages(['image' as never])
+    expect(hub.hasUnsavedDrafts()).toBe(true)
+    shell.removeImage('image' as never)
+    expect(hub.hasUnsavedDrafts()).toBe(false)
+    shell.addDocuments(['document' as never])
+    expect(hub.hasUnsavedDrafts()).toBe(true)
+    shell.removeDocument('document' as never)
+    detach()
+    expect(hub.hasUnsavedDrafts()).toBe(true)
+  })
+
   it('keeps a draft and its input machine when the visible Session changes', async () => {
     const { sessions, hub } = await bench()
     const binding = sessions.binding(first)!

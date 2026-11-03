@@ -1,0 +1,556 @@
+{
+  "finding": "B473",
+  "status": "fixed_verified_failed_spawn_cancellation_process_group_isolation_390_cases_global_review_open",
+  "updatedAt": "2026-11-02T08:46:54.035013+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "verifiedAt": "2026-11-02T08:38:56.561612+00:00",
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-current-baseline.json"
+  },
+  "problem": "Node22/24 cancellation of a failed spawn can signal native process id zero before its error/close arrives. Actual isolated probes terminate their own process group with SIGTERM or SIGKILL. The public native runner also allocates for an already cancelled input. Shared Runtime or Gateway callers can therefore disappear instead of returning a cancellation.",
+  "fix": "Own cancellation without passing signal into Node execFile/spawn, reject native pre-cancelled calls before allocation, signal only assigned child PIDs, retain original native close ownership and existing public ABORT_ERR streams. Apply the same allocated-PID rule to browser helper cancellation and maintenance pipe rollback.",
+  "compatibility": {
+    "newConfig": false,
+    "publicSignaturesChanged": false,
+    "newDependencies": false,
+    "schemaChanged": false,
+    "sessionFormatChanged": false,
+    "agentLoopChanged": false,
+    "modelCallsMade": false,
+    "peerReservedSourcesEdited": false,
+    "productionDeploymentPerformed": false
+  },
+  "verification": {
+    "differentNamedCases": 390,
+    "caseDerivation": "162 native/browser +163 consumer cases after the one failed28-case leaf is repaired +39 Gateway control/pipe/snapshot +26 real PostgreSQL maintenance. Repetitions and fixture subscenarios are not extra cases.",
+    "skippedPlatformCases": 3,
+    "sourceNode22AndBuiltNode24Snapshots": true,
+    "originalIsolatedExecutions": 8,
+    "originalProcessGroupsTerminated": 6,
+    "sourceAfterRepairIsolatedExecutions": 8,
+    "sourceAfterRepairAllReturnNormally": true,
+    "originalEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/failed-spawn-cancellation-before.json",
+    "afterEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/failed-spawn-cancellation-after.json",
+    "nativeSnapshotScenarios": 5,
+    "gatewaySnapshotScenarios": 4,
+    "builtSystemdControlExample": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/gateway-built-control.json",
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 91,
+          "covered": 91,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 107,
+          "covered": 107,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 29,
+          "covered": 29,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 58,
+          "covered": 58,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/bundle/web-app/src/index.ts": {
+        "lines": {
+          "total": 72,
+          "covered": 72,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 21,
+          "covered": 21,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 84,
+          "covered": 84,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 50,
+          "covered": 50,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/util/native-command/src/runner.ts": {
+        "lines": {
+          "total": 19,
+          "covered": 19,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 8,
+          "covered": 8,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 23,
+          "covered": 23,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 8,
+          "covered": 8,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "gatewayWholeEntryCoverageClaimed": false,
+    "coverageThresholdChanged": false,
+    "checks": [
+      {
+        "name": "native-complete-coverage",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-complete-coverage.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/util/native-command/tests",
+          "packages/bundle/web-app/tests",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot",
+          "--coverage",
+          "--coverage.include",
+          "packages/util/native-command/src/runner.ts",
+          "--coverage.include",
+          "packages/bundle/web-app/src/index.ts",
+          "--coverage.reportsDirectory",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-coverage",
+          "--coverage.reporter",
+          "text",
+          "--coverage.reporter",
+          "json-summary",
+          "--coverage.reporter",
+          "json"
+        ]
+      },
+      {
+        "name": "native-and-gateway-isolated-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-and-gateway-isolated-final.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/util/native-command/tests/failed-spawn.spec.ts",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot"
+        ]
+      },
+      {
+        "name": "native-live-source-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-live-source-final.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/util/native-command/tests/failed-spawn.spec.ts",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot"
+        ]
+      },
+      {
+        "name": "native-final-built-snapshot",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-final-built-snapshot.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "DSH_NATIVE_CANCEL_ARTIFACT=1",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/util/native-command/tests/failed-spawn.spec.ts",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot"
+        ]
+      },
+      {
+        "name": "native-consumer-failed-leaf",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-consumer-failed-leaf.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/host/directory-picker-native/tests/native-picker.spec.ts",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot"
+        ]
+      },
+      {
+        "name": "gateway-command-source",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/gateway-command-source.json",
+        "status": "passed",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--root",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+          "--config",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/vitest.config.ts",
+          "tests/deployment-commands.spec.ts",
+          "tests/deployment-command-environment.spec.ts",
+          "tests/deployment-command-diagnostics.spec.ts",
+          "tests/account-lookup-lifetime.spec.ts",
+          "tests/launcher.spec.ts",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot"
+        ]
+      },
+      {
+        "name": "gateway-isolated-source-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/gateway-isolated-source-final.json",
+        "status": "passed",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--root",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+          "--config",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/vitest.config.ts",
+          "tests/failed-spawn-cancellation.spec.ts",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot"
+        ]
+      },
+      {
+        "name": "gateway-artifact-node24",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/gateway-artifact-node24.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "HGW_CANCEL_ARTIFACT=1",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--root",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+          "--config",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/vitest.config.ts",
+          "tests/failed-spawn-cancellation.spec.ts",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot"
+        ]
+      },
+      {
+        "name": "gateway-maintenance-postgres-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/gateway-maintenance-postgres-final.json",
+        "status": "passed",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/run-pg-with-tools.mjs",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--root",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+          "--config",
+          "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/vitest.config.ts",
+          "tests/deployment-backups.spec.ts",
+          "tests/deployment-restore.spec.ts",
+          "--maxWorkers",
+          "1",
+          "--reporter",
+          "dot"
+        ]
+      },
+      {
+        "name": "gateway-built-control",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/gateway-built-control.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "gateway/tests/run-built-systemd-control.mjs"
+        ]
+      },
+      {
+        "name": "native-normal-types",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-normal-types.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-b",
+          "packages/util/native-command",
+          "packages/bundle/web-app",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "native-normal-final-emit",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-normal-final-emit.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-b",
+          "packages/util/native-command",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "native-normal-final-bundle",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-normal-final-bundle.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "RAYON_NUM_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/tsdown/dist/run.mjs",
+          "--filter",
+          "@deepseek-ai/dsh-native-command"
+        ]
+      },
+      {
+        "name": "browser-normal-bundle",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/browser-normal-bundle.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "RAYON_NUM_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/tsdown/dist/run.mjs",
+          "--filter",
+          "@deepseek-ai/dsh-web-app"
+        ]
+      },
+      {
+        "name": "gateway-check-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/gateway-check-final.json",
+        "status": "passed",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "gateway/tsconfig.json",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/gateway.tsbuildinfo",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "gateway-normal-build",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/gateway-normal-build.json",
+        "status": "passed",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "gateway/tsconfig.build.json",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "native-host-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-host-final.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/host.tsbuildinfo",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "native-lint-final",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-lint-final.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_OXLINT_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/util/native-command/src/runner.ts",
+          "packages/util/native-command/tests/pre-cancelled.spec.ts",
+          "packages/util/native-command/tests/failed-spawn.spec.ts",
+          "packages/util/native-command/tests/fixtures/failed-spawn-cancellation.mjs",
+          "packages/util/native-command/tests/path-opener.spec.ts",
+          "packages/bundle/web-app/src/index.ts",
+          "packages/bundle/web-app/tests/web-app.spec.ts",
+          "packages/host/directory-picker-native/tests/native-picker.spec.ts",
+          "gateway/src/child-command.ts",
+          "gateway/src/deployment-commands.ts",
+          "gateway/tests/failed-spawn-cancellation.spec.ts",
+          "gateway/tests/fixtures/failed-spawn-cancellation.mjs"
+        ]
+      },
+      {
+        "name": "native-node-next",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-node-next.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-node-next-types.ts"
+        ]
+      },
+      {
+        "name": "native-publint-actual",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-publint-actual.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/publint-all.ts",
+          "--packages-root",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/publish-actual"
+        ]
+      },
+      {
+        "name": "native-doc-failed-leaf",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-doc-failed-leaf.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-repository-references.ts"
+        ]
+      },
+      {
+        "name": "native-export-jsdoc",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-export-jsdoc.json",
+        "status": "passed",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-export-jsdoc.ts"
+        ]
+      },
+      {
+        "name": "native-signal-classification",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-signal-classification.json",
+        "status": "passed",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/classify-native-signals.mjs"
+        ]
+      },
+      {
+        "name": "native-current-baseline",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/native-current-baseline.json",
+        "status": "passed",
+        "command": [
+          "git",
+          "fetch",
+          "--no-tags",
+          "origin",
+          "master"
+        ]
+      }
+    ],
+    "consumerAggregate": "The initial consumer run passes162 and fails one obsolete assertion that Node receives signal. Corrected that test adapter and reran its28-case owning leaf successfully; the remaining162 outcomes stay recorded, so unique consumer total is163.",
+    "docAggregate": "19 doc-quick leaves passed; repository references failed because B472 copied raw baseline commit identifiers into maintained audit JSON. Move those identifiers to private evidence references and rerun the unchanged failed leaf successfully. No validation rule is disabled.",
+    "hostCheckingFace": "Rebuilding current gateway-runtime declarations resolves the3-vs4argument peer test mismatch; Host checking face then passes without editing peer source.",
+    "publication": "The actual repository publication-view checker visits exactly2 copied package directories and passes with existing unpublished ./src/* glob warnings. The earlier zero-package subset and raw API diagnostics are excluded from acceptance.",
+    "postgresEnvironment": "The first maintenance run cannot find pg_dump. Existing /opt/homebrew/opt/libpq/bin tools are added only to the child test PATH;26 actual backup/restore cases then pass. No dependency is installed.",
+    "ownedDisposableDatabasesDropped": 2,
+    "firstUngroupedProbe": "The first direct runner test terminates its command group with137. No worker remains; subsequent regression fixtures use actual spawn({detached:true}) and private Python start_new_session to isolate native group signals."
+  },
+  "capsule": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/failed-spawn-capsule.json",
+  "integrationIndex": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T074529Z/B416-B473-integration-index.json",
+  "remaining": [
+    "Complete remaining model/process/Worker/helper/Python/third-party allocation and authorization inventory. The27 current direct Node subprocess calls have no built-in signal option after this repair; dynamic owners are not covered by that scan.",
+    "Continue SDK/subagent/workflow lifetime and account/computer business transitions outside peer-reserved sources.",
+    "B25 escaped descendants and Windows/native desktop acceptance remain separate open questions. REAL-050/B451 exact Runtime management still needs independent operational acceptance.",
+    "Database credential process-argument privacy remains the existing native/Docker/SSH wrapper and libpq service-precedence design candidate. No unverified transport rewrite is included.",
+    "Peer owns index/catalog/workbench and104. Root makes no production deployment or full live-QA claim.",
+    "All12 global domains remain in progress. Official paid Responses validation stays deferred by the user."
+  ],
+  "wholeProjectComplete": false,
+  "officialResponsesDeferredByUser": true,
+  "productionAcceptanceClaimed": false
+}

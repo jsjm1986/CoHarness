@@ -1,0 +1,14 @@
+{
+  "name": "preset-retired-native-causal-fields",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/run-managed-native-ssh.py lib /Users/a1234/.nvm/versions/node/v22.22.1/bin/node retired",
+  "startedAt": "2026-10-25T14:15:44.654475+00:00",
+  "seconds": 4.221,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fe46781532a504244c685d5434b6d830b8ff2bb22048e81f7022d4b8ccf20ce2",
+  "inputsAfter": "fe46781532a504244c685d5434b6d830b8ff2bb22048e81f7022d4b8ccf20ce2",
+  "postgresToolDirectory": null,
+  "outputSha256": "14f861bec04b6924ef6d50241372ce34f16e835e4aef8e694bb39de0be978f73",
+  "outputTail": "Traceback (most recent call last):\n  File \"/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/run-managed-native-ssh.py\", line 49, in <module>\n    if active.returncode:raise RuntimeError('Native managed SSH failed in '+mode+'\\n'+stdout[-2000:]+'\\n'+stderr[-6000:])\n                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: Native managed SSH failed in retired\n\nnode:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Missing expected rejection.\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/subagent/subagent-codex/tests/fixtures/managed-ssh-driver.mjs:232:27 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: /SSH connection is closed/,\n  operator: 'rejects',\n  diff: 'simple'\n}\n\nNode.js v22.22.1\n\n"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "sdk-notification-python-lint",
+  "cwd": ".",
+  "command": "python/sdk/.venv/bin/ruff check python/sdk/src/deepseek_harness/client.py python/sdk/src/deepseek_harness/api.py python/sdk/tests/test_client.py python/sdk/tests/test_sdk_session_lineage.py python/sdk/tests/test_sdk_child_process_admission.py",
+  "startedAt": "2026-10-24T11:28:04.193896+00:00",
+  "seconds": 2.018,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0aa30cf857305b653f6d091ed945647f71c47e8e748d082a6a641a4e8f7e8b42",
+  "inputsAfter": "0aa30cf857305b653f6d091ed945647f71c47e8e748d082a6a641a4e8f7e8b42",
+  "postgresToolDirectory": null,
+  "outputSha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+  "outputTail": "All checks passed!\n"
+}

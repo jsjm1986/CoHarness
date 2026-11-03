@@ -245,9 +245,8 @@ describe('Python file sandbox', () => {
     { program: 'import os\nos._exit(152)', kind: 'worker-exit' },
   ])('distinguishes CPU exhaustion from a numeric exit behind a signal-mapping launcher: $kind', async ({ program, kind }) => {
     const { ctx, run } = await setup('read-only', { cpuSeconds: 1, maxWallMs: 30_000 })
-    // Linux bwrap converts a child's signal into a numeric exit; preserve fd 3
-    // and exercise that launcher behavior independently of the host platform.
-    const launcher = 'import subprocess,sys\nchild = subprocess.Popen(sys.argv[1:], pass_fds=(3,))\ncode = child.wait()\nsys.exit(128 - code if code < 0 else code)'
+    // The launcher preserves the inherited control descriptor before the trusted loader maps it to fd 3.
+    const launcher = 'import subprocess,sys\nchild = subprocess.Popen(sys.argv[1:], pass_fds=(7,))\ncode = child.wait()\nsys.exit(128 - code if code < 0 else code)'
     vi.spyOn(ctx.sandbox, 'confine').mockImplementation(async argv => confinement([
       argv[0]!, '-I', '-c', launcher, ...argv,
     ]))

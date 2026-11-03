@@ -1,0 +1,11 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, workflowRecordReady]
+- insert:
+    - id: record-ptc
+      name: '@deepseek-ai/dsh-ptc-runtime-node'
+    - id: record-runtime
+      name: './runtime.mjs'
+    - id: record-model
+      name: './model.mjs'

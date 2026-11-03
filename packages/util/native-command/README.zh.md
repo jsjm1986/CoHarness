@@ -37,7 +37,7 @@ declare const signal: AbortSignal
 const { stdout, stderr } = await runNativeCommand('osascript', ['-e', script], signal, 'hidden')
 ```
 
-退出码为 0 时，调用解析为捕获到的 stdout 与 stderr。任何失败都会以错误拒绝，错误附带退出 `code` 与两路已捕获输出，因此调用方无需重跑命令即可区分工具缺失（`ENOENT`）、取消（`ABORT_ERR`）与真实的命令失败。必填的第四个参数 `window: 'hidden' | 'visible'` 控制 Windows 启动时的窗口可见性，在其他平台不生效。后台命令传入 `'hidden'`，GUI 启动程序传入 `'visible'`。路径打开器为 Explorer 选择 `'visible'`，包括 WSL 转交和文件选中操作，因为隐藏 Explorer 也会隐藏它的文件夹窗口。
+退出码为 0 时，调用解析为捕获到的 stdout 与 stderr。任何失败都会以错误拒绝，错误附带退出 `code` 与两路已捕获输出，因此调用方无需重跑命令即可区分工具缺失（`ENOENT`）、取消（`ABORT_ERR`）与真实的命令失败。调用前已取消时，在创建进程前以 `ABORT_ERR` 拒绝。取消不会向未分配的子进程句柄或调用方进程组发送信号。取消会强制终止直接辅助进程，调用仅在该进程及其捕获的输出流关闭后结束。已移交给桌面的应用保留独立生命周期。必填的第四个参数 `window: 'hidden' | 'visible'` 控制 Windows 启动时的窗口可见性，在其他平台不生效。后台命令传入 `'hidden'`，GUI 启动程序传入 `'visible'`。路径打开器为 Explorer 选择 `'visible'`，包括 WSL 转交和文件选中操作，因为隐藏 Explorer 也会隐藏它的文件夹窗口。
 
 ### 注入命令边界
 
@@ -46,6 +46,8 @@ const { stdout, stderr } = await runNativeCommand('osascript', ['-e', script], s
 ### 打开 Host 路径
 
 `openNativePath(path, signal)` 将路径交给默认应用；平台能够确定默认浏览器时，HTML 与 SVG 会优先交给该浏览器。`openNativeAssociatedPath(path, signal)` 始终使用文件类型关联，不覆盖为浏览器。`openNativeTextFile(path, signal)` 选择文本编辑器意图；macOS 使用 `open -t`。Windows 将每种意图都交给 Explorer，由 shell 自身的默认应用解析（即双击所走的那条）选择应用；Explorer 收到的是编码后的文件 URI，其退出码 1 按已转交请求处理，取消、找不到可执行文件和其他退出码仍然报错。该确认不能证明应用已打开文件。WSL 路径先通过 `wslpath -w` 转换，再交给 Windows 桌面。`canOpenNativePath()` 报告当前 Host 是否可能具备桌面目标。
+
+`inspectDesktopEnvironment()` 只读显示环境变量、操作系统登录会话记录与本机显示套接字，不启动驱动、不截屏，也不申请系统权限。结果分为 `detected`、`not-detected` 和 `unknown`；无法读取的记录保持未知。检测结果不代表桌面操作授权或 VNC 可达性。没有显示环境声明或登录会话记录的 Wayland 合成器可能需要显式配置提供方。
 
 `revealNativePath(path, signal)` 在 Finder 或文件资源管理器中选中文件，包含 WSL 路径转换；在桌面 Linux 上通过 `xdg-open` 打开上层目录。`nativeFileManager()` 标识该操作，供 UI 根据 Host 选择文案；桌面是否可用仍由独立的 `canOpenNativePath()` 检查决定。调用方必须先授权绝对文件路径，再执行操作。平台分派由注入运行器的测试覆盖；原生桌面验证由对应平台负责。 Explorer 接收独立参数中的编码文件 URI。退出码 1 按已转交请求处理；取消、找不到可执行文件和其他退出码仍然报错。该确认不能证明应用已打开文件，也不能证明桌面窗口已选中文件。
 

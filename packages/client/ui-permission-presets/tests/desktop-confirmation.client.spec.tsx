@@ -15,11 +15,74 @@ function fixture() {
   const status = vi.fn<ConnectionHandle['api']['desktop']['status']>().mockResolvedValue(ok(value))
   const confirm = vi.fn<ConnectionHandle['api']['desktop']['confirm']>().mockImplementation(async payload => ok({ ...value, confirmed: payload.confirmed }))
   const state = createSnapshotStore<'connected' | 'reconnecting' | undefined>('connected')
-  const host = createSnapshotStore<{ executionAuthorityRequired: boolean } | undefined>({ executionAuthorityRequired: true })
+  const host = createSnapshotStore<{ executionAuthorityRequired: boolean; computerUseUnavailableReason?: 'headless' | 'disabled' } | undefined>({ executionAuthorityRequired: true })
   const connection = { api: { desktop: { status, confirm } }, state, hostDescription: host } as unknown as ConnectionHandle
   const props = { sessionId: 'pane' as SessionId, connection, t: (key: keyof typeof desktopEn) => desktopEn[key] } as DesktopConfirmationProps
   return { value, status, confirm, state, host, props }
 }
+
+it.each(['headless', 'disabled'] as const)('explains %s provider availability without offering a confirmation gesture', async (unavailableReason) => {
+  const f = fixture()
+  f.status.mockResolvedValue(ok({ unavailableReason }))
+  render(<DesktopConfirmationAction {...f.props} />)
+  fireEvent.click(screen.getByRole('button', { name: /Desktop access/ }))
+  await screen.findByText(desktopEn[unavailableReason])
+  expect(screen.queryByRole('button', { name: desktopEn.confirm })).toBeNull()
+  expect(f.confirm).not.toHaveBeenCalled()
+})
+
+it.each(['headless', 'disabled'] as const)('explains %s from the Host summary during reconnection without an eager remote read', async (computerUseUnavailableReason) => {
+  const f = fixture()
+  f.host.set({ executionAuthorityRequired: true, computerUseUnavailableReason })
+  f.status.mockResolvedValue(ok({ unavailableReason: computerUseUnavailableReason }))
+  render(<DesktopConfirmationAction {...f.props} />)
+  expect(f.status).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: /Desktop access/ }))
+  await screen.findByText(desktopEn[computerUseUnavailableReason])
+  expect(f.status).toHaveBeenCalledOnce()
+  act(() => { f.state.set('reconnecting'); f.host.set(undefined) })
+  expect(screen.getByText(desktopEn[computerUseUnavailableReason])).toBeTruthy()
+  expect(screen.queryByText(desktopEn.disconnected)).toBeNull()
+  expect(screen.queryByRole('button', { name: desktopEn.confirm })).toBeNull()
+  expect(f.confirm).not.toHaveBeenCalled()
+})
+
+it('does not carry a headless summary to another runtime with a configured desktop', async () => {
+  const first = fixture(), second = fixture()
+  first.host.set({ executionAuthorityRequired: true, computerUseUnavailableReason: 'headless' })
+  first.status.mockResolvedValue(ok({ unavailableReason: 'headless' }))
+  second.status.mockResolvedValue(ok({ ...second.value, desktop: 'remote-desktop' }))
+  const view = render(<DesktopConfirmationAction {...first.props} />)
+  fireEvent.click(screen.getByRole('button', { name: /Desktop access/ }))
+  await screen.findByText(desktopEn.headless)
+  view.rerender(<DesktopConfirmationAction {...second.props} />)
+  await screen.findByText('remote-desktop')
+  expect(screen.queryByText(desktopEn.headless)).toBeNull()
+  expect(first.confirm).not.toHaveBeenCalled()
+})
+
+it('accepts a fresh explicit read when a provider becomes available after the Host summary', async () => {
+  const f = fixture()
+  f.host.set({ executionAuthorityRequired: true, computerUseUnavailableReason: 'headless' })
+  render(<DesktopConfirmationAction {...f.props} />)
+  expect(f.status).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: /Desktop access/ }))
+  await screen.findByText('display-0')
+  expect(screen.queryByText(desktopEn.headless)).toBeNull()
+  expect(screen.getByRole('button', { name: desktopEn.confirm })).toBeTruthy()
+})
+
+it('refreshes a closed desktop action when a new Host summary removes the environment limitation', async () => {
+  const f = fixture()
+  f.host.set({ executionAuthorityRequired: true, computerUseUnavailableReason: 'headless' })
+  render(<DesktopConfirmationAction {...f.props} />)
+  expect(f.status).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: /Desktop access/ }).getAttribute('aria-description')).toBe(desktopEn.statusUnavailable)
+  act(() => { f.host.set({ executionAuthorityRequired: true }) })
+  await waitFor(() => { expect(f.status).toHaveBeenCalledOnce() })
+  await waitFor(() => { expect(screen.getByRole('button', { name: /Desktop access/ }).getAttribute('aria-description')).toBe(desktopEn.statusPending) })
+  expect(f.confirm).not.toHaveBeenCalled()
+})
 
 it('shows the exact target and saves only explicit confirmation and withdrawal gestures', async () => {
   const f = fixture()

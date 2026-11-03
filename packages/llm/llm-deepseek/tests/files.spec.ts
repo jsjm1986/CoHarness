@@ -47,6 +47,16 @@ function harness(config: Config = {}) {
 afterEach(() => { vi.unstubAllGlobals() })
 
 describe('Messages Files requests', () => {
+  it.each(['MODEL_FORBIDDEN', 'MODEL_POLICY_UNAVAILABLE'] as const)('does not replace a Files %s refusal with inline inference', async (code) => {
+    const h = harness()
+    const refusal = new LlmError('Model authorization changed.', code)
+    h.ensureUploaded.mockRejectedValueOnce(refusal)
+    const fetchImpl = vi.fn<typeof fetch>()
+    vi.stubGlobal('fetch', fetchImpl)
+    await expect(chunks(h.adapter.stream(request()))).rejects.toBe(refusal)
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
   it('keeps nested tool-result images in order and sends only Files ids with the beta header', async () => {
     const fetchImpl = vi.fn<typeof fetch>(async () => success())
     vi.stubGlobal('fetch', fetchImpl)

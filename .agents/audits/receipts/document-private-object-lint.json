@@ -1,0 +1,14 @@
+{
+  "name": "document-private-object-lint",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/file-object.ts packages/attachment/userdoc-local/tests/fixtures/linux-object-replay.ts",
+  "startedAt": "2026-10-26T23:22:53.230709+00:00",
+  "seconds": 5.331,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d88e0c7941a6e8cafc60c54fa42c5f504ad2e39e023d2f4332132cb21f1a5c36",
+  "inputsAfter": "d88e0c7941a6e8cafc60c54fa42c5f504ad2e39e023d2f4332132cb21f1a5c36",
+  "postgresToolDirectory": null,
+  "outputSha256": "8caf10f7450c2bdeb8909cb7aebfaa4b70f80f0a9cbe540162560ae0c914f8dc",
+  "outputTail": "packages/attachment/userdoc-local/tests/fixtures/linux-object-replay.ts:114:1: error @stylistic(max-len): This line has a length of 142. Maximum allowed is 140.\npackages/attachment/userdoc-local/tests/fixtures/linux-object-replay.ts:70:22: error typescript(no-confusing-void-expression): Placing a void expression inside another expression is forbidden. help: Move it to its own statement instead.\npackages/attachment/userdoc-local/tests/fixtures/linux-object-replay.ts:79:22: error typescript(no-confusing-void-expression): Placing a void expression inside another expression is forbidden. help: Move it to its own statement instead.\npackages/attachment/userdoc-local/tests/fixtures/linux-object-replay.ts:81:74: error typescript(use-unknown-in-catch-callback-variable): Prefer the safe `: unknown` for a `then` rejection callback variable.\n"
+}

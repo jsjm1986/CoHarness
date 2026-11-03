@@ -1,0 +1,14 @@
+{
+  "name": "gateway-built-model-admission",
+  "cwd": "gateway",
+  "command": "node tests/run-built-resource-admission.mjs",
+  "startedAt": "2026-10-23T21:44:49.389291+00:00",
+  "seconds": 2.803,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "65eaa7a1e5bd93ac190ebe33e40483a57e75b9e4ebec9961843211f862307e4d",
+  "inputsAfter": "65eaa7a1e5bd93ac190ebe33e40483a57e75b9e4ebec9961843211f862307e4d",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "d0710bee365dfe018fe075bdabe674ff552a25893df76357c70e720609a5168d",
+  "outputTail": "{\"freshPressureRequired\":true,\"sharedCreditSpent\":true,\"cancellationBeforeAllocation\":true,\"activeAssignmentPreserved\":true}\n{\"compiledGatewayModel\":true,\"kernelOwnerLoaded\":true,\"waitedForNodeGrant\":true,\"exactRequestEvidence\":true,\"deploymentHeaders\":true,\"harnessAttribution\":true,\"disjointTokenTotal\":17,\"releasedAfterCompletion\":true}\n"
+}

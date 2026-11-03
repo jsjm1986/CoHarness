@@ -1,0 +1,14 @@
+{
+  "name": "jobs-starting-slot-and-timer-config-catalog",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/gen-config-catalog.ts --check",
+  "startedAt": "2026-10-26T02:44:50.753199+00:00",
+  "seconds": 5.337,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9d934f6c471dbd1e9343d16161f85c3d0bb3349d456e8d93a73ffa470ae17a3e",
+  "inputsAfter": "9d934f6c471dbd1e9343d16161f85c3d0bb3349d456e8d93a73ffa470ae17a3e",
+  "postgresToolDirectory": null,
+  "outputSha256": "59f0858c228cc79f44cd4d1ce0b78731b0ce93bd0dc71230036b1d98e99c9383",
+  "outputTail": "gen-config-catalog: stale — docs/config-catalog.md, docs/config-catalog.zh.md, docs/config-catalog.i18n.yaml. Run `pnpm run gen-config-catalog` and commit the result.\n"
+}

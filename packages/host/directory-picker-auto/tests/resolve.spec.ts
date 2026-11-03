@@ -8,6 +8,7 @@ import type { DirectoryPickerHostFacts } from '../src/resolve.ts'
 
 /** Baseline facts that resolve to `native`; each case overrides one signal (darwin never consults `linuxChooser`). */
 const attended: DirectoryPickerHostFacts = {
+  gatewayRuntime: false,
   bindHost: '127.0.0.1',
   allowsRemoteAuthorities: false,
   platform: 'darwin',
@@ -17,6 +18,12 @@ const attended: DirectoryPickerHostFacts = {
 }
 
 describe('resolveDirectoryPickerBackend', () => {
+  it('uses browsing for Gateway runtimes even when their proxy arrives through loopback', () => {
+    for (const platform of ['darwin', 'win32', 'linux'] as const) {
+      expect(resolveDirectoryPickerBackend({ ...attended, gatewayRuntime: true, platform,
+        linuxChooser: true, env: { DISPLAY: ':0' } })).toBe('browse')
+    }
+  })
   it('resolves native for a loopback bind on a display platform', () => {
     expect(resolveDirectoryPickerBackend(attended)).toBe('native')
     expect(resolveDirectoryPickerBackend({ ...attended, platform: 'win32' })).toBe('native')

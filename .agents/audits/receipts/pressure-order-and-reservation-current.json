@@ -1,0 +1,14 @@
+{
+  "name": "pressure-order-and-reservation-current",
+  "cwd": "gateway",
+  "command": "npm exec -- vitest run tests/node-resource-budget-postgres.spec.ts --no-file-parallelism",
+  "startedAt": "2026-10-23T23:24:02.110028+00:00",
+  "seconds": 8.905,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9058ae2d45519e67ce31f2bb44898a952b1efa70822a860f8e24f1e829663282",
+  "inputsAfter": "9058ae2d45519e67ce31f2bb44898a952b1efa70822a860f8e24f1e829663282",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "36a14d05a1822ebeac409942c1051ffa68c29e431b4cfc08ec6d05a628579eb0",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  34 passed (34)\n   Start at  07:24:05\n   Duration  5.92s (transform 702ms, setup 0ms, import 872ms, tests 4.95s, environment 0ms)\n\n"
+}

@@ -1,0 +1,34 @@
+[
+  {
+    "phase": "read-only",
+    "status": 403,
+    "body": {
+      "code": "collaboration-forbidden",
+      "reason": "forbidden"
+    }
+  },
+  {
+    "phase": "provider-withdrawn",
+    "status": 503,
+    "body": {
+      "code": "collaboration-forbidden",
+      "reason": "gateway-unavailable"
+    }
+  },
+  {
+    "phase": "replaced-read-only",
+    "status": 403,
+    "body": {
+      "code": "collaboration-forbidden",
+      "reason": "forbidden"
+    }
+  },
+  {
+    "phase": "replaced-read-write",
+    "status": 200,
+    "body": {
+      "operation": "create",
+      "writerUserId": 9
+    }
+  }
+]

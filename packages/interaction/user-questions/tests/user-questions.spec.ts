@@ -1,14 +1,15 @@
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { agentCarrier, agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import UserQuestionService, {
   TIMED_WAIT_PARAMETER,
   UserQuestionError,
   type AskUserQuestionAnswer,
   type AskUserQuestionRequest,
 } from '@deepseek-ai/dsh-user-questions'
-import { createToolResultMessage, createUserMessage, ToolCallId, type ToolSchema, type UserMessage } from '@deepseek-ai/dsh-llm'
-import { Session, SessionId, TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session'
+import { createToolResultMessage, createUserMessage, freezeMessage, ToolCallId, type ToolSchema, type UserMessage } from '@deepseek-ai/dsh-llm'
+import type { ExecutionInputId } from '@deepseek-ai/dsh-execution-authority'
+import SessionStore, { Session, SessionId, TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 interface QuestionAnswerer {
@@ -51,7 +52,9 @@ describe('UserQuestionService', () => {
     const result = await ctx.userQuestions.ask({ questions })
 
     expect(result).toEqual({ answers: [{ id: 'confirm', selected: ['yes'] }] })
-    expect(p.seen).toEqual([{ questions }])
+    expect(p.seen).toHaveLength(1)
+    expect(p.seen[0]?.questions).toBe(questions)
+    expect(p.seen[0]?.signal).toBeInstanceOf(AbortSignal)
   })
 
   it('rejects ask requests when no provider is registered', async () => {
@@ -109,7 +112,8 @@ describe('UserQuestionService', () => {
     const ctx = new Context()
     await ctx.plugin(UserQuestionService)
     const pending = Promise.withResolvers<never>()
-    registerAnswerer(ctx, { ask: () => pending.promise })
+    const entered = Promise.withResolvers<undefined>()
+    registerAnswerer(ctx, { ask: () => { entered.resolve(undefined); return pending.promise } })
     const controller = new AbortController()
     const abortReason = new DOMException('This operation was aborted', 'AbortError')
 
@@ -117,6 +121,7 @@ describe('UserQuestionService', () => {
       questions: [{ id: 'confirm', question: 'Proceed?' }],
       signal: controller.signal,
     })
+    await entered.promise
     controller.abort(abortReason)
     pending.reject(abortReason)
 
@@ -634,6 +639,203 @@ describe('late replies', () => {
     }, { surfaceOp: 'append' })
   }
 
+  async function continuedContext() {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(SessionProjectionRegistry)
+    const service = await ctx.plugin(UserQuestionService)
+    const prepared = liveAgent('continued-authority')
+    const agent = { ...prepared, session: ctx.sessions.create(prepared.id) }
+    const detach = ctx.agents.register(agent)
+    await detach
+    askInLog(agent, timedCallId)
+    continueInLog(agent, timedCallId)
+    return { ctx, agent, detach, service }
+  }
+
+  const answerBatch = { answers: [{ id: 'scope', selected: ['Tool only'] }] }
+
+  it('refuses an already cancelled reply without starting attestation', async () => {
+    const { ctx, agent } = await continuedContext()
+    const stamp = vi.fn(async (_session: Session, message: UserMessage) => message)
+    ctx.provide('executionAuthority', { stamp } as never)
+    const controller = new AbortController()
+    const reason = new Error('Reply was cancelled')
+    controller.abort(reason)
+    try {
+      await expect(ctx.userQuestions.answer(agent, timedCallId, answerBatch, controller.signal)).rejects.toBe(reason)
+      expect(stamp).not.toHaveBeenCalled()
+      expect(agent.steer).not.toHaveBeenCalled()
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('refuses a retained reference after its service is unloaded', async () => {
+    const { ctx, agent, service } = await continuedContext()
+    const questions = ctx.userQuestions
+    try {
+      await service.dispose()
+      await expect(questions.answer(agent, timedCallId, answerBatch, new AbortController().signal))
+        .rejects.toMatchObject({ code: 'ASK_ABORTED' })
+      expect(agent.steer).not.toHaveBeenCalled()
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('attests the actual queued reply before delivery', async () => {
+    const { ctx, agent } = await continuedContext()
+    const inputId = '00000000-0000-4000-8000-000000000001' as ExecutionInputId
+    const stamp = vi.fn(async (session: Session, message: UserMessage) => {
+      expect(session).toBe(agent.session)
+      expect(agent.steer).not.toHaveBeenCalled()
+      return freezeMessage({ ...message, source: { ...message.source, gatewayExecutionInput: inputId } })
+    })
+    ctx.provide('executionAuthority', { stamp } as never)
+    try {
+      expect(await ctx.userQuestions.answer(agent, timedCallId, answerBatch, new AbortController().signal)).toBe(true)
+      expect(stamp).toHaveBeenCalledOnce()
+      expect(agent.steer.mock.calls[0]?.[0].source).toMatchObject({ gatewayExecutionInput: inputId, kind: 'user-question-reply' })
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('releases a reply reservation when required attestation is unavailable', async () => {
+    const { ctx, agent } = await continuedContext()
+    const remove = ctx.provide('executionAuthorityRequired', true)
+    try {
+      await expect(ctx.userQuestions.answer(agent, timedCallId, answerBatch, new AbortController().signal))
+        .rejects.toThrow('Managed execution requires its authorization provider.')
+      expect(agent.steer).not.toHaveBeenCalled()
+      expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBeUndefined()
+      remove()
+      expect(await ctx.userQuestions.answer(agent, timedCallId, answerBatch, new AbortController().signal)).toBe(true)
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('reserves one answer and prevents idle release while its attestation is pending', async () => {
+    const { ctx, agent } = await continuedContext()
+    const entered = Promise.withResolvers<undefined>()
+    const proceed = Promise.withResolvers<undefined>()
+    const stamp = vi.fn(async (_session: Session, message: UserMessage) => {
+      entered.resolve(undefined)
+      await proceed.promise
+      return message
+    })
+    ctx.provide('executionAuthority', { stamp } as never)
+    const first = ctx.userQuestions.answer(agent, timedCallId, answerBatch, new AbortController().signal)
+    try {
+      await entered.promise
+      expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBe('busy')
+      await expect(ctx.userQuestions.answer(agent, timedCallId, answerBatch, new AbortController().signal))
+        .rejects.toMatchObject({ code: 'REPLY_QUEUED' })
+      expect(stamp).toHaveBeenCalledOnce()
+      proceed.resolve(undefined)
+      expect(await first).toBe(true)
+      const message = agent.steer.mock.calls[0]![0]
+      agent.session.append('user/message', message, { surfaceOp: 'append' })
+      expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBeUndefined()
+    } finally {
+      proceed.resolve(undefined)
+      await Promise.allSettled([first])
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('preserves another reply queued while the current reply is being attested', async () => {
+    const { ctx, agent } = await continuedContext()
+    const entered = Promise.withResolvers<undefined>()
+    const proceed = Promise.withResolvers<undefined>()
+    ctx.provide('executionAuthority', { async stamp(_session: Session, message: UserMessage) {
+      entered.resolve(undefined)
+      await proceed.promise
+      return message
+    } } as never)
+    const operation = ctx.userQuestions.answer(agent, timedCallId, answerBatch, new AbortController().signal)
+    const outcome = operation.then(value => ({ value }), (error: unknown) => ({ error }))
+    try {
+      await entered.promise
+      const other = createUserMessage({ source: { kind: 'user-question-reply', callId: timedCallId, outcome: 'answered' }, content: [] })
+      agent.queuedMessages.push(other)
+      proceed.resolve(undefined)
+      expect(await outcome).toMatchObject({ error: { code: 'REPLY_QUEUED' } })
+      expect(agent.queuedMessages).toEqual([other])
+      expect(agent.steer).not.toHaveBeenCalled()
+    } finally {
+      proceed.resolve(undefined)
+      await outcome
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it.each(['cancelled', 'authority-replaced', 'agent-removed', 'service-unloaded', 'question-settled', 'question-replaced'] as const)(
+    'does not deliver a reply when %s during attestation', async (change) => {
+      const { ctx, agent, detach, service } = await continuedContext()
+      const entered = Promise.withResolvers<undefined>()
+      const proceed = Promise.withResolvers<undefined>()
+      const authority = { async stamp(_session: Session, message: UserMessage) {
+        entered.resolve(undefined)
+        await proceed.promise
+        return message
+      } }
+      const remove = ctx.provide('executionAuthority', authority as never)
+      const controller = new AbortController()
+      const cancelled = new Error('Reply submission cancelled')
+      const reply = ctx.userQuestions.answer(agent, timedCallId, answerBatch, controller.signal)
+      const outcome = reply.then(value => ({ value }), (error: unknown) => ({ error }))
+      try {
+        await entered.promise
+        if (change === 'cancelled') controller.abort(cancelled)
+        else if (change === 'authority-replaced') { remove(); ctx.provide('executionAuthority', { ...authority } as never) }
+        else if (change === 'agent-removed') await detach()
+        else if (change === 'service-unloaded') await service.dispose()
+        else if (change === 'question-settled') agent.session.append('user/message', createUserMessage({
+          source: { kind: 'user-question-reply', callId: timedCallId, outcome: 'answered' }, content: [],
+        }), { surfaceOp: 'append' })
+        else { askInLog(agent, timedCallId); continueInLog(agent, timedCallId) }
+        proceed.resolve(undefined)
+        const settled = await outcome
+        if (change === 'question-settled' || change === 'question-replaced') expect(settled).toEqual({ value: false })
+        else if (change === 'cancelled') expect(settled).toEqual({ error: cancelled })
+        else expect(settled).toMatchObject({ error: { code: change === 'agent-removed' ? 'CALLER_NOT_LIVE'
+          : change === 'service-unloaded' ? 'ASK_ABORTED' : 'AUTHORITY_CHANGED' } })
+        expect(agent.steer).not.toHaveBeenCalled()
+      } finally {
+        proceed.resolve(undefined)
+        await outcome
+        await ctx.fiber.dispose()
+      }
+    })
+
+  it('keeps a replacement Agent reply reserved when an old attestation finishes', async () => {
+    const { ctx, agent, detach } = await continuedContext()
+    const entered = Promise.withResolvers<undefined>()
+    const proceed = Promise.withResolvers<undefined>()
+    const stamp = vi.fn(async (_session: Session, message: UserMessage) => message)
+      .mockImplementationOnce(async (_session, message) => {
+        entered.resolve(undefined)
+        await proceed.promise
+        return message
+      })
+    ctx.provide('executionAuthority', { stamp } as never)
+    const old = ctx.userQuestions.answer(agent, timedCallId, answerBatch, new AbortController().signal)
+    const oldOutcome = old.then(value => ({ value }), (error: unknown) => ({ error }))
+    try {
+      await entered.promise
+      await detach()
+      const replacement = { ...agent, steer: vi.fn() }
+      await ctx.agents.register(replacement)
+      expect(await ctx.userQuestions.answer(replacement, timedCallId, answerBatch, new AbortController().signal)).toBe(true)
+      proceed.resolve(undefined)
+      expect(await oldOutcome).toMatchObject({ error: { code: 'CALLER_NOT_LIVE' } })
+      await expect(ctx.userQuestions.answer(replacement, timedCallId, answerBatch, new AbortController().signal))
+        .rejects.toMatchObject({ code: 'REPLY_QUEUED' })
+      expect(replacement.steer).toHaveBeenCalledOnce()
+      expect(agent.steer).not.toHaveBeenCalled()
+    } finally {
+      proceed.resolve(undefined)
+      await oldOutcome
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('steers an answer into a continued question and closes it once the reply enters the inbox', async () => {
     const ctx = await timedContext()
     const agent = liveAgent('late-answer')
@@ -642,7 +844,7 @@ describe('late replies', () => {
     continueInLog(agent, timedCallId)
     const batch = { answers: [{ id: 'scope', selected: ['Tool only'] }] }
 
-    expect(ctx.userQuestions.answer(agent, timedCallId, batch)).toBe(true)
+    expect(await ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).toBe(true)
 
     expect(agent.steer).toHaveBeenCalledOnce()
     const steered = agent.steer.mock.calls[0]![0]
@@ -653,7 +855,7 @@ describe('late replies', () => {
     })
     agent.session.append('agent/inbox/spliced', { target: 'next-step', start: 0, inserted: [steered] })
     agent.session.append('user/message', steered, { surfaceOp: 'append' })
-    expect(ctx.userQuestions.answer(agent, timedCallId, batch)).toBe(false)
+    expect(await ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).toBe(false)
     await ctx.fiber.dispose()
   })
 
@@ -671,8 +873,8 @@ describe('late replies', () => {
     continueInLog(agent, secondCallId)
     const batch = { answers: [{ id: 'scope', selected: ['Tool only'] }] }
 
-    expect(ctx.userQuestions.answer(agent, secondCallId, batch)).toBe(true)
-    expect(ctx.userQuestions.answer(agent, timedCallId, batch)).toBe(true)
+    expect(await ctx.userQuestions.answer(agent, secondCallId, batch, new AbortController().signal)).toBe(true)
+    expect(await ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).toBe(true)
     expect(agent.queuedMessages.map(message => message.source)).toEqual([
       { kind: 'user-question-reply', callId: secondCallId, outcome: 'answered' },
       { kind: 'user-question-reply', callId: timedCallId, outcome: 'answered' },
@@ -689,15 +891,15 @@ describe('late replies', () => {
     continueInLog(agent, timedCallId)
     const batch = { answers: [{ id: 'scope', selected: ['Tool only'] }] }
 
-    expect(ctx.userQuestions.answer(agent, timedCallId, batch)).toBe(true)
-    expect(() => ctx.userQuestions.answer(agent, timedCallId, batch))
+    expect(await ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).toBe(true)
+    await expect(ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).rejects
       .toThrow(expect.objectContaining({ code: 'REPLY_QUEUED' }))
     expect(agent.steer).toHaveBeenCalledTimes(1)
 
     const first = agent.steer.mock.calls[0]![0]
     agent.queuedMessages.shift()
     agentEvents(ctx, agent).emit('agent/inbox/discarded', { message: first })
-    expect(ctx.userQuestions.answer(agent, timedCallId, batch)).toBe(true)
+    expect(await ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).toBe(true)
     expect(agent.steer).toHaveBeenCalledTimes(2)
     await ctx.fiber.dispose()
   })
@@ -715,11 +917,11 @@ describe('late replies', () => {
     })
     agent.queuedMessages.push(reply)
 
-    expect(() => ctx.userQuestions.answer(agent, timedCallId, batch))
+    await expect(ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).rejects
       .toThrow(expect.objectContaining({ code: 'REPLY_QUEUED' }))
     agent.queuedMessages.shift()
     agent.queuedTurns.push(reply)
-    expect(() => ctx.userQuestions.answer(agent, timedCallId, batch))
+    await expect(ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).rejects
       .toThrow(expect.objectContaining({ code: 'REPLY_QUEUED' }))
     expect(agent.steer).not.toHaveBeenCalled()
     await ctx.fiber.dispose()
@@ -737,12 +939,12 @@ describe('late replies', () => {
       content: [{ type: 'text', text: 'restored reply' }],
     })
     agent.queuedMessages.push(reply)
-    expect(() => ctx.userQuestions.answer(agent, timedCallId, batch))
+    await expect(ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).rejects
       .toThrow(expect.objectContaining({ code: 'REPLY_QUEUED' }))
 
     agent.queuedMessages.shift()
     agentEvents(ctx, agent).emit('agent/inbox/claimed', { message: reply, turn: 1 })
-    expect(() => ctx.userQuestions.answer(agent, timedCallId, batch))
+    await expect(ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).rejects
       .toThrow(expect.objectContaining({ code: 'REPLY_QUEUED' }))
 
     // An unexpected second claim for the same call must not replace the first reservation.
@@ -754,7 +956,7 @@ describe('late replies', () => {
 
     const ended = agent.session.append('turn/end', { turn: 1, reason: { kind: 'aborted', reason: { kind: 'user' } } })
     ctx.emit('session/event', agent.session, ended)
-    expect(ctx.userQuestions.answer(agent, timedCallId, batch)).toBe(true)
+    expect(await ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).toBe(true)
     await ctx.fiber.dispose()
   })
 
@@ -776,7 +978,7 @@ describe('late replies', () => {
     ctx.emit('session/event', otherSession, otherEnd)
     events.emit('agent/inbox/claimed', { message: otherReply, turn: 1 })
 
-    expect(ctx.userQuestions.answer(agent, timedCallId, batch)).toBe(true)
+    expect(await ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).toBe(true)
     events.emit('agent/inbox/claimed', { message: other, turn: 1 })
     events.emit('agent/inbox/claimed', { message: otherReply, turn: 1 })
     events.emit('agent/inbox/discarded', { message: other })
@@ -790,7 +992,7 @@ describe('late replies', () => {
     const turnEnd = agent.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     ctx.emit('session/event', agent.session, turnEnd)
 
-    expect(() => ctx.userQuestions.answer(agent, timedCallId, batch))
+    await expect(ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).rejects
       .toThrow(expect.objectContaining({ code: 'REPLY_QUEUED' }))
     expect(agent.steer).toHaveBeenCalledOnce()
     await ctx.fiber.dispose()
@@ -804,16 +1006,16 @@ describe('late replies', () => {
     continueInLog(agent, timedCallId)
     const batch = { answers: [{ id: 'scope', selected: ['Tool only'] }] }
 
-    expect(ctx.userQuestions.answer(agent, timedCallId, batch)).toBe(true)
+    expect(await ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).toBe(true)
     const first = agent.steer.mock.calls[0]![0]
     agent.queuedMessages.shift()
     agentEvents(ctx, agent).emit('agent/inbox/claimed', { message: first, turn: 1 })
-    expect(() => ctx.userQuestions.answer(agent, timedCallId, batch))
+    await expect(ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).rejects
       .toThrow(expect.objectContaining({ code: 'REPLY_QUEUED' }))
 
     const ended = agent.session.append('turn/end', { turn: 1, reason: { kind: 'aborted', reason: { kind: 'user' } } })
     ctx.emit('session/event', agent.session, ended)
-    expect(ctx.userQuestions.answer(agent, timedCallId, batch)).toBe(true)
+    expect(await ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).toBe(true)
     expect(agent.steer).toHaveBeenCalledTimes(2)
     await ctx.fiber.dispose()
   })
@@ -827,8 +1029,8 @@ describe('late replies', () => {
     const batch = { answers: [{ id: 'scope', selected: ['Tool only'] }] }
     agent.steer.mockImplementationOnce(() => { throw new Error('steer failed') })
 
-    expect(() => ctx.userQuestions.answer(agent, timedCallId, batch)).toThrow('steer failed')
-    expect(ctx.userQuestions.answer(agent, timedCallId, batch)).toBe(true)
+    await expect(ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).rejects.toThrow('steer failed')
+    expect(await ctx.userQuestions.answer(agent, timedCallId, batch, new AbortController().signal)).toBe(true)
     expect(agent.steer).toHaveBeenCalledTimes(2)
     await ctx.fiber.dispose()
   })
@@ -842,7 +1044,7 @@ describe('late replies', () => {
     askInLog(agent, timedCallId)
     continueInLog(agent, timedCallId)
 
-    expect(ctx.userQuestions.answer(agent, timedCallId, { answers: [] })).toBe(false)
+    expect(await ctx.userQuestions.answer(agent, timedCallId, { answers: [] }, new AbortController().signal)).toBe(false)
     expect(agent.steer).not.toHaveBeenCalled()
     await ctx.fiber.dispose()
   })
@@ -853,8 +1055,8 @@ describe('late replies', () => {
     ctx.agents.enter(agent, undefined)
     askInLog(agent, timedCallId)
 
-    expect(ctx.userQuestions.answer(agent, timedCallId, { answers: [] })).toBe(false)
-    expect(ctx.userQuestions.answer(agent, ToolCallId('never-asked'), { answers: [] })).toBe(false)
+    expect(await ctx.userQuestions.answer(agent, timedCallId, { answers: [] }, new AbortController().signal)).toBe(false)
+    expect(await ctx.userQuestions.answer(agent, ToolCallId('never-asked'), { answers: [] }, new AbortController().signal)).toBe(false)
     expect(agent.steer).not.toHaveBeenCalled()
     expect(agent.inject).not.toHaveBeenCalled()
     await ctx.fiber.dispose()
@@ -873,12 +1075,12 @@ describe('late replies', () => {
       [{ id: 'scope', selected: ['Tool only'] }, { id: 'scope', selected: [] }],
       [{ id: 'scope', selected: ['Tool only'] }, { id: 'other', selected: [] }],
     ]) {
-      expect(() => ctx.userQuestions.answer(agent, timedCallId, { answers }))
+      await expect(ctx.userQuestions.answer(agent, timedCallId, { answers }, new AbortController().signal)).rejects
         .toThrow(expect.objectContaining({ name: 'UserQuestionError', code: 'BAD_ANSWER' }))
     }
     expect(agent.steer).not.toHaveBeenCalled()
     // The question stays continued and takes a well-formed batch afterwards.
-    expect(ctx.userQuestions.answer(agent, timedCallId, { answers: [{ id: 'scope', selected: [] }] })).toBe(true)
+    expect(await ctx.userQuestions.answer(agent, timedCallId, { answers: [{ id: 'scope', selected: [] }] }, new AbortController().signal)).toBe(true)
     await ctx.fiber.dispose()
   })
 
@@ -897,7 +1099,7 @@ describe('late replies', () => {
     }, { surfaceOp: 'append' })
 
     expect(ctx.sessionProjections.stateOf(agent.session, 'userQuestions')?.questions).toEqual({ active: [], settled: [] })
-    expect(ctx.userQuestions.answer(agent, timedCallId, { answers: [{ id: 'scope', selected: [] }] })).toBe(false)
+    expect(await ctx.userQuestions.answer(agent, timedCallId, { answers: [{ id: 'scope', selected: [] }] }, new AbortController().signal)).toBe(false)
     expect(agent.steer).not.toHaveBeenCalled()
     await ctx.fiber.dispose()
   })

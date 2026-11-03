@@ -8,7 +8,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { Collaboration, CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
+import { isCollaborationRequired, type Collaboration, type CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 import {
@@ -73,7 +73,7 @@ function callerOf(exec: ToolRunContext, ctx: Context): Caller {
     id: agent.session.id,
     agent,
     header: agent.session.header,
-    requiresParticipantAcl: ctx.get('collaboration') !== undefined,
+    requiresParticipantAcl: isCollaborationRequired(ctx),
     boundary: ctx.sessionProjections.stateOf(agent.session, 'turnBoundary'),
   }
 }
@@ -116,7 +116,10 @@ async function readableSessions(
   signal: AbortSignal,
 ): Promise<ReadonlySet<SessionIdValue> | undefined> {
   const collaboration = ctx.get('collaboration')
-  if (collaboration === undefined) return undefined
+  if (collaboration === undefined) {
+    if (isCollaborationRequired(ctx)) throw serviceBoundary.unauthorizedTarget()
+    return undefined
+  }
   return captureReadableSet(ctx, collaboration, ids, signal)
 }
 
@@ -180,7 +183,10 @@ async function authorizedWorkspaceIds(
   signal: AbortSignal,
 ): Promise<ReadonlySet<SessionIdValue> | undefined> {
   const collaboration = ctx.get('collaboration')
-  if (collaboration === undefined) return undefined
+  if (collaboration === undefined) {
+    if (isCollaborationRequired(ctx)) throw serviceBoundary.unauthorizedTarget()
+    return undefined
+  }
   const authorized = new Set<SessionIdValue>([caller.id])
   const records = await serviceBoundary.call(ctx, signal, 'workspace authorization', () =>
     ctx.sessionQuery.filterSessions([{ kind: 'cwd', values: [cwd] }], signal))

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import {
-  createLaunchEnvironmentSnapshot, DSH_LAUNCH_ENVIRONMENT_KEY, launchEnvironmentOf,
+  createLaunchEnvironmentSnapshot, DSH_LAUNCH_ENVIRONMENT_KEY, launchEnvironmentOf, launchedByGateway,
 } from '../src/index.ts'
 
 const layered = createLaunchEnvironmentSnapshot([
@@ -9,6 +9,20 @@ const layered = createLaunchEnvironmentSnapshot([
   { source: 'project-env', path: '/work/.env', values: { SHARED: 'from-project', ONLY_PROJECT: 'j' } },
   { source: 'user-env', path: '/home/.dsh/.env', values: { SHARED: 'from-user', ONLY_USER: 'u' } },
 ])
+
+describe('launchedByGateway', () => {
+  it.each(['DSH_GATEWAY_CREDENTIAL_FD', 'DSH_GATEWAY_CREDENTIAL_FILE'])('uses only the inherited %s marker', (name) => {
+    expect(launchedByGateway(createLaunchEnvironmentSnapshot([{ source: 'process', values: { [name]: 'owned-channel' } }]))).toBe(true)
+    expect(launchedByGateway(createLaunchEnvironmentSnapshot([{ source: 'process', values: { [name]: '' } }]))).toBe(false)
+    expect(launchedByGateway(createLaunchEnvironmentSnapshot([
+      { source: 'project-env', values: { [name]: 'untrusted-project' } },
+      { source: 'user-env', values: { [name]: 'untrusted-home' } },
+    ]))).toBe(false)
+  })
+  it('keeps independent launches independent', () => {
+    expect(launchedByGateway(createLaunchEnvironmentSnapshot([]))).toBe(false)
+  })
+})
 
 describe('createLaunchEnvironmentSnapshot', () => {
   it('resolves across every layer, most trusted first, and reports the winning source', () => {

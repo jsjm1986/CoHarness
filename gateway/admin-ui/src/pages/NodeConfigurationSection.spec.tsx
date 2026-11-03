@@ -5,11 +5,15 @@ import { NODE_CONFIG_FIELDS } from '../../../src/node-config-fields.ts'
 import * as api from '../api.ts'
 import { NodeConfigurationSection } from './NodeConfigurationSection.tsx'
 
-vi.mock('../api.ts', () => ({ getNodeConfiguration: vi.fn(), mutateNodeConfiguration: vi.fn() }))
+vi.mock('../api.ts', () => ({ getNodeConfiguration: vi.fn(), mutateNodeConfiguration: vi.fn(), getDesktopEnvironment: vi.fn() }))
 const values = Object.fromEntries(NODE_CONFIG_FIELDS.map(field => [field.key, field.kind === 'integer' ? '8899' : `/private/${field.key}`])) as api.NodeSettingValues
 const initial: api.NodeConfigurationView = { organizationId: 'org', nodeId: 'node', revision: 0, appliedRevision: 0, runningRevision: 0,
   desired: values, effective: values, operation: null, configFile: '/private/config.json' }
-beforeEach(() => { vi.resetAllMocks(); vi.mocked(api.getNodeConfiguration).mockResolvedValue(structuredClone(initial)) })
+beforeEach(() => {
+  vi.resetAllMocks()
+  vi.mocked(api.getNodeConfiguration).mockResolvedValue(structuredClone(initial))
+  vi.mocked(api.getDesktopEnvironment).mockResolvedValue({ state: 'detected', reason: 'display-environment' })
+})
 afterEach(() => { cleanup() })
 
 it('saves a node-bound revision without restarting and keeps the effective value visible', async () => {

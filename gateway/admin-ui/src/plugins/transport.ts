@@ -4,12 +4,15 @@ import type { ClientRemote } from '../../../../packages/api/remotes/lib/types/cl
 import managerContribution from '../../../../packages/boot/plugin-manager/lib/typert.remote-client.js'
 import inventoryContribution from '../../../../packages/host/plugin-inventory/lib/typert.remote-client.js'
 import { readRpcStream } from '../../../../packages/client/connection/src/rpc-stream-reader.ts'
+import { ConnectionRpcStreamInterrupted } from '../../../../packages/client/connection/src/rpc-stream.ts'
 import type { ChangeResult, PluginInstallFrame } from '../../../../packages/boot/plugin-manager/src/types.ts'
 import { settingsDescribeValueSchema, settingsMutateValueSchema } from '../../../../packages/host/apiproxy/src/api/settings.schema.ts'
 import type { SettingsNamespaceView, SettingsPathOpView } from '../../../../packages/host/apiproxy/src/api/settings.ts'
 import { AdminRequestError, pluginManagementInvoke, type PluginManagementTarget } from '../api.ts'
 import { adminLanguage } from '../language.ts'
 import { translatePlugin } from './presentation.ts'
+import { adminComputerRequestUrl } from '../computer-target.ts'
+import { computerErrorMessage } from '../computer.copy.ts'
 
 type Answers<Methods> = { [K in keyof Methods]: Methods[K] extends (...args: infer Args) => Promise<{ ok: true; value: infer Value } | { ok: false; error: unknown }> ? (...args: Args) => Promise<Answer<Value>> : never }
 export interface ProfileSettingsRemote {
@@ -44,8 +47,9 @@ function decode<T>(endpoint: string, value: unknown): T {
 /** Bind every request to the selected node and generation; installation streams never reconnect or replay effects. */
 export function pluginManagementRemote(target: PluginManagementTarget, lifetime: AbortSignal, progress: (frame: PluginInstallFrame) => void, invalidate: (message: string) => void): PluginManagementRemote {
   const interrupted = (error: unknown) => {
-    if (!lifetime.aborted && error instanceof AdminRequestError && [401, 403, 404, 409].includes(error.status)) invalidate(messageOf(error))
-    return refused(messageOf(error))
+    const failure = error instanceof ConnectionRpcStreamInterrupted && error.cause instanceof AdminRequestError ? error.cause : error
+    if (!lifetime.aborted && failure instanceof AdminRequestError && [401, 403, 404, 409].includes(failure.status)) invalidate(messageOf(failure))
+    return refused(messageOf(failure))
   }
   const remoteFailure = (error: { message: string; code?: unknown }) => {
     if (!lifetime.aborted && (error.code === 'plugin-management/forbidden' || error.code === 'collaboration-forbidden')) invalidate(error.message)
@@ -92,9 +96,13 @@ export function pluginManagementRemote(target: PluginManagementTarget, lifetime:
         let final: ChangeResult | undefined
         try {
           for await (const answer of readRpcStream(async (_url, init) => {
-            const response = await fetch('/admin/api/plugins/invoke', {
+            const response = await fetch(adminComputerRequestUrl('/admin/api/plugins/invoke'), {
               ...init, credentials: 'same-origin', body: JSON.stringify(input),
             })
+            if ([503, 504].includes(response.status)) {
+              await response.body?.cancel()
+              throw new AdminRequestError(response.status, computerErrorMessage(response.status === 504 ? 'node-service/timeout' : 'node-service/unavailable'))
+            }
             if ([401, 403, 404, 409].includes(response.status)) {
               await response.body?.cancel()
               if (!lifetime.aborted) invalidate(t()('wireStale'))

@@ -51,7 +51,23 @@
   flex: 1;
   align-items: center;
   justify-content: center;
+  gap: var(--dsw-space-2);
   padding: 0 var(--dsw-space-2);
+}
+
+.topbarEnvironment {
+  display: flex;
+  min-width: 0;
+  max-width: 50%;
+  align-items: center;
+}
+
+.topbarEnvironment:empty {
+  display: none;
+}
+
+.topbarEnvironment button {
+  min-height: var(--dsw-touch-target);
 }
 
 .topbarActions {
@@ -225,6 +241,19 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.railEnvironment {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  min-width: 0;
+  padding: var(--dsw-space-2) var(--dsw-space-3) 0;
+}
+
+.railEnvironment:empty,
+.railEnvironment:has(> :global([data-slot]):empty) {
+  display: none;
 }
 
 .frame:not([data-viewport='compact']) .centerCol {

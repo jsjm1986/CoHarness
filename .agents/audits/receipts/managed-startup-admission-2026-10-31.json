@@ -1,0 +1,246 @@
+{
+  "finding": "B357",
+  "status": "fixed_and_verified_shared_profile_startup",
+  "updatedAt": "2026-10-30T16:56:42.712747+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z",
+  "sourcePaths": [
+    "apps/cli/src/profile-boot.ts",
+    "apps/cli/tests/managed-startup.spec.ts",
+    "apps/cli/tests/fixtures/managed-startup.mjs",
+    "apps/cli/tests/expected/managed-startup.jsonl",
+    "apps/cli/README.md",
+    "apps/cli/README.zh.md",
+    "apps/cli/README.i18n.yaml",
+    "apps/cli/reference/README.md",
+    "apps/cli/reference/README.zh.md",
+    "apps/cli/reference/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-managed-startup-admission.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-managed-startup-admission.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-managed-startup-admission.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "apps/cli/src/profile-boot.ts": "2674aef2b70edda88b57a677bbebbd1841d503ff8065362bfd1c288c8d1927ac",
+    "apps/cli/tests/managed-startup.spec.ts": "3175684c4bc8750859a7ced221ba81bfd65f24e14d4f918c68485f36b676cf7e",
+    "apps/cli/tests/fixtures/managed-startup.mjs": "18adc7a00fddc5a6238e0e9d6101aea1c7a1ce6c713a81e04aca6211d749386e",
+    "apps/cli/tests/expected/managed-startup.jsonl": "6da1de69afb4708b402b35ab2a4157d41d5b1fcd03e6e7232046b04744aa0ecd",
+    "apps/cli/README.md": "a4c9f285827bed029f853403353b348e48980fa50b93247e2a5584cfb3ea198e",
+    "apps/cli/README.zh.md": "7ae1ae9c9c34d8e355793a73fa41bc8376521c6a48ae3c0c82f7d76b40331e2d",
+    "apps/cli/README.i18n.yaml": "f7aaa60d31218211f50508dda05788a2f47e10b968a6a671bbf44f7eabf63b9e",
+    "apps/cli/reference/README.md": "a508926cbb459943f192793cdaa83a130fedb4a43e6bc0aea400089de65a8d97",
+    "apps/cli/reference/README.zh.md": "80c373170abe2d121f33c8f179a06312e45b003ea63580a4ab8dbfe2d13e3dcf",
+    "apps/cli/reference/README.i18n.yaml": "684f7b0de80c0e20651863787cfb49e059fb501ffd4828e4edfcbfe3c8545f36",
+    ".agents/notes/implemented/bug-fix/2026-10-31-managed-startup-admission.md": "58d74bde52b0974de88d8ec7ed0b5f0151f0ea8d11a106bd28ca66915036a88d",
+    ".agents/notes/implemented/bug-fix/2026-10-31-managed-startup-admission.zh.md": "0e5af666b723639b256e7e6c3ed46f24b5e367423feed6d09607b8103cd6e9fa",
+    ".agents/notes/implemented/bug-fix/2026-10-31-managed-startup-admission.i18n.yaml": "1f3c70040ef2b983a658466a7817ccdd58cd2ec9dc388426a4074a6ad00aeb19",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md": "ac4637f7f64a6887470014c16dd87fb4f30e78217efdbcc2dfbe12652809cfaa",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.zh.md": "9e406a1e7e6a114237f7a69337867f209583f4539b374092ba3d9e6d45331e92",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml": "2c89adf505817df7e147b9cf7b7ed55c5760a3685f1e3dd93a1a21a82e51154e"
+  },
+  "compiledCliHashes": {
+    "apps/cli/lib/dump-config-B0VOIGXu.js": "26f6a8c57407ca171efb485504066dacfe028a6ced983b3d4064b8b9ff57f1f0",
+    "apps/cli/lib/profile-boot-DwC-NV0V.js": "2d6eb6c8e556dacf9d5e028e5a33cdf5d6853fb757904e4950130965a44d6cd3",
+    "apps/cli/lib/profile-boot.js": "9fb205c1dfa6d84ebc4614327887d5664da30ea0e1dd805bd1b669ca7682f25a",
+    "apps/cli/lib/bin.js": "a3f373cfa7a3a84aa5fb6e25c3db5b2cb9b338afe986169c00fcc38ea0044455",
+    "apps/cli/lib/dump-config-DqJMizat.js": "a26e36482543d8e7dc2094938140cd49ff77187e2b59fac22c700fc39f824846",
+    "apps/cli/lib/dump-config-schema-DHnTOTS8.js": "e0706a1aa5996dd11cd628137ebffc99fdf6124dd718ac4e258c594ca5a0ddeb",
+    "apps/cli/lib/plugin-Cgw-DlVK.js": "87199bcca8ee2c6e254b115eee5e341a5b8a0a1a446831823a2d683e3a4c596d"
+  },
+  "repair": "The shared profile launcher reads inherited Gateway credential-channel markers from the immutable launch snapshot and publishes modelAccessRequired/resourceBudgetRequired/executionAuthorityRequired on the application root before SDK parent bootstrap and profile entries. These flags restrict effects; they grant no identity or permission. Standalone launches remain optional and root ownership survives provider reload.",
+  "causalNegative": {
+    "receipt": "managed-startup-actual-allocation-negative.json",
+    "plainNodeVersion": "22.22.1",
+    "publicCompiledCli": true,
+    "fakeModelDispatches": 1,
+    "actualNodeChildCreatedAndJoined": true,
+    "executionAuthorityTreatedIndependent": true,
+    "expectedManagedRefusalRejected": true,
+    "control": "managed-startup-standalone-control.json",
+    "worktreeRollback": false,
+    "paidModelCalls": 0
+  },
+  "verification": {
+    "sourceAndAdjacentCases": 39,
+    "sourceFiles": 6,
+    "newRunnableProgramIncluded": 1,
+    "launchScenarios": [
+      "standalone",
+      "managed-file",
+      "managed-descriptor"
+    ],
+    "goldenLines": 3,
+    "sdkBootstrapFlagsCheckedBeforeProfile": true,
+    "compiledNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "compiledLaunchExecutions": 6,
+    "repeatedExecutionsAreNotNewCases": true,
+    "managedFakeModelDispatches": 0,
+    "managedChildFileAbsent": true,
+    "standaloneActualChildJoined": true,
+    "compiledRealPostgresWebScopePrograms": 2,
+    "compiledWebNodeVersion": "22.22.1",
+    "buildGates": 8,
+    "docQuickGates": 20,
+    "checks": {
+      "managed-startup-adjacent-source": {
+        "status": "passed",
+        "startedAt": "2026-10-30T16:44:59.853927+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "apps/cli/tests/managed-startup.spec.ts",
+          "apps/cli/tests/resolved-profile-boot.spec.ts",
+          "packages/context/resource-budget/tests/provider.spec.ts",
+          "packages/context/execution-authority/tests/authority.spec.ts",
+          "packages/llm/llm/tests/model-policy.spec.ts",
+          "packages/util/launch-environment/tests/launch-environment.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T16:45:02.456917+00:00"
+      },
+      "managed-startup-production-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T16:48:36.831866+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/build.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T16:48:54.278858+00:00"
+      },
+      "managed-startup-host-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T16:48:36.831872+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "./node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T16:48:45.059256+00:00"
+      },
+      "managed-startup-final-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T16:48:36.831865+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "apps/cli/src/profile-boot.ts",
+          "apps/cli/tests/managed-startup.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T16:48:39.112001+00:00"
+      },
+      "managed-startup-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T16:49:04.891017+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T16:49:46.756648+00:00"
+      },
+      "managed-startup-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T16:51:39.534030+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "apps/cli/tests/managed-startup.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T16:51:41.146716+00:00"
+      },
+      "managed-startup-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T16:51:39.534030+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "apps/cli/tests/managed-startup.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T16:51:41.146371+00:00"
+      },
+      "managed-startup-compiled-web": {
+        "status": "passed",
+        "startedAt": "2026-10-30T16:51:57.680199+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "LOCAL_WEB_GATEWAY_ARTIFACT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/lib",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/run-local-web-assembly.mjs",
+          "lib",
+          "documents"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T16:52:04.782462+00:00"
+      },
+      "managed-startup-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-30T16:51:39.534030+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin",
+          "--prune"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T16:51:43.625131+00:00"
+      }
+    }
+  },
+  "coverageScope": "Real public CLI source and compiled replay plus existing policy/launch-environment unit cases cover the new startup decision. No whole-CLI or whole-project100percent coverage claim, threshold reduction or added exemption.",
+  "documentation": {
+    "pairedStems": 4,
+    "existingUpgradeGuideUpdated": true,
+    "newActiveDecision": ".agents/notes/implemented/bug-fix/2026-10-31-managed-startup-admission.md",
+    "fullySupersededActiveNotes": [],
+    "frozenArchivesEdited": false
+  },
+  "limits": [
+    "This establishes mandatory policy before supported shared-profile launch effects. Every remaining raw/native allocation and custom embedding still needs its own owner/admission review; B04andB25remain open.",
+    "The compiled Web replay uses the previously fingerprinted private Gateway artifact and synthetic fresh node-pressure observation; it does not certify current peer topology changes or physical WAN behavior.",
+    "Initial private fixtures lacked required injections, used the wrong exit accessor and passed a numeric wait bound; those outcomes are not causal evidence. The accepted negative observes actual model dispatch and a physically created/joined child.",
+    "The accepted fixture observes the LLM terminal error chunk; zero dispatch alone would not prove a reported refusal.",
+    "Root did not mutate live deployment or production data. Real paid model success and public push remain human-deferred. All12original domains stay in progress."
+  ]
+}

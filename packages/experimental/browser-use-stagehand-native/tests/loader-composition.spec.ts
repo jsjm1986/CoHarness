@@ -21,11 +21,19 @@ import ToolRuntime from '@deepseek-ai/dsh-tools'
 import * as Provider from '../src/index.ts'
 import { resetFixture, screenshotBase64 } from './fixtures/stagehand.ts'
 
+vi.mock('playwright-core', async () => import('./fixtures/cdp.ts'))
 vi.mock('@browserbasehq/stagehand', async importActual => ({
   ...await import('./fixtures/stagehand.ts'),
-  StagehandClientCreateConfigSchema: (await importActual<typeof import('@browserbasehq/stagehand')>()).StagehandClientCreateConfigSchema,
+  ClientLLMSchema: (await importActual<typeof import('@browserbasehq/stagehand')>()).ClientLLMSchema,
 }))
 vi.mock('@puppeteer/browsers', async () => import('./fixtures/chromium.ts'))
+vi.mock('@deepseek-ai/dsh-subprocess-local', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@deepseek-ai/dsh-subprocess-local')>()
+  const { allocateChromium } = await import('./fixtures/chromium.ts')
+  return { ...original, LocalSubprocessRuntime: class extends original.LocalSubprocessRuntime {
+    protected override spawnProcess(spec: import('@deepseek-ai/dsh-subprocess').SubprocessSpawnSpec) { return allocateChromium(spec) }
+  } }
+})
 vi.mock('node:worker_threads', async (importActual) => {
   const actual = await importActual<typeof import('node:worker_threads')>()
   return {
@@ -90,7 +98,7 @@ it('loads browser tools from cordis.yml, logs browser results, and admits the sc
   await writeFile(configPath, [...modules.keys()].flatMap(name => [
     `- name: '${name}'`,
     ...name === '@deepseek-ai/dsh-attachment-local' ? ['  config:', `    dshHome: ${JSON.stringify(root)}`] : [],
-    ...name === '@deepseek-ai/dsh-experimental-browser-use-stagehand-native' ? ['  config:', '    mode: launch', '    model:', '      modelName: openai/gpt-5.4-mini', '      apiKey: fixture-model-key'] : [],
+    ...name === '@deepseek-ai/dsh-experimental-browser-use-stagehand-native' ? ['  config:', '    mode: launch', '    model:', '      provider: browser-fixture', '      model: browser-model'] : [],
   ]).join('\n') + '\n')
   const context = ctx = new Context()
   context.baseUrl = pathToFileURL(root).href + '/'
@@ -108,12 +116,18 @@ it('loads browser tools from cordis.yml, logs browser results, and admits the sc
   for (const entry of context.loader.entries()) await entry.fiber?.await()
   const model = new BrowserModel()
   context.llm.registerAdapter(['fixture'], model)
+  context.llm.registerAdapter(['browser-fixture'], new class extends LlmAdapter {
+    async * stream(): AsyncIterable<StreamChunk> {
+      yield { type: 'block-end', index: 0, block: { type: 'text', text: '{"extraction":"Fixture heading"}' } }
+      yield { type: 'finish', reason: { kind: 'stop' } }
+    }
+  }())
   const agent = await context.agentLoop.create(SessionId('stagehand-loader'), { provider: 'fixture', model: 'vision' })
   agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Extract the heading and take a screenshot.' }], source: { kind: 'user' } }))
   await agent.whenIdle()
   expect(model.mainRequests).toHaveLength(3)
   const events = agent.session.snapshotEvents()
-  expect(events.some(event => event.type.startsWith('browser-use/'))).toBe(false)
+  expect(events.filter(event => event.type === 'browser-use/stagehand-llm-request')).toHaveLength(1)
   expect(JSON.stringify(model.mainRequests)).not.toContain('fixture-model-key')
   const extraction = events.find(event => event.type === 'tool/result' && event.data.message.source.callId === 'extract-heading')
   expect(JSON.stringify(extraction)).toContain('Fixture heading')

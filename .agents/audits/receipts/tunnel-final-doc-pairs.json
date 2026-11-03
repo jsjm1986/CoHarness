@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-final-doc-pairs",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write gateway/README.md .agents/notes/implemented/bug-fix/2026-10-25-gateway-runtime-environment.md .agents/notes/implemented/bug-fix/2026-10-25-gateway-tunnel-lifecycle.md .agents/notes/implemented/feature/2026-10-18-admin-managed-public-access-tunnel.md docs/upgrade-guide/v0.2.1-rc.1.coharness.1/gateway-tunnel-lifecycle/guide.md",
+  "startedAt": "2026-10-24T21:48:43.863234+00:00",
+  "seconds": 2.619,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "926d4a4e141875d5586f4dc8f1fb3d2a38a40f7838b147a699a1d74e7b53c650",
+  "inputsAfter": "406e23c5a0722b2f2a8a6bdedfe05da2aa3e8709137cba58779bef363a22b438",
+  "postgresToolDirectory": null,
+  "outputSha256": "c6abd80a28572f2559ca5ffc7bdf24fa75da9cf4249dce3f07806cd9d1801912",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-25-gateway-runtime-environment.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/bug-fix/2026-10-25-gateway-tunnel-lifecycle.i18n.yaml\nverify-translation-pairing: recorded .agents/notes/implemented/feature/2026-10-18-admin-managed-public-access-tunnel.i18n.yaml\nverify-translation-pairing: recorded docs/upgrade-guide/v0.2.1-rc.1.coharness.1/gateway-tunnel-lifecycle/guide.i18n.yaml\nverify-translation-pairing: recorded gateway/README.i18n.yaml\nverify-translation-pairing: 5 record(s) written; run the check to validate the pairs.\n"
+}

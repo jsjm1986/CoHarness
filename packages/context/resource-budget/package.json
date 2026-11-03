@@ -22,15 +22,23 @@
       "types": "./lib/types/types.d.ts",
       "default": "./lib/types/types.js"
     },
+    "./wire": {
+      "types": "./lib/types/wire.d.ts",
+      "default": "./lib/wire.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
+    "lib/wire.js",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-brand": "workspace:*"

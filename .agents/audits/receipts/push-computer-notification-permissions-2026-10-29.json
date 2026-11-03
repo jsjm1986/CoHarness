@@ -1,0 +1,393 @@
+{
+  "recordedAt": "2026-10-29T06:39:45.147555+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z",
+  "baseline": {
+    "recordedAt": "2026-10-29T06:38:08.574573+00:00",
+    "fetchReceipt": "continuation-current-baseline-fetch-final",
+    "headAheadOriginBehind": [
+      139,
+      0
+    ],
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "sharedWorktreeRebasedOrReset": false,
+    "headRef": "HEAD",
+    "upstreamRef": "origin/master",
+    "identityEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/previous-resource-baseline.json"
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "resource-completion-final-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-29T06:27:27.118933+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/experimental/inspector/src/host/bridge/controller.ts",
+          "packages/experimental/inspector/src/host/bridge/lifecycle.ts",
+          "packages/experimental/inspector/tests/resource-admission.host.spec.ts",
+          "packages/experimental/inspector/tests/worker-lifecycle.host.spec.ts",
+          "packages/experimental/inspector/tests/resource-cleanup-example.host.spec.ts",
+          "packages/experimental/inspector/tests/fixtures/resource-cleanup.mjs",
+          "scripts/coverage-baseline.ts",
+          "gateway/src/push-notifications.ts",
+          "gateway/tests/push-notifications.spec.ts",
+          "gateway/tests/push-notifications-postgres.spec.ts",
+          "gateway/tests/fixtures/push-delivery.mjs",
+          "packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+          "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+          "packages/subagent/subagent-dsh-sdk/src/admission.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/control.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion.mjs",
+          "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-parent.mjs",
+          "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-child.mjs",
+          "packages/subagent/subagent/src/index.ts",
+          "packages/subagent/subagent/src/out-of-process.ts",
+          "packages/subagent/subagent/src/types.ts",
+          "packages/subagent/subagent/tests/out-of-process.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T06:27:34.939525+00:00"
+      },
+      {
+        "name": "sdk-resource-capacity-current-lint",
+        "status": "passed",
+        "startedAt": "2026-10-29T06:32:46.634449+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/control.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T06:32:52.012728+00:00"
+      },
+      {
+        "name": "resource-completion-current-host-aggregate",
+        "status": "passed",
+        "startedAt": "2026-10-29T06:32:46.634457+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.host.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T06:32:52.888657+00:00"
+      },
+      {
+        "name": "resource-completion-gateway-final-types",
+        "status": "passed",
+        "startedAt": "2026-10-29T06:31:54.212699+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T06:31:57.869749+00:00"
+      },
+      {
+        "name": "resource-completion-doc-quick-final-ownership",
+        "status": "passed",
+        "startedAt": "2026-10-29T06:36:43.361635+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T06:37:54.339879+00:00"
+      }
+    ],
+    "fullRepositoryBuild": {
+      "receipt": {
+        "status": "failed",
+        "startedAt": "2026-10-29T06:27:25.968760+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/build.ts"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-29T06:28:35.781844+00:00"
+      },
+      "accepted": false,
+      "reason": "Peer-owned multi-computer UI is in implementation; Client compiler reports five typing errors. Host compiler, bundles and aggregate checks passed. No peer UI source was changed by this audit."
+    },
+    "manualUpgradeTriplets": {
+      "executed": true,
+      "wordCounts": {
+        "push-delivery": 252,
+        "sdk-subagent-process-admission": 433,
+        "inspector-resource-completion": 121
+      },
+      "exactThreeFiles": true,
+      "headersAndMetadataValid": true,
+      "nonexistentVerifierInvoked": false
+    }
+  },
+  "realModelAndCloudDelivery": "Human-deferred; loopback providers only.",
+  "otherCodex": {
+    "routineMessages": 0,
+    "actualBuildBlockerMessages": 1,
+    "peerFilesResetOrOverwritten": false
+  },
+  "database": {
+    "name": "hgw-push-computer-85edd9d7",
+    "volume": "hgw-push-computer-85edd9d7-data",
+    "owned": true,
+    "threadId": "01a16450-5b0a-7661-a0d9-79e9d8d2cae0",
+    "status": "removed",
+    "createdAt": "2026-10-29T05:29:09.615986+00:00",
+    "database": "hgw_push_computer_test",
+    "productionPortExcluded": 5432,
+    "peerPortExcluded": 55699,
+    "id": "de53097bc2d12586185c493620e9869652ccc39b66132b9da2fb825608e53a6f",
+    "port": 62652,
+    "url": "postgresql://postgres@127.0.0.1:62652/hgw_push_computer_test",
+    "testMigrationSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z/push-computer-migrations-20261029",
+    "snapshotUpperVersion": 95,
+    "removedAt": "2026-10-29T06:32:48.566369+00:00",
+    "databases": [
+      "hgw_push_computer_test"
+    ],
+    "latestSnapshotUpperVersion": 95,
+    "openConnectionsBeforeClose": 0,
+    "volumeRemoved": true,
+    "otherContainersModified": false
+  },
+  "findings": [
+    "B298",
+    "B301"
+  ],
+  "causalNegatives": [
+    {
+      "name": "push-personal-computer-provisioned-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T05:37:53.835231+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:62652/hgw_push_computer_test",
+        "DSH_AUDIT_ACCOUNT_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z/push-computer-migrations-20261029",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/push-notifications-postgres.spec.ts",
+        "-t",
+        "requires the personal Session source|retains a personal source",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T05:37:55.526265+00:00"
+    },
+    {
+      "name": "push-provider-completion-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T06:13:47.007670+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:62652/hgw_push_computer_test",
+        "DSH_AUDIT_ACCOUNT_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z/push-computer-migrations-20261029",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/push-notifications-postgres.spec.ts",
+        "tests/push-notifications.spec.ts",
+        "-t",
+        "unconfigured",
+        "--maxWorkers=2",
+        "--no-file-parallelism"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T06:13:48.339005+00:00"
+    }
+  ],
+  "businessBehavior": [
+    "Personal notification claims require the exact root Runtime assignment and source computer grant; another allowed computer cannot authorize that Session. Missing, withdrawn or retired sources are skipped.",
+    "Claim admission retains current account, Runtime assignment and computer grant through transaction commit, including a blocked device-row acquisition.",
+    "An unconfigured FCM or JPush sender records failure and preserves its device. A later configured callback can send the original completed event exactly once after provider acceptance.",
+    "Actual PostgreSQL and loopback JPush HTTP replay include personal roots and children, account device ownership, source grant revoke/delete/restore, Runtime retirement and provider recovery."
+  ],
+  "positiveChecks": [
+    {
+      "name": "push-source-computer-and-provider-final-coverage",
+      "status": "passed",
+      "startedAt": "2026-10-29T06:15:16.378434+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:62652/hgw_push_computer_test",
+        "DSH_AUDIT_ACCOUNT_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z/push-computer-migrations-20261029",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/push-notifications-postgres.spec.ts",
+        "tests/push-notifications.spec.ts",
+        "tests/push-notifications-transcript.spec.ts",
+        "--maxWorkers=2",
+        "--no-file-parallelism",
+        "--coverage",
+        "--coverage.include=src/push-notifications.ts",
+        "--coverage.reporter=json-summary",
+        "--coverage.reporter=text",
+        "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z/push-source-computer-and-provider-final-coverage"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T06:15:23.511354+00:00"
+    },
+    {
+      "name": "personal-computer-push-final-private-artifact",
+      "status": "passed",
+      "startedAt": "2026-10-29T06:22:58.469874+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z/build-personal-computer-push-artifact-final.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T06:23:00.906913+00:00"
+    },
+    {
+      "name": "push-computer-and-provider-built-final-node22",
+      "status": "passed",
+      "startedAt": "2026-10-29T06:25:18.462564+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:62652/hgw_push_computer_test",
+        "DSH_AUDIT_ACCOUNT_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z/push-computer-migrations-20261029",
+        "DSH_EXAMPLE_MODE=lib",
+        "DSH_GATEWAY_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z/personal-computer-push-artifact-final/lib",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "../node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/push-notifications-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T06:25:20.809982+00:00"
+    },
+    {
+      "name": "push-computer-and-provider-built-final-node24",
+      "status": "passed",
+      "startedAt": "2026-10-29T06:27:27.118753+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:62652/hgw_push_computer_test",
+        "DSH_AUDIT_ACCOUNT_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z/push-computer-migrations-20261029",
+        "DSH_EXAMPLE_MODE=lib",
+        "DSH_GATEWAY_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z/personal-computer-push-artifact-final/lib",
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "../node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/push-notifications-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T06:27:30.230155+00:00"
+    },
+    {
+      "name": "push-computer-private-postgres-cleanup",
+      "status": "passed",
+      "startedAt": "2026-10-29T06:32:47.869143+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z/close-push-computer-postgres.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T06:32:48.571881+00:00"
+    }
+  ],
+  "limitations": [
+    "45 tests pass, including29 actual PostgreSQL cases and one standalone multi-scenario HTTP transcript.",
+    "Push source measured coverage is94.87percent lines and81.03percent branches; full Gateway coverage remains open.",
+    "Only synthetic logical computers share this private PostgreSQL fixture; actual remote hardware, Android cloud push and live providers remain separate acceptance work."
+  ],
+  "currentInputHashes": {
+    "packages/experimental/inspector/src/host/bridge/controller.ts": "e34544b982be477c120ebc8d3699762d7a6b4743f8908d5e86b47aa850b64dc6",
+    "packages/experimental/inspector/src/host/bridge/lifecycle.ts": "a9afa09e55d389a42e4b036746a1e09417a09e6de488d3c4fc2a87221088de7c",
+    "packages/experimental/inspector/tests/resource-admission.host.spec.ts": "f09a2a07f2124ea4336f3928e596620badcf7f727a40e9113a409c6fade0540c",
+    "packages/experimental/inspector/tests/worker-lifecycle.host.spec.ts": "0db9acbf0bdd2c51a180cc34a10b8fffba86dac3d58e175229f425aab8ec82e9",
+    "packages/experimental/inspector/tests/resource-cleanup-example.host.spec.ts": "18e1a81acf51139c1c6a76d5e0ee3fb7a7b2e36ae498bbedcc7efd144681c2bc",
+    "packages/experimental/inspector/tests/fixtures/resource-cleanup.mjs": "75674df06b4c502576793decc6da46531370b9cd042e20e44c25c944fc07549f",
+    "packages/experimental/inspector/tests/expected/resource-cleanup.jsonl": "8635ddaab0849c0241e7a83a5d134ef70771c507b89048c65ac79a034178ce6e",
+    "packages/subagent/subagent-dsh-sdk/src/bridge.ts": "6e86a1811c18c06404a99fd541f7dcaf94a76a8feff0700b06343827e700c5a9",
+    "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts": "e2e2d22dd8b4d88175aa631aa51f18db7457e122194f8a6320579c67afdcdb7c",
+    "packages/subagent/subagent-dsh-sdk/src/admission.ts": "0986a5626f70bc19caf46c244345e70ac74893d984cab27110a34252b94feb19",
+    "packages/subagent/subagent/src/index.ts": "a45cccc33261cc831ba245bdc9ef8091848679ec48e17721f27f98d314e70843",
+    "packages/subagent/subagent/src/out-of-process.ts": "20c816317cbb4418399960b7402b29c2884368149a945a4beaa3cab19d5496fe",
+    "packages/subagent/subagent/src/types.ts": "19ffbd4efb89fa86da184bdfd37beea939fbdb1072f9f81590a1f3f0ce78b81c",
+    "packages/subagent/subagent-dsh-sdk/tests/control.spec.ts": "5dc9c80ccbb787b4d917a23948437d6918cec14bd7d8b1d012b933ef749cefdd",
+    "packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts": "12d483d0e1ad9bf21c560835c2b54ef49fe651189dfa9ad1432e0a2be9374e5b",
+    "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts": "e8116f377576e19df966904208fe5630585a2c29e1e071780aa6620ea289913e",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion.mjs": "b4efb6910886bb0cf113acd13971ec7753d16ac5d7d98e32d1d7cd2a320e1a4d",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-parent.mjs": "3fb76f67e0138f49fce7516e0d77e5aa2efc01c2bf00c0ff167cba59576ee641",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/resource-completion-child.mjs": "9dce12b7772d5768c41cb56d31a01eb99b3f03cef8710e4df67750988bc0ce98",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/resource-completion.jsonl": "4d041a78c5280a37d1b8d81eb589628f1a20008aa072a4a7a747023e5ede592b",
+    "packages/subagent/subagent/tests/out-of-process.spec.ts": "7ff539b812d72029367926b6c24e040c53cb829a40a25e09083521514bc4f6d5",
+    "gateway/src/push-notifications.ts": "39b51e145fb0791edbca63b0161c3e268a83d2dc7fa4d10654f1c0243dac15d2",
+    "gateway/tests/push-notifications.spec.ts": "e969ed7af92517b8de78d7b9c149d35a1a2cf674ed8b1fbd21ea04885d8ca7c7",
+    "gateway/tests/push-notifications-postgres.spec.ts": "f2a8a0ce855a4bf09a3b86d6cb29c3b61348c7e9aefde7bf4567d55a5f29d1b8",
+    "gateway/tests/fixtures/push-delivery.mjs": "789172fce444c2361546602e7518deb30c9606bbedcfc9dd36bcbb35740ac90e",
+    "gateway/tests/expected/projects/push-delivery-ownership.jsonl": "32bbf73a17ad8d66f38d163cdf31771e8dd18a1b66c20bd41f33ab6a06f078c8",
+    "scripts/coverage-baseline.ts": "80c3fc1ed2357c481991afb4426108787e3d68e97544fdddccd8c3006a33d7c2",
+    "packages/experimental/inspector/README.md": "3e5b8998b3f9ededdc99fd9ddcbd82862cb80e41bf925497a4c00b687c310a8a",
+    "packages/experimental/inspector/README.zh.md": "bcf52bee46ffb481469bad56b2d772da3a1e2800ab7e971a72ef65a82af80b07",
+    "packages/experimental/inspector/README.i18n.yaml": "31243856101cb96bb6c8e20001b525be4ff79facc16f8478e21bc4c46c771aca",
+    "packages/subagent/subagent-dsh-sdk/README.md": "b42bbb555e7e2276664683af2c9984026b27b954c770a3e7df4977803b796003",
+    "packages/subagent/subagent-dsh-sdk/README.zh.md": "a45c5bd960fb9cfefdbfb84f52024b11817bcb1458c79e08abeeda64e0f78214",
+    "packages/subagent/subagent-dsh-sdk/README.i18n.yaml": "fd99cd2b93df994c2c5ee2c8b82255be84047e2fe2c693b58decc356f586318b",
+    "packages/subagent/subagent/README.md": "fcc69003e2c927ef3c0a40bd764081746de0ef748a45c46274f8cfc8319b065c",
+    "packages/subagent/subagent/README.zh.md": "7d99314cbd1db680c4e6a9053329843810dab5a18fcb793533ff8ba4afbed525",
+    "packages/subagent/subagent/README.i18n.yaml": "fd79bf3815e80ce501234f2ff1eeba69aa26f5e86eb7be644b277a0223a9b6f4",
+    "gateway/README.md": "04b98dd1da965295a7235a7ee189286cd950a1c6287d6661652f118667169747",
+    "gateway/README.zh.md": "609041b02d46fae4893700b5463ffe78d36982c3929a5d8750936d26f3abf07f",
+    "gateway/README.i18n.yaml": "8f6e2bd0ca56bcda7e92cf80872dc06e4e6ddc0a373ee0a4b9cf77bfe19cb281",
+    "docs/subsystems/subagent.md": "a7e3f7c244b64c0787228ff5782fd5af4fe7a2236bec251e5739394a4ef379a2",
+    "docs/subsystems/subagent.zh.md": "0bbd5af0844538ca038497169fb3cf9e600cc9f33a497b72b3499a3ae00d9a99",
+    "docs/subsystems/subagent.i18n.yaml": "bc26d5f65ba24ead89c584630cbd58285ad6855e20caf79c69a0747d32a21d5e",
+    ".agents/notes/implemented/bug-fix/2026-10-29-inspector-resource-completion.md": "43fa1a66e90eaf13e79ddab25a9a8489411312810b869e3d21dff65a3bd11ae6",
+    ".agents/notes/implemented/bug-fix/2026-10-29-inspector-resource-completion.zh.md": "669c6dd302bfe580368c32f426169b89d77b707b8df895b18f1818102b0ab48b",
+    ".agents/notes/implemented/bug-fix/2026-10-29-inspector-resource-completion.i18n.yaml": "cd590c7d4cce1d67570410f07049955df89f2010a8ff2b9299d7142e30359ef7",
+    ".agents/notes/implemented/bug-fix/2026-10-29-push-delivery-authority.md": "18949200b0fe21b1af30bdc751e3aacfbaf56b979fcc1981994983c587027f5f",
+    ".agents/notes/implemented/bug-fix/2026-10-29-push-delivery-authority.zh.md": "b53e1fd634e5a02e42fd5eec55ce28ebe53628e4e9ce36f889afe39ad3a825a0",
+    ".agents/notes/implemented/bug-fix/2026-10-29-push-delivery-authority.i18n.yaml": "9216b837f606846a32aeb45939fc2a7928fe6e83afec761ea00eba208900e969",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md": "d11e81a636bd73bc88c69a36362adf970bd8fa846b8b09ad09ebe8f7d7d274ca",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.zh.md": "99e6c9384caa48e96c4b59859b71dbf3e8cb896b48c26b9d746ab6ec8eecd92a",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml": "a06bb8c09b21723d58c815a67b6fcdd3d26ef71aa0cc9f2eb35a24d9a3449da9",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md": "559053fb305b0616680ed3ffd3997ddd42401d392786b7396790eee2d0136a38",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.zh.md": "14c92cbaff85d4c7f02a155a9fd3d738ba2d33c74f63ea3e596c6bf8737138a4",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.i18n.yaml": "1a9cf1bb18ec3e7439b52966444e196664e511487ff2b46d6363727d1034b1e1",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/inspector-resource-completion/guide.md": "980a0a79bad693e8c4b8302db0d2eae4a22cad5b5aa184f380ab73f25ab2b490",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/inspector-resource-completion/guide.zh.md": "26dbb8eb816d6a0811f1c886c8c61541395c2583bb731d424efa70037909da37",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/inspector-resource-completion/guide.i18n.yaml": "e038b75fc0939ac41e772ab90ed89b7d8bd031f1422446103e7c078d54f303e5",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/push-delivery/guide.md": "fcb51507d8bffe2c6dbb316acfcacc9243a2b3abf0920fdf0b7480c19802e05a",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/push-delivery/guide.zh.md": "105c2a287bfd542208e5c8bf8b957a574f9512dc08d22a0dc7270b0a4ce38c2a",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/push-delivery/guide.i18n.yaml": "1723581554e54b5eee1cd527253525088ecc0e6397196be48b637f72035ce2fe",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md": "81326eba935df59a7869bfc1873e0ff8a34fcc50c2e0cc2697eb9d9bb1896462",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md": "dab50ed3720d2f34e99b0dc264689cfc3a988dd7e06c661955bb04fba8fba588",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml": "840700240f9c7681f03151300e76ad625418b262cc3fce721fcbf83919711434"
+  }
+}

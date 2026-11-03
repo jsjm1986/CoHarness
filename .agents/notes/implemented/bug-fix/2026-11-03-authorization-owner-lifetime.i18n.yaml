@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-03-authorization-owner-lifetime.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-03-authorization-owner-lifetime.md
+document:
+  en: 650979caa43e07922efd91c9bc2cc2f146f020a9
+  zh: 8cfc9ec8e7eed3833d066eced25066a6cd0ab86e
+/agent-note-authorization-attempts-retain-their-service-and-credential-owner:
+  en: cf833e95de4e1e0e
+  zh: 27fc42e3610f40e7
+/agent-note-authorization-attempts-retain-their-service-and-credential-owner/problem:
+  en: d8ec0ce81717aea0
+  zh: caeff0b1c68f0abe
+/agent-note-authorization-attempts-retain-their-service-and-credential-owner/decision:
+  en: d3c76de8c8f4ed21
+  zh: 6733bad136a082f9
+/agent-note-authorization-attempts-retain-their-service-and-credential-owner/alternatives-considered:
+  en: 1ed57eb870959ba0
+  zh: 72427200b41d1594
+/agent-note-authorization-attempts-retain-their-service-and-credential-owner/consequences:
+  en: 52cb94346b31627a
+  zh: 1399404b5d478749
+/agent-note-authorization-attempts-retain-their-service-and-credential-owner/verification:
+  en: d1d97a45c618e1f2
+  zh: dcbbfac74ef0d8b5

@@ -1,0 +1,21 @@
+- region "Compute computer":
+  - button "Compute computer" [expanded]:
+    - img
+    - img
+    - text: Compute computer
+  - button "New conversation":
+    - img
+  - tree "Sessions":
+    - treeitem "Compute work New session in Compute work" [expanded]:
+      - img
+      - text: Compute work
+      - button "New session in Compute work":
+        - img
+    - treeitem "Compute conversation Session actions for Compute conversation Archive session Pin session" [selected]:
+      - text: Compute conversation
+      - button "Session actions for Compute conversation":
+        - img
+      - button "Archive session":
+        - img
+      - button "Pin session":
+        - img

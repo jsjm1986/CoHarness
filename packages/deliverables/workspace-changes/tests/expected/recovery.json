@@ -1,0 +1,24 @@
+{
+  "first": {
+    "probes": 1,
+    "modelRequests": 0
+  },
+  "firstIncomplete": true,
+  "second": {
+    "probes": 2,
+    "modelRequests": 1
+  },
+  "third": {
+    "probes": 2,
+    "modelRequests": 2
+  },
+  "responses": [
+    "",
+    "REVIEW_RECOVERED",
+    "REVIEW_RECOVERED"
+  ],
+  "cleanup": {
+    "hostMappingRestored": true,
+    "spawnRestored": true
+  }
+}

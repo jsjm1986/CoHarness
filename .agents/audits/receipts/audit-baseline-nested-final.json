@@ -1,0 +1,14 @@
+{
+  "name": "audit-baseline-nested-final",
+  "cwd": ".",
+  "command": "git fetch origin",
+  "startedAt": "2026-10-25T14:03:54.815673+00:00",
+  "seconds": 5.205,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "53552572ceb8c722151e9229ea2046459747c96a58d87d45de879748c9c9fe3e",
+  "inputsAfter": "53552572ceb8c722151e9229ea2046459747c96a58d87d45de879748c9c9fe3e",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

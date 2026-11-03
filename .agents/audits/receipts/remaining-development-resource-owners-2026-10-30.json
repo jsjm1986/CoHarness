@@ -1,0 +1,81 @@
+{
+  "status": "named_allocations_classified_remaining_inventory_open",
+  "updatedAt": "2026-10-30T08:35:08.100728+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T075654Z",
+  "checks": {
+    "remaining-build-worker-and-development-git": {
+      "status": "passed",
+      "startedAt": "2026-10-30T08:27:09.657398+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/typert/generator/tests/tsdown-plugin-worker.spec.ts",
+        "apps/plugin-market-generator/tests/git.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T08:28:40.108444+00:00"
+    },
+    "remaining-acp-launcher-close": {
+      "status": "passed",
+      "startedAt": "2026-10-30T08:28:10.643779+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/test-support/session-snapshot/tests/harness.spec.ts",
+        "-t",
+        "waits for inherited stdio|rejects promptly when fallback termination|waits for in-flight client callbacks",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-30T08:29:34.264097+00:00"
+    }
+  },
+  "selectedTests": 9,
+  "files": 3,
+  "selection": "Git3, actual Typert worker2 and ACP launcher close4;64unselected ACP cases are explicitly skipped.",
+  "classification": [
+    {
+      "path": "apps/plugin-market-generator/src/fetchers.ts",
+      "role": "Private development CLI generates market indexes, not Gateway model/execution work; Git runs with selected transport/deadline bounds.",
+      "evidence": [
+        "apps/plugin-market-generator/src/bin.ts",
+        "apps/plugin-market-generator/src/generate.ts",
+        "apps/plugin-market-generator/tests/git.spec.ts"
+      ]
+    },
+    {
+      "path": "packages/typert/generator/src/tsdown-plugin.ts",
+      "role": "Build analysis worker; generation terminates and awaits its Worker before reporting artifacts or analysis failure.",
+      "evidence": [
+        "packages/typert/generator/tests/tsdown-plugin-worker.spec.ts"
+      ]
+    },
+    {
+      "path": "packages/test-support/session-snapshot/src/launcher.ts",
+      "role": "Test-owned ACP process; selected regressions join inherited stdio, buffered parsing and accepted callbacks, and report refused fallback termination.",
+      "evidence": [
+        "packages/test-support/session-snapshot/tests/harness.spec.ts"
+      ]
+    },
+    {
+      "path": "gateway/src/launcher.ts",
+      "role": "Historical execFile allocation is absent. Current SystemdLauncher uses the shared bounded, cancellation-aware child-command owner; LocalLauncher retains its separate supervised spawn.",
+      "evidence": [
+        "gateway/src/child-command.ts",
+        "receipts/gateway-native-control-cancellation-2026-10-29.json"
+      ]
+    }
+  ],
+  "limitations": [
+    "Classification is not proof of every lifecycle or deadline path in these files.",
+    "Native/macOS/Windows helpers and legacy partial-observation cleanup remain open; physical Windows acceptance is not established here.",
+    "B04and B25remain open; all12original domains remain in_progress."
+  ]
+}

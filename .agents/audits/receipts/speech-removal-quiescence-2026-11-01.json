@@ -1,0 +1,183 @@
+{
+  "findings": [
+    "B422"
+  ],
+  "status": "fixed_verified_named_speech_removal_cases_remaining_review_open",
+  "updatedAt": "2026-11-01T01:57:41.024933+00:00",
+  "baseline": {
+    "remote": "origin/master",
+    "aheadBehind": {
+      "ahead": 139,
+      "behind": 0
+    },
+    "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-origin-final.json",
+    "fetchedAt": "2026-11-01T01:56:05.860108+00:00",
+    "dirtyWorkspacePreserved": true
+  },
+  "problem": "Routing removal loses a provider from the registry before accepted work ends, so duplicate disposal or registry shutdown can return early; unsubscribe failure can skip abort/join.",
+  "fix": "Retain one removal promise per registration before cleanup begins and track detached removals independently. Shutdown joins all outcomes; unsubscribe failures still abort/join and are reported afterward.",
+  "verification": {
+    "distinctRelatedTests": 133,
+    "packageTests": 129,
+    "typescriptSdkScenarios": 2,
+    "pythonSdkScenarios": 2,
+    "repeatVersionRunsNotAdded": true,
+    "normalPassedChecks": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-preparation-committed-cancel.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-related.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-overlap-fixed.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-failure.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-sdk-source.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-sdk-node22-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-sdk-node24.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-sdk-python-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-tsc-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-bundle-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-host-types.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-pairing.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-pairing-owned-check.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-lint-final.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-python-lint.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-origin-final.json"
+    ],
+    "negativeChecks": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-overlap-negative.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-sdk-old-source.json",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-sdk-old-node22.json"
+    ],
+    "counterfactual": "Complete original B421 speech package fails both actual SDK scenarios in source and built modes; provider work remains controlled and routing is removed in both versions.",
+    "cleanupFailure": "Actual registry tests retain provider cleanup failure until active work settles; repeated disposal and shutdown remain pending before release.",
+    "nonBugCandidate": {
+      "status": "existing_behavior_verified_no_new_defect",
+      "source": "packages/experimental/speech-to-text-sensevoice/src/recognizer.ts:publish",
+      "invariant": "Terminal preparation state marks its task completed before notifying subscribers.",
+      "test": "speech-preparation-committed-cancel.json",
+      "cases": [
+        "ready",
+        "standby",
+        "unprepared",
+        "failed"
+      ],
+      "scope": "This rules out the candidate completion/cancel adjacency issue only; it does not close all SenseVoice resource or shutdown review."
+    },
+    "coverage": {
+      "lines": {
+        "total": 101,
+        "covered": 101,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 33,
+        "covered": 32,
+        "skipped": 0,
+        "pct": 96.96
+      },
+      "statements": {
+        "total": 129,
+        "covered": 128,
+        "skipped": 0,
+        "pct": 99.22
+      },
+      "branches": {
+        "total": 46,
+        "covered": 45,
+        "skipped": 0,
+        "pct": 97.82
+      }
+    },
+    "coverageScope": "Additional diagnostic measurement of an existing CI-exempt module; no policy/threshold/exclusion changes.",
+    "documentation": {
+      "status": "peer_owned_live_edit_not_root_failure",
+      "fullQuickPassed": 19,
+      "fullQuickFailed": 1,
+      "failedGate": "translation-pairing",
+      "paths": [
+        ".agents/notes/implemented/bug-fix/2026-11-01-node-control-response-recovery.i18n.yaml",
+        "gateway/docs/node-agent/README.i18n.yaml"
+      ],
+      "rootAction": "Do not edit or confirm peer bilingual prose. Check the three owned pairs only; global convergence remains open.",
+      "peerOwns": [
+        "gateway/src/node-agent.ts",
+        "gateway/tests/node-agent.spec.ts",
+        "gateway/tests/node-access-postgres.spec.ts",
+        "gateway/tests/run-built-node-agent.mjs",
+        "test-only native fetch IPC observer",
+        "Gateway Agent docs and note"
+      ],
+      "noRootOverlap": true
+    },
+    "setupCorrections": "Lint required explicit void for the tracked removal promise and removal of an unused overlength lint directive. Final normal emit/bundle and Node22/Python SDK runs use the corrected bytes.",
+    "resources": {
+      "productionOsAllocationsAdded": 0,
+      "paidRequests": 0,
+      "recognitionInvocations": 0,
+      "postgresDatabasesAdded": 0,
+      "ownership": "Actual SDK processes, nested Boot Host and recognition gates are owned and joined. Fixture cleanup releases its gate before registry shutdown; temporary files removed."
+    }
+  },
+  "sourceSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T013839Z/speech-removal-capsule.json",
+  "dependsOnFinding": "B421",
+  "paths": [
+    ".agents/notes/implemented/bug-fix/2026-11-01-speech-removal-quiescence.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-11-01-speech-removal-quiescence.md",
+    ".agents/notes/implemented/bug-fix/2026-11-01-speech-removal-quiescence.zh.md",
+    "apps/cli/tests/profiles/sdk/speech-removal.expected.e2e.ts",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/speech-removal/guide.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/speech-removal/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/speech-removal/guide.zh.md",
+    "examples/headless-agent/tests/fixtures/speech-removal/expected.json",
+    "examples/headless-agent/tests/fixtures/speech-removal/model.mjs",
+    "examples/headless-agent/tests/fixtures/speech-removal/prepare.mjs",
+    "examples/headless-agent/tests/fixtures/speech-removal/runtime.cordis.yml",
+    "packages/experimental/speech-to-text/README.i18n.yaml",
+    "packages/experimental/speech-to-text/README.md",
+    "packages/experimental/speech-to-text/README.zh.md",
+    "packages/experimental/speech-to-text/src/index.ts",
+    "packages/experimental/speech-to-text/tests/service.spec.ts",
+    "python/sdk/tests/test_speech_removal_expected.py"
+  ],
+  "readOnlyPrerequisiteCount": 4225,
+  "runtimeReferences": 1,
+  "mergeRequirement": "Apply after B421, using only17 sourceDeltaPaths. Prerequisites are read-only context and must not overwrite newer peer source. The normal lib/index.js is only a comparison artifact; rebuild from matching current source. No Gateway Agent/node-service, Session event, generation or database schema changes.",
+  "notes": {
+    "reviewedActiveRecords": [
+      ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md",
+      ".agents/notes/implemented/bug-fix/2026-11-01-speech-settings-provider-lifetime.md",
+      ".agents/notes/implemented/bug-fix/2026-11-01-speech-removal-quiescence.md"
+    ],
+    "decision": "retain active records; no archived note changes",
+    "reason": "Voice architecture and optional Settings binding remain distinct. New note owns quiescence across routing withdrawal, repeated disposal and cleanup errors, which guide future consumers."
+  },
+  "peerReport": {
+    "status": "peer_reported_not_root_reverified",
+    "servingRelease": "R23",
+    "pendingReleaseWork": "R24 source only, not deployed",
+    "reserved": [
+      "gateway/src/node-agent.ts",
+      "gateway/tests/node-agent.spec.ts",
+      "gateway/tests/node-access-postgres.spec.ts",
+      "gateway/tests/run-built-node-agent.mjs",
+      "test-only native fetch IPC observer",
+      "Gateway node-agent docs and Note",
+      "REAL043 workspace-changes/ui-deliverables error copy"
+    ],
+    "agentRecoveryVerification": "24 real HTTP tests reported passed; actual Gateway+PostgreSQL+separate CLI Agent three-phase body interruption validation in progress.",
+    "nodeService": "No capacity change or deployment;503 investigation remains open.",
+    "networkRule": "Linux public host uses its public endpoint/direct SSH; do not add an extra public tunnel.",
+    "latestReportedNode": {
+      "epoch": 48,
+      "generation": 17
+    },
+    "requiredReaderEvent": "Peer keeps B417 required-on-read event and format acceptance separate from older serving R23."
+  },
+  "remaining": [
+    "Integrate B422 after B421 through the peer matching build. Only17 sourceDeltaPaths are changes; prerequisites and runtime reference artifacts must not overwrite newer peer source. Earlier B416/B417/B418/B419/B420 remain independently pending.",
+    "Continue direct resource consumers: verify SenseVoice stop/start behavior when waitForExit cannot confirm termination, and speech preference write completion when its Settings binding changes during persistence. These remain unverified candidates, not confirmed bugs.",
+    "Continue auxiliary/extension model purpose, trace and interactive ownership, diagnostic/database argument privacy, filesystem/document races, cross-account/computer access and native containment. All12 domains and B04/B25 remain open.",
+    "Speech index existing CI coverage debt remains explicit; additional diagnostic measurement is recorded without changing exclusions or thresholds. Global docs currently19/20 because the peer Agent note/reference pairs are live edits; owned pairs pass.",
+    "Peer owns Gateway Agent control-response recovery, its HTTP/PG/CLI tests and docs, node-service503 investigation and REAL043 error copy. Root has no new mandatory precondition beyond the already delivered matching packets. Do not duplicate edits or repeatedly poll.",
+    "Official paid Responses stays deferred. No root paid inference, ASR model inference/download or production deployment is claimed."
+  ],
+  "globalReviewComplete": false
+}

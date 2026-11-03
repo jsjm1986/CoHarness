@@ -23,7 +23,7 @@ import * as MemoryContext from '../src/index.ts'
 import * as MemoryCuration from '@deepseek-ai/dsh-memory-curation'
 import * as ToolMemory from '@deepseek-ai/dsh-tool-memory'
 import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
-import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, LlmCallConfig, StreamChunk } from '@deepseek-ai/dsh-llm'
 
 let root: string | undefined
 const contexts: Context[] = []
@@ -148,6 +148,9 @@ describe('memory loader composition', () => {
     const calls: GenerateOptions[] = []
     let next = 0
     ctx.provide('llm', {
+      async prepareCall(config: LlmCallConfig) {
+        return { config, stream: (options: GenerateOptions) => ctx.llm.stream({ ...options, ...config }) }
+      },
       stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
         calls.push(options)
         next += 1

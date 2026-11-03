@@ -1,0 +1,13 @@
+{
+  "name": "stagehand-retry-lint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/experimental/browser-use-stagehand-native/src/worker-client.ts packages/experimental/browser-use-stagehand-native/tests/worker-client.spec.ts",
+  "startedAt": "2026-10-23T17:24:52.524116+00:00",
+  "seconds": 3.752,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "017d745e3f6863ff8b3fd39e0166ac366fa11eae3e39684f35f67652f3252abf",
+  "inputsAfter": "017d745e3f6863ff8b3fd39e0166ac366fa11eae3e39684f35f67652f3252abf",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

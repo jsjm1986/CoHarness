@@ -1,0 +1,14 @@
+{
+  "name": "ssh-codex-parent-failure-fixed",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/subagent/subagent-codex/tests/managed-model-http.spec.ts packages/subagent/subagent-codex/tests/managed-ssh-loader.spec.ts --coverage --coverage.include=packages/subagent/subagent-codex/src/managed-model.ts --coverage.reportsDirectory=.agents/audits/.local/ssh-codex-parent-failure-coverage --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary",
+  "startedAt": "2026-10-25T12:54:49.528541+00:00",
+  "seconds": 24.004,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "0759c11e49d9106df4bdc218e8fdb6ed32b009fbc4a537c78d39257b0b90d1d7",
+  "inputsAfter": "0759c11e49d9106df4bdc218e8fdb6ed32b009fbc4a537c78d39257b0b90d1d7",
+  "postgresToolDirectory": null,
+  "outputSha256": "a04aa75928398d467398c0b761395698db9a181de0084d70d4dab59dd205d249",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  2 passed (2)\n      Tests  54 passed (54)\n   Start at  20:55:01\n   Duration  11.90s (transform 1.19s, setup 76ms, import 1.52s, tests 11.10s, environment 0ms)\n\n % Coverage report from v8\n------------------|---------|----------|---------|---------|-------------------\nFile              | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n------------------|---------|----------|---------|---------|-------------------\nAll files         |     100 |    98.61 |     100 |     100 |                   \n managed-model.ts |     100 |    98.61 |     100 |     100 | 187               \n------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 100% ( 176/176 )\nBranches     : 98.61% ( 71/72 )\nFunctions    : 100% ( 31/31 )\nLines        : 100% ( 145/145 )\n================================================================================\nERROR: Coverage for branches (98.61%) does not meet global threshold (100%) for packages/subagent/subagent-codex/src/managed-model.ts\n"
+}

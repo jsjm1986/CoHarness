@@ -7,6 +7,7 @@
  */
 
 import { execFile } from 'node:child_process'
+import { addAbortListener } from 'node:events'
 
 /** Testable command boundary; native implementations never invoke a shell. */
 export type NativeCommandRunner = (
@@ -20,28 +21,47 @@ export type NativeCommandRunner = (
  * Run a host command with utf8 stdio, abort propagation, and explicit GUI visibility.
  * @param command - executable path or PATH name.
  * @param args - argv (never a shell string).
- * @param signal - caller/connection lifetime; abort terminates the child.
+ * @param signal - caller/connection lifetime; a pre-cancelled call allocates nothing, and later cancellation awaits direct-helper closure.
  * @param window - Windows startup visibility: `hidden` for background commands,
  * `visible` for GUI launchers. Ignored on other platforms.
  * @returns captured stdout/stderr on exit 0.
  */
 export const runNativeCommand: NativeCommandRunner = (command, args, signal, window) =>
   new Promise((resolve, reject) => {
-    execFile(
+    const cancelled = (): Error & { code: string } => Object.assign(
+      new Error('The operation was aborted', { cause: signal.reason }), { code: 'ABORT_ERR' },
+    )
+    if (signal.aborted) {
+      reject(Object.assign(cancelled(), { stdout: '', stderr: '' }))
+      return
+    }
+    let cancellation: ReturnType<typeof cancelled> | undefined
+    const child = execFile(
       command,
       [...args],
-      { encoding: 'utf8', signal, windowsHide: window === 'hidden' },
+      { encoding: 'utf8', killSignal: 'SIGKILL', windowsHide: window === 'hidden' },
       (error, stdout, stderr) => {
-        if (error !== null) {
-          const failure = Object.assign(new Error(error.message, { cause: error }), {
-            code: error.code,
-            stdout,
-            stderr,
-          })
-          reject(failure)
-          return
-        }
-        resolve({ stdout, stderr })
+        void closed.then(() => {
+          const cause = cancellation ?? error
+          if (cause !== null) {
+            const failure = Object.assign(new Error(cause.message, { cause }), {
+              code: cause.code,
+              stdout,
+              stderr,
+            })
+            reject(failure)
+            return
+          }
+          resolve({ stdout, stderr })
+        })
       },
     )
+    // Failed spawn handles may still have a native pid of zero before their error event.
+    const abort = addAbortListener(signal, () => {
+      cancellation ??= cancelled()
+      if (child.pid !== undefined) child.kill('SIGKILL')
+    })
+    const closed = new Promise<void>((resolveClosed) => {
+      child.once('close', () => { abort[Symbol.dispose](); resolveClosed() })
+    })
   })

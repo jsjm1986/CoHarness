@@ -1,0 +1,14 @@
+{
+  "name": "progress-session-scoped-lint-current",
+  "cwd": ".",
+  "command": "pnpm exec tsx scripts/run-oxlint.ts gateway/src/postgres/progress-usage.ts gateway/src/postgres/progress-service.ts gateway/tests/project-progress-postgres.spec.ts gateway/tests/fixtures/gateway-model-owner.ts gateway/tests/fixtures/project-progress-built.mjs gateway/tests/run-built-resource-admission.mjs gateway/tests/macos-release-control.spec.ts scripts/build-production.ts",
+  "startedAt": "2026-10-23T23:01:00.104650+00:00",
+  "seconds": 5.641,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "aea260e1dc4dd7fcb0c75ce1413ceed83f9d1d2d074004fbd080e7d351cb628b",
+  "inputsAfter": "aea260e1dc4dd7fcb0c75ce1413ceed83f9d1d2d074004fbd080e7d351cb628b",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

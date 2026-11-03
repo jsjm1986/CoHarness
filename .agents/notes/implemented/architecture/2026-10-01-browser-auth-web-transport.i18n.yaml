@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-01-browser-auth-web-transport.md
 document:
-  en: c570f358a1610cca30ad8ef019fc7296ca6ed692
-  zh: 35919cd29eb3cdfb958392250b69f996c2d3a16f
+  en: d037c03260622272a30d3f8c5f4819d0ed92cf46
+  zh: cdec18cf88e424e1d390376251e0eae80adbac81
 /agent-note-browser-session-authentication-for-the-web-connection-carrier:
   en: 71e2120d9c548187
   zh: 0cc8a02f8a043da9
@@ -12,8 +12,8 @@ document:
   en: 37f56edc2676b0b8
   zh: 9be82f71b9f2d499
 /agent-note-browser-session-authentication-for-the-web-connection-carrier/decision:
-  en: 9dfe1c738d3e4759
-  zh: 5998b2d70811b3e8
+  en: 041247454bd56ef6
+  zh: 872ee5748886c384
 /agent-note-browser-session-authentication-for-the-web-connection-carrier/alternatives-considered:
   en: 3e1dfcb47dccbf04
   zh: 2c9ba9c0cc6292df

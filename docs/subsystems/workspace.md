@@ -493,6 +493,22 @@ Complete archive snapshot after a durable archive or restore mutation.
 
 Source: [`packages/workspace/workspace/src/index.ts`](../../packages/workspace/workspace/src/index.ts)
 
+<a id="workspacecatalog-changed--emit"></a>
+
+#### `workspace/catalog-changed` — emit
+
+The durable Workspace catalog has settled and its ordered entities are readable.
+
+```ts cordis-catalog
+/**
+ * The durable Workspace catalog has settled and its ordered entities are readable.
+ * @mode emit
+ */
+'workspace/catalog-changed'(): void
+```
+
+Source: [`packages/workspace/workspace/src/index.ts`](../../packages/workspace/workspace/src/index.ts)
+
 <a id="workspacesession-activity--waterfall"></a>
 
 #### `workspace/session-activity` — waterfall

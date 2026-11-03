@@ -1,0 +1,14 @@
+{
+  "name": "document-reuse-project-current-bytes-characterization",
+  "cwd": "gateway",
+  "command": "node ../.agents/audits/.local/document-reuse-project-probe.mjs",
+  "startedAt": "2026-10-25T03:52:15.778992+00:00",
+  "seconds": 1.044,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d52ebe8b0ef66417adeff479b3233fbadd03d1ca11b4bcbf4d93923cedf5815c",
+  "inputsAfter": "d52ebe8b0ef66417adeff479b3233fbadd03d1ca11b4bcbf4d93923cedf5815c",
+  "postgresToolDirectory": "/opt/homebrew/opt/libpq/bin",
+  "outputSha256": "b165e552f0f4cf91bac54e144dbc1e1c15c0e009c42818381cbbee2dc9f64228",
+  "outputTail": "{\n  \"scopeKind\": \"project\",\n  \"replacementUploaderId\": 269,\n  \"previousUploaderId\": 268,\n  \"replacementCatalogOwnerId\": 268,\n  \"observedCatalogState\": \"active\",\n  \"observedCatalogBytes\": 24,\n  \"actualReplacementBytes\": 24,\n  \"purgedPathReused\": true,\n  \"newPurgedPathVisibleInCatalog\": false,\n  \"newPurgedPathTrashStatus\": 503,\n  \"newPurgedPathTrashBody\": \"{\\\"error\\\":{\\\"code\\\":\\\"DOCUMENT_OWNERSHIP_UNKNOWN\\\",\\\"message\\\":\\\"Document ownership is not yet synchronized.\\\"}}\",\n  \"retainedTrashPathReused\": true,\n  \"newRetainedTrashPathTrashStatus\": 503,\n  \"newRetainedTrashPathBytesRemainActive\": true,\n  \"newRetainedTrashPathTrashBody\": \"{\\\"error\\\":{\\\"code\\\":\\\"DOCUMENT_OWNERSHIP_UNKNOWN\\\",\\\"message\\\":\\\"Document ownership is not yet synchronized.\\\"}}\"\n}\n"
+}

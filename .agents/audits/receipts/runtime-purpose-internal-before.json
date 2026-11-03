@@ -1,0 +1,14 @@
+{
+  "name": "runtime-purpose-internal-before",
+  "cwd": "gateway",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 ../node_modules/.bin/vitest run tests/runtime-api.spec.ts -t 'assertion before invoking cross-scope transfer'",
+  "startedAt": "2026-10-26T14:40:53.483298+00:00",
+  "seconds": 4.617,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ae618e8a926edc72433ca5f290b32b71c958ec35570e614a69dbf89cd96e08ab",
+  "inputsAfter": "ae618e8a926edc72433ca5f290b32b71c958ec35570e614a69dbf89cd96e08ab",
+  "postgresToolDirectory": null,
+  "outputSha256": "8ef082e5aa26a2683367d79f7ca62901585a8ec5eb92be22752574a368897bd2",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n ❯ tests/runtime-api.spec.ts (74 tests | 4 failed | 69 skipped) 18ms\n     × refuses a archive-read assertion before invoking cross-scope transfer 13ms\n     × refuses a document-admin assertion before invoking cross-scope transfer 2ms\n     × refuses a terminal-admin assertion before invoking cross-scope transfer 1ms\n     × refuses a plugin-admin assertion before invoking cross-scope transfer 1ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  tests/runtime-api.spec.ts > runtime document transfer authorization > refuses a archive-read assertion before invoking cross-scope transfer\n FAIL  tests/runtime-api.spec.ts > runtime document transfer authorization > refuses a document-admin assertion before invoking cross-scope transfer\n FAIL  tests/runtime-api.spec.ts > runtime document transfer authorization > refuses a terminal-admin assertion before invoking cross-scope transfer\n FAIL  tests/runtime-api.spec.ts > runtime document transfer authorization > refuses a plugin-admin assertion before invoking cross-scope transfer\nAssertionError: expected { handled: true, status: 200, …(1) } to match object { status: 403, …(1) }\n(10 matching properties omitted from actual)\n\n- Expected\n+ Received\n\n  {\n    \"body\": {\n-     \"error\": \"forbidden\",\n+     \"items\": [],\n+     \"source\": {\n+       \"kind\": \"personal\",\n+       \"label\": \"Personal documents\",\n      },\n-   \"status\": 403,\n+     \"target\": {\n+       \"kind\": \"project\",\n+       \"label\": \"Shared\",\n+     },\n+     \"transferId\": \"restricted-transfer\",\n+     \"version\": 1,\n+   },\n+   \"status\": 200,\n  }\n\n ❯ tests/runtime-api.spec.ts:617:11\n    615|       expect(await request(runtime.handler, '/internal/runtime/documen…\n    616|         principal, body: { version: 1 },\n    617|       })).toMatchObject({ status: 403, body: { error: 'forbidden' } })\n       |           ^\n    618|       expect(transfer).not.toHaveBeenCalled()\n    619|     },\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯\n\n\n Test Files  1 failed (1)\n      Tests  4 failed | 1 passed | 69 skipped (74)\n   Start at  22:40:56\n   Duration  1.98s (transform 1.51s, setup 0ms, import 1.86s, tests 18ms, environment 0ms)\n\n"
+}

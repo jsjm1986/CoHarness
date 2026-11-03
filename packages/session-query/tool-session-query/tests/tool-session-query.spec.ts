@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, type Fiber } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage, ToolCallId, HarnessError , createMessage } from '@deepseek-ai/dsh-llm'
-import type { ContextFormed, GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed, FinishReason, GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { MAX_TIMER_DELAY_MS, TimeoutReason } from '@deepseek-ai/dsh-timeout'
 import * as TimeoutPolicy from '@deepseek-ai/dsh-tool-call-timeout-policy'
 import SessionStore, {
@@ -1279,6 +1279,18 @@ describe('workspace authority and lineage redaction', () => {
 })
 
 describe('collaboration participant readability', () => {
+  it.each(['session_trace', 'session_search'] as const)('refuses %s while the required participant provider is unavailable', async (toolName) => {
+    const mounted = await mount()
+    const target = createSession(mounted.ctx, 'required-provider-secret', '/work')
+    openStep(target, 'private source content')
+    mounted.ctx.provide('collaborationRequired', true)
+    const result = await mounted.call(toolName, toolName === 'session_trace'
+      ? { session_id: target.id } : { query: 'private' })
+    expect(errorCode(result)).toBe('SESSION_QUERY_TOOL_UNAUTHORIZED')
+    expect(JSON.stringify(result)).not.toContain('required-provider-secret')
+    expect(JSON.stringify(result)).not.toContain('private source content')
+  })
+
   function installParticipantAcl(ctx: Context, readable: readonly SessionIdValue[]): Set<SessionIdValue> {
     const allowed = new Set(readable)
     ctx.provide('collaboration', {
@@ -2525,6 +2537,8 @@ describe('session handoff', () => {
     const requests: GenerateOptions[] = []
     mounted.ctx.provide('llm', {
       async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+        expect(mounted.caller.snapshotEvents().find(event => event.type === 'session/handoff-llm-request')?.data)
+          .toMatchObject({ sourceSessionId: target.id, messages: options.messages })
         requests.push(options)
         yield { type: 'block-start', index: 0, blockType: 'text' }
         yield { type: 'text-delta', index: 0, text: '## Goal\nship the release' }
@@ -2545,6 +2559,9 @@ describe('session handoff', () => {
     expect(requests[0]?.purpose).toBe('session-handoff')
     expect(requests[0]?.provider).toBe('test-provider')
     expect(requests[0]?.sessionId).toBe(mounted.caller.id)
+    expect(mounted.caller.snapshotEvents().filter(event => event.type === 'session/handoff-llm-request'))
+      .toMatchObject([{ data: { sourceSessionId: target.id,
+        route: { provider: 'test-provider', model: 'test-model' }, messages: requests[0]?.messages } }])
   })
 
   it.each(['surface read', 'extraction'] as const)(
@@ -2620,6 +2637,73 @@ describe('session handoff', () => {
     const output = text(await mounted.call('session_handoff', { session_id: 'fallback-target' }, { agent }))
     expect(output).toContain('Source: local tail')
     expect(output).toContain('keep the local tail')
+  })
+
+  it.each(['cost $$', 'literal $&', 'prefix $`', "suffix $'"])(
+    'preserves the source transcript literally in handoff input: %s', async (literal) => {
+      const mounted = await mount()
+      const target = createSession(mounted.ctx, 'literal-target', '/work')
+      appendExchange(target, literal, 'retained reply')
+      const requests: GenerateOptions[] = []
+      mounted.ctx.provide('llm', {
+        async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+          requests.push(options)
+          yield { type: 'block-end', index: 0, block: { type: 'text', text: 'literal capsule' } }
+          yield { type: 'finish', reason: { kind: 'stop' } }
+        },
+      } as never)
+      const agent: Agent = { ...fakeAgent(mounted.caller), options: { provider: 'test-provider', model: 'test-model' } }
+
+      const output = text(await mounted.call('session_handoff', { session_id: target.id }, { agent }))
+      expect(output).toContain('Source: model capsule')
+      expect(requests).toHaveLength(1)
+      expect(JSON.stringify(requests[0]?.messages)).toContain('user: ' + literal)
+    },
+  )
+
+  it('keeps extraction local when its request input cannot be logged', async () => {
+    const mounted = await mount()
+    const target = createSession(mounted.ctx, 'audit-failure-target', '/work')
+    appendExchange(target, 'retain local input after an audit failure', 'local reply')
+    const stream = vi.fn(async function* (): AsyncIterable<StreamChunk> {
+      yield { type: 'finish', reason: { kind: 'stop' } }
+    })
+    mounted.ctx.provide('llm', { stream } as never)
+    vi.spyOn(mounted.caller, 'append').mockImplementationOnce(() => { throw new Error('request logging unavailable') })
+    const agent: Agent = { ...fakeAgent(mounted.caller), options: { provider: 'test-provider', model: 'test-model' } }
+
+    const output = text(await mounted.call('session_handoff', { session_id: target.id }, { agent }))
+    expect(output).toContain('Source: local tail')
+    expect(output).toContain('retain local input after an audit failure')
+    expect(stream).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { kind: 'error', failure: { message: 'upstream stopped', code: 'UPSTREAM_FAILED' } },
+    { kind: 'aborted', failure: { message: 'provider cancelled', code: 'ABORTED' } },
+    { kind: 'max-tokens' },
+    { kind: 'tool-calls' },
+    undefined,
+  ] satisfies Array<FinishReason | undefined>)('uses the local tail for an incomplete model capsule: %j', async (reason) => {
+    const mounted = await mount()
+    const target = createSession(mounted.ctx, 'partial-target', '/work')
+    appendExchange(target, 'retain the verified local history', 'local reply')
+    mounted.ctx.provide('llm', {
+      async * stream(): AsyncIterable<StreamChunk> {
+        yield { type: 'block-start', index: 0, blockType: 'text' }
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: 'PARTIAL_CAPSULE' } }
+        if (reason !== undefined) yield { type: 'finish', reason }
+      },
+    } as never)
+    const agent: Agent = { ...fakeAgent(mounted.caller), options: { provider: 'test-provider', model: 'test-model' } }
+
+    const output = text(await mounted.call('session_handoff', { session_id: target.id }, { agent }))
+    expect(output).toContain('Source: local tail')
+    expect(output).toContain('retain the verified local history')
+    expect(output).not.toContain('PARTIAL_CAPSULE')
+    expect(mounted.caller.snapshotEvents().filter(event => event.type === 'session/handoff-llm-request'))
+      .toMatchObject([{ data: { sourceSessionId: target.id,
+        route: { provider: 'test-provider', model: 'test-model' } } }])
   })
 
   it('skips extraction beyond the serialized-conversation cap', async () => {

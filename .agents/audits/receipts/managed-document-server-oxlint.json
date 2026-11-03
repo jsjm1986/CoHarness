@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-server-oxlint",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-gateway/src packages/attachment/userdoc-gateway/tests packages/attachment/userdoc-gateway/tsdown.config.ts",
+  "startedAt": "2026-10-26T17:44:38.267285+00:00",
+  "seconds": 6.416,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bce87baf477e57fa8adfcaea19b7c669577ec2a8271c17efb9b40952af1072da",
+  "inputsAfter": "bce87baf477e57fa8adfcaea19b7c669577ec2a8271c17efb9b40952af1072da",
+  "postgresToolDirectory": null,
+  "outputSha256": "ea0df412b8dfdd8095255357d07dad93a828ef29dd3b721b1d9d45aea4d38df6",
+  "outputTail": "packages/attachment/userdoc-gateway/tests/server.spec.ts:34:55: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/attachment/userdoc-gateway/tests/server.spec.ts:34:55: error typescript(use-unknown-in-catch-callback-variable): Prefer the safe `: unknown` for a `then` rejection callback variable.\npackages/attachment/userdoc-gateway/tests/server.spec.ts:46:96: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\npackages/attachment/userdoc-gateway/tests/server.spec.ts:46:112: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\n"
+}

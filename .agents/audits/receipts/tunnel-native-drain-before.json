@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-native-drain-before",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/tsx --tsconfig tsconfig.run.json ../.agents/audits/.local/tunnel-native-probe.mjs drain",
+  "startedAt": "2026-10-24T21:29:56.366306+00:00",
+  "seconds": 10.909,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "cfd0584c6b5816a86b605ca3d6daca9e9c5ed7df3215a0e5f25e3d7f5412c949",
+  "inputsAfter": "cfd0584c6b5816a86b605ca3d6daca9e9c5ed7df3215a0e5f25e3d7f5412c949",
+  "postgresToolDirectory": null,
+  "outputSha256": "e539762922ee2138827dffcc70c6c6902a71a6a67b82dda805320c24b962e464",
+  "outputTail": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/tunnel-native-probe.mjs:22\n    if (performance.now() >= deadline) throw new Error('Named tunnel did not drain both output streams')\n                                             ^\n\nError: Named tunnel did not drain both output streams\n    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/.agents/audits/.local/tunnel-native-probe.mjs:22:46)\n\nNode.js v25.8.1\n"
+}

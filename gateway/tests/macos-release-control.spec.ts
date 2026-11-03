@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { describe, expect, it, onTestFinished } from 'vitest'
 
@@ -60,14 +60,18 @@ function release(root: string, name: string): string {
     'gateway/lib/config.js',
     'gateway/lib/server.js',
     'gateway/lib/runtime-api.js',
+    'gateway/lib/runtime-resource-api.js',
+    'gateway/lib/node-resource-budget.js',
+    'gateway/lib/node-resource-pressure.js',
+    'packages/context/resource-budget/lib/wire.js',
     'gateway/public/admin/index.html',
     'gateway/node_modules/pg/package.json',
     'gateway/node_modules/argon2/package.json',
     'gateway/node_modules/better-sqlite3/package.json',
-    ...['@deepseek-ai/cordis', '@deepseek-ai/schemastery', '@deepseek-ai/dsh-managed-data', '@deepseek-ai/dsh-atomic-write',
+    ...['@deepseek-ai/cordis', '@deepseek-ai/schemastery', '@deepseek-ai/dsh-managed-data', '@deepseek-ai/dsh-atomic-write', '@deepseek-ai/dsh-native-command',
       '@deepseek-ai/dsh-llm', '@deepseek-ai/dsh-session-format', '@deepseek-ai/dsh-session-format-catalog',
       '@deepseek-ai/dsh-home-paths', '@deepseek-ai/dsh-userdoc', '@deepseek-ai/dsh-userdoc-local',
-      '@deepseek-ai/dsh-host-userdoc-http']
+      '@deepseek-ai/dsh-host-userdoc-http', '@deepseek-ai/dsh-resource-budget']
       .map(packageName => `gateway/node_modules/${packageName}/package.json`),
     'packages/llm/llm/lib/types/discovery.js',
     'packages/session/session-format/lib/index.js',
@@ -86,6 +90,7 @@ function release(root: string, name: string): string {
     mkdirSync(resolve(file, '..'), { recursive: true })
     writeFileSync(file, 'fixture\n')
   }
+  writeFileSync(join(directory, 'gateway/lib/runtime-api.js'), "import './runtime-resource-api.js'\n")
   return directory
 }
 
@@ -282,8 +287,14 @@ printf '%s\n' "$*" > "$CAPTURE"
   it.each([
     'packages/session/session-format/lib/index.js',
     'packages/session/session-format/lib/types/surface.js',
+    'gateway/lib/runtime-resource-api.js',
+    'gateway/lib/node-resource-budget.js',
+    'gateway/lib/node-resource-pressure.js',
+    'packages/context/resource-budget/lib/wire.js',
+    'gateway/node_modules/@deepseek-ai/dsh-resource-budget/package.json',
   ])('rejects a compiled release missing %s before switching current', (missing) => {
     const root = mkdtempSync(join(tmpdir(), 'hgw-release-missing-'))
+    onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
     const previous = release(root, 'release-one')
     const candidate = release(root, 'release-two')
     pointCurrent(root, previous)
@@ -305,7 +316,8 @@ printf '%s\n' "$*" > "$CAPTURE"
     })
 
     expect(result.status).toBe(1)
-    expect(result.stderr).toContain('release has no complete compiled Gateway payload')
+    expect(result.stderr).toContain(missing.startsWith('packages/session/')
+      ? 'release has no complete compiled Gateway payload' : 'release resource admission payload is missing or empty')
     expect(realpathSync(join(root, 'current'))).toBe(realpathSync(previous))
     expect(existsSync(join(root, '.activation.lock'))).toBe(false)
   })
@@ -315,6 +327,188 @@ printf '%s\n' "$*" > "$CAPTURE"
     'native/system/packages/entry/lib/index.js',
     'native/system/packages/entry/lib/flock.js',
   ])('rejects a compiled release missing native payload %s before switching current', (missing) => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-release-native-'))
+    const previous = release(root, 'release-one')
+    const candidate = release(root, 'release-two')
+    pointCurrent(root, previous)
+    unlinkSync(join(candidate, missing))
+    const envFile = environmentFile(root)
+    const state = join(root, 'state')
+    const bin = fakeTools(root, state)
+    writeFileSync(join(state, 'pid'), '100\n')
+    writeFileSync(join(state, 'cwd'), `${realpathSync(previous)}/gateway\n`)
+
+    const result = spawnSync('/bin/bash', [control, 'activate', candidate], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH ?? ''}`,
+        FAKE_STATE: state,
+        HGW_GATEWAY_ENV_FILE: envFile,
+      },
+    })
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(`release payload is missing or empty`)
+    expect(result.stderr).toContain(missing)
+    expect(realpathSync(join(root, 'current'))).toBe(realpathSync(previous))
+    expect(existsSync(join(root, '.activation.lock'))).toBe(false)
+  })
+
+  it('accepts an older compiled Gateway whose API does not import the resource coordinator', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-release-prior-resource-'))
+    onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+    const previous = release(root, 'release-one')
+    writeFileSync(join(previous, 'gateway/lib/runtime-api.js'), 'previous API\n')
+    for (const missing of ['gateway/lib/runtime-resource-api.js', 'gateway/lib/node-resource-budget.js',
+      'gateway/lib/node-resource-pressure.js', 'packages/context/resource-budget/lib/wire.js',
+      'gateway/node_modules/@deepseek-ai/dsh-resource-budget/package.json']) unlinkSync(join(previous, missing))
+    pointCurrent(root, previous)
+    const capture = join(root, 'capture')
+    const fakeNode = join(root, 'fake-node')
+    executable(fakeNode, '#!/bin/bash\nprintf "%s\\n" "$*" > "$CAPTURE"\n')
+    const envFile = environmentFile(root, fakeNode)
+    const result = spawnSync('/bin/bash', [control, 'run'], { encoding: 'utf8',
+      env: { ...process.env, CAPTURE: capture, HGW_GATEWAY_ENV_FILE: envFile } })
+    expect(result.status, result.stderr).toBe(0)
+    expect(readFileSync(capture, 'utf8')).toBe(`${realpathSync(previous)}/gateway/lib/index.js\n`)
+  })
+
+  it.each([null, 'gateway/lib/runtime-document-store.js',
+    'packages/attachment/userdoc-gateway/lib/protocol.js', 'packages/attachment/userdoc-gateway/lib/protocol-core.js',
+    'packages/util/values/lib/index.js', 'empty-protocol', 'wrong-export',
+  ])('validates the compiled document module graph before running a release with defect %s', (defect) => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-release-documents-'))
+    onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+    const candidate = release(root, 'release-documents')
+    writeFileSync(join(candidate, 'gateway/package.json'), JSON.stringify({ type: 'module' }))
+    writeFileSync(join(candidate, 'gateway/lib/index.js'), 'export {}\n')
+    writeFileSync(join(candidate, 'gateway/lib/runtime-api.js'), "export { value } from './runtime-document-store.js'\n")
+    writeFileSync(join(candidate, 'gateway/lib/runtime-document-store.js'),
+      'export { value } from "@deepseek-ai/dsh-userdoc-gateway/protocol"\nexport { assertNever } from "@deepseek-ai/dsh-util-values"\n')
+    for (const [directory, name, exports] of [
+      ['packages/attachment/userdoc-gateway', '@deepseek-ai/dsh-userdoc-gateway', { './protocol': './lib/protocol.js' }],
+      ['packages/util/values', '@deepseek-ai/dsh-util-values', { '.': './lib/index.js' }],
+    ] as const) {
+      const packageRoot = join(candidate, directory), link = join(candidate, 'gateway/node_modules', name)
+      mkdirSync(join(packageRoot, 'lib'), { recursive: true })
+      writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ name, type: 'module', exports }))
+      symlinkSync(relative(dirname(link), packageRoot), link, 'dir')
+    }
+    writeFileSync(join(candidate, 'packages/attachment/userdoc-gateway/lib/protocol.js'), "export { value } from './protocol-core.js'\n")
+    writeFileSync(join(candidate, 'packages/attachment/userdoc-gateway/lib/protocol-core.js'), 'export const value = 1\n')
+    writeFileSync(join(candidate, 'packages/util/values/lib/index.js'), 'export function assertNever() { throw new Error("unreachable") }\n')
+    if (defect === 'empty-protocol') writeFileSync(join(candidate, 'packages/attachment/userdoc-gateway/lib/protocol.js'), '')
+    else if (defect === 'wrong-export') {
+      writeFileSync(join(candidate, 'packages/attachment/userdoc-gateway/package.json'), JSON.stringify({ type: 'module', exports: {} }))
+    } else if (defect !== null) unlinkSync(join(candidate, defect))
+    pointCurrent(root, candidate)
+    const result = spawnSync('/bin/bash', [control, 'run'], { encoding: 'utf8',
+      env: { ...process.env, HGW_GATEWAY_ENV_FILE: environmentFile(root) } })
+    expect(result.signal).toBeNull()
+    expect(result.status, result.stderr).toBe(defect === null ? 0 : 1)
+    if (defect !== null) expect(result.stderr).toMatch(/release document (payload|module graph)/)
+  })
+
+  it.each([null, 'prior-material-receipts', 'prior-request-sessions', 'gateway/lib/gateway-model-budget.js', 'gateway/lib/postgres/progress-usage.js',
+    'gateway/lib/postgres/progress-service.js',
+    'native/system/packages/entry/lib/flock.js', 'gateway/node_modules/@deepseek-ai/node-addon-system/package.json',
+    'gateway/deploy/postgres/migrations/065_gateway_model_ownership.sql',
+    'gateway/deploy/postgres/migrations/066_project_journal_generation.sql',
+    'gateway/deploy/postgres/migrations/067_project_journal_requests.sql',
+    'gateway/deploy/postgres/migrations/068_project_journal_visibility.sql',
+    'gateway/deploy/postgres/migrations/069_project_journal_materials.sql',
+    'gateway/deploy/postgres/migrations/070_project_journal_request_sessions.sql',
+    'gateway/deploy/postgres/migrations/071_project_journal_request_deletion.sql',
+    'packages/core/session/lib/index.js', 'gateway/node_modules/@deepseek-ai/dsh-session/package.json',
+  ])('checks the compiled Gateway model admission payload with absent file %s', missing => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-release-model-'))
+    onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+    const candidate = release(root, 'release-model')
+    writeFileSync(join(candidate, 'gateway/lib/index.js'), "import './gateway-model-budget.js'\n")
+    for (const file of ['gateway/lib/gateway-model-budget.js', 'gateway/lib/postgres/progress-usage.js',
+      'gateway/lib/postgres/progress-service.js',
+      'native/system/packages/entry/lib/flock.js', 'gateway/node_modules/@deepseek-ai/node-addon-system/package.json',
+      'gateway/deploy/postgres/migrations/065_gateway_model_ownership.sql',
+      'gateway/deploy/postgres/migrations/066_project_journal_generation.sql',
+      'gateway/deploy/postgres/migrations/067_project_journal_requests.sql',
+      'gateway/deploy/postgres/migrations/068_project_journal_visibility.sql',
+      'gateway/deploy/postgres/migrations/069_project_journal_materials.sql',
+      'gateway/deploy/postgres/migrations/070_project_journal_request_sessions.sql',
+      'gateway/deploy/postgres/migrations/071_project_journal_request_deletion.sql',
+      'packages/core/session/lib/index.js', 'gateway/node_modules/@deepseek-ai/dsh-session/package.json']) {
+      mkdirSync(join(candidate, file, '..'), { recursive: true })
+      writeFileSync(join(candidate, file), 'payload\n')
+    }
+    writeFileSync(join(candidate, 'gateway/lib/postgres/progress-service.js'), 'project_journal_materials\n')
+    writeFileSync(join(candidate, 'gateway/lib/postgres/progress-usage.js'), 'request_session\n')
+    if (missing === 'prior-material-receipts') {
+      writeFileSync(join(candidate, 'gateway/lib/postgres/progress-service.js'), 'prior progress service\n')
+      unlinkSync(join(candidate, 'gateway/deploy/postgres/migrations/069_project_journal_materials.sql'))
+    }
+    if (missing === 'prior-material-receipts' || missing === 'prior-request-sessions') {
+      writeFileSync(join(candidate, 'gateway/lib/postgres/progress-usage.js'), 'prior progress evidence\n')
+      for (const file of ['gateway/deploy/postgres/migrations/070_project_journal_request_sessions.sql',
+        'gateway/deploy/postgres/migrations/071_project_journal_request_deletion.sql',
+        'packages/core/session/lib/index.js', 'gateway/node_modules/@deepseek-ai/dsh-session/package.json']) unlinkSync(join(candidate, file))
+    } else if (missing !== null) unlinkSync(join(candidate, missing))
+    pointCurrent(root, candidate)
+    const capture = join(root, 'capture'), fakeNode = join(root, 'fake-node')
+    executable(fakeNode, '#!/bin/bash\nprintf "%s\\n" "$*" > "$CAPTURE"\n')
+    const envFile = environmentFile(root, fakeNode)
+    const result = spawnSync('/bin/bash', [control, 'run'], { encoding: 'utf8',
+      env: { ...process.env, CAPTURE: capture, HGW_GATEWAY_ENV_FILE: envFile } })
+    const accepted = missing === null || missing === 'prior-material-receipts' || missing === 'prior-request-sessions'
+    expect(result.status, result.stderr).toBe(accepted ? 0 : 1)
+    if (accepted) expect(readFileSync(capture, 'utf8')).toBe(`${realpathSync(candidate)}/gateway/lib/index.js\n`)
+    else expect(result.stderr).toContain('release Gateway model admission payload is missing or empty')
+  })
+
+  it.each(['complete', 'missing-migration', 'prior-capture-bounds'] as const)('checks %s pressure-capture payloads', mode => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-release-pressure-'))
+    onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+    const candidate = release(root, 'pressure')
+    writeFileSync(join(candidate, 'gateway/lib/node-resource-budget.js'), mode === 'prior-capture-bounds' ? 'prior budget\n' : 'sampled_before\n')
+    if (mode === 'complete') {
+      const migration = join(candidate, 'gateway/deploy/postgres/migrations/072_node_pressure_capture_bounds.sql')
+      mkdirSync(dirname(migration), { recursive: true }); writeFileSync(migration, 'payload\n')
+    }
+    pointCurrent(root, candidate)
+    const capture = join(root, 'capture'), fakeNode = join(root, 'fake-node')
+    executable(fakeNode, '#!/bin/bash\nprintf "%s\\n" "$*" > "$CAPTURE"\n')
+    const envFile = environmentFile(root, fakeNode)
+    const result = spawnSync('/bin/bash', [control, 'run'], { encoding: 'utf8',
+      env: { ...process.env, CAPTURE: capture, HGW_GATEWAY_ENV_FILE: envFile } })
+    expect(result.status, result.stderr).toBe(mode === 'missing-migration' ? 1 : 0)
+    if (mode === 'missing-migration') expect(result.stderr).toContain('release resource admission payload is missing or empty')
+    else expect(readFileSync(capture, 'utf8')).toBe(`${realpathSync(candidate)}/gateway/lib/index.js\n`)
+  })
+
+  it.each((['project', 'model'] as const).flatMap(kind =>
+    (['complete', 'missing-migration', 'prior-account-locks'] as const).map(mode => ({ kind, mode })),
+  ))('checks $mode $kind account-deletion payloads', ({ kind, mode }) => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-release-account-'))
+    onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+    const candidate = release(root, 'account')
+    const service = join(candidate, `gateway/lib/postgres/${kind === 'project' ? 'project' : 'model-governance'}-service.js`)
+    mkdirSync(dirname(service), { recursive: true })
+    writeFileSync(service, mode === 'prior-account-locks' ? 'prior project service\n' : 'mutationUser\n')
+    if (mode === 'complete') {
+      const migration = join(candidate, `gateway/deploy/postgres/migrations/${kind === 'project' ? '073_deleted_project' : '074_deleted_model'}_relationships.sql`)
+      mkdirSync(dirname(migration), { recursive: true }); writeFileSync(migration, 'payload\n')
+    }
+    pointCurrent(root, candidate)
+    const capture = join(root, 'capture'), fakeNode = join(root, 'fake-node')
+    executable(fakeNode, '#!/bin/bash\nprintf "%s\\n" "$*" > "$CAPTURE"\n')
+    const envFile = environmentFile(root, fakeNode)
+    const result = spawnSync('/bin/bash', [control, 'run'], { encoding: 'utf8',
+      env: { ...process.env, CAPTURE: capture, HGW_GATEWAY_ENV_FILE: envFile } })
+    expect(result.status, result.stderr).toBe(mode === 'missing-migration' ? 1 : 0)
+    if (mode === 'missing-migration') expect(result.stderr).toContain(`release ${kind} account deletion payload is missing or empty`)
+    else expect(readFileSync(capture, 'utf8')).toBe(`${realpathSync(candidate)}/gateway/lib/index.js\n`)
+  })
+
+  it('rejects a compiled release missing the host native addon before switching current', () => {
     const root = mkdtempSync(join(tmpdir(), 'hgw-release-native-'))
     const previous = release(root, 'release-one')
     const candidate = release(root, 'release-two')

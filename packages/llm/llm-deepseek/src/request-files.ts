@@ -2,6 +2,7 @@
 
 import type { RequestImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { deadline } from '@deepseek-ai/dsh-timeout'
+import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { DeepSeekFileStore, DeepSeekFileConnection, DeepSeekFilePolicy } from './file-store.ts'
 import type { DeepSeekFileId } from './file-id.ts'
 
@@ -120,6 +121,7 @@ export class RequestFiles {
       resolved = await this.files.ensureUploaded(version, this.connection, this.policy, limit.signal)
     } catch (error) {
       if (this.signal.aborted) throw error
+      if (error instanceof LlmError && (error.code === 'MODEL_FORBIDDEN' || error.code === 'MODEL_POLICY_UNAVAILABLE')) throw error
       throw new FileResolutionFailure(error)
     }
     this.activity()

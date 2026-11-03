@@ -1,0 +1,14 @@
+{
+  "name": "document-reference-manifest-before",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 pnpm exec vitest run packages/attachment/userdoc-local/tests/upload.spec.ts -t 'retains an identified publication'",
+  "startedAt": "2026-10-26T22:07:22.259257+00:00",
+  "seconds": 9.75,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "11d2b53ccd3b5816a84a3f6a6555b14a400457c3a057f329283647d172a0fe72",
+  "inputsAfter": "11d2b53ccd3b5816a84a3f6a6555b14a400457c3a057f329283647d172a0fe72",
+  "postgresToolDirectory": null,
+  "outputSha256": "deed06ab35127b6153dce46037baf3db444be05aa04dc0e8d7f87525fa2a34a9",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/attachment/userdoc-local/tests/upload.spec.ts (31 tests | 1 failed | 30 skipped) 211ms\n     × retains an identified publication through status inspection and restart 209ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/attachment/userdoc-local/tests/upload.spec.ts > resumable local document uploads > retains an identified publication through status inspection and restart\nAssertionError: expected undefined to deeply equal { …(4) }\n\n- Expected:\n{\n  \"createdBy\": \"user:7\",\n  \"incarnationId\": \"2fc790ee-0c63-4a71-bbe6-59e04ccc743e\",\n  \"origin\": \"upload\",\n  \"revision\": 1,\n}\n\n+ Received:\nundefined\n\n ❯ packages/attachment/userdoc-local/tests/upload.spec.ts:89:43\n     87|       sha256: digest(data), body: body(data) }, undefined, owner)\n     88|     const completeSession = await complete(first, session.uploadId, di…\n     89|     expect(completeSession.ref?.identity).toEqual(identity)\n       |                                           ^\n     90|     await firstContext.fiber.dispose()\n     91|     const restarted = await store(root)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 30 skipped (31)\n   Start at  06:07:31\n   Duration  802ms (transform 306ms, setup 62ms, import 324ms, tests 211ms, environment 0ms)\n\n"
+}

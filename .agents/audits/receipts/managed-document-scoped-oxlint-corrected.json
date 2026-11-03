@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-scoped-oxlint-corrected",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-gateway/src packages/attachment/userdoc-gateway/tests packages/attachment/userdoc/src/index.ts packages/attachment/userdoc/src/error.ts packages/host/userdoc-http/src/index.ts packages/context/gateway-runtime/src/index.ts",
+  "startedAt": "2026-10-26T17:34:35.805662+00:00",
+  "seconds": 8.664,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "ee112699ded9ffa5365c305de7a45fd202e3ad74d289798cd648f879cc157327",
+  "inputsAfter": "ee112699ded9ffa5365c305de7a45fd202e3ad74d289798cd648f879cc157327",
+  "postgresToolDirectory": null,
+  "outputSha256": "fe3c57578dcd66c5dff543e91f9b21f7c704a399be9f53e3dba3063f8508de63",
+  "outputTail": "packages/attachment/userdoc-gateway/tests/client.spec.ts:56:1: error @stylistic(max-len): This line has a length of 147. Maximum allowed is 140.\npackages/attachment/userdoc-gateway/tests/frame.spec.ts:76:1: error @stylistic(max-len): This line has a length of 144. Maximum allowed is 140.\npackages/attachment/userdoc-gateway/tests/frame.spec.ts:134:1: error @stylistic(max-len): This line has a length of 142. Maximum allowed is 140.\npackages/attachment/userdoc-gateway/src/server.ts:227:1: error @stylistic(max-len): This line has a length of 150. Maximum allowed is 140.\n"
+}

@@ -37,6 +37,7 @@ class DeepSeekHarnessConfig:
     max_line_bytes: int = 1 * 1024 * 1024
     max_pending_requests: int = 1_000
     max_notification_queue: int = 10_000
+    max_session_relationships: int = 10_000
     max_incoming_requests: int = 100
     max_output_bytes: int = 8 * 1024 * 1024
     base_url: str | None = None
@@ -88,6 +89,7 @@ class DeepSeekHarness:
                 max_line_bytes=self.config.max_line_bytes,
                 max_pending_requests=self.config.max_pending_requests,
                 max_notification_queue=self.config.max_notification_queue,
+                max_session_relationships=self.config.max_session_relationships,
                 max_incoming_requests=self.config.max_incoming_requests,
                 max_output_bytes=self.config.max_output_bytes,
             ),
@@ -131,9 +133,10 @@ class DeepSeekHarness:
             self._initialized = True
 
     def close(self) -> None:
+        """Stop new turns and reap the runtime; a failed teardown remains retryable."""
         with self._lifecycle_lock:
-            self._client.close()
             self._initialized = False
+            self._client.close()
 
     def start_session(self, session_id: str | None = None) -> "Session":
         self.start()

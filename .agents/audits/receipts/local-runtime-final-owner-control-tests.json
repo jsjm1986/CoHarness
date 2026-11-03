@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-final-owner-control-tests",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/local-runtime-launcher.spec.ts tests/local-runtime-owner.spec.ts tests/launcher.spec.ts tests/instances.spec.ts tests/runtime-capacity.spec.ts --retry=0 --maxWorkers=2",
+  "startedAt": "2026-10-24T19:23:55.487354+00:00",
+  "seconds": 20.274,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "37ef0e5ef7299347c40d8a4bd86862602f622f313de2a296bc41e502ea90602e",
+  "inputsAfter": "37ef0e5ef7299347c40d8a4bd86862602f622f313de2a296bc41e502ea90602e",
+  "postgresToolDirectory": null,
+  "outputSha256": "55d6a6d588b9c7a91bfb1bfde3953a5e21bc8c267a8e7ca2ba4807c699ebe7fd",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  5 passed (5)\n      Tests  85 passed (85)\n   Start at  03:23:57\n   Duration  17.80s (transform 1.17s, setup 0ms, import 1.69s, tests 20.43s, environment 0ms)\n\n"
+}

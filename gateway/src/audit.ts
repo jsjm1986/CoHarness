@@ -19,7 +19,7 @@ export interface AuditRow {
 /** Coarse grouping so the console can page one audit concern at a time. */
 export type AuditFamily = 'admin' | 'auth' | 'model' | 'steward' | 'api' | 'other'
 
-/** Filters accepted by both audit stores; stores clamp `limit` and floor `offset`. */
+/** Filters accepted by both audit stores; integer pagination counts are clamped to their supported ranges. */
 export interface AuditQueryFilter {
   userId?: number
   /** Login or display name substring match. */
@@ -41,18 +41,18 @@ export interface AuditQueryFilter {
 const MAX_LIMIT = 500
 
 /** Action names whose durable suffix already declares the failed result. */
-const FAILURE_ACTION_SUFFIX = /(?:\.(?:failed|denied|locked|error)|-failed)$/
+const FAILURE_ACTION_SUFFIXES = ['.failed', '.denied', '.locked', '.error', '-failed']
 
 /**
  * Durable outcome for one audit row: the HTTP status when the row records a
- * request, otherwise the result declared by the action name.
+ * request, otherwise the result declared by an exact, case-sensitive action suffix.
  * @param action - durable audit action.
  * @param status - HTTP status recorded for request rows.
  * @returns the outcome stored and filtered on.
  */
 export function auditOutcome(action: string, status: number | undefined): 'success' | 'failure' {
   if (status !== undefined) return status >= 400 ? 'failure' : 'success'
-  return FAILURE_ACTION_SUFFIX.test(action) ? 'failure' : 'success'
+  return FAILURE_ACTION_SUFFIXES.some(suffix => action.endsWith(suffix)) ? 'failure' : 'success'
 }
 
 /** LIKE literal escaping shared by the local store; ESCAPE '\\' accompanies every use. */
@@ -82,7 +82,8 @@ function whereClauses(filter: AuditQueryFilter): { clauses: string[]; params: un
   if (filter.actionPrefix !== undefined) { clauses.push(`audit_log.action LIKE ? ESCAPE '\\'`); params.push(`${escapeLike(filter.actionPrefix)}%`) }
   if (filter.queryText !== undefined) { clauses.push(`audit_log.action LIKE ? ESCAPE '\\'`); params.push(`%${escapeLike(filter.queryText)}%`) }
   if (filter.family !== undefined) clauses.push(FAMILY_CLAUSES[filter.family])
-  const failureMatch = `(COALESCE(audit_log.status, 0) >= 400 OR audit_log.action LIKE '%.failed' ESCAPE '\\' OR audit_log.action LIKE '%.denied' ESCAPE '\\' OR audit_log.action LIKE '%.locked' ESCAPE '\\' OR audit_log.action LIKE '%.error' ESCAPE '\\' OR audit_log.action LIKE '%-failed' ESCAPE '\\')`
+  const suffixMatch = FAILURE_ACTION_SUFFIXES.map(suffix => `audit_log.action GLOB '*${suffix}'`).join(' OR ')
+  const failureMatch = `(COALESCE(audit_log.status, 0) >= 400 OR (audit_log.status IS NULL AND (${suffixMatch})))`
   if (filter.outcome === 'failure') clauses.push(failureMatch)
   else if (filter.outcome === 'success') clauses.push(`NOT ${failureMatch}`)
   if (filter.fromMs !== undefined) { clauses.push('audit_log.ts >= ?'); params.push(filter.fromMs) }

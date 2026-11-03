@@ -1,3 +1,4 @@
+import type { RuntimeId } from '../src/runtime-catalog.ts'
 import type { Pool, PoolClient } from 'pg'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -7,9 +8,12 @@ import {
   encodePageCursor,
 } from '../src/postgres/conversation-repository.ts'
 
+const SCOPE = { organizationId: '00000000-0000-4000-8000-000000000001', runtimeId: '00000000-0000-4000-8000-000000000002' as RuntimeId }
+
 const headerRow = {
   id: 'session-1',
-  organization_id: 'organization-1',
+  runtime_id: SCOPE.runtimeId,
+  organization_id: SCOPE.organizationId,
   creator_user_id: 'user-1',
   project_id: null,
   parent_session_id: null,
@@ -46,7 +50,7 @@ describe('ConversationRepository load', () => {
     } as unknown as PoolClient
     const pool = { connect: vi.fn(async () => client) } as unknown as Pool
 
-    await expect(new ConversationRepository(pool).load('session-1')).resolves.toMatchObject({
+    await expect(new ConversationRepository(pool, SCOPE).load('session-1')).resolves.toMatchObject({
       header: { id: 'session-1', createdAt: 1000 },
       events: [event],
       revision: '7:1',
@@ -55,7 +59,7 @@ describe('ConversationRepository load', () => {
       'BEGIN',
       'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
       expect.stringMatching(/^SELECT id,organization_id/),
-      'SELECT e.seq::text,e.event FROM harness.conversation_events e WHERE e.session_id=$1 AND e.seq >= $2 ORDER BY e.seq',
+      expect.stringMatching(/SELECT e.seq::text,e.event FROM .*conversation_events.*WHERE e.session_id=\$1 AND e.seq >= \$2 ORDER BY e.seq/),
       'COMMIT',
     ])
     expect(client.release).toHaveBeenCalledOnce()
@@ -72,7 +76,7 @@ describe('ConversationRepository load', () => {
     } as unknown as PoolClient
     const pool = { connect: vi.fn(async () => client) } as unknown as Pool
 
-    await expect(new ConversationRepository(pool).load('missing')).resolves.toBeUndefined()
+    await expect(new ConversationRepository(pool, SCOPE).load('missing')).resolves.toBeUndefined()
     expect(calls.filter(text => text.startsWith('SELECT e.seq::text,e.event FROM'))).toHaveLength(0)
     expect(calls.at(-1)).toBe('COMMIT')
     expect(client.release).toHaveBeenCalledOnce()
@@ -114,7 +118,7 @@ describe('ConversationRepository bounded pages', () => {
       payload_bytes: 60,
     }))
     const fixture = pagePool(header, rows)
-    const repository = new ConversationRepository(fixture.pool)
+    const repository = new ConversationRepository(fixture.pool, SCOPE)
 
     const newer = await repository.readPage('session-1', { direction: 'newer', fromSeq: 0, maxEvents: 2 })
     expect(newer?.events.map(event => event.seq)).toEqual([0, 1])
@@ -145,7 +149,7 @@ describe('ConversationRepository bounded pages', () => {
       payload_bytes: 60,
     }))
     const fixture = pagePool(header, rows)
-    const page = await new ConversationRepository(fixture.pool).readPage('session-1', {
+    const page = await new ConversationRepository(fixture.pool, SCOPE).readPage('session-1', {
       maxBytes: 10_000,
       maxEvents: 10,
       maxGroups: 1,
@@ -157,7 +161,7 @@ describe('ConversationRepository bounded pages', () => {
   it('returns an empty page at either end without manufacturing a cursor', async () => {
     const header = { ...headerRow, version: '7', next_seq: '0' }
     const fixture = pagePool(header, [])
-    const repository = new ConversationRepository(fixture.pool)
+    const repository = new ConversationRepository(fixture.pool, SCOPE)
     await expect(repository.readPage('session-1', { direction: 'newer', fromSeq: 0 })).resolves.toMatchObject({
       events: [], startSeq: null, endSeq: null, hasMore: false,
     })
@@ -173,7 +177,7 @@ describe('ConversationRepository bounded pages', () => {
       event: { type: 'turn/start', seq: 0, time: 0, data: { text: 'large' } },
       payload_bytes: 100,
     }])
-    const repository = new ConversationRepository(fixture.pool)
+    const repository = new ConversationRepository(fixture.pool, SCOPE)
     await expect(repository.readPage('session-1', { maxEvents: 2_001 }))
       .rejects.toMatchObject({ code: 'protocol' })
     await expect(repository.readPage('session-1', { maxBytes: 10 }))
@@ -190,10 +194,10 @@ describe('ConversationRepository bounded pages', () => {
       payload_bytes: 60,
     }))
     const fixture = pagePool(header, rows)
-    const repository = new ConversationRepository(fixture.pool)
+    const repository = new ConversationRepository(fixture.pool, SCOPE)
     const page = await repository.readPage('session-1', { maxEvents: 1 })
     // A foreign cursor is a caller fault; a moved log is the retryable category.
-    const foreign = encodePageCursor({ version: 1, sessionId: 'session-2', revision: '7:2', direction: 'older', anchor: 1 })
+    const foreign = encodePageCursor({ version: 2, ...SCOPE, sessionId: 'session-2', revision: '7:2', direction: 'older', anchor: 1 })
     await expect(repository.readPage('session-1', { cursor: foreign })).rejects
       .toMatchObject({ code: 'protocol' })
     header.version = '8'
@@ -207,7 +211,7 @@ describe('ConversationRepository bounded pages', () => {
       { seq: 0, event: { type: 'turn/start', seq: 0, time: 0, data: {} }, payload_bytes: 40 },
       { seq: 2, event: { type: 'turn/end', seq: 2, time: 2, data: {} }, payload_bytes: 40 },
     ])
-    const repository = new ConversationRepository(fixture.pool)
+    const repository = new ConversationRepository(fixture.pool, SCOPE)
     await expect(repository.readPage('session-1', { maxEvents: 2 })).rejects
       .toMatchObject({ code: 'protocol' })
   })
@@ -250,7 +254,7 @@ describe('ConversationRepository history index', () => {
     } as unknown as PoolClient
     const pool = { connect: vi.fn(async () => client) } as unknown as Pool
 
-    await expect(new ConversationRepository(pool).readHistoryIndex('session-1')).resolves.toEqual({
+    await expect(new ConversationRepository(pool, SCOPE).readHistoryIndex('session-1')).resolves.toEqual({
       revision: '9:12',
       asOfSeq: 11,
       totalTurns: 2,
@@ -288,7 +292,7 @@ describe('ConversationRepository history index', () => {
       release: vi.fn(),
     } as unknown as PoolClient
     const pool = { connect: vi.fn(async () => client) } as unknown as Pool
-    const result = await new ConversationRepository(pool).readHistoryIndex('session-1', 2)
+    const result = await new ConversationRepository(pool, SCOPE).readHistoryIndex('session-1', 2)
     expect(result?.items.map(item => item.turn)).toEqual([1, 3])
     expect(result?.items[0]?.prompt).toBeUndefined()
     expect(result?.items[1]?.prompt).toBeUndefined()
@@ -327,10 +331,10 @@ describe('ConversationRepository append', () => {
     const client = {
       query: vi.fn(async (text: string, values?: unknown[]) => {
         if (text.startsWith('INSERT INTO harness.conversation_events')) inserts.push(values ?? [])
-        if (text.includes('FROM harness.conversation_sessions c')) {
-          return { rows: [{ organization_id: 'organization-1', root_session_id: 'session-1' }], rowCount: 1 }
+        if (text.includes('c.organization_id,c.root_session_id FROM')) {
+          return { rows: [{ organization_id: SCOPE.organizationId, root_session_id: 'session-1' }], rowCount: 1 }
         }
-        if (text.startsWith('SELECT id FROM harness.conversation_sessions')) {
+        if (text.startsWith('SELECT id FROM')) {
           return { rows: [{ id: 'session-1' }], rowCount: 1 }
         }
         if (text.startsWith('SELECT id,organization_id')) return { rows: [{ ...headerRow, next_seq: '1' }], rowCount: 1 }
@@ -341,9 +345,9 @@ describe('ConversationRepository append', () => {
     const pool = { connect: vi.fn(async () => client) } as unknown as Pool
 
     const event = { type: 'turn/start', seq: 1, time: 1000, data: { scope: '.\u0000AGENTS.md' } }
-    await expect(new ConversationRepository(pool).append('session-1', 'batch-1', [event] as never))
+    await expect(new ConversationRepository(pool, SCOPE).append('session-1', 'batch-1', [event] as never))
       .resolves.toBe('inserted')
-    const json = inserts[0]?.[4]
+    const json = inserts[0]?.[6]
     expect(typeof json).toBe('string')
     // The json column stores the \u0000 escape verbatim and decodes it back
     // to the real character on read; jsonb would reject the escape instead.

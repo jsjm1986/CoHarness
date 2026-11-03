@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-owner-perf-after",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/measure-local-owner.py",
+  "startedAt": "2026-10-24T19:15:02.506126+00:00",
+  "seconds": 3.677,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "3c4e67c3b11251973bc0397e5db4dc7768549db2eb92d17a9dfadc216763a389",
+  "inputsAfter": "3c4e67c3b11251973bc0397e5db4dc7768549db2eb92d17a9dfadc216763a389",
+  "postgresToolDirectory": null,
+  "outputSha256": "b4187b45d1e46b90802cea021cb0bcd2ae35b762ddcd7f1f0a6936a61554341f",
+  "outputTail": "{\n  \"workload\": \"compiled LocalLauncher plus a real loopback Node HTTP runtime\",\n  \"samples\": [\n    {\n      \"readinessMs\": 261.72,\n      \"gatewayRssKiB\": 83632,\n      \"runtimeRssKiB\": 62256,\n      \"supervisorRssKiB\": 78064\n    },\n    {\n      \"readinessMs\": 234.18,\n      \"gatewayRssKiB\": 83968,\n      \"runtimeRssKiB\": 62320,\n      \"supervisorRssKiB\": 78400\n    },\n    {\n      \"readinessMs\": 242.67,\n      \"gatewayRssKiB\": 83600,\n      \"runtimeRssKiB\": 62480,\n      \"supervisorRssKiB\": 78224\n    },\n    {\n      \"readinessMs\": 222.36,\n      \"gatewayRssKiB\": 83232,\n      \"runtimeRssKiB\": 62416,\n      \"supervisorRssKiB\": 78256\n    },\n    {\n      \"readinessMs\": 225.39,\n      \"gatewayRssKiB\": 84000,\n      \"runtimeRssKiB\": 62384,\n      \"supervisorRssKiB\": 78480\n    }\n  ],\n  \"medians\": {\n    \"readinessMs\": 234.18,\n    \"gatewayRssKiB\": 83632,\n    \"runtimeRssKiB\": 62384,\n    \"supervisorRssKiB\": 78256\n  }\n}\n"
+}

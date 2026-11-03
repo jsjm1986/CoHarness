@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-session-handoff-tool.md
 document:
-  en: 211d69a435eb24c36f068931cd8c60f3c4911ecc
-  zh: 55262362ca054008789269720d807399834e5bc6
+  en: 15f79203320dbfd0e5786e5c8ca1b80c287364f3
+  zh: 39588ecc9f21d8400f19324bed0f2bcb915de391
 /agent-note-session-handoff-tool-with-bounded-local-projection-and-optional-auxiliary-model-capsule:
   en: 45ef43ac1d1b686b
   zh: 9a62821c4d8adf3c
@@ -12,8 +12,8 @@ document:
   en: 0e12a5a8d4c30ad6
   zh: 7188c509bbfe49af
 /agent-note-session-handoff-tool-with-bounded-local-projection-and-optional-auxiliary-model-capsule/decision:
-  en: 95f22febfc1a525b
-  zh: 877a11ebf0cbcfc8
+  en: 58e5317c85c5f9f4
+  zh: df967950ea34dae8
 /agent-note-session-handoff-tool-with-bounded-local-projection-and-optional-auxiliary-model-capsule/consequences:
   en: e617d6f40bb40fb9
   zh: bc2ed9c32c44e692

@@ -1,0 +1,14 @@
+{
+  "name": "memory-auxiliary-event-graphs",
+  "cwd": ".",
+  "command": "pnpm run gen-doc-graphs",
+  "startedAt": "2026-10-24T01:45:30.016053+00:00",
+  "seconds": 28.266,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b2fc6546248a77d8e803169dd3d5882f1b1ccb0c10ed0615a01e62bb4c2c713a",
+  "inputsAfter": "b2fc6546248a77d8e803169dd3d5882f1b1ccb0c10ed0615a01e62bb4c2c713a",
+  "postgresToolDirectory": null,
+  "outputSha256": "2b5460ebf8b8586bdc7f7ccd45ef9c74454fcb10568d696874c7bfeef6896ede",
+  "outputTail": "$ tsx scripts/gen-doc-graphs.ts\ngen-doc-graphs: wrote 9 graph doc(s).\n"
+}

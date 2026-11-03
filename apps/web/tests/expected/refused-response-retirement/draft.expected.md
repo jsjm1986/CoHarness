@@ -1,0 +1,51 @@
+- button "New session"
+- button "Collapse sidebar":
+  - img
+- button "New session":
+  - img
+  - text: New Session
+- navigation "Panels":
+  - button "Plugins"
+- text: Workspaces
+- button "Search sessions":
+  - img
+- button "View options":
+  - img
+- button "Add workspace":
+  - img
+- tree "Sessions":
+  - treeitem "workspace New session in workspace" [expanded]:
+    - img
+    - text: workspace
+    - button "New session in workspace":
+      - img
+  - treeitem "New Session" [selected]
+- button "Documents":
+  - img
+  - text: Documents
+- button "Settings":
+  - img
+  - text: Settings
+- banner:
+  - navigation "Session hierarchy":
+    - button "workspace" [disabled]
+  - text: Standard mode
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - button "Open right sidebar":
+    - img
+- textbox "Message COHARNESS": Keep this draft after the refused send
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"': Workspace write
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message"
+- separator "Adjust transcript content width"
+- separator "Adjust transcript content width"

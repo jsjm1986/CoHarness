@@ -11,9 +11,11 @@ Shared browser-only uploader used by the conversation composer and document mana
 
 The package has no Cordis service or UI surface. Host-specific clients provide their relative route, JSON request helper, and network-error adapter; the uploader keeps file bytes in the browser and persists only opaque session metadata in IndexedDB (with a localStorage fallback), never document bytes. Metadata is discarded after the server-reported session expiry (or a seven-day fallback for older records) and is capped at 256 records and 1 MiB per browser storage backend.
 
+Accepted verification uses a separate five-minute browser wait budget. A receiving-session expiry timestamp cannot end that wait; provider status determines completion or failure.
+
 Adapters may append a stable query string to every protocol request and provide a resume namespace. The namespace is part of the browser recovery key, so the same file can resume independently in separate personal or project document scopes.
 
-Verification status is checked immediately after completion returns `verifying`. Later checks wait 500 ms, bounded by the server expiry and a five-minute verification deadline; aborting preserves the resumable session metadata.
+A completed response must contain a valid document reference with the selected file’s byte count and a matching completed progress count. Invalid responses use the host’s existing response-error adapter without reporting success or discarding recovery metadata. Optional document identity fields are validated and preserved; unknown identity fields are omitted.
 
 ## Summary
 
@@ -39,7 +41,7 @@ None; the package never assembles or sends provider requests.
 ## Known Limitations and Deferred Work
 
 - **One active file per call** — the host UI owns multi-file sequencing and cancellation; this package deliberately keeps one resumable state machine per selected file.
-- **Browser storage is best-effort** — private-mode or quota-restricted browsers may lose the bounded session metadata, after which the server still retains the session until its configured expiry but the user must select the file again without a local session id.
+- **Browser storage is best-effort** — private-mode or quota-restricted browsers may lose the bounded session metadata, after which the server retains receiving sessions until expiry and accepted verification until it settles but the user must select the file again without a local session id.
 - **Host adapters own authentication and route availability** — the uploader only maps the callbacks supplied by its consumer and cannot refresh credentials or discover an unavailable document service.
 
 <a id="dev-note"></a>

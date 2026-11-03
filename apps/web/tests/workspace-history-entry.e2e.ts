@@ -23,6 +23,7 @@ const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/workspace-history-entry'
 const GEOMETRY_DIR = fileURLToPath(new URL('./expected/workspace-history-entry/', import.meta.url))
 const DESKTOP_EXPECTED = join(SNAPSHOT_DIR, 'desktop.expected.md')
 const COMPACT_EXPECTED = join(SNAPSHOT_DIR, 'compact.expected.md')
+const PREPARING_EXPECTED = join(SNAPSHOT_DIR, 'preparing.expected.md')
 const MODE = webSnapshotMode()
 const HISTORY_ID = 'workspace-history-entry-history'
 const BLANK_ID = 'workspace-history-entry-blank'
@@ -154,7 +155,13 @@ describe('web e2e: Workspace history-first entry', () => {
       await input.fill('Keep this history draft after delayed navigation')
       await page.getByRole('button', { name: /New session in /i }).first().click()
       await requestStarted.promise
+      await expect.poll(() => input.isDisabled()).toBe(true)
+      expect(await input.getAttribute('placeholder')).toBe('Opening the new conversation…')
+      expect(await input.inputValue()).toBe('Keep this history draft after delayed navigation')
+      const pendingSnapshot = await captureStableAria(page, '[data-phase]', scaffold.workspaceCwd)
+      await compareOrRefreshGolden(PREPARING_EXPECTED, pendingSnapshot, MODE)
       await page.locator('[role="treeitem"][aria-selected="true"]').click()
+      await expect.poll(() => input.isDisabled()).toBe(false)
       const finished = page.waitForEvent('requestfinished', request => new URL(request.url()).pathname === '/api/session.create')
       release.resolve(undefined)
       await responseDelivered.promise
@@ -277,7 +284,7 @@ describe('web e2e: Workspace history-first entry', () => {
   }, 60_000)
 
   it('keeps the workspace-entry snapshot inventory closed', async () => {
-    await assertFixtureInventory(SNAPSHOT_DIR, ['auxiliary.expected.md', 'compact.expected.md', 'desktop.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['auxiliary.expected.md', 'compact.expected.md', 'desktop.expected.md', 'preparing.expected.md'])
     await assertFixtureInventory(GEOMETRY_DIR, ['geometry.expected.md'])
   })
 })

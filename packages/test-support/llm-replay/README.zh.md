@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-用于无密钥快照测试的 LLM（大语言模型）回放插件。它根据已记录的**会话 JSONL** fixture（测试前置数据）重建模型流，使测试无需 API 密钥即可针对固定的模型 transcript（文本记录）启动真实 agent（智能体）。配置 `providers` 后，它会注册仅用于回放的适配器，其模型目录可供测试模型发现功能的场景使用；未配置 `providers` 时，它会安装无需模型发现功能的测试所用 catch-all `llm/stream` waterfall（瀑布式事件）。
+用于无密钥快照测试的 LLM（大语言模型）回放插件。它根据已记录的**会话 JSONL** fixture（测试前置数据）重建模型流，使测试无需 API 密钥即可针对固定的模型 transcript（文本记录）启动真实 agent（智能体）。配置 `providers` 后，它会注册仅用于回放的适配器，其模型目录可供测试模型发现功能的场景使用；未配置 `providers` 时，它会安装无需模型发现功能的测试所用 catch-all `llm/stream` 与 `llm/orchestration` waterfall（瀑布式事件）。
 
 其消费方包括 ACP（Agent Client Protocol）与 headless `stream-json` 快照套件，以及 Web 浏览器 e2e 流水线。Loader 驱动的套件使用此插件替代真实 LLM 适配器；Web 流水线直接安装它，以保留清理阶段的消费检查句柄。
 
@@ -86,7 +86,7 @@ fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `as
 <a id="exports"></a>
 ## 导出项
 
-- `installLlmReplay(ctx, config)`：安装已配置回放适配器或 catch-all `llm/stream` 监听器；返回 `ReplayHandle`（包含用于保证 HMR（热模块替换）安全的 `dispose()`，以及清理阶段执行的 `assertConsumed()` 检查；后者确保每个已记录脚本都绑定到实时会话，且每个已绑定游标都已耗尽，从而将场景静默驱动的模型调用少于记录数转换为明确诊断）。在测试中使用它，可以不通过 Loader 或 env var 驱动回放。
+- `installLlmReplay(ctx, config)`：安装已配置回放适配器或 catch-all 模型／编排监听器；返回 `ReplayHandle`（包含用于保证 HMR（热模块替换）安全的 `dispose()`，以及清理阶段执行的 `assertConsumed()` 检查；后者确保每个已记录脚本都绑定到实时会话，且每个已绑定游标都已耗尽，从而将场景静默驱动的模型调用少于记录数转换为明确诊断）。在测试中使用它，可以不通过 Loader 或 env var 驱动回放。
 - `loadSessionScripts(config)`：解析场景中有序的 `SessionScript[]`（主会话 + 子会话），准备按首次调用顺序绑定到实时会话。
 - `loadReplayScript(config)`：只解析主会话的 `ReplayEntry[]`（如果伴随文件存在，则使用经校验的替换或补丁；否则从 JSONL 派生；fixture 缺失时明确报错）。
 - `deriveReplayScript(events)` / `parseSessionLog(text)` / `parseSessionHeader(text)` / `resolveScriptedEntry(entry, messages)`：将已记录会话日志中的普通 loop 分片和显式标记的本地压缩输出转换为脚本、读取其 header `id`/`createdAt`、并针对单次实时请求解析 `{{fromRequest:...}}` 占位符的纯辅助工具。派生的 assistant 分组必须以 `finish` 分片结束；没有该分片的分组是 `stream()` 抛出异常的指纹，必须改用 override 伴随文件表达。

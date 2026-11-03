@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-workspace-document-manager.md
 document:
-  en: 750c2a69131c842083b2e658d481c919939610d6
-  zh: da3c09b7c9ae0a3029f4766cdd68caf2500a04d2
+  en: 3afd2f05b607becc50053dd0f90d8948ef38cd7a
+  zh: ac2decec221bb5d071c962b48b545b23c368b8e3
 /agent-note-workspace-document-manager-ui:
   en: 2b648dcbb2ef72a1
   zh: 6932e84ab8616cc6
@@ -15,11 +15,11 @@ document:
   en: 46667ca74ba4bce7
   zh: f8dd34de33b0bba6
 /agent-note-workspace-document-manager-ui/design:
-  en: eea07ab7d25d6141
-  zh: 11e108fa6b636007
+  en: 5383ae8d32cc890b
+  zh: c070fc142c97913a
 /agent-note-workspace-document-manager-ui/consequences:
-  en: ce56c3ce390455ce
-  zh: 603d295c2613dbfb
+  en: 92ce0833c21d81f4
+  zh: 2c75b1cd83171316
 /agent-note-workspace-document-manager-ui/verification:
   en: 6ebdcaf09554be81
   zh: 0adf05d5d115940b

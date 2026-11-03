@@ -203,6 +203,20 @@ describe('real Loader composition', () => {
   // The 60s budget covers this file's static imports (webserver plus both
   // backend node halves through tsx), which dominate on cold caches; the
   // Loader itself resolves nothing here — `loader.internal` is a module map.
+  it('mounts the browser interaction for a Gateway credential before Gateway services are available', async () => {
+    fakeBin = await mkdtemp(join(tmpdir(), 'dsh-managed-picker-'))
+    const grants = join(fakeBin, 'directory-grants.json')
+    await writeFile(grants, '[]')
+    vi.stubEnv('DSH_DIRECTORY_GRANTS', grants)
+    const launchEnvironment = createLaunchEnvironmentSnapshot([
+      { source: 'process', values: { DSH_GATEWAY_CREDENTIAL_FD: '7', DSH_DIRECTORY_GRANTS: grants } },
+    ])
+    const { ctx } = await loadComposition('127.0.0.1', { launchEnvironment })
+    expect(ctx.get('directoryPicker')!.capability().kind).toBe('browse')
+    expect(Object.values(ctx.loader.store).some(entry => entry.options.name === BROWSE_SURFACE)).toBe(true)
+    expect(Object.values(ctx.loader.store).some(entry => entry.options.name === NATIVE)).toBe(false)
+  })
+
   it('mounts the native backend for an attended loopback host and unmounts it on disposal', { timeout: 60_000 }, async () => {
     stubAttendedHost()
     const { ctx, configPath } = await loadComposition('127.0.0.1')

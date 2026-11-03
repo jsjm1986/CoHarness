@@ -337,27 +337,27 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'workspaceId', description: 'explicit target; omitted inherits the current Session\'s Workspace before falling back to the recency projection.' }, { name: 'options', description: 'draft initialization (`prompt` prefills the target Session\'s composer without sending; `clearPreviousDraft` discards its draft text first) plus `onFailure`, the observer for the rejected connect/open. A call carrying neither draft option always creates fresh.' }],
       },
       {
-        signature: 'create(input: { path: string }): Promise<WorkspaceView>',
+        signature: 'create(input: { path: string; runtimeTarget?: SessionRuntimeTarget | null }): Promise<WorkspaceView>',
         description: 'Register an existing path as a Workspace.',
-        parameters: [{ name: 'input', description: 'the Host create payload.' }],
+        parameters: [{ name: 'input', description: 'directory and captured Runtime; null uses the bootstrap Host, omission uses current selection.' }],
         returns: 'the created or idempotently resolved Workspace.',
       },
       {
-        signature: 'pickDirectory(): Promise<string | null>',
+        signature: 'pickDirectory(runtimeTarget?: SessionRuntimeTarget | null): Promise<string | null>',
         description: 'Open the Host\'s native directory picker.',
-        parameters: [],
+        parameters: [{ name: 'runtimeTarget', description: 'captured Runtime; null uses the bootstrap Host, omission uses current selection.' }],
         returns: 'the selected path, or null when the user cancelled.',
       },
       {
-        signature: 'listDirectory(path?: string, signal?: AbortSignal): Promise<DirectoryListing>',
+        signature: 'listDirectory(path?: string, signal?: AbortSignal, runtimeTarget?: SessionRuntimeTarget | null): Promise<DirectoryListing>',
         description: 'List one directory level through the Host\'s `browse` capability.',
-        parameters: [{ name: 'path', description: 'absolute directory to list; absent lists the Host home directory.' }, { name: 'signal', description: 'aborts the wire request (and the Host\'s scan) when the caller supersedes it.' }],
+        parameters: [{ name: 'path', description: 'absolute directory to list; absent lists the Host home directory.' }, { name: 'signal', description: 'aborts the wire request (and the Host\'s scan) when the caller supersedes it.' }, { name: 'runtimeTarget', description: 'captured Runtime; null uses the bootstrap Host, omission uses current selection.' }],
         returns: 'the level\'s listing with breadcrumb ancestry.',
       },
       {
-        signature: 'createDirectory(path: string, name: string): Promise<string>',
+        signature: 'createDirectory(path: string, name: string, runtimeTarget?: SessionRuntimeTarget | null): Promise<string>',
         description: 'Create one child directory through the Host\'s `browse` capability.',
-        parameters: [{ name: 'path', description: 'absolute existing parent directory.' }, { name: 'name', description: 'single non-blank path segment.' }],
+        parameters: [{ name: 'path', description: 'absolute existing parent directory.' }, { name: 'name', description: 'single non-blank path segment.' }, { name: 'runtimeTarget', description: 'captured Runtime; null uses the bootstrap Host, omission uses current selection.' }],
         returns: 'the created directory\'s absolute path.',
       },
       {
@@ -527,7 +527,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ClientRemote',
-    declaration: 'export interface ClientRemote extends TypertClientRemote {\n    $stream<Item>(options: RemoteStreamOptions<Item>): RemoteStream<Item>;\n}',
+    declaration: 'export interface ClientRemote extends TypertClientRemote {\n    $forTarget(target?: ConnectionRuntimeTarget): ClientRemote;\n    $stream<Item>(options: RemoteStreamOptions<Item>): RemoteStream<Item>;\n}',
   },
   {
     name: 'CommandNode',
@@ -968,6 +968,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionPublishedInteraction',
     declaration: 'export interface SessionPublishedInteraction {\n    readonly kind: string;\n    readonly key: string;\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'SessionRuntimeTarget',
+    declaration: 'export type SessionRuntimeTarget = ConnectionRuntimeTarget;',
   },
   {
     name: 'SessionSearchResultItem',

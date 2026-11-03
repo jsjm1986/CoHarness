@@ -129,6 +129,21 @@ export function launchedThroughSsh(environment: LaunchEnvironmentSnapshot): bool
   })
 }
 
+/**
+ * Identify a Gateway-managed launch before its plugins finish mounting.
+ * Only inherited credential-channel markers select managed behavior; project
+ * and user environment files cannot change this launch fact. The marker does
+ * not authenticate a caller or validate its credential.
+ * @param environment - the launcher's immutable environment snapshot.
+ * @returns whether the process inherited a nonempty Gateway credential channel.
+ */
+export function launchedByGateway(environment: LaunchEnvironmentSnapshot): boolean {
+  return ['DSH_GATEWAY_CREDENTIAL_FD', 'DSH_GATEWAY_CREDENTIAL_FILE'].some((name) => {
+    const value = environment.getFrom(name, ['process'])?.value
+    return value !== undefined && value !== ''
+  })
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Launcher-owned snapshot of this run's environment; absent in compositions the product CLI did not boot. */

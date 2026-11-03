@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-gateway-revocation-response.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-gateway-revocation-response.md
+document:
+  en: a482a4d26af7ac0ad3909f13222d1cd203be2b82
+  zh: 1509fa1716fcfd27411d93e6a421907a429d157f
+/agent-note-gateway-response-cancellation-cannot-postpone-revocation:
+  en: fa95fb6bb1115bbd
+  zh: 2fc06f7529ac04fd
+/agent-note-gateway-response-cancellation-cannot-postpone-revocation/problem:
+  en: ea88546cc3e01045
+  zh: 0afe2a85469d399d
+/agent-note-gateway-response-cancellation-cannot-postpone-revocation/decision:
+  en: 6efa0f05558c9d6a
+  zh: cc89b7b6953ee2fd
+/agent-note-gateway-response-cancellation-cannot-postpone-revocation/alternatives-considered:
+  en: e84ac63a192deb55
+  zh: 0eb48c0df5e82126
+/agent-note-gateway-response-cancellation-cannot-postpone-revocation/consequences:
+  en: ef1e175a71ee82ef
+  zh: 9dfbb4e3ea5e621a
+/agent-note-gateway-response-cancellation-cannot-postpone-revocation/verification:
+  en: f73ad5813e7c7856
+  zh: e8fdeb2e7bf14fb5

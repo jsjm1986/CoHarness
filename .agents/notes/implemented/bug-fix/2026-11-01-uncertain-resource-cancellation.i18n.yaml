@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-01-uncertain-resource-cancellation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-uncertain-resource-cancellation.md
+document:
+  en: b48a1b3af4df83cf47050774dc590ad336e0b3de
+  zh: 93e35181948919d1ca7c6ac10bb1d92ca536cd9d
+/agent-note-uncertain-accounting-retains-execution-cancellation:
+  en: 4a691d4f9d7f6114
+  zh: fdb3f59d0e9293d8
+/agent-note-uncertain-accounting-retains-execution-cancellation/problem:
+  en: e873d18cf9e4c5db
+  zh: 4ca3951f015d6feb
+/agent-note-uncertain-accounting-retains-execution-cancellation/decision:
+  en: fac3e073e239627c
+  zh: 60c8fc8173a25205
+/agent-note-uncertain-accounting-retains-execution-cancellation/alternatives-considered:
+  en: c458c64981f97f15
+  zh: 23fd9eeaa7be7381
+/agent-note-uncertain-accounting-retains-execution-cancellation/consequences:
+  en: 39977472140a602a
+  zh: cf62fc8deab7bdd6
+/agent-note-uncertain-accounting-retains-execution-cancellation/verification:
+  en: 6b061ea2dc39de0d
+  zh: 351d20dec5741ca0

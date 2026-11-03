@@ -1,0 +1,11 @@
+{"backend":"sqlite","operation":"model","change":"role","status":403,"code":"forbidden","changed":false,"discoveryRequests":0,"successAudit":0,"failedAuditStatus":403,"quotaApplied":null}
+{"backend":"sqlite","operation":"model","change":"current","status":204,"code":null,"changed":true,"discoveryRequests":0,"successAudit":1,"failedAuditStatus":null,"quotaApplied":null}
+{"backend":"sqlite","operation":"user-access","change":"role","status":403,"code":"forbidden","changed":false,"discoveryRequests":0,"successAudit":0,"failedAuditStatus":403,"quotaApplied":null}
+{"backend":"sqlite","operation":"user-access","change":"current","status":204,"code":null,"changed":true,"discoveryRequests":0,"successAudit":1,"failedAuditStatus":null,"quotaApplied":null}
+{"backend":"sqlite","operation":"role-quota","change":"role","status":403,"code":"forbidden","changed":false,"discoveryRequests":0,"successAudit":0,"failedAuditStatus":403,"quotaApplied":null}
+{"backend":"sqlite","operation":"role-quota","change":"current","status":204,"code":null,"changed":true,"discoveryRequests":0,"successAudit":1,"failedAuditStatus":null,"quotaApplied":null}
+{"backend":"sqlite","operation":"user-quota","change":"role","status":403,"code":"forbidden","changed":false,"discoveryRequests":0,"successAudit":0,"failedAuditStatus":403,"quotaApplied":null}
+{"backend":"sqlite","operation":"user-quota","change":"current","status":204,"code":null,"changed":true,"discoveryRequests":0,"successAudit":1,"failedAuditStatus":null,"quotaApplied":null}
+{"backend":"sqlite","operation":"user-access","change":"deleted-target","status":400,"code":"unknown-user","changed":false,"discoveryRequests":0,"successAudit":0,"failedAuditStatus":400,"quotaApplied":null}
+{"backend":"sqlite","operation":"user-quota","change":"deleted-target","status":400,"code":"unknown-user","changed":false,"discoveryRequests":0,"successAudit":0,"failedAuditStatus":400,"quotaApplied":null}
+{"backend":"sqlite","operation":"user-quota","change":"numeric-alias","status":204,"code":null,"changed":true,"discoveryRequests":0,"successAudit":1,"failedAuditStatus":null,"quotaApplied":true}

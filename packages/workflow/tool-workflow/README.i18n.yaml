@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/workflow/tool-workflow/README.md
 document:
-  en: 8222cfe39956aa97f202c3c60da4fa1459e95b6a
-  zh: 0ce7d240c39374b7c84e68c62e9737cf9702ffd6
+  en: a4691b33a0bc304ff2dfd2c157740c67277a2873
+  zh: 3992b923bbac3d23eed5eeb667106c12cdeafb40
 /:
   en: de1de2c83432e095
   zh: facea56204dc9c76
@@ -24,11 +24,11 @@ document:
   en: aeebba9469f0558d
   zh: e2e74d4272e94201
 /deepseek-ai-dsh-tool-workflow/use-this-package/what-to-expect-during-a-run:
-  en: 19ec4f830edb8e1a
-  zh: 8579ae5274aca6de
+  en: f4b379064351f0d7
+  zh: 13deabba101b77aa
 /deepseek-ai-dsh-tool-workflow/use-this-package/background-runs:
-  en: 3083f3f2657a46e3
-  zh: bca5cb741ea76798
+  en: 07626b21060270b3
+  zh: 83ac53e01c8f8b23
 /deepseek-ai-dsh-tool-workflow/use-this-package/config:
   en: 18d1067a480e072e
   zh: cf27e51f0dec2f4d
@@ -42,11 +42,11 @@ document:
   en: 8ea9ce564251249a
   zh: a59b88cc14a25a1f
 /deepseek-ai-dsh-tool-workflow/understand-the-implementation/background-lifecycle:
-  en: 35950b2015800ec5
-  zh: 5ae6f5a5e53dc585
+  en: ac4464cf6c1fd4f6
+  zh: 10c9f3f15745ed3c
 /deepseek-ai-dsh-tool-workflow/understand-the-implementation/durable-session-records:
-  en: e5bbbb7788d6dcdf
-  zh: aa035f074f7ac021
+  en: 3db9f6d0bdac4ac3
+  zh: 155cea540fe1aed7
 /deepseek-ai-dsh-tool-workflow/understand-the-implementation/render-intent:
   en: 389b3740ec1f5ac2
   zh: 78430014f5e270e2
@@ -99,8 +99,8 @@ document:
   en: f5d5f97a153f7c70
   zh: 3d6bc05b9eadfbc2
 /deepseek-ai-dsh-tool-workflow/known-limitations-and-deferred-work:
-  en: 28e362db0d4d929f
-  zh: d2b1a4da09f55a42
+  en: 37c53a53fbb9e3ca
+  zh: 47ce8752f498fffa
 /deepseek-ai-dsh-tool-workflow/known-limitations-and-deferred-work/dev-note:
   en: 9e9abf9ef01e719a
   zh: df286968b39ec955

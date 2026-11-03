@@ -1,0 +1,14 @@
+{
+  "name": "gateway-document-stream-types",
+  "cwd": "gateway",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 ../node_modules/.bin/tsc -p tsconfig.ci.json",
+  "startedAt": "2026-10-26T19:00:47.951838+00:00",
+  "seconds": 8.162,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1c96e1b05dd069b0dc13af58820de9804cedcddda172f0eddcebfca2f6660c05",
+  "inputsAfter": "1c96e1b05dd069b0dc13af58820de9804cedcddda172f0eddcebfca2f6660c05",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

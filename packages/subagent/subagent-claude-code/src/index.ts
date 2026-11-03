@@ -14,6 +14,7 @@ import z from '@deepseek-ai/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import {
   assertPositiveFinite,
+  assertExternalModelExecution,
   NO_START_CAPABILITIES,
   resolveChildExecution,
   externalMemberAgent,
@@ -121,6 +122,8 @@ class ClaudeCodeProvider implements SubagentProvider {
       // this provider's member route; the external Claude session is bound and
       // resumed by the member adapter.
       this.prepareContinuable = async (request: ContinuableCreateRequest) => {
+        assertExternalModelExecution(ctx)
+        assertExternalModelExecution(request.parent.ctx)
         const execution = await resolveChildExecution(ctx, request.parent, config.memberCwd ?? request.cwd, request.signal)
         if (execution.remote) await execution.subprocess.resolveExecutable(config.remoteCommand, config.env, request.signal)
         return {}
@@ -133,6 +136,8 @@ class ClaudeCodeProvider implements SubagentProvider {
   ) => Promise<ContinuableCreateSpec>
 
   async start(request: ResolvedSubagentStartRequest) {
+    assertExternalModelExecution(this.ctx)
+    assertExternalModelExecution(request.parent.ctx)
     let execution: ChildExecution
     try {
       execution = await resolveChildExecution(this.ctx, request.parent, request.cwd, request.signal)
@@ -159,7 +164,7 @@ class ClaudeCodeProvider implements SubagentProvider {
       permissionMode: this.config.permissionMode,
       env: this.config.env,
       disposeGraceMs: this.config.disposeGraceMs,
-      spawn: spawnSpec => execution.subprocess.spawn(spawnSpec),
+      spawn: spawnSpec => execution.subprocess.spawn({ ...spawnSpec, sessionId: request.parent.id, resourceOrigin: 'execution' }),
       onError: (error, stopReason) => {
         this.ctx.logger.warn(
           `subagent-claude-code "${this.name}": child run failed (${stopReason}): %o`,
@@ -208,7 +213,10 @@ export function apply(ctx: Context, config: Config): void {
       join(resolved.stateDir ?? join(homedir(), '.dsh', 'external-members'), identity.filename),
     )
     const transport = async (child: SessionId, signal: AbortSignal) => {
-      const execution = await resolveChildExecution(ctx, externalMemberAgent(ctx, child), resolved.memberCwd, signal)
+      assertExternalModelExecution(ctx)
+      const agent = externalMemberAgent(ctx, child)
+      assertExternalModelExecution(agent.ctx)
+      const execution = await resolveChildExecution(ctx, agent, resolved.memberCwd, signal)
       store.assertExecution(child, execution)
       const memberConfig: ClaudeMemberConfig = {
         cwd: execution.cwd, remote: execution.remote,
@@ -218,7 +226,7 @@ export function apply(ctx: Context, config: Config): void {
         ...resolved.model === undefined ? {} : { model: resolved.model },
         permissionMode: resolved.permissionMode, env: resolved.env, disposeGraceMs: resolved.disposeGraceMs,
       }
-      return new ClaudeMemberTransport(memberConfig, spec => execution.subprocess.spawn(spec))
+      return new ClaudeMemberTransport(memberConfig, spec => execution.subprocess.spawn({ ...spec, sessionId: child, resourceOrigin: 'execution' }))
     }
     ctx.effect(() => {
       const registration = llm.registerAdapter(

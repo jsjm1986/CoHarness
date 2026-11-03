@@ -1,0 +1,14 @@
+{
+  "name": "ssh-preset-final-coverage-diagnostic",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/ssh-preset-measure.config.mts packages/ssh/ssh/tests packages/preset/agent-preset-registry/tests --coverage",
+  "startedAt": "2026-10-25T13:25:27.298426+00:00",
+  "seconds": 19.189,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "inputsAfter": "965d08948517fbba7e71c57b0c62e68e328f9072ab9939476574844291ef644e",
+  "postgresToolDirectory": null,
+  "outputSha256": "e0375d52e2b0dbf1ecb67c9aa34060134ed606d07682ec94db86d32e342674ec",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n      Coverage enabled with v8\n\n\n Test Files  33 passed (33)\n      Tests  370 passed (370)\n   Start at  21:25:40\n   Duration  6.06s (transform 10.69s, setup 1.08s, import 20.31s, tests 8.19s, environment 3ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\nAll files          |   93.86 |     88.2 |   97.77 |    95.6 |                   \n ...t-registry/src |   86.09 |     77.1 |   92.85 |   90.19 |                   \n  mount.ts         |   86.09 |     77.1 |   92.85 |   90.19 | ...88-496,510-513 \n ssh/ssh/src       |   98.67 |    95.34 |     100 |   99.14 |                   \n  index.ts         |   98.67 |    95.34 |     100 |   99.14 | 207,407           \n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 93.86% ( 459/489 )\nBranches     : 88.2% ( 187/212 )\nFunctions    : 97.77% ( 88/90 )\nLines        : 95.6% ( 370/387 )\n================================================================================\n"
+}

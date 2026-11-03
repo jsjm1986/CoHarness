@@ -9,7 +9,6 @@ import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type {} from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-office-to-pdf'
 import { realOfficeBytes } from './office-fixture.ts'
-import { pdfResourceFixture } from '../../../packages/client/ui-workbench/tests/pdf-resource-fixture.ts'
 import { launchWebScaffold, seedSession, watchConsole, captureStableAria, compareOrRefreshGolden, webSnapshotMode, type WebScaffold } from './scaffold.ts'
 import { expectPdfResolution, hideDocumentZoom, newEnglishPage, revealDocumentZoom, saveFailureShot } from './support.ts'
 
@@ -37,12 +36,9 @@ describe('web e2e: authorized Office preview', () => {
     scaffold = await launchWebScaffold({ workbench: true, extraOverlayPath: overlay })
     expect(scaffold.ctx.get('officeToPdf')).toBeDefined()
     for (const extension of FORMATS) await writeFile(join(scaffold.workspaceCwd, `preview.${extension}`), realOfficeBytes(extension))
-    for (const kind of PDF_RESOURCES) await writeFile(join(scaffold.workspaceCwd, `resource-${kind}.pdf`), pdfResourceFixture(kind))
+    await writeFile(join(scaffold.workspaceCwd, 'readonly.csv'), 'key,value\nAlpha,1\nBeta,2\n')
     await writeFile(join(scaffold.workspaceCwd, 'broken.docx'), 'This is not an Office archive.')
-    const links = [
-      ...FORMATS.map(extension => `[Preview ${extension}](preview.${extension})`),
-      ...PDF_RESOURCES.map(kind => `[Resource ${kind}](resource-${kind}.pdf)`), '[Broken document](broken.docx)',
-    ].join('\n\n')
+    const links = [...FORMATS.map(extension => `[Preview ${extension}](preview.${extension})`), '[Read-only spreadsheet](readonly.csv)', '[Broken document](broken.docx)'].join('\n\n')
     const source = (await readFile(SEED, 'utf8')).replace('"text":"DONE"', `"text":${JSON.stringify(links)}`)
     const history = await seedSession(scaffold, source, 'workspace-office-history')
     const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
@@ -296,6 +292,33 @@ describe('web e2e: authorized Office preview', () => {
     }
     await preview.getByRole('button', { name: 'Close preview', exact: true }).click()
     await expect.poll(() => preview.count()).toBe(0)
+    expect(tripwire.pageErrors).toEqual([])
+  }, 90_000)
+
+  it('blocks cell typing in read-only spreadsheet preview', async () => {
+    if (scaffold === undefined) throw new Error('Web scaffold is unavailable')
+    onTestFailed(() => saveFailureShot(page, 'workspace-office-readonly-input'))
+    const tripwire = watchConsole(page)
+    await page.getByRole('button', { name: 'Read-only spreadsheet', exact: true }).click()
+    const preview = page.getByRole('region', { name: 'readonly.csv', exact: true })
+    const sheet = preview.locator('[data-excel-preview]')
+    const formula = sheet.locator('#luckysheet-functionbox-cell')
+    await expect.poll(() => formula.textContent(), { timeout: 60_000 }).toBe('key')
+    const editor = sheet.locator('#luckysheet-rich-text-editor')
+    await editor.focus()
+    expect(await editor.evaluate(element => document.activeElement === element)).toBe(true)
+    await page.keyboard.press('Delete')
+    await page.keyboard.type('READONLY_INPUT_MUST_NOT_APPEAR')
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Escape')
+    expect(await editor.textContent()).not.toContain('READONLY_INPUT_MUST_NOT_APPEAR')
+    expect(await editor.getAttribute('contenteditable')).toBe('false')
+    expect(await formula.textContent()).toBe('key')
+    expect(await readFile(join(scaffold.workspaceCwd, 'readonly.csv'), 'utf8')).toBe('key,value\nAlpha,1\nBeta,2\n')
+    const snapshot = await captureStableAria(page, '[data-excel-preview]', scaffold.workspaceCwd)
+    const expected = fileURLToPath(new URL('./expected/workspace-office/readonly-input.expected.md', import.meta.url))
+    await compareOrRefreshGolden(expected, snapshot, webSnapshotMode())
+    await preview.getByRole('button', { name: 'Close preview', exact: true }).click()
     expect(tripwire.pageErrors).toEqual([])
   }, 90_000)
 

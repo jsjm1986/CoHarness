@@ -1,0 +1,357 @@
+{
+  "at": "2026-10-31T02:18:18.638114+00:00",
+  "findings": [
+    "B384"
+  ],
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T015425Z",
+  "sourcePaths": [
+    "packages/subagent/subagent-acp/src/member.ts",
+    "packages/subagent/subagent-claude-code/src/member.ts",
+    "packages/subagent/subagent-acp/tests/managed-model-control.spec.ts",
+    "packages/subagent/subagent-claude-code/tests/managed-model-control.spec.ts",
+    "packages/subagent/subagent-codex/tests/managed-model-control.spec.ts",
+    "packages/subagent/subagent-claude-code/tests/member.spec.ts",
+    "packages/subagent/subagent/tests/fixtures/opaque-admission.mjs",
+    "packages/subagent/subagent/tests/external-admission-example.host.spec.ts",
+    "packages/subagent/subagent/tests/expected/opaque-admission.jsonl",
+    "packages/subagent/subagent/README.md",
+    "packages/subagent/subagent/README.zh.md",
+    "packages/subagent/subagent/README.i18n.yaml",
+    "packages/subagent/subagent-acp/README.md",
+    "packages/subagent/subagent-acp/README.zh.md",
+    "packages/subagent/subagent-acp/README.i18n.yaml",
+    "packages/subagent/subagent-claude-code/README.md",
+    "packages/subagent/subagent-claude-code/README.zh.md",
+    "packages/subagent/subagent-claude-code/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.zh.md",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/subagent/subagent-acp/src/member.ts": "cd6b54c92ae0ba914152fb5dbb9fcdc73c4360b574bd928f380fc6629c9a0494",
+    "packages/subagent/subagent-claude-code/src/member.ts": "a9a1634c40ebbe55f8e5ba5b57f54c4518676ef900afe59d78c8ec38047e1d6a",
+    "packages/subagent/subagent-acp/tests/managed-model-control.spec.ts": "4b1b861f3e1d7abdd8781c1ee867f68165486b3907099b3686b4c062fa664460",
+    "packages/subagent/subagent-claude-code/tests/managed-model-control.spec.ts": "57edf9d346e61a2d1fa316703b6d83ab9f1be6a2d61a3e527fec6e3d441d8393",
+    "packages/subagent/subagent-codex/tests/managed-model-control.spec.ts": "4800e667fed6e0fd3fa7f9fe584134be68e9b558896336a08cbf9d2df14a3a7d",
+    "packages/subagent/subagent-claude-code/tests/member.spec.ts": "b247a5ccfa3ab9aee917ef04250fdcdc62d8b81bb3a3541d37dc81bf7a698226",
+    "packages/subagent/subagent/tests/fixtures/opaque-admission.mjs": "eac986d89f9ce57db2a0875e08b1838083ff22fcfc3a88e2da4a595aa604e647",
+    "packages/subagent/subagent/tests/external-admission-example.host.spec.ts": "0058747aa6a6f023c85148cd8200e068d20017cd7476fb52fa4b17a5dc73ad46",
+    "packages/subagent/subagent/tests/expected/opaque-admission.jsonl": "78a1e1cd66a4d84691766fbcecff6605b87c8d99d8b733165692b06deb2375df",
+    "packages/subagent/subagent/README.md": "0a32f574dfbfa01cb56d65a9530950602080dbdaf916460b4b7404df8608ae4a",
+    "packages/subagent/subagent/README.zh.md": "8e9dbb02d2653316324a452ba1c32535b9999f3c76d8cbfd41b9ab693cf81d67",
+    "packages/subagent/subagent/README.i18n.yaml": "46d64d0b9c2c91b384fa49620149466fa00fad55689c40c11c03e343350d4328",
+    "packages/subagent/subagent-acp/README.md": "25c85072a31cca12ac42e4d19a4d0563a9cdd7c629e67ab10caee60ddabe01c4",
+    "packages/subagent/subagent-acp/README.zh.md": "9d972b8a2dd0c2c53f37862fef987a0a0940eebf3ef2dadd84bc52ff4f2b64f0",
+    "packages/subagent/subagent-acp/README.i18n.yaml": "81898b19db4c5c49ce201fab2dcd2de53d70dbcdacb62489e876dad0d3cbd14e",
+    "packages/subagent/subagent-claude-code/README.md": "7a76e3c31f2eae84bd495eb9e5a79ca2b2092aa6e140cbf751124b55cce21d1a",
+    "packages/subagent/subagent-claude-code/README.zh.md": "44de79f40b4d8310d776279822be2574d58e6f1642880b513febe5db6c389a1d",
+    "packages/subagent/subagent-claude-code/README.i18n.yaml": "42202b797bc4f381b1ce560f2ad3176b8be252b62b84df16fcaa20180acaf8d4",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md": "c4a773ec998f12a8391eb7fe3d0b890e5b625d167172676ad84a5e162e16e14e",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.zh.md": "fb60e650787c2e54ce97a36981887ddebfd2cac743c51dbadbb1569a6719ba74",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.i18n.yaml": "0c57cef39aa7bd599c784f14d0b988c5cb3fab7b96831ed29f6c856a96041017",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.md": "11b483ed10319a6f2cd1003731913dea060a976776495172d5b203bc2bb19fd9",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.zh.md": "a7091ab31790f0688988192b128c263361ec3504a1d1e98dc3938a304fb5cdfc",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.i18n.yaml": "d4320b7e3f3ba0b06dc3c524418002df3418eb35473df51fe9f3a3ea9c396e63"
+  },
+  "builtArtifacts": {
+    "packages/subagent/subagent-acp/lib/index.js": "d60ca6cf15bb21745e121ddb8cf3b1758cb87b517490fee7a977e806fe0a102b",
+    "packages/subagent/subagent-claude-code/lib/index.js": "df0cb21ebb87c8d5f16cff8b57ba725936f1d5161718e2a7b3a6c187657d94d2"
+  },
+  "behavior": "ACP and Claude Code persistent member adapters register callKind orchestration. Governed opaque turns reach their unsupported-capability guard without reserving or queuing a synthetic model permit. Required model policy remains enforced; a missing required owner retains MODEL_POLICY_UNAVAILABLE. Shared and isolated registration/Agent controls continue to refuse before native allocation.",
+  "protocolAndData": "No new wire fields, Session events, structural Session versions or database versions. Existing orchestration extension points carry external turns; physical inference remains separately governed.",
+  "causalEvidence": "The expanded provider matrix observes an erroneous kind:model acquire before the member guard. An actual Loader application with a pending controlled model grant makes old private artifacts wait, acquire and release one permit before refusing. Corrected source and Node22/24 artifacts return UNSUPPORTED_CAPABILITY without entering the wait or requesting model/process admission.",
+  "verification": {
+    "uniqueCases": 186,
+    "providerGuardCases": 24,
+    "sharedHelperCases": 5,
+    "runnableLoaderCasesIncluded": 1,
+    "sourceCoverage": {
+      "subagent-acp/src/member.ts.html": {
+        "statements": [
+          100,
+          100
+        ],
+        "branches": [
+          44,
+          44
+        ],
+        "functions": [
+          22,
+          22
+        ],
+        "lines": [
+          93,
+          93
+        ]
+      },
+      "subagent-claude-code/src/member.ts.html": {
+        "statements": [
+          67,
+          67
+        ],
+        "branches": [
+          43,
+          43
+        ],
+        "functions": [
+          14,
+          14
+        ],
+        "lines": [
+          59,
+          59
+        ]
+      }
+    },
+    "buildGates": 8,
+    "documentationGates": 20,
+    "engines": [
+      "macOS source Loader application",
+      "macOS Node22 compiled Loader application",
+      "macOS Node24 compiled Loader application"
+    ],
+    "loaderProviders": [
+      "owned-acp",
+      "owned-claude"
+    ],
+    "modelAdmissionAttemptsPerProvider": 0,
+    "processAdmissionAttemptsPerProvider": 0,
+    "waitedForModelPermit": false,
+    "additionalCoverage": "A Claude SDK query that never requests its managed process refuses and closes its query on disposal.",
+    "checks": {
+      "opaque-resource-unmanaged-query-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-31T02:08:51.127698+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-acp/tests",
+          "packages/subagent/subagent-claude-code/tests",
+          "packages/subagent/subagent-codex/tests/managed-model-control.spec.ts",
+          "packages/subagent/subagent/tests/external-model.spec.ts",
+          "packages/subagent/subagent/tests/external-admission-example.host.spec.ts",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/subagent/subagent-acp/src/member.ts",
+          "--coverage.include=packages/subagent/subagent-claude-code/src/member.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T015425Z/coverage-complete"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T02:09:32.686743+00:00"
+      },
+      "opaque-resource-final-build": {
+        "status": "passed",
+        "startedAt": "2026-10-31T02:11:30.325220+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/build.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T02:13:03.754018+00:00"
+      },
+      "opaque-resource-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-31T02:14:59.273922+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent/tests/external-admission-example.host.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T02:15:05.690089+00:00"
+      },
+      "opaque-resource-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-31T02:14:59.274181+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent/tests/external-admission-example.host.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T02:15:05.592375+00:00"
+      },
+      "opaque-resource-final-guard-and-query": {
+        "status": "passed",
+        "startedAt": "2026-10-31T02:15:00.407897+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-acp/tests/managed-model-control.spec.ts",
+          "packages/subagent/subagent-claude-code/tests/managed-model-control.spec.ts",
+          "packages/subagent/subagent-codex/tests/managed-model-control.spec.ts",
+          "packages/subagent/subagent-claude-code/tests/member.spec.ts",
+          "-t",
+          "opaque one-shot|never requests its managed process",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T02:15:06.898713+00:00"
+      },
+      "opaque-resource-final-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-31T02:11:55.349148+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/subagent/subagent-acp/src/member.ts",
+          "packages/subagent/subagent-claude-code/src/member.ts",
+          "packages/subagent/subagent-acp/tests/managed-model-control.spec.ts",
+          "packages/subagent/subagent-claude-code/tests/managed-model-control.spec.ts",
+          "packages/subagent/subagent-codex/tests/managed-model-control.spec.ts",
+          "packages/subagent/subagent-claude-code/tests/member.spec.ts",
+          "packages/subagent/subagent/tests/external-admission-example.host.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T02:12:02.425562+00:00"
+      },
+      "opaque-resource-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-31T02:09:44.586996+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T02:11:54.321302+00:00"
+      },
+      "opaque-resource-pairing": {
+        "status": "passed",
+        "startedAt": "2026-10-31T02:09:43.701878+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          "packages/subagent/subagent/README.md",
+          "packages/subagent/subagent-acp/README.md",
+          "packages/subagent/subagent-claude-code/README.md",
+          ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T02:09:44.526877+00:00"
+      },
+      "opaque-resource-guide": {
+        "status": "passed",
+        "startedAt": "2026-10-31T02:13:40.795124+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261031T015425Z/verify-external-guide.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T02:13:40.866592+00:00"
+      },
+      "opaque-resource-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-31T02:13:40.798391+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T02:13:45.777748+00:00"
+      },
+      "opaque-resource-export-jsdoc": {
+        "status": "passed",
+        "startedAt": "2026-10-31T02:13:40.795432+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-export-jsdoc.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T02:13:46.598400+00:00"
+      }
+    },
+    "paidProviderCalls": "None. Provider package tests mock official SDK/ACP boundaries; the runnable Loader refuses before any inference or native process. Paid Responses remains deferred.",
+    "fixtureCorrections": "Initial Loader attempts lacked working-directory dependencies and did not establish a product negative. Final private-artifact negatives include the full application composition and directly expose admission/wait counters; shared source and compiled artifacts were not reverted."
+  },
+  "noteReview": {
+    "updatedOwningNote": ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md",
+    "newNotes": 0,
+    "archivedOrDeleted": 0,
+    "retainedActive": [
+      ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md",
+      ".agents/notes/implemented/architecture/2026-10-25-managed-codex-ssh-model-requests.md",
+      ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md"
+    ],
+    "reason": "The existing external-runtime control note owns opaque member admission. SSH forwarding and managed SDK control retain separate responsibilities; frozen archives were untouched.",
+    "upgradeGuide": "Updated provider and shared seam README triplets, the owning note and current guide pair. The guide is 468 English words. The shared README also removes a stale managed-SSH Codex restriction, matching its implemented retained-forward support."
+  },
+  "baseline": {
+    "at": "2026-10-31T02:13:45.777748+00:00",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "workingTreePreserved": true
+  },
+  "coordination": {
+    "peerThread": "multi-computer architecture chat",
+    "peerReportedRelease": "R6 on mac-mini and Ubuntu; auth-only incremental deployment, schema102 and epoch83.",
+    "peerReportedVerification": "19 real PostgreSQL auth cases and 8-concurrent token performance 7932.94ms to 963.68ms; page performance remains REAL-001 open.",
+    "independentlyVerifiedByThisBatch": false,
+    "rootReleaseStatus": "B379-B384 are verified root increments after peer-reported R6; root did not deploy or operate production databases or Docker.",
+    "reservedPeerPaths": [
+      "gateway/src/postgres/auth-service.ts",
+      "gateway/tests/auth-postgres.spec.ts",
+      "Gateway HTML and real Web assembly fixtures",
+      "topology/node access, CUA and migration101/102",
+      "the three resource-budget files and late UI authorization hydration",
+      "packages/client/runtime",
+      "ui-conversation",
+      "test-support/client-runtime",
+      "apps/web/tests/workspace-history-entry.e2e.ts"
+    ],
+    "handoff": "One receipt and source-hash handoff after verification; no repeated progress messages.",
+    "latestReadOnlyPeerSnapshot": "Peer reports a real collaborative project write succeeded on computer A; owner and readonly members saw the response, readonly had no send entry, and computer B draft remained independent. Root did not independently reproduce this report.",
+    "peerCandidateStatus": "Peer reports R7 candidate and GUI work are in progress, not deployed. It plans to integrate the frozen root candidate and preserve matched parent/child artifacts.",
+    "peerNewRace": "REAL-013: navigation can submit the previous Session composer while creating a new Session. Peer owns originating-Session input hold and its GUI/real Web regressions. No root acceptance of that fix is claimed.",
+    "productionPerformance": "Peer reports direct QA TLS to actual A Gateway reaches the workbench in about one second; public-entry performance still fails independently. No root verification is claimed."
+  },
+  "remaining": [
+    "All 12 domains remain in progress; B04/B25 remain implementation_in_progress.",
+    "Continue resource-only managed Codex selection, remaining quota/admission failure classification and business/permission review.",
+    "No fresh root PostgreSQL, physical Linux/Windows or paid API acceptance. Revalidate owned database identity/mapping before any future test; an unreachable historical port does not establish container termination.",
+    "Peer navigation/input hold and public-entry performance remain separate work in progress. Full doc-sync and root deployment are not claimed."
+  ]
+}

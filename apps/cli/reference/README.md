@@ -4,6 +4,11 @@ English | [中文](README.zh.md)
 
 This reference defines the profile, plugin-management, and config-dump command modes. Argv is parsed once through [`src/args.ts`](../src/args.ts), and [`src/bin.ts`](../src/bin.ts) dynamically imports only the selected runner.
 
+<a id="managed-launch"></a>
+## Managed launch
+
+A nonempty inherited `DSH_GATEWAY_CREDENTIAL_FD` or `DSH_GATEWAY_CREDENTIAL_FILE` selects managed execution from the immutable launch snapshot. Before SDK bootstrap and profile entries mount, the application requires model policy, resource admission and execution authority. Pending or unavailable providers refuse their affected work; a credential-channel marker authenticates no caller and grants no permission. Environment-file values cannot select this mode. Independent launches retain optional providers. The requirements belong to the application and survive profile-provider reloads.
+
 ## Profile boot
 
 `dsh <name>` abbreviates `dsh --profile <name>` and boots the profile at `$DSH_HOME/profiles/<name>`. The shorthand name must immediately follow `dsh`; `plugin` remains the plugin-management command, so boot a profile with that name using `dsh --profile plugin`. The effective tree is composed over an empty root by applying, in order: each bundle patch named in the profile manifest's `dsh.profile.bundles` list, the profile's own `cordis.patch.yml`, the home-level `$DSH_HOME/cordis.patch.yml` (machine-local preferences shared by every profile, so it outranks the per-profile layer), and each `--patch <path>` overlay in argv order. Later layers win per row; a patch replaces the targeted row's complete `config` value rather than deep-merging keys, and may insert new rows. The final YAML composition controls whether `dsh-hmr` watches configuration; without HMR, changes require restart. A parse, schema, resolution, or plugin boot failure is reported and exits nonzero. SIGINT and SIGTERM dispose the mounted root before exit.

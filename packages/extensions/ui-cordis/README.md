@@ -27,6 +27,8 @@ Historical `cordis_define`, `cordis_run`, `cordis_stop`, and `cordis_undefine` r
 
 The panel reads the Host inventory and pending requests. It groups rows by their owning Session and derives actions from the runner, rather than copying run state into component state. Authorization and definition ownership remain Host responsibilities; displaying a row does not grant permission to execute it.
 
+Opening the panel captures its Runtime until it closes. Navigating to another conversation or completing an older approval cannot redirect its actions or dismiss a different Runtime’s panel. Failed inventory reads retain existing rows and expose a retry for the same Runtime. Single mode omits the computer label.
+
 Host activation and page-local loading are separate facts. A page may offer loading an existing Client half while the Host is already running it; global stop affects every page. The panel displays this page's render failures independently from Host activation results. A failed component can therefore appear beside a successful activation receipt.
 
 The `/client` entry exports the plugin body and its injected face, run-state, port, and event types. [The Client runner](../cordis-client-runner/README.md) owns browser loading and cleanup; [the Host runner](../cordis-host-runner/README.md) owns definitions and execution.

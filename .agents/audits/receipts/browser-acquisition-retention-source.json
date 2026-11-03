@@ -1,0 +1,13 @@
+{
+  "name": "browser-acquisition-retention-source",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/browser-use-stagehand-native/tests packages/experimental/browser-use-runtime/tests --retry=0",
+  "startedAt": "2026-10-23T14:22:37.126342+00:00",
+  "seconds": 5.592,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "c6dd30c6b547db8bfdbd2ad0f535ca0ee34be75048d76337ca9d720579eb0456",
+  "inputsAfter": "c6dd30c6b547db8bfdbd2ad0f535ca0ee34be75048d76337ca9d720579eb0456",
+  "outputSha256": "7bb728dbef5f27ef013dc485437c9b89ba733959f89b9615d8dab1f0fc685202",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ |thread-safe| packages/experimental/browser-use-stagehand-native/tests/launch.spec.ts (7 tests | 1 failed) 35ms\n   × preserves cleanup failure when a canceled process cannot be killed 7ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |thread-safe| packages/experimental/browser-use-stagehand-native/tests/launch.spec.ts > preserves cleanup failure when a canceled process cannot be killed\nAssertionError: expected [Function] to throw error including 'Kill denied' but got 'Browser acquisition cleanup could not…'\n\nExpected: \"Kill denied\"\nReceived: \"Browser acquisition cleanup could not be confirmed\"\n\n ❯ packages/experimental/browser-use-stagehand-native/tests/launch.spec.ts:110:33\n    108|   const controller = new AbortController()\n    109|   const opening = launchChromium(config, controller.signal)\n    110|   const failed = expect(opening).rejects.toThrow('Kill denied')\n       |                                 ^\n    111|   await fake.started.promise\n    112|   controller.abort(new Error('Canceled'))\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed | 12 passed (13)\n      Tests  1 failed | 127 passed (128)\n   Start at  22:22:39\n   Duration  3.61s (transform 6.51s, setup 586ms, import 9.89s, tests 4.48s, environment 1ms)\n\n"
+}

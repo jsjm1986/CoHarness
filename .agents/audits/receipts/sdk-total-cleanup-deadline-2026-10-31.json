@@ -1,0 +1,492 @@
+{
+  "findings": [
+    "B378"
+  ],
+  "status": "fixed_named_sdk_cleanup_deadline_cases_verified_remaining_full_review_open",
+  "updatedAt": "2026-10-30T23:44:26.839721+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T232427Z",
+  "sourcePaths": [
+    "packages/subagent/subagent-dsh-sdk/src/managed.ts",
+    "packages/subagent/subagent-dsh-sdk/src/managed-client.ts",
+    "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown-child.mjs",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/model-shutdown.jsonl",
+    "packages/subagent/subagent-dsh-sdk/README.md",
+    "packages/subagent/subagent-dsh-sdk/README.zh.md",
+    "packages/subagent/subagent-dsh-sdk/README.i18n.yaml",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.zh.md",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/subagent/subagent-dsh-sdk/src/managed.ts": "50de984bc27ef755d838f9bf6c5dc044d45ce52662b9d79ef81c02c58d5b3488",
+    "packages/subagent/subagent-dsh-sdk/src/managed-client.ts": "2d6a22689261fdf50608346d79ceeeeccbdb8604111647bacb0ac6b694a22965",
+    "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts": "74972e485c0dd2f41d15c752f7e76cbc0c7628d34fe27ff669bb1304a507f21f",
+    "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts": "ed9e363712d7813610720dca32758c6a2445991b043355d219dcde1088c2ccad",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown.mjs": "a7847bf4425f560baf34da9e43ec4958b0555c51d60891cbb455b976284becb5",
+    "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown-child.mjs": "1ca2e08929457b4ce838735022be77ba1bdffd872b27cf3d0de7ebba08270b45",
+    "packages/subagent/subagent-dsh-sdk/tests/expected/model-shutdown.jsonl": "1e6cf30dc11b7cd2f474b35fb2c267272bdd02e920b2e568560fa25b1daa9e94",
+    "packages/subagent/subagent-dsh-sdk/README.md": "0a9cd912885d5eab3426f3f3a053d1b10a7be23b0c52aec52df29e5f38ca8035",
+    "packages/subagent/subagent-dsh-sdk/README.zh.md": "eba9f75563da766c0af6648208698f06ee32b425b738637c037e7c8cf4ef3355",
+    "packages/subagent/subagent-dsh-sdk/README.i18n.yaml": "767541d186fcb9a66532b8e272de71a7b39590010285589dd116401cab0edd6b",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md": "486bc856ea5dd444134aa2b0cb21653844e6172ed637b1e175b7cdfa1cc9628e",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.zh.md": "565cd7430920b5eef1f84e0b4276a4493ae64891b2cf8330d640bbe09118fe2b",
+    ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.i18n.yaml": "e785c8e8ea8eea81534ff800675a21d991fa1cb029d83cf4fdfd752713da8b6b",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md": "54cdcf80e4161f174f104d091ee61a39fd5505a5385a06a829ed3d5fd3c2e190",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.zh.md": "0096f17ce0934d580c9a427ac4d718d8993a09b28e6db794389622a12f3a15d3",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.i18n.yaml": "25633b65f7aaf2c4dcaa8dc46b2a1dbf7f513ceda30be9dfffea86dcddb999a7"
+  },
+  "compiledArtifactHashes": {
+    "packages/subagent/subagent-dsh-sdk/lib/index.js": "cbceb4ec4f3b961341725c5f592c2880f87a2d41463a2cf18f032a05d2e95263",
+    "packages/subagent/subagent-dsh-sdk/lib/managed.js": "e93c13e9f0467a9d4113e7d7ed0a52a103edf2e75aee4201b1979887a46e8ef8"
+  },
+  "repairs": [
+    {
+      "id": "B378",
+      "title": "Managed SDK child shutdown restarts its cleanup budget between phases and excludes final acknowledgements",
+      "repair": "The private control client owns one monotonic cleanup deadline per attempt. Nested model/resource cleanup and their requests inherit it; pending admission and final reports remain inside the aggregate wait. Consumer grace reserves the final request interval. Timeout rejects cleanup and retains exact completion identities. Closed control connections refuse late cleanup admission; active budget shutdown calls share one pending task."
+    }
+  ],
+  "causalEvidence": {
+    "originalSourceNegative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T23:24:31.999168+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts",
+        "-t",
+        "includes the final",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T23:24:34.707137+00:00"
+    },
+    "closedClientGuardRed": {
+      "status": "failed",
+      "startedAt": "2026-10-30T23:37:42.139475+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts",
+        "-t",
+        "refuses late cleanup",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T23:37:44.552937+00:00"
+    },
+    "privateCompiledProbes": {
+      "before": {
+        "mode": "before",
+        "closedAtDeadline": false,
+        "deadline": 2000,
+        "reports": [
+          {
+            "id": "1",
+            "outcome": "uncertain",
+            "at": 2000
+          },
+          {
+            "id": "1",
+            "outcome": "released",
+            "at": 3000
+          }
+        ],
+        "originalIdentityRecovered": true
+      },
+      "current": {
+        "mode": "current",
+        "closedAtDeadline": true,
+        "deadline": 2000,
+        "reports": [
+          {
+            "id": "1",
+            "outcome": "uncertain",
+            "at": 1000
+          },
+          {
+            "id": "1",
+            "outcome": "released",
+            "at": 3000
+          }
+        ],
+        "originalIdentityRecovered": true
+      }
+    },
+    "sameProbeProgramHash": "15096ddd83df1e80da569cf92273b31a6183fa93b8bd287bf403140ae2850a09",
+    "privateInstrumentation": "Private copies append exports of the two existing implementation classes so the same controlled-clock/transport program can instantiate them. Shared source and compiled artifacts are not changed for a negative. These probes do not claim real network latency.",
+    "sharedArtifactsMutatedForNegative": false
+  },
+  "verification": {
+    "uniqueRelatedCases": 230,
+    "sdkPackageCases": 225,
+    "composedAndTypeScriptSdkCases": 4,
+    "pythonSdkCases": 1,
+    "counting": "Focused141cases, private probes, source example and engine reruns overlap the225SDK package cases and are not added again. Name-filter deselections are not acceptance passes.",
+    "newConditionalSkips": 0,
+    "coverage": {
+      "managed.ts": {
+        "statements": [
+          104,
+          104
+        ],
+        "branches": [
+          40,
+          40
+        ],
+        "functions": [
+          19,
+          19
+        ],
+        "lines": [
+          82,
+          82
+        ],
+        "allFourMetrics": 100
+      },
+      "managed-client.ts": {
+        "statements": [
+          60,
+          60
+        ],
+        "branches": [
+          20,
+          20
+        ],
+        "functions": [
+          13,
+          13
+        ],
+        "lines": [
+          47,
+          47
+        ],
+        "allFourMetrics": 100
+      },
+      "managed-budget.ts": {
+        "statements": [
+          103,
+          103
+        ],
+        "branches": [
+          54,
+          54
+        ],
+        "functions": [
+          22,
+          22
+        ],
+        "lines": [
+          80,
+          80
+        ],
+        "allFourMetrics": 100
+      }
+    },
+    "actualLoaderSdkNativeTrace": {
+      "normalTurn": "completed",
+      "phases": [
+        "consumer-paused",
+        "adapter-stopped",
+        "consumer-closed",
+        "process-stopped"
+      ],
+      "allocations": 4,
+      "acknowledgedReleases": 4,
+      "occupied": 0,
+      "sameParentSessionForAllAdmissions": true
+    },
+    "engines": [
+      "macOS Node22 compiled actual SDK/native example",
+      "macOS Node24 compiled SDK/native examples and225SDK cases",
+      "macOS default Node source Loader/SDK/native example"
+    ],
+    "buildGates": 8,
+    "documentationGates": 20,
+    "extraDocumentationCheck": "export-jsdoc passed; the edited guide artifact check passed. Full doc-sync is not claimed passing.",
+    "receipts": {
+      "sdk-total-cleanup-coverage-final": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:38:16.585340+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/control.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/managed-client.ts",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/managed.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T232427Z/coverage-final"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:38:34.776749+00:00"
+      },
+      "sdk-total-cleanup-complete-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:38:16.585292+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/build.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:38:33.914539+00:00"
+      },
+      "sdk-total-cleanup-final-node24-suite": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:39:28.823438+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:39:40.748098+00:00"
+      },
+      "sdk-total-cleanup-final-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:39:28.823239+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "-t",
+          "model-shutdown",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:39:31.940232+00:00"
+      },
+      "sdk-total-cleanup-source-example": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:40:37.048490+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=src",
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "-t",
+          "model-shutdown",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:40:39.598063+00:00"
+      },
+      "sdk-total-cleanup-final-projection-snapshots": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:40:23.942347+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/scoped-sdk-model-admission.snapshot.ts",
+          "snapshots/sdk/memory-auxiliary.snapshot.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:40:27.950989+00:00"
+      },
+      "sdk-total-cleanup-final-python-sdk": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:40:23.942456+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "uv",
+          "run",
+          "--no-sync",
+          "--project",
+          "python/sdk",
+          "python",
+          "-m",
+          "pytest",
+          "python/sdk/tests/test_memory_model_snapshot.py",
+          "-q"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:40:25.521445+00:00"
+      },
+      "sdk-total-cleanup-lint-final-guard": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:39:14.769767+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/subagent/subagent-dsh-sdk/src/managed.ts",
+          "packages/subagent/subagent-dsh-sdk/src/managed-client.ts",
+          "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-recovery.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown.mjs",
+          "packages/subagent/subagent-dsh-sdk/tests/fixtures/model-shutdown-child.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:39:16.582464+00:00"
+      },
+      "sdk-total-cleanup-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:32:59.664949+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:33:32.221116+00:00"
+      },
+      "sdk-total-cleanup-export-jsdoc": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:42:00.890675+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-export-jsdoc.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:42:04.240598+00:00"
+      },
+      "sdk-total-cleanup-guide-artifact": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:35:32.110628+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T232427Z/verify-sdk-guide.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:35:32.149658+00:00"
+      },
+      "sdk-total-cleanup-entrypoints": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:40:38.195627+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-application-entrypoints.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:40:38.607945+00:00"
+      },
+      "sdk-total-cleanup-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:35:44.432070+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:35:48.246676+00:00"
+      },
+      "sdk-total-cleanup-compiled-negative": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:35:30.847452+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T232427Z/probe-compiled-deadline.mjs",
+          "before"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:35:30.893999+00:00"
+      },
+      "sdk-total-cleanup-compiled-final-positive": {
+        "status": "passed",
+        "startedAt": "2026-10-30T23:39:29.996141+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T232427Z/final-probe/probe-compiled-deadline.mjs",
+          "current"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T23:39:30.043665+00:00"
+      }
+    }
+  },
+  "noteReview": {
+    "updatedOwningNote": ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+    "newNotes": 0,
+    "archivedOrDeleted": 0,
+    "retainedActive": [
+      ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md",
+      ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md",
+      ".agents/notes/implemented/bug-fix/2026-10-29-inspector-resource-completion.md"
+    ],
+    "reason": "The existing managed model note owns control cleanup timing. Native process ownership and inspector acknowledgement remain distinct active responsibilities; no frozen archive was edited.",
+    "upgradeGuide": "Updated the current SDK process-admission guide pair and README; guide is497English words. No SDK arguments, wire fields, Session events or durable schema versions changed."
+  },
+  "coordination": {
+    "peerFrozenRelease": "coharness-full-real-20261031-r4",
+    "frozenDirectory": "/Users/a1234/harness-gateway-releases/coharness-full-real-20261031-r4",
+    "frozenClientSourceMatchesBeforeDeadlineFix": true,
+    "rootDidNotModifyFrozenRelease": true,
+    "scope": "B378follows R4. Root did not deploy or operate Docker/production services. The peer reports R4is deployed and is preparing R5.",
+    "peerReservedFiles": [
+      "gateway/src/runtime-resource-api.ts",
+      "gateway/src/node-resource-budget.ts",
+      "packages/context/gateway-runtime/src/resource-budget.ts"
+    ],
+    "peerAdditionalOwnership": "Peer owns collaboration URLs, identity documents, ui-conversation late-auth draft hydration, and the reported REAL-012stopped-page runtimeId work in Gateway HTML and local Web assembly.",
+    "peerReportedAcceptance": "Peer reports project-sharing exact Runtime GET/PATCH and reader prompt denial pass. Those peer observations are not counted in the230root cases. Full real acceptance and remote latency remain open.",
+    "peerFullDocumentationObservation": "Latest compact peer snapshot reported38full-doc checks passing and3failing, with fixes underway; root does not claim full doc-sync success.",
+    "nextReleaseCoordination": "Peer requested final SDK files before R5freeze. Root will provide a24path union with current hashes covering B375throughB378. No further SDK edits until that source capture is acknowledged; no concurrent heavy build is planned."
+  },
+  "additionalReadOnlyReview": {
+    "paths": [
+      "packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+      "packages/subagent/subagent-dsh-sdk/src/control.ts",
+      "packages/subagent/subagent-dsh-sdk/src/index.ts",
+      "packages/subagent/subagent-dsh-sdk/tests/managed-control.spec.ts",
+      "packages/subagent/subagent-dsh-sdk/tests/control.spec.ts"
+    ],
+    "scope": "Selected parent shutdown, transport configuration and cleanup consumers. Search confirms the changed private classes have consumers only within this SDK package. This does not complete the whole-file or whole-domain review."
+  },
+  "remaining": [
+    "All12business domains remain in progress; B04/B25remain implementation_in_progress.",
+    "Failed model-span close acknowledgements and the wider model/process allocation and cross-computer permission inventory still require review.",
+    "No new Linux or physical Windows acceptance was run for this change. Root real Responses validation remains deferred.",
+    "Avoid SDK source edits during the requested R5capture; continue independent permissions/business review."
+  ]
+}

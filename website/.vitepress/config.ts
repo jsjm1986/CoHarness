@@ -215,6 +215,12 @@ const siteStyle = `
   color: var(--vp-c-brand-1);
 }
 
+@media (max-width: 374px) {
+  .dsh-lockup { gap: 6px; }
+  .dsh-wordmark { height: 18px; }
+  .dsh-tag { padding-inline: 6px; }
+}
+
 .VPSidebar::-webkit-scrollbar { width: 6px; }
 .VPSidebar::-webkit-scrollbar-track { background: transparent; }
 .VPSidebar::-webkit-scrollbar-thumb {
@@ -257,10 +263,11 @@ const scrollbarScript = `
  * VitePress renders `siteTitle` as HTML.
  *
  * @param previewTag - Localized release-stage label.
+ * @param homeLabel - Localized name of the home destination.
  * @returns Markup placed beside the navigation-bar home link.
  */
-function siteTitle(previewTag: string): string {
-  return `<span class="dsh-lockup">${wordmark}<span class="dsh-tag">${previewTag}</span></span>`
+function siteTitle(previewTag: string, homeLabel: string): string {
+  return `<span class="dsh-lockup" role="img" aria-label="${siteIdentity.title} ${homeLabel}">${wordmark}<span class="dsh-tag">${previewTag}</span></span>`
 }
 
 export default withMermaid({
@@ -288,7 +295,7 @@ export default withMermaid({
       label: '简体中文',
       lang: 'zh-CN',
       themeConfig: {
-        siteTitle: siteTitle('技术预览'),
+        siteTitle: siteTitle('技术预览', '首页'),
         nav: [
           { text: '入门', link: landingLink('root', guideModules.root.guide), activeMatch: '^/guide/' },
           ...moduleNav('root'),
@@ -314,7 +321,7 @@ export default withMermaid({
       lang: 'en-US',
       link: '/en/',
       themeConfig: {
-        siteTitle: siteTitle('Preview'),
+        siteTitle: siteTitle('Preview', 'home'),
         nav: [
           { text: 'Guide', link: landingLink('en', guideModules.en.guide), activeMatch: '^/en/guide/' },
           ...moduleNav('en'),

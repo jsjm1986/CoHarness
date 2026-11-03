@@ -1,0 +1,14 @@
+{
+  "name": "gateway-shutdown-real-resources",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/vitest run tests/shutdown.spec.ts tests/documents-local.spec.ts",
+  "startedAt": "2026-10-26T11:50:11.122551+00:00",
+  "seconds": 4.279,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "449e8091e1fc16ac433c611273f9bc9c2586d0042e549a12397e9c97d02323da",
+  "inputsAfter": "449e8091e1fc16ac433c611273f9bc9c2586d0042e549a12397e9c97d02323da",
+  "postgresToolDirectory": null,
+  "outputSha256": "57a7bf0e4a96f27ea9d38a956f541a906774a8c37b2beddb9cc49862070ff797",
+  "outputTail": "\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  2 passed (2)\n      Tests  38 passed (38)\n   Start at  19:50:13\n   Duration  1.75s (transform 1.58s, setup 0ms, import 2.20s, tests 756ms, environment 0ms)\n\n"
+}

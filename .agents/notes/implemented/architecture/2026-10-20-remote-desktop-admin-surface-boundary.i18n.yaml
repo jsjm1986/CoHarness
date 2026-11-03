@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-20-remote-desktop-admin-surface-boundary.md
 document:
-  en: ea159b9ae4dbae62e1f0f96095ac0202976a39f2
-  zh: 6a54f90be33ec0c9a60ac3d5b04bad5cc00dda1f
+  en: 3950a24f181c0a0f70f8c23bad1746a3d2ad45a2
+  zh: 9d5511d69cb641dcf32190bc8f127ab392916b6c
 /agent-note-remote-desktop-administration-lives-only-in-the-gateway-admin-surface:
   en: 3c1b87c53f2bc18b
   zh: 64802ef913e0e62b
@@ -12,8 +12,8 @@ document:
   en: 897d1b0cfa4dd030
   zh: 37e6dac3cd4705e9
 /agent-note-remote-desktop-administration-lives-only-in-the-gateway-admin-surface/decision:
-  en: 79d741164fdadcb8
-  zh: 17abe25b164c761c
+  en: ed756a0ee76962bc
+  zh: 20619de0d7e43ed7
 /agent-note-remote-desktop-administration-lives-only-in-the-gateway-admin-surface/alternatives-considered:
   en: 2d2d8c656902670d
   zh: aa27b443a67f24f3

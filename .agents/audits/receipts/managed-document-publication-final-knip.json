@@ -1,0 +1,14 @@
+{
+  "name": "managed-document-publication-final-knip",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 pnpm run knip",
+  "startedAt": "2026-10-26T18:30:02.747727+00:00",
+  "seconds": 53.999,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "bab156caafd2706df76c0a66551c6b2e160ca3c65be04bad5c208681623464e3",
+  "inputsAfter": "bab156caafd2706df76c0a66551c6b2e160ca3c65be04bad5c208681623464e3",
+  "postgresToolDirectory": null,
+  "outputSha256": "5134248437ed379b56a811efd4f004623bccf334f00b9f2ca7f55224d2686c2f",
+  "outputTail": "$ knip --config knip.config.ts --treat-config-hints-as-errors\n"
+}

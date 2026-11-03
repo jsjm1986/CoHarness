@@ -1,0 +1,13 @@
+{
+  "name": "ssh-private-transport-tests-current",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/ssh/ssh/tests/startup-behavior.spec.ts packages/ssh/ssh/tests/connection-disposal.spec.ts packages/ssh/ssh/tests/password-channel.spec.ts --retry=0",
+  "startedAt": "2026-10-23T15:01:14.340011+00:00",
+  "seconds": 2.463,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "8e83001e280a9fbc75b04ae095f604e9b5c6ba9c1cdcc6593b96da7673408dfa",
+  "inputsAfter": "8e83001e280a9fbc75b04ae095f604e9b5c6ba9c1cdcc6593b96da7673408dfa",
+  "outputSha256": "850441e5382556ff95d967fda5d644e7be19d720a0bdc90e57c70a4811a13262",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  3 passed (3)\n      Tests  48 passed (48)\n   Start at  23:01:16\n   Duration  689ms (transform 578ms, setup 112ms, import 801ms, tests 400ms, environment 0ms)\n\n"
+}

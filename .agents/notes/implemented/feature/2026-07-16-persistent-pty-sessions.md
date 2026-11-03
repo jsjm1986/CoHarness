@@ -96,6 +96,10 @@ The subprocess terminal handle owns the top-level terminal process and its sessi
 
 Teardown reports top-level exit and survivor cleanup independently. The PTY session does not claim success merely because the shell exited: it calls `SubprocessTerminalHandle.terminate()` and awaits whole-session quiescence, propagating a cleanup failure that names survivors. A failed close is not cached forever: the registry and local session clear the fence only when it still names that failed attempt, so a later explicit or lifecycle close retries without disturbing a newer concurrent attempt. Service disposal still clears its backend, reservation, and owner-detacher registries when a close fails.
 
+Local terminal descendant and Windows shell grace periods use process-monotonic time. Wall-clock adjustments cannot suppress or advance termination escalation; successful close still requires verified process exit.
+
+After failed local-provider disposal, its exit callback remains while process ownership is uncertain. A later successful terminal close removes its retained ownership record and retires the callback only when every process, terminal and control endpoint has drained.
+
 ### Composition and rollout
 
 The example composition remains opt-in and safe by default:

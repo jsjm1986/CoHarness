@@ -1,31 +1,24 @@
 import { clientSessionKey, parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 /** Workbench controls, Workspace/session chooser, and compact pane tabs. */
 import { useEffect, useRef, useState } from 'react'
-import type { HostObservable, InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
+import type { HostObservable, PropsHooks, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   Button, IconChevronDownOutline14, IconCopyOutline16, IconEditOutline16, IconFolderOpenOutline16, IconLogoutOutline16,
   IconPlusOutline16, IconSplitPanesOutline16, IconTrashOutline16, IconWarningOutline16, Menu, Modal, relativeTime, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkbenchLayoutPreset } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { AddPaneResult, ConversationViewportMode, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
+import type { AddPaneResult, ConversationViewportMode, DeploymentContextSnapshot, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-client-runtime/client'
 import type { createWorkbenchStore } from '../stores.ts'
 import { NS } from '../locales.ts'
-import type { WorkbenchCatalog, WorkbenchConversation } from '../catalog.ts'
+import { loadWorkbenchCatalog, type WorkbenchCatalog, type WorkbenchConversation } from '../catalog.ts'
+import type { LegacyWorkbenchRestore, WorkbenchRestoreOptions } from '../layout-restore.ts'
 import { ScopeTile } from './ScopeTile.tsx'
 import css from './Workbench.module.css'
 import { WorkspaceFileBrowser, type ListWorkspaceDirectory, type OpenWorkspaceResource } from './WorkspaceFileBrowser.tsx'
 
-/** Viewport-owned demand for authenticated saved-layout restoration. */
-export interface WorkbenchToolbarInjected {
-  hooks: { catalogRestore: HostObservable<boolean> }
-  /** Read the directory through the owning plugin's pending request.
-   * @param signal - cancellation for this toolbar instance.
-   * @param fresh - explicit retry requires a new request.
-   * @returns the validated account catalog.
-   */
-  loadCatalog(signal: AbortSignal, fresh: boolean): Promise<WorkbenchCatalog>
-}
+/** Initial and user-requested increments of visible chooser rows. */
+const CONVERSATION_PAGE_SIZE = 50
 
 interface Actions {
   listWorkbenches?: () => readonly { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number }[]
@@ -35,10 +28,12 @@ interface Actions {
   duplicateWorkbench?: (id: string, name: string) => string
   deleteWorkbench?: (id: string) => void
   switchWorkbench?: (id: string) => void
-  chooseSession: (item: WorkbenchConversation, replace: boolean) => Promise<AddPaneResult>
+  chooseSession: (item: WorkbenchConversation, replace: boolean, signal?: AbortSignal) => Promise<AddPaneResult>
   focusSession: (id: SessionId) => void
-  createSession: (target: SessionRuntimeTarget, replace: boolean) => Promise<AddPaneResult>
-  hydrateCatalog?: (catalog: WorkbenchCatalog, paneIds: readonly SessionId[]) => Promise<void>
+  createSession: (target: SessionRuntimeTarget, replace: boolean, signal?: AbortSignal) => Promise<AddPaneResult>
+  hydrateCatalog?: (
+    catalog: WorkbenchCatalog, paneIds: readonly SessionId[], options?: WorkbenchRestoreOptions,
+  ) => Promise<LegacyWorkbenchRestore | void>
   catalogUnavailable?: () => void
   setMode: (mode: ConversationViewportMode) => void
   listWorkspaceDirectory?: ListWorkspaceDirectory
@@ -49,7 +44,8 @@ interface Actions {
   openFiles?: (() => void) | undefined
 }
 type Props = PropsRuntime<'conversation.workbench.toolbar'> & PropsLocale<typeof NS>
-  & PropsStore<ReturnType<typeof createWorkbenchStore>> & Actions & InjectFace<WorkbenchToolbarInjected>
+  & PropsStore<ReturnType<typeof createWorkbenchStore>> & Actions
+  & PropsHooks<{ deployment: HostObservable<DeploymentContextSnapshot> }>
 
 function conversationDisplayName(item: WorkbenchConversation, untitled: string): string {
   const title = item.title?.trim()
@@ -65,8 +61,8 @@ function conversationDisplayName(item: WorkbenchConversation, untitled: string):
  * @returns the toolbar and its controlled picker dialog.
  */
 export function WorkbenchToolbar({
-  viewport, tabbed, inline = false, layout, onSelectLayout, toolsHostId, useStore, actions, useSessions, useWorkspaces, useCatalogRestore,
-  chooseSession, focusSession, createSession, hydrateCatalog, catalogUnavailable, setMode, loadCatalog,
+  viewport, tabbed, inline = false, layout, onSelectLayout, toolsHostId, useStore, actions, useSessions, useWorkspaces, useDeployment,
+  chooseSession, focusSession, createSession, hydrateCatalog, catalogUnavailable, setMode,
   listWorkbenches, currentWorkbench, switchWorkbench, createWorkbench, renameWorkbench,
   duplicateWorkbench, deleteWorkbench,
   listWorkspaceDirectory, openWorkspaceResource, filesAvailable, openFiles, t,
@@ -74,9 +70,9 @@ export function WorkbenchToolbar({
   const { pickerOpen, replace, browser, workbenchMenuOpen } = useStore(state => state)
   const sessions = useSessions(s => s)
   const workspaces = useWorkspaces(s => s)
-  const restoreCatalog = useCatalogRestore(required => required)
-  const catalogRequired = pickerOpen || restoreCatalog
+  const deployment = useDeployment(value => value)
   const [query, setQuery] = useState('')
+  const [visibleCount, setVisibleCount] = useState(CONVERSATION_PAGE_SIZE)
   const [workspace, setWorkspace] = useState('')
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
@@ -91,30 +87,94 @@ export function WorkbenchToolbar({
   const [workbenchName, setWorkbenchName] = useState('')
   const [catalog, setCatalog] = useState<WorkbenchCatalog | undefined>()
   const [catalogAttempt, setCatalogAttempt] = useState(0)
-  const handledCatalogAttempt = useRef(0)
+  const [catalogPhase, setCatalogPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [pending, setPending] = useState(false)
+  const pendingOperation = useRef<AbortController | undefined>(undefined)
   const [error, setError] = useState<string | undefined>()
+  const [legacyRestore, setLegacyRestore] = useState<LegacyWorkbenchRestore>()
+  const [restoreOpen, setRestoreOpen] = useState(false)
+  const [restoreOwners, setRestoreOwners] = useState<Record<string, string>>({})
+  const [restorePending, setRestorePending] = useState(false)
+  const [restoreError, setRestoreError] = useState<string>()
+  const restoreRequest = useRef<AbortController | undefined>(undefined)
+  const activeWorkbenchId = currentWorkbench?.()?.id
   useEffect(() => {
-    const retry = catalogAttempt !== handledCatalogAttempt.current
-    handledCatalogAttempt.current = catalogAttempt
-    if (!catalogRequired && !retry) return
+    restoreRequest.current?.abort()
+    restoreRequest.current = undefined
+    setRestorePending(false)
+    setRestoreOpen(false)
+    setRestoreOwners({})
+  }, [activeWorkbenchId])
+  useEffect(() => () => { restoreRequest.current?.abort(); restoreRequest.current = undefined }, [])
+  useEffect(() => { setVisibleCount(CONVERSATION_PAGE_SIZE) }, [pickerOpen, query, workspace])
+  useEffect(() => {
     const abort = new AbortController()
-    void loadCatalog(abort.signal, retry).then((next) => {
+    setCatalogPhase('loading')
+    void loadWorkbenchCatalog(abort.signal).then((next) => {
       if (abort.signal.aborted) return
       setCatalog(next)
-    }, () => { if (!abort.signal.aborted) catalogUnavailable?.() })
+      setCatalogPhase('ready')
+    }, () => {
+      if (abort.signal.aborted) return
+      setCatalogPhase('error')
+      catalogUnavailable?.()
+    })
     return () => { abort.abort() }
-  }, [pickerOpen, catalogRequired, catalogAttempt])
+  }, [pickerOpen, catalogAttempt])
+  useEffect(() => () => {
+    const request = pendingOperation.current
+    pendingOperation.current = undefined
+    request?.abort()
+  }, [])
+  useEffect(() => {
+    if (pickerOpen) return
+    pendingOperation.current?.abort()
+    pendingOperation.current = undefined
+    setPending(false)
+  }, [pickerOpen])
   const restoredPanes = JSON.stringify(viewport.paneIds)
   useEffect(() => {
-    if (catalog === undefined || hydrateCatalog === undefined) return
+    if (catalog === undefined || hydrateCatalog === undefined || restorePending) return
+    const abort = new AbortController()
     const runtime = catalog.activeRuntime
     const project = runtime.kind === 'project'
       ? catalog.projects.find(candidate => candidate.projectId === runtime.projectId) : undefined
     const activeRuntime: SessionRuntimeTarget = runtime.kind === 'project' && project !== undefined
       ? { ...runtime, projectName: project.name } : runtime
-    void hydrateCatalog({ ...catalog, activeRuntime }, viewport.paneIds)
-  }, [catalog, viewport.mode, restoredPanes])
+    void hydrateCatalog({ ...catalog, activeRuntime }, viewport.paneIds, { signal: abort.signal }).then((result) => {
+      if (abort.signal.aborted) return
+      setLegacyRestore(result || undefined)
+      setRestoreError(undefined)
+    }, () => { if (!abort.signal.aborted) setRestoreError(t('layoutRestoreError')) })
+    return () => { abort.abort() }
+  }, [catalog, viewport.mode, restoredPanes, restorePending, activeWorkbenchId])
+  const closeRestore = (): void => {
+    restoreRequest.current?.abort()
+    restoreRequest.current = undefined
+    setRestorePending(false)
+    setRestoreOpen(false)
+  }
+  const restoreLayout = (): void => {
+    if (catalog === undefined || legacyRestore === undefined || hydrateCatalog === undefined || restorePending) return
+    const request = new AbortController()
+    restoreRequest.current = request
+    const owners = Object.fromEntries(legacyRestore.issues.map(issue => [issue.sessionId,
+      restoreOwners[issue.sessionId] === '__remove' ? null : restoreOwners[issue.sessionId] as SessionId]))
+    setRestorePending(true)
+    setRestoreError(undefined)
+    void hydrateCatalog(catalog, viewport.paneIds, { signal: request.signal,
+      selection: { workbenchId: legacyRestore.workbenchId, owners } }).then((result) => {
+      if (restoreRequest.current !== request) return
+      setLegacyRestore(result || undefined)
+      if (!result) setRestoreOpen(false)
+    }, () => { if (restoreRequest.current === request) setRestoreError(t('layoutRestoreError')) })
+      .finally(() => { if (restoreRequest.current === request) { restoreRequest.current = undefined; setRestorePending(false) } })
+  }
+  const restoreCandidateLabel = (item: WorkbenchConversation): string => {
+    const owner = item.runtime.kind === 'personal' ? t('personal') : item.runtime.projectName
+    return [owner, deployment.showComputer ? item.runtime.nodeName : undefined, item.runtime.runtimeId?.slice(0, 8)]
+      .filter(part => part !== undefined).join(' · ')
+  }
   const full = viewport.paneIds.length >= 4 && !replace
   // The root crumb names the owning pane's Workspace so cross-project browsing
   // cannot be mistaken for the active pane's scope.
@@ -129,7 +189,20 @@ export function WorkbenchToolbar({
     loading: t('previewLoading'), empty: t('filesEmpty'), directory: t('filesDirectory'),
     truncated: t('filesTruncated'), error: t('createError'), reload: t('previewReload'),
   }
-  const selectedProject = workspace === 'personal' || workspace === ''
+  const allocatedRuntimes = catalog?.personalRuntimes ?? (catalog?.activeRuntime.kind === 'personal' ? [catalog.activeRuntime] : [{ kind: 'personal' as const }])
+  const entryNode = deployment.context?.scope === 'local' ? deployment.context.entry.nodeId : catalog?.activeRuntime.nodeId
+  const personalRuntimes = deployment.aggregateComputers ? allocatedRuntimes : allocatedRuntimes.filter(item =>
+    entryNode === undefined ? item.runtimeId === catalog?.activeRuntime.runtimeId : item.nodeId === entryNode)
+  const personalKey = (runtime: SessionRuntimeTarget): string => runtime.runtimeId === undefined ? 'personal' : `personal:${runtime.runtimeId}`
+  const personalLabel = (runtime: SessionRuntimeTarget): string => {
+    const name = deployment.showComputer ? runtime.nodeName ?? t('personal') : t('personal')
+    return personalRuntimes.filter(item => item.nodeId === runtime.nodeId).length > 1 && runtime.runtimeId !== undefined
+      ? `${name} · ${runtime.runtimeId.slice(0, 8)}` : name
+  }
+  const selectedPersonal = workspace.startsWith('personal:')
+    ? personalRuntimes.find(item => personalKey(item) === workspace)
+    : workspace === 'personal' && personalRuntimes.length === 1 ? personalRuntimes[0] : undefined
+  const selectedProject = workspace === 'personal' || workspace.startsWith('personal:') || workspace === ''
     ? undefined
     : catalog?.projects.find(project => String(project.projectId) === workspace)
   // `archivedById` merges every pooled runtime's archive set; the Workspace
@@ -143,7 +216,7 @@ export function WorkbenchToolbar({
       || (summary.blank && summary.id !== sessions.current)
       || isArchived(summary.id)) return []
     const address = parseClientSessionKey(summary.id)
-    const runtime: SessionRuntimeTarget = address?.runtime ?? (summary.projectId === undefined
+    const runtime: SessionRuntimeTarget = summary.runtime ?? address?.runtime ?? (summary.projectId === undefined
       ? { kind: 'personal' } : { kind: 'project', projectId: summary.projectId })
     return [{
       sessionId: address?.sessionId ?? summary.id,
@@ -160,13 +233,19 @@ export function WorkbenchToolbar({
     }]
   })
   const browserKey = (item: WorkbenchConversation): SessionId => clientSessionKey(item.runtime, item.sessionId)
-  const catalogItems = catalog?.items ?? fallbackCandidates
+  const catalogItems = catalog === undefined ? fallbackCandidates : [...new Map([
+    ...catalog.items.map(item => [browserKey(item), item] as const),
+    ...(!catalog.personalComplete ? fallbackCandidates.filter(item => item.runtime.kind === 'personal'
+      && catalog.personalRuntimes?.some(target => target.runtimeId === item.runtime.runtimeId) === true)
+      .map(item => [browserKey(item), item] as const) : []),
+  ]).values()].filter(item => deployment.aggregateComputers || item.runtime.kind !== 'personal'
+    || personalRuntimes.some(runtime => runtime.runtimeId === item.runtime.runtimeId))
   const candidates = catalogItems.filter((item) => {
     const projectId = item.runtime.kind === 'project' ? String(item.runtime.projectId) : 'personal'
     return (!item.blank || browserKey(item) === sessions.current)
       && !isArchived(browserKey(item))
-      && (workspace === '' || workspace === projectId)
-      && `${item.title ?? item.sessionId} ${item.cwd ?? ''} ${item.runtime.kind === 'project'
+      && (workspace === '' || workspace === projectId || (item.runtime.kind === 'personal' && workspace === personalKey(item.runtime)))
+      && `${item.title ?? item.sessionId} ${item.cwd ?? ''} ${deployment.showComputer ? item.runtime.nodeName ?? '' : ''} ${item.runtime.kind === 'project'
         ? item.runtime.projectName
         : catalog?.personal.name ?? ''}`
         .toLocaleLowerCase().includes(query.toLocaleLowerCase())
@@ -175,25 +254,52 @@ export function WorkbenchToolbar({
     if (result.ok || result.reason === 'duplicate') { actions.closePicker(); setError(undefined) }
     else setError(t(result.reason === 'limit' ? 'limit' : 'unavailable'))
   }
+  const cancelPending = (): void => {
+    pendingOperation.current?.abort()
+    pendingOperation.current = undefined
+    setPending(false)
+  }
+  const closePicker = (): void => { cancelPending(); actions.closePicker() }
+  const runSelection = (operation: (signal: AbortSignal) => Promise<AddPaneResult>, creating: boolean): void => {
+    if (pendingOperation.current !== undefined) return
+    const request = new AbortController()
+    pendingOperation.current = request
+    setPending(true)
+    setError(undefined)
+    void (async () => {
+      try {
+        const result = await operation(request.signal)
+        if (pendingOperation.current === request) finish(result)
+      } catch (cause: unknown) {
+        if (pendingOperation.current === request && !request.signal.aborted) {
+          setError(cause instanceof Error ? cause.message : creating ? t('createError') : String(cause))
+        }
+      } finally {
+        if (pendingOperation.current === request) {
+          pendingOperation.current = undefined
+          setPending(false)
+        }
+      }
+    })()
+  }
   const create = (): void => {
     /* v8 ignore next -- the create button is disabled during pending and read-only workspaces */
-    if (pending || selectedProject?.mode === 'ro') {
+    if (pending || workspace === '' || selectedProject?.mode === 'ro'
+      || workspace.startsWith('personal') && selectedPersonal === undefined) {
       if (selectedProject?.mode === 'ro') setError(t('readOnly'))
       return
     }
-    setPending(true)
-    setError(undefined)
-    const target: SessionRuntimeTarget = workspace === 'personal'
-      ? { kind: 'personal' as const }
+    const target: SessionRuntimeTarget = selectedPersonal !== undefined
+      ? selectedPersonal
       : {
         kind: 'project' as const, projectId: Number(workspace),
         // The name rides the target so a runtime first opened by this create
         // still stamps workspaceName on its summaries (pane scope label).
         ...(selectedProject === undefined ? {} : { projectName: selectedProject.name }),
+        ...(selectedProject?.nodeId === undefined ? {} : { nodeId: selectedProject.nodeId }),
+        ...(selectedProject?.nodeName === undefined ? {} : { nodeName: selectedProject.nodeName }),
       }
-    void createSession(target, replace).then(finish, (cause: unknown) => {
-      setError(cause instanceof Error ? cause.message : t('createError'))
-    }).finally(() => { setPending(false) })
+    runSelection(signal => createSession(target, replace, signal), true)
   }
   /* v8 ignore next -- the picker CSS module class is always defined */
   const pickerClass = css.picker ?? ''
@@ -286,6 +392,8 @@ export function WorkbenchToolbar({
         <div className={css.notice} role="status">
           {t('layoutPending')}
           <Button size="sm" onClick={() => { setCatalogAttempt(value => value + 1) }}>{t('retryCatalog')}</Button>
+          {legacyRestore !== undefined && <Button size="sm" onClick={() => { setRestoreOpen(true) }}>{t('layoutChooseOwner')}</Button>}
+          {restoreError !== undefined && <span role="alert">{restoreError}</span>}
         </div>
       )}
       {browser !== undefined && listWorkspaceDirectory !== undefined && openWorkspaceResource !== undefined && (
@@ -332,7 +440,7 @@ export function WorkbenchToolbar({
           })}
         </div>
       )}
-      <Modal open={pickerOpen} onClose={() => { if (!pending) actions.closePicker() }}
+      <Modal open={pickerOpen} onClose={closePicker}
         title={t(replace ? 'replace' : 'add')} closeLabel={t('dismiss')} className={pickerClass}>
         <div className={css.pickerFilters}>
           <input value={query} onChange={(event) => { setQuery(event.target.value) }} placeholder={t('search')} aria-label={t('search')} />
@@ -344,21 +452,39 @@ export function WorkbenchToolbar({
             portal dense align="end" listClassName={css.workspaceMenu}
             items={[
               { id: '', label: <span className={css.workspaceOption}><strong>{t('allWorkspaces')}</strong><small>{t('workspace')}</small></span> },
-              { id: 'personal', label: <span className={css.workspaceOption}><strong>{t('personal')}</strong><small>{catalog?.personal.name ?? ''}</small></span> },
-              ...(catalog?.projects ?? []).map(item => ({ id: String(item.projectId), label: <span className={css.workspaceOption}><strong>{item.name}</strong><small>{item.mode === 'ro' ? t('readOnlyBadge') : t('workspace')}</small></span> })),
+              { id: 'personal', label: <span className={css.workspaceOption}>
+                <strong>{t('personal')}</strong><small>{catalog?.personal.name ?? ''}</small></span> },
+              ...(deployment.aggregateComputers || personalRuntimes.length > 1 ? personalRuntimes
+                .filter(item => item.runtimeId !== undefined).map(item => ({
+                  id: personalKey(item), label: <span className={css.workspaceOption}>
+                    <strong>{personalLabel(item)}</strong><small>{t('personal')}</small></span>,
+                })) : []),
+              ...(catalog?.projects ?? []).map(item => ({ id: String(item.projectId), label: <span className={css.workspaceOption}>
+                <strong>{item.name}</strong><small>{[
+                  deployment.showComputer ? item.nodeName : undefined,
+                  item.mode === 'ro' ? t('readOnlyBadge') : t('workspace'),
+                ].filter(Boolean).join(' · ')}</small></span> })),
             ]}
             anchor={<button type="button" className={css.workspaceTrigger} aria-label={t('workspace')} aria-haspopup="menu" aria-expanded={workspaceMenuOpen} onClick={() => { setWorkspaceMenuOpen(value => !value) }}>
-              <span>{workspace === '' ? t('allWorkspaces') : workspace === 'personal' ? t('personal') : /* v8 ignore next -- a project workspace always resolves in the loaded catalog */ selectedProject?.name ?? t('workspace')}</span>
+              <span>{workspace === '' ? t('allWorkspaces') : workspace === 'personal' ? t('personal')
+                : workspace.startsWith('personal:') ? selectedPersonal === undefined ? t('unavailable') : personalLabel(selectedPersonal)
+                  : /* v8 ignore next -- a project workspace always resolves in the loaded catalog */ selectedProject?.name ?? t('workspace')}</span>
               <IconChevronDownOutline14 />
             </button>}
           />
         </div>
+        {catalogPhase === 'loading' && <p className={css.notice} role="status">{t('catalogLoading')}</p>}
+        {(catalogPhase === 'error' || catalog?.personalComplete === false) && <p className={css.notice} role="status">
+          {t(catalogPhase === 'error' ? 'catalogError' : 'catalogIncomplete')}
+          <Button size="sm" disabled={catalogPhase === 'loading'} onClick={() => { setCatalogAttempt(value => value + 1) }}>{t('retryCatalog')}</Button>
+        </p>}
         {full && <div className={css.notice} role="status">{t('limit')} <Button size="sm" onClick={() => { actions.openPicker(true) }}>{t('replace')}</Button></div>}
         {error !== undefined && <p role="alert" className={css.notice}>{error}</p>}
         <div className={css.catalogSummary}><span>{t('history')}</span><span>{candidates.length}</span></div>
         <div className={css.candidates}>
-          {candidates.length === 0 && <p className={css.notice}>{t('noSessions')}</p>}
-          {candidates.map((item) => {
+          {candidates.length === 0 && catalogPhase === 'ready' && catalog?.personalComplete !== false
+            && <p className={css.notice}>{t('noSessions')}</p>}
+          {candidates.slice(0, visibleCount).map((item) => {
             const pinned = viewport.paneIds.includes(browserKey(item))
             const title = conversationDisplayName(item, t('untitled'))
             /* v8 ignore next -- scopeName is always a personal or project name */
@@ -366,30 +492,51 @@ export function WorkbenchToolbar({
             const { unit, n } = relativeTime(item.updatedAt, now)
             return (
               <button
-                key={`${item.runtime.kind}:${item.runtime.kind === 'project' ? item.runtime.projectId : 'personal'}:${item.sessionId}`}
-                type="button" aria-label={`${title} ${item.cwd ?? ''}`}
+                key={browserKey(item)}
+                type="button" aria-label={`${title} ${item.cwd ?? ''}${deployment.showComputer && item.runtime.nodeName !== undefined ? ` ${item.runtime.nodeName}` : ''}`}
                 disabled={viewport.pendingIdentity === true || pending || (full && !pinned)} className={css.candidate}
                 onClick={() => {
-                  setPending(true)
-                  void Promise.resolve(chooseSession(item, replace)).then(
-                    finish,
-                    (cause: unknown) => {
-                      setError(cause instanceof Error ? cause.message : String(cause))
-                    },
-                  ).finally(() => { setPending(false) })
+                  runSelection(signal => chooseSession(item, replace, signal), false)
                 }}>
                 <ScopeTile name={scopeName} tone={item.runtime.kind === 'project' ? 'project' : 'personal'} />
-                <span className={css.candidateText}><strong>{title}</strong><small title={item.cwd}>{scopeName}{item.cwd === undefined ? '' : ` · ${workspaceTitleOf(item.cwd) || item.cwd}`}</small></span>
+                <span className={css.candidateText}><strong>{title}</strong><small title={item.cwd}>{scopeName}{deployment.showComputer && item.runtime.nodeName !== undefined ? ` · ${item.runtime.nodeName}` : ''}{item.cwd === undefined ? '' : ` · ${workspaceTitleOf(item.cwd) || item.cwd}`}</small></span>
                 <small className={css.candidateTime}>{unit === 'now' ? t('time.now') : t(`time.${unit}`, { n })}</small>
                 {pinned ? <small className={css.rowBadge}>{t('opened')}</small> : !item.canWrite && <small className={css.rowBadge}>{t('readOnlyBadge')}</small>}
               </button>
             )
           })}
+          {candidates.length > visibleCount && <Button variant="ghost" size="sm" disabled={pending}
+            onClick={() => { setVisibleCount(count => count + CONVERSATION_PAGE_SIZE) }}>
+            {t('moreConversations', { count: candidates.length - visibleCount })}
+          </Button>}
         </div>
         <div className={css.pickerFooter}>
-          <span>{t('chooseWorkspace')}</span>
-          <Button variant="primary" size="sm" disabled={viewport.pendingIdentity === true || workspace === '' || pending || full || selectedProject?.mode === 'ro'} onClick={create}>{t(pending ? 'creating' : 'create')}</Button>
+          <span>{t(workspace === 'personal' && selectedPersonal === undefined
+            ? deployment.showComputer ? 'chooseComputer' : 'choosePersonalRuntime' : 'chooseWorkspace')}</span>
+          {pending && <Button variant="outline" size="sm" onClick={cancelPending}>{t('cancelPending')}</Button>}
+          <Button variant="primary" size="sm" disabled={viewport.pendingIdentity === true || workspace === '' || pending || full || selectedProject?.mode === 'ro'
+            || workspace.startsWith('personal') && selectedPersonal === undefined} onClick={create}>{t(pending ? 'creating' : 'create')}</Button>
         </div>
+      </Modal>
+      <Modal open={restoreOpen && legacyRestore !== undefined} onClose={closeRestore}
+        title={t('layoutChooseOwner')} closeLabel={t('dismiss')}
+        footer={<><Button variant="outline" onClick={closeRestore}>{t('cancel')}</Button>
+          <Button variant="primary" disabled={restorePending || legacyRestore?.issues.some(issue => !restoreOwners[issue.sessionId]) === true}
+            onClick={restoreLayout}>{t(restorePending ? 'layoutRestoring' : 'layoutRestore')}</Button></>}>
+        <p className={css.notice}>{t('layoutChooseOwnerBody')}</p>
+        {legacyRestore?.issues.map(issue => <label key={issue.sessionId} className={css.restoreRow}>
+          <span>{issue.candidates[0]?.title ?? t('untitled')}</span>
+          <select value={restoreOwners[issue.sessionId] ?? ''} disabled={restorePending}
+            onChange={(event) => {
+              const choice = event.target.value
+              setRestoreOwners(previous => ({ ...previous, [issue.sessionId]: choice }))
+            }}>
+            <option value="">{t('layoutChooseRuntime')}</option>
+            {issue.candidates.map(item => <option key={browserKey(item)} value={browserKey(item)}>{restoreCandidateLabel(item)}</option>)}
+            <option value="__remove">{t('layoutRemoveReference')}</option>
+          </select>
+        </label>)}
+        {restoreError !== undefined && <p role="alert" className={css.notice}>{restoreError}</p>}
       </Modal>
       <Modal open={workbenchDialog !== undefined} onClose={() => { setWorkbenchDialog(undefined) }} title={t(workbenchDialog === 'rename' ? 'renameWorkbench' : workbenchDialog === 'duplicate' ? 'duplicateWorkbench' : 'newWorkbench')} closeLabel={t('dismiss')}
         footer={<><Button variant="outline" onClick={() => { setWorkbenchDialog(undefined) }}>{t('cancel')}</Button><Button variant="primary" disabled={workbenchName.trim() === ''} onClick={() => {

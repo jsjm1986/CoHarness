@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-experimental-browser-use-stagehand-native",
-  "description": "Experimental Stagehand browser tools with separately configured native models",
+  "description": "Experimental Stagehand browser tools with separately configured governed model routes",
   "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
@@ -36,7 +36,12 @@
     "@deepseek-ai/dsh-agent": "workspace:*",
     "@deepseek-ai/dsh-browser-use": "workspace:*",
     "@deepseek-ai/dsh-system-prompt": "workspace:*",
-    "@deepseek-ai/dsh-tools": "workspace:*"
+    "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/dsh-resource-budget": "workspace:*",
+    "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-subprocess-local": "workspace:*",
+    "@deepseek-ai/dsh-llm": "workspace:*",
+    "@deepseek-ai/dsh-attachment": "workspace:*"
   },
   "dependencies": {
     "@browserbasehq/stagehand": "4.1.0",
@@ -46,7 +51,8 @@
     "@deepseek-ai/schemastery": "workspace:~",
     "zod": "^4.4.3",
     "@deepseek-ai/dsh-subprocess": "workspace:*",
-    "@puppeteer/browsers": "3.2.2"
+    "@puppeteer/browsers": "3.2.2",
+    "playwright-core": "1.62.1"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
@@ -63,6 +69,9 @@
     "@deepseek-ai/dsh-session-projection": "workspace:*",
     "@deepseek-ai/dsh-system-prompt": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "@deepseek-ai/dsh-resource-budget": "workspace:*",
+    "@deepseek-ai/dsh-subprocess-local": "workspace:*",
+    "@deepseek-ai/dsh-llm-pi-ai": "workspace:*"
   }
 }

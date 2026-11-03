@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-31-memory-live-availability.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-31-memory-live-availability.md
+document:
+  en: 9fb9854336d813699d178a22e7cf5ebdd3e6f27e
+  zh: 67de392c83f301136e554e0891cd9440ca1e836e
+/agent-note-memory-availability-at-asynchronous-completion:
+  en: 41c049897a79b6a0
+  zh: 717a6c87e153a3a1
+/agent-note-memory-availability-at-asynchronous-completion/problem:
+  en: cbde47275710d41e
+  zh: 3753538ce2a381af
+/agent-note-memory-availability-at-asynchronous-completion/decision:
+  en: 8a7755810e4bf356
+  zh: 70e99c3b5b578a20
+/agent-note-memory-availability-at-asynchronous-completion/alternatives-considered:
+  en: 4aacbbec6772bfc7
+  zh: cf7a38b296cf4606
+/agent-note-memory-availability-at-asynchronous-completion/consequences:
+  en: 49eea02f5cc3125b
+  zh: fd3bef2150e3faa8
+/agent-note-memory-availability-at-asynchronous-completion/verification:
+  en: c688f40e1d803995
+  zh: 3066a20c755d4416

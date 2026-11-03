@@ -108,7 +108,9 @@ interface SubagentStartRequest {
 ```ts type-equiv
 /**
  * Provider-facing one-shot request after {@link SubagentRuntime.start} resolves
- * the durable child descriptor.
+ * the durable child descriptor. Its signal combines caller cancellation with
+ * runtime withdrawal until publication to its holder; after publication only
+ * caller cancellation remains connected.
  */
 interface ResolvedSubagentStartRequest extends SubagentStartRequest {
   /** Absolute directory selected once before provider startup. */
@@ -267,6 +269,15 @@ interface ContinuableCreateSpec {
 
 本地一次性提供方会在子 agent 的初始轮次内、首次请求前追加描述符。继续执行管理器会在任何提供方提供的谱系之后、初始提示词获准之前追加描述符；`Session.inheritedEventCount` 仍是 fork 谱系边界：恢复时的描述符权威读取子 agent 自身的后缀，而供列表使用的身份投影以 last-wins 折叠 `subagent/descriptor`，子 agent 自己的描述符会覆盖 fork seed 中祖先的描述符。seeded cold list 会跳过 cache hint，直到权威 observation 提供该精确 cut。该事件只进入日志：不含 `surfaceOp`，绝不进入模型历史，并由仅追加日志跨压缩保留。格式错误的当前版本描述符属于损坏；本运行时无法对不受支持的版本进行分类。
 
+外部成员提供方在发布前把原生认证或受管上游固定在绑定存储中。冷恢复保留该选择；格式错误或冲突的记录会拒绝执行。[Codex 提供方](../../packages/subagent/subagent-codex/README.zh.md#persistent-members)在编排成员轮次内分别执行模型请求。
+
+```ts type-equiv
+/** Model authority selected before an external member is published. */
+type ExternalModelSelection =
+  | { readonly mode: 'native' }
+  | { readonly mode: 'managed'; readonly provider: string; readonly model: string }
+```
+
 ## 持久化枚举：`listChildren()`、`listDescendants()` 与其条目
 
 `SubagentRuntime.listChildren(parentSessionId)` 从 `ctx.sessions.list()` 与可选 `ctx.sessionPersistence.list()` 的实时优先合并中枚举 parent 直接且由会话支撑的 subagent——不经查询服务，也不会加载或恢复任何 Agent。候选是持久 header 携带 `origin: 'subagent'` 的直接 child；该标记只负责枚举分类与粗粒度的通用路由拒绝，不能证明描述符有效、child 可恢复或操作已获授权——身份由投影折叠负责，恢复由 Activation 约定负责。每行的 `mode`／`label` 是已注册 `subagent` projection unit 的值，经三级阶梯供值：存活 child 由注册表水位缓存供值（零日志读取）；冷 child 先读可选的投影 checkpoint 缓存（`cachedSnapshot`——过 own-suffix seq 门的身份即定值，own descriptor 一经追加不可变）；否则在一次 `persistence.inspect()` 读取上经注册表折叠（有界并发，每次列表重新计算）。该缓存是纯可选加速层：服务缺席、行里是 `null` 哨兵或 key 缺席、seq 门不过、读取出错，都静默落到权威重折。折叠规则是 `subagent/descriptor` last-wins 且没有失败通道：子 agent 自己的描述符覆盖 fork seed 中祖先的描述符，格式错误或版本不认识的载荷折叠为可序列化的 `null` 哨兵，视同无值。结果是按 `createdAt`、再按 id 排序的 `SubagentListEntry[]`：取到身份即生成带有 `mode: 'one-shot' | 'continuable'` 和 `activity: 'running' | 'inactive'` 的 `child` 条目；可继续条目始终携带 `label`，一次性条目则只在启动调用方提供展示元数据时携带该字段。已定局而折叠无身份的候选生成 `corrupt` diagnostic——缺失、格式错误与版本不认识的描述符有意不再细分（`unsupported` 仍保留在类型中但从不产出）；运行中而无身份的候选被省略（描述符落盘前的创建窗口）；冷检查失败生成一条 `unavailable` diagnostic 并在下次列表自然重试，因此一个损坏的 sibling 不会隐藏健康 child。`hasChildren` 标记存在持久 subagent origin 的直接后代，读取自同一份合并材料。活动状态只表示逻辑记录是否在 `ctx.sessions` 中存活，而不表示结果或可恢复性。缺少持久化时，枚举退化为仅存活枚举而不是报错——此时冷 child 本就无法恢复。缺少 `ctx.sessionProjections` 注册表时，`listChildren()` 抛出携带错误码 `SUBAGENT_CONTROL_PROJECTIONS_UNAVAILABLE` 的 `SubagentError`，缺少会话存储时则抛出 `SUBAGENT_CONTROL_SESSION_STORE_UNAVAILABLE`，两者都在任何读取之前检查，因此零 child 的部署同样确定失败；列表工具在插件加载时要求 `ctx.subagents` 与 `ctx.agents`。UI 等服务消费方可以展示两种模式，并为无标签的一次性 child 选择回退展示；面向模型的 `list_agents` 适配器（[dsh-tool-subagent-control](../../packages/subagent/tool-subagent-control) 中可单独加载的 `/list-agents` 插件）则只保留可继续条目，并通过在线 Agent 注册表将状态细化为 `running`／`inactive`；`inactive` 涵盖已加载与仅存于存储的 child，不描述任务完成或结果。枚举不会查询继续执行管理器的 Activation map、Agent 注册表或提供方可用性；`send_message` 仍是消息送达时的权威操作，列表中的运行中可继续 child 仍可能因所有权冲突而拒绝投递。读路径的设计理由见[列表身份投影 Agent Note](../../.agents/notes/implemented/architecture/2026-08-06-subagent-list-identity-projection.zh.md)。
@@ -386,7 +397,11 @@ interface SubagentRun {
   readonly result: Promise<SubagentResult>
   /**
    * Cancel remaining work, reach child quiescence, and release resources.
-   * Idempotent.
+   * Pending calls coalesce and successful cleanup is idempotent. A rejected
+   * cleanup retains caller ownership and may retry through the same handle.
+   * A foreground caller may hand failed cleanup back through
+   * `SubagentRuntime.retainFailedCleanup()`; the handle stays idempotent.
+   * @returns Cleanup completion; a settled child result remains unchanged by retry.
    */
   dispose(): Promise<void>
 }
@@ -635,6 +650,8 @@ listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<Subagen
  * Parent availability is a hint; {@link prompt} performs the authoritative
  * check. Named apart from the provider-name {@link list}, which owns the
  * member.
+ * The captured collaboration provider cancels the read on withdrawal; data
+ * is withheld even when a backing read finishes afterward.
  * @param parentSessionId - parent session whose direct children are listed.
  * @param signal - carrier cancellation forwarded to Session queries.
  * @returns the catalog view for that parent.
@@ -651,7 +668,9 @@ listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<Subagen
  * exact live direct parent, retaining the caller-minted request identity,
  * validated browser zone, and authenticated project participant on the
  * accepted message. Success identifies the message the child's inbox
- * accepted; later execution is independent of this call. Queue delivery
+ * accepted; later execution is independent of this call. The captured
+ * collaboration provider cancels admission and delivery until that acceptance;
+ * a replacement cannot authorize this request. Queue delivery
  * targets a later turn; steer delivery targets the nearest step and retains
  * the Agent loop's best-effort fallback semantics. Image parts are admitted
  * and persisted through the attachment store before delivery, and the
@@ -674,7 +693,8 @@ listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<Subagen
  * authorization tiers and the core primitive's lineage check together
  * authorize the address, which is what keeps a live child interruptible
  * while its parent Agent is offline. Absent, idle, and already-completed
- * targets are accepted no-ops there.
+ * targets are accepted no-ops there. Withdrawal of the captured collaboration
+ * provider before interrupt admission refuses the request.
  * @param childSessionId - durable child session id to interrupt.
  * @param parentSessionId - durable direct parent whose authority is claimed.
  * @param mode - required continuable-address discriminator.
@@ -716,11 +736,32 @@ list(): string[]
  * failures settle through the returned run.
  * A catalog append failure disposes the run and handles its result rejection;
  * the caller receives the catalog error even if disposal also fails.
+ * Another start for the same exact parent retries handed-back failed cleanup before
+ * provider admission. Unconfirmed cleanup refuses the new start; unrelated
+ * parents and holder-owned, successful or pending-only leases are not retried.
+ * Runtime withdrawal stops admission, cancels and joins pending starts, and
+ * disposes a provider publication received after cancellation. Published
+ * holder-owned runs retain caller cancellation and are not revoked by withdrawal.
  * @param name - the provider to use.
  * @param request - child label, prompt, parent, signal, and optional capabilities.
  * @returns the published holder-owned run.
  */
 async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>
+
+/**
+ * Retain failed cleanup after a foreground caller gives up its one-shot handle.
+ * Another start for the exact parent retries it before allocation; service
+ * disposal also joins retained cleanup. Holder-owned background work keeps
+ * its existing completion and cancellation controls.
+ * A live parent's recovery outlives this runtime's registration.
+ * Parent teardown retries retained cleanup and joins late transfers. A
+ * departing parent adds no effects; an unaccepted transfer retries its original lease.
+ * @param parent - exact Agent that originally started the run.
+ * @param run - handle returned by this service for that parent.
+ * @returns fulfillment after confirmed release; failed attempts keep it pending.
+ * @throws {SubagentError} `UNAUTHORIZED` for another runtime's or parent's handle.
+ */
+retainFailedCleanup(parent: Agent, run: SubagentRun): Promise<void>
 ```
 
 Types: [Agent](core.zh.md) · [ContentBlock](llm-streaming.zh.md) · [MessageId](llm-streaming.zh.md) · [SessionId](core.zh.md)
@@ -730,6 +771,53 @@ Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/suba
 <a id="subagent-events"></a>
 
 ### `subagent/*` events
+
+<a id="subagentcleanup-retain--emit"></a>
+
+#### `subagent/cleanup-retain` — emit
+
+Offer failed cleanup to an existing exact-parent recovery, including one already draining. Accepting recovery keeps the original owner's operation reachable without registering effects in a departing parent.
+
+```ts cordis-catalog
+/**
+ * Offer failed cleanup to an existing exact-parent recovery, including one
+ * already draining. Accepting recovery keeps the original owner's operation
+ * reachable without registering effects in a departing parent.
+ * @param parent - exact Agent that owns the failed child.
+ * @param retry - original owner's coalescing cleanup operation.
+ * @param released - non-rejecting confirmation of physical release.
+ * @param claim - atomically accept this offer once; false leaves it to the accepting listener.
+ * @mode emit
+ */
+'subagent/cleanup-retain'(parent: Agent, retry: () => Promise<void>, released: Promise<void>, claim: () => boolean): void
+```
+
+Types: [Agent](core.zh.md)
+
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
+
+<a id="subagentcleanup-retry--emit"></a>
+
+#### `subagent/cleanup-retry` — emit
+
+Collect retry operations owned by the exact parent's retained cleanup. Listeners register operations synchronously without starting them; the admitting runtime joins every attempt before refusing new work. Run handles and cleanup authority remain with their original owners.
+
+```ts cordis-catalog
+/**
+ * Collect retry operations owned by the exact parent's retained cleanup.
+ * Listeners register operations synchronously without starting them; the
+ * admitting runtime joins every attempt before refusing new work.
+ * Run handles and cleanup authority remain with their original owners.
+ * @param parent - exact Agent requesting new allocation.
+ * @param register - collect one recovery operation for this admission.
+ * @mode emit
+ */
+'subagent/cleanup-retry'(parent: Agent, register: (retry: () => Promise<void>) => void): void
+```
+
+Types: [Agent](core.zh.md)
+
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentend--emit"></a>
 

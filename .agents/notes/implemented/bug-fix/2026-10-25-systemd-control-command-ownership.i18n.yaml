@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-25-systemd-control-command-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-25-systemd-control-command-ownership.md
+document:
+  en: d3c612a89773914a0dffe2d1df14c9f12c9f1e78
+  zh: ea6c40f78e44d3ebf467aa0f00f738dd40fec8de
+/agent-note-systemd-control-clients-have-bounded-owned-lifetimes:
+  en: 3b45a5eee247c349
+  zh: 181910f9035aa6d0
+/agent-note-systemd-control-clients-have-bounded-owned-lifetimes/problem:
+  en: 6816d650d1964707
+  zh: 6360e4a6411850d8
+/agent-note-systemd-control-clients-have-bounded-owned-lifetimes/decision:
+  en: b1134cbd7a300b40
+  zh: 31c6f12d4d4a3248
+/agent-note-systemd-control-clients-have-bounded-owned-lifetimes/alternatives-considered:
+  en: 01d339a63b42b3ae
+  zh: 204f719e84c29cad
+/agent-note-systemd-control-clients-have-bounded-owned-lifetimes/consequences:
+  en: 0d8a44851afb29bd
+  zh: 2a626e36eb0bc92e

@@ -1,7 +1,55 @@
 import { describe, expect, it } from 'vitest'
+import { ResourceAdmissionError } from '@deepseek-ai/dsh-resource-budget'
 import { normalizeLlmFailure } from '../src/adapter-failure.ts'
 
 describe('adapter failure normalization', () => {
+  it.each([
+    ['unavailable', 'RESOURCE_BUDGET_UNAVAILABLE'], ['cancelled', 'ABORTED'],
+    ['expired', 'RESOURCE_ADMISSION_EXPIRED'], ['refused', 'RESOURCE_ADMISSION_REFUSED'],
+  ] as const)('preserves the owned resource admission category %s', (reason, code) => {
+    expect(normalizeLlmFailure(new ResourceAdmissionError(reason, 'Local resource admission failed.')))
+      .toEqual({ message: 'Local resource admission failed.', code })
+  })
+
+  it('keeps SDK reason fields outside the owned resource taxonomy', () => {
+    const error = Object.assign(new Error('SDK unavailable'), { name: 'ResourceAdmissionError', reason: 'unavailable' })
+    expect(normalizeLlmFailure(error)).toEqual({ message: 'SDK unavailable', code: 'UNKNOWN' })
+  })
+
+  it.each([0, 1.5])('rejects an invalid offloaded image count: %s', (offloadImages) => {
+    const error = Object.assign(new Error('Provider failed.'), {
+      code: 'IMAGE_LIMIT', failure: { message: 'Provider failed.', code: 'IMAGE_LIMIT', offloadImages },
+    })
+    expect(normalizeLlmFailure(error)).toEqual({ message: 'Provider failed.', code: 'UNKNOWN' })
+  })
+
+  it('preserves a valid offloaded image count in detached failure facts', () => {
+    const failure = { message: 'Image limit.', code: 'IMAGE_LIMIT', offloadImages: 2 }
+    const error = Object.assign(new Error(failure.message), { code: failure.code, failure })
+    expect(normalizeLlmFailure(error)).toEqual(failure)
+    expect(normalizeLlmFailure(error)).not.toBe(failure)
+  })
+
+  it('preserves validated detailed facts carried by an owned admission error', () => {
+    const failure = { message: 'Execution denied.', code: 'EXECUTION_DENIED', status: 403 }
+    const error = Object.assign(new ResourceAdmissionError('refused', failure.message), { code: failure.code, failure })
+    expect(normalizeLlmFailure(error)).toEqual(failure)
+  })
+
+  it.each(['hidden', 'accessor', 'unrecognized', 'throwing'] as const)(
+    'contains an unreadable admission reason descriptor: %s', (mode) => {
+      const error = new Proxy(new ResourceAdmissionError('refused', 'Admission failed.'), {
+        getOwnPropertyDescriptor(target, property) {
+          if (property !== 'reason') return Reflect.getOwnPropertyDescriptor(target, property)
+          if (mode === 'throwing') throw new Error('Descriptor unavailable.')
+          if (mode === 'hidden') return undefined
+          if (mode === 'accessor') return { configurable: true, get: () => { throw new Error('Do not invoke SDK accessors.') } }
+          return { configurable: true, value: '__proto__' }
+        },
+      })
+      expect(normalizeLlmFailure(error)).toEqual({ message: 'Admission failed.', code: 'UNKNOWN' })
+    },
+  )
   it('contains hostile non-Error coercion', () => {
     const thrown = { [Symbol.toPrimitive]: () => { throw new Error('coercion failed') } }
     expect(normalizeLlmFailure(thrown)).toEqual({ message: 'LLM adapter failed', code: 'UNKNOWN' })

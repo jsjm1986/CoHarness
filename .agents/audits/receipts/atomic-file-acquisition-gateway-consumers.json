@@ -1,0 +1,14 @@
+{
+  "name": "atomic-file-acquisition-gateway-consumers",
+  "cwd": "gateway",
+  "command": "node_modules/.bin/vitest run tests/documents-local.spec.ts tests/node-config-store.spec.ts tests/node-config-applier.spec.ts",
+  "startedAt": "2026-10-25T23:17:10.507921+00:00",
+  "seconds": 9.47,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "7a1300b448aa7fba28cbc11ca1dac646c8d1f2f231083650bd915be1728f2cf1",
+  "inputsAfter": "7a1300b448aa7fba28cbc11ca1dac646c8d1f2f231083650bd915be1728f2cf1",
+  "postgresToolDirectory": null,
+  "outputSha256": "5d4d4710786c8782457c07de664a5a1043c55a85725310afcb4ce6c540c516bb",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  3 passed (3)\n      Tests  30 passed (30)\n   Start at  07:17:14\n   Duration  5.52s (transform 3.82s, setup 0ms, import 4.59s, tests 6.08s, environment 0ms)\n\n"
+}

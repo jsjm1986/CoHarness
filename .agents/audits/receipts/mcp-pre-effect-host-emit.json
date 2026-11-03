@@ -1,0 +1,13 @@
+{
+  "name": "mcp-pre-effect-host-emit",
+  "cwd": ".",
+  "command": "env DSH_GATE_CONCURRENCY=2 ./node_modules/.bin/tsc -b tsconfig.host.json",
+  "startedAt": "2026-10-23T17:07:05.355520+00:00",
+  "seconds": 6.731,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9adc87a83a62bb3d5c69368e8564624f0915e27b7085cf9f957de9684897b343",
+  "inputsAfter": "9adc87a83a62bb3d5c69368e8564624f0915e27b7085cf9f957de9684897b343",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -1,0 +1,16 @@
+{
+  "name": "local-group-old-built-negative",
+  "cwd": "gateway",
+  "command": "node tests/run-built-local-supervision.mjs",
+  "startedAt": "2026-10-25T00:37:01.718976+00:00",
+  "seconds": 2.039,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d1633ff325c1659fc09d9294b4e23cdaba574a2dcd78bab082941ec46cbdfa26",
+  "inputsAfter": "d1633ff325c1659fc09d9294b4e23cdaba574a2dcd78bab082941ec46cbdfa26",
+  "postgresToolDirectory": null,
+  "outputSha256": "bb2dadc06b575ead3476e3a074b0a3d76dfc27cfac614656f17dc46df7a62a6b",
+  "outputTail": "file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/tests/run-built-local-supervision.mjs:71\n      throw Object.assign(new Error('Group observation denied'), { code: 'EPERM' })\n                          ^\n\nError: Group observation denied\n    at process.kill (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/tests/run-built-local-supervision.mjs:71:27)\n    at LocalRuntimeControl.groupExists (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/local-runtime-control.js:100:21)\n    at LocalRuntimeControl.confirmStopped (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/local-runtime-control.js:83:116)\n    at async LocalRuntimeControl.stop (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/lib/local-runtime-control.js:54:17)\n    at async file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/gateway/tests/run-built-local-supervision.mjs:76:5 {\n  code: 'EPERM'\n}\n\nNode.js v25.8.1\n",
+  "builtControlSha256": "65a15f262a9f2fa89c9a5c8dd3d5095e040d925a2b830c32592ec38dc085da2e",
+  "builtArtifactState": "Emitted before EPERM source fix; expected negative compiled transcript"
+}

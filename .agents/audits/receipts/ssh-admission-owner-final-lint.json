@@ -1,0 +1,13 @@
+{
+  "name": "ssh-admission-owner-final-lint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/ssh/ssh/src/index.ts packages/ssh/subprocess-ssh/src/index.ts packages/ssh/ssh/tests/startup-behavior.spec.ts packages/ssh/ssh/tests/fixtures packages/ssh/subprocess-ssh/tests packages/host/apiproxy/src/ssh-execution.ts packages/host/apiproxy/tests/ssh-execution.spec.ts packages/ssh/ssh/tests/resource-admission.e2e.ts",
+  "startedAt": "2026-10-23T15:27:53.606221+00:00",
+  "seconds": 3.325,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a9c2b7381a46756f35956db2cd982b260995e675f42c4051b92fdd27a22f06b4",
+  "inputsAfter": "a9c2b7381a46756f35956db2cd982b260995e675f42c4051b92fdd27a22f06b4",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

@@ -1,0 +1,399 @@
+{
+  "finding": "B469",
+  "status": "fixed_verified_continued_reply_identity_and_cancellation_210_cases_global_review_open",
+  "updatedAt": "2026-11-02T04:32:07.159554+00:00",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "ahead": 139,
+    "behind": 0,
+    "verifiedAt": "2026-11-02T04:27:42.456282+00:00",
+    "fetchCommand": [
+      "git",
+      "fetch",
+      "--quiet",
+      "origin"
+    ],
+    "fetchExitCode": 0,
+    "workingTreePreserved": true
+  },
+  "problem": "A continued question reply can reach the next model request under an earlier user identity because its RPC request identity does not belong to the queued reply. Legacy untagged question replies also fail to mark privileged execution unverified.",
+  "fix": "Attest the exact reply before delivery; retain one reservation and its exact Agent through attestation and queue admission; recheck cancellation, current Agent, question, service and issuer before steering. Keep Host write authorization while allowing the reply service to own input attestation. Treat durable untagged replies as unverified for privileged execution.",
+  "compatibility": {
+    "directTypeScriptAnswerIsAsync": true,
+    "directTypeScriptAnswerRequiresAbortSignal": true,
+    "remoteBusinessArgumentCount": 3,
+    "remoteCancellationTransportSupplied": true,
+    "sessionEventsChanged": false,
+    "sessionFormatChanged": false,
+    "historicalDataRewritten": false,
+    "newConfiguration": false,
+    "agentLoopChanged": false,
+    "peerOwnedUiOrTransportEdited": false
+  },
+  "verification": {
+    "differentNamedCases": 210,
+    "unitAndSourceSnapshotCases": 178,
+    "realPostgresCases": 32,
+    "skipped": 0,
+    "sourceBuiltRepetitionsNotAdditionalCases": true,
+    "originalCounterexamples": {
+      "realPostgresCases": 2,
+      "legacyInputParserCases": 1,
+      "receipts": [
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-original.json",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-legacy-input-original-ready.json"
+      ]
+    },
+    "coverage": {
+      "total": {
+        "lines": {
+          "total": 169,
+          "covered": 169,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 209,
+          "covered": 209,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 38,
+          "covered": 38,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 198,
+          "covered": 198,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/gateway-execution/src/input.ts": {
+        "lines": {
+          "total": 26,
+          "covered": 26,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 8,
+          "covered": 8,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 34,
+          "covered": 34,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 72,
+          "covered": 72,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/user-questions/src/index.ts": {
+        "lines": {
+          "total": 143,
+          "covered": 143,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 30,
+          "covered": 30,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 175,
+          "covered": 175,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 126,
+          "covered": 126,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "normalFullEntryCoverageExemptionRemoved": true,
+    "normalRunnableSnapshot": [
+      "Node22 source Loader with timed tool and real AgentLoop",
+      "Node24 built Loader, generated Typert descriptor and actual Remote dispatcher with three wire arguments"
+    ],
+    "ordinaryUnverifiedExecutionRemainsAvailable": true,
+    "unverifiedPrivilegedExecutionRefused": true,
+    "allChecks": [
+      {
+        "name": "question-owner-unit-coverage-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-unit-coverage-final.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/interaction/user-questions/tests",
+          "packages/interaction/tool-ask-user/tests",
+          "packages/host/apiproxy/tests/client-session-routing.spec.ts",
+          "packages/context/gateway-execution/tests/input.spec.ts",
+          "packages/extensions/tool-cordis/tests",
+          "scripts/coverage-selection.spec.ts",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/interaction/user-questions/src/index.ts",
+          "--coverage.include=packages/context/gateway-execution/src/input.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-final-coverage",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-unit-coverage-final-cases.json"
+        ]
+      },
+      {
+        "name": "question-owner-postgres-typed",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-postgres-typed.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/run-pg-check.mjs",
+          "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.e2e.config.ts",
+          "packages/context/gateway-execution/tests/pg-composition.e2e.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-postgres-typed-cases.json"
+        ]
+      },
+      {
+        "name": "question-owner-native-built",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-native-built.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/interaction/user-questions/tests/continued-answer-loader.spec.ts",
+          "--maxWorkers=1",
+          "--reporter=json",
+          "--outputFile=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-native-built-cases.json"
+        ]
+      },
+      {
+        "name": "question-owner-build-normal",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-build-normal.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "RAYON_NUM_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/tsdown/dist/run.mjs",
+          "--filter",
+          "@deepseek-ai/dsh-user-questions",
+          "--filter",
+          "@deepseek-ai/dsh-host-apiproxy",
+          "--filter",
+          "@deepseek-ai/dsh-gateway-execution",
+          "--filter",
+          "@deepseek-ai/dsh-tool-cordis"
+        ]
+      },
+      {
+        "name": "question-owner-final-declarations",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-final-declarations.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-b",
+          "packages/interaction/user-questions",
+          "packages/host/apiproxy",
+          "packages/context/gateway-execution",
+          "packages/extensions/tool-cordis",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "question-owner-host-types-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-host-types-final.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-host-final.tsbuildinfo",
+          "--pretty",
+          "false"
+        ]
+      },
+      {
+        "name": "question-owner-lint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-lint.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_OXLINT_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/interaction/user-questions/src/index.ts",
+          "packages/interaction/user-questions/tests",
+          "packages/context/gateway-execution/src/input.ts",
+          "packages/context/gateway-execution/tests/input.spec.ts",
+          "packages/context/gateway-execution/tests/pg-composition.e2e.ts",
+          "packages/host/apiproxy/src/api/remote-session-routing.ts",
+          "packages/host/apiproxy/tests/client-session-routing.spec.ts",
+          "packages/extensions/tool-cordis/src/api-catalog.ts",
+          "scripts/coverage-baseline.ts",
+          "scripts/coverage-selection.spec.ts"
+        ]
+      },
+      {
+        "name": "question-owner-lint-fixture-final",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-lint-fixture-final.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_OXLINT_THREADS=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/interaction/user-questions/tests/continued-answer-loader.spec.ts",
+          "packages/interaction/user-questions/tests/fixtures/continued-answer-driver.mjs"
+        ]
+      },
+      {
+        "name": "question-owner-doc-quick-direct",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-doc-quick-direct.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_GATE_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/run-docs.mjs"
+        ]
+      },
+      {
+        "name": "question-owner-static-constraints",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-static-constraints.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/check-workspace-constraints.ts"
+        ]
+      },
+      {
+        "name": "question-owner-dependency-cohorts",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-dependency-cohorts.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-dependency-cohorts.ts"
+        ]
+      },
+      {
+        "name": "question-owner-export-jsdoc",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-export-jsdoc.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-export-jsdoc.ts"
+        ]
+      },
+      {
+        "name": "question-owner-node-next",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-node-next.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-node-next-types.ts"
+        ]
+      },
+      {
+        "name": "question-owner-publint",
+        "status": "passed",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-publint.json",
+        "command": [
+          "env",
+          "NODE_DISABLE_COMPILE_CACHE=1",
+          "DSH_PUBLINT_CONCURRENCY=1",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "--import",
+          "tsx/esm",
+          "scripts/publint-all.ts",
+          "--packages-root",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/publish-view"
+        ]
+      }
+    ],
+    "ownedDisposablePostgresDatabasesDropped": 6
+  },
+  "capsule": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/question-owner-capsule.json",
+  "integrationIndex": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T032349Z/B416-B469-integration-index.json",
+  "remaining": [
+    "Review command service withdrawal with pending admission and handler cleanup.",
+    "Cover the two retained SubagentCore fallback cleanup statements under the unchanged full-entry coverage gate.",
+    "Complete requirement-by-requirement B04/B25 acceptance and remaining domain/function inventory; named regressions do not prove whole-project coverage.",
+    "Independently accept peer R41/R42 topology, historical migration and exact Runtime control on the assembled matching release.",
+    "Official paid Responses validation stays deferred by the user."
+  ],
+  "wholeProjectComplete": false,
+  "productionAcceptanceClaimed": false,
+  "officialResponsesDeferredByUser": true
+}

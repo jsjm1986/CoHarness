@@ -7,6 +7,7 @@
  * widening what features may do to the workspaces domain.
  */
 import type { DirectoryListing, SessionId, WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-remotes/client'
+import type { SessionRuntimeTarget } from './sessions.ts'
 import type { WorkspaceListState } from '../workspaces/service.ts'
 import type { ObservableSnapshot } from './store.ts'
 
@@ -28,6 +29,18 @@ export interface StartSessionOptions {
 export interface IWorkspaces {
   /** The useWorkspaces standard feed (read face — writes stay inside the domain). */
   readonly list: ObservableSnapshot<WorkspaceListState>
+  /** Refresh metadata for granted personal Runtimes without starting them; absent on standalone Hosts. */
+  refreshPersonalDirectory?: () => Promise<void>
+  /** Foreign Runtime to retain through Workspace navigation; undefined uses the bootstrap connection. */
+  runtimeForWorkspace?: (workspaceId: WorkspaceId) => import('./sessions.ts').SessionRuntimeTarget | undefined
+  /**
+   * Create a fresh conversation in an exact Runtime's Workspace.
+   * @param target - captured Runtime; another computer is never substituted.
+   * @param workspaceId - selected projected Workspace; omission registers the target Host's default directory.
+   * @param signal - cancellation prevents a late navigation after preparation or creation.
+   * @returns the runtime-qualified Session identity, attached to a real Workspace.
+   */
+  createRuntimeSession?: (target: SessionRuntimeTarget, workspaceId?: WorkspaceId, signal?: AbortSignal) => Promise<SessionId>
   /**
    * Refresh this space's Workspace baseline, sharing an in-flight pull.
    * Failures remain in list state/error; cancellation retains the received rows.
@@ -73,29 +86,32 @@ export interface IWorkspaces {
   startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void
   /**
    * Register an existing path as a Workspace.
-   * @param input - the Host create payload.
+   * @param input - directory and captured Runtime; null uses the bootstrap Host, omission uses current selection.
    * @returns the created or idempotently resolved Workspace.
    */
-  create(input: { path: string }): Promise<WorkspaceView>
+  create(input: { path: string; runtimeTarget?: SessionRuntimeTarget | null }): Promise<WorkspaceView>
   /**
    * Open the Host's native directory picker.
+   * @param runtimeTarget - captured Runtime; null uses the bootstrap Host, omission uses current selection.
    * @returns the selected path, or null when the user cancelled.
    */
-  pickDirectory(): Promise<string | null>
+  pickDirectory(runtimeTarget?: SessionRuntimeTarget | null): Promise<string | null>
   /**
    * List one directory level through the Host's `browse` capability.
    * @param path - absolute directory to list; absent lists the Host home directory.
    * @param signal - aborts the wire request (and the Host's scan) when the caller supersedes it.
+   * @param runtimeTarget - captured Runtime; null uses the bootstrap Host, omission uses current selection.
    * @returns the level's listing with breadcrumb ancestry.
    */
-  listDirectory(path?: string, signal?: AbortSignal): Promise<DirectoryListing>
+  listDirectory(path?: string, signal?: AbortSignal, runtimeTarget?: SessionRuntimeTarget | null): Promise<DirectoryListing>
   /**
    * Create one child directory through the Host's `browse` capability.
    * @param path - absolute existing parent directory.
    * @param name - single non-blank path segment.
+   * @param runtimeTarget - captured Runtime; null uses the bootstrap Host, omission uses current selection.
    * @returns the created directory's absolute path.
    */
-  createDirectory(path: string, name: string): Promise<string>
+  createDirectory(path: string, name: string, runtimeTarget?: SessionRuntimeTarget | null): Promise<string>
   /**
    * Open a filesystem path with the Host operating system's default application.
    * @param path - absolute or host-resolvable path.

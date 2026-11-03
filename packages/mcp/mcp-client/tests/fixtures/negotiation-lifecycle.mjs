@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 import { setTimeout } from 'node:timers/promises'
 
-const [eventsPath, releasePath] = process.argv.slice(2)
+const [eventsPath, releasePath, discoveryMode] = process.argv.slice(2)
 const record = (event, extra = {}) => appendFileSync(eventsPath, `${JSON.stringify({ event, pid: process.pid, ...extra })}\n`)
 const previous = readFileSync(eventsPath, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line))
 const previousPid = previous.findLast(item => item.event === 'start')?.pid
@@ -25,6 +25,7 @@ createInterface({ input: process.stdin }).on('line', async (line) => {
   if (request.id === undefined) return
   record(request.method)
   if (request.method === 'server/discover') {
+    if (discoveryMode === 'close') process.exit(0)
     while (!existsSync(releasePath)) await setTimeout(10)
     process.stdout.write(`${JSON.stringify({
       jsonrpc: '2.0', id: request.id, error: { code: -32601, message: 'Legacy server' },

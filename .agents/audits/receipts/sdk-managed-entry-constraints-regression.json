@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-entry-constraints-regression",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run scripts/check-workspace-constraints.spec.ts --retry=0",
+  "startedAt": "2026-10-24T17:58:16.310001+00:00",
+  "seconds": 6.099,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d25db61b5e834c6a8d9dbca0731f3ae82f3a8ecbc313f719e146233031b66840",
+  "inputsAfter": "d25db61b5e834c6a8d9dbca0731f3ae82f3a8ecbc313f719e146233031b66840",
+  "postgresToolDirectory": null,
+  "outputSha256": "37f3d45480d2e593efb143d1e127b2372ba35e2025a2647e382863476cb4cbb0",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  1 passed (1)\n      Tests  111 passed (111)\n   Start at  01:58:20\n   Duration  2.18s (transform 1.63s, setup 103ms, import 1.89s, tests 57ms, environment 0ms)\n\n"
+}

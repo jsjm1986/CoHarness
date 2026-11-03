@@ -9,6 +9,7 @@ import type {} from '@deepseek-ai/dsh-plugin-manager'
 import type {} from '@deepseek-ai/dsh-plugin-market'
 import { randomUUID } from 'node:crypto'
 import { createDesktopApi } from './desktop.ts'
+import { computerUseUnavailableReason } from '@deepseek-ai/dsh-computer-use'
 import { createWorkspaceChangesApi } from './workspace-changes.ts'
 import { createWorkspaceFilesApi, subscribeWorkspaceFileChanges, DEFAULT_WORKSPACE_FILE_MAX_BYTES, DEFAULT_WORKSPACE_FILE_MAX_LINES, DEFAULT_WORKSPACE_FILE_MAX_ENTRIES, DEFAULT_WORKSPACE_FILE_MAX_RESOURCES } from './workspace-files.ts'
 import { mkdir, realpath, stat } from 'node:fs/promises'
@@ -130,7 +131,9 @@ import type {} from '@deepseek-ai/dsh-session-projection-cache'
 import type {} from '@deepseek-ai/dsh-commands'
 import {
   CollaborationError,
+  collaborationOf,
   collaborationRefusal,
+  isCollaborationRequired,
   type CollaborationAccess,
   type CollaborationAction,
   type CollaborationAuthority,
@@ -347,7 +350,7 @@ interface GatewayRequestReader {
 /** The runtime-identity slice of the managed `gatewayRuntime` service. */
 interface GatewayRuntimeIdentityReader {
   /** Runtime identity bound into the launch credential. */
-  readonly identity: { readonly kind: 'user' | 'project'; readonly id: number }
+  readonly identity: { readonly kind: 'user' | 'project'; readonly id: number; readonly runtimeId?: import('./api/client-session.ts').ClientRuntimeId }
 }
 
 function pluginAdministration(ctx: Context): boolean {
@@ -362,16 +365,19 @@ function pluginAdministration(ctx: Context): boolean {
  * @param next - resolved business method.
  * @returns its result under the current initiator's verified identity.
  */
-export function invokeTypertRemote(ctx: Context, payload: TypertGatewayAuthorizationRequest,
+export async function invokeTypertRemote(ctx: Context, payload: TypertGatewayAuthorizationRequest,
   next: () => Promise<unknown>): Promise<unknown> {
   const invoke = (): Promise<unknown> => {
     if (payload.endpoint !== 'schedule/catalog') return next()
-    const collaboration = ctx.get('collaboration')
-    if (collaboration === undefined) return next()
     // The task store is Host-wide; a project-scoped caller receives only the
     // entries bound to Sessions that participant may read.
-    const authority = collaboration.capture()
-    if (authority.participant.scope.kind === 'personal') return next()
+    let authority: CollaborationAuthority | undefined
+    try {
+      authority = collaborationOf(ctx)?.capture()
+    } catch (error: unknown) {
+      rejectTypertCollaboration(error, 'read')
+    }
+    if (authority === undefined || authority.participant.scope.kind === 'personal') return next()
     return next().then(async (result: unknown) => {
       if (!Array.isArray(result)) return result
       const rows: readonly unknown[] = result
@@ -393,7 +399,7 @@ export function invokeTypertRemote(ctx: Context, payload: TypertGatewayAuthoriza
 
 /**
  * Apply project collaboration ACLs to a validated Typert Remote request.
- * Personal requests and compositions without collaboration retain ordinary behavior.
+ * Personal requests and independent applications retain ordinary behavior.
  * @param ctx - Host Context carrying the optional collaboration provider.
  * @param payload - decoded Remote request emitted before lookup resolution.
  * @returns after the request is authorized or does not use project scope.
@@ -421,16 +427,15 @@ export async function authorizeTypertRemote(
     await controller.authorizeSession(sessionId, payload.signal ?? TERMINAL_REQUEST_SIGNAL)
     return
   }
-  const collaboration = ctx.get('collaboration')
-  if (collaboration === undefined) return
   const policy = lookupRemoteSessionPolicy(payload.endpoint)
   const action = policy?.action ?? 'manage'
-  let authority: CollaborationAuthority
+  let authority: CollaborationAuthority | undefined
   try {
-    authority = collaboration.capture()
+    authority = collaborationOf(ctx)?.capture()
   } catch (error: unknown) {
     rejectTypertCollaboration(error, action)
   }
+  if (authority === undefined) return
   if (authority.participant.scope.kind === 'personal') return
   if (PROJECT_TYPERT_PROCESS_WIDE_READS.has(payload.endpoint)) return
   if (PROJECT_TYPERT_PROCESS_WIDE_OPERATIONS.has(payload.endpoint)) return
@@ -2108,10 +2113,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   function captureCollaboration(
     action: CollaborationAction,
   ): { authority: CollaborationAuthority | undefined } | { error: RpcError } {
-    const collaboration = ctx.get('collaboration')
-    if (collaboration === undefined) return { authority: undefined }
     try {
-      return { authority: collaboration.capture() }
+      return { authority: collaborationOf(ctx)?.capture() }
     } catch (error: unknown) {
       return { error: collaborationRefusal(error, action) }
     }
@@ -2123,10 +2126,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     action: CollaborationAction,
     captured?: CollaborationAuthority,
   ): Promise<AuthorizedSession | { error: RpcError }> {
-    const collaboration = ctx.get('collaboration')
-    if (collaboration === undefined) return { authority: undefined, access: undefined }
     try {
-      const authority = captured ?? collaboration.capture()
+      const authority = captured ?? collaborationOf(ctx)?.capture()
+      if (authority === undefined) return { authority: undefined, access: undefined }
       return { authority, access: await authority.authorize(sessionId, action) }
     } catch (error: unknown) {
       return { error: collaborationRefusal(error, action, sessionId) }
@@ -2234,7 +2236,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     visibility: CollaborationVisibility | 'personal',
     operation: () => Promise<T>,
   ): Promise<T> {
-    const collaboration = ctx.get('collaboration')
+    const collaboration = collaborationOf(ctx)
     return visibility === 'personal' || collaboration === undefined
       ? operation()
       : collaboration.withSessionCreation({ visibility }, operation)
@@ -3695,7 +3697,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       } finally { verified.close() }
     }
     items.sort((a, b) => b.updatedAt - a.updatedAt)
-    const collaboration = ctx.get('collaboration')
+    const collaboration = collaborationOf(ctx)
     if (collaboration === undefined) return items
     const captured = authority ?? collaboration.capture()
     const readable = await captured.readableSessionIds(items.map(item => item.sessionId))
@@ -3867,7 +3869,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
   /** Whether this deployment can hand a path to a native opener at all. */
   function canOpenPaths(): boolean {
-    if (ctx.get('collaboration') !== undefined) return false
+    if (isCollaborationRequired(ctx)) return false
     if (defaults.canOpenPath !== undefined) return defaults.canOpenPath()
     // An injected opener is by definition usable; otherwise ask the platform.
     return defaults.openPath !== undefined || defaults.openTextFile !== undefined || canOpenNativePath()
@@ -5723,6 +5725,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // TODO: version should read apps/cli's package.json; placeholder for now.
         const selection = defaults.defaultModelSelection()
         const runtimeIdentity = (ctx.get('gatewayRuntime', false) as GatewayRuntimeIdentityReader | undefined)?.identity
+        const desktopUnavailable = computerUseUnavailableReason(ctx)
         return ok(request, {
           version: '0.0.1',
           // Same source as session.create's fallback: the UI's default project
@@ -5737,8 +5740,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           canOpenPath: !projectScope && canOpenPaths(),
           fileManager: !projectScope && canOpenPaths() ? nativeFileManager() : null,
           executionAuthorityRequired: ctx.get('executionAuthorityRequired') === true,
-          runtimeTarget: runtimeIdentity?.kind === 'project'
-            ? { kind: 'project' as const, projectId: runtimeIdentity.id } : { kind: 'personal' as const },
+          ...(desktopUnavailable === undefined ? {} : { computerUseUnavailableReason: desktopUnavailable }),
+          runtimeTarget: {
+            ...(runtimeIdentity?.kind === 'project'
+              ? { kind: 'project' as const, projectId: runtimeIdentity.id } : { kind: 'personal' as const }),
+            ...(runtimeIdentity?.runtimeId === undefined ? {} : { runtimeId: runtimeIdentity.runtimeId }),
+          },
           ...(ctx.get('fs') === undefined ? {} : { workspaceFiles: {
             maxBytes: defaults.workspaceFileMaxBytes ?? DEFAULT_WORKSPACE_FILE_MAX_BYTES,
             maxLines: defaults.workspaceFileMaxLines ?? DEFAULT_WORKSPACE_FILE_MAX_LINES,

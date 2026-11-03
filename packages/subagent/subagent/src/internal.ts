@@ -1,5 +1,5 @@
 /**
- * Continuation integration markers and host adapters outside the public
+ * Integration markers and host adapters outside the public
  * Service Definition and model-facing Agent messaging contract.
  * @module @deepseek-ai/dsh-subagent/internal
  */
@@ -10,6 +10,23 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { SubagentDelivery } from './inbox.ts'
 import type SubagentRuntime from './index.ts'
+
+/** Process-stable host operation shared by bundled and unbundled runtime entries. */
+export const subagentForegroundOperation = Symbol.for('dsh.subagent.foregroundOperation')
+
+/**
+ * Keep foreground collection and cleanup transfer inside the originating runtime's withdrawal drain.
+ * @param runtime - service that owns the foreground operation.
+ * @param parent - exact live parent whose occupation stays retained.
+ * @param signal - caller cancellation for the complete foreground operation.
+ * @param operation - collect the child and transfer failed cleanup before settling.
+ * @returns the operation's result; withdrawal joins its settlement before retained cleanup.
+ */
+export function withSubagentForeground<T>(
+  runtime: SubagentRuntime, parent: Agent, signal: AbortSignal, operation: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  return runtime[subagentForegroundOperation](parent, signal, operation)
+}
 
 /** Process-stable identity carried only by the standard adjacent-Agent messaging tool. */
 export const adjacentAgentSendMessageTool = Symbol.for('dsh.subagent.adjacentAgentSendMessageTool')

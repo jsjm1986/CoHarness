@@ -1,0 +1,7 @@
+{"operation":"blocked-list","code":"DOCUMENT_MIGRATION_FAILED","legacyText":"retained legacy document","currentRootExists":false}
+{"operation":"retry-list","documents":[{"docId":"brief.txt","name":"brief.txt","bytes":24}],"migratedText":"retained legacy document"}
+{"operation":"trash-manifest-recovery","refused":["list","restore","purge"],"restoredText":"retained legacy document","remainingTrash":0}
+{"operation":"restore-publication-conflict","code":"DOCUMENT_RESTORE_CONFLICT","occupiedText":"concurrent upload","recoverableText":"retained legacy document","retryDocId":"brief (2).txt","retryText":"retained legacy document","remainingTrash":0}
+{"operation":"retention-after-replacement","purged":0,"restoredText":"new recoverable bytes","remainingTrash":0}
+{"operation":"upload-metadata-recovery","kind":"future-version","refused":true,"retained":"received bytes","receivedBytes":14}
+{"operation":"upload-metadata-recovery","kind":"missing-manifest","refused":false,"retained":"received bytes","receivedBytes":14}

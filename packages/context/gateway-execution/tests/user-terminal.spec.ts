@@ -1,5 +1,6 @@
 /** Human terminal authority is private, revocable, and independent of model execution. */
 import { afterEach, expect, it, vi } from 'vitest'
+import { setImmediate as nextTurn } from 'node:timers/promises'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { GatewayRuntime, GatewayRequestPrincipal } from '@deepseek-ai/dsh-gateway-runtime'
 import { GatewayUserTerminalAuthorization } from '../src/user-terminal.ts'
@@ -115,6 +116,52 @@ it('cancels all held owners when its provider is disposed', async () => {
   f.policy.dispose()
   expect(authority.signal.aborted).toBe(true)
   await expect(f.policy.authorize(session, f.signal)).rejects.toThrow()
+})
+
+it.each([403, 503])('revokes retained terminal authority before HTTP %s response cancellation acknowledges', async (status) => {
+  const f = fixture()
+  using authority = await f.policy.authorize(session, f.signal)
+  using _held = authority.retain()
+  const cancellation = Promise.withResolvers<undefined>()
+  const acknowledgement = Promise.withResolvers<undefined>()
+  const response = new Response(new ReadableStream({
+    cancel: () => { cancellation.resolve(undefined); return acknowledgement.promise },
+  }), { status })
+  f.request.mockResolvedValueOnce(response)
+  let finished = false
+  const invalidating = f.policy.invalidate({ userId: 12 }).then(() => { finished = true })
+  try {
+    await cancellation.promise
+    await nextTurn()
+    expect(authority.signal.aborted).toBe(true)
+    expect(finished).toBe(true)
+  } finally {
+    acknowledgement.resolve(undefined)
+    await invalidating
+  }
+})
+
+it.each(['user', 'administrator'] as const)('reports denied %s authority without waiting for body cancellation', async (kind) => {
+  const f = fixture()
+  if (kind === 'administrator') f.principal({ claims: {
+    user: { id: 12, role: 'admin' }, purpose: 'terminal-admin', expiresAt: Date.now() + 60_000,
+  } } as GatewayRequestPrincipal)
+  const cancellation = Promise.withResolvers<undefined>()
+  const acknowledgement = Promise.withResolvers<undefined>()
+  f.request.mockResolvedValueOnce(new Response(new ReadableStream({
+    cancel: () => { cancellation.resolve(undefined); return acknowledgement.promise },
+  }), { status: 403 }))
+  let result: PromiseSettledResult<unknown> | undefined
+  const denied = Promise.allSettled([kind === 'user'
+    ? f.policy.authorize(session, f.signal) : f.policy.administrator(f.signal)]).then(([value]) => { result = value })
+  try {
+    await cancellation.promise
+    await nextTurn()
+    expect(result).toMatchObject({ status: 'rejected', reason: { code: 'terminal/forbidden' } })
+  } finally {
+    acknowledgement.resolve(undefined)
+    await denied
+  }
 })
 
 it('limits terminal management to the dedicated administrator purpose and a fresh database decision', async () => {

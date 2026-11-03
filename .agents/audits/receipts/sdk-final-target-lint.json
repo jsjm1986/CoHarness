@@ -1,0 +1,14 @@
+{
+  "name": "sdk-final-target-lint",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/run-oxlint.ts packages/subagent/subagent-dsh-sdk packages/subagent/subagent/src/external-model.ts packages/subagent/subagent/src/out-of-process.ts packages/subagent/subagent/tests/external-model.spec.ts packages/subagent/subagent-codex packages/subagent/subagent-claude-code packages/subagent/subagent-acp examples/headless-agent/tests/external-model-admission.snapshot.ts examples/headless-agent/tests/scoped-sdk-model-admission.snapshot.ts examples/headless-agent/tests/sdk-remote-target.snapshot.ts",
+  "startedAt": "2026-10-24T17:44:09.964577+00:00",
+  "seconds": 5.011,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "65bce3a2fed108d32a432926cf63828d4c05520653726359ecc51506c9852362",
+  "inputsAfter": "65bce3a2fed108d32a432926cf63828d4c05520653726359ecc51506c9852362",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

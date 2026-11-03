@@ -1,0 +1,14 @@
+{
+  "name": "document-directory-intent-lint-fixed",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/identity.ts packages/attachment/userdoc-local/src/mutation.ts packages/attachment/userdoc-local/tests/identity.spec.ts packages/attachment/userdoc-local/tests/mutation.spec.ts packages/attachment/userdoc-local/tests/identity-fs.spec.ts",
+  "startedAt": "2026-10-26T15:11:48.779397+00:00",
+  "seconds": 4.722,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d0c291aeeeaae39c48399a2e27dc52716ab382dbb9292faf0297e0d7252a1961",
+  "inputsAfter": "d0c291aeeeaae39c48399a2e27dc52716ab382dbb9292faf0297e0d7252a1961",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

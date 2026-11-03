@@ -44,7 +44,7 @@ Both roots are new; existing records are unchanged. The events are additive Sess
 <a id="verification"></a>
 ## Verification
 
-pnpm exec vitest run packages/test-support/session-snapshot/tests/suite.spec.ts: replayed Sessions keep the registered and settled job records byte-stable.
+`pnpm exec vitest run packages/workflow/tool-workflow/tests/failure-loader.spec.ts` runs the real registry, Bash process, PTC workflow and JSONL writer, then compares persisted lifecycle records with the live Session.
 
 <a id="dev-note"></a>
 ## Dev Note

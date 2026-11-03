@@ -1,0 +1,14 @@
+{
+  "name": "trash-safety-current-guide-structure",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/verify-document-trash-guide.py",
+  "startedAt": "2026-10-24T05:26:16.441206+00:00",
+  "seconds": 1.888,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fa9fe08397a64e9801a5f782caf1f35598b1c0c04ab86ea8b512db5bd2cd561c",
+  "inputsAfter": "fa9fe08397a64e9801a5f782caf1f35598b1c0c04ab86ea8b512db5bd2cd561c",
+  "postgresToolDirectory": null,
+  "outputSha256": "eea4696053f7e1b137d387a49fab3e230b5b95d9b4f93671419ba7d53402cefc",
+  "outputTail": "guide.md structure verified 259 words\nguide.zh.md structure verified 36 words\nCurrent guide only; the repository has no verify-upgrade-guides script.\n"
+}

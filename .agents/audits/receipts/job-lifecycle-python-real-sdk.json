@@ -1,0 +1,14 @@
+{
+  "name": "job-lifecycle-python-real-sdk",
+  "cwd": ".",
+  "command": "env PYTHONPATH=python/sdk/src python/sdk/.venv/bin/python -m pytest python/sdk/tests/test_job_lifecycle_snapshot.py -q",
+  "startedAt": "2026-10-26T09:29:21.576174+00:00",
+  "seconds": 4.041,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "86f7b6abe1790d4cbcaf1a7006e75b40260072d00181167ed4de8a0dc0b08176",
+  "inputsAfter": "86f7b6abe1790d4cbcaf1a7006e75b40260072d00181167ed4de8a0dc0b08176",
+  "postgresToolDirectory": null,
+  "outputSha256": "a2c599745b57e42b1c9d4d796b70588589f45d6b9e47240810b358ec1148fc89",
+  "outputTail": "F                                                                        [100%]\n=================================== FAILURES ===================================\n_________________________ test_job_lifecycle_snapshot __________________________\n\ntmp_path = PosixPath('/private/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/pytest-of-a1234/pytest-0/test_job_lifecycle_snapshot0')\n\n    @pytest.mark.skipif(not CLI.exists() or not SNAPSHOTS.exists(), reason='requires built dsh and snapshot fixture preparation')\n    def test_job_lifecycle_snapshot(tmp_path: Path) -> None:\n        prepared = json.loads(subprocess.run(\n            ['node', str(PREPARE), str(tmp_path.resolve())],\n            cwd=ROOT, check=True, capture_output=True, text=True,\n        ).stdout)\n        with DeepSeekHarness(\n            dsh_bin=str(CLI), dsh_home=str(tmp_path / '.dsh'), cwd=str(tmp_path),\n            profile='sdk', patches=tuple(prepared['patches']),\n            provider=prepared['provider'], model=prepared['model'],\n            initialize_timeout_seconds=110, request_timeout_seconds=110, shutdown_timeout_seconds=30,\n            env={\n                'DSH_TELEMETRY_DISABLED': '1', 'DSH_SNAPSHOT': 'replay',\n                'DSH_SNAPSHOT_PROVIDER': prepared['provider'], 'DSH_SNAPSHOT_MODEL': prepared['model'],\n                'DSH_SNAPSHOT_FILE': prepared['replay'], 'DSH_SNAPSHOT_OVERRIDE': prepared['override'],\n                'DSH_TEST_CHILD_PATCH': prepared['childPatch'], 'DSH_AGENTS_HOME': str(tmp_path / '.agents'),\n            },\n        ) as harness:\n            result = harness.run(prepared['task'])\n        registrations = [event['data'] for event in result.events if event['type'] == 'job/registered']\n        settlements = [event['data'] for event in result.events if event['type'] == 'job/settled']\n>       assert len(registrations) == len(settlements) == 1\nE       assert 0 == 1\nE        +  where 0 = len([])\n\npython/sdk/tests/test_job_lifecycle_snapshot.py:39: AssertionError\n=========================== short test summary info ============================\nFAILED python/sdk/tests/test_job_lifecycle_snapshot.py::test_job_lifecycle_snapshot\n"
+}

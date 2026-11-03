@@ -1,0 +1,14 @@
+{
+  "name": "sdk-managed-governance-built",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -p plugins/dsh-model-governance/tsconfig.build.json",
+  "startedAt": "2026-10-24T14:37:31.185527+00:00",
+  "seconds": 1.023,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "b78f2f9d380ee5b6f83e5e3a67a347b86cb1433bd0fef87c34fff015b6f9725b",
+  "inputsAfter": "54f8712ec5ea7baa0b2286a0478d0c6b1f6d09aee69f2adb8653f7fcc51ebd46",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

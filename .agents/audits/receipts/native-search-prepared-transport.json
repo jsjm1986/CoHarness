@@ -1,0 +1,14 @@
+{
+  "name": "native-search-prepared-transport",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run packages/web/web-search-deepseek --retry=0",
+  "startedAt": "2026-10-24T06:05:09.054295+00:00",
+  "seconds": 2.744,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "fe29640861be3d4c4dab6acfaae8132bf74f9d8c0e1a485e85df3097e52ee525",
+  "inputsAfter": "fe29640861be3d4c4dab6acfaae8132bf74f9d8c0e1a485e85df3097e52ee525",
+  "postgresToolDirectory": null,
+  "outputSha256": "debacdf5459063723aa1ec77dd68d0c8f1ef69b0a62d68563eb653b3909b165b",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  5 passed (5)\n      Tests  82 passed (82)\n   Start at  14:05:11\n   Duration  754ms (transform 1.90s, setup 197ms, import 2.29s, tests 268ms, environment 0ms)\n\n"
+}

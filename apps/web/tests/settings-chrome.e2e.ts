@@ -612,8 +612,91 @@ describe('web e2e: settings modal and General preferences', () => {
     }
   }, 90_000)
 
+  it.each([false, true])('uses account font permissions when available and otherwise enforces read-only Host settings (%s)', async (accountPreferences) => {
+    const readonlyPage = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
+    let writes = 0
+    const accountWrites: Array<Record<string, unknown>> = []
+    const current = {
+      revision: 0, migrated: true,
+      values: {
+        locale: {}, 'ui-theme': {
+          preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+          textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+        },
+        'ui-conversation': {
+          busyEnter: 'queue', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14,
+          transcriptView: 'detailed', performanceUsage: 'detailed', linkOpening: 'sidebar',
+        },
+      },
+      overrides: { locale: {}, 'ui-theme': {}, 'ui-conversation': {} },
+    }
+    readonlyPage.on('request', (request) => { if (new URL(request.url()).pathname === '/api/settings.mutate') writes += 1 })
+    if (accountPreferences) await readonlyPage.route('**/account/api/preferences', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        const mutation = route.request().postDataJSON() as Record<string, unknown>
+        expect(mutation).toMatchObject({ namespace: 'ui-theme', operation: 'set', expectedRevision: current.revision })
+        if (typeof mutation.field !== 'string') throw new Error('Account preference request omitted its field')
+        accountWrites.push(mutation)
+        current.revision += 1
+        Object.assign(current.values['ui-theme'], { [mutation.field]: mutation.value })
+        Object.assign(current.overrides['ui-theme'], { [mutation.field]: mutation.value })
+      }
+      await route.fulfill({ json: current })
+    })
+    await readonlyPage.route(/\/api\/settings\.describe(?:\?.*)?$/, async (route) => {
+      const response = await route.fetch()
+      const envelope = await response.json() as {
+        result: { value: { namespaces: Array<{ ns: string; writable?: boolean; writableReason?: string }> } }
+      }
+      const theme = envelope.result.value.namespaces.find(entry => entry.ns === 'ui-theme')
+      if (theme === undefined) throw new Error('The real settings response omitted ui-theme')
+      theme.writable = false
+      theme.writableReason = 'project'
+      await route.fulfill({ response, json: envelope })
+    })
+    try {
+      await readonlyPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      await readonlyPage.getByRole('button', { name: '设置', exact: true }).click()
+      const dialog = readonlyPage.getByRole('dialog', { name: '设置', exact: true })
+      const fonts = dialog.getByRole('group', { name: '更多字体设置', exact: true })
+      if (accountPreferences) {
+        await expect.poll(() => fonts.getByRole('button', { name: '增大字号', exact: true }).isEnabled()).toBe(true)
+        expect(await fonts.getByRole('status').count()).toBe(0)
+        await fonts.getByRole('button', { name: '更多字体设置', exact: true }).click()
+        for (const name of ['正文字体', '代码字体', '终端字体']) {
+          expect(await fonts.getByRole('textbox', { name, exact: true }).isEnabled()).toBe(true)
+        }
+        expect(await fonts.getByRole('button', { name: '增大代码字号', exact: true }).isEnabled()).toBe(true)
+        expect(await fonts.getByRole('button', { name: '减小终端字号', exact: true }).isEnabled()).toBe(true)
+        await fonts.getByRole('button', { name: '增大字号', exact: true }).click()
+        await expect.poll(() => accountWrites.length).toBe(1)
+        expect(accountWrites[0]).toMatchObject({ namespace: 'ui-theme', field: 'fontSize', value: 15 })
+        const codeFont = fonts.getByRole('textbox', { name: '代码字体', exact: true })
+        await expect.poll(() => codeFont.isEnabled()).toBe(true)
+        await codeFont.fill('QA Account Font')
+        await codeFont.press('Tab')
+        await expect.poll(() => accountWrites.length).toBe(2)
+        expect(accountWrites[1]).toMatchObject({ namespace: 'ui-theme', field: 'codeFontFamily', value: '"QA Account Font"' })
+        await expect.poll(() => codeFont.inputValue()).toBe('"QA Account Font"')
+      } else {
+        await fonts.getByRole('status').waitFor()
+        expect(await fonts.getByRole('button', { name: '增大字号', exact: true }).isDisabled()).toBe(true)
+        await fonts.getByRole('button', { name: '更多字体设置', exact: true }).click()
+        for (const name of ['正文字体', '代码字体', '终端字体']) {
+          expect(await fonts.getByRole('textbox', { name, exact: true }).isDisabled()).toBe(true)
+        }
+        expect(await fonts.getByRole('button', { name: '增大代码字号', exact: true }).isDisabled()).toBe(true)
+        expect(await fonts.getByRole('button', { name: '减小终端字号', exact: true }).isDisabled()).toBe(true)
+        expect(accountWrites).toEqual([])
+        await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'readonly-fonts.expected.md'),
+          await captureStableAria(readonlyPage, '[role="group"][aria-label="更多字体设置"]', scaffold.workspaceCwd), MODE)
+      }
+      expect(writes).toBe(0)
+    } finally { await readonlyPage.close() }
+  })
+
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['dialog-en.expected.md', 'dialog.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['dialog-en.expected.md', 'dialog.expected.md', 'readonly-fonts.expected.md'])
   })
 })

@@ -1,0 +1,14 @@
+{
+  "name": "model-governance-scoped-meter-before",
+  "cwd": ".",
+  "command": "node_modules/.bin/vitest run --config .agents/audits/.local/model-governance-vitest.config.mts plugins/dsh-model-governance/tests/governance.spec.ts -t Session-isolated --retry=0",
+  "startedAt": "2026-10-24T13:51:09.952594+00:00",
+  "seconds": 4.673,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "d537b1a9014d61f4310416ee2ae9ff5b591b7c4d0991a91b9da4887573d64549",
+  "inputsAfter": "d537b1a9014d61f4310416ee2ae9ff5b591b7c4d0991a91b9da4887573d64549",
+  "postgresToolDirectory": null,
+  "outputSha256": "c08835cc0371cb41d28bc778e5e36ed134ca23ca6263c9b2a2adc98b16df0e80",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n ❯ plugins/dsh-model-governance/tests/governance.spec.ts (11 tests | 1 failed | 10 skipped) 15ms\n   × meters a Session-isolated LLM service with the runtime governance owner 14ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  plugins/dsh-model-governance/tests/governance.spec.ts > meters a Session-isolated LLM service with the runtime governance owner\nAssertionError: expected [] to have a length of 1 but got +0\n\n- Expected\n+ Received\n\n- 1\n+ 0\n\n ❯ plugins/dsh-model-governance/tests/governance.spec.ts:274:21\n    272|     await ctx.fiber.dispose()\n    273|     const records = readdirSync(join(home, 'model-governance-outbox'))…\n    274|     expect(records).toHaveLength(1)\n       |                     ^\n    275|     expect(JSON.parse(readFileSync(join(home, 'model-governance-outbox…\n    276|       provider: 'p', model: 'm', credentialSource: 'file', credentialC…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 10 skipped (11)\n   Start at  21:51:14\n   Duration  561ms (transform 357ms, setup 0ms, import 438ms, tests 15ms, environment 0ms)\n\n"
+}

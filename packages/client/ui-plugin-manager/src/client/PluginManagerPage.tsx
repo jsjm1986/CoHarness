@@ -44,7 +44,7 @@ export type PluginManagerPageProps =
   & PropsLocale<'pluginManager'>
   & PropsRenderSlots<
     | 'plugins.item' | 'plugins.bundle.config' | 'plugins.row.config' | 'plugins.bundle.activation'
-    | 'plugins.add.actions' | 'plugins.tab'
+    | 'plugins.add.actions' | 'plugins.tab' | 'plugins.context'
     | 'plugins.detail.actions' | 'plugins.detail.badge' | 'plugins.detail.section'
   >
   & InjectFace<PluginManagerFace>
@@ -1738,9 +1738,9 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
           t={t}
           renderSlot={renderSlot}
           feature={plugin}
-          busy={plugin !== undefined && state.busy.includes(rowKey(plugin.entryId))}
+          busy={state.busy.includes(rowKey(plugin.entryId))}
           canManage={canManage}
-          onSetEnabled={plugin === undefined ? undefined : (enabled) => { props.setRowEnabled(plugin.entryId, enabled) }}
+          onSetEnabled={(enabled) => { props.setRowEnabled(plugin.entryId, enabled) }}
           onOpen={() => { setView({ kind: 'item', id: item.id }) }}
         />
       )]
@@ -1775,7 +1775,10 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
         ? (
           <header className={css.pageHead} data-window-drag>
             <div className={css.pageHeading}>
-              <h1 className={css.pageTitle}>{t('title')}</h1>
+              <div className={css.titleRow}>
+                <h1 className={css.pageTitle}>{t('title')}</h1>
+                {renderSlot('plugins.context', {})}
+              </div>
               <div className={css.pageIntro}>
                 <span>{t('intro')}</span>
                 <Tooltip label={t('infoDescription')} side="bottom" delayMs={300} maxWidth={300} portal openOnClick>
@@ -1867,6 +1870,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
             <IconChevronLeftOutline14 size={20} aria-hidden="true" />
           </Button>
           <h1 className={css.pageTitle}>{t('moreTitle')}</h1>
+          {renderSlot('plugins.context', {})}
         </header>
       ) : null}
       {installedCards && !loaded ? (

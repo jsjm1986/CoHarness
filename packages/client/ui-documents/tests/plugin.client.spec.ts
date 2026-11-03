@@ -11,7 +11,7 @@ import { apply, inject } from '../src/client/index.ts'
 
 describe('ui-documents apply', () => {
   it('declares only the services it reads', () => {
-    expect(inject).toEqual(['slots', 'locale', 'sessions', 'conversation', 'connection'])
+    expect(inject).toEqual(['slots', 'locale', 'sessions', 'conversation', 'connection', 'deploymentContext'])
   })
 
   it('registers the footer trigger and one independent picker overlay', async () => {
@@ -25,6 +25,7 @@ describe('ui-documents apply', () => {
     })
     ctx.provide('conversation', { attachDocument })
     ctx.provide('connection', {} as never)
+    ctx.provide('deploymentContext', { getSnapshot: () => ({ phase: 'ready', showComputer: false, aggregateComputers: false }), subscribe: () => () => {} } as never)
     ctx.slots.register({
       name: 'root',
       children: {
@@ -40,7 +41,7 @@ describe('ui-documents apply', () => {
     const docEntry = entries.find(entry => entry.component === DocumentsButton)!
     expect(docEntry).toBeDefined()
     expect(docEntry.options).toMatchObject({ id: 'documents', order: -10 })
-    expect(docEntry.inject).toBeUndefined()
+    expect(docEntry.inject).toBeDefined()
     const overlays = ctx.slots.entries('shell.overlay')
     expect(overlays).toHaveLength(1)
     expect(overlays[0]?.component).toBe(DocumentsOverlay)
@@ -49,7 +50,7 @@ describe('ui-documents apply', () => {
       docId: 'folder/report.pdf', path: '/documents/folder/report.pdf', name: 'report.pdf',
       bytes: 10, mediaType: 'application/pdf', modifiedAt: 1,
     } as UserDocRef
-    const injected = overlays[0]!.inject!() as DocumentsButtonInjected
+    const injected = overlays[0]!.inject!() as unknown as DocumentsButtonInjected
     expect(injected.attachDocument?.(ref)).toBe(true)
     expect(attachDocument).toHaveBeenCalledWith('session-1', ref)
     expect(injected.attachDocument?.(ref, 'session-2' as SessionId)).toBe(true)

@@ -39,10 +39,10 @@
     "ws": "^8.21.3"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "peerDependencies": {
     "@deepseek-ai/dsh-credentials": "workspace:*",

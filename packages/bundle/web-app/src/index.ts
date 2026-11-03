@@ -13,6 +13,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
+import { addAbortListener } from 'node:events'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -142,19 +143,22 @@ function spawnBrowserLauncher(url: string): ChildProcess {
   })
 }
 
-/** Hand one URL to the operating system's default browser. */
-async function openBrowser(url: string): Promise<void> {
+/** Hand one URL to the default browser; cancellation joins the short-lived helper's close. */
+async function openBrowser(url: string, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted()
   const launcher = spawnBrowserLauncher(url)
   let launcherStderr = ''
   launcher.stderr?.setEncoding('utf8')
   launcher.stderr?.on('data', (chunk: string) => { launcherStderr += chunk })
   await new Promise<void>((resolve, reject) => {
+    let failure: Error | undefined
     function onError(error: Error): void {
-      launcher.off('close', onClose)
-      reject(error)
+      failure ??= error
     }
     function onClose(code: number | null): void {
+      abort[Symbol.dispose]()
       launcher.off('error', onError)
+      if (failure !== undefined) { reject(failure); return }
       if (code !== 0) {
         const firstLine = launcherStderr.trim().split(/\r?\n/u)[0]
         const reason = firstLine === undefined || firstLine === ''
@@ -168,13 +172,17 @@ async function openBrowser(url: string): Promise<void> {
     }
     launcher.once('error', onError)
     launcher.once('close', onClose)
+    const abort = addAbortListener(signal, () => {
+      failure ??= signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason))
+      if (launcher.pid !== undefined) launcher.kill('SIGKILL')
+    })
   })
 }
 
 /** Test hooks for the built dist and native browser handoff; production never mutates them. */
 export const internals: {
   resolveDistIndex: () => string
-  openBrowser: (url: string) => Promise<void>
+  openBrowser: (url: string, signal: AbortSignal) => Promise<void>
 } = { resolveDistIndex, openBrowser }
 
 /**
@@ -217,6 +225,9 @@ export function apply(ctx: Context, config: Config): void {
   }
   if (config.printUrl || handoffBrowser) {
     ctx.inject(['connection'], (connectionCtx) => {
+      const lifetime = new AbortController()
+      let opening: Promise<void> | undefined
+      connectionCtx.effect(() => async () => { lifetime.abort(); await opening })
       // The URL line and browser handoff are readiness signals: supervisors RPC
       // as soon as they observe the line, while a browser requests the page as
       // soon as it opens. Neither may run while sibling rows such as the /api
@@ -232,7 +243,8 @@ export function apply(ctx: Context, config: Config): void {
         }
         if (handoffBrowser) {
           console.log('dsh web: opening the default browser; pass --no-open to disable')
-          void internals.openBrowser(authenticatedUrl).catch((error: unknown) => {
+          opening = internals.openBrowser(authenticatedUrl, lifetime.signal).catch((error: unknown) => {
+            if (lifetime.signal.aborted) return
             const reason = error instanceof Error ? error.message : String(error)
             console.error(`web-app: could not open the default browser because ${reason}; use the dsh web URL printed at startup`)
           })

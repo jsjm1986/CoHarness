@@ -62,6 +62,8 @@ Namespace 插件（`name`／`inject`／`Config`／`apply`，无默认导出）�
 <a id="protocol-behavior"></a>
 ## 协议行为
 
+服务器分配先等待子进程许可，再发布实例。池同时拥有待完成分配与活动服务器；取消和提供方销毁会停止排队创建，并等待任何已分配进程完成清理。协议初始化仅在分配后开始。 清理失败会保留失效实例；下一次查询必须重试并确认其原生进程已停止，才能分配替代进程。失败的释放可以重试，但不会重新开放查询准入；提供方清理只移除已确认的池项。
+
 初始化会声明 `general.positionEncodings: ['utf-16']`、`workspace: { workspaceFolders: true, configuration: true }`、`textDocument.hover.contentFormat: ['markdown', 'plaintext']`，以及定义与实现使用的 `linkSupport: true`，且不进行动态注册。服务器返回的能力具有最终决定权：不受支持的操作，或缺少临时打开／关闭的同步方式，会使查询失败。服务器省略 `positionEncoding` 时默认为 `utf-16`；其他值都属于协议错误。客户端通过静态配置回答 `workspace/configuration`，接受生命周期记账请求，并拒绝 `workspace/applyEdit`：它绝不应用编辑或运行命令。导航直接映射 `Location`，并从 `LocationLink` 的 `targetUri` + `targetSelectionRange` 映射；hover 规范化会取得有效的 `MarkupContent.value`，保留 string `MarkedString`，把带 language tag 的值渲染为围栏代码，并用一个空行连接数组。缺失结果、格式错误的范围或位置，以及格式错误的 hover 编码，都会以结构化 `LSP_MALFORMED_RESPONSE` 错误的形式失败。
 
 <a id="security-boundary"></a>

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/api/terminal-controller/README.md
 document:
-  en: 215c2067b93e1e988ebe3fd23da6b3616242aa39
-  zh: 0f4cbdd654a0f47cb32d31f4476161397274ea75
+  en: d3594cc4866e83fb6233d39514b266d3a5bacd76
+  zh: de1f7181d5fe1cce5358dcd2ff321255508a062d
 /:
   en: 6a19f6d3fdfe0db2
   zh: a361afe6b8cd3010
@@ -21,8 +21,8 @@ document:
   en: 2d8fe460e6b02575
   zh: c242b8c184d85533
 /deepseek-ai-dsh-api-terminal-controller/understand-the-implementation:
-  en: 93f573b9c98ae143
-  zh: 1067eae96d33fec4
+  en: cbf9e63a4bb7b75a
+  zh: f5438fd84e2a5f8b
 /deepseek-ai-dsh-api-terminal-controller/further-exploration:
   en: b1b5d2a2bfb8cc6a
   zh: aa0ea568aa63fda5

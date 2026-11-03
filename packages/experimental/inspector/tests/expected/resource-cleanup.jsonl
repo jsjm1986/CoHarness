@@ -1,0 +1,3 @@
+{"phase":"running","endpointReady":true,"occupied":1,"allocations":1}
+{"phase":"unacknowledged","closeFailed":true,"endpointGone":true,"occupied":1}
+{"phase":"recovered","occupied":0,"allocations":1,"acknowledgements":1,"idempotent":true}

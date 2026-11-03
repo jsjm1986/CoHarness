@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/computer-use-cua-driver-native/README.md
 document:
-  en: 544220c47ddfe93b7621160622d337e0dd7bd6b3
-  zh: 3ea6fca09a1ba5c0de99340b93134f1cc2c719d2
+  en: ebbd9d51dc07862a9dcc381a5f6767000b515388
+  zh: 6fcfa1a1bfad915814c34c45698f9042a532bb60
 /:
   en: 7210ebd8c364c9af
   zh: 3ea0e8c44830de0e
@@ -21,8 +21,8 @@ document:
   en: b1d93e5d9cdefd2c
   zh: 26bf7c66a154e831
 /deepseek-ai-dsh-experimental-computer-use-cua-driver-native/use-this-package/minimal-configuration:
-  en: 5dc426f9c8d17959
-  zh: 402fc48b02be911a
+  en: 7a31e1f155628b1e
+  zh: 5e6f59b311b33860
 /deepseek-ai-dsh-experimental-computer-use-cua-driver-native/use-this-package/host-requirements:
   en: 5b907271715ce730
   zh: 21b71f9ce6e6dafd

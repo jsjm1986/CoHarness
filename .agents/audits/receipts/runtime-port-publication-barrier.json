@@ -1,0 +1,14 @@
+{
+  "name": "runtime-port-publication-barrier",
+  "cwd": "gateway",
+  "command": "node_modules/.bin/vitest run tests/runtime-relay.spec.ts --retry=0",
+  "startedAt": "2026-10-25T00:58:23.652973+00:00",
+  "seconds": 2.56,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "35ae46569d776641d42ffcf3c8757d9fb6b873d4d456604d214195e89c76c9fe",
+  "inputsAfter": "35ae46569d776641d42ffcf3c8757d9fb6b873d4d456604d214195e89c76c9fe",
+  "postgresToolDirectory": null,
+  "outputSha256": "ab5595b4cebb08d99fb6293530142c6f529074ec551319fbe67b6653d199b99f",
+  "outputTail": "\n RUN  v4.1.11 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway\n\n\n Test Files  1 passed (1)\n      Tests  6 passed (6)\n   Start at  08:58:25\n   Duration  214ms (transform 21ms, setup 0ms, import 31ms, tests 88ms, environment 0ms)\n\n"
+}

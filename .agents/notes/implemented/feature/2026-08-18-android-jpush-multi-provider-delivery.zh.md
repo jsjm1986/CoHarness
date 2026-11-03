@@ -14,7 +14,7 @@ Android 薄壳保留 `com.coharness` 应用 id，并把 JPush `6.2.0` 作为基�
 
 Web UI 通过 `/account/api/push-devices` 注册 FCM Token，并通过同一端点携带 `provider: "jpush"` 注册 JPush RegistrationID。原生薄壳只在 Android 通知权限获准后初始化 JPush，并在之后的主进程启动中恢复该授权。PostgreSQL 保存 provider，并按 `(organization_id, provider, token)` 强制唯一；没有 provider 的请求继续按 FCM 处理，以兼容旧客户端。
 
-Gateway 为每个 provider 构造一个 sender。FCM 继续使用现有 HTTP v1 service-account 流程；JPush 使用 REST `/v3/push` 端点，并用 `HGW_JPUSH_APP_KEY` 与 `HGW_JPUSH_MASTER_SECRET` 做 Basic 认证。两个 JPush 变量在配置加载时成对校验。账户 API 拒绝未知 provider，provider 返回无效注册时会删除对应注册。
+Gateway 为每个 provider 构造一个 sender。FCM 继续使用现有 HTTP v1 service-account 流程；JPush 使用 REST `/v3/push` 端点，并用 `HGW_JPUSH_APP_KEY` 与 `HGW_JPUSH_MASTER_SECRET` 做 Basic 认证。两个 JPush 变量在配置加载时成对校验。账户 API 拒绝未知 provider。失败发送的清理保留[当前投递与设备归属](../bug-fix/2026-10-29-push-delivery-authority.zh.md)。
 
 原生薄壳在没有 Firebase 客户端配置时不会调用 Firebase 注册，因此只使用 JPush 的构建不需要 FCM 凭据。JPush 通知点击只携带会话 id 和事件序号。Receiver 同时把冷启动和热启动 Intent 转给 Capacitor 插件；插件会保留事件，直到 Web listener 打开认证会话。
 

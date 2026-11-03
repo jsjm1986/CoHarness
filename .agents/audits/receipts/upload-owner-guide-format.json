@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-guide-format",
+  "cwd": ".",
+  "command": "python3 .agents/audits/.local/verify-upload-actor-guide.py",
+  "startedAt": "2026-10-25T10:29:38.473960+00:00",
+  "seconds": 1.589,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "796b292af8022f51d6932e70b74c52ece82bbe22e2ab4fff4061a8309bd9b75d",
+  "inputsAfter": "796b292af8022f51d6932e70b74c52ece82bbe22e2ab4fff4061a8309bd9b75d",
+  "postgresToolDirectory": null,
+  "outputSha256": "15c47cb470276a2de850e24e25d7895ff5bb73818b23afa463aa93278ba6fd60",
+  "outputTail": "Upload actor guide: exact triplet, metadata, section order and word budget passed for both languages.\n"
+}

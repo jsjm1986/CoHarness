@@ -1,0 +1,14 @@
+{
+  "name": "document-operation-types-repaired",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsc -b packages/attachment/userdoc-local",
+  "startedAt": "2026-10-25T20:40:59.517905+00:00",
+  "seconds": 2.55,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5814114219522086973a0785f35f0e1c605c9ebe94d2109e3aa5b34ed1bf8dff",
+  "inputsAfter": "5814114219522086973a0785f35f0e1c605c9ebe94d2109e3aa5b34ed1bf8dff",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

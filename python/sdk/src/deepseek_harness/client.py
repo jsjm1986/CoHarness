@@ -102,6 +102,7 @@ class HarnessConfig:
     max_line_bytes: int = 1 * 1024 * 1024
     max_pending_requests: int = 1_000
     max_notification_queue: int = 10_000
+    max_session_relationships: int = 10_000
     max_incoming_requests: int = 100
     max_output_bytes: int = 8 * 1024 * 1024
 
@@ -116,6 +117,7 @@ class HarnessClient:
             "max_line_bytes",
             "max_pending_requests",
             "max_notification_queue",
+            "max_session_relationships",
             "max_incoming_requests",
             "max_output_bytes",
         ):
@@ -127,7 +129,11 @@ class HarnessClient:
         _validate_timeout(self.config.shutdown_timeout_seconds, "shutdown_timeout_seconds")
         self._proc: subprocess.Popen[bytes] | None = None
         self._lock = threading.Lock()
+        self._close_lock = threading.Lock()
         self._write_lock = threading.Lock()
+        self._output: queue.Queue[bytes | None] = queue.Queue()
+        self._output_bytes = 0
+        self._output_closing = False
         self._responses: dict[str, queue.Queue[JsonValue | BaseException]] = {}
         self._notifications: queue.Queue[Notification | BaseException] = queue.Queue(
             maxsize=self.config.max_notification_queue
@@ -142,8 +148,10 @@ class HarnessClient:
         self._stderr_lines: deque[str] = deque(maxlen=400)
         self._reader_thread: threading.Thread | None = None
         self._stderr_thread: threading.Thread | None = None
+        self._writer_thread: threading.Thread | None = None
         self._closed = False
         self._runtime_dead = False
+        self._notification_failure: TransportClosedError | None = None
 
     def __enter__(self) -> "HarnessClient":
         self.start()
@@ -154,6 +162,8 @@ class HarnessClient:
 
     def start(self) -> None:
         with self._lock:
+            if self._notification_failure is not None:
+                raise self._notification_failure
             if self._closed:
                 raise TransportClosedError("DeepSeek Harness runtime client is closed")
             if self._proc is not None:
@@ -172,14 +182,21 @@ class HarnessClient:
                 cwd=None if self.config.cwd is None else str(Path(self.config.cwd).resolve()),
                 env=env,
             )
+            self._start_writer_thread()
             self._start_reader_thread()
             self._start_stderr_thread()
 
     def close(self) -> None:
-        """Request shutdown, allow EOF cleanup, then terminate and reap an unresponsive runtime."""
+        """Stop new work and reap the runtime; retry its original owner after failed exit confirmation.
+
+        Concurrent calls serialize teardown. Configured shutdown timeouts bound
+        each acknowledgement, exit and input-writer wait, including forced termination.
+        """
+        with self._close_lock:
+            self._close_owned_runtime()
+
+    def _close_owned_runtime(self) -> None:
         with self._lock:
-            if self._closed:
-                return
             self._closed = True
             proc = self._proc
         if proc is None:
@@ -187,14 +204,10 @@ class HarnessClient:
             return
         try:
             if not self._runtime_dead:
-                self.request("shutdown", None, response_model=_EmptyResponse, timeout_seconds=self.config.shutdown_timeout_seconds)
+                self._request_raw("shutdown", timeout_seconds=self.config.shutdown_timeout_seconds)
         except Exception as exc:
             self._stderr_lines.append(f"shutdown request failed: {exc}")
-        if proc.stdin:
-            try:
-                proc.stdin.close()
-            except Exception as exc:
-                self._stderr_lines.append(f"stdin close failed: {exc}")
+        self._finish_output()
         try:
             proc.wait(timeout=self.config.shutdown_timeout_seconds)
         except subprocess.TimeoutExpired:
@@ -205,16 +218,23 @@ class HarnessClient:
             try:
                 proc.wait(timeout=self.config.shutdown_timeout_seconds)
             except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait()
-        self._proc = None
-        self._runtime_dead = True
-        with self._lock:
-            self._session_parents.clear()
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+                proc.wait(timeout=self.config.shutdown_timeout_seconds)
         self._fail_waiters(self._runtime_closed_error("DeepSeek Harness runtime closed"))
-        if self._reader_thread and self._reader_thread.is_alive():
+        if self._writer_thread and self._writer_thread.is_alive():
+            self._writer_thread.join(timeout=self.config.shutdown_timeout_seconds)
+            if self._writer_thread.is_alive():
+                raise TransportClosedError("DeepSeek Harness runtime input writer has not settled after process exit")
+        with self._lock:
+            self._proc = None
+            self._runtime_dead = True
+            self._session_parents.clear()
+        if self._reader_thread and self._reader_thread is not threading.current_thread() and self._reader_thread.is_alive():
             self._reader_thread.join(timeout=0.5)
-        if self._stderr_thread and self._stderr_thread.is_alive():
+        if self._stderr_thread and self._stderr_thread is not threading.current_thread() and self._stderr_thread.is_alive():
             self._stderr_thread.join(timeout=0.5)
 
     def initialize(
@@ -297,6 +317,10 @@ class HarnessClient:
         notification_filter: NotificationFilter | None = None,
         notification_subscription: "NotificationSubscription | None" = None,
     ) -> ModelT:
+        """Validate the deadline before queuing an RPC request and await its matching response."""
+        with self._lock:
+            if self._closed:
+                raise TransportClosedError("DeepSeek Harness runtime client is closed")
         result = self._request_raw(
             method,
             params,
@@ -310,6 +334,10 @@ class HarnessClient:
         return response_model.model_validate(result)
 
     def notify(self, method: str, params: JsonObject | None = None) -> None:
+        """Queue a notification; asynchronous write failures terminate pending transport consumers."""
+        with self._lock:
+            if self._closed:
+                raise TransportClosedError("DeepSeek Harness runtime client is closed")
         message: JsonObject = {"jsonrpc": "2.0", "method": method}
         if params is not None:
             message["params"] = params
@@ -332,7 +360,7 @@ class HarnessClient:
         with self._lock:
             if self._closed or self._runtime_dead:
                 subscription = NotificationSubscription(self, subscription_id, notifications)
-                self._put_terminal(notifications, self._runtime_closed_error("DeepSeek Harness runtime closed"))
+                self._put_terminal(notifications, self._notification_failure or self._runtime_closed_error("DeepSeek Harness runtime closed"))
                 return subscription
             self._notification_subscribers[subscription_id] = (notifications, notification_filter)
         return NotificationSubscription(self, subscription_id, notifications)
@@ -373,6 +401,9 @@ class HarnessClient:
         notification_filter: NotificationFilter | None = None,
         notification_subscription: "NotificationSubscription | None" = None,
     ) -> JsonValue:
+        timeout = self.config.request_timeout_seconds if timeout_seconds is None else timeout_seconds
+        _validate_timeout(timeout, "timeout_seconds")
+        deadline = None if timeout is None else time.monotonic() + timeout
         request_id = str(uuid.uuid4())
         waiter: queue.Queue[JsonValue | BaseException] = queue.Queue(maxsize=1)
         temp_subscription: NotificationSubscription | None = None
@@ -395,9 +426,6 @@ class HarnessClient:
             if temp_subscription is not None:
                 temp_subscription.close()
             raise
-        timeout = self.config.request_timeout_seconds if timeout_seconds is None else timeout_seconds
-        _validate_timeout(timeout, "timeout_seconds")
-        deadline = None if timeout is None else time.monotonic() + timeout
         try:
             while True:
                 if on_notification is not None and subscription is not None:
@@ -437,19 +465,70 @@ class HarnessClient:
         return item
 
     def _write_message(self, message: JsonObject) -> None:
+        """Admit one ordered output frame without blocking on the runtime's native pipe."""
         proc = self._proc
         if proc is None or proc.stdin is None:
             raise TransportClosedError("DeepSeek Harness runtime is not running")
         try:
             payload = json.dumps(message, separators=(",", ":")) + "\n"
             encoded = payload.encode("utf-8")
-            if len(encoded) > self.config.max_output_bytes:
-                raise TransportClosedError("JSON-RPC output frame exceeds configured limit")
-            with self._write_lock:
-                proc.stdin.write(encoded)
-                proc.stdin.flush()
         except Exception as exc:
             raise self._runtime_closed_error("Failed to write to DeepSeek Harness runtime") from exc
+        with self._write_lock:
+            if self._output_closing:
+                raise self._runtime_closed_error("DeepSeek Harness runtime input is closed")
+            if len(encoded) > self.config.max_output_bytes:
+                raise TransportClosedError("JSON-RPC output frame exceeds configured limit")
+            if self._output_bytes + len(encoded) > self.config.max_output_bytes:
+                raise TransportClosedError("JSON-RPC output queue exceeds configured limit")
+            self._output_bytes += len(encoded)
+            self._output.put_nowait(encoded)
+
+    def _finish_output(self) -> None:
+        """Queue stdin EOF without waiting for a blocked native pipe write."""
+        with self._write_lock:
+            if self._output_closing:
+                return
+            self._output_closing = True
+            self._output.put_nowait(None)
+
+    def _start_writer_thread(self) -> None:
+        self._writer_thread = threading.Thread(target=self._writer_loop, name="dsh-runtime-writer", daemon=True)
+        self._writer_thread.start()
+
+    def _writer_loop(self) -> None:
+        """Own native stdin writes; queued and active bytes share the configured output limit."""
+        proc = self._proc
+        if proc is None or proc.stdin is None:
+            return
+        try:
+            while True:
+                encoded = self._output.get()
+                if encoded is None:
+                    return
+                try:
+                    proc.stdin.write(encoded)
+                    proc.stdin.flush()
+                finally:
+                    with self._write_lock:
+                        self._output_bytes -= len(encoded)
+        except Exception as exc:
+            self._stderr_lines.append(f"stdin write failed: {exc}")
+            self._fail_waiters(self._runtime_closed_error("Failed to write to DeepSeek Harness runtime"))
+        finally:
+            with self._write_lock:
+                self._output_closing = True
+                while True:
+                    try:
+                        pending = self._output.get_nowait()
+                    except queue.Empty:
+                        break
+                    if pending is not None:
+                        self._output_bytes -= len(pending)
+            try:
+                proc.stdin.close()
+            except Exception as exc:
+                self._stderr_lines.append(f"stdin close failed: {exc}")
 
     def _start_reader_thread(self) -> None:
         self._reader_thread = threading.Thread(target=self._reader_loop, name="dsh-runtime-reader", daemon=True)
@@ -550,28 +629,44 @@ class HarnessClient:
         if isinstance(method, str):
             params = message.get("params")
             notification = Notification(method=method, payload=params if isinstance(params, dict) else {})
-            with self._lock:
-                self._record_session_relationship_locked(notification)
-                subscribers = list(self._notification_subscribers.items())
+            try:
+                with self._lock:
+                    if self._runtime_dead:
+                        return
+                    self._record_session_relationship_locked(notification)
+                    subscribers = list(self._notification_subscribers.items())
+            except TransportClosedError as exc:
+                self._notification_failure = exc
+                self._fail_waiters(exc)
+                return
             delivered = False
             for subscription_id, (subscriber, predicate) in subscribers:
+                with self._lock:
+                    current = self._notification_subscribers.get(subscription_id)
+                    if current is None or current[0] is not subscriber:
+                        continue
                 try:
                     matches = predicate is None or predicate(notification)
                 except BaseException as exc:
                     with self._lock:
                         current = self._notification_subscribers.get(subscription_id)
-                        if current is not None and current[0] is subscriber:
-                            self._notification_subscribers.pop(subscription_id, None)
+                        if current is None or current[0] is not subscriber:
+                            continue
+                        self._notification_subscribers.pop(subscription_id, None)
                     self._put_terminal(subscriber, exc)
                     continue
                 if matches:
-                    try:
-                        subscriber.put_nowait(notification)
-                    except queue.Full:
-                        with self._lock:
-                            current = self._notification_subscribers.get(subscription_id)
-                            if current is not None and current[0] is subscriber:
-                                self._notification_subscribers.pop(subscription_id, None)
+                    overflow = False
+                    with self._lock:
+                        current = self._notification_subscribers.get(subscription_id)
+                        if current is None or current[0] is not subscriber:
+                            continue
+                        try:
+                            subscriber.put_nowait(notification)
+                        except queue.Full:
+                            self._notification_subscribers.pop(subscription_id, None)
+                            overflow = True
+                    if overflow:
                         self._put_terminal(subscriber, TransportClosedError("notification subscription queue limit exceeded"))
                         continue
                     delivered = True
@@ -585,6 +680,7 @@ class HarnessClient:
 
     def _fail_waiters(self, exc: BaseException) -> None:
         self._runtime_dead = True
+        self._finish_output()
         with self._lock:
             waiters = list(self._responses.values())
             self._responses.clear()
@@ -689,10 +785,9 @@ class HarnessClient:
             and child_id
             and parent_id != child_id
         ):
-            if child_id not in self._session_parents and len(self._session_parents) >= self.config.max_notification_queue:
-                oldest = next(iter(self._session_parents), None)
-                if oldest is not None:
-                    self._session_parents.pop(oldest, None)
+            if child_id not in self._session_parents and len(self._session_parents) >= self.config.max_session_relationships:
+                self._session_parents.clear()
+                raise TransportClosedError("Session relationship limit exceeded")
             self._session_parents[child_id] = parent_id
 
     def _forget_session_relationship_locked(self, notification: Notification) -> None:

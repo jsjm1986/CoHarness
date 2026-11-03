@@ -1,0 +1,9 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, foregroundWithdrawalReady]
+- insert:
+    - id: foreground-withdrawal-runtime
+      name: './runtime.mjs'
+    - id: foreground-withdrawal-model
+      name: './model.mjs'

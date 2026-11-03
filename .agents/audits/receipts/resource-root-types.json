@@ -1,0 +1,13 @@
+{
+  "name": "resource-root-types",
+  "cwd": "gateway",
+  "command": "./node_modules/.bin/tsc --noEmit",
+  "startedAt": "2026-10-23T12:28:00.445303+00:00",
+  "seconds": 4.429,
+  "exitCode": 0,
+  "inputsBefore": "ae6d3ada920e49aeb584da0ecdede9430a9e42ab7d517cdf5fbedede3d7be8c6",
+  "inputsAfter": "ae6d3ada920e49aeb584da0ecdede9430a9e42ab7d517cdf5fbedede3d7be8c6",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": "",
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf"
+}

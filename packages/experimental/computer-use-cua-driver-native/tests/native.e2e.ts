@@ -17,7 +17,7 @@ it.skipIf(process.env.DSH_COMPUTER_USE_NATIVE_E2E !== '1')(
       await ctx.plugin(ComputerUseRegistry)
       await ctx.plugin(SystemPrompt)
       await ctx.plugin(ToolRuntime)
-      const provider = ctx.plugin(NativeProvider)
+      const provider = ctx.plugin(NativeProvider, { desktopMode: 'enabled' })
       await provider
       expect(ctx.computerUse.providerName).toBe('cua-driver-native')
       const names = ctx.tools.schemas().map(tool => tool.name)

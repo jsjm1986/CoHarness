@@ -41,6 +41,34 @@ function isInputTriggerController(value: unknown): value is InputTriggerControll
 }
 
 describe('reference submission', () => {
+  it.each(['text', 'command', 'attachments'] as const)('keeps %s in its originating draft while a new conversation is prepared', async (kind) => {
+    let blocked = true
+    const sink = vi.fn(() => Promise.resolve<SubmitOutcome>({ kind: 'success' }))
+    const shell = new SessionInputShell({
+      actx: {} as ClientContext, defaultSink: sink, commandImages,
+      submissionBlock: () => blocked ? 'Opening the new conversation…' : undefined,
+    })
+    try {
+      const text = kind === 'command' ? '/inspect' : kind === 'text' ? 'Keep this input' : ''
+      shell.setDraft(text)
+      if (kind === 'attachments') {
+        shell.addImages(['image' as DraftAttachmentId])
+        shell.addDocuments(['document' as DraftDocumentId])
+      }
+      const before = shell.snapshot
+      shell.submit()
+      await Promise.resolve()
+      expect(sink).not.toHaveBeenCalled()
+      expect(shell.snapshot).toEqual(before)
+      expect(shell.notices.getSnapshot()).toMatchObject({ level: 'info', text: 'Opening the new conversation…' })
+      blocked = false
+      shell.submit()
+      await vi.waitFor(() => { expect(sink).toHaveBeenCalledOnce() })
+      expect(sink).toHaveBeenCalledWith(text,
+        kind === 'attachments' ? ['image'] : [], kind === 'attachments' ? ['document'] : [],
+        'queue', expect.any(AbortSignal))
+    } finally { shell.dispose() }
+  })
   it('restores reference chips from persisted data and serializes through their owner', async () => {
     const mirror = vi.fn()
     const first = new SessionInputShell({

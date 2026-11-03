@@ -100,9 +100,10 @@ const dshSdkDiagnosticChildPatch = fileURLToPath(new URL(
   import.meta.url,
 ))
 const dshSdkChildConfig = fileURLToPath(new URL(
-  '../../packages/subagent/subagent-dsh-sdk/tests/fixtures/loader/child.patch.yml',
+  '../../examples/jsonrpc-agent/tests/fixtures/subagent/subagent-dsh-sdk/child.patch.yml',
   import.meta.url,
 ))
+const sdkFixtureResolver = fileURLToPath(new URL('../../examples/package.json', import.meta.url))
 
 function dirOf(url: string): string {
   return fileURLToPath(new URL('.', url))
@@ -133,6 +134,7 @@ interface SdkAssertions {
 }
 
 const SDK_ASSERTIONS: Readonly<Record<string, SdkAssertions>> = {
+  'browser-use-stagehand-native': { expectedFinalResponse: 'DONE' },
   'tool-scheduler-recovery': {
     patches: [fileURLToPath(new URL('./tool-scheduler-recovery/runtime.cordis.yml', import.meta.url))],
   },
@@ -574,12 +576,12 @@ async function runScenario(scenario: CorpusScenario): Promise<{
   await mkdir(patchRoot, { recursive: true })
   const assertions = SDK_ASSERTIONS[scenario.name] ?? {}
   const patches = [...authoredPatches(scenario, !recording), ...assertions.patches ?? []]
-    .map((patch, index) => materializeProfilePatch(patch, cwd, 'sdk', patchRoot, index))
+    .map((patch, index) => materializeProfilePatch(patch, cwd, 'sdk', patchRoot, index, sdkFixtureResolver))
   let childSessionsRoot: string | undefined
   let childEnvironment: Record<string, string> = {}
   if (assertions.dshSdkChild !== undefined) {
     const childHome = join(cwd, '.child-dsh')
-    const childPatch = materializeProfilePatch(assertions.dshSdkChild.config, cwd, 'sdk', patchRoot, patches.length)
+    const childPatch = materializeProfilePatch(assertions.dshSdkChild.config, cwd, 'sdk', patchRoot, patches.length, sdkFixtureResolver)
     await mkdir(childHome, { recursive: true })
     childSessionsRoot = join(childHome, 'sessions')
     childEnvironment = {
@@ -929,6 +931,21 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
         }
         console.error(`SDK snapshot evidence: ${evidence}`)
       })
+      if (scenario.name === 'subagent-dsh-sdk-diagnostic') {
+        const diagnostic = 'Subagent failure (provider: DSH SDK; stage: session-run; category: child-error)'
+        const outcomes = results.flatMap(result => result.events).filter(event => event.type === 'tool/result')
+        expect(outcomes).toMatchObject([
+          { data: { message: { toolCallId: 'call_dsh_sdk_foreground', isError: true, content: [{
+            type: 'text', text: `Error: subagent run failed\nDiagnostic: ${diagnostic}\nPartial output before the run ended:\npartial child loader answer`,
+          }] } } },
+          { data: { message: { toolCallId: 'call_dsh_sdk_background', isError: false, content: [{
+            type: 'text', text: expect.stringMatching(/^started background subagent job /u),
+          }] } } },
+          { data: { message: { toolCallId: 'call_dsh_sdk_output', isError: false, content: [{
+            type: 'text', text: `(no new output)\n[status: failed, error; diagnostic: ${diagnostic}]`,
+          }] } } },
+        ])
+      }
       if (scenario.name === 'tool-scheduler-recovery') {
         expect(results).toHaveLength(2)
         const events = results.flatMap(result => result.events)
@@ -995,6 +1012,20 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
         const turnEnds = records(parent.content).filter(record => record.type === 'turn/end')
         expect(turnEnds, `${scenario.name}: completed turns`).toHaveLength(results.length)
         for (const turnEnd of turnEnds) expect(turnEnd).toMatchObject({ data: { reason: { kind: 'completed' } } })
+      }
+      if (scenario.name === 'browser-use-stagehand-native') {
+        const events = results.flatMap(result => result.events)
+        expect(events.filter(event => event.type === 'tool/result')).toHaveLength(2)
+        expect(events.filter(event => event.type === 'tool/result').every(event => (
+          event.data as { message: { isError?: boolean } }
+        ).message.isError !== true)).toBe(true)
+        const requests = events.filter(event => event.type === 'browser-use/stagehand-llm-request')
+        expect(requests).toHaveLength(1)
+        expect(requests[0]).toMatchObject({ data: { request: {
+          provider: 'browser-fixture', model: 'browser-model',
+          messages: [{ role: 'user', content: [{ type: 'text', text: 'Extract the heading' }] }],
+        } } })
+        expect(JSON.stringify(requests)).toContain('Return only a JSON value matching this JSON Schema')
       }
 
       let expectedContents = retained && !refreshing

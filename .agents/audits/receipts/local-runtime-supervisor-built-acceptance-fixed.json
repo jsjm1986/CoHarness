@@ -1,0 +1,14 @@
+{
+  "name": "local-runtime-supervisor-built-acceptance-fixed",
+  "cwd": "gateway",
+  "command": "node tests/run-built-local-supervision.mjs",
+  "startedAt": "2026-10-24T19:16:21.470871+00:00",
+  "seconds": 2.51,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "9c004ca6e6d6a3932c22ea86a163c6d19c772ab233f2ac34c05ed541493e425c",
+  "inputsAfter": "9c004ca6e6d6a3932c22ea86a163c6d19c772ab233f2ac34c05ed541493e425c",
+  "postgresToolDirectory": null,
+  "outputSha256": "20106c8a8d68e4a610cb95d454bd2237059de2d549d7fe5b9a4969f434273a75",
+  "outputTail": "Compiled Runtime starts with its private credential.\nGateway SIGKILL leaves the independently owned Runtime available.\nA replacement Gateway authenticates the exact runtime generation.\nA different credential cannot stop the active generation.\nConfirmed stop joins the owned process range and retained runtime output.\nA stopped credential generation cannot allocate again.\nA fresh credential survives a repeated stop from the older handle.\n"
+}

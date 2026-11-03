@@ -1,0 +1,6 @@
+- main:
+  - heading "Webhook" [level=1]
+  - alert: 服务暂不可用，请稍后重试。
+  - heading "接入端点" [level=2]
+  - button "刷新"
+  - button "注册端点"

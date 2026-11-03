@@ -1,0 +1,13 @@
+{
+  "name": "inspector-admission-oxlint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts packages/experimental/inspector/src/host/bridge/controller.ts packages/experimental/inspector/src/host/bridge/lifecycle.ts packages/experimental/inspector/src/host/plugin.ts packages/experimental/inspector/src/index.ts packages/experimental/inspector/tests/resource-admission.host.spec.ts packages/experimental/inspector/tests/worker-lifecycle.host.spec.ts packages/experimental/inspector/tests/plugin.host.spec.ts",
+  "startedAt": "2026-10-23T14:42:32.798361+00:00",
+  "seconds": 2.867,
+  "exitCode": 1,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "962722c2841eb395ca28ec75bedf99c44dd054e53f8644bcecdf4c3879546c9e",
+  "inputsAfter": "962722c2841eb395ca28ec75bedf99c44dd054e53f8644bcecdf4c3879546c9e",
+  "outputSha256": "a04f6c8fed569c604fc990f36e0e3aaad8476bb18d6175766651dac2d1d4deb5",
+  "outputTail": "packages/experimental/inspector/tests/resource-admission.host.spec.ts:9:38: error @stylistic(arrow-parens): Expected parentheses around arrow function argument having a body with curly braces.\npackages/experimental/inspector/src/host/bridge/lifecycle.ts:70:25: error typescript(prefer-promise-reject-errors): Expected the Promise rejection reason to be an Error.\npackages/experimental/inspector/src/host/plugin.ts:64:26: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\npackages/experimental/inspector/src/host/bridge/controller.ts:260:34: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\npackages/experimental/inspector/src/host/bridge/controller.ts:264:54: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\npackages/experimental/inspector/src/host/bridge/controller.ts:296:34: error typescript(no-confusing-void-expression): Returning a void expression from an arrow function shorthand is forbidden. help: Add braces to the arrow function.\n"
+}

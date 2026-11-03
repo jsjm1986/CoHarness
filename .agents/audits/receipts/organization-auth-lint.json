@@ -1,0 +1,13 @@
+{
+  "name": "organization-auth-lint",
+  "cwd": ".",
+  "command": "./node_modules/.bin/tsx scripts/run-oxlint.ts gateway/src/postgres/auth-service.ts gateway/tests/auth-postgres.spec.ts gateway/tests/postgres.spec.ts",
+  "startedAt": "2026-10-23T19:20:34.062947+00:00",
+  "seconds": 4.519,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "5cdb44c96e798137c7a1c36b104c4975168e45a18c14a7ca7975c4807f0cc4cb",
+  "inputsAfter": "5cdb44c96e798137c7a1c36b104c4975168e45a18c14a7ca7975c4807f0cc4cb",
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

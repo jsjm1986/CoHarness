@@ -1,0 +1,9 @@
+- id: llm-deepseek
+  disabled: true
+
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, externalModelAdmissionReady]
+
+- insert:
+    - id: external-model-admission-fixture
+      name: './plugin.mjs'

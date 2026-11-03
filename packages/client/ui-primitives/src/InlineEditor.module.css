@@ -13,7 +13,7 @@
   background: var(--dsw-alias-bg-base);
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xs-13);
-  font-family: Inter, var(--dsw-font-family);
+  font-family: var(--dsw-font-family);
   overflow-y: auto;
   resize: none;
 }

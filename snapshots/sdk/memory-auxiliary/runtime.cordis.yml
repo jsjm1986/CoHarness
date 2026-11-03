@@ -1,0 +1,36 @@
+- id: llm-deepseek
+  disabled: true
+
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, memoryAuxiliaryReady]
+
+- insert:
+    - id: memory-fixture-storage
+      name: '@deepseek-ai/dsh-storage'
+    - id: memory-fixture-json
+      name: '@deepseek-ai/dsh-storage-json'
+      config:
+        root: !!js process.cwd() + '/.memory-store'
+    - id: memory-fixture-domains
+      name: '@deepseek-ai/dsh-storage-domain'
+      config:
+        backend: json
+    - id: memory
+      name: '@deepseek-ai/dsh-memory'
+      config:
+        extraction: true
+        consolidation: true
+        recall: true
+    - id: memory-context
+      name: '@deepseek-ai/dsh-memory-context'
+      config:
+        maxOutputTokens: 64
+    - id: tool-memory
+      name: '@deepseek-ai/dsh-tool-memory'
+    - id: memory-curation
+      name: '@deepseek-ai/dsh-memory-curation'
+      config:
+        consolidationMinChanges: 1
+        maxOutputTokens: 32
+    - id: memory-auxiliary-model
+      name: '../../../examples/headless-agent/tests/fixtures/memory-auxiliary-model.mjs'

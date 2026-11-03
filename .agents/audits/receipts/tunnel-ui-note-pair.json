@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-ui-note-pair",
+  "cwd": ".",
+  "command": "node_modules/.bin/tsx scripts/verify-translation-pairing.ts --write .agents/notes/implemented/feature/2026-10-18-admin-managed-public-access-tunnel.md",
+  "startedAt": "2026-10-24T23:12:09.853257+00:00",
+  "seconds": 0.799,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "f527824fac7778a6424e81cd4524ff4e5a002a2414194ca18e0356cd1d89968d",
+  "inputsAfter": "f527824fac7778a6424e81cd4524ff4e5a002a2414194ca18e0356cd1d89968d",
+  "postgresToolDirectory": null,
+  "outputSha256": "7500a8eecb11e24ae883b50b1d62a46c6228991f20063767b8fab22696fe0b76",
+  "outputTail": "verify-translation-pairing: recorded .agents/notes/implemented/feature/2026-10-18-admin-managed-public-access-tunnel.i18n.yaml\nverify-translation-pairing: 1 record(s) written; run the check to validate the pairs.\n"
+}

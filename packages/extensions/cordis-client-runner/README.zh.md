@@ -39,6 +39,8 @@ kind: "package-reference"
 
 装载是幂等的：要求装载这一页已在运行的 revision 不会改变任何东西，更新的 revision 顶替已装载的那个，同一 revision 在 retract 之后再装则重新装载。同一定义的操作串行执行。刷新按设计从干净状态开始——host 仍持有定义，本页在再次被要求之前不运行它。
 
+运行器、审批和 Host 调用按 Runtime 隔离。浏览器模块、视图与主题贡献键带有 Runtime 前缀，Host Plugin 与 Run ID 保持不变。动态插件通过自身 fiber 读取固定 Runtime 的 Remote 与 Connection 服务。Inspect 查询 ID 按 Host 隔离，目录发布和重连不等待其他 Runtime。
+
 -----
 
 <a id="understand-the-implementation"></a>

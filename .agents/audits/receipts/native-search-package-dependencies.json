@@ -1,0 +1,14 @@
+{
+  "name": "native-search-package-dependencies",
+  "cwd": ".",
+  "command": "pnpm run verify-package-dependencies",
+  "startedAt": "2026-10-24T03:49:28.074157+00:00",
+  "seconds": 134.467,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "a63e35021964698d547d7f0ba328ef695538954de713b87a6f31dc8e27465548",
+  "inputsAfter": "a63e35021964698d547d7f0ba328ef695538954de713b87a6f31dc8e27465548",
+  "postgresToolDirectory": null,
+  "outputSha256": "159a4c4afb96dc4665a1a5f68cf4528785385077bddbea0dba95ab27d6496554",
+  "outputTail": "$ tsx scripts/verify-package-dependencies.ts\nverify-package-dependencies: 70 package(s) match the published dependency policy (5 Client-only, 63 Client/Host, 2 configured Host).\n"
+}

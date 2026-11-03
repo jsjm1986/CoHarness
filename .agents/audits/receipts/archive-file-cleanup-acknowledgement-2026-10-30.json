@@ -1,0 +1,84 @@
+{
+  "recordedAt": "2026-10-29T20:43:23.312082+00:00",
+  "status": "fixed_and_verified_for_named_scope",
+  "finding": "B332",
+  "wholeProjectComplete": false,
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z",
+  "negativeControl": "archive-cleanup-reproduced.json",
+  "beforeSourceSha256": "5751ada34487a809f1df718ef8bf03b9c2afdbc6affb7efcc5770c243f5da328",
+  "scope": "Base-table DELETE retains the existing organization, node and task-id predicates; same documented lifecycle and wire/schema behavior. This is a local SQL-target correction, with a real filesystem/PG regression and no new Agent Note for the mechanical correction.",
+  "B331": "Session namespace migration remains isolated and unpublished.",
+  "sourcePaths": [
+    "gateway/src/postgres/conversation-archive-service.ts",
+    "gateway/tests/archive-file-cleanup-postgres.spec.ts",
+    "gateway/package.json",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/README.i18n.yaml"
+  ],
+  "checks": [
+    {
+      "name": "archive-cleanup-fixed",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/archive-cleanup-fixed.json"
+    },
+    {
+      "name": "archive-cleanup-final-coverage",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/archive-cleanup-final-coverage.json"
+    },
+    {
+      "name": "archive-cleanup-published-types",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/archive-cleanup-published-types.json"
+    },
+    {
+      "name": "archive-cleanup-lint",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/archive-cleanup-lint.json"
+    },
+    {
+      "name": "archive-cleanup-pairing",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/archive-cleanup-pairing.json"
+    },
+    {
+      "name": "archive-cleanup-node22",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/archive-cleanup-node22.json"
+    },
+    {
+      "name": "archive-cleanup-node24",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/archive-cleanup-node24.json"
+    },
+    {
+      "name": "archive-cleanup-docs-final",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/archive-cleanup-docs-final.json"
+    },
+    {
+      "name": "current-origin-fetch",
+      "status": "passed",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/current-origin-fetch.json"
+    }
+  ],
+  "validation": {
+    "realPostgres": "Deterministic original SQL42601 reproduced; fixed production service drains completed/missing/referenced leases, retries unsafe directories without a held lease, and leaves the other computer queue untouched. Dedicated child databases were dropped after their pools ended.",
+    "focusedCases": 21,
+    "nodeSourceRuns": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "coverage": {
+      "scope": "Only cleanup PostgreSQL and archive-service unit cases; measurement is partial, not comparable to a broader selection.",
+      "statements": 72.92,
+      "branches": 58.62,
+      "functions": 85.41,
+      "lines": 78.8
+    },
+    "documentationGates": 20
+  },
+  "sourceAndBaselineEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/archive-cleanup-final-source-hashes-v2.json",
+  "remaining": "B331 is still isolated and unpublished; remaining resource, permission, transport/platform and project domains stay in progress."
+}

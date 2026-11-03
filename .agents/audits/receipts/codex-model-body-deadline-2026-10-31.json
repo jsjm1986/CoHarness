@@ -1,0 +1,442 @@
+{
+  "findings": [
+    "B379"
+  ],
+  "status": "fixed_named_codex_upload_deadline_verified_remaining_full_review_open",
+  "updatedAt": "2026-10-31T00:31:49.101700+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T234640Z",
+  "sourcePaths": [
+    "packages/subagent/subagent-codex/src/managed-model.ts",
+    "packages/subagent/subagent-codex/tests/managed-model-http.spec.ts",
+    "packages/subagent/subagent-codex/README.md",
+    "packages/subagent/subagent-codex/README.zh.md",
+    "packages/subagent/subagent-codex/README.i18n.yaml",
+    "examples/headless-agent/tests/fixtures/managed-codex-model/plugin.mjs",
+    "examples/headless-agent/tests/fixtures/managed-codex-model/plugin.d.mts",
+    "examples/headless-agent/tests/fixtures/managed-codex-model/runtime.cordis.yml",
+    "examples/headless-agent/tests/fixtures/managed-codex-model/expected.json",
+    "examples/headless-agent/tests/fixtures/managed-codex-member/runtime.cordis.yml",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.zh.md",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "packages/subagent/subagent-codex/src/managed-model.ts": "6037e30d5ef013537e7a6dc7f75d4aaf76f92a11a5e18b52883ec94fe6557830",
+    "packages/subagent/subagent-codex/tests/managed-model-http.spec.ts": "89ada523fec8a62983ba7d6dcd87332f9e52764e4edc51ce40a892df7034a097",
+    "packages/subagent/subagent-codex/README.md": "fb9993fbb2615b2a0899fa3df94511be8bf7caa2186f44132b2c5b3ffcfda42e",
+    "packages/subagent/subagent-codex/README.zh.md": "d8accfbe72076be7a014a14462d6c67bfdadc43705ef7c70950476bfc633cd69",
+    "packages/subagent/subagent-codex/README.i18n.yaml": "cf40cb29b3b0dac9541a9a6f4389d4ae9db0da9fbff8fb4ce0cfe785d8faa101",
+    "examples/headless-agent/tests/fixtures/managed-codex-model/plugin.mjs": "031460b7a060565043aaa52249c4a4a0b90e3fddcc64e842c386b853f0be39d2",
+    "examples/headless-agent/tests/fixtures/managed-codex-model/plugin.d.mts": "f2c60a40fe14a7231ab1a2e211f3a4840b00c71868fded8cb40695f1f03ffe32",
+    "examples/headless-agent/tests/fixtures/managed-codex-model/runtime.cordis.yml": "e168c42fea376be89b7252838925f153c06d67035d395218eac0d41137104be0",
+    "examples/headless-agent/tests/fixtures/managed-codex-model/expected.json": "8537ffc43a95264c5a5f0a4127002644456aa042b940283551a611dcd2112e75",
+    "examples/headless-agent/tests/fixtures/managed-codex-member/runtime.cordis.yml": "2e2233047adf96ac1aa34f91f42a213f6683ab74b6f80d1b8e8c08c8fae042bf",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md": "17b86f4b5b21e6a87a222abc46d53ced77188af66e1f63520eb68f19b67ee3df",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.zh.md": "9584415ccebde3db4653d55deb975da470cd165b6b256e5968246c7f37b4f658",
+    ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.i18n.yaml": "1a01c2e18ffee7516904c50919d5037bda49472bca3bc3f1631ab190613104ae",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.md": "7cd79e95d64bbaa78679399413c76c45e1f00205dbfa960d8322ca8d088853a8",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.zh.md": "f079471765f7a2300a776ccb4a84bb5d17b874057e7fcc635b7b5ff4933f45f7",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-external-model-control/guide.i18n.yaml": "7c6db45d7371ffabae10086eb1b84f060cadf28c82b79800ac81fb94430421fa"
+  },
+  "compiledArtifactHashes": {
+    "packages/subagent/subagent-codex/lib/index.js": "6fbe2aa68495b31c5b697e46316277430c3c7ae52d84541067472c8c0c3d0374"
+  },
+  "repairs": [
+    {
+      "id": "B379",
+      "title": "Incomplete authenticated Codex uploads exceed their configured body deadline and retain private request capacity",
+      "repair": "Give each authenticated HTTP body an abortable deadline; bounded node:events iteration can stop reading while preserving the error response. Expiry returns504TIMEOUT before model preparation, durable input or admission. Completed uploads clear the timer. Preserve Node derived header timeout and give body expiry one owner, avoiding competing native request expiry."
+    }
+  ],
+  "causalEvidence": {
+    "originalSourceNegative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T23:51:57.532758+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/subagent/subagent-codex/tests/managed-model-http.spec.ts",
+        "-t",
+        "refuses an incomplete",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T23:52:02.068258+00:00"
+    },
+    "existingBuiltApplicationNegative": {
+      "status": "failed",
+      "startedAt": "2026-10-31T00:02:34.678358+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "--config",
+        "vitest.snapshot.config.ts",
+        "examples/headless-agent/tests/managed-codex-model.snapshot.ts",
+        "-t",
+        "managed-codex-model$",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-31T00:02:42.058069+00:00"
+    },
+    "negativeApplicationObservation": "The repaired runnable fixture starts, the incomplete upload fails its5second probe bound, and the old compiled provider reaches no native model request. Updated compiled provider returns504then the pinned native Codex performs its normal two requests and cold resume. No shared artifact was temporarily reverted for a negative.",
+    "initialValidationCorrections": [
+      "An initial oversized fixture used a16byte limit that also rejected its normal recovery request. The corrected64byte limit and65byte partial upload pass on the original source; this is not a second product finding.",
+      "The first built fixture failed before inference because sdk-minimal already provides subprocess and direct Cordis lookup was not available from the fixture directory. Remove duplicate provider rows in both profiles and resolve Cordis through the declared Codex peer before using the built result as causal evidence."
+    ]
+  },
+  "verification": {
+    "uniqueRelatedCases": 222,
+    "relatedPackageCases": 218,
+    "typeScriptSdkCases": 2,
+    "pythonSdkCases": 2,
+    "counting": "The focused68cases, source SDK case, Node22rerun and earlier intermediate runs overlap these222cases. Name-filter deselections and the Python conditional skip marker are not counted as passes; both Python cases executed.",
+    "newConditionalSkips": 0,
+    "coverage": {
+      "managed-model.ts": {
+        "statements": [
+          185,
+          185
+        ],
+        "branches": [
+          72,
+          72
+        ],
+        "functions": [
+          32,
+          32
+        ],
+        "lines": [
+          152,
+          152
+        ],
+        "allFourMetrics": 100
+      }
+    },
+    "actualNativeSdkTrace": {
+      "bodyTimeouts": [
+        504
+      ],
+      "nativeRequests": 2,
+      "persistedBeforeHttp": 2,
+      "modelPermits": 4,
+      "processPermits": 1,
+      "allPermitsSettled": true,
+      "allOwnersMatch": true,
+      "bodyProbeAllocatesNoModelPermit": true,
+      "persistentMemberAndFreshProcessResume": "verified by both SDK cases"
+    },
+    "engines": [
+      "macOS Node22compiled SDK/native one-shot and cold resume",
+      "macOS Node24compiled SDK/native one-shot and persistent member",
+      "macOS default Node source SDK/native one-shot"
+    ],
+    "buildGates": 8,
+    "documentationGates": 20,
+    "configFiles": 421,
+    "receipts": {
+      "codex-body-deadline-final-build": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:22:27.897889+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/build.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:22:56.136780+00:00"
+      },
+      "codex-body-deadline-final-coverage": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:22:27.897853+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-codex/tests/managed-model-http.spec.ts",
+          "packages/subagent/subagent-codex/tests/managed-model-control.spec.ts",
+          "packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts",
+          "--maxWorkers=1",
+          "--coverage",
+          "--coverage.include=packages/subagent/subagent-codex/src/managed-model.ts",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T234640Z/coverage-final"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:22:45.019466+00:00"
+      },
+      "codex-body-deadline-final-related-tests": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:23:44.690189+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-codex",
+          "packages/subagent/subagent-claude-code/tests/managed-model-control.spec.ts",
+          "packages/subagent/subagent-acp/tests/managed-model-control.spec.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:24:30.512998+00:00"
+      },
+      "codex-body-deadline-final-sdk-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:23:44.690210+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/managed-codex-model.snapshot.ts",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:23:54.707511+00:00"
+      },
+      "codex-body-deadline-final-sdk-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:25:23.345070+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/managed-codex-model.snapshot.ts",
+          "-t",
+          "managed-codex-model$",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:25:28.488571+00:00"
+      },
+      "codex-body-deadline-final-source-sdk": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:27:07.808194+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=src",
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "vitest.snapshot.config.ts",
+          "examples/headless-agent/tests/managed-codex-model.snapshot.ts",
+          "-t",
+          "managed-codex-model$",
+          "--maxWorkers=1"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:27:13.183911+00:00"
+      },
+      "codex-body-deadline-final-python-sdk": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:25:23.345655+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "uv",
+          "run",
+          "--no-sync",
+          "--project",
+          "python/sdk",
+          "python",
+          "-m",
+          "pytest",
+          "python/sdk/tests/test_managed_codex_model_snapshot.py",
+          "-q"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:25:30.124401+00:00"
+      },
+      "codex-body-deadline-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:09:23.771050+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:11:15.517013+00:00"
+      },
+      "codex-body-deadline-lint-converged": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:22:59.358716+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/subagent/subagent-codex/src/managed-model.ts",
+          "packages/subagent/subagent-codex/tests/managed-model-http.spec.ts",
+          "examples/headless-agent/tests/fixtures/managed-codex-model/plugin.mjs",
+          "examples/headless-agent/tests/fixtures/managed-codex-model/plugin.d.mts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:23:04.521300+00:00"
+      },
+      "codex-body-deadline-final-host-types": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:09:23.768065+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "node_modules/typescript/bin/tsc",
+          "-p",
+          "tsconfig.host.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:09:35.270675+00:00"
+      },
+      "codex-body-deadline-export-jsdoc": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:13:08.690867+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-export-jsdoc.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:13:13.293089+00:00"
+      },
+      "codex-body-deadline-cordis-config": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:13:09.852964+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-cordis-config.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:13:11.634429+00:00"
+      },
+      "codex-body-deadline-guide-artifact": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:22:29.108320+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T234640Z/verify-codex-guide.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:22:29.174058+00:00"
+      },
+      "codex-body-deadline-entrypoints": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:23:00.504440+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-application-entrypoints.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:23:01.120525+00:00"
+      },
+      "codex-body-deadline-origin-fetch": {
+        "status": "passed",
+        "startedAt": "2026-10-31T00:12:51.954068+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-31T00:12:56.324803+00:00"
+      }
+    },
+    "paidProviderCalls": "None. Native Codex and SDKs use owned loopback inference fixtures; actual Responses remains deferred."
+  },
+  "noteReview": {
+    "updatedOwningNote": ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md",
+    "newNotes": 0,
+    "archivedOrDeleted": 0,
+    "retainedActive": [
+      ".agents/notes/implemented/architecture/2026-10-25-external-runtime-model-control.md",
+      ".agents/notes/implemented/architecture/2026-10-25-managed-codex-ssh-model-requests.md",
+      ".agents/notes/implemented/architecture/2026-10-24-sdk-managed-model-requests.md"
+    ],
+    "reason": "The existing external model-control note owns native HTTP admission and input timing. SSH forwarding and managed SDK control remain separate active responsibilities; no frozen archive was edited.",
+    "upgradeGuide": "Updated current managed external-model guide pair and Codex README; guide is440English words. No public fields, Session event types or schema versions changed."
+  },
+  "coordination": {
+    "peerFrozenRelease": "coharness-full-real-20261031-r5",
+    "frozenDirectory": "/Users/a1234/harness-gateway-releases/coharness-full-real-20261031-r5",
+    "frozenCodexSourceMatchesBeforeFix": true,
+    "sdk24PathUnionAndTwoArtifactsUnchanged": true,
+    "sdkSourceCaptureAcknowledged": true,
+    "scope": "B379follows R5. Peer reports R5deployed on both hosts and B375throughB378SDK artifacts matched. Root did not modify the frozen release, deploy, or operate Docker/production services. Peer-reported acceptance is not counted as root evidence.",
+    "peerReservedFiles": [
+      "gateway/src/runtime-resource-api.ts",
+      "gateway/src/node-resource-budget.ts",
+      "packages/context/gateway-runtime/src/resource-budget.ts",
+      "gateway/src/postgres/auth-service.ts",
+      "gateway/tests/auth-postgres.spec.ts"
+    ],
+    "peerAdditionalOwnership": "Gateway HTML/stopped-page targeting, local Web assembly, collaboration URLs, identity/draft work, and the2026-10-24-browser-authentication-lock-waits note and corresponding docs remain with the peer.",
+    "peerLatestReportedPerformance": "R5cold startup to page load138.7seconds and one workspace.list92.4seconds remain under investigation. Peer is testing whether same-token authentication row locks serialize cross-computer requests, preserving revocation, roles, organization status and clock_timestamp expiry. Root makes no independent production verification claim.",
+    "rootBuildConcurrency": 1
+  },
+  "additionalReadOnlyReview": {
+    "paths": [
+      "packages/subagent/subagent-codex/src/index.ts",
+      "packages/subagent/subagent-codex/tests/managed-model-control.spec.ts",
+      "packages/subagent/subagent-codex/tests/managed-model-lifecycle.spec.ts",
+      "packages/subagent/subagent-acp/tests/managed-model-control.spec.ts",
+      "packages/subagent/subagent-claude-code/tests/managed-model-control.spec.ts",
+      "packages/subprocess/subprocess/src/index.ts",
+      "packages/subprocess/subprocess/src/types.ts"
+    ],
+    "scope": "Selected managed route/resource ownership, opaque external refusal, native spawn and cleanup paths. Source search and named integration cases do not complete these files or whole business domains."
+  },
+  "postgresObservation": {
+    "checkedAt": "2026-10-31T00:25:24.506452+00:00",
+    "host": "127.0.0.1",
+    "lastKnownOwnedPort": 55933,
+    "reachable": false,
+    "mappedContainerEndpointRevalidated": false,
+    "postgresIdentityTestsRun": false,
+    "note": "This does not prove container termination or current port mapping. No Docker or production service action was performed."
+  },
+  "remaining": [
+    "All12business domains remain in progress; B04/B25remain implementation_in_progress.",
+    "Failed SDK model-span close acknowledgements, resource-only governance in isolated external runtimes, and remaining permissions/allocation inventory still require review.",
+    "Fresh PostgreSQL actor/permission acceptance was not run: the last-known owned port is unreachable and its current mapping was not revalidated. This does not establish container termination.",
+    "No new physical Windows or Linux acceptance in this batch. Actual Responses remains deferred. Full doc-sync is not claimed passing."
+  ]
+}

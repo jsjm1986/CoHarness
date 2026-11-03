@@ -44,6 +44,7 @@ it('keeps the connected Runtime mounted for the same graph, applies changed code
   const description = { version: 'fixture', cwd: '/fixture', attachedSessions: 0, home: '/fixture', canOpenPath: false }
   const connection: ConnectionHandle = {
     api, interactions: 'none', isLoopback: true,
+    metadataTiming: { requestTimeoutMs: 15000, retryAfterMs: 10000 },
     hostDescription: { getSnapshot: () => description, subscribe: () => () => {} },
     state: { getSnapshot: () => undefined, subscribe: () => () => {} },
     rpc: { call: async (channel, endpoint) => {

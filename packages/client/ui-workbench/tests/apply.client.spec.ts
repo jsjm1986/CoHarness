@@ -8,16 +8,38 @@ import { ConversationViewportController, createConversationViewportStore } from 
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '../src/client/apply.ts'
 import type { WorkbenchCatalog, WorkbenchConversation } from '../src/client/catalog.ts'
+import type { LegacyWorkbenchRestore, WorkbenchRestoreOptions } from '../src/client/layout-restore.ts'
 import { createWorkspacePreviewReaders } from '../src/client/preview-readers.ts'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { Config, apply as nodeApply } from '../src/index.ts'
 import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
-import type { WorkbenchToolbarInjected } from '../src/client/components/WorkbenchToolbar.tsx'
-import type { createWorkbenchStore } from '../src/client/stores.ts'
 
 const A = 'a' as SessionId
 const item: WorkbenchConversation = { sessionId: A, runtime: { kind: 'personal' }, visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true }
 const catalog: WorkbenchCatalog = { personalComplete: true, personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [], items: [item] }
+
+async function savedLegacyWorkbench() {
+  localStorage.clear()
+  const runtime = await SlotTestRuntime.create()
+  const keyFor = (id: SessionId, target: SessionRuntimeTarget) => clientSessionKey(target, id)
+  Object.assign(runtime.sessions, { keyFor })
+  localStorage.setItem('dsh.conversation.workbenches.v2.account%3A1', JSON.stringify({
+    version: 2, mode: 'workbench', activeId: 'saved', workbenches: [
+      { id: 'saved', name: 'Saved', paneIds: [A], activePaneId: A, paneRatios: [1], updatedAt: 1 },
+      { id: 'other', name: 'Other', paneIds: ['b'], paneRatios: [1], updatedAt: 1 },
+    ],
+  }))
+  const view = new ConversationViewportController(runtime.sessions, createConversationViewportStore().create())
+  view.setPersistenceScope('account:1')
+  view.setEnabled(true)
+  try {
+    const h = await harness({ viewport: view })
+    Object.assign(h.sessions, { keyFor })
+    return { runtime, view, h, dispose: async () => {
+      await h.ctx.fiber.dispose(); view.dispose(); await runtime.dispose(); localStorage.clear()
+    } }
+  } catch (error: unknown) { view.dispose(); await runtime.dispose(); localStorage.clear(); throw error }
+}
 
 /** The native-open members of the workbench tab inject face these tests exercise. */
 interface NativeOpenInjected {
@@ -68,8 +90,9 @@ async function harness(services: HarnessServices = {}) {
       ready: Promise.resolve({ session: { getSnapshot: () => ({ openState: 'open', openError: null }) } }),
       release: vi.fn(),
     })),
-    ensureSession: vi.fn(async () => true), createSession: vi.fn(async () => A), setBaseRuntimeTarget: vi.fn(),
-    runtimeTargetFor: vi.fn((_id: SessionId) => undefined as { kind: 'project'; projectId: number } | undefined),
+    ensureSession: vi.fn(async (_target: SessionRuntimeTarget, _id: SessionId, _signal?: AbortSignal) => true),
+    createSession: vi.fn(async (_target: SessionRuntimeTarget, _signal?: AbortSignal) => A), setBaseRuntimeTarget: vi.fn(),
+    runtimeTargetFor: vi.fn((_id: SessionId) => undefined as SessionRuntimeTarget | undefined),
     list: { getSnapshot: () => ({ current: A as SessionId | undefined }) },
   }
   const sidebarRight = { openSessionResource: vi.fn() }
@@ -80,7 +103,9 @@ async function harness(services: HarnessServices = {}) {
   ctx.provide('layout', layout as never)
   ctx.provide('conversationViewport', (services.viewport ?? viewport) as never)
   ctx.provide('sessions', sessions as never)
-  ctx.provide('workspaces', (services.workspaces ?? {}) as never)
+  ctx.provide('deploymentContext', createSnapshotStore({ phase: 'ready', showComputer: false, aggregateComputers: false }) as never)
+  ctx.provide('workspaces', (services.workspaces ?? { createRuntimeSession: async (target: SessionRuntimeTarget, _workspaceId: unknown, signal: AbortSignal) =>
+    sessions.createSession?.(target, signal) }) as never)
   if (services.connection !== undefined) ctx.provide('connection', services.connection as never)
   ctx.provide('workspaceResources', (services.workspaceResources ?? new WorkspaceResourceRegistry()) as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
@@ -92,10 +117,12 @@ async function harness(services: HarnessServices = {}) {
     'sidebar.right.pane.tab': { kind: 'keyed', scope: 'session' },
   } } as never, () => null)
   const fiber = await ctx.plugin({ inject, apply }).await()
-  const actions = (slots.entries('conversation.workbench.toolbar')[0]!.inject as unknown as () => WorkbenchToolbarInjected & {
-    chooseSession(item: WorkbenchConversation, replace: boolean): Promise<unknown>
-    createSession(target: WorkbenchConversation['runtime'], replace: boolean): Promise<unknown>
-    hydrateCatalog(catalog: WorkbenchCatalog, ids: SessionId[]): Promise<void>
+  const actions = (slots.entries('conversation.workbench.toolbar')[0]!.inject as unknown as () => {
+    chooseSession(item: WorkbenchConversation, replace: boolean, signal?: AbortSignal): Promise<unknown>
+    createSession(target: WorkbenchConversation['runtime'], replace: boolean, signal?: AbortSignal): Promise<unknown>
+    hydrateCatalog(
+      catalog: WorkbenchCatalog, ids: SessionId[], options?: WorkbenchRestoreOptions,
+    ): Promise<LegacyWorkbenchRestore | undefined>
     catalogUnavailable(): void
     focusSession(id: SessionId): void
     setMode(mode: 'single' | 'workbench'): void
@@ -115,70 +142,11 @@ async function harness(services: HarnessServices = {}) {
   })()
   return {
     ctx, slots, fiber, sessions, viewport, snapshot, sidebarRight, layout, tabTypes,
-    chooser: slots.bindStore(slots.entries('conversation.workbench.toolbar')[0]!.store as ReturnType<typeof createWorkbenchStore>),
     actions: { ...actions, ...createWorkspacePreviewReaders(services.connection as ConnectionHandle | undefined) },
   }
 }
 
 describe('workbench navigation lifecycle', () => {
-  it('reads fresh on each chooser opening while sharing reads across controls of that opening', async () => {
-    const h = await harness()
-    const pending = Promise.withResolvers<undefined>()
-    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => {
-      await pending.promise
-      return new Response(JSON.stringify(catalog))
-    })
-    vi.stubGlobal('fetch', fetcher)
-    try {
-      const reads = [h.actions.loadCatalog(new AbortController().signal, false)]
-      h.chooser.actions.openPicker()
-      reads.push(h.actions.loadCatalog(new AbortController().signal, false))
-      reads.push(h.actions.loadCatalog(new AbortController().signal, false))
-      expect(fetcher).toHaveBeenCalledTimes(2)
-      h.chooser.actions.closePicker()
-      h.chooser.actions.openPicker()
-      reads.push(h.actions.loadCatalog(new AbortController().signal, false))
-      reads.push(h.actions.loadCatalog(new AbortController().signal, false))
-      expect(fetcher).toHaveBeenCalledTimes(3)
-      pending.resolve(undefined)
-      const results = await Promise.all(reads)
-      expect(results).toEqual(Array.from({ length: 5 }, () => catalog))
-    } finally {
-      pending.resolve(undefined)
-      await h.ctx.fiber.dispose()
-      vi.unstubAllGlobals()
-    }
-  })
-
-  it('shares catalog reads through slot injections and joins them when its plugin is disposed', async () => {
-    const h = await harness()
-    const pending = Promise.withResolvers<Response>()
-    const fetcher = vi.fn<typeof fetch>().mockReturnValue(pending.promise)
-    vi.stubGlobal('fetch', fetcher)
-    try {
-      const firstFace = (h.slots.entries('conversation.workbench.toolbar')[0]!.inject as unknown as () => WorkbenchToolbarInjected)()
-      const first = h.actions.loadCatalog(new AbortController().signal, false)
-      const firstCanceled = expect(first).rejects.toMatchObject({ name: 'AbortError' })
-      const second = firstFace.loadCatalog(new AbortController().signal, false)
-      const secondCanceled = expect(second).rejects.toMatchObject({ name: 'AbortError' })
-      expect(fetcher).toHaveBeenCalledOnce()
-      let disposed = false
-      const disposal = h.fiber.dispose().then(() => { disposed = true })
-      await Promise.all([firstCanceled, secondCanceled])
-      expect(fetcher.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
-      expect(disposed).toBe(false)
-      pending.resolve(new Response(JSON.stringify(catalog)))
-      await disposal
-      expect(disposed).toBe(true)
-      await expect(firstFace.loadCatalog(new AbortController().signal, false)).rejects.toMatchObject({ name: 'AbortError' })
-      expect(fetcher).toHaveBeenCalledOnce()
-    } finally {
-      pending.resolve(new Response(JSON.stringify(catalog)))
-      await h.ctx.fiber.dispose()
-      vi.unstubAllGlobals()
-    }
-  })
-
   it.each([
     { entry: 'toolbar', target: A, selection: 'same-current pane' },
     { entry: 'toolbar', target: 'q' as SessionId, selection: 'another pane' },
@@ -223,27 +191,66 @@ describe('workbench navigation lifecycle', () => {
     } finally { await h.ctx.fiber.dispose() }
   })
 
-  it('reads catalog restoration demand from the viewport owner and keeps its hook source stable', async () => {
-    const h = await harness()
+  it('retains every named legacy layout until explicit owners are selected and prepares only the active panes', async () => {
+    const f = await savedLegacyWorkbench(), other = 'b' as SessionId
+    const project = { kind: 'project' as const, projectId: 7 }
+    const projectA = clientSessionKey(project, A), personalB = clientSessionKey({ kind: 'personal' }, other)
+    const directory: WorkbenchCatalog = { ...catalog, personalComplete: false,
+      items: [A, other].flatMap(id => [{ ...item, sessionId: id }, { ...item, sessionId: id, runtime: project }]) }
     try {
-      const source = h.actions.hooks.catalogRestore
-      expect(source.getSnapshot()).toBe(true)
-      const needsCatalogRestore = vi.fn(() => false)
-      Object.assign(h.viewport, { needsCatalogRestore })
-      expect(source.getSnapshot()).toBe(false)
-      const changed = vi.fn()
-      const stop = source.subscribe(changed)
-      try {
-        needsCatalogRestore.mockReturnValue(true)
-        h.snapshot.set({ ...h.snapshot.getSnapshot(), pendingIdentity: true })
-        expect(changed).toHaveBeenCalledOnce()
-        expect(source.getSnapshot()).toBe(true)
-        const injected = (h.slots.entries('conversation.workbench.toolbar')[0]!.inject as unknown as () => WorkbenchToolbarInjected)()
-        expect(injected.hooks.catalogRestore).toBe(source)
-      } finally { stop() }
-    } finally { await h.ctx.fiber.dispose() }
+      const pending = await f.h.actions.hydrateCatalog(directory, [])
+      expect(pending?.issues.map(issue => issue.sessionId)).toEqual([A, other])
+      expect(f.h.sessions.ensureSession).not.toHaveBeenCalled()
+      expect(f.view.listWorkbenches().map(row => row.paneIds)).toEqual([[A], [other]])
+      await f.runtime.sessions.add({ id: projectA })
+      await f.h.actions.hydrateCatalog(directory, [], { selection: { workbenchId: 'saved', owners: { [A]: projectA, [other]: personalB } } })
+      expect(f.view.sessionKeyVersion()).toBe(3)
+      expect(f.view.currentWorkbench().paneIds).toEqual([projectA])
+      expect(f.view.listWorkbenches().find(row => row.id === 'other')?.paneIds).toEqual([personalB])
+      expect(f.h.sessions.ensureSession).toHaveBeenCalledExactlyOnceWith(project, A, expect.any(AbortSignal))
+      expect(f.h.sessions.createSession).not.toHaveBeenCalled()
+    } finally { await f.dispose() }
   })
 
+  it('removes only explicitly selected unresolved pane references and never starts a Runtime for that choice', async () => {
+    const f = await savedLegacyWorkbench(), other = 'b' as SessionId
+    const directory: WorkbenchCatalog = { ...catalog, personalComplete: false, items: [] }
+    try {
+      expect((await f.h.actions.hydrateCatalog(directory, []))?.issues).toHaveLength(2)
+      await f.h.actions.hydrateCatalog(directory, [], { selection: { workbenchId: 'saved', owners: { [A]: null, [other]: null } } })
+      expect(f.view.sessionKeyVersion()).toBe(3)
+      expect(f.view.listWorkbenches().map(row => row.paneIds)).toEqual([[], []])
+      expect(f.h.sessions.ensureSession).not.toHaveBeenCalled()
+      expect(f.h.sessions.createSession).not.toHaveBeenCalled()
+    } finally { await f.dispose() }
+  })
+
+  it('cannot apply a delayed saved-layout restoration after another workbench becomes active', async () => {
+    const f = await savedLegacyWorkbench(), loading = Promise.withResolvers<boolean>()
+    const directory: WorkbenchCatalog = { ...catalog, items: [item, { ...item, sessionId: 'b' as SessionId }] }
+    f.h.sessions.ensureSession.mockReturnValue(loading.promise)
+    try {
+      const restoring = f.h.actions.hydrateCatalog(directory, [])
+      await vi.waitFor(() => { expect(f.h.sessions.ensureSession).toHaveBeenCalledOnce() })
+      f.view.switchWorkbench('other')
+      loading.resolve(true)
+      await restoring
+      expect(f.view.sessionKeyVersion()).toBe(2)
+      expect(f.view.currentWorkbench()).toMatchObject({ id: 'other', paneIds: ['b'] })
+      expect(f.view.listWorkbenches().find(row => row.id === 'saved')?.paneIds).toEqual([A])
+    } finally { loading.resolve(true); await f.dispose() }
+  })
+
+  it('creates through the selected Runtime Workspace instead of bypassing directory attachment', async () => {
+    const target = { kind: 'personal', runtimeId: '22222222-2222-4222-8222-222222222222' } as SessionRuntimeTarget
+    const createRuntimeSession = vi.fn(async () => clientSessionKey(target, A))
+    const h = await harness({ workspaces: { createRuntimeSession } })
+    try {
+      await expect(h.actions.createSession(target, false)).resolves.toEqual({ ok: true })
+      expect(createRuntimeSession).toHaveBeenCalledWith(target, undefined, expect.any(AbortSignal))
+      expect(h.sessions.createSession).not.toHaveBeenCalled()
+    } finally { await h.ctx.fiber.dispose() }
+  })
   it('rejects missing viewport configuration at application', () => {
     expect(() => { apply(new Context()) }).toThrow('requires the conversation viewport')
   })
@@ -287,6 +294,25 @@ describe('workbench navigation lifecycle', () => {
       await expect(pending).resolves.toEqual({ ok: false, reason: 'unknown' })
       expect(h.viewport.replaceActive).not.toHaveBeenCalled()
       expect(h.viewport.add).not.toHaveBeenCalled()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['choose', 'create'] as const)('cancelling a slow %s does not commit its late result to the workbench', async (operation) => {
+    const h = await harness(), abort = new AbortController()
+    const loading = Promise.withResolvers<boolean>(), creating = Promise.withResolvers<SessionId>()
+    try {
+      h.sessions.ensureSession.mockReturnValue(loading.promise)
+      h.sessions.createSession.mockReturnValue(creating.promise)
+      const pending = operation === 'choose' ? h.actions.chooseSession(item, false, abort.signal)
+        : h.actions.createSession(item.runtime, false, abort.signal)
+      abort.abort()
+      loading.resolve(true); creating.resolve(A)
+      await expect(pending).resolves.toEqual({ ok: false, reason: 'unknown' })
+      expect(h.viewport.replaceActive).not.toHaveBeenCalled()
+      expect(h.viewport.add).not.toHaveBeenCalled()
+      const signal = operation === 'choose' ? h.sessions.ensureSession.mock.calls[0]?.[2]
+        : h.sessions.createSession.mock.calls[0]?.[1]
+      expect((signal as AbortSignal).aborted).toBe(true)
     } finally { await h.ctx.fiber.dispose() }
   })
 
@@ -460,12 +486,18 @@ describe('workbench navigation lifecycle', () => {
       view.setMode('single')
       expect(view.snapshot.getSnapshot().mode).toBe('single')
       view.setMode('workbench')
-      await h.actions.hydrateCatalog({ ...directory, personalComplete: true, items: [item, ...directory.items] }, [])
+      const complete = { ...directory, personalComplete: true, items: [item, ...directory.items] }
+      const unresolved = await h.actions.hydrateCatalog(complete, [])
+      expect(unresolved?.issues[0]?.candidates).toHaveLength(2)
+      expect(view.sessionKeyVersion()).toBe(2)
+      expect(view.currentWorkbench().paneIds).toEqual([A])
+      Object.assign(h.sessions, { keyFor: (id: SessionId, target: SessionRuntimeTarget) => clientSessionKey(target, id) })
+      await h.actions.hydrateCatalog(complete, [], { selection: { workbenchId: 'saved', owners: { [A]: project } } })
       expect(view.sessionKeyVersion()).toBe(3)
-      expect(view.currentWorkbench().paneIds).toEqual([])
-      expect(h.sessions.ensureSession).not.toHaveBeenCalled()
+      expect(view.currentWorkbench().paneIds).toEqual([project])
+      expect(h.sessions.ensureSession).toHaveBeenCalledExactlyOnceWith({ kind: 'project', projectId: 7 }, A, expect.any(AbortSignal))
       expect(view.snapshot.getSnapshot().pendingIdentity).toBeUndefined()
-      expect(view.add(project)).toEqual({ ok: true })
+      expect(view.add(project)).toEqual({ ok: false, reason: 'duplicate' })
       expect(view.currentWorkbench().paneIds).toEqual([project])
     } finally { view.dispose(); await h.ctx.fiber.dispose(); await runtime.dispose(); localStorage.clear() }
   })
@@ -710,6 +742,19 @@ describe('workspace file serving', () => {
       expect(h.sidebarRight.openSessionResource).toHaveBeenCalledExactlyOnceWith(origin, request.address, { kind: 'workspace-file' })
       expect(h.viewport.add).not.toHaveBeenCalled()
       expect(h.viewport.replaceActive).not.toHaveBeenCalled()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('refuses a file-open request naming a different personal Runtime before changing the pane', async () => {
+    const h = await harness({ connection: connection() })
+    const first: SessionRuntimeTarget = { kind: 'personal', runtimeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' as never }
+    const second: SessionRuntimeTarget = { kind: 'personal', runtimeId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' as never }
+    try {
+      h.sessions.runtimeTargetFor.mockReturnValue(first)
+      expect(() =>{  h.actions.openWorkspaceResource({ ...openRequest, runtimeTarget: second }) }).toThrow('no longer owns')
+      expect(h.sidebarRight.openSessionResource).not.toHaveBeenCalled()
+      h.actions.openWorkspaceResource({ ...openRequest, runtimeTarget: first })
+      expect(h.sidebarRight.openSessionResource).toHaveBeenCalledOnce()
     } finally { await h.ctx.fiber.dispose() }
   })
 

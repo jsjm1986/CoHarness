@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-08-web-background-job-display.md
 document:
-  en: 8c3b0dff2785e95f151a2b8e34db76c1d04445a0
-  zh: 4283a8a00e9170f139daa5c58c4dc3b3b1a3f88e
+  en: e55547df6d7c1a75b10fcbad640b11a82856dcfe
+  zh: 99a4850e3e7ead6a3be3cc911e0fe5adf77d8238
 /agent-note-web-background-job-display:
   en: 0d0404b9cce14367
   zh: 2dbf18965256c53f
@@ -33,8 +33,8 @@ document:
   en: 95487f025a6ef8ae
   zh: e046cf7d8ed5b6c2
 /agent-note-web-background-job-display/alternatives-considered:
-  en: b209cc4487299237
-  zh: 944708f64c077585
+  en: 49a328731efd9032
+  zh: 8acf9e7ab8bbeddd
 /agent-note-web-background-job-display/testing:
   en: 587344a3ec743875
   zh: edf910fcd3cfc209

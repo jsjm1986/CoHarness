@@ -110,8 +110,26 @@ export class WorkspaceManager {
     return this.startRefresh().completion
   }
 
+  /**
+   * Share the in-flight baseline read (or start one) with per-reader
+   * cancellation: aborting withdraws the shared RPC, and an `undefined`
+   * resolution defers the cause to `state`/`error`.
+   * @param signal - reader-owned cancellation, bound to the shared controller.
+   * @returns the settled archive snapshot, or `undefined` on abort or failure.
+   */
+  shareRefresh(signal: AbortSignal): Promise<WorkspaceArchiveSnapshot | undefined> {
+    const refresh = this.startRefresh()
+    const abort = (): void => { refresh.controller.abort(signal.reason) }
+    if (signal.aborted) abort()
+    else signal.addEventListener('abort', abort, { once: true })
+    return refresh.result.finally(() => { signal.removeEventListener('abort', abort) })
+  }
+
   private startRefresh(): WorkspaceRefresh {
-    if (this.inflight !== null) return this.inflight
+    // A cancelled reader leaves its RPC promise pending until the wire
+    // settles; treat the dead in-flight read as gone so the next caller
+    // issues a fresh request instead of waiting on a retired operation.
+    if (this.inflight !== null && !this.inflight.controller.signal.aborted) return this.inflight
     const controller = new AbortController()
     this.state = 'loading'
     this.error = null

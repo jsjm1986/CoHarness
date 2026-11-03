@@ -1,0 +1,384 @@
+{
+  "recordedAt": "2026-10-29T15:05:40.314940+00:00",
+  "status": "fixed_named_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z",
+  "sourceAndArtifactEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/native-probe-final-source-artifact-hashes.json",
+  "realProviderApiValidation": "human-deferred",
+  "resourceQuiescence": {
+    "status": "passed",
+    "recordedAt": "2026-10-29T15:02:09.812723+00:00",
+    "ownedNativeFixturePids": [],
+    "ownedDatabaseCreated": false,
+    "peerAndProductionResourcesAccessed": false,
+    "nativeFailedFixtureCleanup": {
+      "status": "passed",
+      "removedOwnedRoots": [
+        "/var/folders/k7/_smtjn515sv15mh14220sw080000gn/T/nalr-fake-launcher-grL6BY"
+      ],
+      "ownership": "Exact first failed native-entry receipt creation window and exact sole generated fixture contents."
+    }
+  },
+  "limitations": [
+    "The native client scenarios run real private POSIX helpers; the Windows ACL probe call is exercised through its provider adapter on POSIX, without claiming real Windows execution.",
+    "These are host-probe and bootstrap ownership cases, not new Linux kernel/cgroup, public-network cross-computer or real model-provider acceptance.",
+    "Coverage applies only to local-runtime-protocol.ts, child-command.ts, sandbox-local/src/index.ts and native entry/src/index.ts; other files and every original audit domain remain open."
+  ],
+  "findings": [
+    "B322"
+  ],
+  "repair": "Bwrap, Seatbelt, Windows ACL probe clients and the public Landlock probe use SIGKILL for their existing command deadlines. Client closure precedes unavailable selection and its cached verdict; no target runs unconfined. Native source and provider tests retain absent optional packages, empty grants and default probe behavior. The standalone public entry fixture owns its child and cleanup and uses a patient budget for positive report parsing.",
+  "paths": [
+    "packages/sandbox/sandbox-local/src/index.ts",
+    "native/system/packages/entry/src/index.ts",
+    "packages/sandbox/sandbox-local/tests/landlock-entry-source.spec.ts",
+    "packages/sandbox/sandbox-local/tests/probe-native-timeout.spec.ts",
+    "packages/sandbox/sandbox-local/tests/run-native-probe-timeout.mjs",
+    "packages/sandbox/sandbox-local/tests/fixtures/probe-timeout-driver.mjs",
+    "packages/sandbox/sandbox-local/tests/fixtures/probe-client.mjs",
+    "packages/sandbox/sandbox-local/tests/fixtures/probe-timeout.expected.md",
+    "native/system/test/entry.test.js",
+    "native/system/test/probe-timeout.mjs"
+  ],
+  "negativeEvidence": [
+    {
+      "name": "sandbox-probe-bwrap-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T14:33:40.688990+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "--import",
+        "tsx/esm",
+        "packages/sandbox/sandbox-local/tests/run-native-probe-timeout.mjs",
+        "src",
+        "-",
+        "bwrap"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T14:33:46.651098+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-probe-bwrap-causal-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-probe-bwrap-causal-before.log"
+    },
+    {
+      "name": "sandbox-probe-landlock-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T14:33:46.688763+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node",
+        "--import",
+        "tsx/esm",
+        "packages/sandbox/sandbox-local/tests/run-native-probe-timeout.mjs",
+        "src",
+        "-",
+        "landlock"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T14:33:52.158701+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-probe-landlock-causal-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-probe-landlock-causal-before.log"
+    }
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "sandbox-probe-complete-source-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:41:56.276726+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/sandbox/sandbox-local/tests",
+          "--maxWorkers=2",
+          "--retry=0",
+          "--coverage",
+          "--coverage.include=packages/sandbox/sandbox-local/src/index.ts",
+          "--coverage.include=native/system/packages/entry/src/index.ts",
+          "--coverage.reporter=text",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=json",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-probe-complete-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:42:28.200329+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-probe-complete-source-coverage.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-probe-complete-source-coverage.log"
+      },
+      {
+        "name": "native-probe-targeted-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:43:16.649642+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "-b",
+          "packages/sandbox/sandbox-local/tsconfig.json",
+          "native/system/packages/entry/tsconfig.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:43:17.371301+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/native-probe-targeted-build.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/native-probe-targeted-build.log"
+      },
+      {
+        "name": "confinement-probe-public-native-subpath-bundle",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:51:26.903713+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/sandbox/sandbox-local",
+        "command": [
+          "../../../node_modules/.bin/tsdown",
+          "-c",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-artifact/tsdown.config.mjs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:51:27.009833+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/confinement-probe-public-native-subpath-bundle.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/confinement-probe-public-native-subpath-bundle.log"
+      },
+      {
+        "name": "sandbox-probe-public-externals-final-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:51:27.077160+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "packages/sandbox/sandbox-local/tests/run-native-probe-timeout.mjs",
+          "lib",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-artifact/lib/index.js"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:51:47.420714+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-probe-public-externals-final-node22.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-probe-public-externals-final-node22.log"
+      },
+      {
+        "name": "sandbox-probe-public-externals-final-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:51:47.454360+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "packages/sandbox/sandbox-local/tests/run-native-probe-timeout.mjs",
+          "lib",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-artifact/lib/index.js"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:52:07.800829+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-probe-public-externals-final-node24.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/sandbox-probe-public-externals-final-node24.log"
+      },
+      {
+        "name": "landlock-public-entry-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:49:48.307348+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/native/system",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "test/entry.test.js"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:49:54.273074+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/landlock-public-entry-node22.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/landlock-public-entry-node22.log"
+      },
+      {
+        "name": "landlock-public-entry-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T14:50:19.997042+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/native/system",
+        "command": [
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "test/entry.test.js"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T14:50:26.045883+00:00",
+        "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/landlock-public-entry-node24.json",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T142715Z/landlock-public-entry-node24.log"
+      }
+    ],
+    "coverage": {
+      "bootIdentityAndCommand": {
+        "total": {
+          "lines": {
+            "total": 18,
+            "covered": 18,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 22,
+            "covered": 22,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 4,
+            "covered": 4,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 7,
+            "covered": 7,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": "Unknown"
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/child-command.ts": {
+          "lines": {
+            "total": 8,
+            "covered": 8,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 3,
+            "covered": 3,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 11,
+            "covered": 11,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 3,
+            "covered": 3,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/local-runtime-protocol.ts": {
+          "lines": {
+            "total": 10,
+            "covered": 10,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 1,
+            "covered": 1,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 11,
+            "covered": 11,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 4,
+            "covered": 4,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      },
+      "sandboxProviderAndNativeEntry": {
+        "total": {
+          "lines": {
+            "total": 146,
+            "covered": 146,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 164,
+            "covered": 164,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 30,
+            "covered": 30,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 100,
+            "covered": 100,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branchesTrue": {
+            "total": 0,
+            "covered": 0,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/native/system/packages/entry/src/index.ts": {
+          "lines": {
+            "total": 12,
+            "covered": 12,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 5,
+            "covered": 5,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 13,
+            "covered": 13,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 13,
+            "covered": 13,
+            "skipped": 0,
+            "pct": 100
+          }
+        },
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/sandbox/sandbox-local/src/index.ts": {
+          "lines": {
+            "total": 134,
+            "covered": 134,
+            "skipped": 0,
+            "pct": 100
+          },
+          "functions": {
+            "total": 25,
+            "covered": 25,
+            "skipped": 0,
+            "pct": 100
+          },
+          "statements": {
+            "total": 151,
+            "covered": 151,
+            "skipped": 0,
+            "pct": 100
+          },
+          "branches": {
+            "total": 87,
+            "covered": 87,
+            "skipped": 0,
+            "pct": 100
+          }
+        }
+      }
+    }
+  },
+  "intermediateEvidence": {
+    "notCausal": [
+      "Initial boot commands omitted the declared runtime tsconfig; their module-resolution failures are not bug reproductions."
+    ],
+    "failedCoverage": "The first extended native-source selection lacked optional-package/default-grant cases;52behavior cases passed but the strict coverage command failed. Added source-plane native API cases without reducing thresholds; final54cases and four metrics passed.",
+    "nativeFixture": "An initial positive fake-launcher report was refused under its default budget. The native diagnostic succeeded; positive parsing uses a patient explicit budget and unconditional cleanup. Timeout regressions retain explicit deadlines and physical closure witnesses.",
+    "artifact": "Private bundle rehearsals were corrected to preserve package subpath externals and native package resolution. Only the final external-native-entry Node22/24 receipts support the final sandbox artifact claim."
+  }
+}

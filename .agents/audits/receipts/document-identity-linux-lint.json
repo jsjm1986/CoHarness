@@ -1,0 +1,14 @@
+{
+  "name": "document-identity-linux-lint",
+  "cwd": ".",
+  "command": "env NODE_DISABLE_COMPILE_CACHE=1 node_modules/.bin/tsx scripts/run-oxlint.ts packages/attachment/userdoc-local/src/file-object.ts packages/attachment/userdoc-local/src/rooted-fs.ts packages/attachment/userdoc-local/tests/fixtures/linux-object-replay.ts packages/attachment/userdoc-local/tests/linux-object-paths.spec.ts packages/attachment/userdoc-local/tests/file-object.spec.ts",
+  "startedAt": "2026-10-26T23:33:27.151186+00:00",
+  "seconds": 7.603,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "1e019799aeb6d9b2697be1929e3c72bcbfdd24ec5145ba3e962cd4250a28e98e",
+  "inputsAfter": "1e019799aeb6d9b2697be1929e3c72bcbfdd24ec5145ba3e962cd4250a28e98e",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

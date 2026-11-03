@@ -59,6 +59,8 @@ kind: "package-reference"
 
 当 `run_in_background` 为 true 时，此插件会在 spawn 前预检 `ctx.jobs.start()`，把调用方 agent 注册为持有者，并将返回的 `ShellProcess` 句柄适配为通用的取消／完成／增量输出钩子。任务运行时负责 job id、跨会话隔离、完成通知、等待和 dispose（资源释放）清理；此插件只把 bash 退出／沙箱事实映射为任务输出和结果详情。`enableRunInBackground: false` 会移除该参数，并在执行时拒绝强制后台调用。
 
+生产方还会向任务注册表提供确切工具调用 id 与根调用 id，供所属生命周期记录保留。
+
 <a id="ui-presentation"></a>
 ## UI 展示
 

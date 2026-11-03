@@ -1,0 +1,843 @@
+{
+  "recordedAt": "2026-10-29T08:36:51.587370+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z",
+  "baseline": {
+    "recordedAt": "2026-10-29T08:35:04.426711+00:00",
+    "fetchReceipt": "sdk-cleanup-current-baseline-fetch",
+    "headAheadOriginBehind": [
+      139,
+      0
+    ],
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "sharedWorktreeRebasedOrReset": false,
+    "headRef": "HEAD",
+    "upstreamRef": "origin/master",
+    "identityEvidence": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-cleanup-current-baseline.json"
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "sdk-cleanup-current-baseline-fetch",
+        "status": "passed",
+        "startedAt": "2026-10-29T08:33:25.875548+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "git",
+          "fetch",
+          "origin"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T08:33:29.231840+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-cleanup-current-baseline-fetch.log"
+      },
+      {
+        "name": "sdk-startup-artifact-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T07:59:44.559482+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/build-sdk-startup-artifact.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T07:59:44.868146+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-startup-artifact-build.log"
+      },
+      {
+        "name": "sdk-client-close-artifact-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T08:18:06.090000+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/build-sdk-client-close-artifact.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T08:18:10.314819+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-client-close-artifact-build.log"
+      },
+      {
+        "name": "sdk-cleanup-resource-and-realm-final-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T08:23:40.136482+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/sdk/client/tests",
+          "packages/subagent/subagent-dsh-sdk/tests",
+          "packages/subagent/subagent/tests/out-of-process.spec.ts",
+          "packages/subagent/subagent/tests/optional-presets.spec.ts",
+          "packages/subagent/subagent/tests/run-settlement.spec.ts",
+          "packages/preset/agent-preset-registry/tests/realm.spec.ts",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/run.ts",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/admission.ts",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+          "--coverage.include=packages/subagent/subagent/src/out-of-process.ts",
+          "--coverage.include=packages/sdk/client/src/dispose.ts",
+          "--coverage.reporter=json",
+          "--coverage.reporter=json-summary",
+          "--coverage.reporter=text",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-cleanup-resource-and-realm-final-coverage"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T08:24:10.837826+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-cleanup-resource-and-realm-final-coverage.log"
+      },
+      {
+        "name": "sdk-cleanup-native-artifact-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T08:19:32.273886+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "DSH_SDK_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-startup-recovery-artifact",
+          "DSH_SDK_CLIENT_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-client-close-recovery-artifact",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/startup-recovery-example.host.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "packages/sdk/client/tests/close-recovery-example.host.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T08:19:37.674326+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-cleanup-native-artifact-node22.log"
+      },
+      {
+        "name": "sdk-cleanup-native-artifact-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T08:20:16.957365+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_EXAMPLE_MODE=lib",
+          "DSH_SDK_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-startup-recovery-artifact",
+          "DSH_SDK_CLIENT_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-client-close-recovery-artifact",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/subagent/subagent-dsh-sdk/tests/startup-recovery-example.host.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/resource-completion-example.host.spec.ts",
+          "packages/sdk/client/tests/close-recovery-example.host.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T08:20:22.336337+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-cleanup-native-artifact-node24.log"
+      },
+      {
+        "name": "sdk-cleanup-final-host-types",
+        "status": "passed",
+        "startedAt": "2026-10-29T08:26:12.948951+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.host.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T08:26:18.332249+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-cleanup-final-host-types.log"
+      },
+      {
+        "name": "sdk-cleanup-final-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-29T08:33:27.035782+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "packages/subagent/subagent-dsh-sdk/src/admission.ts",
+          "packages/subagent/subagent-dsh-sdk/src/run.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/startup-recovery-example.host.spec.ts",
+          "packages/subagent/subagent-dsh-sdk/tests/fixtures/startup-recovery.mjs",
+          "packages/subagent/subagent-dsh-sdk/tests/fixtures/startup-recovery-child.mjs",
+          "packages/sdk/client/src/client.ts",
+          "packages/sdk/client/tests/sdk-client.spec.ts",
+          "packages/sdk/client/tests/close-recovery-example.host.spec.ts",
+          "packages/sdk/client/tests/fixtures/close-recovery.mjs",
+          "packages/sdk/client/tests/fixtures/close-recovery-runtime.mjs",
+          "scripts/coverage-baseline.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T08:33:31.036375+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-cleanup-final-scoped-lint.log"
+      },
+      {
+        "name": "sdk-startup-doc-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-29T07:53:42.678189+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          "packages/subagent/subagent-dsh-sdk/README.md",
+          ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-subagent-process-admission/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T07:53:43.064573+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-startup-doc-pairs.log"
+      },
+      {
+        "name": "sdk-close-doc-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-29T08:16:08.500343+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "verify-translation-pairing",
+          "--write",
+          "packages/sdk/client/README.md",
+          "python/sdk/README.md",
+          ".agents/notes/implemented/architecture/2026-10-24-sdk-subagent-process-ownership.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/sdk-close-recovery/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T08:16:10.720186+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-close-doc-pairs.log"
+      },
+      {
+        "name": "python-sdk-cleanup-node22-with-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T08:23:41.298715+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/python/sdk",
+        "command": [
+          "env",
+          "PATH=/Users/a1234/.nvm/versions/node/v22.22.1/bin:/usr/local/bin:/usr/bin:/bin",
+          "/Users/a1234/.local/bin/uv",
+          "run",
+          "--no-sync",
+          "--with",
+          "coverage",
+          "python",
+          "-m",
+          "coverage",
+          "run",
+          "--branch",
+          "--data-file=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-cleanup-node22-with-coverage.coverage",
+          "--include=*/deepseek_harness/client.py,*/deepseek_harness/api.py",
+          "-m",
+          "pytest",
+          "tests/test_close_recovery.py",
+          "tests/test_close_recovery_snapshot.py",
+          "tests/test_client.py",
+          "tests/test_resume.py",
+          "tests/test_working_directory.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T08:23:51.785917+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-cleanup-node22-with-coverage.log"
+      },
+      {
+        "name": "python-sdk-cleanup-node24-with-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T08:25:31.138995+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/python/sdk",
+        "command": [
+          "env",
+          "PATH=/Users/a1234/.nvm/versions/node/v24.19.0/bin:/usr/local/bin:/usr/bin:/bin",
+          "/Users/a1234/.local/bin/uv",
+          "run",
+          "--no-sync",
+          "--with",
+          "coverage",
+          "python",
+          "-m",
+          "coverage",
+          "run",
+          "--branch",
+          "--data-file=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-cleanup-node24-with-coverage.coverage",
+          "--include=*/deepseek_harness/client.py,*/deepseek_harness/api.py",
+          "-m",
+          "pytest",
+          "tests/test_close_recovery.py",
+          "tests/test_close_recovery_snapshot.py",
+          "tests/test_client.py",
+          "tests/test_resume.py",
+          "tests/test_working_directory.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T08:25:43.028057+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-cleanup-node24-with-coverage.log"
+      },
+      {
+        "name": "python-sdk-cleanup-stdin-close-coverage",
+        "status": "passed",
+        "startedAt": "2026-10-29T08:31:09.639674+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/python/sdk",
+        "command": [
+          "/Users/a1234/.local/bin/uv",
+          "run",
+          "--no-sync",
+          "--with",
+          "coverage",
+          "python",
+          "-m",
+          "coverage",
+          "run",
+          "--append",
+          "--branch",
+          "--data-file=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-cleanup-node24-with-coverage.coverage",
+          "--include=*/deepseek_harness/client.py,*/deepseek_harness/api.py",
+          "-m",
+          "pytest",
+          "tests/test_close_recovery.py",
+          "-k",
+          "stdin"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T08:31:10.009158+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-cleanup-stdin-close-coverage.log"
+      },
+      {
+        "name": "python-sdk-cleanup-final-coverage-report",
+        "status": "passed",
+        "startedAt": "2026-10-29T08:35:03.970010+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/python/sdk",
+        "command": [
+          "/Users/a1234/.local/bin/uv",
+          "run",
+          "--no-sync",
+          "--with",
+          "coverage",
+          "python",
+          "-m",
+          "coverage",
+          "json",
+          "--data-file=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-cleanup-node24-with-coverage.coverage",
+          "-o",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-cleanup-node24-final-coverage.json"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T08:35:04.385825+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-cleanup-final-coverage-report.log"
+      },
+      {
+        "name": "python-sdk-cleanup-scoped-ruff",
+        "status": "passed",
+        "startedAt": "2026-10-29T08:27:10.237442+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python/sdk/.venv/bin/python",
+          "-m",
+          "ruff",
+          "check",
+          "--config",
+          "python/sdk/pyproject.toml",
+          "python/sdk/src/deepseek_harness/client.py",
+          "python/sdk/src/deepseek_harness/api.py",
+          "python/sdk/tests/test_close_recovery.py",
+          "python/sdk/tests/test_close_recovery_snapshot.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T08:27:10.324160+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-cleanup-scoped-ruff.log"
+      }
+    ],
+    "enforcedSourceCoverage": {
+      "total": {
+        "lines": {
+          "total": 527,
+          "covered": 527,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 665,
+          "covered": 665,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 137,
+          "covered": 137,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 360,
+          "covered": 360,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/sdk/client/src/dispose.ts": {
+        "lines": {
+          "total": 41,
+          "covered": 41,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 15,
+          "covered": 15,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 52,
+          "covered": 52,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 27,
+          "covered": 27,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent-dsh-sdk/src/admission.ts": {
+        "lines": {
+          "total": 77,
+          "covered": 77,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 27,
+          "covered": 27,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 101,
+          "covered": 101,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 45,
+          "covered": 45,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent-dsh-sdk/src/bridge.ts": {
+        "lines": {
+          "total": 171,
+          "covered": 171,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 39,
+          "covered": 39,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 229,
+          "covered": 229,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 150,
+          "covered": 150,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent-dsh-sdk/src/managed-budget.ts": {
+        "lines": {
+          "total": 68,
+          "covered": 68,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 15,
+          "covered": 15,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 88,
+          "covered": 88,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 48,
+          "covered": 48,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent-dsh-sdk/src/run.ts": {
+        "lines": {
+          "total": 110,
+          "covered": 110,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 29,
+          "covered": 29,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 123,
+          "covered": 123,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 48,
+          "covered": 48,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/subagent/subagent/src/out-of-process.ts": {
+        "lines": {
+          "total": 60,
+          "covered": 60,
+          "skipped": 0,
+          "pct": 100
+        },
+        "functions": {
+          "total": 12,
+          "covered": 12,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 72,
+          "covered": 72,
+          "skipped": 0,
+          "pct": 100
+        },
+        "branches": {
+          "total": 42,
+          "covered": 42,
+          "skipped": 0,
+          "pct": 100
+        }
+      }
+    },
+    "artifactSourceInputs": {
+      "packages/subagent/subagent-dsh-sdk/src/admission.ts": "f1086b8ca12f1fe7e121241af0bb79b4396b88646da78195718cb07468a743d3",
+      "packages/subagent/subagent-dsh-sdk/src/control-entry.ts": "48b1d20c14274f7e71b8b858f8e96627f3a43ed8aa244aa0da7b8e129e595ea1",
+      "packages/subagent/subagent-dsh-sdk/src/managed.ts": "92a3086666b73e522376976234b0603bb8c264effccc100892cfa448e555d63f",
+      "packages/subagent/subagent-dsh-sdk/src/managed-client.ts": "17b4f9c489619dc1743e9fedccc3284f757907a647841d419e741e0fc4f32366",
+      "packages/subagent/subagent-dsh-sdk/src/managed-budget.ts": "e2e2d22dd8b4d88175aa631aa51f18db7457e122194f8a6320579c67afdcdb7c",
+      "packages/subagent/subagent-dsh-sdk/src/model-relay.ts": "4cea999280fea956e1f15ae1a024b59487bf97df6f40b06cffcc5f2adfaf776f",
+      "packages/subagent/subagent-dsh-sdk/src/bridge.ts": "6e86a1811c18c06404a99fd541f7dcaf94a76a8feff0700b06343827e700c5a9",
+      "packages/subagent/subagent-dsh-sdk/src/channel.ts": "192a6ae5280a26b7ad834b497ed4031150731c1e56ba16e42d26d8809d719d7b",
+      "packages/subagent/subagent-dsh-sdk/src/control.ts": "a97ee359783d3b336a7c09b70fc8e9ad064c97d8217186f8e827f15339dacf77",
+      "packages/subagent/subagent-dsh-sdk/src/index.ts": "d8315384367d712c97b603b419288795e62b35d6942d6718dcff919ca8c079f7",
+      "packages/subagent/subagent-dsh-sdk/src/run.ts": "4d74a2b1eb566420635459e0831b40cb47e469664e83015e94ce57cb7d45dfd6",
+      "packages/sdk/client/src/dispose.ts": "d1e3321d070a1347d4c973695668ae467f55ce7e85a1c8d32efb8398328906f0",
+      "packages/sdk/client/src/launch.ts": "4fe3a1af9416218703908d303fd7e3499968f92c8b7fc16070afb75d4fd16c86",
+      "packages/sdk/client/src/api.ts": "0fad72f18b35e36e916e3565a97512743e2aff05b7b98b52fcefd6abb0b9e970",
+      "packages/sdk/client/src/types.ts": "9fd0c78963d1a5265160553c28f765d6443f1c91314d3cbcd7fbfe03e46ce0fa",
+      "packages/sdk/client/src/client.ts": "8dbc05a98ad83b926c9a56539369ba38218440362c09d8bcc2d6f1eeeb3d42fe",
+      "packages/sdk/client/src/index.ts": "9d25d855266a82a732c19ee6a825621f4284e1368f13818aaf2372c69b512f7f"
+    },
+    "artifactInputsUnchanged": true,
+    "adjacentAssertions": {
+      "receipt": {
+        "name": "sdk-cleanup-complete-provider-coverage",
+        "status": "failed",
+        "startedAt": "2026-10-29T08:20:37.528948+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/sdk/client/tests",
+          "packages/subagent",
+          "--maxWorkers=2",
+          "--coverage",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/run.ts",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/admission.ts",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/bridge.ts",
+          "--coverage.include=packages/subagent/subagent-dsh-sdk/src/managed-budget.ts",
+          "--coverage.include=packages/subagent/subagent/src/out-of-process.ts",
+          "--coverage.include=packages/sdk/client/src/dispose.ts",
+          "--coverage.reporter=json",
+          "--coverage.reporter=text",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-cleanup-complete-provider-coverage"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-29T08:21:49.373117+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-cleanup-complete-provider-coverage.log"
+      },
+      "assertions": 1402,
+      "assertionsPassed": true,
+      "coverageGatePassed": false,
+      "reason": "Shared SSH execution resolver coverage requires the external preset-realm owner suite. The final matched 346-case command includes it and passes every configured threshold."
+    },
+    "typescriptClientDiagnostic": {
+      "receipt": {
+        "name": "sdk-client-close-final-diagnostic-coverage",
+        "status": "failed",
+        "startedAt": "2026-10-29T08:25:32.297922+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/vitest",
+          "run",
+          "packages/sdk/client/tests",
+          "--maxWorkers=2",
+          "--config",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-client-close-coverage.config.mjs",
+          "--coverage",
+          "--coverage.include=packages/sdk/client/src/client.ts",
+          "--coverage.reporter=json",
+          "--coverage.reporter=text",
+          "--coverage.reportsDirectory=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-client-close-final-diagnostic-coverage"
+        ],
+        "exitCode": 1,
+        "finishedAt": "2026-10-29T08:26:05.911687+00:00",
+        "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-client-close-final-diagnostic-coverage.log"
+      },
+      "assertions": 94,
+      "assertionsPassed": true,
+      "coverageGatePassed": false,
+      "statements": 99.27,
+      "branches": 98.82,
+      "functions": 100,
+      "lines": 100,
+      "retainedBaselineExemption": "packages/sdk/client/src/client.ts",
+      "remaining": "Two existing private late-notification guards; no threshold or ignore annotation was changed."
+    },
+    "pythonCoverage": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/python-sdk-cleanup-node24-final-coverage.json",
+      "closeFunctions": {
+        "DeepSeekHarness.close": {
+          "covered_lines": 3,
+          "num_statements": 3,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "HarnessClient.close": {
+          "covered_lines": 2,
+          "num_statements": 2,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "HarnessClient._close_owned_runtime": {
+          "covered_lines": 40,
+          "num_statements": 40,
+          "percent_covered": 98.0,
+          "percent_covered_display": "98",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 10,
+          "num_partial_branches": 1,
+          "covered_branches": 9,
+          "missing_branches": 1,
+          "percent_branches_covered": 90.0,
+          "percent_branches_covered_display": "90"
+        }
+      },
+      "wholeModuleCoverageComplete": false,
+      "remaining": "The real Popen always supplies piped stdin, so the absent-stdin defensive branch was not forced. Other Python client/API paths remain below full coverage."
+    },
+    "sharedFullBuild": {
+      "name": "sdk-startup-full-build",
+      "status": "failed",
+      "startedAt": "2026-10-29T07:53:41.553580+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "node",
+        "--import",
+        "tsx/esm",
+        "scripts/build.ts"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T07:55:07.829307+00:00",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-startup-full-build.log"
+    },
+    "sharedDocQuick": {
+      "name": "sdk-cleanup-doc-quick",
+      "status": "failed",
+      "startedAt": "2026-10-29T08:27:20.207969+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "pnpm",
+        "run",
+        "test:docs"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T08:28:37.331583+00:00",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-cleanup-doc-quick.log"
+    },
+    "sharedGateFollowup": "Peer UI fixes and this audit metadata correction are included in the final passing 8-gate build and 20-gate doc-quick. No repeated peer message was sent.",
+    "sharedFullBuildFinal": {
+      "name": "sdk-cleanup-full-build-final",
+      "status": "passed",
+      "startedAt": "2026-10-29T08:37:24.302466+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "node",
+        "--import",
+        "tsx/esm",
+        "scripts/build.ts"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T08:37:57.634126+00:00"
+    },
+    "sharedDocQuickFinal": {
+      "name": "sdk-cleanup-doc-quick-final",
+      "status": "passed",
+      "startedAt": "2026-10-29T08:41:16.840360+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "pnpm",
+        "run",
+        "test:docs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T08:42:31.491403+00:00"
+    },
+    "pythonLintFinal": {
+      "name": "python-sdk-cleanup-final-ruff",
+      "status": "passed",
+      "startedAt": "2026-10-29T08:37:25.448138+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python/sdk/.venv/bin/python",
+        "-m",
+        "ruff",
+        "check",
+        "--config",
+        "python/sdk/pyproject.toml",
+        "python/sdk/src/deepseek_harness/client.py",
+        "python/sdk/src/deepseek_harness/api.py",
+        "python/sdk/tests/test_close_recovery.py",
+        "python/sdk/tests/test_close_recovery_snapshot.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T08:37:25.471733+00:00"
+    },
+    "finalFormattingProof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-client-final-newline-proof.json",
+    "subsequentSharedDocQuick": {
+      "name": "python-sdk-pipe-final-doc-quick",
+      "status": "passed",
+      "startedAt": "2026-10-29T09:17:29.282253+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "pnpm",
+        "run",
+        "test:docs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-29T09:18:49.054570+00:00"
+    }
+  },
+  "limits": [
+    "B04 full raw/helper/native/Python allocation inventory remains open.",
+    "B25 Linux delegated user-systemd/escaped-descendant integration remains open.",
+    "Peer-owned multi-computer UI, document-copy and routing acceptance remains separate; peer reports are not independent acceptance by this audit.",
+    "Real provider API and public-cloud push validation remain deferred by the human.",
+    "All 12 audit domains remain in progress."
+  ],
+  "coordination": {
+    "peerThread": "01a1821f-1577-7472-93db-3bd83ee42345",
+    "peerTitle": "多电脑连接架构",
+    "outgoingMessagesThisContinuation": 1,
+    "passiveSnapshotsThisContinuation": 2,
+    "scope": "SDK process/permit cleanup, Python/TypeScript SDK admission, resource inventory and audit evidence; no peer UI or routing files edited."
+  },
+  "findings": [
+    "B303"
+  ],
+  "negativeEvidence": [
+    {
+      "name": "sdk-unpublished-startup-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T07:30:18.034673+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/subagent/subagent-dsh-sdk/tests/admission.spec.ts",
+        "-t",
+        "retains failed startup accounting|recovers the original failed startup permit",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T07:30:20.288763+00:00",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-unpublished-startup-causal-before.log"
+    },
+    {
+      "name": "sdk-unpublished-native-negative-current-fixture",
+      "status": "failed",
+      "startedAt": "2026-10-29T07:53:43.103591+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "DSH_SDK_ARTIFACT_ROOT=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T051707Z/sdk-resource-completion-artifact-final",
+        "node_modules/.bin/vitest",
+        "run",
+        "packages/subagent/subagent-dsh-sdk/tests/startup-recovery-example.host.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T07:53:47.538616+00:00",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T072413Z/sdk-unpublished-native-negative-current-fixture.log"
+    }
+  ],
+  "phaseClosedAt": "2026-10-29T08:46:18.671111+00:00",
+  "pythonTransportFollowup": "receipts/python-sdk-pipe-backpressure-2026-10-29.json"
+}

@@ -1,0 +1,11 @@
+{"label":"independent-same-host-identities","accepted":[200,200],"distinctArchiveIds":true,"originalHostIds":true}
+{"label":"bounded-local-admin-reads","ownBodies":true,"ownExports":true,"foreignComputerReads":404,"foreignComputerMutation":false,"rpcIdentityChecked":true}
+{"label":"authenticated-session-http-namespace","independentWriters":2,"originalHostIds":true,"independentBatchReplay":true,"foreignCursor":400,"foreignToken":401,"siblingBodySurvivesDelete":true}
+{"label":"fallback-session-namespace","owningEvents":1,"otherRuntimeEvents":0,"otherRuntimeSearchHits":0}
+{"label":"command-and-purge-isolation","hostCommandsPreserved":true,"wrongRuntimeAck":409,"otherRuntimeState":"trash","otherRuntimeDataRetained":true,"otherRuntimeFileRetained":true}
+{"label":"replay-and-wire-refusals","stableTombstone":true,"tombstoneSearchRows":0,"foreignCredential":401,"malformedOrDuplicateIds":400,"legacyRootRoute":410}
+{"label":"sibling-runtime-namespace","distinctArchiveId":true,"borrowedEvents":0,"foreignExistingDraft":"refused"}
+{"label":"recent-conversation-namespace","owningRestoredRootVisible":true,"siblingTombstoneIndependent":true}
+{"label":"blank-draft-archive-lifecycle","canonicalRetry":true,"archivedReservation":400,"archivedCleanupCandidate":false,"recentlyRestoredCleanupCandidate":false}
+{"label":"runtime-qualified-empty-maintenance","sameHostCandidates":2,"unqualifiedOrDuplicate":400,"foreignComputerTrashed":0,"exactSelectedPairTrashed":1,"siblingDraftRetained":true}
+{"label":"nul-text-through-runtime-http","append":200,"indexedRoles":3,"originalEventText":true,"historyPreviewsOriginal":true,"archiveSync":200,"literalNulFilter":200,"encodedEscapeDoesNotMatch":true,"foreignComputerArchiveVisible":false}

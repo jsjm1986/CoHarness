@@ -42,7 +42,7 @@ export function CordisRunRow(props: CordisRunRowProps) {
 
 function StartedCordisRunRow({
   callId, block, inspect, renderSlot, useInventory, useLoaded, useRunCards, useActiveRuns,
-  onObserveRunCard, t,
+  onObserveRunCard, viewPrefix, t,
 }: Exclude<CordisRunRowProps, { phase: 'preparing' }>) {
   const card = cordisRunCard(block)
   const inventory = useInventory(snapshot => snapshot)
@@ -54,7 +54,7 @@ function StartedCordisRunRow({
     && card.packageId !== null
     && card.pluginRunId !== null
     && card.seq !== null
-    ? cordisToolViewKey(card.pluginId, card.packageId)
+    ? cordisToolViewKey(card.pluginId, card.packageId, viewPrefix)
     : null
   useEffect(() => {
     if (key === null || card.seq === null || card.pluginRunId === null) return

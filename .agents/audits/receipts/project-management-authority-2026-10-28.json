@@ -1,0 +1,523 @@
+{
+  "finding": "B232",
+  "status": "named_business_acceptance_verified_coverage_debt_open",
+  "updatedAt": "2026-10-27T22:16:10.700047+00:00",
+  "scope": "Transaction-owned current manager admission for project name, theme, model settings, credential set/unset and model-discovery credential preparation. This does not certify every project, account or administrator mutation.",
+  "baseline": {
+    "branch": "codex/business-logic-audit-2026-10-23",
+    "remote": "origin/master",
+    "fetchExitCode": 0,
+    "ahead": 139,
+    "behind": 0,
+    "existingDirtyEditsPreserved": true
+  },
+  "negativeControls": {
+    "actualPostgresHttpCasesFailedBeforeFix": 2,
+    "oldRenameStatus": 204,
+    "oldThemeStatus": 200,
+    "expectedStatus": 403,
+    "previousEmittedOperationsFailed": [
+      "name",
+      "theme",
+      "models",
+      "credential-set",
+      "credential-unset",
+      "discover"
+    ],
+    "interleaving": "Capture the real HTTP project view, commit an ownership transfer in PostgreSQL, then release the request. No simulated authorization result or live model is used."
+  },
+  "fixes": [
+    "Pass the authenticated server actor through browser and administrator rename consumers. Client-supplied actor fields cannot select another account.",
+    "Retain raw active account and organization membership locks, lock the selected current project, and re-read ownership, membership and steward qualification inside the same transaction as the mutation.",
+    "Keep canonical account-before-project lock order. A role revocation waits behind an already-admitted short writer; a following writer is denied.",
+    "Prepare stored model credentials in the admitted transaction using its existing connection. Release the database transaction before the discovery network probe, including when the pool has only one connection.",
+    "Keep actor omission available only for trusted internal maintenance. No database schema or external request fields change."
+  ],
+  "acceptance": {
+    "sourceCasesPassed": 126,
+    "sourceFilesPassed": 5,
+    "skipped": 0,
+    "newAuthorityModuleStrictCoverage": "100 percent statements, branches, functions and lines with per-file100 thresholds unchanged.",
+    "sourceAuthorityStates": [
+      "current owner",
+      "current administrator",
+      "ordinary rw member",
+      "disabled account",
+      "disabled membership",
+      "deleted account",
+      "removed membership",
+      "disabled organization",
+      "archived project",
+      "missing project",
+      "qualified steward",
+      "unqualified steward",
+      "steward administrator downgrade"
+    ],
+    "postgresLockLifetime": "A real competing project lock and actor-role revocation prove queue ordering. The already-admitted manager commits before role revocation; the next mutation is refused.",
+    "singleConnectionPreparation": "All four source model mutation/preparation cases use max1 pool. The loopback catalog handler acquires that same pool before responding, proving the network probe does not retain its preparation transaction.",
+    "sqlite": "Current owner rename, ownership transfer refusal, administrator rename, disabled administrator refusal and missing project behavior pass.",
+    "assembledHttp": {
+      "operationsPerRuntime": 6,
+      "sourceReplay": true,
+      "plainNode22": "v22.22.1 passed",
+      "plainNode24": "v24.19.0 passed",
+      "assertions": [
+        "former owner403",
+        "data, encrypted credentials and configuration revision preserved",
+        "no successful mutation audit for denied write",
+        "no unauthorized catalog probe",
+        "spoofed administrator actor ignored",
+        "current owner action succeeds"
+      ]
+    },
+    "gatewayCompile": "Direct emitted tsc build and noEmit compiler passed. Root/core artifacts were unchanged in this scope.",
+    "lint": "All7 source and4 test/fixture files passed scoped oxlint.",
+    "documentation": "3 named bilingual pairs recorded and current20 quick documentation gates plus persistence history passed.",
+    "liveModelApiUsed": false
+  },
+  "coverage": {
+    "metrics": {
+      "authority": {
+        "total": {
+          "statements": 100,
+          "branches": 100,
+          "functions": 100,
+          "lines": 100
+        },
+        "gateway/src/postgres/project-management-authority.ts": {
+          "statements": 100,
+          "branches": 100,
+          "functions": 100,
+          "lines": 100
+        }
+      },
+      "selectedClasses": {
+        "total": {
+          "statements": 41.66,
+          "branches": 31.97,
+          "functions": 51.38,
+          "lines": 44.79
+        },
+        "gateway/src/projects.ts": {
+          "statements": 81.16,
+          "branches": 69.07,
+          "functions": 93.02,
+          "lines": 84.04
+        },
+        "gateway/src/postgres/model-governance-service.ts": {
+          "statements": 21.43,
+          "branches": 15.48,
+          "functions": 30.48,
+          "lines": 23.68
+        },
+        "gateway/src/postgres/project-management-authority.ts": {
+          "statements": 100,
+          "branches": 100,
+          "functions": 100,
+          "lines": 100
+        },
+        "gateway/src/postgres/project-service.ts": {
+          "statements": 75.54,
+          "branches": 65,
+          "functions": 86.66,
+          "lines": 84.75
+        }
+      }
+    },
+    "authorityReport": "gateway/coverage/project-management-authority-final-20261028/coverage-summary.json",
+    "selectedClassesReport": "gateway/coverage/project-management-source-current-20261028/coverage-summary.json",
+    "limitations": "The broader diagnostic four-module report is below100percent. Its126 cases precede only the final stronger pool-release assertion, which passes in the final strict helper run. Child-process HTTP execution does not imply parent-process coverage. No whole-file or whole-domain review completion is claimed.",
+    "thresholdsLowered": false,
+    "exclusionsAdded": false
+  },
+  "performance": {
+    "before": {
+      "renames": 50,
+      "themeChanges": 50,
+      "warmupWrites": 10,
+      "durationMs": 54.74200000000002,
+      "heapBefore": 7908360,
+      "peakHeap": 10423880,
+      "heapAfter": 8104264,
+      "maxRssKiB": 87680
+    },
+    "after": {
+      "renames": 50,
+      "themeChanges": 50,
+      "warmupWrites": 10,
+      "durationMs": 171.66108300000002,
+      "heapBefore": 7961216,
+      "peakHeap": 11532304,
+      "heapAfter": 8368960,
+      "maxRssKiB": 91008
+    },
+    "durationIncreaseMs": 116.919,
+    "durationIncreasePercent": 213.58,
+    "addedMsPerMutation": 1.169,
+    "runtime": "macOS Node v24.19.0 and PostgreSQL18.6",
+    "dataset": "50 renames and50 theme writes per process,10 warmup writes; same current active administrator, same disposable PostgreSQL, archived prior emitted artifact versus current emitted artifact.",
+    "interpretation": "One bounded sample measures additional permission-query and transaction cost. This is not a throughput guarantee; larger deployment performance remains open."
+  },
+  "notes": {
+    "updatedExisting": [
+      ".agents/notes/implemented/feature/2026-08-28-project-scoped-settings-management.md"
+    ],
+    "new": [],
+    "archived": [],
+    "deleted": [],
+    "reason": "Current manager write lifetime extends the existing project-scoped settings decision. Independent role/visibility and zero-pool-RPC guard notes remain useful."
+  },
+  "unsuccessfulEvidencePreserved": [
+    "Two real HTTP negative controls and all6 previous-emitted manager operations fail before the repair.",
+    "An initial TypeScript test used Promise.withResolvers beyond the configured es2023 library; explicit promises repaired the fixture and the current compiler passes.",
+    "The initial selected-class coverage did not execute model governance in the measuring process. Four direct source cases now measure those selected methods; unexercised class paths remain open.",
+    "The pnpm wrapper for an earlier emitted build printed a standalone-workspace package-resolution warning despite invoking tsc. The final direct Gateway tsc build is the accepted command."
+  ],
+  "cleanup": {
+    "owned": true,
+    "name": "hgw-project-manager-60a7d963",
+    "id": "beb9ef6daff00ac11c8e1e7d17266f04765f9f01fa00ffa0d86e99e4de5a010a",
+    "database": "hgw_projects_test",
+    "createdAt": "2026-10-27T21:44:23.523161+00:00",
+    "productionPortExcluded": 5432,
+    "status": "stopped_and_removed_after_verification",
+    "port": 63911,
+    "url": "postgresql://postgres@127.0.0.1:63911/hgw_projects_test",
+    "cleanedAt": "2026-10-27T22:14:53.739608+00:00",
+    "version": "PostgreSQL 18.6 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+    "archiveDependencyLinkRemoved": true,
+    "productionDataAccessed": false
+  },
+  "limitations": [
+    "Whole-project review and all12 domain completion remain open.",
+    "Other administrator writes, project/member deletion and runtime grant lifetime remain separate review scopes.",
+    "Organization availability is checked freshly after project admission; this is not an organization-wide revocation lease.",
+    "An already-prepared discovery probe may finish with its captured credential after permission changes; the network stage holds no database connection. This is catalog preparation, not inference admission.",
+    "The human continues to defer live model API success verification."
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "commandReceipts": [
+    {
+      "name": "project-manager-http-negative",
+      "status": "failed",
+      "startedAt": "2026-10-27T21:44:30.890897+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:63911/hgw_projects_test",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/project-service-postgres.spec.ts",
+        "-t",
+        "former owner changing project",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T21:44:33.569889+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-http-negative.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-http-negative.log"
+    },
+    {
+      "name": "project-manager-previous-emitted-negative",
+      "status": "failed",
+      "startedAt": "2026-10-27T21:53:00.281843+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "DSH_EXAMPLE_MODE=lib",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:63911/hgw_projects_test",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/project-management-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-27T21:53:02.737106+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-previous-emitted-negative.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-previous-emitted-negative.log"
+    },
+    {
+      "name": "project-manager-source-model-lifetimes",
+      "status": "passed",
+      "startedAt": "2026-10-27T22:05:39.717921+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:63911/hgw_projects_test",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/project-service-postgres.spec.ts",
+        "tests/project-management-transcript.spec.ts",
+        "tests/projects.spec.ts",
+        "tests/project-model-settings.spec.ts",
+        "tests/admin-api.spec.ts",
+        "--maxWorkers=2",
+        "--coverage",
+        "--coverage.include=src/postgres/project-management-authority.ts",
+        "--coverage.include=src/postgres/project-service.ts",
+        "--coverage.include=src/postgres/model-governance-service.ts",
+        "--coverage.include=src/projects.ts",
+        "--coverage.reportsDirectory=coverage/project-management-source-current-20261028",
+        "--coverage.reporter=json",
+        "--coverage.reporter=json-summary",
+        "--coverage.reporter=text"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T22:05:49.391134+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-source-model-lifetimes.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-source-model-lifetimes.log"
+    },
+    {
+      "name": "project-manager-final-lint",
+      "status": "passed",
+      "startedAt": "2026-10-27T22:10:02.342641+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_OXLINT_THREADS=1",
+        "node_modules/.bin/tsx",
+        "scripts/run-oxlint.ts",
+        "gateway/src/postgres/project-management-authority.ts",
+        "gateway/src/postgres/project-service.ts",
+        "gateway/src/postgres/model-governance-service.ts",
+        "gateway/src/projects.ts",
+        "gateway/src/services.ts",
+        "gateway/src/server.ts",
+        "gateway/src/admin-api.ts",
+        "gateway/tests/project-service-postgres.spec.ts",
+        "gateway/tests/projects.spec.ts",
+        "gateway/tests/project-management-transcript.spec.ts",
+        "gateway/tests/fixtures/project-management.mjs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T22:10:03.358719+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-final-lint.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-final-lint.log"
+    },
+    {
+      "name": "project-manager-strict-authority-coverage",
+      "status": "passed",
+      "startedAt": "2026-10-27T22:10:03.386000+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:63911/hgw_projects_test",
+        "../node_modules/.bin/vitest",
+        "run",
+        "tests/project-service-postgres.spec.ts",
+        "tests/project-management-transcript.spec.ts",
+        "tests/projects.spec.ts",
+        "tests/project-model-settings.spec.ts",
+        "tests/admin-api.spec.ts",
+        "--maxWorkers=2",
+        "--coverage",
+        "--coverage.include=src/postgres/project-management-authority.ts",
+        "--coverage.reportsDirectory=coverage/project-management-authority-final-20261028",
+        "--coverage.reporter=json",
+        "--coverage.reporter=json-summary",
+        "--coverage.reporter=text",
+        "--coverage.thresholds.perFile",
+        "--coverage.thresholds.statements=100",
+        "--coverage.thresholds.branches=100",
+        "--coverage.thresholds.functions=100",
+        "--coverage.thresholds.lines=100"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T22:10:11.917074+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-strict-authority-coverage.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-strict-authority-coverage.log"
+    },
+    {
+      "name": "project-manager-final-gateway-build",
+      "status": "passed",
+      "startedAt": "2026-10-27T22:10:11.942102+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--project",
+        "tsconfig.build.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T22:10:13.969062+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-final-gateway-build.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-final-gateway-build.log"
+    },
+    {
+      "name": "project-manager-final-gateway-types",
+      "status": "passed",
+      "startedAt": "2026-10-27T22:10:13.993476+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "../node_modules/.bin/tsc",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T22:10:17.046915+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-final-gateway-types.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-final-gateway-types.log"
+    },
+    {
+      "name": "project-manager-emitted-node22",
+      "status": "passed",
+      "startedAt": "2026-10-27T22:10:17.073459+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:63911/hgw_projects_test",
+        "DSH_EXAMPLE_MODE=lib",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/project-management-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T22:10:18.956679+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-emitted-node22.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-emitted-node22.log"
+    },
+    {
+      "name": "project-manager-emitted-node24",
+      "status": "passed",
+      "startedAt": "2026-10-27T22:10:18.981126+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:63911/hgw_projects_test",
+        "DSH_EXAMPLE_MODE=lib",
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/project-management-transcript.spec.ts",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T22:10:20.741279+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-emitted-node24.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-emitted-node24.log"
+    },
+    {
+      "name": "project-manager-doc-pairs",
+      "status": "passed",
+      "startedAt": "2026-10-27T22:10:20.767036+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/tsx",
+        "scripts/verify-translation-pairing.ts",
+        "--write",
+        "gateway/README.md",
+        ".agents/notes/implemented/feature/2026-08-28-project-scoped-settings-management.md",
+        "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-manager-authority/guide.md"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T22:10:21.256971+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-doc-pairs.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-doc-pairs.log"
+    },
+    {
+      "name": "project-manager-doc-quick",
+      "status": "passed",
+      "startedAt": "2026-10-27T22:10:21.281542+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "DSH_GATE_CONCURRENCY=1",
+        "pnpm",
+        "run",
+        "test:docs"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T22:11:53.805494+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-doc-quick.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-doc-quick.log"
+    },
+    {
+      "name": "project-manager-persistence-history",
+      "status": "passed",
+      "startedAt": "2026-10-27T22:11:53.834744+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "node_modules/.bin/tsx",
+        "scripts/persistence-changes.ts",
+        "--check"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T22:12:00.726174+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-persistence-history.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-persistence-history.log"
+    },
+    {
+      "name": "project-manager-perf-before",
+      "status": "passed",
+      "startedAt": "2026-10-27T22:14:19.443148+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:63911/hgw_projects_test",
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "--expose-gc",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-performance.mjs",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-before-lib"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T22:14:19.687281+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-perf-before.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-perf-before.log"
+    },
+    {
+      "name": "project-manager-perf-after",
+      "status": "passed",
+      "startedAt": "2026-10-27T22:14:19.713082+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:63911/hgw_projects_test",
+        "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+        "--expose-gc",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-performance.mjs",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/lib"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T22:14:20.019482+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-perf-after.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-perf-after.log"
+    },
+    {
+      "name": "project-manager-cleanup",
+      "status": "passed",
+      "startedAt": "2026-10-27T22:14:53.270526+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/cleanup-project-manager.py"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T22:14:53.744187+00:00",
+      "receipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-cleanup.json",
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/project-manager-cleanup.log"
+    }
+  ],
+  "sourceSha256": {
+    "gateway/src/postgres/project-management-authority.ts": "2a87ec2cf2f63399f72367cfc71d7db9c9da30a9ddbf05e540646952b8ba0855",
+    "gateway/src/postgres/project-service.ts": "d8e84deccf90b2945572844090b88dd08c08d4d4901d911339069a09daf75403",
+    "gateway/src/postgres/model-governance-service.ts": "8b7d83d7f6898f3caf7270e187fab4f004e4328988c279eab88ff3771f4fb8f9",
+    "gateway/src/projects.ts": "aeb7b4ae504e548feced758962948e6c6953910e0ed7a049fa8daeeb77d8e5c9",
+    "gateway/src/services.ts": "4de61e62c92e21ac322d9e0c5d0f448ee58ebb53b2d9bb0135b56292c1fcf825",
+    "gateway/src/server.ts": "cf615fc88c673c31a346a0a142c6db082cd0eadbe6a39104b48d4ab84008e1cf",
+    "gateway/src/admin-api.ts": "927295305f33f2d1b4b4ee4f5653e594f93b95d11b4bcddb9fe2292b376c5228",
+    "gateway/tests/project-service-postgres.spec.ts": "bad35093d08e2a47152a57e1e15c8a69e1302200f4e4b22825103298354ce9c1",
+    "gateway/tests/projects.spec.ts": "9a962e8dd08d7ce66f5db12763a21b748fd859cf2aeea49d4208d6497d351046",
+    "gateway/tests/project-management-transcript.spec.ts": "9a0cade2c5b2e0e11655bd1bf8db97713642a7b58cfb16d2970baae7d17de088",
+    "gateway/tests/fixtures/project-management.mjs": "eb39cfcf77a3ed2646525b838fd6888a15c5f85ceff59282a161a90c8c815409",
+    "gateway/tests/expected/projects/management.jsonl": "b698db813d655b52e1ab9b3ddc5295f2ff0a7cbfdcdc89ce90bf9c3e32ab5b6c",
+    "gateway/README.md": "37b1a96106df871d778b1e77c747301ae157b6288dff7d94c2e6819eed9d80c8",
+    "gateway/README.zh.md": "9f66a7ca0d7693ff37b1c1434b489fb67ccc801cb421a08d499edfa21205f953",
+    "gateway/README.i18n.yaml": "4823efb5ee1c8575285d5b407b1a1120941f3425791c4cc71657c9b63e7c02d3",
+    ".agents/notes/implemented/feature/2026-08-28-project-scoped-settings-management.md": "bcdd113a49922613a25fd94d3383815cb5f04a7494d750058d7e5aaf9bfd4b5a",
+    ".agents/notes/implemented/feature/2026-08-28-project-scoped-settings-management.zh.md": "c28476a3f8e41765ee51a60b497b8b452203a712bf03d540ab75e615a9815aaa",
+    ".agents/notes/implemented/feature/2026-08-28-project-scoped-settings-management.i18n.yaml": "5b36763138cb29e868d2c2e8dc07675e88549cd2d98d57652639f0c127857875",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-manager-authority/guide.md": "17709f04ca6f48be7e8ba215ba761f15d5057b64c4b1d9cf96af204bb1eaf60c",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-manager-authority/guide.zh.md": "4722c4a4329247fd45a6bc8a682dd7021308d3bdce16560992131544c34ceed9",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-manager-authority/guide.i18n.yaml": "26f0e10615e020b6da3530518aeb2abe337a1e836695eb6cdc2fb34fc7cc36ff"
+  }
+}

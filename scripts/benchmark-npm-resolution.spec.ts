@@ -162,6 +162,57 @@ describe('npm resolution benchmark', () => {
     expect(result.unknownPackages).toEqual([])
   }, NPM_TEST_TIMEOUT_MS)
 
+  it('retains published dependency ranges while supplementing uninstalled external versions', async ({ signal }) => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-npm-registry-supplement-'))
+    roots.push(root)
+    writeJson(root, 'apps/cli/package.json', {
+      name: '@deepseek-ai/dsh', version: '0.1.0', dependencies: { external: '2.0.0' },
+    })
+    writeJson(root, 'node_modules/.pnpm/external@2.0.0/node_modules/external/package.json', {
+      name: 'external', version: '2.0.0', dependencies: { child: '1.0.0' },
+    })
+    writeJson(root, 'node_modules/.pnpm/child@2.0.0/node_modules/child/package.json', { name: 'child', version: '2.0.0' })
+    writeJson(root, 'scripts/fixtures/npm-resolution-published-metadata.json', {
+      schemaVersion: 1, registry: 'https://registry.npmjs.org', manifests: [{ name: 'child', version: '1.0.0' }],
+    })
+    const index = buildRegistryIndex(root)
+    expect(index.get('external')?.get('2.0.0')?.dependencies).toEqual({ child: '1.0.0' })
+    expect([...index.get('child')!.keys()].sort()).toEqual(['1.0.0', '2.0.0'])
+    const result = await resolveNpmPackageLock(index, { '@deepseek-ai/dsh': '0.1.0' }, NPM_TIMEOUT_MS, undefined, signal)
+    expect(result.packageLock.packages['node_modules/child']?.version).toBe('1.0.0')
+    expect(result.archiveRequests).toBe(0)
+    expect(result.unknownPackages).toEqual([])
+  }, NPM_TEST_TIMEOUT_MS)
+
+  it.each(['workspace', 'installed', 'invalid'] as const)('rejects %s metadata from the published-version supplement', (conflict) => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-npm-registry-conflict-'))
+    roots.push(root)
+    writeJson(root, 'apps/cli/package.json', { name: '@deepseek-ai/dsh', version: '0.1.0' })
+    writeJson(root, 'node_modules/.pnpm/external@2.0.0/node_modules/external/package.json', { name: 'external', version: '2.0.0' })
+    const manifest = conflict === 'workspace' ? { name: '@deepseek-ai/dsh', version: '0.0.1' }
+      : conflict === 'installed' ? { name: 'external', version: '2.0.0', dependencies: { child: '1.0.0' } }
+        : { name: 'external', version: 'not-a-version' }
+    writeJson(root, 'scripts/fixtures/npm-resolution-published-metadata.json', {
+      schemaVersion: 1, registry: 'https://registry.npmjs.org', manifests: [manifest],
+    })
+    expect(() => buildRegistryIndex(root)).toThrow()
+  })
+
+  it.each(['identical', 'duplicate', 'registry', 'range'] as const)('checks %s records before extending the local registry', (kind) => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-npm-registry-record-'))
+    roots.push(root)
+    writeJson(root, 'apps/cli/package.json', { name: '@deepseek-ai/dsh', version: '0.1.0' })
+    writeJson(root, 'node_modules/.pnpm/external@2.0.0/node_modules/external/package.json', { name: 'external', version: '2.0.0' })
+    const manifest = { name: 'external', version: '2.0.0', dependencies: {} }
+    writeJson(root, 'scripts/fixtures/npm-resolution-published-metadata.json', {
+      schemaVersion: 1, registry: kind === 'registry' ? 'https://untrusted.invalid' : 'https://registry.npmjs.org',
+      manifests: kind === 'duplicate' ? [manifest, manifest] : kind === 'range'
+        ? [{ ...manifest, dependencies: { child: 42 } }] : [manifest],
+    })
+    if (kind === 'identical') expect(buildRegistryIndex(root).get('external')?.get('2.0.0')).toEqual({ name: 'external', version: '2.0.0' })
+    else expect(() => buildRegistryIndex(root)).toThrow()
+  })
+
   it('returns npm placement for two aliased package versions without requesting archives', async ({ signal }) => {
     const index: RegistryIndex = new Map([[
       '@deepseek-ai/dsh',

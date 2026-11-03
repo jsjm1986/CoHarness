@@ -1,0 +1,64 @@
+{"operation":"create","change":"role","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"create","change":"disabled-account","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"create","change":"deleted-account","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"create","change":"disabled-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"create","change":"missing-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"create","change":"disabled-organization","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"create","change":"current","status":200,"error":null,"endpointRows":2,"revision":"1","enabled":false,"receipts":0,"successfulAudit":1}
+{"operation":"update","change":"role","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"update","change":"disabled-account","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"update","change":"deleted-account","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"update","change":"disabled-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"update","change":"missing-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"update","change":"disabled-organization","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"update","change":"current","status":200,"error":null,"endpointRows":1,"revision":"2","enabled":false,"receipts":0,"successfulAudit":1}
+{"operation":"enable","change":"role","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"enable","change":"disabled-account","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"enable","change":"deleted-account","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"enable","change":"disabled-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"enable","change":"missing-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"enable","change":"disabled-organization","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"enable","change":"current","status":200,"error":null,"endpointRows":1,"revision":"2","enabled":true,"receipts":0,"successfulAudit":1}
+{"operation":"disable","change":"role","status":403,"error":"forbidden","endpointRows":1,"revision":"2","enabled":true,"receipts":0,"successfulAudit":0}
+{"operation":"disable","change":"disabled-account","status":403,"error":"forbidden","endpointRows":1,"revision":"2","enabled":true,"receipts":0,"successfulAudit":0}
+{"operation":"disable","change":"deleted-account","status":403,"error":"forbidden","endpointRows":1,"revision":"2","enabled":true,"receipts":0,"successfulAudit":0}
+{"operation":"disable","change":"disabled-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"2","enabled":true,"receipts":0,"successfulAudit":0}
+{"operation":"disable","change":"missing-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"2","enabled":true,"receipts":0,"successfulAudit":0}
+{"operation":"disable","change":"disabled-organization","status":403,"error":"forbidden","endpointRows":1,"revision":"2","enabled":true,"receipts":0,"successfulAudit":0}
+{"operation":"disable","change":"current","status":200,"error":null,"endpointRows":1,"revision":"3","enabled":false,"receipts":0,"successfulAudit":1}
+{"operation":"remove","change":"role","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"remove","change":"disabled-account","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"remove","change":"deleted-account","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"remove","change":"disabled-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"remove","change":"missing-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"remove","change":"disabled-organization","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"remove","change":"current","status":200,"error":null,"endpointRows":0,"revision":null,"enabled":null,"receipts":0,"successfulAudit":1}
+{"operation":"list","change":"role","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"list","change":"disabled-account","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"list","change":"deleted-account","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"list","change":"disabled-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"list","change":"missing-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"list","change":"disabled-organization","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"list","change":"current","status":200,"error":null,"endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"receipts","change":"role","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"receipts","change":"disabled-account","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"receipts","change":"deleted-account","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"receipts","change":"disabled-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"receipts","change":"missing-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"receipts","change":"disabled-organization","status":403,"error":"forbidden","endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"receipts","change":"current","status":200,"error":null,"endpointRows":1,"revision":"1","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"redispatch","change":"role","status":403,"error":"forbidden","endpointRows":1,"revision":"2","enabled":true,"receipts":1,"successfulAudit":0}
+{"operation":"redispatch","change":"disabled-account","status":403,"error":"forbidden","endpointRows":1,"revision":"2","enabled":true,"receipts":1,"successfulAudit":0}
+{"operation":"redispatch","change":"deleted-account","status":403,"error":"forbidden","endpointRows":1,"revision":"2","enabled":true,"receipts":1,"successfulAudit":0}
+{"operation":"redispatch","change":"disabled-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"2","enabled":true,"receipts":1,"successfulAudit":0}
+{"operation":"redispatch","change":"missing-membership","status":403,"error":"forbidden","endpointRows":1,"revision":"2","enabled":true,"receipts":1,"successfulAudit":0}
+{"operation":"redispatch","change":"disabled-organization","status":403,"error":"forbidden","endpointRows":1,"revision":"2","enabled":true,"receipts":1,"successfulAudit":0}
+{"operation":"redispatch","change":"current","status":200,"error":null,"endpointRows":1,"revision":"2","enabled":true,"receipts":2,"successfulAudit":1}
+{"operation":"redispatch","change":"disabled-intake","status":200,"error":null,"endpointRows":1,"revision":"3","enabled":false,"receipts":2,"successfulAudit":1}
+{"operation":"intake","change":"disable","status":404,"error":"webhook endpoint not found","endpointRows":1,"revision":"3","enabled":false,"receipts":0,"successfulAudit":0}
+{"operation":"intake","change":"rotate","status":409,"error":"webhook endpoint changed; retry delivery","endpointRows":1,"revision":"3","enabled":true,"receipts":0,"successfulAudit":0}
+{"operation":"intake","change":"remove","status":404,"error":"webhook endpoint not found","endpointRows":0,"revision":null,"enabled":null,"receipts":0,"successfulAudit":0}
+{"operation":"intake","change":"disabled-organization","status":404,"error":"webhook endpoint not found","endpointRows":1,"revision":"2","enabled":true,"receipts":0,"successfulAudit":0}
+{"operation":"intake","change":"current","status":202,"error":null,"endpointRows":1,"revision":"2","enabled":true,"receipts":1,"successfulAudit":0}
+{"operation":"intake","change":"nonfinite-payload","status":400,"error":"webhook payload is not lossless JSON","endpointRows":1,"revision":"2","enabled":true,"receipts":0,"successfulAudit":0}
+{"operation":"intake","change":"finite-payload","status":202,"error":null,"endpointRows":1,"revision":"2","enabled":true,"receipts":1,"successfulAudit":0}

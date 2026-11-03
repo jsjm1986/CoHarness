@@ -1,6 +1,12 @@
 /** Browser-safe desktop confirmation data; no Host service declarations. */
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
+/** A configured native provider cannot operate a missing or explicitly disabled desktop. */
+export type ComputerUseUnavailableReason = 'headless' | 'disabled'
+
+/** Current provider availability, or current-user confirmation when a desktop policy exists. */
+export type DesktopStatus = DesktopConfirmation | { readonly unavailableReason: ComputerUseUnavailableReason } | null
+
 /** Live coordinator occupancy of the addressed desktop resource. */
 export interface DesktopOccupancy {
   /** The resource accepts new work; `unavailable` blocks every caller. */

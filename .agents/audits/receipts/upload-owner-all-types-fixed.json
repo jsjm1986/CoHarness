@@ -1,0 +1,14 @@
+{
+  "name": "upload-owner-all-types-fixed",
+  "cwd": "gateway",
+  "command": "../node_modules/.bin/tsc --noEmit",
+  "startedAt": "2026-10-25T10:18:12.578451+00:00",
+  "seconds": 10.129,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "30f5981afeb13ba3319473ada0ec3e79341f86a9bf501ac9012a8c86777e692e",
+  "inputsAfter": "30f5981afeb13ba3319473ada0ec3e79341f86a9bf501ac9012a8c86777e692e",
+  "postgresToolDirectory": null,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "outputTail": ""
+}

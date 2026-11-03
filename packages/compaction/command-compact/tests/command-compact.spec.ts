@@ -154,6 +154,78 @@ function expectLastLifecycle(
 }
 
 describe('@deepseek-ai/dsh-command-compact registration', () => {
+  it('runs manual compaction under the attested command initiator', async () => {
+    const test = await harness()
+    const admitted: unknown[] = []
+    let inside = false
+    test.ctx.provide('executionAuthority', {
+      async runRequest(agent: Agent, input: unknown, work: () => unknown) {
+        expect(agent).toBe(test.agent)
+        admitted.push(input)
+        inside = true
+        try { return await work() } finally { inside = false }
+      },
+    } as never)
+    test.compact.operation = async () => {
+      expect(inside).toBe(true)
+      return null
+    }
+    try {
+      expect((await run(test)).result).toEqual({ kind: 'success', text: 'No compactable history yet.' })
+      expect(admitted).toEqual([{ command: 'compact', input: '' }])
+    } finally { await test.ctx.fiber.dispose() }
+  })
+
+  it('refuses managed manual compaction when its authority is unavailable', async () => {
+    const test = await harness()
+    test.ctx.provide('executionAuthorityRequired', true)
+    try {
+      await expect(run(test)).rejects.toThrow('Managed execution requires its authorization provider.')
+      expect(test.compact.calls).toEqual([])
+    } finally { await test.ctx.fiber.dispose() }
+  })
+
+  it('does not enter compaction after the command initiator is denied', async () => {
+    const test = await harness()
+    const denied = new Error('Caller cannot execute this command')
+    test.ctx.provide('executionAuthority', { runRequest: async () => { throw denied } } as never)
+    try {
+      await expect(run(test)).rejects.toBe(denied)
+      expect(test.compact.calls).toEqual([])
+    } finally { await test.ctx.fiber.dispose() }
+  })
+
+  it.each(['cancelled', 'replaced'] as const)('does not enter compaction when admission is %s while awaiting authority', async (change) => {
+    const test = await harness()
+    const entered = Promise.withResolvers<undefined>()
+    const proceed = Promise.withResolvers<undefined>()
+    const authority = { async runRequest(_agent: Agent, _input: unknown, work: () => unknown) {
+      entered.resolve(undefined)
+      await proceed.promise
+      return await work()
+    } }
+    const remove = test.ctx.provide('executionAuthority', authority as never)
+    const controller = new AbortController()
+    const cancelled = new Error('Cancel the pending command')
+    const operation = run(test, '', controller)
+    const outcome = change === 'cancelled' ? expect(operation).rejects.toBe(cancelled)
+      : expect(operation).rejects.toThrow('The execution authority changed before manual compaction.')
+    try {
+      await entered.promise
+      if (change === 'cancelled') controller.abort(cancelled)
+      else {
+        remove()
+        test.ctx.provide('executionAuthority', { ...authority } as never)
+      }
+      proceed.resolve(undefined)
+      await outcome
+    } finally {
+      proceed.resolve(undefined)
+      await test.ctx.fiber.dispose()
+    }
+    expect(test.compact.calls).toEqual([])
+  })
+
   it('registers one argument-free command with Loader-safe exports and disposes it', async () => {
     const test = await harness()
     expect(commandCompact.name).toBe('command-compact')
@@ -173,7 +245,7 @@ describe('@deepseek-ai/dsh-command-compact registration', () => {
 })
 
 describe('/compact human command', () => {
-  it('reports success with useful accounting and forwards the exact target and signal', async () => {
+  it('reports success with useful accounting and forwards the exact target and UI cancellation', async () => {
     const test = await harness()
     const controller = new AbortController()
     const execution = await run(test, '', controller)
@@ -183,7 +255,12 @@ describe('/compact human command', () => {
       sourceEventSeq: RESULT.summarySeq,
     })
     expect(execution.commandId).toBe(expectLastLifecycle(test, '', execution.result))
-    expect(test.compact.calls).toEqual([{ agent: test.agent, signal: controller.signal }])
+    expect(test.compact.calls).toHaveLength(1)
+    expect(test.compact.calls[0]?.agent).toBe(test.agent)
+    expect(test.compact.calls[0]?.signal).toBeInstanceOf(AbortSignal)
+    const reason = new Error('Compaction request cancelled')
+    controller.abort(reason)
+    expect(test.compact.calls[0]?.signal?.reason).toBe(reason)
   })
 
   it('returns direct no-history and argument-rejection results', async () => {

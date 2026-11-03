@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md
 document:
-  en: d00c692964af6891e3d8ab1f39ce556fa52b30f7
-  zh: 571200788eba55c8c25c63e33abdf20d7d116d02
+  en: c74264e54e3bcf573a82f363792979d441cb74d5
+  zh: 53410924c6ae932657cfbf6f59874a6eac1ea5e9
 /agent-note-project-collaborative-conversations:
   en: 488634139248bc0a
   zh: 1bc530200532a0ac
@@ -12,14 +12,14 @@ document:
   en: b855c021b607769f
   zh: 5d71b7bafdfc368d
 /agent-note-project-collaborative-conversations/decision:
-  en: 8cc45a997ca1031e
-  zh: 7a957231e1aeb1ac
+  en: d36918df4fa23b07
+  zh: 4697674f6c1e7a52
 /agent-note-project-collaborative-conversations/verification:
-  en: 3d985469e8c20d48
-  zh: 3e0da0e64947175d
+  en: 9ce79ba00aa9129a
+  zh: c1d72b2980d603b2
 /agent-note-project-collaborative-conversations/alternatives-considered:
-  en: 94f093bcd69cc3a8
-  zh: e71b07ef4f0ce85c
+  en: 4c2a931b50c6fa07
+  zh: 6a3e61b17a9e6452
 /agent-note-project-collaborative-conversations/consequences:
   en: 23774ab7d678f422
   zh: e97d05c2192933a4

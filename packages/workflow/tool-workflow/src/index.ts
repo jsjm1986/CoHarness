@@ -18,14 +18,13 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { JobId, JobOutcome } from '@deepseek-ai/dsh-jobs'
+import type { JobId, JobOutcome, JobToolCall } from '@deepseek-ai/dsh-jobs'
 import type { Session, SessionEventMap } from '@deepseek-ai/dsh-session'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type {
   WorkflowResult, WorkflowRun, WorkflowRunId, WorkflowStopReason,
 } from '@deepseek-ai/dsh-workflow'
-import { createWorkflowRecordMirror } from './record.ts'
-import type { WorkflowRecordMirror } from './record.ts'
+import { startWorkflowRecordMirror } from './record.ts'
 import type {
   ToolWorkflowAgentEndData, ToolWorkflowAgentStartData,
   ToolWorkflowRunEndData, ToolWorkflowRunStartData,
@@ -67,7 +66,7 @@ export const Config: z<Config> = z.object({
 type ResolvedConfig = Required<Config>
 
 interface WorkflowRecorder {
-  start(session: Session, run: WorkflowRun): void
+  start(parent: Agent, run: WorkflowRun, ownership: 'foreground' | 'background'): void
   finish(runId: WorkflowRunId, stopReason: WorkflowStopReason): void
   abandon(runId: WorkflowRunId): void
 }
@@ -79,8 +78,8 @@ interface ToolWorkflowRecordEventMap {
   'tool-workflow/run-end': ToolWorkflowRunEndData
 }
 
-/** Render a contained recording failure without trusting the thrown value. */
-function renderRecordingError(error: unknown): string {
+/** Render a contained failure without trusting the thrown value. */
+function renderContainedError(error: unknown): string {
   try {
     return String(error)
   } catch {
@@ -89,11 +88,25 @@ function renderRecordingError(error: unknown): string {
 }
 
 /**
- * Project active top-level workflow runs into their parent Sessions without
- * letting recording failure affect tool execution.
+ * Project top-level runs through subscriptions owned by the exact parent scope.
+ * Tool withdrawal preserves accepted records; background parent teardown joins
+ * its Job's final record before releasing subscriptions. Recording failure
+ * leaves an incomplete prefix without changing execution or cleanup.
  */
 function createWorkflowRecorder(ctx: Context): WorkflowRecorder {
-  const active = new Map<WorkflowRunId, Session>()
+  const active = new Map<WorkflowRunId, {
+    readonly parent: Agent
+    readonly dispose: () => Promise<void>
+    readonly released: PromiseWithResolvers<undefined>
+  }>()
+  const abandon = (runId: WorkflowRunId): void => {
+    const record = active.get(runId)
+    active.delete(runId)
+    if (record !== undefined) {
+      record.released.resolve(undefined)
+      void record.dispose()
+    }
+  }
   const append = <Type extends keyof ToolWorkflowRecordEventMap>(
     session: Session,
     type: Type,
@@ -109,46 +122,57 @@ function createWorkflowRecorder(ctx: Context): WorkflowRecorder {
       appendRecord(type, data)
       return true
     } catch (error: unknown) {
-      ctx.logger.warn(`tool-workflow: disabled durable record after ${type} append failed: ${renderRecordingError(error)}`)
+      ctx.logger.warn(`tool-workflow: disabled durable record after ${type} append failed: ${renderContainedError(error)}`)
       return false
     }
   }
 
-  ctx.on('workflow/agent-start', (info, agent) => {
-    const session = active.get(info.id)
-    if (session === undefined) return
-    const data: ToolWorkflowAgentStartData = {
-      runId: info.id,
-      seq: agent.seq,
-      label: agent.label,
-      ...agent.phase === undefined ? {} : { phase: agent.phase },
-      childId: agent.childId,
-    }
-    if (!append(session, 'tool-workflow/agent-start', data)) active.delete(info.id)
-  })
-  ctx.on('workflow/agent-end', (info, agent) => {
-    const session = active.get(info.id)
-    if (session === undefined) return
-    const data: ToolWorkflowAgentEndData = {
-      runId: info.id,
-      seq: agent.seq,
-      outcome: agent.outcome,
-    }
-    if (!append(session, 'tool-workflow/agent-end', data)) active.delete(info.id)
-  })
-
   return {
-    start(session, run) {
+    start(parent, run, ownership) {
+      const session = parent.session
+      const released = Promise.withResolvers<undefined>()
+      const dispose = parent.ctx.effect(function* () {
+        yield parent.ctx.on('agent/idle-release-check', ({ agent }) =>
+          agent === parent && active.has(run.id) ? 'busy' : undefined, { global: true })
+        yield parent.ctx.on('workflow/agent-start', (info, agent) => {
+          if (info.id !== run.id || !active.has(run.id)) return
+          const data: ToolWorkflowAgentStartData = {
+            runId: info.id,
+            seq: agent.seq,
+            label: agent.label,
+            ...agent.phase === undefined ? {} : { phase: agent.phase },
+            childId: agent.childId,
+          }
+          if (!append(session, 'tool-workflow/agent-start', data)) abandon(run.id)
+        })
+        yield parent.ctx.on('workflow/agent-end', (info, agent) => {
+          if (info.id !== run.id || !active.has(run.id)) return
+          const data: ToolWorkflowAgentEndData = {
+            runId: info.id,
+            seq: agent.seq,
+            outcome: agent.outcome,
+          }
+          if (!append(session, 'tool-workflow/agent-end', data)) abandon(run.id)
+        })
+        yield async () => {
+          if (ownership === 'background' && active.has(run.id)) {
+            await released.promise
+          }
+          active.delete(run.id)
+        }
+      }, 'tool-workflow: parent-owned durable record')
       if (append(session, 'tool-workflow/run-start', { runId: run.id, name: run.meta.name })) {
-        active.set(run.id, session)
+        active.set(run.id, { parent, dispose, released })
+      } else {
+        void dispose()
       }
     },
     finish(runId, stopReason) {
-      const session = active.get(runId)
+      const session = active.get(runId)?.parent.session
       if (session !== undefined) append(session, 'tool-workflow/run-end', { runId, stopReason })
-      active.delete(runId)
+      abandon(runId)
     },
-    abandon: (runId) => { active.delete(runId) },
+    abandon,
   }
 }
 
@@ -258,7 +282,7 @@ function renderResult(name: string, agentsStarted: number, value: JsonValue, max
  * @param args - the validated tool call.
  * @param parent - the calling agent; owns the job.
  * @param recordsRun - whether this top-level call records durable run events.
- * @param deps - the tool's recorder/mirror taps and the render cap.
+ * @param deps - recorder/mirror taps, render cap, and the creating tool invocation.
  * @returns the background result for the tool's output schema.
  */
 function startBackgroundRun(
@@ -266,7 +290,7 @@ function startBackgroundRun(
   args: WorkflowCallArgs,
   parent: Agent,
   recordsRun: boolean,
-  deps: { recorder: WorkflowRecorder; mirror: WorkflowRecordMirror; maxResultChars: number },
+  deps: { recorder: WorkflowRecorder; maxResultChars: number; toolCall: JobToolCall },
 ): { kind: 'background'; jobId: JobId; runId: WorkflowRunId } {
   const jobs = ctx.get('jobs')
   if (jobs === undefined) {
@@ -276,6 +300,7 @@ function startBackgroundRun(
   const jobId = jobs.start({
     kind: 'workflow',
     label: args.meta.name,
+    toolCall: deps.toolCall,
     owner: parent.id,
     run: (job) => {
       // A synchronous engine rejection (META_INVALID/SCRIPT_PARSE) propagates
@@ -287,26 +312,42 @@ function startBackgroundRun(
         ...args.args !== undefined ? { args: args.args } : {},
         parent,
       })
-      deps.mirror.start(run.id, job)
-      if (recordsRun) deps.recorder.start(parent.session, run)
+      const stopMirror = startWorkflowRecordMirror(parent.ctx, run.id, job)
+      if (recordsRun) deps.recorder.start(parent, run, 'background')
+      let retryCleanup: (() => void) | undefined
       const done = run.result.then(async (result): Promise<JobOutcome> => {
-        try {
-          // Keep member listeners alive through disposal: an engine may
-          // synthesize cancelled member endings while reaching quiescence.
-          await run.dispose()
-        } catch (error: unknown) {
-          // done must not reject; a failed disposal still has a settled result to report.
-          ctx.logger.warn(`background workflow run ${run.id} dispose failed: ${String(error)}`)
+        let cleanupFailure: string | undefined
+        for (;;) {
+          try {
+            // Member recording stays active until disposal confirms quiescence.
+            await run.dispose()
+            break
+          } catch (error: unknown) {
+            cleanupFailure = renderContainedError(error)
+            const retry = Promise.withResolvers<undefined>()
+            retryCleanup = () => { retry.resolve(undefined) }
+            stopMirror()
+            job.updateProgress(`Workflow cleanup is unconfirmed; request termination again to retry. ${cleanupFailure}`)
+            ctx.logger.warn(`background workflow run ${run.id} dispose failed: ${cleanupFailure}`)
+            try { await retry.promise } finally { retryCleanup = undefined }
+          }
         }
-        deps.mirror.stop(run.id)
+        const settled: WorkflowResult = cleanupFailure === undefined ? result : {
+          value: null, stopReason: 'error', agentsStarted: result.agentsStarted,
+          error: `Workflow cleanup failed: ${cleanupFailure}`,
+        }
+        stopMirror()
         if (recordsRun) {
-          deps.recorder.finish(run.id, result.stopReason)
+          deps.recorder.finish(run.id, settled.stopReason)
           deps.recorder.abandon(run.id)
         }
-        return jobOutcomeOf(result, args.meta.name, deps.maxResultChars)
+        return jobOutcomeOf(settled, args.meta.name, deps.maxResultChars)
       })
       return {
-        cancel: (reason?: string) => { run.cancel(reason ?? 'background workflow job killed') },
+        cancel: (reason?: string) => {
+          run.cancel(reason ?? 'background workflow job killed')
+          retryCleanup?.()
+        },
         done,
       }
     },
@@ -319,7 +360,6 @@ export function apply(ctx: Context, config: Config): void {
   // fields; the assertion records that resolution, not a hidden fallback.
   const { toolName, maxResultChars, enableRunInBackground } = config as ResolvedConfig
   const recorder = createWorkflowRecorder(ctx)
-  const mirror = createWorkflowRecordMirror(ctx)
   // Usage policy ships with the tool (the master convention: tool guidance
   // lives in tool plugins as prompt sections, not in the deployment persona).
   ctx.systemPrompt.section({
@@ -423,62 +463,75 @@ export function apply(ctx: Context, config: Config): void {
         // sandbox escalation approval before registering, which is the window
         // their check covers.
         return startBackgroundRun(ctx, args, parent, exec.parent === undefined, {
+          toolCall: { callId: exec.callId, rootCallId: exec.rootCallId },
           recorder,
-          mirror,
           maxResultChars,
         })
       }
 
-      // Meta/body validation failures (META_INVALID/SCRIPT_PARSE) throw
-      // synchronously here and become isError results via the registry — the
-      // model sees the violation list and can correct the call.
-      const run = ctx.workflowEngine.start({
-        script: args.script,
-        meta: args.meta,
-        ...args.args !== undefined ? { args: args.args } : {},
-        parent,
-        signal: exec.signal,
-      })
-      const recordsRun = exec.parent === undefined
-      // The engine publishes member events after start() returns and this run record is active.
-      if (recordsRun) recorder.start(parent.session, run)
+      const engine = ctx.workflowEngine
+      return engine.withForeground(parent, exec.signal, async (signal) => {
+        // Meta/body validation failures (META_INVALID/SCRIPT_PARSE) throw
+        // synchronously here and become isError results via the registry — the
+        // model sees the violation list and can correct the call.
+        const run = engine.start({
+          script: args.script,
+          meta: args.meta,
+          ...args.args !== undefined ? { args: args.args } : {},
+          parent,
+          signal: signal,
+        })
+        const recordsRun = exec.parent === undefined
+        // The engine publishes member events after start() returns and this run record is active.
+        if (recordsRun) recorder.start(parent, run, 'foreground')
 
-      // Bridge the tool's abort signal to the run: if the parent step is aborted while the
-      // script is in flight, cancel the whole run. The signal also enters the engine directly, but
-      // this local bridge preserves the tool contract even if an implementation ignores it.
-      const onAbort = (): void => { run.cancel('parent step aborted') }
-      exec.signal.addEventListener('abort', onAbort, { once: true })
+        // Bridge the tool's abort signal to the run: if the parent step is aborted while the
+        // script is in flight, cancel the whole run. The signal also enters the engine directly, but
+        // this local bridge preserves the tool contract even if an implementation ignores it.
+        const onAbort = (): void => { run.cancel('parent step aborted') }
+        signal.addEventListener('abort', onAbort, { once: true })
+        if (signal.aborted) run.cancel('parent step aborted')
 
-      let result: WorkflowResult | undefined
-      try {
-        result = await run.result
-        const error = stopReasonError(result)
-        if (error !== undefined) {
-          // Map a non-clean finish to an isError result (the registry turns a
-          // throw into an isError). Report the reason, not partial output.
-          throw new Error(error)
+        let result: WorkflowResult | undefined
+        const finishRecord = (): void => {
+          if (!recordsRun) return
+          /* v8 ignore next -- WorkflowRun.result never rejects by contract, so result is assigned before finally. */
+          if (result === undefined) throw new Error('workflow run settled without a result')
+          recorder.finish(run.id, result.stopReason)
         }
-        return {
-          kind: 'foreground' as const,
-          runId: run.id,
-          agentsStarted: result.agentsStarted,
-          result: result.value as JsonValue,
-        }
-      } finally {
-        exec.signal.removeEventListener('abort', onAbort)
         try {
-          // Keep member listeners alive through disposal: an engine may
-          // synthesize cancelled member endings while reaching quiescence.
-          await run.dispose()
-          if (recordsRun) {
-            /* v8 ignore next -- WorkflowRun.result never rejects by contract, so result is assigned before finally. */
-            if (result === undefined) throw new Error('workflow run settled without a result')
-            recorder.finish(run.id, result.stopReason)
+          result = await run.result
+          const error = stopReasonError(result)
+          if (error !== undefined) {
+            // Map a non-clean finish to an isError result (the registry turns a
+            // throw into an isError). Report the reason, not partial output.
+            throw new Error(error)
+          }
+          return {
+            kind: 'foreground' as const,
+            runId: run.id,
+            agentsStarted: result.agentsStarted,
+            result: result.value as JsonValue,
           }
         } finally {
-          if (recordsRun) recorder.abandon(run.id)
+          signal.removeEventListener('abort', onAbort)
+          // Member listeners stay available through retained cleanup and run-end.
+          try {
+            await run.dispose()
+          } catch (error: unknown) {
+            void run.retainFailedCleanup().then(finishRecord).catch((failure: unknown) => {
+              if (recordsRun) recorder.abandon(run.id)
+              ctx.logger.warn(`workflow: retained cleanup failed: ${renderContainedError(failure)}`)
+            })
+            throw error
+          }
+          try {
+            finishRecord()
+          } finally {
+            if (recordsRun) recorder.abandon(run.id)
+          }
         }
-      }
+      })
     },
     presentCall: args => presentWorkflowCall(args),
     presentResult: (args, result) => presentWorkflowResult(args, result),

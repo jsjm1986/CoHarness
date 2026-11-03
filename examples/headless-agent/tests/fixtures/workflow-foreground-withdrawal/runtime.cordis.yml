@@ -1,0 +1,11 @@
+- id: llm-deepseek
+  disabled: true
+- id: sdk-jsonrpc-server
+  inject: [sdkAppStartup, loader, workflowWithdrawalReady]
+- insert:
+    - id: workflow-withdrawal-ptc
+      name: '@deepseek-ai/dsh-ptc-runtime-node'
+    - id: workflow-withdrawal-runtime
+      name: './runtime.mjs'
+    - id: workflow-withdrawal-model
+      name: './model.mjs'

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/historical-formats/README.md
 document:
-  en: 4ade55de0ab5789ec29dfe4045e730258a86b627
-  zh: 64d92a97bd16f18d66b7887699665ce986efbbef
+  en: 6804b01424d82ee6ab631e4d62d4159120976898
+  zh: 02fd7e79353132398419b5a4aa670fca86cb0468
 /:
   en: 1257a74512f9daed
   zh: 74e1378126c7dd99
@@ -18,8 +18,8 @@ document:
   en: 14c57f30e676f6e3
   zh: b1a0ccf26fab3727
 /session-persistence-formats/format-references:
-  en: 2847b34da168bec7
-  zh: bcbc1dcc6aceab96
+  en: e535b3c344100615
+  zh: 985996052c9bb525
 /session-persistence-formats/scope-and-evidence:
   en: b220062139ddac1e
   zh: 7c4c0efe05dafa9c

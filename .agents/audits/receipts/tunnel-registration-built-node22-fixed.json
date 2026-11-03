@@ -1,0 +1,14 @@
+{
+  "name": "tunnel-registration-built-node22-fixed",
+  "cwd": "gateway",
+  "command": "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node ../.agents/audits/.local/tunnel-built-node-acceptance.mjs",
+  "startedAt": "2026-10-24T23:04:56.415265+00:00",
+  "seconds": 3.453,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "65c9935ef0ba71822f43e2e51979a665c2fc36c76a6bfcc18e9e040168926766",
+  "inputsAfter": "65c9935ef0ba71822f43e2e51979a665c2fc36c76a6bfcc18e9e040168926766",
+  "postgresToolDirectory": null,
+  "outputSha256": "d37e5a81a03f27bebd392a31d120a1968c64ee9cc040aae4a12a320b10deea19",
+  "outputTail": "Plain Node: quick/named registration, bounded output, token isolation and confirmed cleanup pass.\n"
+}

@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type {
   ApprovalRequestId, CordisDynamicPackageId, CordisDynamicPluginId, CordisDynamicPluginRunId,
 } from '@deepseek-ai/dsh-api-remotes/client'
-import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
+import type { ConnectionRuntimeTarget, SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import type { DynamicCordisInvokeResult } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: resolves `ctx.remote` and with it the `$on`/`$dispatch` surface.
 import type {} from '@deepseek-ai/dsh-api-gateway/client'
@@ -25,6 +25,10 @@ const PLUGIN = 'dyn-1' as CordisDynamicPluginId
 const PACKAGE = 'pkg-1' as CordisDynamicPackageId
 const RUN = 'run-1' as CordisDynamicPluginRunId
 const AGENT = 's-1' as SessionId
+const REMOTE_AGENT = 'runtime-b/s-1' as SessionId
+const REMOTE_TARGET: ConnectionRuntimeTarget = {
+  kind: 'personal', runtimeId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' as NonNullable<ConnectionRuntimeTarget['runtimeId']>,
+}
 const USER_RUN = {
   agentId: AGENT, pluginId: PLUGIN, packageId: PACKAGE, mode: 'run' as const, hasClientHalf: true,
 }
@@ -56,6 +60,12 @@ interface Bench {
   invokeResult: { current: DynamicCordisInvokeResult }
   /** Rejection the namespace throws instead of answering (the codec refusing a payload). */
   invokeThrow: { current: unknown }
+  alternate: {
+    source: Bench['source']
+    invoked: Bench['invoked']
+    resolved: Bench['resolved']
+    forward(event: string, payload: object): void
+  }
   /** Render failures the namespace received, in order. */
   renderFailures: {
     agentId: string
@@ -158,26 +168,63 @@ async function boot(): Promise<Bench> {
   // Minimal stand-in for the gateway's Client Remote: the fan-out under test is
   // this plugin's subscriptions, so registration order and delivery are all the
   // stub owes (api-gateway covers isolation and disposal on the real one).
-  const listeners = new Map<string, ((...args: never[]) => void)[]>()
-  const remote = {
-    dynamicCordisRunner: namespace,
-    $on: (event: string, listener: (...args: never[]) => void) => {
-      const bucket = listeners.get(event) ?? []
-      bucket.push(listener)
-      listeners.set(event, bucket)
-      return () => {
-        const at = bucket.indexOf(listener)
-        if (at >= 0) bucket.splice(at, 1)
-      }
+  const events = () => {
+    const listeners = new Map<string, ((...args: never[]) => void)[]>()
+    return {
+      $on: (event: string, listener: (...args: never[]) => void) => {
+        const bucket = listeners.get(event) ?? []
+        bucket.push(listener)
+        listeners.set(event, bucket)
+        return () => {
+          const at = bucket.indexOf(listener)
+          if (at >= 0) bucket.splice(at, 1)
+        }
+      },
+      $dispatch: (event: string, args: readonly unknown[]) => {
+        for (const listener of [...listeners.get(event) ?? []]) {
+          (listener as (...a: readonly unknown[]) => void)(...args)
+        }
+      },
+    }
+  }
+  const alternateSource: Bench['source'] = { current: { ...source.current } }
+  const alternateInvoked: Bench['invoked'] = []
+  const alternateResolved: Bench['resolved'] = []
+  const baseEvents = events(), alternateEvents = events(), globalEvents = events()
+  const base = { dynamicCordisRunner: namespace, ...baseEvents }
+  const alternate = { dynamicCordisRunner: {
+    ...namespace,
+    getClientCode: () => answered(alternateSource.current),
+    invoke: (pluginId: CordisDynamicPluginId, pluginRunId: CordisDynamicPluginRunId, method: string, args: unknown) => {
+      alternateInvoked.push({ pluginId, pluginRunId, method, args })
+      return answered({ ok: true, value: 'remote-pong' })
     },
+    resolveRequestRun: (requestId: string, resolution: unknown) => {
+      alternateResolved.push({ requestId, resolution })
+      return answered({ accepted: true })
+    },
+  }, ...alternateEvents }
+  const remote = {
+    ...base,
+    $forTarget: (target?: ConnectionRuntimeTarget) => target?.runtimeId === REMOTE_TARGET.runtimeId ? alternate : base,
+    $on: globalEvents.$on,
     $dispatch: (event: string, args: readonly unknown[]) => {
-      for (const listener of [...listeners.get(event) ?? []]) {
-        (listener as (...a: readonly unknown[]) => void)(...args)
-      }
+      globalEvents.$dispatch(event, args)
+      baseEvents.$dispatch(event, args)
     },
   }
   ctx.reflect.provide('remote', remote)
   ctx.reflect.provide('remote.dynamicCordisRunner', namespace)
+  const alternateTransport = {
+    api: { label: () => 'remote' },
+    state: { getSnapshot: () => 'connected', subscribe: () => () => {} },
+  }
+  ctx.provide('connection', {
+    api: { label: () => 'base' },
+    state: { getSnapshot: () => 'connected', subscribe: () => () => {} },
+    forTarget: () => alternateTransport,
+  } as never)
+  ctx.provide('sessions', { runtimeTargetFor: (id: SessionId) => id === REMOTE_AGENT ? REMOTE_TARGET : undefined } as never)
   const fiber = ctx.plugin(ClientHalf)
   await fiber
   return {
@@ -187,6 +234,11 @@ async function boot(): Promise<Bench> {
     invoked,
     invokeResult,
     invokeThrow,
+    alternate: { source: alternateSource, invoked: alternateInvoked, resolved: alternateResolved,
+      forward: (event, payload) => {
+        globalEvents.$dispatch(event, [payload])
+        alternateEvents.$dispatch(event, [payload])
+      } },
     renderFailures,
     reportRefused,
     crash: (slot, entry, abdicate, error) => {
@@ -201,6 +253,69 @@ async function boot(): Promise<Bench> {
 }
 
 describe('browser half', () => {
+  it('keeps colliding Plugin identities, calls, priorities and withdrawals in their Runtime', async () => {
+    const bench = await boot()
+    try {
+      const code = `return { inject: ['slots', 'remote', 'connection'], apply(ctx) {
+        const label = ctx.connection.api.label()
+        ctx.slots.register({ name: 'root' }, () => label)
+        globalThis['__runtimeCalls_' + label] = Promise.all([
+          host.call('ping', label),
+          ctx.remote.dynamicCordisRunner.invoke('${PLUGIN}', '${RUN}', 'direct', label),
+          ctx.get('remote.dynamicCordisRunner').invoke('${PLUGIN}', '${RUN}', 'optional', label)
+        ])
+      } }`
+      bench.source.current.code = code
+      bench.alternate.source.current.code = code
+      const base = bench.ctx.dynamicCordisRunner
+      const alternate = base.forSession(REMOTE_AGENT)
+      expect(alternate).not.toBe(base)
+      expect(base.getSnapshot()).toEqual([])
+      expect(alternate.getSnapshot()).toEqual([])
+      await base.startUserRun(USER_RUN)
+      await alternate.startUserRun({ ...USER_RUN, agentId: REMOTE_AGENT })
+      await Promise.all([
+        Reflect.get(globalThis, '__runtimeCalls_base'),
+        Reflect.get(globalThis, '__runtimeCalls_remote'),
+      ])
+      expect(bench.invoked.map(call => call.args)).toEqual(['base', 'base', 'base'])
+      expect(bench.alternate.invoked.map(call => call.args)).toEqual(['remote', 'remote', 'remote'])
+      expect(bench.ctx.slots.entries('root').map(entry => entry.options.priority)).toEqual([-2, -1])
+      expect(base.isLoaded(PLUGIN)).toBe(true)
+      expect(alternate.isLoaded(PLUGIN)).toBe(true)
+      bench.alternate.forward('@deepseek-ai/cordis/dynamic-retract', {
+        pluginId: PLUGIN, packageId: PACKAGE, pluginRunId: RUN,
+      })
+      await vi.waitFor(() => { expect(alternate.isLoaded(PLUGIN)).toBe(false) })
+      expect(base.isLoaded(PLUGIN)).toBe(true)
+      expect(bench.ctx.slots.entries('root')).toHaveLength(1)
+    } finally {
+      await bench.dispose()
+      Reflect.deleteProperty(globalThis, '__runtimeCalls_base')
+      Reflect.deleteProperty(globalThis, '__runtimeCalls_remote')
+    }
+  })
+
+  it('answers colliding approval IDs only on the Runtime selected by the request Session', async () => {
+    const bench = await boot()
+    try {
+      const requestId = 'same-request' as ApprovalRequestId
+      const request = { requestId, agentId: AGENT, pluginId: PLUGIN, packageId: PACKAGE, mode: 'run',
+        name: 'Same Plugin', purpose: 'Check Runtime attribution', requiresApproval: true }
+      forward(bench.ctx, '@deepseek-ai/cordis/request-run', request)
+      bench.alternate.forward('@deepseek-ai/cordis/request-run', { ...request, agentId: REMOTE_AGENT })
+      const base = bench.ctx.dynamicCordisRunner
+      expect(base.pendingApprovals.getSnapshot()).toHaveLength(2)
+      await base.forSession(REMOTE_AGENT).decline(requestId)
+      expect(bench.alternate.resolved).toHaveLength(1)
+      expect(bench.resolved).toHaveLength(0)
+      expect(base.activeRuns.getSnapshot().get(PLUGIN)?.phase).toBe('awaiting-approval')
+      await base.approve(requestId, false)
+      expect(bench.resolved).toHaveLength(1)
+      expect(base.pendingApprovals.getSnapshot()).toEqual([])
+    } finally { await bench.dispose() }
+  })
+
   it('provides the load engine as the page run-state face', async () => {
     const bench = await boot()
     expect(bench.ctx.dynamicCordisRunner.getSnapshot()).toEqual([])

@@ -1,9 +1,7 @@
 /**
- * Command-directory cache keyed by session: one entry per served catalog —
- * every session is agent-backed, so `command.list({sessionId})` is the only
- * request fields. Each entry keeps the single-flight / soft-hard invalidation
- * / epoch-guard behavior of the original global cache; the session-key axis
- * is the only extra dimension.
+ * Session-keyed command catalogs with one outstanding pull per session.
+ * Invalidation during a pull requests one replacement after it settles;
+ * a superseded result never becomes the served catalog.
  */
 import type { CommandDescriptor } from '@deepseek-ai/dsh-commands/types'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -25,8 +23,10 @@ export type FetchCommands = (sessionId: SessionId) => Promise<readonly CommandDe
 class Entry {
   state: DirectoryStatus = 'cold'
   commands: readonly CommandDescriptor[] = []
-  /** Bumped at each pull start; only the latest pull may publish its outcome. */
+  /** Requested catalog revision; only a pull for this revision may publish. */
   epoch = 0
+  /** Includes any replacement requested while the current RPC is pending. */
+  pulling: Promise<void> | undefined
   lastError: unknown
   waiters: Array<() => void> = []
 }
@@ -99,29 +99,44 @@ export class CommandDirectory {
   }
 
   /**
-   * Start one pull for one session. Publishes ready/failed only while it is
-   * still the key's latest pull (epoch guard); a ready snapshot is not
-   * demoted while the pull flies.
+   * Request a fresh catalog, sharing one RPC and coalescing pending invalidations.
+   * A ready snapshot serves during a soft refresh; a reset drops it immediately.
    * @param sessionId - session key.
-   * @returns settled when this pull's outcome is published or discarded.
+   * @returns settled when the latest requested revision is published or fails.
    */
-  async refresh(sessionId: SessionId): Promise<void> {
+  refresh(sessionId: SessionId): Promise<void> {
     const entry = this.entry(sessionId)
-    const epoch = ++entry.epoch
+    entry.epoch++
     if (entry.state !== 'ready') entry.state = 'pending'
+    if (entry.pulling !== undefined) return entry.pulling
+    const completion = Promise.withResolvers<void>()
+    // Reserve ownership before fetchCommands can synchronously invalidate the entry.
+    entry.pulling = completion.promise
+    void this.pull(sessionId, entry).then(completion.resolve, completion.reject)
+    return completion.promise
+  }
+
+  private async pull(sessionId: SessionId, entry: Entry): Promise<void> {
     try {
-      const commands = await this.fetchCommands(sessionId)
-      if (epoch !== entry.epoch) return
-      entry.commands = commands
-      entry.state = 'ready'
-      entry.lastError = undefined
-    } catch (error) {
-      if (epoch !== entry.epoch) return
-      entry.commands = []
-      entry.state = 'failed'
-      entry.lastError = error
+      for (;;) {
+        const epoch = entry.epoch
+        try {
+          const commands = await this.fetchCommands(sessionId)
+          if (epoch !== entry.epoch) continue
+          entry.commands = commands
+          entry.state = 'ready'
+          entry.lastError = undefined
+        } catch (error) {
+          if (epoch !== entry.epoch) continue
+          entry.commands = []
+          entry.state = 'failed'
+          entry.lastError = error
+        }
+        return
+      }
     } finally {
-      if (epoch === entry.epoch) notifyWaiters(entry)
+      entry.pulling = undefined
+      notifyWaiters(entry)
     }
   }
 

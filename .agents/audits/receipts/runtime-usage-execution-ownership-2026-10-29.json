@@ -1,0 +1,309 @@
+{
+  "recordedAt": "2026-10-29T01:27:05.094727+00:00",
+  "status": "fixed_named_business_scenarios_verified_remaining_full_review_open",
+  "findings": [
+    "B295"
+  ],
+  "wholeProjectComplete": false,
+  "externalEvidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z",
+  "causalNegatives": [
+    {
+      "name": "runtime-usage-attribution-isolated-causal-before",
+      "status": "failed",
+      "startedAt": "2026-10-29T01:17:13.382920+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "env",
+        "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+        "DSH_AUDIT_RUNTIME_USAGE_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-runtime-usage-replay.py",
+        "/Users/a1234/.nvm/versions/node/v25.8.1/bin/node",
+        "src",
+        "runtime-usage-attribution-isolated-causal-before"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-29T01:17:14.003155+00:00"
+    }
+  ],
+  "businessCounterexamples": {
+    "foreignRuntimeProofsAccepted": 5,
+    "sameComputerAndRemoteComputer": true,
+    "forgedEventBodyRuntimeAccepted": true,
+    "foreignProofAfterRevocationAccepted": true,
+    "billingBefore": {
+      "calls": 10,
+      "tokens": 30
+    },
+    "correctBilling": {
+      "calls": 5,
+      "tokens": 15,
+      "owner": "onepersonalaccount"
+    },
+    "ordinaryAndWrongComputerControlsMatched": 6
+  },
+  "behavior": [
+    "Runtime-specific model reporting retains its durable RuntimeId through intake validation. Supplied execution witnesses require the recorded Session to belong to that same Runtime.",
+    "Sharing account ownership or computer placement grants no access to another Runtime Session proof. The event body cannot replace the authenticated reporting identity. Mismatched proof returns the existing400usage-validation refusal and inserts no usage row.",
+    "Billing stays with its account/project owner. Valid historical proof from the original Runtime remains billable after account/computer eligibility is withdrawn; no new execution authority is granted. Explicit legacy owner-only reporting and non-Session usage preserve their existing validation.",
+    "No applied migration, token format or released Session generation is changed. The peer-owned Runtime routing, lifecycle and immutable095schema are preserved."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "name": "runtime-usage-attribution-current-source",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:18:29.216845+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+          "DSH_AUDIT_RUNTIME_USAGE_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/runtime-usage-attribution-transcript.spec.ts",
+          "tests/postgres-suite.spec.ts",
+          "--maxWorkers=2",
+          "--no-file-parallelism"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:18:30.839824+00:00"
+      },
+      {
+        "name": "runtime-usage-attribution-legacy-execution",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:18:29.216851+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_regression_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/execution.spec.ts",
+          "tests/execution-scopes.spec.ts",
+          "-t",
+          "validates delayed attribution|allows a new qualified initiator|refuses old Session witnesses",
+          "--maxWorkers=2",
+          "--no-file-parallelism"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:18:33.510995+00:00"
+      },
+      {
+        "name": "runtime-usage-independent-095-token-regression",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:25:03.828957+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+          "../node_modules/.bin/vitest",
+          "run",
+          "tests/runtime-management-postgres.spec.ts",
+          "-t",
+          "keeps Runtime reporting credentials independent",
+          "--maxWorkers=2",
+          "--no-file-parallelism"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:25:05.107151+00:00"
+      },
+      {
+        "name": "runtime-usage-attribution-initial-types",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:18:29.216835+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "--noEmit",
+          "--incremental",
+          "--tsBuildInfoFile",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/account-preferences-typecheck.tsbuildinfo"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:18:32.912237+00:00"
+      },
+      {
+        "name": "runtime-usage-private-artifact-build",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:22:36.015991+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/build-runtime-usage-artifact.py"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:22:38.412665+00:00"
+      },
+      {
+        "name": "runtime-usage-built-node22",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:23:07.320908+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+          "DSH_AUDIT_RUNTIME_USAGE_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-runtime-usage-replay.py",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "lib",
+          "runtime-usage-built-node22",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/runtime-usage-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:23:07.763783+00:00"
+      },
+      {
+        "name": "runtime-usage-built-node24",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:24:54.185143+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "HGW_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:61597/hgw_node_configuration_test",
+          "DSH_AUDIT_RUNTIME_USAGE_MIGRATIONS=/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029",
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/run-runtime-usage-replay.py",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "lib",
+          "runtime-usage-built-node24",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/runtime-usage-artifact-20261029/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:24:54.648073+00:00"
+      },
+      {
+        "name": "runtime-usage-final-scoped-lint",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:22:36.015920+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_OXLINT_THREADS=1",
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/execution-identity.ts",
+          "gateway/src/postgres/model-governance-service.ts",
+          "gateway/src/services.ts",
+          "gateway/tests/runtime-usage-attribution-transcript.spec.ts",
+          "gateway/tests/fixtures/runtime-usage-attribution.mjs",
+          "gateway/tests/postgres-suite.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:22:37.380612+00:00"
+      },
+      {
+        "name": "runtime-usage-reviewed-doc-pairs",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:22:36.015728+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/verify-translation-pairing.ts",
+          "--write",
+          ".agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.md",
+          ".agents/notes/implemented/feature/2026-08-25-dual-usage-attribution.md",
+          "gateway/README.md",
+          "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.md"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:22:36.654942+00:00"
+      },
+      {
+        "name": "runtime-usage-final-doc-quick",
+        "status": "passed",
+        "startedAt": "2026-10-29T01:23:07.320877+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "env",
+          "DSH_GATE_CONCURRENCY=1",
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-29T01:24:20.511887+00:00"
+      }
+    ],
+    "source": {
+      "wrapperAndRegistryCases": 4,
+      "files": 2,
+      "runtimeAllocations": 3,
+      "computers": 2,
+      "usageHttpRequests": 11,
+      "finalBillingObservations": 1,
+      "refusedForeignRuntimeRequests": 5,
+      "legacyExecutionRegressionCases": 3,
+      "legacyExecutionFilteredOut": 49,
+      "independent095ReportingAndAccountDeletionCases": 1,
+      "independent095FilteredOut": 6
+    },
+    "compiled": {
+      "nodes": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "usageHttpRequestsPerNode": 11,
+      "finalBillingObservationsPerNode": 1,
+      "goldenMatched": true,
+      "driverFieldClarification": "The inherited driver prints httpObservations12 for twelve JSONrecords; one is the final PostgreSQL billing observation, so this receipt counts11HTTPrequests and1billingobservation."
+    },
+    "coverage": "The new source and emitted native-child examples exercise the real provider/HTTP path without parent Vitest coverage instrumentation. No new full-file percentage or100percent CI coverage claim is made. The filtered legacy cases prove existing owner-only delayed attribution and replaced-Runtime execution isolation.",
+    "docs": "All20quickdocumentationgatespass;4existing/newbilingualpairsrecorded. Thecurrentversionupgradetripletpassesdirectfrontmatter/heading/newline/Englishbudgetchecks. No verify-upgrade-guides command exists.",
+    "fixtureCleanup": "An initial counterexample completed all observations but its generic organization deletion hit immutable execution-input retention. The corrected fixture closes HTTP listeners, confirms its simulated instance records stopped, disables only its unique organization, closes its pool and removes its private directory. Immutable execution/accounting history remains for the disposable test database owner; no trigger is disabled."
+  },
+  "sourceHashes": {
+    "gateway/src/execution-identity.ts": "f94f7ebc9f99b68bb1909db1975b994d6415bebc7717edf23f9be29faaa3b24b",
+    "gateway/src/postgres/model-governance-service.ts": "ee7b34c00ea7b4bc73b5f8cb8548a3fda62a1629926a225476c62f3460b342ba",
+    "gateway/src/services.ts": "e2812aa9a38795ff1ebfee7ea28f23d2519654f7391a83474c6cc63837a6c7fd",
+    "gateway/tests/runtime-usage-attribution-transcript.spec.ts": "67fb7825fd6a78d739491bf53fc8535d86c6f2fd13e17aae677292e077c9f2a3",
+    "gateway/tests/fixtures/runtime-usage-attribution.mjs": "6aa8f89e09f25c37506d8623a82084575bcf5e27656013bb8a93549e02f0d577",
+    "gateway/tests/expected/projects/runtime-usage-attribution.jsonl": "fcd38425066ea59ca621fbf3ac1e7b85abd3434cf064058a0b1ae7b255e3f04a",
+    "gateway/tests/postgres-suite.spec.ts": "d4702ef76fd6ae4c994e4e04a12478f2904756e4c8814934840d52f66a2fe41e",
+    "gateway/package.json": "8248afb26c8a6de37a4601d7bfce6a205fd06015791353a34a8a995ee76b6050"
+  },
+  "artifacts": {
+    "privateGateway": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/runtime-usage-artifact-20261029/lib",
+    "metadata": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/runtime-usage-build-inputs-20261029.json",
+    "immutableMigrationSnapshot": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-migrations-20261029"
+  },
+  "noteReview": {
+    "extendedExisting": [
+      ".agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.md",
+      ".agents/notes/implemented/feature/2026-08-25-dual-usage-attribution.md"
+    ],
+    "keptIndependent": [
+      ".agents/notes/implemented/architecture/2026-09-22-verified-execution-participants.md",
+      ".agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.md"
+    ],
+    "new": [],
+    "archived": [],
+    "deleted": [],
+    "frozenArchivesEdited": false
+  },
+  "database": {
+    "ownerFile": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/after-reboot-20261027T120714Z/node-configuration-postgres-owner-20261029.json",
+    "port": 61597,
+    "status": "Retained for independent conversation-catalog permission review; final cleanup pending.",
+    "excludedPorts": [
+      5432,
+      55699
+    ]
+  },
+  "limitations": [
+    "All12domains remain in_progress. B04allocations/B25nativecontainment/full-file coverage remain open.",
+    "Token coexistence and personal account removal are independently exercised; full project-token retirement, every per-computer caller and UI/physical network/Windows/multi-node backups remain open.",
+    "Real model API and cloud delivery remain human-deferred."
+  ],
+  "subsequentOwnedDatabaseCleanup": {
+    "receipt": "receipts/workbench-computer-permissions-2026-10-29.json",
+    "port": 61597,
+    "containerAndVolumeRemoved": true,
+    "openClientConnectionsBeforeClose": 0
+  }
+}

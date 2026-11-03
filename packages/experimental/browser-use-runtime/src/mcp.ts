@@ -7,7 +7,7 @@ import { BrowserUseProviderName } from '@deepseek-ai/dsh-browser-use/brand'
 import * as McpClient from '@deepseek-ai/dsh-mcp-client'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { Scope } from '@deepseek-ai/dsh-scope'
-import { SessionResources } from './index.ts'
+import { ResourceAcquisitionCleanupError, SessionResources } from './index.ts'
 import type {} from '@deepseek-ai/dsh-browser-use'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-system-prompt'
@@ -132,8 +132,16 @@ export function mountSessionMcp(ctx: Context, options: SessionMcpOptions): void 
       exclusive: options.exclusive,
       async open(agent, signal) {
         const scope = createScope(ctx, agent)
+        let client: McpClient.McpClientHandle | undefined
         let cancellation: Promise<void> | undefined
-        const cancel = (): void => { cancellation = scope.dispose() }
+        const cleanup = async (): Promise<void> => {
+          await client?.dispose()
+          await scope.dispose()
+        }
+        const cancel = (): void => {
+          cancellation = cleanup()
+          void cancellation.catch(() => {})
+        }
         signal.addEventListener('abort', cancel, { once: true })
         try {
           signal.throwIfAborted()
@@ -145,7 +153,14 @@ export function mountSessionMcp(ctx: Context, options: SessionMcpOptions): void 
             }
             return next()
           })
-          await scope.ctx.plugin(McpClient, McpClient.Config({
+          await scope.ctx.plugin({
+            name: McpClient.name, inject: McpClient.inject, Config: McpClient.Config,
+            async apply(inner: Context, resolved: McpClient.Config) {
+              signal.throwIfAborted()
+              client = McpClient.mountMcpClient(inner, resolved)
+              await client.ready
+            },
+          }, McpClient.Config({
             transport: 'stdio',
             serverName: options.name,
             command: options.command,
@@ -161,11 +176,14 @@ export function mountSessionMcp(ctx: Context, options: SessionMcpOptions): void 
             value: scope,
             close() {
               clients.delete(agent)
-              return scope.dispose()
+              return cleanup()
             },
           }
         } catch (error) {
-          await (cancellation ?? scope.dispose())
+          const rollback = () => cancellation ?? cleanup()
+          try { await rollback() } catch (cleanupError) {
+            throw new ResourceAcquisitionCleanupError(cleanup, new AggregateError([error, cleanupError], `${options.name}: MCP startup cleanup failed`))
+          }
           throw error
         } finally {
           signal.removeEventListener('abort', cancel)

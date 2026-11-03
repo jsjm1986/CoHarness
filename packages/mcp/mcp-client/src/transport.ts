@@ -7,36 +7,22 @@
  */
 
 import type { Transport } from '@modelcontextprotocol/client'
-import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
-import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'
+import type { McpProcessOwner } from './managed-stdio.ts'
 import type { Config } from './index.ts'
-
-/**
- * The subprocess seam's scrubbed parent env (credential-shaped and stale
- * `DSH_*` names dropped), plus the spec's explicit env. The MCP SDK owns the
- * actual spawn, so this transport shares the scrub definition rather than the
- * spawn path.
- */
-function buildChildEnv(extra: Record<string, string>): Record<string, string> {
-  return { ...scrubbedParentEnv(), ...extra }
-}
 
 /**
  * Create an MCP transport from the resolved plugin config.
  *
  * @param config - Resolved plugin config discriminated on `transport`.
+ * @param processes - Required local process owner for stdio; HTTP needs no child process.
  * @returns A connected-ready MCP Transport (stdio or Streamable HTTP).
  */
-export function createTransport(config: Config): Transport {
+export function createTransport(config: Config, processes?: McpProcessOwner): Transport {
   switch (config.transport) {
     case 'stdio':
-      return new StdioClientTransport({
-        command: config.command,
-        args: config.args,
-        env: buildChildEnv(config.env),
-        cwd: config.cwd,
-      })
+      if (processes === undefined) throw new Error('MCP stdio transport requires its managed process owner')
+      return processes.transport()
     case 'streamable-http':
       return new StreamableHTTPClientTransport(
         new URL(config.url),

@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-terminal",
-  "description": "Persistent PTY session seam for the DeepSeek Harness \u2014 owner-scoped ids, backend registry, interactive sends, reads, signals, and awaited cleanup",
+  "description": "Persistent PTY session seam for the DeepSeek Harness — owner-scoped ids, backend registry, interactive sends, reads, signals, and awaited cleanup",
   "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"
@@ -23,9 +23,9 @@
     "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
-    "lib/types/**/*.d.ts",
-    "locale/*.json"
+    "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {

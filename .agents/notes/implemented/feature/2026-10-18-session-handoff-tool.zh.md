@@ -12,7 +12,7 @@ Status: implemented
 
 [handoff.ts](../../../../packages/session-query/tool-session-query/src/handoff.ts) 新增第六个模型可见工具 `session_handoff`，复用现有五个工具的授权与超时路径。本地投影对已授权会话的当前界面做一次读取，保留直接的用户与 assistant 对话以及压缩检查点，丢弃工具调用、推理、注入上下文和其他界面，再在 `handoffChars` 预算内按最新优先截取尾部，使简报始终从最新状态开始。
 
-当 `llm` 服务与路由目标都能解析且 `handoffExtraction` 开启时，`handoffExtractChars` 以内的序列化对话发送给单个 `session-handoff` 辅助请求，提示词要求输出目标、决策、文件、状态与下一步。所有失败形态——提取关闭、界面超限、服务缺失、capsule 为空、请求失败——都回退到有界本地尾部，工具不依赖辅助路径。`handoffTimeoutMs` 覆盖投影与提取之和；目标会话 id 与其他操作一样在读取后重新校验。
+当 `llm` 服务与路由目标都能解析且 `handoffExtraction` 开启时，`handoffExtractChars` 以内的序列化对话发送给单个 `session-handoff` 辅助请求，提示词要求输出目标、决策、文件、状态与下一步。所有失败形态——提取关闭、界面超限、服务缺失、capsule 为空、请求失败——都回退到有界本地尾部，工具不依赖辅助路径。`handoffTimeoutMs` 覆盖投影与提取之和；目标会话 id 与其他操作一样在读取后重新校验。[Capsule 完成规则](../bug-fix/2026-11-01-session-handoff-completion.zh.md) 要求生成文本正常结束后才可采用。[输入记录](../bug-fix/2026-11-01-session-handoff-input.zh.md) 在派发前保留准确的投影提示词。
 
 ## Consequences
 

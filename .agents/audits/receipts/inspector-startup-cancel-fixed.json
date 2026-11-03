@@ -1,0 +1,13 @@
+{
+  "name": "inspector-startup-cancel-fixed",
+  "cwd": ".",
+  "command": "./node_modules/.bin/vitest run packages/experimental/inspector/tests/resource-admission.host.spec.ts packages/experimental/inspector/tests/plugin.host.spec.ts packages/experimental/inspector/tests/worker-lifecycle.host.spec.ts packages/experimental/inspector/tests/loader-composition.host.spec.ts --retry=0",
+  "startedAt": "2026-10-23T14:40:12.810764+00:00",
+  "seconds": 7.862,
+  "exitCode": 0,
+  "sourceTree": "bf87466f9b1c730312e4c1e57be1a69eae1b98cf",
+  "inputsBefore": "39d7d07d805be1df6b109a59d6a99d39363914f22e53155ed3a7275086d172eb",
+  "inputsAfter": "39d7d07d805be1df6b109a59d6a99d39363914f22e53155ed3a7275086d172eb",
+  "outputSha256": "23a8130314ec257f807f1db45bf96f8647a14ce998b136b89199fd0b350449db",
+  "outputTail": "The plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\nThe plugin \"vite-tsconfig-paths\" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.\n\n RUN  v4.1.12 /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness\n\n\n Test Files  4 passed (4)\n      Tests  13 passed (13)\n   Start at  22:40:17\n   Duration  2.73s (transform 3.37s, setup 142ms, import 4.41s, tests 1.25s, environment 0ms)\n\n"
+}

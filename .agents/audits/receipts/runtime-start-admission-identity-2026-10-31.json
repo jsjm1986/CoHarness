@@ -1,0 +1,251 @@
+{
+  "finding": "B361",
+  "status": "fixed_named_runtime_start_identity_scope",
+  "updatedAt": "2026-10-30T17:52:21.787864+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z",
+  "sourcePaths": [
+    "gateway/src/node-resource-budget.ts",
+    "gateway/tests/node-resource-budget-postgres.spec.ts",
+    "gateway/tests/fixtures/runtime-start-built.mjs",
+    "gateway/tests/expected/runtime-start-built.json",
+    "gateway/README.md",
+    "gateway/README.zh.md",
+    "gateway/README.i18n.yaml",
+    ".agents/notes/implemented/bug-fix/2026-10-31-runtime-start-admission-identity.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-runtime-start-admission-identity.zh.md",
+    ".agents/notes/implemented/bug-fix/2026-10-31-runtime-start-admission-identity.i18n.yaml",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.zh.md",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml"
+  ],
+  "sourceHashes": {
+    "gateway/src/node-resource-budget.ts": "21e0b64b06ccfd075ed3c291804a574907e1dd8c13ee172a1a436ee4446c2d3a",
+    "gateway/tests/node-resource-budget-postgres.spec.ts": "bbc8aa9c21b159c1075b8ed102878d8f07a769dcb2d72f1cc60601d18cb765c8",
+    "gateway/tests/fixtures/runtime-start-built.mjs": "78fe2a464fbb152693cdad50822840d5b00f6ef78ccadd0b5a2aa218301ad177",
+    "gateway/tests/expected/runtime-start-built.json": "3c36b49705d662e1f4c135eeea9b35692d6c4e9d60079e7569f3cd564157647c",
+    "gateway/README.md": "95e077edaa01113876d3664b2c6f717bfa33f3c1a81395ef39ce7a5c0ff5afa2",
+    "gateway/README.zh.md": "c84988cccf687f9776da2f92eca182f93f692da05a4f922efb4d7988a96bbb93",
+    "gateway/README.i18n.yaml": "5324975940eca71c2b82cb9b5e0539bbd74a692b5cb81d9faa1e8cdbf944cdce",
+    ".agents/notes/implemented/bug-fix/2026-10-31-runtime-start-admission-identity.md": "19df636653c8578284d6da1c12aede95b348ce1ab41e25b6e40e2b46f1d21233",
+    ".agents/notes/implemented/bug-fix/2026-10-31-runtime-start-admission-identity.zh.md": "e06df9d3172433206733b22d2a3d76a0ed353d5f006ba9b41a0528e20806f25e",
+    ".agents/notes/implemented/bug-fix/2026-10-31-runtime-start-admission-identity.i18n.yaml": "4037d64eb25ca1852d716f87f10637331bb2b8c3c62b5df3ca4846b19d5825f7",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.md": "608326eaf7751a25fda19018124214ce3844714ecfd590b18b0c00683d3e9750",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.zh.md": "0a7b8dca335821627136f10dba9fcfce9a09232e95978acf57bbfebb9f102a47",
+    "docs/upgrade-guide/v0.2.1-rc.1.coharness.1/managed-resource-admission/guide.i18n.yaml": "d074d387d21b662284d7b13e1a40dc9b75a65370ae6fd57e2cec93acc7cb3035"
+  },
+  "privateCompiledArtifact": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z/runtime-start-identity-gateway-artifact/lib",
+  "compiledHashes": {
+    "node-resource-budget.js": "f8dd92069e77d038922ee06db8847f91bc95943ef527b00bcc60aae8e0ed5a7a",
+    "postgres/instance-repository.js": "6372c0b9ad19ec69e05bdcacc7173e0a0bef9c55c27f722e2bdba7d52c404a5b",
+    "postgres/database.js": "d47725c74ba356e4850fc563a97419ef17eababf05a2cc6a64d1fd97925209ab"
+  },
+  "predecessorBudgetHash": "255f3bbf2c55a337a3547f722e215bde6cbf7775768edad01a7b53824bc799b1",
+  "repair": "Cold-start pressure admission includes any explicitly supplied durable RuntimeId in the organization/node/owner/generation row match, before writing allocation_state or spending shared credits. Optional absent IDs preserve the legacy generation lookup. No schema, Runtime generation policy or new authority is introduced.",
+  "causalEvidence": {
+    "runtime-start-identity-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T17:43:52.142954+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+        "node",
+        "../node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/node-resource-budget-postgres.spec.ts",
+        "-t",
+        "explicit Runtime identity",
+        "--maxWorkers=2"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T17:43:53.759279+00:00"
+    },
+    "runtime-start-identity-compiled-causal-negative": {
+      "status": "failed",
+      "startedAt": "2026-10-30T17:47:09.507416+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "python3",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+        "env",
+        "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+        "node",
+        "--import",
+        "tsx/esm",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "tests/fixtures/runtime-start-built.mjs",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T123832Z/directory-pinning-gateway-artifact/lib"
+      ],
+      "exitCode": 1,
+      "finishedAt": "2026-10-30T17:47:10.021064+00:00"
+    }
+  },
+  "verification": {
+    "sourceAndAdjacentCases": 68,
+    "sourceFiles": 3,
+    "resourceBudgetCases": 48,
+    "newExplicitIdRefusalCases": [
+      "foreign-account",
+      "foreign-project",
+      "same-account-other-computer",
+      "unknown-environment"
+    ],
+    "eachRefusalKeepsAllocationUnchanged": true,
+    "sameCreditCorrectTargetControl": true,
+    "plainCompiledProgramSemanticFlags": 5,
+    "plainCompiledProgramWrongIdControls": 2,
+    "goldenFile": "gateway/tests/expected/runtime-start-built.json",
+    "compiledNodeVersions": [
+      "22.22.1",
+      "24.19.0"
+    ],
+    "repeatedExecutionsAreNotNewCases": true,
+    "gatewayArtifactCompiledIntoPrivateDirectory": true,
+    "ownFreshDatabasePerInvocation": true,
+    "docQuickGates": 20,
+    "checks": {
+      "runtime-start-identity-final-regression": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:50:40.104621+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "node",
+          "../node_modules/vitest/vitest.mjs",
+          "run",
+          "tests/node-resource-budget-postgres.spec.ts",
+          "tests/runtime-catalog-postgres.spec.ts",
+          "tests/instance-capacity-postgres.spec.ts",
+          "--maxWorkers=2"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:50:47.297395+00:00"
+      },
+      "runtime-start-identity-artifact-build": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:46:52.162455+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node_modules/.bin/tsc",
+          "-p",
+          "gateway/tsconfig.build.json",
+          "--outDir",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z/runtime-start-identity-gateway-artifact/lib",
+          "--incremental",
+          "false"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:46:54.518272+00:00"
+      },
+      "runtime-start-identity-final-types": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:50:40.104621+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "../node_modules/.bin/tsc",
+          "-p",
+          "tsconfig.ci.json",
+          "--noEmit"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:50:43.278391+00:00"
+      },
+      "runtime-start-identity-final-lint": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:50:40.104625+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "node",
+          "--import",
+          "tsx/esm",
+          "scripts/run-oxlint.ts",
+          "gateway/src/node-resource-budget.ts",
+          "gateway/tests/node-resource-budget-postgres.spec.ts"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:50:40.998662+00:00"
+      },
+      "runtime-start-identity-built-node22": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:49:21.702226+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+          "tests/fixtures/runtime-start-built.mjs",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z/runtime-start-identity-gateway-artifact/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:49:22.868786+00:00"
+      },
+      "runtime-start-identity-built-node24": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:50:13.765820+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+        "command": [
+          "python3",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-owned-pg.py",
+          "env",
+          "TSX_TSCONFIG_PATH=/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/tsconfig.run.json",
+          "node",
+          "--import",
+          "tsx/esm",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261029T200732Z/with-fresh-postgres.mjs",
+          "/Users/a1234/.nvm/versions/node/v24.19.0/bin/node",
+          "tests/fixtures/runtime-start-built.mjs",
+          "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261030T163504Z/runtime-start-identity-gateway-artifact/lib"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:50:15.467080+00:00"
+      },
+      "runtime-start-identity-doc-quick": {
+        "status": "passed",
+        "startedAt": "2026-10-30T17:50:12.595586+00:00",
+        "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+        "command": [
+          "pnpm",
+          "run",
+          "test:docs"
+        ],
+        "exitCode": 0,
+        "finishedAt": "2026-10-30T17:50:45.306108+00:00"
+      }
+    }
+  },
+  "coverageScope": "Both omitted and explicit selector paths and four invalid durable identity classes are exercised against real PostgreSQL, with correct-target controls that consume the retained credit. No new whole-node-budget or Gateway100percent measurement or completion claim; root desktop100percent evidence is a separate two-module scope.",
+  "documentation": {
+    "pairedStems": 3,
+    "existingManagedResourceUpgradeGuideUpdated": true,
+    "newActiveDecision": ".agents/notes/implemented/bug-fix/2026-10-31-runtime-start-admission-identity.md",
+    "fullSupersessions": [],
+    "retainedRules": "Existing generation allocation and early startup requirements own independent decisions.",
+    "frozenArchivesEdited": false
+  },
+  "limits": [
+    "Ordinary InstanceManager startup validates target ownership earlier. The accepted defect is the admission service silently discarding an explicit selector; no external cross-account process execution exploit was established. Migration093already prevents overlapping same-owner generations, so a generation-collision hypothesis was rejected.",
+    "The other-computer case uses two persisted computer identities in one isolated PostgreSQL database on this Mac; it does not claim a second physical host or remote deployment acceptance.",
+    "The first compiled fixture lacked the now-required computer-use permission and did not create an assignment. The first expanded source fixture lacked the remote node account. Those outcomes are fixture setup errors, not causal evidence; the accepted compiled negative fails specifically on a missing required refusal.",
+    "Only a private Gateway artifact was compiled. Root did not overwrite peer Gatewaylib, deploy code, mutate live data, or edit peer project directory preparation. Real paid model success and public push remain human-deferred; all12original domains and B04/B25 stay open."
+  ]
+}

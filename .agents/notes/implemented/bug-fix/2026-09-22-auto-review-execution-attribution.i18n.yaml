@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.md
 document:
-  en: ed9f1f0421233805be11df98f74e442b77f7eef6
-  zh: 7b5548b1295102b18f78b778ce70dfb6731d966a
+  en: f0487c00b81d603a6efc96154a165518abda0ae6
+  zh: 562fbb733945cbed4ce8ea20bf76a8bd9d5b91c4
 /agent-note-auto-review-execution-authority-and-billing-attribution:
   en: 37cf33ffacb64c12
   zh: 6d9a70f76547f21a
@@ -12,8 +12,8 @@ document:
   en: 5cc782c9bed7fbdc
   zh: 2971b91938001cdb
 /agent-note-auto-review-execution-authority-and-billing-attribution/decision:
-  en: f47563c9f9865e88
-  zh: 4349226056355237
+  en: ec53dc4634d64281
+  zh: 9f7032f483ee1ec2
 /agent-note-auto-review-execution-authority-and-billing-attribution/alternatives-considered:
   en: 7c017dc834ee87b3
   zh: 6ed17cb00654f06d
