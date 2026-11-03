@@ -22,7 +22,7 @@ The [multi-computer design](../../proposed/architecture/2026-10-28-multi-compute
 
 ## Consequences
 
-Windows x64/arm64 computers can enroll, hold leases, serve control-channel probes and forward existing Gateway services once configured. Windows service templates (`node-connection-platform-unsupported` on `start`), the local Runtime supervisor/owner path, kernel-boot identity and pressure sampling remain POSIX-only and gate actual execution. Both `node-agent.ts` and `node-connection.ts` share `node-private-file.ts`, so the private-file contract stays single-sourced.
+Windows x64/arm64 computers can enroll, hold leases, serve control-channel probes and forward existing Gateway services once configured. `deploy/windows/node-agent-task.ps1` registers the compiled entry as the `HarnessNodeAgent` Scheduled Task (SYSTEM, at startup, restart-on-failure), and `GatewayNodeConnection.start` dispatches `schtasks /Run`; the local Runtime supervisor/owner path, kernel-boot identity and pressure sampling remain POSIX-only and gate actual execution. Both `node-agent.ts` and `node-connection.ts` share `node-private-file.ts`, so the private-file contract stays single-sourced; Windows privacy anchors on the file's owner SID plus SYSTEM and Administrators rather than the reader's account, so an operator-written setup file stays private to a SYSTEM-hosted agent.
 
 ## Verification
 

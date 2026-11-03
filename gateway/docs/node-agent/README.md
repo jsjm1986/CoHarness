@@ -163,7 +163,7 @@ Node settings are resolved before file or network acquisition.
 | Node variable | Default | Meaning |
 |---|---|---|
 | `HGW_NODE_CENTER_URL` | Required | HTTPS origin; loopback HTTP is accepted locally |
-| `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | Credential file private to the agent's OS account (mode 0600 on macOS/Linux, exclusive ACL on Windows) |
+| `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | Credential file private to its owning account (mode 0600 on macOS/Linux, an ACL limited to the file owner plus SYSTEM and Administrators on Windows) |
 | `HGW_NODE_ENROLLMENT_TOKEN` | Required for a new state file | Administrator ticket; enrolled records use their saved credential |
 | `HGW_NODE_AGENT_REQUEST_TIMEOUT_MS` | 10000 | Network request and shutdown-release timeout |
 | `HGW_NODE_AGENT_RETRY_MS` | 3000 | Delay between idempotent control retries |

@@ -99,7 +99,7 @@ export class GatewayNodeConnection {
     this.file = cfg.nodeConnectionFile
     this.service = process.platform === 'darwin'
       ? `${environment.HGW_LAUNCHD_DOMAIN ?? `gui/${process.getuid?.() ?? 0}`}/${environment.HGW_NODE_AGENT_LABEL ?? 'com.maycran.harness-node-agent'}`
-      : environment.HGW_NODE_AGENT_SERVICE ?? 'harness-node-agent.service'
+      : environment.HGW_NODE_AGENT_SERVICE ?? (process.platform === 'win32' ? 'HarnessNodeAgent' : 'harness-node-agent.service')
     if (/[\s\u0000-\u001f]/u.test(this.service)) throw new NodeConfigurationError(400, 'invalid-node-agent-service')
   }
 
@@ -179,7 +179,8 @@ export class GatewayNodeConnection {
         }, { waitMs: 0 })
       }
       const command = process.platform === 'darwin' ? ['launchctl', 'kickstart', '-k', this.service]
-        : process.platform === 'linux' ? ['systemctl', '--no-ask-password', '--no-pager', 'restart', this.service] : undefined
+        : process.platform === 'linux' ? ['systemctl', '--no-ask-password', '--no-pager', 'restart', this.service]
+        : process.platform === 'win32' ? ['schtasks.exe', '/Run', '/TN', this.service] : undefined
       if (command === undefined) throw new NodeConfigurationError(409, 'node-connection-platform-unsupported')
       try { await runGatewayChildCommand(command[0]!, command.slice(1), this.cfg.systemdCommandTimeoutMs, signal, 8192) }
       catch (error) { throw new NodeConfigurationError(409, 'node-connection-service-start-failed', { cause: error }) }

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-04-windows-node-enrollment.md
 document:
-  en: 80a563a0f1670ed9c895813a0a9ea8c5ad871fc1
-  zh: 548da25c2fb28e87ebd2ef17e867ec4a53249e8d
+  en: 74f988832547e82d336a989e202f0cfaf309f145
+  zh: bb8b7ad75070fda6690abdff499955e3cbb1c3b3
 /agent-note-windows-node-enrollment:
   en: 64ba4104d3da55ec
   zh: 87b1d394e523ef17
@@ -18,8 +18,8 @@ document:
   en: 208f6452fde123b8
   zh: 4ee7dc2f93ca8f34
 /agent-note-windows-node-enrollment/consequences:
-  en: cc9aeecfd6ea20b4
-  zh: cc4d3419b1f4309c
+  en: fd27ec503c6f5936
+  zh: 5ff9c9f9a077830b
 /agent-note-windows-node-enrollment/verification:
   en: 3f70469aff2d3393
   zh: 2a266f7167689ce0

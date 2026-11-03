@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/docs/node-agent/README.md
 document:
-  en: 789fe7bd6ab850b39c29b58db206fc2423c16dc0
-  zh: 2bcfc6479f2f24375b939abda34015035b9eef28
+  en: b1a03a30c31c9ba96ce7b6b87ded8ce647151feb
+  zh: 525d1aba465f2969c8250ba3804e90d64fe425be
 /:
   en: 9437b0da044bb538
   zh: 0a314f5801ab579d
@@ -36,8 +36,8 @@ document:
   en: 4d754d650d9a3633
   zh: ce30e7eb03ff2df5
 /node-agent-access-reference/configuration:
-  en: adadc3b9af8b029d
-  zh: 8ad3e64ea0b3ecbf
+  en: 95860c474304011a
+  zh: e427b0330caeac63
 /node-agent-access-reference/recovery:
   en: b734d9a59b34d6ca
   zh: a8c5aa980240f366

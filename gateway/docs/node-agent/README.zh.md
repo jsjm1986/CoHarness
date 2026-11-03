@@ -163,7 +163,7 @@ Webhook 配置绑定精确 Runtime 及电脑。除非提交其他明确 Runtime�
 | 节点变量 | 默认 | 含义 |
 |---|---|---|
 | `HGW_NODE_CENTER_URL` | 必需 | HTTPS 源站；本地可使用回环 HTTP |
-| `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | 仅节点操作系统账号可访问的凭证文件（macOS/Linux 为 0600 权限，Windows 为独占 ACL） |
+| `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | 仅文件属主账号可访问的凭证文件（macOS/Linux 为 0600 权限，Windows 为限定于属主、SYSTEM 与 Administrators 的 ACL） |
 | `HGW_NODE_ENROLLMENT_TOKEN` | 新状态文件必需 | 管理员令牌；已接入记录使用保存的凭证 |
 | `HGW_NODE_AGENT_REQUEST_TIMEOUT_MS` | 10000 | 网络请求和退出释放的超时 |
 | `HGW_NODE_AGENT_RETRY_MS` | 3000 | 幂等控制操作重试之间的间隔 |

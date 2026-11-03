@@ -10,7 +10,7 @@ export type PrivateFileState = 'private' | 'unreadable' | 'not-private'
 const WINDOWS_BOUNDARY_SIDS = new Set(['S-1-5-18', 'S-1-5-32-544'])
 
 const windowsAclSchema = z.object({
-  me: z.string().regex(/^S-1-5(?:-[0-9]+)+$/u), deny: z.number().int().nonnegative().max(1024),
+  owner: z.string().regex(/^S-1(?:-[0-9]+)+$/u), deny: z.number().int().nonnegative().max(1024),
   sids: z.array(z.string().regex(/^S-1(?:-[0-9]+)+$/u)).max(64),
 }).strict()
 
@@ -18,24 +18,37 @@ const windowsAclSchema = z.object({
 // the same SIDs through its `*SID` syntax on any display language. `-Command`
 // swallows every later token into the command text, so the script is wrapped in
 // `& { }` and the file path arrives as the script block's positional argument.
+// Privacy anchors on the file's owner SID rather than the reader's account so an
+// operator-written connection file stays readable to a SYSTEM-hosted agent.
 const WINDOWS_ACL_PROBE = '& { ' + [
   '$acl = Get-Acl -LiteralPath $args[0]',
   '$sids = @($acl.Access | ForEach-Object { try { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { "S-1-0-0" } })',
   '$deny = @($acl.Access | Where-Object { $_.AccessControlType -ne "Allow" }).Count',
-  '@{ me = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value; deny = $deny; sids = $sids } | ConvertTo-Json -Compress',
+  '@{ owner = $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value; deny = $deny; sids = $sids } | ConvertTo-Json -Compress',
 ].join('; ') + ' }'
 
+// icacls `:r` replaces only the named trustee's grant, so the ACL is rebuilt
+// exactly: inheritance cut and dropped, every existing rule removed, then the
+// owner SID plus OS-boundary principals re-added. FileSystemAccessRule parses
+// string trustees as NTAccount names, so SIDs are passed as SecurityIdentifier
+// objects; a partial rebuild must fail rather than leave an empty DACL.
 const WINDOWS_ACL_TIGHTEN = '& { ' + [
-  '$me = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value',
-  '& icacls.exe $args[0] /inheritance:r /grant:r ("*" + $me + ":F") "*S-1-5-18:F" "*S-1-5-32-544:F" | Out-Null',
-  'exit $LASTEXITCODE',
+  '$ErrorActionPreference = "Stop"',
+  '$acl = Get-Acl -LiteralPath $args[0]',
+  '$acl.SetAccessRuleProtection($true, $false)',
+  'foreach ($r in @($acl.Access)) { [void]$acl.RemoveAccessRule($r) }',
+  '$owner = $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value',
+  'foreach ($sid in @($owner, "S-1-5-18", "S-1-5-32-544")) { [void]$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($sid)), "FullControl", "Allow"))) }',
+  'Set-Acl -LiteralPath $args[0] -AclObject $acl',
 ].join('; ') + ' }'
 
 /**
- * Check whether a state file stays private to this operating-system account.
+ * Check whether a state file stays private to its owning account.
  * POSIX verdicts come from already-opened handle metadata (uid + mode 0600);
  * Windows has no handle ACL query, so the file's ACL is resolved through
- * PowerShell and compared against the caller SID plus OS-boundary principals.
+ * PowerShell and every grant must be the owner SID or an OS-boundary
+ * principal — the reader's own account is irrelevant, which lets an
+ * operator-written file stay private to a SYSTEM-hosted agent.
  * `O_NOFOLLOW` is inert on Windows, so the path is re-checked for a reparse
  * point first — the owning directory is still expected to be account-private.
  * @param file - absolute state-file path, used for the Windows ACL lookup.
@@ -58,11 +71,11 @@ export async function privateFileState(file: string, info: { isFile(): boolean; 
   let acl: z.infer<typeof windowsAclSchema> | undefined
   try { acl = probe === undefined ? undefined : windowsAclSchema.parse(JSON.parse(probe.stdout)) } catch { acl = undefined }
   if (acl === undefined || acl.deny !== 0 || acl.sids.length === 0) return 'not-private'
-  return acl.sids.every(sid => sid === acl.me || WINDOWS_BOUNDARY_SIDS.has(sid)) ? 'private' : 'not-private'
+  return acl.sids.every(sid => sid === acl.owner || WINDOWS_BOUNDARY_SIDS.has(sid)) ? 'private' : 'not-private'
 }
 
 /**
- * Tighten a freshly renamed state file to the caller SID plus OS-boundary principals.
+ * Tighten a freshly renamed state file to its owner SID plus OS-boundary principals.
  * No-op outside Windows, where the 0600 create mode already carries the boundary.
  * @param file - state-file path just moved into place.
  * @param signal - caller cancellation.

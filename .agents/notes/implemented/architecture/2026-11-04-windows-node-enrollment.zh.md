@@ -22,7 +22,7 @@ Status: implemented
 
 ## 影响
 
-Windows x64/arm64 电脑可以接入、持有租约、响应控制通道探测，并在配置后转发现有 Gateway 服务。Windows 服务模板（`start` 仍报 `node-connection-platform-unsupported`）、本地 Runtime 监督／属主路径、内核启动身份与压力采样仍为 POSIX 专属，继续隔离真实执行。`node-agent.ts` 与 `node-connection.ts` 共用 `node-private-file.ts`，私有文件契约保持单一实现。
+Windows x64/arm64 电脑可以接入、持有租约、响应控制通道探测，并在配置后转发现有 Gateway 服务。`deploy/windows/node-agent-task.ps1` 将编译入口注册为 `HarnessNodeAgent` 计划任务（SYSTEM、开机启动、失败重启），`GatewayNodeConnection.start` 分发 `schtasks /Run`；本地 Runtime 监督／属主路径、内核启动身份与压力采样仍为 POSIX 专属，继续隔离真实执行。`node-agent.ts` 与 `node-connection.ts` 共用 `node-private-file.ts`，私有文件契约保持单一实现；Windows 私有性锚定文件属主 SID 加 SYSTEM 与 Administrators 而非读取者账号，使运维写入的配置文件对 SYSTEM 托管的 agent 依然私有。
 
 ## 验证
 
