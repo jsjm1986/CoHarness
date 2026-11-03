@@ -206,6 +206,9 @@ importers:
       publint:
         specifier: ^0.3.24
         version: 0.3.24
+      punycode:
+        specifier: 2.3.1
+        version: 2.3.1
       semver:
         specifier: ^7.8.5
         version: 7.8.5

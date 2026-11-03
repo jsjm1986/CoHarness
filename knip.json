@@ -53,7 +53,8 @@
       ],
       "ignoreDependencies": [
         "@deepseek-ai/dsh-ssh-helper-runtime",
-        "pg"
+        "pg",
+        "punycode"
       ],
       "project": [
         "scripts/**/*.ts",
