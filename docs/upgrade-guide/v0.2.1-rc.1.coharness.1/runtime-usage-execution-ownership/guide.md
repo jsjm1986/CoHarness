@@ -18,5 +18,5 @@ Resource scope selection also uses the exact authenticated Runtime. An immutable
 ## Migration
 
 1. Stop every Gateway sharing the database, retain a restore-checked backup, and upgrade all of them together, including managed-computer Gateways. Apply migration 096 with the matching release before accepting traffic; do not run older writers against the migrated database.
-2. Keep Runtime-specific reporting token files with their owning Runtime. For a rejected report, inspect its actual Session and captured input provenance; do not remove proof fields to obtain acceptance.
+2. Keep Runtime-specific reporting token files with their owning Runtime. For a rejected report, inspect its actual Session and the captured input’s source; do not remove proof fields to obtain acceptance.
 3. Verify independent registration using the same Host Session ID in two personal Runtimes, ordinary reporting, refusal when one submits the other's witnesses, shared account totals and valid delayed reporting after revocation. See the [Gateway reference](../../../../gateway/README.md).

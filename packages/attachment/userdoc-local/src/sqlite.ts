@@ -1,6 +1,9 @@
 let nodeSqlite: Promise<typeof import('node:sqlite')> | undefined
 
-/** Load Node SQLite once so concurrent stores share one warning-filter lifetime. */
+/**
+ * Load Node SQLite once so concurrent stores share one warning-filter lifetime.
+ * @returns the memoized `node:sqlite` module promise.
+ */
 export function loadNodeSqlite(): Promise<typeof import('node:sqlite')> {
   nodeSqlite ??= importNodeSqlite()
   return nodeSqlite

@@ -35,8 +35,6 @@ flowchart LR
   svc_pluginManager["ctx.pluginManager<br/>Current-profile plugin and bundle management"]
   svc_pluginManagerCatalog["ctx.pluginManagerCatalog<br/>Authorized plugin-management catalog"]
   pkg_client_ui_plugin_manager["client-ui-plugin-manager"]
-  pkg_resource_budget["resource-budget"]
-  svc_resourceBudget["ctx.resourceBudget<br/>Execution reservation interface"]
   pkg_plugin_market["plugin-market"]
   svc_pluginMarket["ctx.pluginMarket<br/>Plugin market index reader"]
   pkg_client_ui_plugin_market["client-ui-plugin-market"]

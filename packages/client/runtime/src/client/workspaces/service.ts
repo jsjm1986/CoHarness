@@ -968,7 +968,10 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.manager.handleHostEnvelope(envelope)
   }
 
-  /** Rebuild the Workspace baseline after connection. */
+  /**
+   * Rebuild the Workspace baseline after connection.
+   * @returns the archive snapshot produced by the baseline read, or undefined when none applies.
+   */
   handleConnected(): Promise<WorkspaceArchiveSnapshot | undefined> {
     const runtimeId = (this.rootCtx.get('connection') as ConnectionHandle | undefined)
       ?.hostDescription.getSnapshot()?.runtimeTarget?.runtimeId

@@ -9,9 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-jobs-local` runs background jobs inside the harness process while the agent continues. The owning agent can read, wait on, list, and cancel its jobs; mounting `dsh-tool-jobs` also delivers completion notices in-session. Configurable concurrency and output-retention limits bound resource use. Producers can supply output for periodic reading or append it directly; users can observe retained output without consuming the agent's unread output. Jobs end when their owner or the harness shuts down.
-
-Automatic idle release tracks producer resource acknowledgments separately from terminal records. A throwing teardown cancellation can force-fail and remove the record without blocking provider removal; its raw `done` promise and output drain still retain the Runtime and exact owner until resource release completes. A rejected `done` or failed cleanup leaves release unconfirmed and blocks automatic idle release. Explicit administrative shutdown retains its existing authority.
+`dsh-jobs-local` runs background jobs inside the harness process while the agent continues. The owning agent reads, waits on, lists, and cancels its jobs; `dsh-tool-jobs` delivers completion notices in-session. Configurable concurrency and output-retention limits bound resource use. Producers append or periodically supply output that users observe without consuming the agent's unread tail. Jobs end with their owner or the harness. Automatic idle release tracks producer resource acknowledgments separately from terminal records; a throwing teardown cancellation may force-fail the record, while an unconfirmed release blocks idle collection.
 
 ## Table of Contents
 

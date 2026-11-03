@@ -52,7 +52,8 @@
         "client-build-environment"
       ],
       "ignoreDependencies": [
-        "@deepseek-ai/dsh-ssh-helper-runtime"
+        "@deepseek-ai/dsh-ssh-helper-runtime",
+        "pg"
       ],
       "project": [
         "scripts/**/*.ts",
@@ -102,7 +103,12 @@
         "acp-agent/tests/fixtures/shell/tool-pwsh/driver.ts",
         "headless-agent/tests/fixtures/memory-observer-failure.ts",
         "headless-agent/tests/fixtures/memory-curation-race-model.ts",
-        "headless-agent/tests/fixtures/memory-execution-model.ts"
+        "headless-agent/tests/fixtures/memory-execution-model.ts",
+        "headless-agent/tests/fixtures/memory-disabled-tools-model.ts",
+        "headless-agent/tests/fixtures/memory-consolidation-sessions-model.ts",
+        "headless-agent/tests/fixtures/memory-recall-integrity-model.ts",
+        "headless-agent/tests/fixtures/model-policy-driver.ts",
+        "headless-agent/tests/fixtures/model-policy-model.ts"
       ],
       "project": [
         "**/*.ts"
@@ -293,7 +299,8 @@
     "packages/client/ui-workbench": {
       "entry": [
         "tests/**/*.spec.ts",
-        "tests/**/*.spec.tsx"
+        "tests/**/*.spec.tsx",
+        "tests/html-pack-perf.client.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -1023,6 +1030,8 @@
         "tests/**/*.ts"
       ],
       "ignoreDependencies": [
+        "base",
+        "optional",
         "react"
       ]
     },
@@ -1733,6 +1742,36 @@
       ]
     },
     "packages/typert/protocol": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/document/office-to-pdf": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.perf.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/ssh/fs-ssh": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/ssh/subprocess-ssh": {
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts"

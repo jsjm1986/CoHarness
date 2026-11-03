@@ -73,6 +73,8 @@ The catalog’s `personalComplete` flag distinguishes a verified personal direct
 
 An authorized catalog entry remains in the saved layout when its runtime is manually stopped or temporarily unreachable. An unloaded pane shows that state without conversation content; background restoration never requests an explicit start. The existing workspace start action and catalog refresh can restore it. Explicit authorization denial or a confirmed missing Session removes the pane, and account changes clear the active view.
 
+Empty project choices retain their fixed computer from the authorized directory. The chooser shows that name only when the deployment exposes computer information, and first-conversation creation keeps the same project and computer target.
+
 <a id="model-experience"></a>
 ## Model Experience
 
@@ -81,8 +83,6 @@ None, as browser-only pane controls register nothing model-facing; the existing 
 #### KV Cache effect
 
 None; the package never assembles or sends provider requests.
-
-Empty project choices retain their fixed computer from the authorized directory. The chooser shows that name only when the deployment exposes computer information, and first-conversation creation keeps the same project and computer target.
 
 ## Known Limitations and Deferred Work
 

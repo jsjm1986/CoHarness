@@ -1,4 +1,4 @@
-/** One real job controller retains capacity while its external authority captures provenance. */
+/** One real job controller retains capacity while its external authority captures the execution owner. */
 import assert from 'node:assert/strict'
 import { applyLoopbackServerEffect } from '../../../../../snapshots/session/loopback-fixture-server.mjs'
 export const inject = ['llm', 'agents', 'jobs']

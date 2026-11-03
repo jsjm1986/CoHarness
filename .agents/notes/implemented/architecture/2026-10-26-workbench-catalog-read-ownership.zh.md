@@ -22,4 +22,4 @@ Status: implemented
 
 ## 影响
 
-通过屏障控制时序的[完整浏览器场景](../../../../apps/web/tests/frontend-responsiveness.e2e.ts)要求初始化导航只读取一次目录，随后打开保存的面板。工具栏直接读取目录时，该场景因两次请求而失败。它保护的是重复工作，不是公网延迟预算。恢复请求可能在工具栏缺席时完成；若没有调用者，结果会丢弃。[读取器测试](../../../../packages/client/ui-workbench/tests/catalog-reader.client.spec.ts)覆盖取消、恢复需求撤回、新鲜度、独立所有者以及等待底层工作结束的卸载。
+通过屏障控制时序的[完整浏览器场景](../../../../apps/web/tests/frontend-responsiveness.e2e.ts)要求初始化导航只读取一次目录，随后打开保存的面板。工具栏直接读取目录时，该场景因两次请求而失败。它保护的是重复工作，不是公网延迟预算。恢复请求可能在工具栏缺席时完成；若没有调用者，结果会丢弃。[读取器测试](../../../../packages/client/ui-workbench/tests/catalog.client.spec.ts)覆盖取消、恢复需求撤回、新鲜度、独立所有者以及等待底层工作结束的卸载。

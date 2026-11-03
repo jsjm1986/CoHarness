@@ -1,4 +1,4 @@
-/** SDK background capacity includes execution provenance callbacks before producer startup. */
+/** SDK background capacity includes execution-authority callbacks before producer startup. */
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'

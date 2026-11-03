@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-26-workbench-catalog-read-ownership.md
 document:
-  en: 9379997344f33d813d664b1ce7a80e270031e1a6
-  zh: 5026e7a0ea8f5b7607dd79c3b47bed262f5e3fcb
+  en: 3ef36688e4b1407e74e28dcfa75750c1cbb130f3
+  zh: 55f57645e2e04607c55d378d0f547c927a4e03af
 /agent-note-workbench-catalog-read-ownership:
   en: 9e357746bb539e9d
   zh: d052fbe46097fe6e
@@ -18,5 +18,5 @@ document:
   en: 0ca24e2fb22a0006
   zh: ee9aff331249962c
 /agent-note-workbench-catalog-read-ownership/consequences:
-  en: 92c1358e144a8f26
-  zh: 61b8d6f67feaa96c
+  en: 83e9fcbb72d2b904
+  zh: 6b8373110c7a4c1c

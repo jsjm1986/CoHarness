@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for 2026-11-07-question-reply-participant.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-11-07-question-reply-participant.md
+document:
+  en: 53584ddb998dda0ed6102dd646009071f7f8ecb4
+  zh: cee73bcf49456fb52cf2ed672cab2a02fd41462d
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-11-07-question-reply-participant:
+  en: 75a6b059e5523ae3
+  zh: a4f2fc161a75308d
+/2026-11-07-question-reply-participant/summary:
+  en: 405b75ebe37e69e2
+  zh: aefb5dfbbb548fb8
+/2026-11-07-question-reply-participant/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-11-07-question-reply-participant/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-11-07-question-reply-participant/compatibility:
+  en: 4d87714f3591fda0
+  zh: 7de5068663b52cdb
+/2026-11-07-question-reply-participant/verification:
+  en: f47c1cf7f68f31f9
+  zh: d0e1058fa2b7c425
+/2026-11-07-question-reply-participant/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

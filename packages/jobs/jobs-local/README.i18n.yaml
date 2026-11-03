@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/jobs/jobs-local/README.md
 document:
-  en: e11e261ed83f8095669f861741fa2c5bd0b1cf18
-  zh: 3614e1316a86cf5d4901f7e897362af2c5ee744f
+  en: 43bf5e80cac1c90295057406319944157e1673b0
+  zh: 5b2f909968607eb1f7791121e31f1476fbd9359b
 /:
   en: 0abe764a4bc3e3db
   zh: 280ff3a1c1a8bc5c
@@ -12,8 +12,8 @@ document:
   en: 20bc108b32378c74
   zh: 8d1121f0a70f454a
 /deepseek-ai-dsh-jobs-local/summary:
-  en: 1de8689539e35e17
-  zh: 737cc7d80bfdc860
+  en: ad3fa4208fb88dce
+  zh: 88a3c831622c2f16
 /deepseek-ai-dsh-jobs-local/table-of-contents:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb

@@ -5805,7 +5805,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ConnectionRequestBoundary',
-    declaration: 'export interface ConnectionRequestBoundary {\n    kind: \'http\' | \'upgrade\';\n    headers: IncomingHttpHeaders;\n    method?: string;\n    pathname?: string;\n    url?: string;\n}',
+    declaration: 'export interface ConnectionRequestBoundary {\n    kind: \'http\' | \'upgrade\';\n    headers: IncomingHttpHeaders;\n    method?: string;\n    pathname?: string;\n    url?: string;\n    signal?: AbortSignal;\n}',
   },
   {
     name: 'ConnectionRequestRejection',
@@ -9293,7 +9293,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WebBootEntry',
-    declaration: 'export interface WebBootEntry {\n    id: string;\n    url: string;\n    rev: string;\n    inject?: string[];\n    immediately?: boolean;\n    external?: string[];\n}',
+    declaration: 'export interface WebBootEntry {\n    id: string;\n    url: string;\n    rev: string;\n    chunks?: Record<string, string>;\n    inject?: string[];\n    immediately?: boolean;\n    external?: string[];\n}',
   },
   {
     name: 'WebBootGraph',

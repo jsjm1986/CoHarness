@@ -149,7 +149,7 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       // Gate settings and private presentation ownership independently of GUI composition.
       'packages/client/runtime/src/**/!(settings-scope|session-persistence).ts',
       'packages/client/ui-conversation/src/client/!(stores).ts',
-      'packages/client/ui-conversation/src/client/*.tsx',
+      'packages/client/ui-conversation/src/client/**/*.tsx',
       'packages/client/ui-primitives/src/DisclosureRow.tsx',
       // Activity requests and ownership are unit-gated; view components and store bindings retain GUI coverage debt.
       'packages/client/ui-project-activity/src/client/*.tsx',

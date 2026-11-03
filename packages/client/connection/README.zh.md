@@ -17,7 +17,6 @@ kind: "package-reference"
 
 浏览器 Session 地址携带 runtime 身份，但不改变 Host ID。应用注册唯一地址解析器；`api` 路由已声明的 Session 字段，`wireApi` 仅供持有原始 ID 的 runtime 所有者使用。Remote 路由还接受生成的 Agent lookup 字段及应用声明的 JSON 路径；无关载荷字符串绝不改写。受管 Host 必须先声明 runtime 目标，缓冲帧才会对消费者可见。引导连接属于项目时，显式个人目标仍使用独立连接。
 
-一个页面固定其已验证的 Gateway 账号。fetch 包装仅覆盖同源 `/api` 和 `/account/api/` 请求，携带 `x-dsh-expected-principal-id`；socket 优先使用已认证 HTML 提供的身份，否则等待首次 HTTP 身份结果，并携带 `dshPrincipal` 建连。Gateway 将其与已认证用户比较，并返回 `x-dsh-principal-id`。明确不一致、认证被撤销或引导运行时访问被拒绝时，旧请求先中止，Runtime 所有的 Session 与 slot 状态撤下，然后重载页面。临时连接失败导致身份缺失不会被当成另一个账号。不带预期身份字段的旧客户端继续遵守服务端授权。
 一个页面固定其已验证的 Gateway 账号。只有文档身份约束拥有连接时，才提供可选的 `onPrincipalChange` 清理回调；显式传输和 fixture carrier 不声明这一能力。fetch 包装仅覆盖同源 `/api` 和 `/account/api/` 请求，携带 `x-dsh-expected-principal-id`；socket 等待首次 HTTP 身份结果后携带 `dshPrincipal` 建连。Gateway 将其与已认证用户比较，并返回 `x-dsh-principal-id`。明确不一致、认证被撤销或引导运行时访问被拒绝时，旧请求先中止，Runtime 所有的 Session 与 slot 状态撤下，然后重载页面。临时连接失败导致身份缺失不会被当成另一个账号。不带预期身份字段的旧客户端继续遵守服务端授权。
 
 已认证的 Gateway HTML 提供带版本的账号 ID 与 Runtime 目标，在网络初始化之前固定页面。两条事件 socket 与 `host.describe` 可以并行建立，但描述校验与两条物理连接全部成功后，业务帧和连接基线才会可见。账号或描述中的 Runtime 不一致会撤下页面。存在但畸形的输入会使插件加载失败；输入缺省时保留先描述、后建连的握手。fixture 与显式载体忽略这份 HTTP 输入。未显式指定 runtime 的请求使用该固定目标，包括项目活动分页；其他标签页更改作用域 cookie 不会重定向它们。应用生成的私有预览及下载 URL 使用 `privateResourceUrl`，让浏览器原生导航携带同样的账号与 runtime 核验；公共链接保持不变。

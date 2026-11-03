@@ -40,19 +40,11 @@ The Gateway implements authenticated registration, request, status-batch, and co
 <a id="model-experience"></a>
 ## Model Experience
 
-### Resource permits
-
-#### What the model sees
-
-None. The `ResourceBudget` interface declares no prompt section, tool schema, or model-visible result.
-
-#### Token effect
-
-None. Permit requests contain execution metadata rather than model input.
+None, as the `ResourceBudget` interface declares no prompt section, tool schema, or model-visible result.
 
 #### KV Cache effect
 
-None. Service calls do not alter model request content.
+None; service calls do not alter model request content.
 
 ## Known Limitations and Deferred Work
 
