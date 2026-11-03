@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { link, lstat, open, rename, rm, utimes } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from 'node:sqlite'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import type { UserDocRootId } from '@deepseek-ai/dsh-userdoc'
 import { DocumentIdentityStore, type DocumentIdentityRecord } from './identity.ts'
@@ -11,6 +11,7 @@ import { DocumentIdentityStorage, type DocumentIdentityLocations } from './ident
 import { isInside, pathForDocId } from './name.ts'
 import { withDocumentHandle } from './handle.ts'
 import type { DocumentFileObjectId } from './file-object.ts'
+import { loadNodeSqlite } from './sqlite.ts'
 
 /** Immutable membership and digests from the deployment's verified complete snapshot. */
 export interface DocumentBackupEntry {
@@ -116,6 +117,7 @@ async function withVerifiedDomain<T>(
     await verifyFile(databasePath, entry(databasePath), original, signal)
     await verifyFile(markerPath, entry(markerPath), original, signal)
     const marker = await storage.domainMarker()
+    const { DatabaseSync } = await loadNodeSqlite()
     const database = new DatabaseSync(databasePath, { readOnly: original })
     try {
       const store = new DocumentIdentityStore(locations.root, database, 'read')
@@ -302,6 +304,7 @@ export async function recoverDocumentIdentityMount(
     if (String(savedObject.dev) === metadata.device && String(savedObject.ino) === metadata.inode) {
       throw new Error('Mount recovery cannot use a hard link to the live metadata as an independent snapshot.')
     }
+    const { DatabaseSync } = await loadNodeSqlite()
     const savedDatabase = new DatabaseSync(reference.databasePath, { readOnly: true })
     let rootId: UserDocRootId
     try {
