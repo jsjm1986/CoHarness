@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-04-document-identity-remount-self-heal.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-04-document-identity-remount-self-heal.md
+document:
+  en: a594aa5fe94d504f98fb9a4956c3149600b96f74
+  zh: f1b850f1f578bde15c893d0dcc78e71d01b3b179
+/agent-note-document-identity-stores-self-heal-inode-proven-remounts:
+  en: b85706fae5b9c60e
+  zh: 8e77ef2e91cd0566
+/agent-note-document-identity-stores-self-heal-inode-proven-remounts/what:
+  en: 518d931c6a8cd465
+  zh: 441b6ad4b2dd97b7
+/agent-note-document-identity-stores-self-heal-inode-proven-remounts/why:
+  en: 8ad9920aced7bf5f
+  zh: fc0696fac2e5eca7
+/agent-note-document-identity-stores-self-heal-inode-proven-remounts/mechanism:
+  en: b08e52636061fbe1
+  zh: c20c05f8c6f98541
+/agent-note-document-identity-stores-self-heal-inode-proven-remounts/boundary:
+  en: 55466a7cfdc66202
+  zh: cfd425ec5d19334e
+/agent-note-document-identity-stores-self-heal-inode-proven-remounts/validation:
+  en: 9b22b3d3f3532b0a
+  zh: d32c9d8efb56dded

@@ -319,16 +319,19 @@ export class DocumentIdentityStore {
   /**
    * Prove a schema 2 or 3 store's original directories before its writable migration.
    * @param binding - current physical roots; legacy device numbers cannot be inferred from UUIDs acquired later.
+   * @param recovered - admit changed device numbers when every recorded inode agrees and current descriptors carry persistent UUIDs.
    * @returns after original witnesses agree or a fresh domain has no committed history; no database bytes change.
    */
-  verifyLegacyStorage(binding: DocumentStorageBinding): void {
+  verifyLegacyStorage(binding: DocumentStorageBinding, recovered = false): void {
     const row = this.database.prepare('SELECT * FROM document_identity_storage WHERE slot=1').get()
     if (row === undefined) {
       if (this.database.prepare('SELECT sequence FROM document_identity_sequence WHERE slot=1').get()?.sequence === 0) return
       throw new DocumentIdentityConflict('Existing document history cannot acquire an unverified storage binding.')
     }
-    if (!sameFile(fileObject({ device: row.documents_device, inode: row.documents_inode }), binding.documents)
-      || !sameFile(fileObject({ device: row.files_device, inode: row.files_inode }), binding.files)) {
+    const proven = (recorded: DocumentFileObjectId, current: DocumentStorageBinding['documents']): boolean =>
+      recorded.inode === current.inode && (recorded.device === current.device || recovered && current.volume !== undefined)
+    if (!proven(fileObject({ device: row.documents_device, inode: row.documents_inode }), binding.documents)
+      || !proven(fileObject({ device: row.files_device, inode: row.files_inode }), binding.files)) {
       throw new DocumentIdentityConflict('Document storage binding changed; a copied root requires verified restore.')
     }
   }

@@ -75,14 +75,14 @@ async function persistentObject(path: string, expected: StorageObject): Promise<
   /* v8 ignore stop */
 }
 
-function recordedObject(value: unknown, expected: StorageObject, persistent: boolean): boolean {
+function recordedObject(value: unknown, expected: StorageObject, persistent: boolean, recovered = false): boolean {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     && 'device' in value && typeof value.device === 'string' && /^(?:0|[1-9][0-9]*)$/u.test(value.device)
     && 'inode' in value && value.inode === expected.inode
     /* v8 ignore start -- only POSIX persistence writes a volume id, so win32 lanes never measure this arm. */
     && (persistent && 'volume' in value
       ? typeof value.volume === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(value.volume) && value.volume === expected.volume
-      : value.device === expected.device)
+      : recovered || value.device === expected.device)
     /* v8 ignore stop */
 }
 
@@ -211,9 +211,10 @@ export class DocumentIdentityStorage {
    * Bind retained objects to one metadata domain without adopting another domain's files.
    * @param rootId - durable identifier from the private metadata database.
    * @param initialize - permit a fresh, empty store to acquire its private domain marker.
+   * @param recovered - admit unchanged witness inodes after a verified remount normalized device numbers.
    * @returns after the existing private marker agrees or an empty object store is initialized.
    */
-  async bindDomain(rootId: UserDocRootId, initialize = true): Promise<void> {
+  async bindDomain(rootId: UserDocRootId, initialize = true, recovered = false): Promise<void> {
     await withFileLock(join(this.locations.filesRoot, 'domain'), async () => {
       await this.verify()
       const databaseId = await this.metadataFile()
@@ -222,11 +223,11 @@ export class DocumentIdentityStorage {
       if (raw !== undefined) {
         if (typeof raw !== 'object' || raw === null || Array.isArray(raw) || !('version' in raw) || raw.version !== 1 && raw.version !== 2
           || !('rootId' in raw) || raw.rootId !== rootId
-          || !('state' in raw) || !recordedObject(raw.state, this.state, raw.version === 2)
-          || !('database' in raw) || !recordedObject(raw.database, databaseId, raw.version === 2)) {
+          || !('state' in raw) || !recordedObject(raw.state, this.state, raw.version === 2, recovered)
+          || !('database' in raw) || !recordedObject(raw.database, databaseId, raw.version === 2, recovered)) {
           throw new Error('Retained document objects belong to another metadata domain or database file.')
         }
-        if (raw.version === 1) {
+        if (raw.version === 1 || recovered) {
           await writeFileAtomic(path, JSON.stringify({ version: 2, rootId, state: this.state, database: databaseId }), {
             mode: 0o600, dirMode: 0o700,
           })
@@ -242,6 +243,16 @@ export class DocumentIdentityStorage {
         mode: 0o600, dirMode: 0o700,
       })
     })
+  }
+
+  /**
+   * Normalize the private domain marker after original witness inodes prove a remount on a UUID-capable filesystem.
+   * @param rootId - durable identifier from the private metadata database.
+   * @returns after the marker rewrites to persistent descriptors; volume-less hosts and refuted witnesses throw.
+   */
+  async recoverDomainMount(rootId: UserDocRootId): Promise<void> {
+    if (this.state.volume === undefined) throw new Error('Mount recovery requires persistent filesystem UUIDs.')
+    await this.bindDomain(rootId, false, true)
   }
 
   /**
