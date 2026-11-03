@@ -42,8 +42,7 @@ export function writeRuntimeGrantsFile(dshHome: string, grants: EffectiveGrant[]
   const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | noFollow, 0o600)
   try {
     writeFileSync(fd, JSON.stringify(grants, null, 2), { encoding: 'utf8' })
-    fchownSync(fd, homeEntry.uid, homeEntry.gid)
-    fchmodSync(fd, 0o600)
+    if (process.platform !== 'win32') { fchownSync(fd, homeEntry.uid, homeEntry.gid); fchmodSync(fd, 0o600) }
   } finally {
     closeSync(fd)
   }

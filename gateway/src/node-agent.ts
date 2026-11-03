@@ -106,7 +106,7 @@ export class NodeAgentError extends Error {
 /** Process events contain only public identities and safe, declared failure codes. */
 export type NodeAgentEvent =
   | { status: 'enrolled'; nodeId: NodeIdentity['nodeId'] }
-  | { status: 'connected'; nodeId: NodeIdentity['nodeId']; epoch: NodeLease['epoch']; executionReady: false }
+  | { status: 'connected'; nodeId: NodeIdentity['nodeId']; epoch: NodeLease['epoch']; executionReady: boolean }
   | { status: 'degraded'; reason: NodeAgentErrorCode }
   | { status: 'stopped' | 'stopped-lease-uncertain' }
   | NodeChannelClientEvent
@@ -316,7 +316,7 @@ export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal,
         mayHaveLease = true
         let value: unknown
         try {
-          value = lease === undefined ? await request(config, 'connect', state.credential, { connectionId }, signal)
+          value = lease === undefined ? await request(config, 'connect', state.credential, { connectionId, executionReady: config.localGatewayUrl !== undefined }, signal)
             : await request(config, 'heartbeat', state.credential, { connectionId, epoch: lease.epoch }, signal)
         } catch (error) {
           if (!previousAcquisition && error instanceof NodeAgentError && error.refused) mayHaveLease = false
@@ -337,7 +337,7 @@ export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal,
           })
           channel = { stop, completion }
         }
-        if (acquiring || degraded !== undefined) report({ status: 'connected', nodeId: lease.nodeId, epoch: lease.epoch, executionReady: false })
+        if (acquiring || degraded !== undefined) report({ status: 'connected', nodeId: lease.nodeId, epoch: lease.epoch, executionReady: lease.executionReady })
         degraded = undefined
         await delay(lease.heartbeatMs, undefined, { signal: AbortSignal.any([signal, channelFailure.signal]) })
       } catch (error) {

@@ -13,6 +13,7 @@ import { MaintenanceError } from './maintenance-service.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
 
 async function flushDirectory(path: string): Promise<void> {
+  if (process.platform === 'win32') return
   const handle = await open(path, 'r')
   try { await handle.sync() } finally { await handle.close() }
 }
@@ -91,8 +92,7 @@ export async function replaceCandidateDeploymentInventory(context: PostgresRunti
   try {
     const replacement = await open(temp, 'wx', metadata.mode & 0o777)
     try {
-      await replacement.chown(metadata.uid, metadata.gid)
-      await replacement.chmod(metadata.mode & 0o777)
+      if (process.platform !== 'win32') { await replacement.chown(metadata.uid, metadata.gid); await replacement.chmod(metadata.mode & 0o777) }
       await replacement.writeFile(reviewed.records.map(row => JSON.stringify({ version: 1, ...row })).join('\n') + '\n')
       await replacement.sync()
     } finally { await replacement.close() }

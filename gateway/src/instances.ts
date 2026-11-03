@@ -1321,8 +1321,10 @@ export class InstanceManager {
     const dshHome = runtime.dshHome
     mkdirSync(dshHome, { recursive: true })
     copyFileSync(source, join(dshHome, '.env'))
-    const owner = lstatSync(dshHome)
-    chownSync(join(dshHome, '.env'), owner.uid, owner.gid)
+    if (process.platform !== 'win32') {
+      const owner = lstatSync(dshHome)
+      chownSync(join(dshHome, '.env'), owner.uid, owner.gid)
+    }
   }
 
   private async start(

@@ -63,6 +63,29 @@ export async function privateFileState(file: string, info: { isFile(): boolean; 
   if (process.platform !== 'win32') {
     return (info.mode & 0o077) === 0 && info.uid === process.getuid!() ? 'private' : 'not-private'
   }
+  return await windowsAclPrivate(file, signal)
+}
+
+/**
+ * Check whether a directory stays private to its owning account, for callers
+ * whose private records live under it. POSIX verdicts come from the mode and
+ * owner uid; Windows applies the same owner-anchored ACL probe as
+ * {@link privateFileState} — `Get-Acl` covers directories identically.
+ * @param directory - absolute directory path.
+ * @param info - stat result already read from the path.
+ * @param signal - caller cancellation for the Windows ACL probe.
+ * @returns 'private' when only the owner and OS-boundary principals hold grants.
+ */
+export async function privateDirectoryState(directory: string,
+  info: { isDirectory(): boolean; mode: number; uid: number }, signal?: AbortSignal): Promise<PrivateFileState> {
+  if (!info.isDirectory()) return 'not-private'
+  if (process.platform !== 'win32') {
+    return (info.mode & 0o077) === 0 && info.uid === process.getuid!() ? 'private' : 'not-private'
+  }
+  return await windowsAclPrivate(directory, signal)
+}
+
+async function windowsAclPrivate(file: string, signal?: AbortSignal): Promise<PrivateFileState> {
   const link = await lstat(file).catch(() => undefined)
   if (link === undefined) return 'unreadable'
   if (link.isSymbolicLink()) return 'not-private'

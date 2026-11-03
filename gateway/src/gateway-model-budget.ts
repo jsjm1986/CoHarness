@@ -1,7 +1,9 @@
 /** Gateway-owned work retains kernel ownership; HTTP inference also shares node admission. */
 import { randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { constants, type BigIntStats } from 'node:fs'
 import { lstat, mkdir, open, unlink, type FileHandle } from 'node:fs/promises'
+import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { tryLockExclusive } from '@deepseek-ai/node-addon-system/flock'
@@ -30,7 +32,8 @@ export class GatewayModelBudget {
   private closing: Promise<void> | undefined
 
   private constructor(private readonly budget: NodeResourceBudget, private readonly owner: GatewayResourceOwner,
-    private readonly directory: string, private readonly handle: FileHandle, private readonly witness: GatewayResourceLock) {}
+    private readonly directory: string, private readonly handle: FileHandle, private readonly witness: GatewayResourceLock,
+    private readonly kernel: KernelLease) {}
 
   /**
    * Recover only matching, unlocked inodes before registering this process's unique kernel lock.
@@ -48,24 +51,27 @@ export class GatewayModelBudget {
       }
       try {
         if (!await sameInode(handle, directory, owner.ownerId, owner)) continue
-        try { await tryLockExclusive(handle.fd) } catch (error) {
+        let kernel: KernelLease
+        try { kernel = await kernelLease(handle.fd, join(directory, `${owner.ownerId}.lock`)) } catch (error) {
           const code = (error as NodeJS.ErrnoException).code
-          if (code === 'EAGAIN' || code === 'EWOULDBLOCK') continue
+          if (code === 'EAGAIN' || code === 'EWOULDBLOCK' || code === 'EADDRINUSE') continue
           throw error
         }
-        if (!await sameInode(handle, directory, owner.ownerId, owner)) continue
+        if (!await sameInode(handle, directory, owner.ownerId, owner)) { await kernel.release(); continue }
         await budget.gatewayStopped(owner)
         await unlink(join(directory, `${owner.ownerId}.lock`))
+        await kernel.release()
       } finally { await handle.close() }
     }
     const ownerId = randomUUID() as GatewayResourceOwnerId
-    const handle = await open(join(directory, `${ownerId}.lock`), 'wx+', 0o600)
+    const lockPath = join(directory, `${ownerId}.lock`)
+    const handle = await open(lockPath, 'wx+', 0o600)
     try {
-      await tryLockExclusive(handle.fd)
+      const kernel = await kernelLease(handle.fd, lockPath)
       const stat = await handle.stat({ bigint: true })
       const witness = { device: String(stat.dev), inode: String(stat.ino) }
-      if (!await sameInode(handle, directory, ownerId, witness)) throw new Error('Gateway resource lock was replaced')
-      return new GatewayModelBudget(budget, await budget.registerGateway(ownerId, witness), directory, handle, witness)
+      if (!await sameInode(handle, directory, ownerId, witness)) { await kernel.release(); throw new Error('Gateway resource lock was replaced') }
+      return new GatewayModelBudget(budget, await budget.registerGateway(ownerId, witness), directory, handle, witness, kernel)
     } catch (error) {
       // Registration may have committed before a failed acknowledgement. Keep its inode for recovery.
       await handle.close()
@@ -121,6 +127,7 @@ export class GatewayModelBudget {
     }
     if (!this.lockClosed) {
       await this.handle.close()
+      await this.kernel.release()
       this.lockClosed = true
     }
     const path = join(this.directory, `${this.owner.ownerId}.lock`)
@@ -176,6 +183,32 @@ export class GatewayModelBudget {
       throw error
     }
   }
+}
+
+/** Kernel-held exclusion over a Gateway resource lock: POSIX flock on the descriptor, Windows a machine-unique pipe name derived from the lock path (process death releases either). */
+interface KernelLease { readonly release: () => Promise<void> }
+
+/** Pipe names must be unique per lock path without leaking host layout into the shared namespace. */
+function kernelPipeName(lockPath: string): string {
+  return `\\\\.\\pipe\\dsh-gw-owner-${createHash('sha256').update(lockPath).digest('hex')}`
+}
+
+/**
+ * Acquire kernel exclusion over the lock file or throw on contention (EAGAIN/EWOULDBLOCK on POSIX, EADDRINUSE on win32).
+ * @param fd - descriptor whose flock carries the lease on POSIX; unused on win32.
+ * @param lockPath - durable lock path hashed into the win32 pipe name.
+ * @returns a release for the win32 pipe server; the POSIX release is descriptor-close owned by the caller.
+ */
+async function kernelLease(fd: number, lockPath: string): Promise<KernelLease> {
+  if (process.platform !== 'win32') { await tryLockExclusive(fd); return { release: () => Promise.resolve() } }
+  const server = createServer()
+  try {
+    await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(kernelPipeName(lockPath), resolve) })
+  } catch (error) {
+    await new Promise(resolve => server.close(resolve))
+    throw error
+  }
+  return { release: () => new Promise(resolve => server.close(() => resolve())) }
 }
 
 async function sameInode(handle: FileHandle, directory: string, ownerId: GatewayResourceOwnerId, witness: GatewayResourceLock): Promise<boolean> {

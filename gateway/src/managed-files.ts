@@ -4,6 +4,7 @@ import { constants } from 'node:fs'
 import { chmod, chown, lstat, mkdir, open, readdir, realpath, rename, rm, rmdir, unlink } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { ManagedDataPath } from '@deepseek-ai/dsh-managed-data'
+import { syncStateDirectory } from './node-private-file.ts'
 
 interface FileMetadata {
   mode: number
@@ -419,8 +420,7 @@ export async function restoreManagedSnapshot(filesDir: string, selected: Managed
       const member = selected.files.find(file => file.sourcePath === entry.sourcePath)!
       const actual = await fingerprint(join(filesDir, member.member), temporary, signal)
       if (actual.sha256 !== entry.sha256 || actual.sizeBytes !== entry.sizeBytes) throw new Error('Backup changed during restoration')
-      await chown(temporary, entry.uid, entry.gid)
-      await chmod(temporary, entry.mode)
+      if (process.platform !== 'win32') { await chown(temporary, entry.uid, entry.gid); await chmod(temporary, entry.mode) }
       const handle = await open(temporary, constants.O_RDONLY | constants.O_NOFOLLOW)
       try { await handle.sync() } finally { await handle.close() }
       signal?.throwIfAborted()
@@ -428,15 +428,13 @@ export async function restoreManagedSnapshot(filesDir: string, selected: Managed
     } finally { await rm(temporary, { force: true }) }
   }
   for (const dir of [...snapshot.directories].sort((a, b) => b.path.length - a.path.length)) {
-    await chown(dir.path, dir.uid, dir.gid)
-    await chmod(dir.path, dir.mode)
+    if (process.platform !== 'win32') { await chown(dir.path, dir.uid, dir.gid); await chmod(dir.path, dir.mode) }
   }
   for (const directory of new Set([...snapshot.directories.map(dir => dir.path),
     ...authorized.map(root => dirname(root.path)), ...live.directories.map(dir => dirname(dir.path))])) {
     signal?.throwIfAborted()
     if (await infoOrAbsent(directory) === undefined) continue
-    const handle = await open(directory, 'r')
-    try { await handle.sync() } finally { await handle.close() }
+    await syncStateDirectory(directory)
   }
   return snapshot
 }

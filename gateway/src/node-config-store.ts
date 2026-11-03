@@ -7,6 +7,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { loadConfig, type GatewayConfig } from './config.ts'
 import { NODE_CONFIG_FIELDS, type NodeConfigurationIdentity, type NodeConfigurationOperation, type NodeConfigurationView, type NodeSettingValues } from './node-config-fields.ts'
+import { privateFileState, syncStateDirectory, tightenPrivateFileAcl } from './node-private-file.ts'
 import type { Queryable } from './postgres/database.ts'
 
 /** Invalid input, identity mismatch or a concurrent configuration edit. */
@@ -153,7 +154,7 @@ export async function readNodeConfiguration(file: string, environment: NodeJS.Pr
   }
   await using reader = handle
   const info = await reader.stat()
-  if (!info.isFile() || info.size > MAX_CONFIG_BYTES || (info.mode & 0o077) !== 0) throw new NodeConfigurationError(409, 'node-configuration-file-must-be-private')
+  if (await privateFileState(file, info, MAX_CONFIG_BYTES) !== 'private') throw new NodeConfigurationError(409, 'node-configuration-file-must-be-private')
   const bytes = Buffer.alloc(MAX_CONFIG_BYTES + 1)
   let length = 0
   while (length < bytes.length) {
@@ -216,10 +217,8 @@ export async function writeNodeConfiguration(file: string, value: NodeConfigurat
     signal?.throwIfAborted()
     await rename(temporary, file)
     published = true
-    {
-      await using directory = await open(dirname(file), 'r')
-      await directory.sync()
-    }
+    if (process.platform === 'win32') await tightenPrivateFileAcl(file, signal)
+    await syncStateDirectory(dirname(file))
     signal?.throwIfAborted()
   } catch (error) {
     if (acquired && !published) {

@@ -58,7 +58,7 @@ export const nodeIdentitySchema = z.object({
   protocolVersion: z.literal(1),
   organizationId: nodeUuidSchema.transform(value => value as NodeOrganizationId),
   nodeId: nodeUuidSchema.transform(value => value as RuntimeNodeId),
-  executionReady: z.literal(false),
+  executionReady: z.boolean(),
 }).strict()
 /** Parsed center identity; connectivity alone grants no execution access. */
 export type NodeIdentity = z.infer<typeof nodeIdentitySchema>
@@ -91,7 +91,7 @@ export interface NodeAccessEntry {
   architecture: 'x64' | 'arm64' | null
   lastSeenAt: string | null
   leaseExpiresAt: string | null
-  executionReady: false
+  executionReady: boolean
 }
 
 /** Keyset page bounded by the Gateway's directory row and complete-JSON byte limits. */
@@ -115,7 +115,7 @@ export const nodeAccessEntrySchema: z.ZodType<NodeAccessEntry> = z.object({
   nodeId: runtimeNodeIdSchema, name: z.string().min(1).max(64), revision: revisionSchema,
   status: z.enum(['pending', 'connected', 'disconnected', 'revoked', 'detached']),
   platform: z.enum(['darwin', 'linux', 'win32']).nullable(), architecture: z.enum(['x64', 'arm64']).nullable(),
-  lastSeenAt: z.iso.datetime().nullable(), leaseExpiresAt: z.iso.datetime().nullable(), executionReady: z.literal(false),
+  lastSeenAt: z.iso.datetime().nullable(), leaseExpiresAt: z.iso.datetime().nullable(), executionReady: z.boolean(),
 }).strict()
 
 /** Bounded directory response accepted by the Admin node section. */

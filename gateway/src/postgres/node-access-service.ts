@@ -25,7 +25,7 @@ const enrollmentSchema = z.object({
   protocolVersion: z.literal(1), credential: nodeCredentialSchema,
   platform: z.enum(['darwin', 'linux', 'win32']), architecture: z.enum(['x64', 'arm64']),
 }).strict()
-const connectionSchema = z.object({ connectionId: nodeUuidSchema }).strict()
+const connectionSchema = z.object({ connectionId: nodeUuidSchema, executionReady: z.boolean().optional() }).strict()
 const leaseRequestSchema = connectionSchema.extend({ epoch: z.string().regex(/^[1-9][0-9]{0,18}$/u) }).strict()
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
@@ -47,6 +47,7 @@ interface AgentRow {
   lease_expires_at: Date | null
   live: boolean
   attachment_state: 'pending' | 'managed' | 'detached'
+  execution_ready: boolean
 }
 
 type AgentLookup = { kind: 'node'; id: string } | { kind: 'credential'; hash: Buffer }
@@ -181,10 +182,10 @@ export class PostgresNodeAccessService {
       await this.primary(tx, false)
       const result = await tx.query<{ node_id: RuntimeNodeId; name: string; revision: string;
         status: NodeAccessEntry['status']; platform: NodeAccessEntry['platform']; architecture: NodeAccessEntry['architecture'];
-        last_seen_at: Date | null; lease_expires_at: Date | null }>(`SELECT a.node_id,n.name::text,a.revision::text,
+        last_seen_at: Date | null; lease_expires_at: Date | null; execution_ready: boolean }>(`SELECT a.node_id,n.name::text,a.revision::text,
           CASE WHEN a.attachment_state='detached' THEN 'detached' WHEN a.revoked_at IS NOT NULL THEN 'revoked' WHEN a.attachment_state='pending' OR a.credential_hash IS NULL THEN 'pending'
             WHEN a.lease_expires_at>clock_timestamp() THEN 'connected' ELSE 'disconnected' END status,
-          a.platform,a.architecture,a.last_seen_at,a.lease_expires_at
+          a.platform,a.architecture,a.last_seen_at,a.lease_expires_at,a.execution_ready
         FROM harness.node_agents a JOIN harness.compute_nodes n ON n.id=a.node_id AND n.organization_id=a.organization_id
         WHERE a.organization_id=$1 AND ($2::uuid IS NULL OR a.node_id>$2) ORDER BY a.node_id LIMIT $3`,
       [this.context.organizationId, after, limit + 1])
@@ -193,7 +194,7 @@ export class PostgresNodeAccessService {
       for (const row of result.rows.slice(0, limit)) {
         const entry: NodeAccessEntry = { nodeId: row.node_id, name: row.name, revision: publicNumber(row.revision, 'Node credential revision'),
           status: row.status, platform: row.platform, architecture: row.architecture,
-          lastSeenAt: row.last_seen_at?.toISOString() ?? null, leaseExpiresAt: row.lease_expires_at?.toISOString() ?? null, executionReady: false }
+          lastSeenAt: row.last_seen_at?.toISOString() ?? null, leaseExpiresAt: row.lease_expires_at?.toISOString() ?? null, executionReady: row.execution_ready }
         const nextBytes = bytes + Buffer.byteLength(JSON.stringify(entry)) + (items.length === 0 ? 0 : 1)
         const cursorBytes = result.rows.length > items.length + 1 ? Buffer.byteLength(JSON.stringify(entry.nodeId)) - 4 : 0
         if (nextBytes + cursorBytes > this.directoryLimits.maxBytes) {
@@ -253,9 +254,9 @@ export class PostgresNodeAccessService {
     })
   }
 
-  private identity(nodeId: string): NodeIdentity {
+  private identity(nodeId: string, executionReady = false): NodeIdentity {
     return { protocolVersion: 1, organizationId: this.context.organizationId as NodeIdentity['organizationId'],
-      nodeId: nodeId as RuntimeNodeId, executionReady: false }
+      nodeId: nodeId as RuntimeNodeId, executionReady }
   }
 
   private async lockAgent(tx: Queryable, lookup: AgentLookup, mode: 'UPDATE' | 'SHARE' = 'UPDATE'): Promise<AgentRow> {
@@ -292,7 +293,7 @@ export class PostgresNodeAccessService {
       WHERE organization_id=$1 AND node_id=$2 AND (NOT $4::boolean OR lease_expires_at>clock_timestamp()) RETURNING lease_expires_at`,
     [this.context.organizationId, row.node_id, this.config.leaseMs, mustBeLive])
     if (result.rows[0] === undefined) throw new NodeAccessError(409, 'node-access/lease-lost')
-    return { ...this.identity(row.node_id), connectionId: row.connection_id as NodeLease['connectionId'],
+    return { ...this.identity(row.node_id, row.execution_ready), connectionId: row.connection_id as NodeLease['connectionId'],
       epoch: row.connection_epoch as NodeLease['epoch'], expiresAt: result.rows[0]!.lease_expires_at.toISOString(), heartbeatMs: this.config.heartbeatMs }
   }
 
@@ -323,8 +324,9 @@ export class PostgresNodeAccessService {
       if (!row.live) {
         row.connection_epoch = (BigInt(row.connection_epoch) + 1n).toString()
         row.connection_id = request.connectionId
-        await tx.query('UPDATE harness.node_agents SET connection_id=$3,connection_epoch=$4,lease_expires_at=clock_timestamp() WHERE organization_id=$1 AND node_id=$2',
-          [this.context.organizationId, row.node_id, row.connection_id, row.connection_epoch])
+        row.execution_ready = request.executionReady ?? false
+        await tx.query('UPDATE harness.node_agents SET connection_id=$3,connection_epoch=$4,lease_expires_at=clock_timestamp(),execution_ready=$5 WHERE organization_id=$1 AND node_id=$2',
+          [this.context.organizationId, row.node_id, row.connection_id, row.connection_epoch, row.execution_ready])
       }
       return this.renew(tx, row, row.live)
     })
@@ -360,7 +362,7 @@ export class PostgresNodeAccessService {
       if (!row.live || row.connection_id !== request.connectionId || row.connection_epoch !== request.epoch) {
         throw new NodeAccessError(409, 'node-access/lease-lost')
       }
-      return { ...this.identity(row.node_id), connectionId: row.connection_id as NodeLease['connectionId'],
+      return { ...this.identity(row.node_id, row.execution_ready), connectionId: row.connection_id as NodeLease['connectionId'],
         epoch: row.connection_epoch as NodeLease['epoch'], expiresAt: row.lease_expires_at!.toISOString(), heartbeatMs: this.config.heartbeatMs }
     })
   }

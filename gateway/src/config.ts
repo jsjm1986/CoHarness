@@ -3,7 +3,10 @@ import type { RuntimeCapacityConfig } from './runtime-capacity.ts'
 import { realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { basename, join, posix, resolve } from 'node:path'
+import { basename, join, posix, resolve, sep, win32 } from 'node:path'
+
+/** Path grammar matching the hosting OS; deployment paths were validated POSIX-only before Windows hosts joined. */
+const hostPath = process.platform === 'win32' ? win32 : posix
 import { DEFAULT_DESKTOP_COORDINATOR_CONFIG, type DesktopCoordinatorConfig } from './desktop-coordinator.ts'
 import { DEFAULT_PROGRESS_CONFIG, type ProgressConfig } from './postgres/progress-service.ts'
 import { DEFAULT_RUNTIME_LOG_CAP_BYTES } from './runtime-log.ts'
@@ -268,14 +271,14 @@ export const MAX_TIMER_DELAY_MS = 2_147_483_647
 function projectPathRoots(value: string | undefined): string[] {
   if (value === undefined) return []
   const roots = value.split(',').map(path => path.trim()).filter(Boolean).map((path) => {
-    if (!posix.isAbsolute(path)) throw new Error(`HGW_PROJECT_PATH_ROOTS must contain absolute Linux paths: ${path}`)
-    return posix.normalize(path)
+    if (!hostPath.isAbsolute(path)) throw new Error(`HGW_PROJECT_PATH_ROOTS must contain absolute paths: ${path}`)
+    return hostPath.normalize(path)
   })
   for (const [index, root] of roots.entries()) {
-    if (root === '/') throw new Error('HGW_PROJECT_PATH_ROOTS must not include the filesystem root')
+    if (root === '/' || root === '\\') throw new Error('HGW_PROJECT_PATH_ROOTS must not include the filesystem root')
     for (const prior of roots.slice(0, index)) {
-      const nested = root === prior || posix.relative(prior, root).split('/')[0] !== '..'
-        || posix.relative(root, prior).split('/')[0] !== '..'
+      const nested = root === prior || hostPath.relative(prior, root).split(/[\\/]/u)[0] !== '..'
+        || hostPath.relative(root, prior).split(/[\\/]/u)[0] !== '..'
       if (nested) throw new Error(`HGW_PROJECT_PATH_ROOTS contains overlapping roots: ${prior}, ${root}`)
     }
   }
@@ -283,22 +286,22 @@ function projectPathRoots(value: string | undefined): string[] {
 }
 
 function strictlyNestedPath(root: string, path: string): boolean {
-  const normalizedRoot = posix.normalize(root)
-  const normalizedPath = posix.normalize(path)
-  return normalizedPath !== normalizedRoot
-    && posix.relative(normalizedRoot, normalizedPath).split('/')[0] !== '..'
-    && !posix.isAbsolute(posix.relative(normalizedRoot, normalizedPath))
+  const normalizedRoot = hostPath.normalize(root)
+  const normalizedPath = hostPath.normalize(path)
+  const relative = hostPath.relative(normalizedRoot, normalizedPath)
+  return relative.split(/[\\/]/u)[0] !== '..' && !hostPath.isAbsolute(relative)
 }
 
 function normalizedAbsolutePath(path: string): string {
-  const normalized = posix.normalize(path)
-  return normalized.length > 1 ? normalized.replace(/\/+$/, '') : normalized
+  const normalized = hostPath.normalize(path)
+  return normalized.length > 1 ? normalized.replace(/[\\/]+$/u, '') : normalized
 }
 
 function pathsOverlap(left: string, right: string): boolean {
   const nested = (root: string, candidate: string): boolean => {
-    const relative = posix.relative(posix.normalize(root), posix.normalize(candidate))
-    return relative === '' || (!relative.startsWith('../') && relative !== '..' && !posix.isAbsolute(relative))
+    const relative = hostPath.relative(hostPath.normalize(root), hostPath.normalize(candidate))
+    return relative === '' || (!relative.startsWith(`..${sep}`) && !relative.startsWith('../')
+      && relative !== '..' && !hostPath.isAbsolute(relative))
   }
   return nested(left, right) || nested(right, left)
 }
@@ -425,7 +428,7 @@ function parseStewardReadRoots(value: string): string[] {
     throw new Error('HGW_STEWARD_READ_ROOTS must be a JSON array of absolute paths')
   }
   if (!Array.isArray(parsed) || parsed.length > 64
-    || parsed.some(path => typeof path !== 'string' || !posix.isAbsolute(path) || /[\u0000-\u001f\u007f]/u.test(path))) {
+    || parsed.some(path => typeof path !== 'string' || !hostPath.isAbsolute(path) || /[\u0000-\u001f\u007f]/u.test(path))) {
     throw new Error('HGW_STEWARD_READ_ROOTS must be a JSON array of at most 64 absolute paths without control characters')
   }
   return parsed as string[]
@@ -459,7 +462,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   const bootstrapAdminPasswordFile = normalizedAbsolutePath(resolve(
     env.HGW_BOOTSTRAP_ADMIN_PASSWORD_FILE ?? join(stateRoot, 'bootstrap-admin-password'),
   ))
-  if (!posix.isAbsolute(bootstrapAdminPasswordFile) || bootstrapAdminPasswordFile === '/') {
+  if (!hostPath.isAbsolute(bootstrapAdminPasswordFile) || bootstrapAdminPasswordFile === '/') {
     throw new Error('HGW_BOOTSTRAP_ADMIN_PASSWORD_FILE must be an absolute path')
   }
   const principalKeyDir = resolve(env.HGW_PRINCIPAL_KEY_DIR ?? join(stateRoot, 'principal-keys'))
@@ -487,7 +490,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   }
   const userProjectsRoot = normalizedAbsolutePath(env.HGW_USER_PROJECTS_ROOT
     ?? join(configuredProjectPathRoots[0] ?? stateRoot, 'user-projects'))
-  if (!posix.isAbsolute(userProjectsRoot) || userProjectsRoot === '/') {
+  if (!hostPath.isAbsolute(userProjectsRoot) || userProjectsRoot === '/') {
     throw new Error('HGW_USER_PROJECTS_ROOT must be an absolute path')
   }
   if (launcher === 'systemd' && !configuredProjectPathRoots.some(root => strictlyNestedPath(root, userProjectsRoot))) {
@@ -495,7 +498,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   }
   const projectsRoot = normalizedAbsolutePath(env.HGW_PROJECTS_ROOT
     ?? join(configuredProjectPathRoots[0] ?? homedir(), 'harness-projects'))
-  if (!posix.isAbsolute(projectsRoot) || projectsRoot === '/') {
+  if (!hostPath.isAbsolute(projectsRoot) || projectsRoot === '/') {
     throw new Error('HGW_PROJECTS_ROOT must be an absolute path')
   }
   if (launcher === 'systemd' && !configuredProjectPathRoots.some(root => strictlyNestedPath(root, projectsRoot))) {
@@ -719,7 +722,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   const desktopDriverPackage = releaseDesktopDriverPackage
     ?? normalizedAbsolutePath(env.HGW_DESKTOP_DRIVER_PACKAGE
       ?? join(dshRepoRoot, 'packages/experimental/computer-use-cua-driver-mcp'))
-  if (!posix.isAbsolute(desktopDriverPackage)) {
+  if (!hostPath.isAbsolute(desktopDriverPackage)) {
     throw new Error('HGW_DESKTOP_DRIVER_PACKAGE must be an absolute path')
   }
   const desktopDriverCommand = env.HGW_DESKTOP_DRIVER_COMMAND?.trim()
@@ -739,7 +742,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   }
   const stewardRuntimeUser = env.HGW_STEWARD_RUNTIME_USER ?? projectRuntimeUser
   if (stewardEnabled) {
-    if (!posix.isAbsolute(stewardRoot) || stewardRoot === '/') {
+    if (!hostPath.isAbsolute(stewardRoot) || stewardRoot === '/') {
       throw new Error('HGW_STEWARD_ROOT must be an absolute path')
     }
     if (!strictlyNestedPath(stewardRoot, stewardWorkspacePath)) {
