@@ -513,7 +513,9 @@ printf '%s\n' "$*" > "$CAPTURE"
     const previous = release(root, 'release-one')
     const candidate = release(root, 'release-two')
     pointCurrent(root, previous)
-    unlinkSync(join(candidate, missing))
+    const missing = hostNativePaths()[0]
+    expect(missing).toBeDefined()
+    unlinkSync(join(candidate, missing as string))
     const envFile = environmentFile(root)
     const state = join(root, 'state')
     const bin = fakeTools(root, state)

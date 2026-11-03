@@ -9,6 +9,7 @@ import type { Pool, PoolClient } from 'pg'
 import { afterEach, describe, expect, it } from 'vitest'
 import { materializeTlsFixture } from '../../packages/host/webserver/tests/tls-fixture.ts'
 import { ConversationRepository } from '../src/postgres/conversation-repository.ts'
+import type { RuntimeId } from '../src/runtime-catalog.ts'
 import {
   connectFromPool, createPostgresPool, errorCodeForDiagnostics, isTransientDatabaseError,
   withDatabaseStartupRetry, type GatewayPoolConfig,
@@ -151,7 +152,8 @@ describe('Gateway PostgreSQL transport classification', () => {
       if (tag === 'startup') socket.write(AUTHENTICATED)
       else socket.end()
     })
-    const repository = new ConversationRepository(poolFor(remote.port))
+    const repository = new ConversationRepository(poolFor(remote.port),
+      { organizationId: 'org', runtimeId: 'runtime' as RuntimeId })
     await expect(repository.readHeader('synthetic-session')).rejects.toMatchObject({
       code: 'dependency', cause: { code: '08006' },
     })

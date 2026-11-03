@@ -756,7 +756,7 @@ export function createRuntimeApiHandler(
         if (deps.renewStreamPrincipals === undefined) { send(res, 503, { error: 'stream-principal-renewal-unavailable' }); return true }
         res.setHeader('cache-control', 'no-store')
         send(res, 200, await deps.renewStreamPrincipals(subject, JSON.parse(body), async () => {
-          const current = await authenticate(req)
+          const current = await authenticate(req, false)
           return current !== null && current.organizationId === subject.organizationId
             && current.target.kind === subject.target.kind && current.target.id === subject.target.id
             && current.generation === subject.generation

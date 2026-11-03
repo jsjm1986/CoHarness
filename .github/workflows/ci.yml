@@ -531,6 +531,13 @@ jobs:
       - name: Install Gateway dependencies
         run: npm ci --prefix gateway
 
+      # The built resource-admission lane compiles gateway source through the
+      # tsconfig paths, which point at emitted workspace declarations; emit the
+      # same graph the gateway typecheck lane emits.
+      - name: Emit type declarations the Gateway paths consume
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        run: node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format packages/session/session-format-catalog packages/util/managed-data packages/util/atomic-write packages/util/brand packages/util/values packages/util/native-command packages/llm/llm packages/attachment/userdoc packages/attachment/userdoc-gateway packages/attachment/userdoc-local packages/host/userdoc-http packages/typert/protocol packages/context/resource-budget packages/core/session packages/subprocess/subprocess-local packages/test-support/loader-smoke native/system/packages/entry
+
       - name: Test Gateway execution through Loader and PostgreSQL
         id: gateway-execution
         if: needs.pr-scope.outputs.gateway_mode == 'full'
@@ -822,7 +829,7 @@ jobs:
       - name: Install workspace dependencies for declaration emit
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Emit type declarations the Gateway paths consume
-        run: node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format packages/session/session-format-catalog packages/util/managed-data packages/util/atomic-write packages/llm/llm packages/attachment/userdoc packages/attachment/userdoc-local packages/host/userdoc-http
+        run: node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format packages/session/session-format-catalog packages/util/managed-data packages/util/atomic-write packages/util/brand packages/util/values packages/util/native-command packages/llm/llm packages/attachment/userdoc packages/attachment/userdoc-gateway packages/attachment/userdoc-local packages/host/userdoc-http packages/typert/protocol packages/context/resource-budget packages/core/session packages/subprocess/subprocess-local packages/test-support/loader-smoke native/system/packages/entry
       - name: Typecheck Gateway
         run: npm run typecheck --prefix gateway
       # The production `npm run build` resolves workspace packages through their
