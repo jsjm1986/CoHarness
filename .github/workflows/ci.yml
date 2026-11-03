@@ -1421,9 +1421,14 @@ jobs:
   # DSH_CI_FAILOVER_LINUX variable that retargets the three required Linux jobs
   # and the all-checks-passed verdict above.
   windows-native:
-    needs: pr-scope
+    # The static lane is the cheap supersede fence: a stale run is cancelled
+    # before this two-hour job starts, so it cannot become an unkillable job
+    # holding the concurrency slot. On push/schedule node-24 does not exist and
+    # its empty result lets the always() conditions decide.
+    needs: [pr-scope, node-24]
     if: >-
-      always() && ((github.event_name == 'push' && github.ref == 'refs/heads/master')
+      always() && (needs.node-24.result != 'failure' && needs.node-24.result != 'cancelled')
+      && ((github.event_name == 'push' && github.ref == 'refs/heads/master')
       || github.event_name == 'schedule'
       || (github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
       || (github.event_name == 'pull_request' && needs.pr-scope.outputs.proof_native_windows == 'true'))
@@ -1498,6 +1503,9 @@ jobs:
 
       - name: Run complete native Windows gate inventory
         shell: pwsh
+        # Below the job budget so a wedged gate cannot occupy the slot for the
+        # full 120 minutes before GitHub's own cancellation lands.
+        timeout-minutes: 90
         run: pnpm run check:ci:windows-complete
       - name: Preserve gate evidence
         if: always()
