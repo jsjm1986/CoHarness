@@ -37,7 +37,6 @@
     "test:built-archive-ui": "node tests/run-built-archive-ui.mjs"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-userdoc-gateway": "workspace:*",
     "argon2": "^0.44.0",
     "better-sqlite3": "^12.4.1",
     "google-auth-library": "10.7.0",
