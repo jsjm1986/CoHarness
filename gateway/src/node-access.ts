@@ -87,7 +87,7 @@ export interface NodeAccessEntry {
   name: string
   revision: number
   status: 'pending' | 'connected' | 'disconnected' | 'revoked' | 'detached'
-  platform: 'darwin' | 'linux' | null
+  platform: 'darwin' | 'linux' | 'win32' | null
   architecture: 'x64' | 'arm64' | null
   lastSeenAt: string | null
   leaseExpiresAt: string | null
@@ -114,7 +114,7 @@ export type AdminComputerContext = z.infer<typeof adminComputerContextSchema>
 export const nodeAccessEntrySchema: z.ZodType<NodeAccessEntry> = z.object({
   nodeId: runtimeNodeIdSchema, name: z.string().min(1).max(64), revision: revisionSchema,
   status: z.enum(['pending', 'connected', 'disconnected', 'revoked', 'detached']),
-  platform: z.enum(['darwin', 'linux']).nullable(), architecture: z.enum(['x64', 'arm64']).nullable(),
+  platform: z.enum(['darwin', 'linux', 'win32']).nullable(), architecture: z.enum(['x64', 'arm64']).nullable(),
   lastSeenAt: z.iso.datetime().nullable(), leaseExpiresAt: z.iso.datetime().nullable(), executionReady: z.literal(false),
 }).strict()
 

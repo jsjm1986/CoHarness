@@ -180,7 +180,8 @@ export function NodeAccessSection() {
                 <tr key={node.nodeId}>
                   <td className="nodeAccessName">{node.name}</td>
                   <td><StatusBadge tone={STATUS[node.status]}>{t(node.status)}</StatusBadge></td>
-                  <td>{node.platform === null ? t('unknownSystem') : `${node.platform === 'darwin' ? 'macOS' : 'Linux'} · ${node.architecture ?? ''}`}</td>
+                  <td>{node.platform === null ? t('unknownSystem')
+                    : `${node.platform === 'darwin' ? 'macOS' : node.platform === 'linux' ? 'Linux' : 'Windows'} · ${node.architecture ?? ''}`}</td>
                   <td>{node.lastSeenAt === null ? t('never') : <time dateTime={node.lastSeenAt}>{time(node.lastSeenAt)}</time>}</td>
                   <td><div className="rowActions">
                     <Button variant="ghost" onClick={() => open({ kind: 'reissue', node })}>{t('reissue')}</Button>

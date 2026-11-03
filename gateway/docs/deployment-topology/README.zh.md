@@ -35,9 +35,9 @@ Admin 部署页先加载入口策略，再加载状态与备份快照，同一�
 3. 打开该电脑自己的部署页，在“连接到主入口”填写中心地址和接入码。保存私有配置，核对允许来源；需要时按现有流程保存并应用配置，再启动已安装的接入服务。生成的代理配置绑定预期组织和电脑，服务连接核验 Gateway 身份和发布版本。
 4. 确认主入口列表显示连接，再使用现有 Admin 功能配置电脑使用权、能力资格和 Runtime。项目邀请要求用户具备项目所在电脑的使用权限。
 
-向导不安装软件，也不分发数据库凭据或主密钥。单独安装经过核对的 [Linux 服务](../../deploy/harness-node-agent.service) 或 [macOS LaunchAgent](../../deploy/macos/node-agent.plist)，使其操作系统账号、不可变发布路径、`HGW_STATE_ROOT` 和 `HGW_NODE_CONNECTION_FILE` 与 Gateway 一致。Linux 默认使用 `harness-node-agent.service`，可通过 `HGW_NODE_AGENT_SERVICE` 设置；macOS 默认使用 `com.maycran.harness-node-agent`，可通过 `HGW_NODE_AGENT_LABEL` 和 `HGW_LAUNCHD_DOMAIN` 设置。服务运行 `node lib/node-agent-main.js`，加载前需调整模板路径。缺少服务或来源配置时，页面显示准备步骤。
+向导不安装软件，也不分发数据库凭据或主密钥。单独安装经过核对的 [Linux 服务](../../deploy/harness-node-agent.service) 或 [macOS LaunchAgent](../../deploy/macos/node-agent.plist)，使其操作系统账号、不可变发布路径、`HGW_STATE_ROOT` 和 `HGW_NODE_CONNECTION_FILE` 与 Gateway 一致。Linux 默认使用 `harness-node-agent.service`，可通过 `HGW_NODE_AGENT_SERVICE` 设置；macOS 默认使用 `com.maycran.harness-node-agent`，可通过 `HGW_NODE_AGENT_LABEL` 和 `HGW_LAUNCHD_DOMAIN` 设置。服务运行 `node lib/node-agent-main.js`，加载前需调整模板路径。Windows 节点在运维管理的账号下运行同一编译入口，尚无 Windows 服务模板。缺少服务或来源配置时，页面显示准备步骤。
 
-`HGW_NODE_CONNECTION_FILE` 默认位于 `<HGW_STATE_ROOT>/node-connection.json`。该私有文件保存修订号、准确电脑身份、主入口地址、本机回环 Gateway 地址、凭证文件路径及待消费接入码，权限为0600，采用原子写入，接入后清除接入码。重新接入使用新的凭证文件路径。接入码不写入 URL、命令参数或浏览器持久存储，节点代理不需要数据库凭据。没有私有配置文件时，仍可使用现有环境变量配置代理。
+`HGW_NODE_CONNECTION_FILE` 默认位于 `<HGW_STATE_ROOT>/node-connection.json`。该私有文件保存修订号、准确电脑身份、主入口地址、本机回环 Gateway 地址、凭证文件路径及待消费接入码，仅当前账号可访问（macOS/Linux 为 0600 权限，Windows 为独占 ACL），采用原子写入，接入后清除接入码。重新接入使用新的凭证文件路径。接入码不写入 URL、命令参数或浏览器持久存储，节点代理不需要数据库凭据。没有私有配置文件时，仍可使用现有环境变量配置代理。
 
 ## 转换与恢复
 

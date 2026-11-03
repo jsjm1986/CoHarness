@@ -15,6 +15,7 @@ import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.t
 import { runNodeChannel, type NodeChannelClientEvent } from './node-channel-client.ts'
 import { loadNodeChannelClientLimits, type NodeChannelClientLimits } from './node-channel-protocol.ts'
 import { nodeServiceLocalOrigin } from './node-service-stream.ts'
+import { privateFileState, syncStateDirectory, tightenPrivateFileAcl } from './node-private-file.ts'
 
 /** Explicit node-process configuration; credentials are persisted separately from deployment settings. */
 export interface NodeAgentConfig {
@@ -53,7 +54,7 @@ const FAILURE_MESSAGES: Record<NodeAgentErrorCode, string> = {
   'node-access/revision-conflict': 'Node access changed. Refresh its Admin entry before retrying.',
   'node-access/already-connected': 'Another agent holds this node lease. Stop that agent or wait for its lease to expire before restarting.',
   'node-access/lease-lost': 'The connection lease expired or changed. The agent will request a new lease.',
-  'node-access/unsupported-platform': 'This center accepts macOS and Linux nodes. Use a supported host.',
+  'node-access/unsupported-platform': 'This center accepts macOS, Linux and Windows nodes. Use a supported host.',
   'node-access/unsupported-protocol': 'The center does not accept this control protocol. Install a compatible agent release.',
   'node-access/response-too-large': 'The center metadata exceeds its response limit. Ask an administrator to review directory limits.',
   'node-access/busy': 'The center is at its control-request capacity. The agent will retry the same control operation.',
@@ -66,7 +67,7 @@ const FAILURE_MESSAGES: Record<NodeAgentErrorCode, string> = {
   'node-agent/invalid-center-url': 'The center URL must be an HTTPS origin without credentials, a path or query fields; loopback HTTP is supported for local verification.',
   'node-agent/invalid-enrollment-token': 'The enrollment token is malformed. Copy the complete ticket from Admin.',
   'node-agent/state-unreadable': 'The node credential file cannot be opened. Check its owner, permissions and file type.',
-  'node-agent/state-must-be-private': 'The credential file must be owned by this operating-system account with mode 0600. Fix its ownership and permissions before restarting.',
+  'node-agent/state-must-be-private': 'The credential file must be private to this operating-system account (mode 0600 on macOS/Linux, an exclusive ACL on Windows). Fix its ownership and permissions before restarting.',
   'node-agent/invalid-state': 'The credential file is invalid. Preserve it and ask an administrator to reissue access into a new private state file.',
   'node-agent/center-identity-mismatch': 'The center identity differs from the saved node identity. Check the center URL and credential file before restarting.',
   'node-agent/pending-enrollment-mismatch': 'This state file contains another pending ticket. Resume it or use a new private state file for the replacement ticket.',
@@ -74,7 +75,7 @@ const FAILURE_MESSAGES: Record<NodeAgentErrorCode, string> = {
   'node-agent/transport-unavailable': 'The center connection is unavailable. The agent will retry the same control operation; check the network if this persists.',
   'node-agent/invalid-response': 'The center returned an invalid or oversized control response. Check the center URL and release compatibility.',
   'node-agent/center-refused': 'The center refused the control request. Check its URL, ingress configuration and release compatibility.',
-  'node-agent/unsupported-platform': 'This agent supports macOS and Linux. Use a supported host.',
+  'node-agent/unsupported-platform': 'This agent supports macOS, Linux and Windows. Use a supported host.',
   'node-agent/unsupported-architecture': 'This agent supports x64 and arm64 hosts. Use a supported architecture.',
   'node-agent/state-changed': 'The credential file changed during enrollment. Check which process owns that file before restarting.',
   'node-agent/invalid-channel-config': 'A node control-channel limit is invalid. Check HGW_NODE_AGENT_CHANNEL settings before restarting.',
@@ -170,7 +171,9 @@ async function readState(file: string): Promise<AgentState | undefined> {
   }
   try {
     const info = await handle.stat()
-    if (!info.isFile() || info.size > 4096 || (info.mode & 0o077) !== 0 || info.uid !== process.getuid!()) throw new NodeAgentError('node-agent/state-must-be-private')
+    const privacy = await privateFileState(file, info, 4096)
+    if (privacy === 'unreadable') throw new NodeAgentError('node-agent/state-unreadable')
+    if (privacy !== 'private') throw new NodeAgentError('node-agent/state-must-be-private')
     const bytes = Buffer.alloc(4097)
     let bytesRead = 0
     while (bytesRead < bytes.length) {
@@ -189,10 +192,6 @@ async function readState(file: string): Promise<AgentState | undefined> {
 
 // Enrollment may commit before its response arrives. Flush the node-generated
 // credential before exchange so that a restart can repeat that exact exchange.
-async function syncDirectory(path: string): Promise<void> {
-  const directory = await open(path, 'r')
-  try { await directory.sync() } finally { await directory.close() }
-}
 
 async function writeState(file: string, value: AgentState): Promise<void> {
   const temporary = `${file}.${randomUUID()}.tmp`
@@ -201,7 +200,8 @@ async function writeState(file: string, value: AgentState): Promise<void> {
     try { await handle.writeFile(JSON.stringify(value) + '\n'); await handle.sync() }
     finally { await handle.close() }
     await rename(temporary, file)
-    await syncDirectory(dirname(file))
+    await tightenPrivateFileAcl(file)
+    await syncStateDirectory(dirname(file))
   } finally { await rm(temporary, { force: true }) }
 }
 
@@ -210,7 +210,7 @@ async function initialState(config: NodeAgentConfig): Promise<AgentState> {
   if (created !== undefined) {
     const parent = dirname(created)
     for (let directory = dirname(config.stateFile);; directory = dirname(directory)) {
-      await syncDirectory(directory)
+      await syncStateDirectory(directory)
       if (directory === parent) break
     }
   }
@@ -270,7 +270,7 @@ function identityMatches(expected: NodeIdentity, found: NodeIdentity): void {
  * @throws NodeAgentError for unsupported hosts, invalid local state or nonretryable center refusals.
  */
 export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal, report: (event: NodeAgentEvent) => void): Promise<void> {
-  if (process.platform !== 'darwin' && process.platform !== 'linux') throw new NodeAgentError('node-agent/unsupported-platform')
+  if (process.platform !== 'darwin' && process.platform !== 'linux' && process.platform !== 'win32') throw new NodeAgentError('node-agent/unsupported-platform')
   if (process.arch !== 'x64' && process.arch !== 'arm64') throw new NodeAgentError('node-agent/unsupported-architecture')
   signal.throwIfAborted()
   let state = await initialState(config)

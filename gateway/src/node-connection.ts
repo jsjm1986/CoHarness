@@ -10,6 +10,7 @@ import { loadNodeAgentConfig, type NodeAgentConfig } from './node-agent.ts'
 import { nodeEnrollmentTokenSchema, nodeIdentitySchema } from './node-access.ts'
 import { NodeConfigurationError, type NodeConfigurationMutationAuthority } from './node-config-store.ts'
 import { runGatewayChildCommand } from './child-command.ts'
+import { privateFileState, syncStateDirectory, tightenPrivateFileAcl } from './node-private-file.ts'
 import type { GatewayConfig } from './config.ts'
 import type { UserRow } from './auth.ts'
 import type { Queryable } from './postgres/database.ts'
@@ -37,7 +38,7 @@ async function read(file: string): Promise<Record | undefined> {
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined; throw error }
   try {
     const info = await handle.stat()
-    if (!info.isFile() || info.size > 8192 || (info.mode & 0o077) !== 0 || info.uid !== process.getuid?.()) {
+    if ((await privateFileState(file, info, 8192)) !== 'private') {
       throw new NodeConfigurationError(409, 'node-connection-file-not-private')
     }
     const bytes = Buffer.alloc(8193)
@@ -63,8 +64,8 @@ async function write(file: string, record: Record, signal?: AbortSignal): Promis
     try { await handle.writeFile(bytes); await handle.sync() } finally { await handle.close() }
     signal?.throwIfAborted()
     await rename(temporary, file)
-    const directory = await open(dirname(file), 'r')
-    try { await directory.sync() } finally { await directory.close() }
+    await tightenPrivateFileAcl(file)
+    await syncStateDirectory(dirname(file))
   } finally { await rm(temporary, { force: true }) }
 }
 

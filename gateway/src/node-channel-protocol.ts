@@ -35,7 +35,7 @@ export interface NodeChannelClientLimits extends NodeChannelWireLimits {
 
 /** Safe node observation; paths, hostname, environment variables and files are excluded. */
 export const nodeProbeInfoSchema = z.object({
-  platform: z.enum(['darwin', 'linux']), architecture: z.enum(['x64', 'arm64']),
+  platform: z.enum(['darwin', 'linux', 'win32']), architecture: z.enum(['x64', 'arm64']),
   uptimeSeconds: z.number().int().nonnegative().safe(), executionReady: z.literal(false),
 }).strict()
 /** Read-only observation returned by a connected node. */

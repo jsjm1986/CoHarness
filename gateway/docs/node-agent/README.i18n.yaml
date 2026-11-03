@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/docs/node-agent/README.md
 document:
-  en: 42786411c05980f592c0f14f0dae038ffb3a4c82
-  zh: f378ea586cdd1bb5c83dad8346853f603f55eea9
+  en: 789fe7bd6ab850b39c29b58db206fc2423c16dc0
+  zh: 2bcfc6479f2f24375b939abda34015035b9eef28
 /:
   en: 9437b0da044bb538
   zh: 0a314f5801ab579d
@@ -12,8 +12,8 @@ document:
   en: 6179834d0029efdb
   zh: 3c542cd871d8ed88
 /node-agent-access-reference/summary:
-  en: 681e2d1d409bc4d9
-  zh: b2a4afba7ebbc233
+  en: 835009e53c40b545
+  zh: ad8aaacf9b2b3633
 /node-agent-access-reference/contents:
   en: ca6365fe086f39c2
   zh: 85eaded30539a999
@@ -36,14 +36,14 @@ document:
   en: 4d754d650d9a3633
   zh: ce30e7eb03ff2df5
 /node-agent-access-reference/configuration:
-  en: 336554bd9baf797d
-  zh: 1e931fda81d50d91
+  en: adadc3b9af8b029d
+  zh: 8ad3e64ea0b3ecbf
 /node-agent-access-reference/recovery:
   en: b734d9a59b34d6ca
   zh: a8c5aa980240f366
 /node-agent-access-reference/verification:
-  en: 4e605ec8086ad348
-  zh: 68ea052683ee56f5
+  en: 0e09da63680150df
+  zh: 561184d28bf1566d
 /node-agent-access-reference/dev-note:
   en: 94d09b0bc0c78320
   zh: 2a0525c2352ca392

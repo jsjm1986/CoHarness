@@ -8,7 +8,7 @@ description: "节点接入、凭证恢复和现有 Gateway 服务的出站连接
 
 ## 概述
 
-登记 macOS/Linux x64 或 arm64 电脑，通过出站代理连接其现有 Gateway 服务。代理进程无需 PostgreSQL 凭据或入站监听。接入报告 `executionReady: false`，不授予运行时权限。电脑使用权和能力资格分别按电脑配置。组织的[部署模式](../deployment-topology/README.zh.md)控制聚合；用户端与 Admin 流程明确保留电脑和 Runtime 身份。每个协作项目归属于选定电脑。
+登记 macOS、Linux 和 Windows x64 或 arm64 电脑，通过出站代理连接其现有 Gateway 服务。代理进程无需 PostgreSQL 凭据或入站监听。接入报告 `executionReady: false`，不授予运行时权限。电脑使用权和能力资格分别按电脑配置。组织的[部署模式](../deployment-topology/README.zh.md)控制聚合；用户端与 Admin 流程明确保留电脑和 Runtime 身份。每个协作项目归属于选定电脑。
 
 ## 目录
 
@@ -163,7 +163,7 @@ Webhook 配置绑定精确 Runtime 及电脑。除非提交其他明确 Runtime�
 | 节点变量 | 默认 | 含义 |
 |---|---|---|
 | `HGW_NODE_CENTER_URL` | 必需 | HTTPS 源站；本地可使用回环 HTTP |
-| `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | 由节点操作系统账号拥有、权限为 0600 的凭证文件 |
+| `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | 仅节点操作系统账号可访问的凭证文件（macOS/Linux 为 0600 权限，Windows 为独占 ACL） |
 | `HGW_NODE_ENROLLMENT_TOKEN` | 新状态文件必需 | 管理员令牌；已接入记录使用保存的凭证 |
 | `HGW_NODE_AGENT_REQUEST_TIMEOUT_MS` | 10000 | 网络请求和退出释放的超时 |
 | `HGW_NODE_AGENT_RETRY_MS` | 3000 | 幂等控制操作重试之间的间隔 |
@@ -190,7 +190,7 @@ Webhook 配置绑定精确 Runtime 及电脑。除非提交其他明确 Runtime�
 
 ## 验证
 
-当 `HGW_TEST_DATABASE_URL` 指向可丢弃测试数据库时，`npm run test:postgres` 包含已认证 Gateway 记录和两个独立源码节点进程。`npm run test:built-node-agent` 构建后在普通 Node 下重跑进程场景。这些场景覆盖同时连接、独立停止、凭证撤销、真实 Admin 客户端的签发／重发／撤销流程，以及零运行时启动。回环验证不代表已验收公网入口、跨电脑或 Windows。
+当 `HGW_TEST_DATABASE_URL` 指向可丢弃测试数据库时，`npm run test:postgres` 包含已认证 Gateway 记录和两个独立源码节点进程。`npm run test:built-node-agent` 构建后在普通 Node 下重跑进程场景。这些场景覆盖同时连接、独立停止、凭证撤销、真实 Admin 客户端的签发／重发／撤销流程，以及零运行时启动。回环验证不代表已验收公网入口、跨电脑或 Windows 运行时。
 
 `npm run test:built-node-service` 使用两个独立编译 Gateway 进程、一个编译节点代理进程、PostgreSQL 和项目提供的 Web Profile。记录验证中心一次登录、现有远端 Admin API、在选定电脑启动运行时、运行时 WebSocket 上的真实工作区事件，以及节点不可用时拒绝请求且不在中心启动替代进程。它要求已构建工作区产物，并使用同一可丢弃数据库设置。包测试另外覆盖有界二进制传输、分块 HTTP 送达、节点身份不匹配、独立控制容量、撤权和取消获取时的清理。
 

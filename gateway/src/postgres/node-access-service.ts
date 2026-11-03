@@ -23,7 +23,7 @@ const mutationSchema = z.object({
 }).strict()
 const enrollmentSchema = z.object({
   protocolVersion: z.literal(1), credential: nodeCredentialSchema,
-  platform: z.enum(['darwin', 'linux']), architecture: z.enum(['x64', 'arm64']),
+  platform: z.enum(['darwin', 'linux', 'win32']), architecture: z.enum(['x64', 'arm64']),
 }).strict()
 const connectionSchema = z.object({ connectionId: nodeUuidSchema }).strict()
 const leaseRequestSchema = connectionSchema.extend({ epoch: z.string().regex(/^[1-9][0-9]{0,18}$/u) }).strict()
@@ -220,7 +220,8 @@ export class PostgresNodeAccessService {
     if (typeof input === 'object' && input !== null && 'protocolVersion' in input && input.protocolVersion !== 1) {
       throw new NodeAccessError(422, 'node-access/unsupported-protocol')
     }
-    if (typeof input === 'object' && input !== null && 'platform' in input && input.platform !== 'darwin' && input.platform !== 'linux') {
+    if (typeof input === 'object' && input !== null && 'platform' in input
+      && input.platform !== 'darwin' && input.platform !== 'linux' && input.platform !== 'win32') {
       throw new NodeAccessError(422, 'node-access/unsupported-platform')
     }
     const request = parse(enrollmentSchema, input)

@@ -50,7 +50,8 @@ export type NodeProbeProvider = (signal: AbortSignal) => Promise<NodeProbeInfo>
  */
 export async function localNodeProbe(signal: AbortSignal): Promise<NodeProbeInfo> {
   signal.throwIfAborted()
-  if ((process.platform !== 'darwin' && process.platform !== 'linux') || (process.arch !== 'x64' && process.arch !== 'arm64')) {
+  if ((process.platform !== 'darwin' && process.platform !== 'linux' && process.platform !== 'win32')
+    || (process.arch !== 'x64' && process.arch !== 'arm64')) {
     throw new NodeChannelError(503, 'node-channel/probe-failed')
   }
   return { platform: process.platform, architecture: process.arch, uptimeSeconds: Math.floor(uptime()), executionReady: false }

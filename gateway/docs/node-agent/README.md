@@ -8,7 +8,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Register macOS/Linux x64 or arm64 computers and connect their existing Gateway services through an outbound agent. The agent needs no PostgreSQL credential or inbound listener. Enrollment reports `executionReady: false` and grants no runtime authority. Computer use and capability qualifications have separate per-computer policies. The organization’s [deployment mode](../deployment-topology/README.md) controls aggregation; browser and Admin workflows retain explicit computer and Runtime identities. Each collaborative project belongs to its selected computer.
+Register macOS, Linux and Windows x64 or arm64 computers and connect their existing Gateway services through an outbound agent. The agent needs no PostgreSQL credential or inbound listener. Enrollment reports `executionReady: false` and grants no runtime authority. Computer use and capability qualifications have separate per-computer policies. The organization’s [deployment mode](../deployment-topology/README.md) controls aggregation; browser and Admin workflows retain explicit computer and Runtime identities. Each collaborative project belongs to its selected computer.
 
 ## Contents
 
@@ -163,7 +163,7 @@ Node settings are resolved before file or network acquisition.
 | Node variable | Default | Meaning |
 |---|---|---|
 | `HGW_NODE_CENTER_URL` | Required | HTTPS origin; loopback HTTP is accepted locally |
-| `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | Mode-0600 credential file owned by the agent's OS account |
+| `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | Credential file private to the agent's OS account (mode 0600 on macOS/Linux, exclusive ACL on Windows) |
 | `HGW_NODE_ENROLLMENT_TOKEN` | Required for a new state file | Administrator ticket; enrolled records use their saved credential |
 | `HGW_NODE_AGENT_REQUEST_TIMEOUT_MS` | 10000 | Network request and shutdown-release timeout |
 | `HGW_NODE_AGENT_RETRY_MS` | 3000 | Delay between idempotent control retries |
@@ -190,7 +190,7 @@ Connection leases are separate from maintenance writer acknowledgements. Enrolle
 
 ## Verification
 
-With `HGW_TEST_DATABASE_URL` selecting a disposable test database, `npm run test:postgres` includes an authenticated Gateway transcript and two independent source node processes. `npm run test:built-node-agent` builds and repeats the process scenario under plain Node. The scenarios cover simultaneous connections, independent stop, credential revocation, the real Admin client’s issue/reissue/revoke flow, and zero runtime launches. Loopback verification does not establish public-ingress, cross-computer or Windows acceptance.
+With `HGW_TEST_DATABASE_URL` selecting a disposable test database, `npm run test:postgres` includes an authenticated Gateway transcript and two independent source node processes. `npm run test:built-node-agent` builds and repeats the process scenario under plain Node. The scenarios cover simultaneous connections, independent stop, credential revocation, the real Admin client’s issue/reissue/revoke flow, and zero runtime launches. Loopback verification does not establish public-ingress, cross-computer or Windows runtime acceptance.
 
 `npm run test:built-node-service` uses two independent compiled Gateway processes, a compiled node-agent process, PostgreSQL and the shipped Web profile. Its recorded transcript verifies one center login, the existing remote Admin API, runtime startup on the selected computer, a real workspace event over the runtime WebSocket, and unavailable-node refusal without a center replacement. It requires built workspace artifacts and the same disposable database setting. Package tests also cover bounded binary transfer, partial HTTP delivery, node identity mismatch, independent control capacity, revocation and cancelled acquisition teardown.
 
