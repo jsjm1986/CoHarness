@@ -391,11 +391,7 @@ export class LocalRuntimeOwnerLease {
       await this.verify()
       await rename(path, this.store.recordPath)
       await tightenPrivateFileAcl(this.store.recordPath)
-      const directory = await open(this.store.directory, 'r').catch((error: unknown) => {
-        if (process.platform === 'win32' && (error as NodeJS.ErrnoException).code === 'EISDIR') return undefined
-        throw error
-      })
-      try { await directory?.sync() } finally { await directory?.close() }
+      await syncStateDirectory(this.store.directory)
     } finally { await rm(path, { force: true }) }
   }
 }
