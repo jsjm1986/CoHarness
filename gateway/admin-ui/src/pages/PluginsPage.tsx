@@ -241,7 +241,7 @@ export function PluginsPage() {
       {binding === null ? null : <TargetPolicy kind={binding.target.kind} id={binding.target.id} t={t} />}
     </Section>
     {binding === null ? null : <div className="adminRouteContent" inert={!runtimeAvailable || undefined} aria-disabled={!runtimeAvailable || undefined}><BoundPlugins key={`${binding.target.kind}:${binding.target.id}:${binding.generation ?? 'stopped'}`} binding={binding} invalidate={invalidate} t={t} /></div>}
-    <PluginPermissions />
+    <PluginPermissions projects={{ items: projects, loading: loadingProjects, error: projectsError, reload: reloadOwners }} />
   </div>
 }
 

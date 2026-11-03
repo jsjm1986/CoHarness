@@ -92,9 +92,10 @@ function modelRows(profile: Record<string, unknown>): Array<{ id: string; name: 
 async function settingsFailure(
   error: unknown,
   expectedRevision: number | undefined,
-): Promise<RpcEnvelope<never>> | RpcEnvelope<never> {
+  readSettings: () => Promise<OrganizationModelSettingsView>,
+): Promise<RpcEnvelope<never>> {
   if (error instanceof AdminRequestError && error.status === 409 && error.code === 'settings-conflict') {
-    return describeOrganizationModelSettings().then((current) => rejected<never>(
+    return Promise.resolve().then(readSettings).then((current) => rejected<never>(
       'settings-conflict',
       error.message,
       {
