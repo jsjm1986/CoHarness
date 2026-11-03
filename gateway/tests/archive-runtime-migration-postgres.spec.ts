@@ -77,9 +77,13 @@ describePg('archive Runtime namespace migration', () => {
         : 'SELECT to_jsonb(row) record FROM harness.conversation_archive_file_cleanup row ORDER BY id')).rows,
     })
     const before = await history(false)
-    expect(await runMigrations(db, migrations)).toEqual({ applied: [97], current: 97 })
-    expect(await history(true)).toEqual(before)
-    expect(await runMigrations(db, migrations)).toEqual({ applied: [], current: 97 })
+    const through97 = await mkdtemp(join(tmpdir(), 'archive-through-namespace-'))
+    try {
+      for (const name of await readdir(migrations)) if (/^\d+.*\.sql$/u.test(name) && Number(name.slice(0, 3)) <= 97) await copyFile(join(migrations, name), join(through97, name))
+      expect(await runMigrations(db, through97)).toEqual({ applied: [97], current: 97 })
+      expect(await history(true)).toEqual(before)
+      expect(await runMigrations(db, through97)).toEqual({ applied: [], current: 97 })
+    } finally { await rm(through97, { recursive: true, force: true }) }
     const legacy = (await db.query<{ archive_id: ConversationArchiveId; root_session_id: string; runtime_id: RuntimeId | null }>('SELECT archive_id,root_session_id,runtime_id FROM harness.conversation_archive_records ORDER BY root_session_id')).rows
     expect(new Set(legacy.map(row => row.archive_id)).size).toBe(3)
     expect(legacy.find(row => row.root_session_id === 'legacy-owned')?.runtime_id).toBe(runtimeId)

@@ -52,6 +52,9 @@ export async function apply(ctx) {
       if (ctx.get('storage') === undefined) await ctx.plugin((await entry('storage/storage')).default)
       if (ctx.get('storage.backend.sqlite') === undefined) await ctx.plugin(await entry('storage/storage-sqlite'), { path: join(process.cwd(), 'workspaces.sqlite') })
       if (ctx.get('storageDomain') === undefined) await ctx.plugin(await entry('storage/storage-domain'), { backend: 'sqlite' })
+      if (ctx.root.get('apiProxy') === undefined) ctx.root.effect(() => ctx.root.provide('apiProxy', {
+        sessions: { list: async () => ({ result: { ok: true, value: { items: [] } } }) },
+      }), 'workspace-remount-fixture: conversation metadata stub')
       const registry = await entry('workspace/workspace'), gateway = await entry('context/gateway-runtime')
       const folder = join(process.cwd(), 'catalog-directory')
       await mkdir(folder)

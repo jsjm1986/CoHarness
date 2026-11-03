@@ -293,7 +293,8 @@
                 "inputTokens": 3,
                 "outputTokens": 3,
                 "totalTokens": 6
-              }
+              },
+              "credentialSource": "env"
             }
           },
           {
@@ -335,8 +336,44 @@
       }
     },
     {
-      "type": "tool/result",
+      "type": "job/registered",
       "seq": 16,
+      "time": 0,
+      "data": {
+        "jobId": "snapshot-fc88dabe7e414424",
+        "owner": "{{parent}}",
+        "kind": "snapshot",
+        "label": "snapshot_double",
+        "startedAt": 1793722276154,
+        "toolCall": {
+          "callId": "advanced-native",
+          "rootCallId": "advanced-native"
+        }
+      }
+    },
+    {
+      "type": "job/settled",
+      "seq": 17,
+      "time": 0,
+      "data": {
+        "jobId": "snapshot-fc88dabe7e414424",
+        "owner": "{{parent}}",
+        "kind": "snapshot",
+        "label": "snapshot_double",
+        "startedAt": 1793722276154,
+        "toolCall": {
+          "callId": "advanced-native",
+          "rootCallId": "advanced-native"
+        },
+        "finishedAt": 1793722276155,
+        "status": "completed",
+        "cause": "producer",
+        "producerReported": true
+      }
+    },
+    {
+      "type": "tool/result",
+      "seq": 18,
       "time": 0,
       "data": {
         "turn": 1,
@@ -365,7 +402,7 @@
     },
     {
       "type": "step/end",
-      "seq": 17,
+      "seq": 19,
       "time": 0,
       "data": {
         "turn": 1,
@@ -374,7 +411,7 @@
     },
     {
       "type": "step/start",
-      "seq": 18,
+      "seq": 20,
       "time": 0,
       "data": {
         "turn": 1,
@@ -383,17 +420,17 @@
     },
     {
       "type": "session-log-deepseek/delivery-accepted",
-      "seq": 19,
+      "seq": 21,
       "time": 0,
       "data": {
         "sessionId": "{{parent}}",
         "sessionFormatVersion": 7,
-        "throughSeq": 18
+        "throughSeq": 20
       }
     },
     {
       "type": "assistant/message",
-      "seq": 20,
+      "seq": 22,
       "time": 0,
       "data": {
         "turn": 1,
@@ -486,7 +523,8 @@
                 "inputTokens": 3,
                 "outputTokens": 3,
                 "totalTokens": 6
-              }
+              },
+              "credentialSource": "env"
             }
           },
           {
@@ -517,7 +555,7 @@
     },
     {
       "type": "tool/call",
-      "seq": 21,
+      "seq": 23,
       "time": 0,
       "data": {
         "turn": 1,
@@ -529,7 +567,7 @@
     },
     {
       "type": "tool/result",
-      "seq": 22,
+      "seq": 24,
       "time": 0,
       "data": {
         "turn": 1,
@@ -557,13 +595,13 @@
         }
       },
       "sourceEventSeqs": [
-        21
+        23
       ],
       "surfaceOp": "append"
     },
     {
       "type": "step/end",
-      "seq": 23,
+      "seq": 25,
       "time": 0,
       "data": {
         "turn": 1,
@@ -572,7 +610,7 @@
     },
     {
       "type": "step/start",
-      "seq": 24,
+      "seq": 26,
       "time": 0,
       "data": {
         "turn": 1,
@@ -581,17 +619,17 @@
     },
     {
       "type": "session-log-deepseek/delivery-accepted",
-      "seq": 25,
+      "seq": 27,
       "time": 0,
       "data": {
         "sessionId": "{{parent}}",
         "sessionFormatVersion": 7,
-        "throughSeq": 24
+        "throughSeq": 26
       }
     },
     {
       "type": "assistant/message",
-      "seq": 26,
+      "seq": 28,
       "time": 0,
       "data": {
         "turn": 1,
@@ -684,7 +722,8 @@
                 "inputTokens": 3,
                 "outputTokens": 3,
                 "totalTokens": 6
-              }
+              },
+              "credentialSource": "env"
             }
           },
           {
@@ -715,7 +754,7 @@
     },
     {
       "type": "tool/call",
-      "seq": 27,
+      "seq": 29,
       "time": 0,
       "data": {
         "turn": 1,
@@ -727,7 +766,7 @@
     },
     {
       "type": "subagent/catalog",
-      "seq": 28,
+      "seq": 30,
       "time": 0,
       "data": {
         "version": 0,
@@ -739,7 +778,7 @@
     },
     {
       "type": "tool/result",
-      "seq": 29,
+      "seq": 31,
       "time": 0,
       "data": {
         "turn": 1,
@@ -762,13 +801,13 @@
         }
       },
       "sourceEventSeqs": [
-        27
+        29
       ],
       "surfaceOp": "append"
     },
     {
       "type": "step/end",
-      "seq": 30,
+      "seq": 32,
       "time": 0,
       "data": {
         "turn": 1,
@@ -777,7 +816,7 @@
     },
     {
       "type": "step/start",
-      "seq": 31,
+      "seq": 33,
       "time": 0,
       "data": {
         "turn": 1,
@@ -786,17 +825,17 @@
     },
     {
       "type": "session-log-deepseek/delivery-accepted",
-      "seq": 32,
+      "seq": 34,
       "time": 0,
       "data": {
         "sessionId": "{{parent}}",
         "sessionFormatVersion": 7,
-        "throughSeq": 31
+        "throughSeq": 33
       }
     },
     {
       "type": "assistant/message",
-      "seq": 33,
+      "seq": 35,
       "time": 0,
       "data": {
         "turn": 1,
@@ -889,7 +928,8 @@
                 "inputTokens": 3,
                 "outputTokens": 3,
                 "totalTokens": 6
-              }
+              },
+              "credentialSource": "env"
             }
           },
           {
@@ -920,7 +960,7 @@
     },
     {
       "type": "tool/call",
-      "seq": 34,
+      "seq": 36,
       "time": 0,
       "data": {
         "turn": 1,
@@ -932,7 +972,7 @@
     },
     {
       "type": "tool-workflow/run-start",
-      "seq": 35,
+      "seq": 37,
       "time": 0,
       "data": {
         "runId": "{{workflow-run}}",
@@ -941,7 +981,7 @@
     },
     {
       "type": "subagent/catalog",
-      "seq": 36,
+      "seq": 38,
       "time": 0,
       "data": {
         "version": 0,
@@ -952,7 +992,7 @@
     },
     {
       "type": "tool-workflow/agent-start",
-      "seq": 37,
+      "seq": 39,
       "time": 0,
       "data": {
         "runId": "{{workflow-run}}",
@@ -964,7 +1004,7 @@
     },
     {
       "type": "tool-workflow/agent-end",
-      "seq": 38,
+      "seq": 40,
       "time": 0,
       "data": {
         "runId": "{{workflow-run}}",
@@ -974,7 +1014,7 @@
     },
     {
       "type": "tool-workflow/run-end",
-      "seq": 39,
+      "seq": 41,
       "time": 0,
       "data": {
         "runId": "{{workflow-run}}",
@@ -983,7 +1023,7 @@
     },
     {
       "type": "tool/result",
-      "seq": 40,
+      "seq": 42,
       "time": 0,
       "data": {
         "turn": 1,
@@ -1006,13 +1046,13 @@
         }
       },
       "sourceEventSeqs": [
-        34
+        36
       ],
       "surfaceOp": "append"
     },
     {
       "type": "step/end",
-      "seq": 41,
+      "seq": 43,
       "time": 0,
       "data": {
         "turn": 1,
@@ -1021,7 +1061,7 @@
     },
     {
       "type": "step/start",
-      "seq": 42,
+      "seq": 44,
       "time": 0,
       "data": {
         "turn": 1,
@@ -1030,17 +1070,17 @@
     },
     {
       "type": "session-log-deepseek/delivery-accepted",
-      "seq": 43,
+      "seq": 45,
       "time": 0,
       "data": {
         "sessionId": "{{parent}}",
         "sessionFormatVersion": 7,
-        "throughSeq": 42
+        "throughSeq": 44
       }
     },
     {
       "type": "assistant/message",
-      "seq": 44,
+      "seq": 46,
       "time": 0,
       "data": {
         "turn": 1,
@@ -1117,7 +1157,8 @@
                 "inputTokens": 3,
                 "outputTokens": 3,
                 "totalTokens": 6
-              }
+              },
+              "credentialSource": "env"
             }
           },
           {
@@ -1148,7 +1189,7 @@
     },
     {
       "type": "step/end",
-      "seq": 45,
+      "seq": 47,
       "time": 0,
       "data": {
         "turn": 1,
@@ -1157,7 +1198,7 @@
     },
     {
       "type": "turn/end",
-      "seq": 46,
+      "seq": 48,
       "time": 0,
       "data": {
         "turn": 1,
@@ -1536,7 +1577,8 @@
                     "inputTokens": 3,
                     "outputTokens": 3,
                     "totalTokens": 6
-                  }
+                  },
+                  "credentialSource": "env"
                 }
               },
               {
@@ -1590,8 +1632,56 @@
       "payload": {
         "sessionId": "{{parent}}",
         "event": {
-          "type": "tool/result",
+          "type": "job/registered",
           "seq": 16,
+          "time": 0,
+          "data": {
+            "jobId": "snapshot-fc88dabe7e414424",
+            "owner": "{{parent}}",
+            "kind": "snapshot",
+            "label": "snapshot_double",
+            "startedAt": 1793722276154,
+            "toolCall": {
+              "callId": "advanced-native",
+              "rootCallId": "advanced-native"
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "job/settled",
+          "seq": 17,
+          "time": 0,
+          "data": {
+            "jobId": "snapshot-fc88dabe7e414424",
+            "owner": "{{parent}}",
+            "kind": "snapshot",
+            "label": "snapshot_double",
+            "startedAt": 1793722276154,
+            "toolCall": {
+              "callId": "advanced-native",
+              "rootCallId": "advanced-native"
+            },
+            "finishedAt": 1793722276155,
+            "status": "completed",
+            "cause": "producer",
+            "producerReported": true
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "tool/result",
+          "seq": 18,
           "time": 0,
           "data": {
             "turn": 1,
@@ -1626,7 +1716,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "step/end",
-          "seq": 17,
+          "seq": 19,
           "time": 0,
           "data": {
             "turn": 1,
@@ -1641,7 +1731,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "step/start",
-          "seq": 18,
+          "seq": 20,
           "time": 0,
           "data": {
             "turn": 1,
@@ -1656,12 +1746,12 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "session-log-deepseek/delivery-accepted",
-          "seq": 19,
+          "seq": 21,
           "time": 0,
           "data": {
             "sessionId": "{{parent}}",
             "sessionFormatVersion": 7,
-            "throughSeq": 18
+            "throughSeq": 20
           }
         }
       }
@@ -1672,7 +1762,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "assistant/message",
-          "seq": 20,
+          "seq": 22,
           "time": 0,
           "data": {
             "turn": 1,
@@ -1765,7 +1855,8 @@
                     "inputTokens": 3,
                     "outputTokens": 3,
                     "totalTokens": 6
-                  }
+                  },
+                  "credentialSource": "env"
                 }
               },
               {
@@ -1802,7 +1893,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/call",
-          "seq": 21,
+          "seq": 23,
           "time": 0,
           "data": {
             "turn": 1,
@@ -1820,7 +1911,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/result",
-          "seq": 22,
+          "seq": 24,
           "time": 0,
           "data": {
             "turn": 1,
@@ -1848,7 +1939,7 @@
             }
           },
           "sourceEventSeqs": [
-            21
+            23
           ],
           "surfaceOp": "append"
         }
@@ -1860,7 +1951,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "step/end",
-          "seq": 23,
+          "seq": 25,
           "time": 0,
           "data": {
             "turn": 1,
@@ -1875,7 +1966,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "step/start",
-          "seq": 24,
+          "seq": 26,
           "time": 0,
           "data": {
             "turn": 1,
@@ -1890,12 +1981,12 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "session-log-deepseek/delivery-accepted",
-          "seq": 25,
+          "seq": 27,
           "time": 0,
           "data": {
             "sessionId": "{{parent}}",
             "sessionFormatVersion": 7,
-            "throughSeq": 24
+            "throughSeq": 26
           }
         }
       }
@@ -1906,7 +1997,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "assistant/message",
-          "seq": 26,
+          "seq": 28,
           "time": 0,
           "data": {
             "turn": 1,
@@ -1999,7 +2090,8 @@
                     "inputTokens": 3,
                     "outputTokens": 3,
                     "totalTokens": 6
-                  }
+                  },
+                  "credentialSource": "env"
                 }
               },
               {
@@ -2036,7 +2128,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/call",
-          "seq": 27,
+          "seq": 29,
           "time": 0,
           "data": {
             "turn": 1,
@@ -2129,7 +2221,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "subagent/catalog",
-          "seq": 28,
+          "seq": 30,
           "time": 0,
           "data": {
             "version": 0,
@@ -2449,7 +2541,8 @@
                     "inputTokens": 3,
                     "outputTokens": 3,
                     "totalTokens": 6
-                  }
+                  },
+                  "credentialSource": "env"
                 }
               },
               {
@@ -2542,7 +2635,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/result",
-          "seq": 29,
+          "seq": 31,
           "time": 0,
           "data": {
             "turn": 1,
@@ -2565,7 +2658,7 @@
             }
           },
           "sourceEventSeqs": [
-            27
+            29
           ],
           "surfaceOp": "append"
         }
@@ -2577,7 +2670,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "step/end",
-          "seq": 30,
+          "seq": 32,
           "time": 0,
           "data": {
             "turn": 1,
@@ -2592,7 +2685,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "step/start",
-          "seq": 31,
+          "seq": 33,
           "time": 0,
           "data": {
             "turn": 1,
@@ -2607,12 +2700,12 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "session-log-deepseek/delivery-accepted",
-          "seq": 32,
+          "seq": 34,
           "time": 0,
           "data": {
             "sessionId": "{{parent}}",
             "sessionFormatVersion": 7,
-            "throughSeq": 31
+            "throughSeq": 33
           }
         }
       }
@@ -2623,7 +2716,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "assistant/message",
-          "seq": 33,
+          "seq": 35,
           "time": 0,
           "data": {
             "turn": 1,
@@ -2716,7 +2809,8 @@
                     "inputTokens": 3,
                     "outputTokens": 3,
                     "totalTokens": 6
-                  }
+                  },
+                  "credentialSource": "env"
                 }
               },
               {
@@ -2753,7 +2847,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/call",
-          "seq": 34,
+          "seq": 36,
           "time": 0,
           "data": {
             "turn": 1,
@@ -2771,7 +2865,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool-workflow/run-start",
-          "seq": 35,
+          "seq": 37,
           "time": 0,
           "data": {
             "runId": "{{workflow-run}}",
@@ -2861,7 +2955,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "subagent/catalog",
-          "seq": 36,
+          "seq": 38,
           "time": 0,
           "data": {
             "version": 0,
@@ -2878,7 +2972,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool-workflow/agent-start",
-          "seq": 37,
+          "seq": 39,
           "time": 0,
           "data": {
             "runId": "{{workflow-run}}",
@@ -3197,7 +3291,8 @@
                     "inputTokens": 3,
                     "outputTokens": 3,
                     "totalTokens": 6
-                  }
+                  },
+                  "credentialSource": "env"
                 }
               },
               {
@@ -3290,7 +3385,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool-workflow/agent-end",
-          "seq": 38,
+          "seq": 40,
           "time": 0,
           "data": {
             "runId": "{{workflow-run}}",
@@ -3306,7 +3401,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool-workflow/run-end",
-          "seq": 39,
+          "seq": 41,
           "time": 0,
           "data": {
             "runId": "{{workflow-run}}",
@@ -3321,7 +3416,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/result",
-          "seq": 40,
+          "seq": 42,
           "time": 0,
           "data": {
             "turn": 1,
@@ -3344,7 +3439,7 @@
             }
           },
           "sourceEventSeqs": [
-            34
+            36
           ],
           "surfaceOp": "append"
         }
@@ -3356,7 +3451,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "step/end",
-          "seq": 41,
+          "seq": 43,
           "time": 0,
           "data": {
             "turn": 1,
@@ -3371,7 +3466,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "step/start",
-          "seq": 42,
+          "seq": 44,
           "time": 0,
           "data": {
             "turn": 1,
@@ -3386,12 +3481,12 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "session-log-deepseek/delivery-accepted",
-          "seq": 43,
+          "seq": 45,
           "time": 0,
           "data": {
             "sessionId": "{{parent}}",
             "sessionFormatVersion": 7,
-            "throughSeq": 42
+            "throughSeq": 44
           }
         }
       }
@@ -3402,7 +3497,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "assistant/message",
-          "seq": 44,
+          "seq": 46,
           "time": 0,
           "data": {
             "turn": 1,
@@ -3479,7 +3574,8 @@
                     "inputTokens": 3,
                     "outputTokens": 3,
                     "totalTokens": 6
-                  }
+                  },
+                  "credentialSource": "env"
                 }
               },
               {
@@ -3516,7 +3612,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "step/end",
-          "seq": 45,
+          "seq": 47,
           "time": 0,
           "data": {
             "turn": 1,
@@ -3531,7 +3627,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "turn/end",
-          "seq": 46,
+          "seq": 48,
           "time": 0,
           "data": {
             "turn": 1,

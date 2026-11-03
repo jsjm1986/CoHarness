@@ -12,7 +12,7 @@ describe('PostgresDocumentCatalogService sync', () => {
     const client = Object.assign(new Client({ connectionString: 'postgresql://fixture:fixture@127.0.0.1:1/fixture_test' }), {
       query: vi.fn(async (text: string, values?: readonly unknown[]) => {
         calls.push({ text, values })
-        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id' }], rowCount: 1 }
+        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id', public_id: '7', display_name: 'User' }], rowCount: 1 }
         if (text.includes('SELECT id,public_id::text,display_name')) {
           return { rows: [{ id: 'owner-id', public_id: '7', display_name: 'Owner' }], rowCount: 1 }
         }
@@ -71,7 +71,7 @@ describe('PostgresDocumentCatalogService sync', () => {
     const client = Object.assign(new Client({ connectionString: 'postgresql://fixture:fixture@127.0.0.1:1/fixture_test' }), {
       query: vi.fn(async (text: string) => {
         calls.push(text)
-        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id' }], rowCount: 1 }
+        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id', public_id: '7', display_name: 'User' }], rowCount: 1 }
         if (text.includes('SELECT id,public_id::text,display_name')) {
           return { rows: [{ id: 'owner-id', public_id: '7', display_name: 'Owner' }], rowCount: 1 }
         }
@@ -106,11 +106,11 @@ describe('PostgresDocumentCatalogService sync', () => {
     const client = Object.assign(new Client({ connectionString: 'postgresql://fixture:fixture@127.0.0.1:1/fixture_test' }), {
       query: vi.fn(async (text: string) => {
         calls.push(text)
-        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id' }], rowCount: 1 }
+        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id', public_id: '7', display_name: 'User' }], rowCount: 1 }
         if (text.includes('SELECT id,public_id::text,display_name')) {
           return { rows: [{ id: 'owner-id', public_id: '7', display_name: 'Owner' }], rowCount: 1 }
         }
-        if (text.includes('SELECT id,state,runtime_revision FROM harness.document_catalog')) {
+        if (text.includes('SELECT id,state,runtime_revision')) {
           return { rows: [{ id: 'old-id', state: 'missing', runtime_revision: 1 }], rowCount: 1 }
         }
         if (text.includes('SELECT id,runtime_incarnation_id')) {
@@ -132,7 +132,7 @@ describe('PostgresDocumentCatalogService sync', () => {
         identity: { incarnationId: '11111111-1111-4111-8111-111111111111', revision: 1, origin: 'upload' } }],
     })
 
-    expect(calls.some(text => text.includes('SELECT id,runtime_incarnation_id FROM harness.document_catalog'))).toBe(false)
+    expect(calls.some(text => text.includes('SELECT id,runtime_incarnation_id'))).toBe(false)
     expect(calls.some(text => text.includes('UPDATE harness.document_catalog'))).toBe(false)
     expect(calls.some(text => text.includes('INSERT INTO harness.document_catalog'))).toBe(false)
     expect(calls.some(text => text.includes('INSERT INTO harness.document_history'))).toBe(false)
@@ -143,11 +143,11 @@ describe('PostgresDocumentCatalogService sync', () => {
     const client = Object.assign(new Client({ connectionString: 'postgresql://fixture:fixture@127.0.0.1:1/fixture_test' }), {
       query: vi.fn(async (text: string, values?: readonly unknown[]) => {
         calls.push({ text, values })
-        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id' }], rowCount: 1 }
+        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id', public_id: '7', display_name: 'User' }], rowCount: 1 }
         if (text.includes('SELECT id,public_id::text,display_name')) {
           return { rows: [{ id: 'owner-id', public_id: '7', display_name: 'Owner' }], rowCount: 1 }
         }
-        if (text.includes('SELECT id,state,runtime_revision FROM harness.document_catalog')) return { rows: [], rowCount: 0 }
+        if (text.includes('SELECT id,state,runtime_revision')) return { rows: [], rowCount: 0 }
         if (text.includes('SELECT id,runtime_incarnation_id')) {
           return { rows: [{ id: 'old-id', runtime_incarnation_id: '11111111-1111-4111-8111-111111111111' }], rowCount: 1 }
         }
@@ -181,14 +181,14 @@ describe('PostgresDocumentCatalogService sync', () => {
     const client = Object.assign(new Client({ connectionString: 'postgresql://fixture:fixture@127.0.0.1:1/fixture_test' }), {
       query: vi.fn(async (text: string) => {
         calls.push(text)
-        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'owner-id' }], rowCount: 1 }
+        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'owner-id', public_id: '7', display_name: 'User' }], rowCount: 1 }
         if (text.includes('SELECT id,public_id::text,display_name')) {
           return { rows: [{ id: 'owner-id', public_id: '7', display_name: 'Owner' }], rowCount: 1 }
         }
-        if (text.includes('SELECT scope_kind,scope_user_id,scope_project_id,sequence,ordinal FROM harness.document_projection_checkpoints')) {
+        if (text.includes('SELECT scope_kind,scope_user_id,scope_project_id,sequence,ordinal')) {
           return { rows: [{ scope_kind: 'personal', scope_user_id: 'owner-id', scope_project_id: null, sequence: 1, ordinal: 1 }], rowCount: 1 }
         }
-        if (text.includes('SELECT id,runtime_revision,state FROM harness.document_catalog')) {
+        if (text.includes('SELECT id,runtime_revision,state')) {
           return { rows: [{ id: 'old-id', runtime_revision: 3, state: 'missing' }], rowCount: 1 }
         }
         return { rows: [], rowCount: 0 }
@@ -219,14 +219,14 @@ describe('PostgresDocumentCatalogService sync', () => {
     const client = Object.assign(new Client({ connectionString: 'postgresql://fixture:fixture@127.0.0.1:1/fixture_test' }), {
       query: vi.fn(async (text: string, values?: readonly unknown[]) => {
         calls.push({ text, values })
-        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'owner-id' }], rowCount: 1 }
+        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'owner-id', public_id: '7', display_name: 'User' }], rowCount: 1 }
         if (text.includes('SELECT id,public_id::text,display_name')) {
           return { rows: [{ id: 'owner-id', public_id: '7', display_name: 'Owner' }], rowCount: 1 }
         }
-        if (text.includes('SELECT scope_kind,scope_user_id,scope_project_id,sequence,ordinal FROM harness.document_projection_checkpoints')) {
+        if (text.includes('SELECT scope_kind,scope_user_id,scope_project_id,sequence,ordinal')) {
           return { rows: [{ scope_kind: 'personal', scope_user_id: 'owner-id', scope_project_id: null, sequence: 1, ordinal: 1 }], rowCount: 1 }
         }
-        if (text.includes('SELECT id,runtime_revision,state FROM harness.document_catalog')) return { rows: [], rowCount: 0 }
+        if (text.includes('SELECT id,runtime_revision,state')) return { rows: [], rowCount: 0 }
         if (text.includes('SELECT id,runtime_incarnation_id')) {
           return { rows: [{ id: 'old-id', runtime_incarnation_id: '11111111-1111-4111-8111-111111111111' }], rowCount: 1 }
         }
@@ -259,11 +259,11 @@ describe('PostgresDocumentCatalogService sync', () => {
     const client = Object.assign(new Client({ connectionString: 'postgresql://fixture:fixture@127.0.0.1:1/fixture_test' }), {
       query: vi.fn(async (text: string, values?: readonly unknown[]) => {
         calls.push({ text, values })
-        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id' }], rowCount: 1 }
+        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id', public_id: '7', display_name: 'User' }], rowCount: 1 }
         if (text.includes('SELECT id,public_id::text,display_name')) {
           return { rows: [{ id: 'owner-id', public_id: '7', display_name: 'Owner' }], rowCount: 1 }
         }
-        if (text.includes('SELECT id FROM harness.document_catalog')) {
+        if (text.includes('runtime_doc_id=ANY($5::text[])')) {
           return { rows: [{ id: 'doc-a' }, { id: 'doc-b' }], rowCount: 2 }
         }
         if (text.includes('UPDATE harness.document_catalog AS catalog')) {
@@ -282,7 +282,7 @@ describe('PostgresDocumentCatalogService sync', () => {
 
     const update = calls.filter(call => call.text.includes('UPDATE harness.document_catalog AS catalog'))
     const history = calls.filter(call => call.text.includes('INSERT INTO harness.document_history'))
-    expect(calls.find(call => call.text.includes('SELECT id FROM harness.document_catalog'))?.values?.[4]).toEqual(['a.txt', 'b.txt'])
+    expect(calls.find(call => call.text.includes('runtime_doc_id=ANY($5::text[])'))?.values?.[4]).toEqual(['a.txt', 'b.txt'])
     expect(update).toHaveLength(1)
     expect(update[0]?.values?.[7]).toEqual(['doc-a', 'doc-b'])
     expect(history).toHaveLength(1)
@@ -296,7 +296,7 @@ describe('PostgresDocumentCatalogService sync', () => {
     const client = Object.assign(new Client({ connectionString: 'postgresql://fixture:fixture@127.0.0.1:1/fixture_test' }), {
       query: vi.fn(async (text: string, values?: readonly unknown[]) => {
         calls.push({ text, values })
-        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id' }], rowCount: 1 }
+        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id', public_id: '7', display_name: 'User' }], rowCount: 1 }
         if (text.includes('SELECT id,public_id::text,display_name')) {
           return { rows: [{ id: 'owner-id', public_id: '7', display_name: 'Owner' }], rowCount: 1 }
         }
@@ -307,7 +307,7 @@ describe('PostgresDocumentCatalogService sync', () => {
           }
           return { rows: [], rowCount: 0 }
         }
-        if (text.includes('SELECT state,runtime_revision,trash_action_id FROM harness.document_catalog')) {
+        if (text.includes('SELECT state,runtime_revision,trash_action_id')) {
           return { rows: [current], rowCount: 1 }
         }
         return { rows: [], rowCount: 0 }

@@ -532,11 +532,19 @@ jobs:
         run: npm ci --prefix gateway
 
       # The built resource-admission lane compiles gateway source through the
-      # tsconfig paths, which point at emitted workspace declarations; emit the
-      # same graph the gateway typecheck lane emits.
-      - name: Emit type declarations the Gateway paths consume
+      # tsconfig paths, which point at emitted workspace declarations, and then
+      # executes the compiled graph, which imports the workspace runtime
+      # entries. The host library build emits declarations and runtime bundles
+      # for the full graph the gateway typecheck lane compiles, and the runtime
+      # package step recreates the gateway/node_modules links exactly as
+      # build-production does for a standalone release.
+      - name: Build the workspace libraries and native addon the compiled Gateway consumes
         if: needs.pr-scope.outputs.gateway_mode == 'full'
-        run: node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format packages/session/session-format-catalog packages/util/managed-data packages/util/atomic-write packages/util/brand packages/util/values packages/util/native-command packages/llm/llm packages/attachment/userdoc packages/attachment/userdoc-gateway packages/attachment/userdoc-local packages/host/userdoc-http packages/typert/protocol packages/context/resource-budget packages/core/session packages/subprocess/subprocess-local packages/test-support/loader-smoke native/system/packages/entry
+        run: pnpm run build:native-system && pnpm run build:lib:host
+
+      - name: Link the compiled Gateway's runtime packages
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        run: tsx scripts/gateway-runtime-packages.ts
 
       - name: Test Gateway execution through Loader and PostgreSQL
         id: gateway-execution
@@ -828,8 +836,13 @@ jobs:
       # installs it immutably instead of hand-linking node_modules rows.
       - name: Install workspace dependencies for declaration emit
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Emit type declarations the Gateway paths consume
-        run: node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format packages/session/session-format-catalog packages/util/managed-data packages/util/atomic-write packages/util/brand packages/util/values packages/util/native-command packages/llm/llm packages/attachment/userdoc packages/attachment/userdoc-gateway packages/attachment/userdoc-local packages/host/userdoc-http packages/typert/protocol packages/context/resource-budget packages/core/session packages/subprocess/subprocess-local packages/test-support/loader-smoke native/system/packages/entry
+      # The emitted lib/types graph feeds the tsconfig paths and vitest
+      # aliases, while the emitted modules' own workspace imports resolve
+      # through real package exports to the bundled lib entries, and spawned
+      # fixtures exercise the flock and directory bindings; the library build
+      # and host addon produce both artifact planes.
+      - name: Build the workspace libraries and native addon the Gateway graph consumes
+        run: pnpm run build:native-system && pnpm run build:lib:host
       - name: Typecheck Gateway
         run: npm run typecheck --prefix gateway
       # The production `npm run build` resolves workspace packages through their

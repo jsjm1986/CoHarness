@@ -16,12 +16,10 @@ import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
 import { PostgresUserService } from '../src/postgres/user-service.ts'
 import { createGatewayServer, SESSION_COOKIE } from '../src/server.ts'
+import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { testConfig } from './test-config.ts'
 
-const databaseUrl = process.env.HGW_TEST_DATABASE_URL
-if (databaseUrl !== undefined && !/(_test|_accept|_acceptance)(\?.*)?$/.test(databaseUrl)) {
-  throw new Error('HGW_TEST_DATABASE_URL must select a disposable test database ending in _test, _accept, or _acceptance')
-}
+const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
 const roles = ['owner', 'writer', 'reader', 'administrator', 'outsider'] as const
 type Role = typeof roles[number]
