@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { existsSync } from 'node:fs'
-import { writeFile } from 'node:fs/promises'
+import { rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { LlmAdapter, ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -10,6 +10,12 @@ import { memoryConsolidationCursorKey, memoryExtractionCursorKey } from '@deepse
 
 export const name = 'memory-authority-model'
 export const inject = ['llm', 'memory']
+
+/** Publish a JSON marker atomically: the spec polls existsSync, so a plain writeFile exposes an empty window. */
+const publishMarker = async (file, value) => {
+  await writeFile(`${file}.tmp`, JSON.stringify(value))
+  await rename(`${file}.tmp`, file)
+}
 
 export async function apply(ctx) {
   const kind = process.env.DSH_MEMORY_AUTHORITY_KIND
@@ -33,11 +39,11 @@ export async function apply(ctx) {
     const key = kind === 'extraction' ? memoryExtractionCursorKey(agent.id) : memoryConsolidationCursorKey({ kind: 'project' })
     const cursor = await ctx.memory.getCursor(key)
     const owner = await ctx.memory.memberRead({ scope: { kind: 'project' }, key: 'release-rule' })
-    await writeFile(join(process.cwd(), 'authority-observation.json'), JSON.stringify({
+    await publishMarker(join(process.cwd(), 'authority-observation.json'), {
       kind, change, phase, admitted, released, memoryRequests, replacementAuthorizations,
       cursorAdvanced: kind === 'extraction' ? cursor !== undefined : cursor?.lastRunAt !== undefined,
       ownerContent: owner?.content, loggedBeforeDispatch: true,
-    }))
+    })
   }
   const authority = {
     capture: agent => ({ parentSessionId: agent.id, inputs: [], unverifiedHistory: false, primaryActorUserId: 42 }),
@@ -68,7 +74,7 @@ export async function apply(ctx) {
     }
     await issuer.authorize('execute')
     replacementAuthorizations = 0
-    await writeFile(join(process.cwd(), 'authority-pending.json'), JSON.stringify({ kind, change, phase, executeAllowed: true }))
+    await publishMarker(join(process.cwd(), 'authority-pending.json'), { kind, change, phase, executeAllowed: true })
     const deadline = AbortSignal.timeout(50_000)
     while (!existsSync(join(process.cwd(), 'authority-continue'))) await delay(10, undefined, { signal: deadline })
   }

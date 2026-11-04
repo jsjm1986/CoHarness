@@ -1,7 +1,7 @@
 /** Real SDK background curation retains cancellation and provider cleanup after a live settings commit. */
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { LlmAdapter } from '@deepseek-ai/dsh-llm'
@@ -9,6 +9,12 @@ import { MEMORY_SETTINGS_NAMESPACE } from '@deepseek-ai/dsh-memory'
 
 export const name = 'curation-settings-model'
 export const inject = ['llm', 'memory']
+
+/** Publish a JSON marker atomically: the spec polls existsSync, so a plain writeFile exposes an empty window. */
+const publishMarker = async (file, value) => {
+  await writeFile(`${file}.tmp`, JSON.stringify(value))
+  await rename(`${file}.tmp`, file)
+}
 
 export async function apply(ctx) {
   const kind = process.env.DSH_CURATION_FIXTURE_KIND
@@ -55,7 +61,7 @@ export async function apply(ctx) {
       return { signal: new AbortController().signal, release: async () => {
         released++
         if (memoryRequests === 1 && released === admitted) {
-          await writeFile(join(process.cwd(), 'curation-quiescent.json'), JSON.stringify({ admitted, released, providerFinished }))
+          await publishMarker(join(process.cwd(), 'curation-quiescent.json'), { admitted, released, providerFinished })
         }
       },
         uncertain: async () => { throw new Error('Curation fixture retained an uncertain permit') } }
@@ -87,11 +93,11 @@ export async function apply(ctx) {
           assert.deepEqual(JSON.parse(JSON.stringify(event.data.request)), JSON.parse(JSON.stringify(request)))
           await withdraw(options.signal)
           const owner = await ctx.memory.memberRead({ scope: { kind: 'personal' }, key: 'release-rule' })
-          await writeFile(join(process.cwd(), 'curation-observation.json'), JSON.stringify({
+          await publishMarker(join(process.cwd(), 'curation-observation.json'), {
             kind, change, memoryRequests, cancelledBeforeShutdown: options.signal.aborted,
             ownerContent: owner?.content, loggedBeforeDispatch: true,
             livePermits: admitted - released,
-          }))
+          })
           observationReady.resolve()
           const deadline = AbortSignal.timeout(50_000)
           // Provider cleanup deliberately outlives request cancellation.
