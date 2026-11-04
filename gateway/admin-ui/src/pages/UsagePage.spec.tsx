@@ -140,8 +140,10 @@ describe('UsagePage', () => {
 
   it('separates personal billing from shared-project contribution activity', async () => {
     render(<UsagePage />)
-    expect(await screen.findByText('项目 Token')).toBeTruthy()
-    expect(screen.getByText('900')).toBeTruthy()
+    // The metric labels render inside the loading skeleton, so only a data
+    // value can prove the reload committed.
+    expect(await screen.findByText('900')).toBeTruthy()
+    expect(screen.getByText('项目 Token')).toBeTruthy()
     const table = screen.getByRole('table')
     expect(within(table).getByText('alice')).toBeTruthy()
     expect(within(table).getByText('700')).toBeTruthy()
