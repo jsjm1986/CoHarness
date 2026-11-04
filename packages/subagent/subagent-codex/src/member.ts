@@ -68,19 +68,21 @@ class CodexMemberSession implements ExternalMemberSession {
   private readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle | Promise<SubprocessHandle>
   private readonly signal: AbortSignal
   private readonly callerSignal: AbortSignal
+  private readonly openModel: ((signal: AbortSignal) => Promise<ManagedCodexModel>) | undefined
 
   constructor(
     config: CodexMemberConfig,
     spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle | Promise<SubprocessHandle>,
     externalId: string | undefined,
     signal: AbortSignal,
-    private readonly openModel?: (signal: AbortSignal) => Promise<ManagedCodexModel>,
+    openModel?: (signal: AbortSignal) => Promise<ManagedCodexModel>,
   ) {
     this.config = config
     this.spawn = spawn
     this.signal = AbortSignal.any([signal, this.lifetime.signal])
     this.callerSignal = signal
     this.externalId = externalId
+    this.openModel = openModel
   }
 
   async *turn(
@@ -193,14 +195,16 @@ class CodexMemberSession implements ExternalMemberSession {
 export class CodexMemberTransport implements ExternalMemberTransport {
   private readonly config: CodexMemberConfig
   private readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle | Promise<SubprocessHandle>
+  private readonly openModel: ((signal: AbortSignal) => Promise<ManagedCodexModel>) | undefined
 
   constructor(
     config: CodexMemberConfig,
     spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle | Promise<SubprocessHandle>,
-    private readonly openModel?: (signal: AbortSignal) => Promise<ManagedCodexModel>,
+    openModel?: (signal: AbortSignal) => Promise<ManagedCodexModel>,
   ) {
     this.config = config
     this.spawn = spawn
+    this.openModel = openModel
   }
 
   open(externalId: string | undefined, signal: AbortSignal): Promise<ExternalMemberSession> {
