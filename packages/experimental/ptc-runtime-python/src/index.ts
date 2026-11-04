@@ -1456,6 +1456,7 @@ export class PythonPtcRuntime extends PtcRuntime {
         new Promise((resolve) => { stream.once('end', resolve); stream.once('close', resolve) })
       const stdoutDrained = drained(stdout)
       const stderrDrained = drained(stderr)
+      const protoDrained = drained(proto)
 
       // Line-framed JSON reader over fd 3. The unframed buffer is bounded: a
       // hostile program can loop `os.write(3, b"A"*4096)` with no newline to
@@ -2091,7 +2092,16 @@ export class PythonPtcRuntime extends PtcRuntime {
         })()
       }
 
-      void handle.done.then(({ exitCode, signal }) => {
+      void handle.done.then(async ({ exitCode, signal }) => {
+        // `done` covers the exit plus stdout/stderr close only: an fd-3 frame
+        // still queued when the run's own descriptors EOF can dispatch after
+        // this microtask under event-loop starvation, and the settled guard in
+        // the frame reader would drop a late `done` result. Drain the protocol
+        // stream under the same close bound before calling the exit premature.
+        const closeBound = new Promise<void>((resolve) => {
+          setTimeout(resolve, this.config.graceMs + CLOSE_REAP_MARGIN_MS).unref()
+        })
+        await Promise.race([protoDrained, closeBound])
         const runnerFailure = confined === undefined ? undefined : classifyRunnerFailure(exitCode, runnerStderr.toString('utf8'), confined.runnerFailureRules)
         if (bootstrapWriteFailed && runnerFailure !== undefined) {
           decided = { error: { kind: 'sandbox-unavailable', message: runnerFailure.detail } }
