@@ -214,7 +214,9 @@ process.on('message', input => {
       } catch (error) { reply({ kind: 'reuse-runtime', code: error.code, reason: error.reason }) }
     } else if (input.kind === 'stop') { await stop(); reply({ kind: 'stopped' }); process.disconnect() }
     else if (input.kind === 'diagnostics') {
-      const log = await readFile(join(dshHome, 'logs/runtime.log'), 'utf8')
+      // A runtime that never started leaves no log; an absent file must not
+      // mask the original failure with a secondary ENOENT.
+      const log = await readFile(join(dshHome, 'logs/runtime.log'), 'utf8').catch(() => '(runtime log absent)')
       reply({ kind: 'diagnostics', text: log.replace(/token=[\w-]+/gu, 'token=[fixture-token]').slice(-12000) })
     } else throw new Error('Unknown Web assembly fixture command')
   })().catch(error => reply({ kind: 'failure', message: String(error) }))

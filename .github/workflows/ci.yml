@@ -570,6 +570,14 @@ jobs:
       - name: Run keyless compatibility, snapshot, and artifact gates
         run: pnpm run check:ci:consumers:scoped
 
+      # The lifecycle tests materialize the policy bundles into staged
+      # instance homes; the ci face emits transpile-only because this lane has
+      # no workspace lib/types for them. model-governance's lib is committed.
+      - name: Build the policy bundles used by Gateway lifecycle tests
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        run: |
+          gateway/node_modules/.bin/tsc -p plugins/dsh-directory-guard/tsconfig.ci.json
+          gateway/node_modules/.bin/tsc -p plugins/dsh-steward-tools/tsconfig.ci.json
       - name: Test compiled Gateway and Web lifecycle
         if: needs.pr-scope.outputs.gateway_mode == 'full'
         env:

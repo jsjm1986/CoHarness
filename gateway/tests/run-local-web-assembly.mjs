@@ -134,7 +134,7 @@ try {
         }
         const ready = await receive('ready'); dshHome = ready.dshHome
         publicRelay.publish(ready.backendPort); intakeRelay.publish(ready.intakePort)
-        return { child, ready, async command(kind) { const reply = receive(kind === 'stop' ? 'stopped' : kind); child.send({ kind }); return await reply } }
+        return { child, ready, stderr: () => diagnostics, async command(kind) { const reply = receive(kind === 'stop' ? 'stopped' : kind); child.send({ kind }); return await reply } }
       }
       active = await startGateway()
       async function login(username) {
@@ -149,7 +149,7 @@ try {
           body: JSON.stringify(scope === 'personal' ? { kind: 'personal' } : { kind: 'project', projectId: active.ready.projectId }) })
         const body = await response.text()
         const diagnostics = response.status === 204 ? '' : await active.command('diagnostics').then(value => value.text, error => String(error))
-        assert.equal(response.status, 204, `${body}\n${diagnostics}`)
+        assert.equal(response.status, 204, `${body}\n${diagnostics}\n${active.stderr()}`)
         const selected = new URL(response.headers.get('location'), base)
         assert.equal(selected.searchParams.get('dshRuntime'), active.ready.runtimeId)
         const selectionCookie = response.headers.get('set-cookie')
