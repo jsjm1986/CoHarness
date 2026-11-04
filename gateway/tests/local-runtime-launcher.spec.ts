@@ -134,8 +134,10 @@ describe.skipIf(process.platform === 'win32')('recoverable LocalLauncher', () =>
     const recovered = new LocalLauncher(f.cfg).attach(f.runtime); handles.push(recovered)
     expect(await recovered.isAlive?.()).toBe(true)
     await (await fetch(`http://127.0.0.1:${runtime.port}/exit`)).arrayBuffer()
-    await vi.waitFor(async () => expect(await recovered.isAlive?.()).toBe(false), { timeout: 30_000 })
-    expect((await f.store.read())?.phase).toBe('stopped')
+    await vi.waitFor(async () => {
+      expect(await recovered.isAlive?.()).toBe(false)
+      expect((await f.store.read())?.phase).toBe('stopped')
+    }, { timeout: 30_000 })
   })
 
   it('reaps a descendant after its direct runtime exits while leaving inherited output pipes open', async () => {
