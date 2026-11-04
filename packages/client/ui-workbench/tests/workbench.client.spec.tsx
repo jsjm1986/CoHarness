@@ -406,7 +406,7 @@ describe('workbench account targets and asynchronous chooser', () => {
     serve()
     const hydrateCatalog = vi.fn(async () => {})
     toolbar({ hydrateCatalog, needsCatalogRestore: () => true })
-    await waitFor(() => { expect(hydrateCatalog).toHaveBeenCalledWith(expect.objectContaining({ activeRuntime: { kind: 'project', projectId: 7, projectName: 'Team' } }), [], { signal: expect.any(AbortSignal) }) })
+    await waitFor(() => { expect(hydrateCatalog).toHaveBeenCalledWith(expect.objectContaining({ activeRuntime: { kind: 'project', projectId: 7, projectName: 'Team' } }), [], { signal: expect.any(AbortSignal) as AbortSignal }) })
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
     await screen.findByRole('button', { name: 'Project conversation' })
     fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
@@ -434,12 +434,13 @@ describe('workbench account targets and asynchronous chooser', () => {
     const view = render(<WorkbenchToolbar {...p} {...actions} needsCatalogRestore={() => true} t={t} tabbed={false}
       viewport={{ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] }} />)
     await waitFor(() => {
-      expect(actions.hydrateCatalog).toHaveBeenCalledWith(expect.any(Object), [], { signal: expect.any(AbortSignal) })
+      expect(actions.hydrateCatalog).toHaveBeenCalledWith(expect.any(Object), [], { signal: expect.any(AbortSignal) as AbortSignal })
     })
     view.rerender(<WorkbenchToolbar {...p} {...actions} t={t} tabbed={false}
       viewport={{ mode: 'workbench', paneIds: [SID_A, SID_B], paneRatios: [0.5, 0.5], collapsedIds: [] }} />)
     await waitFor(() => {
-      expect(actions.hydrateCatalog).toHaveBeenLastCalledWith(expect.any(Object), [SID_A, SID_B], { signal: expect.any(AbortSignal) })
+      expect(actions.hydrateCatalog).toHaveBeenLastCalledWith(expect.any(Object), [SID_A, SID_B],
+        { signal: expect.any(AbortSignal) as AbortSignal })
     })
     expect(fetch).toHaveBeenCalledOnce()
   })
