@@ -162,7 +162,8 @@ export class DeploymentContextRuntime {
     if (channel !== undefined) channel.onmessage = (event) => {
       if (typeof event.data === 'object' && event.data !== null && typeof (event.data as { revision?: unknown }).revision === 'string') void this.invalidate()
     }
-    const browserFocus = typeof globalThis.addEventListener === 'function' && globalThis.document !== undefined
+    const browserFocus = typeof globalThis.addEventListener === 'function'
+      && (globalThis as { document?: Document }).document !== undefined
     if (browserFocus) {
       globalThis.addEventListener('focus', focus)
       globalThis.document.addEventListener('visibilitychange', focus)
