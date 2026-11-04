@@ -346,7 +346,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     expect(protectedReads).toBe(0)
     expect(await dialog.getByRole('alert').count()).toBe(0)
     await compareOrRefreshGolden(INCOMING_INVITATION_EXPECTED,
-      await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), MODE)
+      await captureStableAria(page, '[role="dialog"]:not([aria-hidden="true"])', scaffold.workspaceCwd), MODE)
     await dialog.getByRole('button', { name: 'Accept', exact: true }).click()
     await expect.poll(() => accepted).toBe(true)
     await dialog.getByText('No pending invitations', { exact: true }).waitFor()
@@ -862,7 +862,7 @@ it.skipIf(MODE === 'record')('keeps space navigation, tab drafts and a running t
 
   const openSpaces = async () => {
     await page.getByRole('button', { name: 'Switch personal or project scope', exact: true }).click()
-    const picker = page.getByRole('group', { name: 'Switch personal or project scope', exact: true })
+    const picker = page.getByRole('dialog', { name: 'Switch personal or project scope', exact: true })
     await picker.getByRole('button', { name: /Payments migration/ }).waitFor()
     return picker
   }
@@ -876,7 +876,7 @@ it.skipIf(MODE === 'record')('keeps space navigation, tab drafts and a running t
   }
   let picker = await openSpaces()
   await compareOrRefreshGolden(join(NAV_SNAPSHOT_DIR, 'directory.expected.md'),
-    await captureStableAria(page, '[role="group"][aria-label="Switch personal or project scope"]', world.workspaceCwd), MODE)
+    await captureStableAria(page, '[role="dialog"][aria-label="Switch personal or project scope"]', world.workspaceCwd), MODE)
   await picker.getByRole('button', { name: 'Favorite this space', exact: true }).click()
   await picker.getByRole('button', { name: 'Remove favorite', exact: true }).waitFor()
   expect(await picker.getByText('Favorites', { exact: true }).isVisible()).toBe(true)

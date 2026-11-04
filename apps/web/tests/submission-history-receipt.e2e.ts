@@ -32,7 +32,10 @@ it.skipIf(MODE === 'record')('unlocks accepted input when its receipt returns on
   const runtime = scaffold
   const workspace = join(runtime.workspaceCwd, 'workspace')
   await mkdir(workspace, { recursive: true })
-  await writeFile(join(workspace, 'receipt-source.txt'), Array.from({ length: 60 }, (_, i) => `receipt line ${String(i + 1)}`).join('\n') + '\n')
+  // Sixty ~7KB lines push the turn past the 256KB history page target, so the
+  // admission receipt lands on an older page exactly as the scenario requires.
+  await writeFile(join(workspace, 'receipt-source.txt'), Array.from({ length: 60 },
+    (_, i) => `receipt line ${String(i + 1)} ${'x'.repeat(7_000)}`).join('\n') + '\n')
   browser = await chromium.launch()
   const page = await newEnglishPage(browser)
   onTestFailed(() => saveFailureShot(page, 'submission-history-receipt'))
@@ -104,5 +107,5 @@ it.skipIf(MODE === 'record')('unlocks accepted input when its receipt returns on
   expect(pages.some(page => page.beforeSeq !== undefined && page.containsReceipt)).toBe(true)
   expect(users).toHaveLength(1)
   const aria = await captureStableAria(page, '[data-composer-seat]', runtime.workspaceCwd)
-  await compareOrRefreshGolden(join(ROOT, 'settled.expected.md'), aria + '\n\nAssistant reply\n' + MARKER + '\n', MODE)
+  await compareOrRefreshGolden(join(ROOT, 'settled.expected.md'), aria + '\n\nAssistant reply\n' + MARKER, MODE)
 })

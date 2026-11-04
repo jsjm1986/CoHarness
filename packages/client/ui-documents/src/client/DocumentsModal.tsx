@@ -1682,7 +1682,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     const controller = new AbortController()
     const previous = scopeCache.current
     if (previous === null) {
-      void load(ROOT_DIRECTORY_ID, controller.signal, { refreshScope: true })
+      // First open and every reopen before the scope settles share this path;
+      // the destination folder survives in component state, so refresh that
+      // listing rather than the root folder.
+      void load(currentDirectoryId, controller.signal, { refreshScope: true })
     } else {
       void (async () => {
         try {
@@ -1716,7 +1719,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
           } else if (trashMode || scopeView !== null || alternateSource !== null) {
             await refreshDisplayed(true)
           } else {
-            await load(ROOT_DIRECTORY_ID, controller.signal)
+            // The manager stays mounted between opens, so the destination
+            // folder and its search survive; refresh that listing rather than
+            // bouncing the user back to the root folder.
+            await load(currentDirectoryId, controller.signal)
           }
         } catch (cause) {
           if (!controller.signal.aborted) {
@@ -1956,9 +1962,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         publishFeedback()
       }
     } catch (cause) {
-      failure = `${uploadErrorMessage(cause, t)} ${t('modal.upload.incomplete', {
-        name: currentFileName, remaining: String(files.length - batch.published - 1),
-      })}`
+      const unstarted = files.length - batch.published - 1
+      failure = unstarted > 0
+        ? `${uploadErrorMessage(cause, t)} ${t('modal.upload.incomplete', {
+          name: currentFileName, remaining: String(unstarted),
+        })}`
+        : uploadErrorMessage(cause, t)
     } finally {
       let reconciled = batch.published === 0
       let listingError = ''

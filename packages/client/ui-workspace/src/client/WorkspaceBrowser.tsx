@@ -376,8 +376,8 @@ function ListLoadingNotice({ t }: Pick<SessionTreeProps, 't'>) {
 /** The list baseline failure: the message plus the re-pull affordance, inside one alert. */
 function ListLoadError({ onRetryList, className, t, visible, rowKey }: Pick<SessionTreeProps, 'onRetryList' | 't'> & { className?: string | undefined; visible?: boolean | undefined; rowKey?: string | undefined }) {
   return (
-    <div className={className} role="alert" data-visible={visible || undefined} aria-hidden={visible === false || undefined}
-      data-row-key={rowKey}>
+    <div className={className} role={visible === false ? undefined : 'alert'} data-visible={visible || undefined}
+      aria-hidden={visible === false || undefined} data-row-key={rowKey}>
       <span>{t('list.failed')}</span>
       <button type="button" className={clsx(css.emptyAction, css.listRetry)} onClick={onRetryList}>
         {t('list.retry')}

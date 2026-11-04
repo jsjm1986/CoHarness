@@ -128,7 +128,7 @@ export function loadWorkbenchCatalog(signal?: AbortSignal): Promise<WorkbenchCat
         headers: { accept: 'application/json' },
       })
       if (!response.ok) throw new Error(`workbench catalog unavailable (${String(response.status)})`)
-      return await parseWorkbenchCatalog(await readApiResponseJson(response))
+      return parseWorkbenchCatalog(await readApiResponseJson(response))
     } finally {
       pendingCatalog = undefined
     }
@@ -136,8 +136,9 @@ export function loadWorkbenchCatalog(signal?: AbortSignal): Promise<WorkbenchCat
   const shared = pendingCatalog
   if (signal === undefined) return shared
   return new Promise<WorkbenchCatalog>((resolve, reject) => {
-    if (signal.aborted) { reject(signal.reason); return }
-    const onAbort = (): void => { reject(signal.reason) }
+    const rejection = (): Error => signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason))
+    if (signal.aborted) { reject(rejection()); return }
+    const onAbort = (): void => { reject(rejection()) }
     signal.addEventListener('abort', onAbort, { once: true })
     void shared.then(resolve, reject).finally(() => { signal.removeEventListener('abort', onAbort) })
   })

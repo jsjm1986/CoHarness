@@ -8,7 +8,7 @@
  */
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { mkdir } from 'node:fs/promises'
 import type { Browser, Page } from 'playwright'
@@ -734,7 +734,7 @@ describe('web e2e: document manager', () => {
         expect(await manager.getByText('Uploaded 3 of 3 files', { exact: true }).count()).toBe(0)
         if (MODE === 'refresh') await mkdir(EXPECTED_DIR, { recursive: true })
         await compareOrRefreshGolden(UPLOAD_PUBLISHED_EXPECTED,
-          await captureStableAria(page, '[data-documents-panel] [role="status"]', scaffold.workspaceCwd), MODE)
+          await captureStableAria(page, '[data-documents-panel] [role="status"][aria-live="polite"]', scaffold.workspaceCwd), MODE)
         release.resolve(undefined)
         const rows = manager.locator('[data-documents-list]')
         await rows.getByText('u01-a.txt', { exact: true }).waitFor()
@@ -784,6 +784,19 @@ describe('web e2e: document manager', () => {
             .catch((error: unknown) => { failures.push(error) })
         }
         await page.unrouteAll({ behavior: 'wait' }).catch((error: unknown) => { failures.push(error) })
+        // Unfinished sessions count against the shared admission limit until
+        // they are cancelled; enumerate the session root rather than trusting
+        // response-body capture, which races page teardown.
+        const sessionRoot = join(scaffold.documentRoot, '.upload-sessions', 'v1')
+        for (const uploadId of await readdir(sessionRoot).catch(() => [] as string[])) {
+          const session = await scaffold.hostFetch(`/api/documents/uploads/${uploadId}`)
+            .catch((error: unknown) => { failures.push(error); return undefined })
+          const state = session?.status === 200 ? (await session.json() as { state?: string }).state : undefined
+          if (state === 'uploading' || state === 'verifying') {
+            await scaffold.hostFetch(`/api/documents/uploads/${uploadId}`, { method: 'DELETE' })
+              .catch((error: unknown) => { failures.push(error) })
+          }
+        }
       }
       if (failures.length > 0) throw new AggregateError(failures, `Real upload batch ${outcome} journey failed`)
     },

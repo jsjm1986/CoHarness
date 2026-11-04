@@ -44,7 +44,7 @@ function normalizeMeasurement(value: string, scope: RuntimeScope): string {
     result = result
       .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, '{{timestamp}}')
       .replace(/(?:\d{4}年)?\d{1,2}月\d{1,2}日 \d{2}:\d{2}/g, '{{clock}}')
-      .replace(/(?:\d{1,2}\/\d{1,2}(?:\/\d{2,4})? )?\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:\s*[AP]M)?/gi, '{{clock}}')
+      .replace(/(?:\d{4}-\d{1,2}-\d{1,2} |\d{1,2}\/\d{1,2}(?:\/\d{2,4})? )?\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:\s*[AP]M)?/gi, '{{clock}}')
   }
   return result
 }

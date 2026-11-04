@@ -42,14 +42,15 @@
   - button "System":
     - img
     - text: System
-  - text: Font size Only affects conversation content 14
-  - button "Increase font size":
-    - img
-  - button "Decrease font size":
-    - img
-  - text: px
-  - button "More font settings":
-    - img
+  - group "More font settings":
+    - text: Font size Only affects conversation content 14
+    - button "Decrease font size":
+      - img
+    - button "Increase font size":
+      - img
+    - text: px
+    - button "More font settings":
+      - img
   - text: Work details Choose how much detail to show for tool calls
   - button "Detailed":
     - text: Detailed

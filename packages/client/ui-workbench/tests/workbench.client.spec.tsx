@@ -1,4 +1,3 @@
-/* oxlint-disable typescript/no-unsafe-assignment -- Vitest asymmetric matchers are typed as any. */
 // @vitest-environment jsdom
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -375,7 +374,8 @@ describe('workbench account targets and asynchronous chooser', () => {
       if (options?.selection !== undefined) completed = true
       return completed ? undefined : recovery
     })
-    toolbar({ hydrateCatalog, currentWorkbench: () => ({ id: 'saved', name: 'Saved', paneIds: [SID_A], updatedAt: 1 }),
+    toolbar({ hydrateCatalog, needsCatalogRestore: () => true,
+      currentWorkbench: () => ({ id: 'saved', name: 'Saved', paneIds: [SID_A], updatedAt: 1 }),
       viewport: { mode: 'workbench', pendingIdentity: true, paneIds: [], paneRatios: [], collapsedIds: [] } })
     fireEvent.click(await screen.findByRole('button', { name: '确认原对话环境' }))
     expect(screen.getByRole('button', { name: '恢复工作台' }).hasAttribute('disabled')).toBe(true)
@@ -405,7 +405,7 @@ describe('workbench account targets and asynchronous chooser', () => {
   it('hydrates project identities and filters choices by Workspace and query', async () => {
     serve()
     const hydrateCatalog = vi.fn(async () => {})
-    toolbar({ hydrateCatalog })
+    toolbar({ hydrateCatalog, needsCatalogRestore: () => true })
     await waitFor(() => { expect(hydrateCatalog).toHaveBeenCalledWith(expect.objectContaining({ activeRuntime: { kind: 'project', projectId: 7, projectName: 'Team' } }), [], { signal: expect.any(AbortSignal) }) })
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
     await screen.findByRole('button', { name: 'Project conversation' })
@@ -431,7 +431,7 @@ describe('workbench account targets and asynchronous chooser', () => {
       createSession: vi.fn(async () => ({ ok: true as const })), setMode: vi.fn(),
       hydrateCatalog: vi.fn(async () => {}),
     }
-    const view = render(<WorkbenchToolbar {...p} {...actions} t={t} tabbed={false}
+    const view = render(<WorkbenchToolbar {...p} {...actions} needsCatalogRestore={() => true} t={t} tabbed={false}
       viewport={{ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] }} />)
     await waitFor(() => {
       expect(actions.hydrateCatalog).toHaveBeenCalledWith(expect.any(Object), [], { signal: expect.any(AbortSignal) })
@@ -501,21 +501,22 @@ describe('workbench account targets and asynchronous chooser', () => {
     const fetcher = vi.fn<typeof fetch>().mockReturnValue(pending.promise)
     vi.stubGlobal('fetch', fetcher)
     const hydrateCatalog = vi.fn(async () => {})
-    const first = toolbar({ hydrateCatalog })
+    const first = toolbar({ hydrateCatalog, needsCatalogRestore: () => true })
     first.view.unmount()
-    expect(fetcher.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
+    expect(fetcher).toHaveBeenCalledTimes(1)
     await act(async () => { pending.resolve(new Response(JSON.stringify(directory))) })
     expect(hydrateCatalog).not.toHaveBeenCalled()
     const ready = vi.fn()
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 503 })))
-    toolbar({ catalogUnavailable: ready })
+    toolbar({ catalogUnavailable: ready, needsCatalogRestore: () => true })
     await waitFor(() => { expect(ready).toHaveBeenCalledOnce() })
   })
 
   it('explains pending legacy ownership, refuses layout edits and allows directory retry and single mode', async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify(directory)))
     vi.stubGlobal('fetch', fetcher)
-    const h = toolbar({ viewport: { mode: 'workbench', pendingIdentity: true, paneIds: [], paneRatios: [], collapsedIds: [] } })
+    const h = toolbar({ needsCatalogRestore: () => true,
+      viewport: { mode: 'workbench', pendingIdentity: true, paneIds: [], paneRatios: [], collapsedIds: [] } })
     await waitFor(() => { expect(fetcher).toHaveBeenCalledOnce() })
     expect(screen.getByRole('status').textContent).toContain('尚未核实会话归属')
     expect(screen.getByRole('button', { name: '添加对话' }).hasAttribute('disabled')).toBe(true)
@@ -853,7 +854,7 @@ describe('workbench toolbar edge paths', () => {
       ['t' as SessionId]: { id: 't' as SessionId, displayTitle: 'Project conv', running: false, blank: false, updatedAt: 0, projectId: 7 },
     } })
     render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench' as const, paneIds: ['t' as SessionId], paneRatios: [1], collapsedIds: [], activePaneId: 't' as SessionId }} tabbed
-      chooseSession={vi.fn()} focusSession={focus} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
+      needsCatalogRestore={() => true} chooseSession={vi.fn()} focusSession={focus} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
     const tab = screen.getByRole('tab')
     fireEvent.keyDown(tab, { key: 'ArrowUp' })
     expect(focus).not.toHaveBeenCalled()

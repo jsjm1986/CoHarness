@@ -138,5 +138,5 @@ it.skipIf(MODE === 'record')('aligns routine toolbar entries across themes while
   results.push({ mobileTargetAtLeast44: mobile.height >= 44, mobileFont: mobile.fontSize })
   expect(tripwire.pageErrors).toEqual([])
   if (MODE === 'refresh') await mkdir(fileURLToPath(new URL('./expected/', import.meta.url)), { recursive: true })
-  await compareOrRefreshGolden(EXPECTED, '```json\n' + JSON.stringify(results, null, 2) + '\n```\n', MODE)
+  await compareOrRefreshGolden(EXPECTED, '```json\n' + JSON.stringify(results, null, 2) + '\n```', MODE)
 }, 120_000)

@@ -69,6 +69,9 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
     const directory = restoredDirectory
     if (selection !== undefined || directory === undefined || account === undefined
       || sessions.bootstrapRuntimeTarget().runtimeId !== directory.runtimeId) return
+    // An intent holding an input block is an in-flight user operation; the
+    // restore must not supersede it or reopen its selection afterward.
+    if (sessions.list.getSnapshot().navigationBlockedSessionId !== undefined) { restoredDirectory = undefined; return }
     restoredDirectory = undefined
     selection = createSnapshotStore<{ sessionId?: SessionId }>({}, { persist: {
       name: `dsh.personal.current.v1.account:${account}.runtime:${directory.runtimeId}`, storage: 'session' } })

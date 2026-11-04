@@ -28,7 +28,7 @@ describe('private Session presentation ownership', () => {
 
   it('requires a visible Session and confirmed account while Host metadata renews', async () => {
     const sessions = await catalog(raw)
-    expect(sessionPersistenceKey(sessions, raw, undefined, 7)).toBe(JSON.stringify(['account:7', ['personal'], raw]))
+    expect(sessionPersistenceKey(sessions, raw, undefined, 7)).toBeUndefined()
     expect(sessionPersistenceKey(sessions, raw, undefined, undefined)).toBeUndefined()
     expect(sessionPersistenceKey(sessions, raw, true, undefined)).toBeUndefined()
     expect(sessionPersistenceKey(sessions, raw, true, 7)).toBe(JSON.stringify(['account:7', ['personal'], raw]))

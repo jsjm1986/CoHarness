@@ -1,5 +1,5 @@
 - text: Show the saved conversation.
-- group "Message time and speed": "2023-11-15 {{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - status: Completed
@@ -13,7 +13,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message time and speed": "2023-11-15 {{clock}}"
+- group "Message time and speed": "{{clock}}"
 - textbox "Message COHARNESS"
 - button "Add images or documents":
   - img

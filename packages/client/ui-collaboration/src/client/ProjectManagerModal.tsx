@@ -198,7 +198,7 @@ export function ProjectManagerModal({
     let active = true
     setLoadingUsers(true)
     setUsersError(false)
-    void listUsers(projectId)
+    void listUsers()
       .then((next) => { if (active) setUsers(next) })
       .catch(() => { if (active) setUsersError(true) })
       .finally(() => { if (active) setLoadingUsers(false) })

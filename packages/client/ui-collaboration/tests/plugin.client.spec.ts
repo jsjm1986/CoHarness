@@ -186,14 +186,15 @@ describe('ui-collaboration apply', () => {
       finally { b.restore() }
     }
   })
-  it('retains document-owned account persistence during a transport renewal while withdrawing permissions', async () => {
+  it('withdraws account persistence during a transport renewal and restores it on re-verification', async () => {
     const b = await bench(baseContext, true)
     const response = Promise.withResolvers<Response>()
     try {
       expect(b.policy.getSnapshot().verifiedAccountId).toBe(7)
       b.fetcher.mockImplementationOnce(() => response.promise)
       b.ctx.emit('connection/reset')
-      expect(b.policy.getSnapshot()).toMatchObject({ verifiedAccountId: 7, accountPermissions: 'unknown' })
+      expect(b.policy.getSnapshot().verifiedAccountId).toBeUndefined()
+      expect(b.policy.getSnapshot().accountPermissions).toBe('unknown')
       response.resolve(Response.json(baseContext))
       await vi.waitFor(() => { expect(b.policy.getSnapshot().accountPermissions).toBe('standard') })
       expect(b.policy.getSnapshot().verifiedAccountId).toBe(7)

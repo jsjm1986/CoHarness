@@ -11,7 +11,7 @@ export interface ProjectUiPolicySnapshot {
   revision: number
   /** Derived current-account choice eligibility; never a Host catalog mutation. */
   accountPermissions: AccountPermissionAvailability
-  /** Document-confirmed Gateway account for private UI persistence; transport renewal does not revoke it. */
+  /** Context-verified Gateway account for private UI persistence; revoked for each unverified renewal interval. */
   verifiedAccountId?: number
   /** Active project id, display name, and management capability, when in project scope. */
   projectId?: number

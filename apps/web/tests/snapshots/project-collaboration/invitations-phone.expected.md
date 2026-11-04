@@ -4,6 +4,7 @@
     - paragraph: Invitations visible to this account
     - button "Close":
       - img
+  - heading "Project members and invitations" [level=3]
   - button "Current project"
   - button "All visible" [pressed]
   - checkbox "Pending only" [checked]

@@ -7,7 +7,8 @@ import type { ISessions } from './contract/sessions.ts'
  * Identify private Session presentation storage under the current verified principal.
  * @param sessions - current visible catalog and runtime ownership.
  * @param sessionId - Session whose presentation is stored.
- * @param authorityRequired - Host-declared Gateway requirement; absent before verification or during transport renewal.
+ * @param authorityRequired - Host-declared Gateway requirement; absent before verification or during transport
+ *   renewal, when no account scope owns persisted state.
  * @param accountId - document-confirmed Gateway account, absent after account invalidation.
  * @param intent - `forget` permits removal after the Session leaves the visible catalog.
  * @returns an account/runtime/Session key, or undefined without current ownership proof.
@@ -21,7 +22,7 @@ export function sessionPersistenceKey(
 ): string | undefined {
   if (intent !== 'forget' && sessions.list.getSnapshot().byId[sessionId] === undefined) return undefined
   const principal = authorityRequired === false ? 'local'
-    : accountId !== undefined ? `account:${accountId}` : undefined
+    : authorityRequired === true && accountId !== undefined ? `account:${accountId}` : undefined
   if (principal === undefined) return undefined
   const address = sessions.runtimeIdentityFor === undefined ? undefined : parseClientSessionKey(sessionId)
   const target = sessions.runtimeIdentityFor === undefined

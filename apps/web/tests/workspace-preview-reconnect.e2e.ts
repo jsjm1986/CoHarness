@@ -217,7 +217,11 @@ it.skipIf(MODE === 'record').each([
   await recover()
   await reload.click()
   await expect.poll(() => byteReads).toBe(2)
-  await expect.poll(() => formula.textContent()).toBe('R1C1')
+  // Identical bytes reuse the mounted workbook: the reread republishes but must
+  // not restart the parsing worker or reset selection and scroll state.
+  await expect.poll(() => selectedAddress.textContent()).toBe('C2')
+  await expect.poll(() => formula.textContent()).toBe('R2C3')
+  expect(await scroll.evaluate(node => node.scrollTop)).toBe(scrollTop)
   if (chinese) {
     const compactWidth = 200
     await target.setViewportSize({ width: compactWidth, height: viewport.height })

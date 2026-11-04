@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type {} from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-office-to-pdf'
 import { realOfficeBytes } from './office-fixture.ts'
+import { pdfResourceFixture } from '../../../packages/client/ui-workbench/tests/pdf-resource-fixture.ts'
 import { launchWebScaffold, seedSession, watchConsole, captureStableAria, compareOrRefreshGolden, webSnapshotMode, type WebScaffold } from './scaffold.ts'
 import { expectPdfResolution, hideDocumentZoom, newEnglishPage, revealDocumentZoom, saveFailureShot } from './support.ts'
 
@@ -36,9 +37,14 @@ describe('web e2e: authorized Office preview', () => {
     scaffold = await launchWebScaffold({ workbench: true, extraOverlayPath: overlay })
     expect(scaffold.ctx.get('officeToPdf')).toBeDefined()
     for (const extension of FORMATS) await writeFile(join(scaffold.workspaceCwd, `preview.${extension}`), realOfficeBytes(extension))
+    for (const kind of PDF_RESOURCES) await writeFile(join(scaffold.workspaceCwd, `resource-${kind}.pdf`), pdfResourceFixture(kind))
     await writeFile(join(scaffold.workspaceCwd, 'readonly.csv'), 'key,value\nAlpha,1\nBeta,2\n')
     await writeFile(join(scaffold.workspaceCwd, 'broken.docx'), 'This is not an Office archive.')
-    const links = [...FORMATS.map(extension => `[Preview ${extension}](preview.${extension})`), '[Read-only spreadsheet](readonly.csv)', '[Broken document](broken.docx)'].join('\n\n')
+    const links = [
+      ...FORMATS.map(extension => `[Preview ${extension}](preview.${extension})`),
+      ...PDF_RESOURCES.map(kind => `[Resource ${kind}](resource-${kind}.pdf)`),
+      '[Read-only spreadsheet](readonly.csv)', '[Broken document](broken.docx)',
+    ].join('\n\n')
     const source = (await readFile(SEED, 'utf8')).replace('"text":"DONE"', `"text":${JSON.stringify(links)}`)
     const history = await seedSession(scaffold, source, 'workspace-office-history')
     const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)

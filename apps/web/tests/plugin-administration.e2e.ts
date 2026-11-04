@@ -111,7 +111,7 @@ it('installs a local bundle through the built Admin workflow and verifies the re
     if (runtime === undefined) throw new Error('CLI did not report its Web address')
     runtimePort = Number(new URL(runtime).port)
     const assertion = new GatewayPrincipalSigner(pair.privateKey, 'fixture', 30000).issuePluginManagement({
-      user: admin, runtime: { kind: 'user', id: admin.id, generation: 1 }, scope: { kind: 'personal' },
+      user: admin, runtime: { kind: 'user', id: admin.id, runtimeId, generation: 1 }, scope: { kind: 'personal' },
     }, 120000)
     const rpcId = randomUUID(), endpoint = 'pluginManager/catalog'
     const catalog = await fetch(`http://127.0.0.1:${runtimePort}/api/${endpoint}`, {

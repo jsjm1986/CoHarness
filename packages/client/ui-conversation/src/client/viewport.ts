@@ -154,7 +154,11 @@ export class ConversationViewportController implements ConversationViewport {
    */
   setPersistenceScope(principal: string | undefined): void {
     if (this.disposed || principal === this.persistenceScope) return
-    if (this.persistenceScope !== undefined) this.sessions.beginNavigation()
+    // Supersede stale view intents, but never an intent holding an input
+    // block: that hold belongs to an in-flight user operation whose commit
+    // must still land when the Host settles it.
+    if (this.persistenceScope !== undefined
+      && this.sessions.list.getSnapshot().navigationBlockedSessionId === undefined) this.sessions.beginNavigation()
     this.persistenceScope = principal
     this.unavailablePanes.clear()
     this.spaceSessionId = undefined
