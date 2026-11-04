@@ -1246,7 +1246,7 @@ describe('DocumentsModal', () => {
       await waitFor(() => { expect(client.upload).toHaveBeenCalledTimes(1) })
       view.rerender(<DocumentsModal open={false} onClose={() => {}} t={t} />)
       view.rerender(<DocumentsModal open onClose={() => {}} t={t} />)
-      await screen.findByText('root-marker.txt')
+      await screen.findByText('folder-marker.txt')
       const readsAfterReopen = client.browse.mock.calls.length
       await act(async () => { releases[0]!.resolve(undefined); await releases[0]!.promise })
       await waitFor(() => { expect(client.upload).toHaveBeenCalledTimes(2) })
@@ -1254,8 +1254,8 @@ describe('DocumentsModal', () => {
       expect(screen.queryByRole('progressbar')).toBeNull()
       expect(screen.getByRole('button', { name: t('modal.upload') }).hasAttribute('disabled')).toBe(true)
       await act(async () => { releases[1]!.resolve(undefined); await releases[1]!.promise })
-      expect(screen.getByText('root-marker.txt')).toBeTruthy()
-      expect(screen.queryByText('folder-marker.txt')).toBeNull()
+      expect(screen.getByText('folder-marker.txt')).toBeTruthy()
+      expect(screen.queryByText('root-marker.txt')).toBeNull()
       expect(client.browse).toHaveBeenCalledTimes(readsAfterReopen)
     } finally {
       await act(async () => {
