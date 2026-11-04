@@ -3774,7 +3774,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                 )}
                 {trashMode && (
                   <section className={css.trash} aria-label={t('trash.title')}>
-                    <header className={css.trashHeader}>
+                    <header className={css.trashHeader} data-documents-trash-header>
                       <div><h2>{t('trash.title')}</h2><p>{visibleScope}</p></div>
                       <div className={css.trashActions}><Button type="button" variant="soft" disabled={busy || trashLoading} onClick={returnFromTrash}>{t('trash.back')}</Button>
                         <Button type="button" variant="ghost" disabled={busy || trashLoading} onClick={() => { void openTrash() }}>{t('modal.refresh')}</Button></div>

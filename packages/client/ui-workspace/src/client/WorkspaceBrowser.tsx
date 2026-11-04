@@ -358,6 +358,32 @@ type SessionTreeProps = Pick<
   workspaceReady: boolean
   /** The `session.new` catalog row; group `＋` tooltips show its effective keys. */
   newShortcut?: ShortcutCatalogEntry | undefined
+  /** Combined Session/Workspace baseline lifecycle; it owns the list's loading, failure, and empty notices. */
+  listBaseline: 'loading' | 'ready' | 'error'
+  /** Re-pull the failed baselines behind the list error notice. */
+  onRetryList: () => void
+}
+
+/** The list baseline pull: a named live region while the first baseline is pending. */
+function ListLoadingNotice({ t }: Pick<SessionTreeProps, 't'>) {
+  return (
+    <div className={css.empty} role="status" aria-label={t('list.loading')}>
+      <span aria-hidden="true">{t('list.loading')}</span>
+    </div>
+  )
+}
+
+/** The list baseline failure: the message plus the re-pull affordance, inside one alert. */
+function ListLoadError({ onRetryList, className, t, visible, rowKey }: Pick<SessionTreeProps, 'onRetryList' | 't'> & { className?: string | undefined; visible?: boolean | undefined; rowKey?: string | undefined }) {
+  return (
+    <div className={className} role="alert" data-visible={visible || undefined} aria-hidden={visible === false || undefined}
+      data-row-key={rowKey}>
+      {t('list.failed')}
+      <button type="button" className={clsx(css.emptyAction, css.listRetry)} onClick={onRetryList}>
+        {t('list.retry')}
+      </button>
+    </div>
+  )
 }
 
 /** The list-empty placeholder — a glyph over the text; the archived-only view names its filter and offers the way back. */
@@ -380,7 +406,7 @@ function EmptySessions({ rowState, onLeaveArchivedOnly, t, directoryPending }: P
 function SessionTree({
   useSessions, usePanelInfo, startSession, open, workspaces, rowState, onLeaveArchivedOnly, nestWorkspaces,
   onRenameRequest, onDeleteRequest, onSessionRenameRequest, revealSessionId, onSessionRevealed,
-  insertWorkspaceBefore, insertSessionBefore, orderBy, workspaceReady, newShortcut,
+  insertWorkspaceBefore, insertSessionBefore, orderBy, workspaceReady, newShortcut, listBaseline, onRetryList,
   groupExpansion, setGroupExpanded,
   sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder,
   home, renderSlot, t, runtimeId, directoryPending,
@@ -813,8 +839,15 @@ function SessionTree({
     )
   }
 
+  const treeBodyRef = useRef<HTMLDivElement>(null)
+  // A dismissed error notice cannot keep its button's focus; the retry hands
+  // it to the tree before the baseline flips to loading.
+  const retryBaseline = (): void => {
+    onRetryList()
+    treeBodyRef.current?.querySelector<HTMLElement>('[role="tree"]')?.focus()
+  }
   return (
-    <div className={clsx(css.treeBody, css.wide)}>
+    <div ref={treeBodyRef} className={clsx(css.treeBody, css.wide)}>
       {workspaceDropAtListStart && <span className={css.listTopDropIndicator} aria-hidden="true" />}
       <AnimatedRows
         className={clsx(css.list, workspaceDropAtListStart && css.listTopDropActive)}
@@ -823,11 +856,21 @@ function SessionTree({
         ready={list.phase === 'ready' && workspaceReady && !nativeDragActive}
         resetKey={JSON.stringify([orderBy, watermarkMotionKey])}
       >
-        {groups.length === 0 && <EmptySessions rowState={rowState} onLeaveArchivedOnly={onLeaveArchivedOnly}
-          t={t} directoryPending={directoryPending} />}
+        {groups.length === 0 && (
+          listBaseline === 'error' ? <ListLoadError onRetryList={retryBaseline} className={css.listNotice} t={t} rowKey="list-feedback" />
+            : listBaseline === 'loading' ? <ListLoadingNotice t={t} />
+              : <EmptySessions rowState={rowState} onLeaveArchivedOnly={onLeaveArchivedOnly}
+                t={t} directoryPending={directoryPending} />
+        )}
         {rootGroups.map(group => renderGroup(group, 0))}
       </AnimatedRows>
       <span className={css.fade} />
+      {/* The failure seat keeps a hidden placeholder so the region's footer
+          edge stays constant across baseline states. */}
+      <div className={css.listFooter} data-workspace-list-footer>
+        <ListLoadError onRetryList={retryBaseline} className={css.listNotice} t={t}
+          visible={groups.length > 0 && listBaseline === 'error'} />
+      </div>
     </div>
   )
 }
@@ -835,7 +878,7 @@ function SessionTree({
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
   useSessions, usePanelInfo, open, onSessionRenameRequest, revealSessionId, onSessionRevealed, rowState,
-  orderBy, workspaceReady, sessionOrderByAccount, sessionUpdatedAtByAccount,
+  orderBy, workspaceReady, sessionOrderByAccount, sessionUpdatedAtByAccount, listBaseline, onRetryList,
   syncSessionOrderAccount, setSessionOrder, renderSlot, t, runtimeId, directoryPending,
 }: Pick<
   SessionTreeProps,
@@ -848,6 +891,8 @@ function FlatList({
   | 'rowState'
   | 'orderBy'
   | 'workspaceReady'
+  | 'listBaseline'
+  | 'onRetryList'
   | 'sessionOrderByAccount'
   | 'sessionUpdatedAtByAccount'
   | 'syncSessionOrderAccount'
@@ -909,8 +954,13 @@ function FlatList({
     if (nextOrder !== undefined) setSessionOrder(FLAT_SESSION_ORDER_KEY, nextOrder.map(id => id as string))
   }
   const now = Date.now()
+  const treeBodyRef = useRef<HTMLDivElement>(null)
+  const retryBaseline = (): void => {
+    onRetryList()
+    treeBodyRef.current?.querySelector<HTMLElement>('[role="tree"]')?.focus()
+  }
   return (
-    <div className={clsx(css.treeBody, css.wide)}>
+    <div ref={treeBodyRef} className={clsx(css.treeBody, css.wide)}>
       <AnimatedRows
         className={clsx(css.list, css.flatList)}
         label={t('section.sessions')}
@@ -919,7 +969,9 @@ function FlatList({
         resetKey={orderBy}
       >
         {rows.length === 0 && (
-          <div className={css.empty} data-row-key="empty">{t(directoryPending ? 'computers.notSynced' : 'empty.none')}</div>
+          listBaseline === 'error' ? <ListLoadError onRetryList={retryBaseline} className={css.listNotice} t={t} rowKey="list-feedback" />
+            : listBaseline === 'loading' ? <ListLoadingNotice t={t} />
+              : <div className={css.empty} data-row-key="empty">{t(directoryPending ? 'computers.notSynced' : 'empty.none')}</div>
         )}
         {rows.map((node) => {
           const active = drag !== null && drag.pinned === node.pinned
@@ -964,6 +1016,10 @@ function FlatList({
         })}
       </AnimatedRows>
       <span className={css.fade} />
+      <div className={css.listFooter} data-workspace-list-footer>
+        <ListLoadError onRetryList={retryBaseline} className={css.listNotice} t={t}
+          visible={rows.length > 0 && listBaseline === 'error'} />
+      </div>
     </div>
   )
 }
@@ -1090,6 +1146,7 @@ export function WorkspaceBrowser({
   dismissForkError,
   refreshComputers,
   startRuntimeSession,
+  retryLists,
 }: WorkspaceBrowserProps) {
   const computerGroups = useWorkspaces(state => state.computerGroups)
   const workspaceRuntimeIds = useWorkspaces(state => state.workspaceRuntimeIds)
@@ -1163,6 +1220,15 @@ export function WorkspaceBrowser({
   const workbenchMode = viewportMode === 'workbench'
   const workspaces = useWorkspaces(state => state.items)
   const workspacePhase = useWorkspaces(state => state.phase)
+  const workspaceListState = useWorkspaces(state => state.state)
+  const baselinesReady = useWorkspaces(state => state.baselinesReady)
+  const sessionListState = useCurrentSessions(state => state.state)
+  // The region lifecycle published on the list: a failed baseline shows the
+  // retryable error, an in-flight or pending pull shows the loading seat, and
+  // only the settled pair renders rows or the empty notice.
+  const listBaseline: 'loading' | 'ready' | 'error' =
+    workspaceListState === 'error' || sessionListState === 'error' ? 'error'
+      : !baselinesReady || workspaceListState === 'loading' || sessionListState === 'loading' ? 'loading' : 'ready'
   const pinnedSessionIds = useWorkspaces(state => state.pinnedSessionIds)
   // Persisted view blobs written before the archived filter existed rehydrate
   // without the field; they read as the default hide-archived view.
@@ -1429,6 +1495,7 @@ export function WorkspaceBrowser({
         runtimeId={runtimeId} directoryPending={directoryPending}
         onSessionRenameRequest={requestSessionRename} revealSessionId={revealSessionId} onSessionRevealed={acknowledgeSessionReveal}
         rowState={rowState} orderBy={orderBy} workspaceReady={workspacePhase === 'ready'}
+        listBaseline={listBaseline} onRetryList={retryLists}
         sessionOrderByAccount={orders} sessionUpdatedAtByAccount={timestamps}
         syncSessionOrderAccount={syncOrder} setSessionOrder={setOrder} renderSlot={renderSlot} t={t} />
       : <SessionTree useSessions={useCurrentSessions} usePanelInfo={usePanelInfo} runtimeId={runtimeId} directoryPending={directoryPending}
@@ -1439,7 +1506,8 @@ export function WorkspaceBrowser({
         sessionOrderByAccount={orders} sessionUpdatedAtByAccount={timestamps}
         syncSessionOrderAccount={syncOrder} setSessionOrder={setOrder}
         rowState={rowState} onLeaveArchivedOnly={() => { actions.setArchivedFilter('default') }} startSession={startSession} open={guardedOpen}
-        workspaceReady={workspacePhase === 'ready'} insertWorkspaceBefore={insertWorkspaceBefore} insertSessionBefore={insertSessionBefore}
+        workspaceReady={workspacePhase === 'ready'} listBaseline={listBaseline} onRetryList={retryLists}
+        insertWorkspaceBefore={insertWorkspaceBefore} insertSessionBefore={insertSessionBefore}
         orderBy={orderBy} home={home} renderSlot={renderSlot} t={t}
         onRenameRequest={(workspaceId, currentTitle) => {
           setRenameTarget({ workspaceId, currentTitle }); setRenameDraft(currentTitle); setRenameError(null)
@@ -1688,7 +1756,8 @@ export function WorkspaceBrowser({
       {wide && computerGroups === undefined && directoryState === 'error' && <div className={css.computerNotice} role="status">
         <span>{t('computers.refreshFailed')}</span><button type="button" onClick={() => { void refreshComputers?.() }}>{t('computers.retry')}</button>
       </div>}
-      <div className={clsx(css.listArea, workbenchMode && css.workbenchListHidden)} aria-busy={navigationPending || undefined}>
+      <div className={clsx(css.listArea, workbenchMode && css.workbenchListHidden)} aria-busy={navigationPending || undefined}
+        data-workspace-list-region data-workspace-list-state={listBaseline}>
         {wide && (computerGroups !== undefined && (normalizedQuery === '' || matchingComputers.length > 0) ? renderComputers() : normalizedQuery !== ''
           ? (
             <SearchResults
@@ -1715,6 +1784,8 @@ export function WorkspaceBrowser({
                 rowState={rowState}
                 orderBy={orderBy}
                 workspaceReady={workspacePhase === 'ready'}
+                listBaseline={listBaseline}
+                onRetryList={retryLists}
                 sessionOrderByAccount={sessionOrderByAccount}
                 sessionUpdatedAtByAccount={sessionUpdatedAtByAccount}
                 syncSessionOrderAccount={actions.syncSessionOrderAccount}
@@ -1744,6 +1815,8 @@ export function WorkspaceBrowser({
                 startSession={startSession}
                 open={guardedOpen}
                 workspaceReady={workspacePhase === 'ready'}
+                listBaseline={listBaseline}
+                onRetryList={retryLists}
                 insertWorkspaceBefore={insertWorkspaceBefore}
                 insertSessionBefore={insertSessionBefore}
                 orderBy={orderBy}
