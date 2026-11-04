@@ -367,7 +367,7 @@ type SessionTreeProps = Pick<
 /** The list baseline pull: a named live region while the first baseline is pending. */
 function ListLoadingNotice({ t }: Pick<SessionTreeProps, 't'>) {
   return (
-    <div className={css.empty} role="status" aria-label={t('list.loading')}>
+    <div className={css.empty} role="status" aria-label={t('list.loading')} data-row-key="loading">
       <span aria-hidden="true">{t('list.loading')}</span>
     </div>
   )
@@ -378,7 +378,7 @@ function ListLoadError({ onRetryList, className, t, visible, rowKey }: Pick<Sess
   return (
     <div className={className} role="alert" data-visible={visible || undefined} aria-hidden={visible === false || undefined}
       data-row-key={rowKey}>
-      {t('list.failed')}
+      <span>{t('list.failed')}</span>
       <button type="button" className={clsx(css.emptyAction, css.listRetry)} onClick={onRetryList}>
         {t('list.retry')}
       </button>
@@ -647,7 +647,9 @@ function SessionTree({
     && workspaceDrag.over.half === 'before'
 
   // Flat DOM-order keys matching the data-row-key attributes the groups emit.
-  const rowKeys: string[] = groups.length === 0 ? ['empty'] : []
+  const rowKeys: string[] = groups.length === 0
+    ? [listBaseline === 'error' ? 'list-feedback' : listBaseline === 'loading' ? 'loading' : 'empty']
+    : []
   const renderGroup = (group: GroupNode, depth: number): ReactNode => {
     const workspaceId = group.workspaceId
     const children = childrenByParent.get(group.key) ?? []
@@ -964,7 +966,9 @@ function FlatList({
       <AnimatedRows
         className={clsx(css.list, css.flatList)}
         label={t('section.sessions')}
-        rowKeys={rows.length === 0 ? ['empty'] : rows.map(row => `session:${row.id}`)}
+        rowKeys={rows.length === 0
+          ? [listBaseline === 'error' ? 'list-feedback' : listBaseline === 'loading' ? 'loading' : 'empty']
+          : rows.map(row => `session:${row.id}`)}
         ready={list.phase === 'ready' && workspaceReady && drag === null}
         resetKey={orderBy}
       >

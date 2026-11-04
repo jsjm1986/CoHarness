@@ -429,7 +429,7 @@ export const coverageBaselineFiles: readonly string[] = [
   'packages/remote-desktop/remote-desktop-vnc/src/rfb.ts',
 
   // Business-logic-audit branch debt (recorded at the first gate run
-  // over this work; same provenance as the inaugural roster above).
+  // over this work; same mechanism as the inaugural roster above).
   'packages/attachment/userdoc-gateway/src/client.ts',
   'packages/attachment/userdoc-gateway/src/frame.ts',
   'packages/attachment/userdoc-gateway/src/index.ts',
