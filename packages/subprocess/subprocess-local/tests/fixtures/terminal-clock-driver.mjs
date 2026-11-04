@@ -145,7 +145,7 @@ for (const scenario of selected === 'all' ? ['normal', 'frozen', 'recovery', 'pa
       // exit callback armed — for the retention checks below.
       if (alive(sibling.pid) === false) {
         await bounded(sibling.done, 5000)
-        await assert.rejects(bounded(sibling.terminate(), 5000), /observation is unavailable/u)
+        await assert.rejects(bounded(sibling.terminate(), 5000), unavailable)
       }
       unreadable = false
     }
