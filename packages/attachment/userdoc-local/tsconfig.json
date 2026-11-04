@@ -30,6 +30,9 @@
       "path": "../../../vendor/schemastery"
     },
     {
+      "path": "../../session/session-persistence-sqlite"
+    },
+    {
       "path": "../../util/managed-data"
     },
     {

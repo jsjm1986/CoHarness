@@ -11,7 +11,7 @@ import { DocumentIdentityStorage, type DocumentIdentityLocations } from './ident
 import { isInside, pathForDocId } from './name.ts'
 import { withDocumentHandle } from './handle.ts'
 import type { DocumentFileObjectId } from './file-object.ts'
-import { loadNodeSqlite } from './sqlite.ts'
+import { loadNodeSqlite } from '@deepseek-ai/dsh-session-persistence-sqlite'
 
 /** Immutable membership and digests from the deployment's verified complete snapshot. */
 export interface DocumentBackupEntry {

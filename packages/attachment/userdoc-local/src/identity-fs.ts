@@ -26,7 +26,7 @@ import { assertInside, assertNestedDirectories, docIdFor, pathForDirectoryId, pa
 import { listDocDirectory, listDocFiles, resolveDocTarget, saveDocFile } from './store.ts'
 import { mediaTypeFor } from './media-type.ts'
 import { readLegacyTrashRecords } from './trash.ts'
-import { loadNodeSqlite } from './sqlite.ts'
+import { loadNodeSqlite } from '@deepseek-ai/dsh-session-persistence-sqlite'
 import type { DocumentProjectionBatch, DocumentProjectionCursor, DocumentProjectionReadOptions } from './projection.ts'
 import { admitDocumentWrite } from './admission.ts'
 import type { UserDocBackgroundWrite } from './upload.ts'
