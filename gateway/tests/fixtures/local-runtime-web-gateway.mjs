@@ -94,6 +94,9 @@ await pool.query(`UPDATE harness.instances i SET port=$1
   WHERE owner.id=${target.kind === 'user' ? 'i.user_id' : 'i.project_id'} AND owner.organization_id=i.organization_id
     AND i.organization_id=$2 AND owner.public_id=$3`, [Number(process.env.LOCAL_WEB_RUNTIME_PORT), context.organizationId, target.id])
 manager.beforeStart = async runtime => {
+  // Real deployments provision the OS account home; the fixture must create
+  // it or the supervisor's spawn(cwd: homePath) fails with ENOENT.
+  await mkdir(runtime.homePath, { recursive: true })
   if (runtime.kind === 'user') await writeModelGovernanceFile(cfg, governance, user)
   else await writeProjectModelGovernanceFile(cfg, governance, { kind: 'project', id: selectedProject.id, name: selectedProject.name, path: selectedProject.path })
   writeRuntimeGrantsFile(runtime.dshHome, [{ path: runtime.homePath, mode: 'rw' }])
