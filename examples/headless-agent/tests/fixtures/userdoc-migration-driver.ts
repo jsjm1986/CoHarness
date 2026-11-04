@@ -116,7 +116,8 @@ try {
   const originalOpen = fs.open
   let waiting = true
   fs.open = async (...args: Parameters<typeof originalOpen>) => {
-    if (args[0] === `${manifestPath}.lock` && waiting) {
+    // Linux pins the manifest through /proc/self/fd paths; match the lock leaf name.
+    if (basename(String(args[0])) === basename(`${manifestPath}.lock`) && waiting) {
       waiting = false
       lockEntered.resolve(undefined)
       await lockGranted.promise

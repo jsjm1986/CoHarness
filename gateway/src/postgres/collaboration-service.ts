@@ -207,8 +207,10 @@ export class PostgresCollaborationService {
   }
 
   async projectsForUser(userId: number): Promise<ProjectScopeView[]> {
+    const nodeScoped = this.catalogEntryNodeId !== undefined
     return (await this.projectAuthorities(userId, undefined, true)).map(
-      ({ administrator: _, canManage: _c, uiThemePolicy: _t, nodeId: _n, nodeName: _m, origin: _o, owner: _w, ...project }) => project,
+      ({ administrator: _, canManage: _c, uiThemePolicy: _t, origin: _o, owner: _w, nodeId, nodeName, ...project }) =>
+        nodeScoped ? { ...project, nodeId, nodeName } : project,
     )
   }
 

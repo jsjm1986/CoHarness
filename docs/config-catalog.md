@@ -3073,7 +3073,7 @@ export type JsonlCompression = 'zstd' | 'none'
 ## `@deepseek-ai/dsh-session-persistence-sqlite`
 
 - `inject`: `sessions`
-- `source`: [`packages/session/session-persistence-sqlite/src/index.ts:42`](../packages/session/session-persistence-sqlite/src/index.ts)
+- `source`: [`packages/session/session-persistence-sqlite/src/index.ts:43`](../packages/session/session-persistence-sqlite/src/index.ts)
 
 ```ts config-catalog
 /** Plugin configuration. */

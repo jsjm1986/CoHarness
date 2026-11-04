@@ -101,6 +101,9 @@ importers:
       '@deepseek-ai/dsh-tool-userdoc':
         specifier: workspace:*
         version: link:packages/attachment/tool-userdoc
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:*
+        version: link:packages/core/tools
       '@deepseek-ai/dsh-web-fetch-http':
         specifier: workspace:*
         version: link:packages/web/web-fetch-http

@@ -244,6 +244,7 @@
     "@deepseek-ai/dsh-ssh-helper-runtime": "workspace:*",
     "@deepseek-ai/dsh-tool-session-query": "workspace:*",
     "@deepseek-ai/dsh-tool-userdoc": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*",
     "@deepseek-ai/dsh-web-fetch-http": "workspace:*",
     "@deepseek-ai/libreoffice-kit": "0.1.1",
     "@stylistic/eslint-plugin": "^5.10.0",
