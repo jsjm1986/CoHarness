@@ -18,6 +18,7 @@ const OriginalWorker = threads.Worker, workers = [], contexts = []
 threads.Worker = class extends OriginalWorker {
   constructor(...args) {
     super(...args)
+    if (!(args[1]?.workerData?.hostSourcePort instanceof threads.MessagePort)) return
     const record = { exited: false }
     record.completion = new Promise(ready => this.once('exit', () => { record.exited = true; ready() }))
     workers.push(record)
