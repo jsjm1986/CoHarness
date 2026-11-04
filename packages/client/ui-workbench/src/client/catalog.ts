@@ -105,22 +105,40 @@ export function parseWorkbenchCatalog(value: unknown): WorkbenchCatalog {
     ...(personalRuntimes === undefined ? {} : { personalRuntimes }) }
 }
 
+/* Concurrent callers share the pending pull: slot re-mounts may restart the
+ * lifecycle effect, and a second request would duplicate a request the first
+ * caller already owns. Each caller's signal only abandons its own wait. */
+let pendingCatalog: Promise<WorkbenchCatalog> | undefined
+
 /** Fetch the authenticated account's ACL-filtered conversation directory.
- * @param signal - optional request cancellation.
+ * @param signal - optional request cancellation; the shared pull still completes for other waiters.
  * @returns the validated catalog projection.
  */
-export async function loadWorkbenchCatalog(signal?: AbortSignal): Promise<WorkbenchCatalog> {
-  const current = new URLSearchParams(typeof location === 'undefined' ? '' : location.search)
-  const selection = new URLSearchParams()
-  for (const key of ['dshRuntime', 'dshTarget']) {
-    const value = current.get(key)
-    if (value !== null) selection.set(key, value)
-  }
-  const query = selection.toString()
-  const response = await fetch(`/account/api/workbench/catalog${query === '' ? '' : `?${query}`}`, {
-    headers: { accept: 'application/json' },
-    ...(signal === undefined ? {} : { signal }),
+export function loadWorkbenchCatalog(signal?: AbortSignal): Promise<WorkbenchCatalog> {
+  pendingCatalog ??= (async () => {
+    try {
+      const current = new URLSearchParams(typeof location === 'undefined' ? '' : location.search)
+      const selection = new URLSearchParams()
+      for (const key of ['dshRuntime', 'dshTarget']) {
+        const value = current.get(key)
+        if (value !== null) selection.set(key, value)
+      }
+      const query = selection.toString()
+      const response = await fetch(`/account/api/workbench/catalog${query === '' ? '' : `?${query}`}`, {
+        headers: { accept: 'application/json' },
+      })
+      if (!response.ok) throw new Error(`workbench catalog unavailable (${String(response.status)})`)
+      return await parseWorkbenchCatalog(await readApiResponseJson(response))
+    } finally {
+      pendingCatalog = undefined
+    }
+  })()
+  const shared = pendingCatalog
+  if (signal === undefined) return shared
+  return new Promise<WorkbenchCatalog>((resolve, reject) => {
+    if (signal.aborted) { reject(signal.reason); return }
+    const onAbort = (): void => { reject(signal.reason) }
+    signal.addEventListener('abort', onAbort, { once: true })
+    void shared.then(resolve, reject).finally(() => { signal.removeEventListener('abort', onAbort) })
   })
-  if (!response.ok) throw new Error(`workbench catalog unavailable (${String(response.status)})`)
-  return parseWorkbenchCatalog(await readApiResponseJson(response))
 }

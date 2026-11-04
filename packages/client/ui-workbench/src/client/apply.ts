@@ -226,6 +226,7 @@ export function apply(ctx: ClientContext): void {
         hooks: { deployment: ctx.deploymentContext },
         listWorkbenches: () => wb.listWorkbenches?.() ?? [],
         currentWorkbench: () => wb.currentWorkbench?.(),
+        needsCatalogRestore: () => wb.needsCatalogRestore?.() ?? false,
         createWorkbench: (name: string) => wb.createWorkbench?.(name) ?? '',
         renameWorkbench: (id: string, name: string) => { wb.renameWorkbench?.(id, name) },
         duplicateWorkbench: (id: string, name: string) => wb.duplicateWorkbench?.(id, name) ?? '',

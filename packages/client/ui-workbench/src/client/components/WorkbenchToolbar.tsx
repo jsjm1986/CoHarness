@@ -23,6 +23,7 @@ const CONVERSATION_PAGE_SIZE = 50
 interface Actions {
   listWorkbenches?: () => readonly { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number }[]
   currentWorkbench?: () => { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number } | undefined
+  needsCatalogRestore?: () => boolean
   createWorkbench?: (name: string) => string
   renameWorkbench?: (id: string, name: string) => void
   duplicateWorkbench?: (id: string, name: string) => string
@@ -63,7 +64,7 @@ function conversationDisplayName(item: WorkbenchConversation, untitled: string):
 export function WorkbenchToolbar({
   viewport, tabbed, inline = false, layout, onSelectLayout, toolsHostId, useStore, actions, useSessions, useWorkspaces, useDeployment,
   chooseSession, focusSession, createSession, hydrateCatalog, catalogUnavailable, setMode,
-  listWorkbenches, currentWorkbench, switchWorkbench, createWorkbench, renameWorkbench,
+  listWorkbenches, currentWorkbench, needsCatalogRestore, switchWorkbench, createWorkbench, renameWorkbench,
   duplicateWorkbench, deleteWorkbench,
   listWorkspaceDirectory, openWorkspaceResource, filesAvailable, openFiles, t,
 }: Props) {
@@ -107,7 +108,11 @@ export function WorkbenchToolbar({
   }, [activeWorkbenchId])
   useEffect(() => () => { restoreRequest.current?.abort(); restoreRequest.current = undefined }, [])
   useEffect(() => { setVisibleCount(CONVERSATION_PAGE_SIZE) }, [pickerOpen, query, workspace])
+  const restoreDemand = needsCatalogRestore?.() === true
   useEffect(() => {
+    // Chooser opens pull the directory each time; a saved layout awaiting
+    // catalog reconciliation pulls once so the restore evaluation has candidates.
+    if (!pickerOpen && !restoreDemand) return
     const abort = new AbortController()
     setCatalogPhase('loading')
     void loadWorkbenchCatalog(abort.signal).then((next) => {
@@ -120,7 +125,7 @@ export function WorkbenchToolbar({
       catalogUnavailable?.()
     })
     return () => { abort.abort() }
-  }, [pickerOpen, catalogAttempt])
+  }, [pickerOpen, catalogAttempt, restoreDemand])
   useEffect(() => () => {
     const request = pendingOperation.current
     pendingOperation.current = undefined
