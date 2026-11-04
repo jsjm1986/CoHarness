@@ -1447,6 +1447,15 @@ export class PythonPtcRuntime extends PtcRuntime {
       })
       stdout.on('end', () => { flushStray(strayOut) })
       stderr.on('end', () => { flushStray(strayErr) })
+      // Process exit closes the child's write ends, but bytes still queued in the
+      // kernel arrive only as later `data`/`end` events: finish() must await this
+      // drain before destroying the streams, or a large final native write is cut
+      // at whatever the host had consumed when cleanup ran. `close` covers the
+      // forced-destroy settlement path that never emits `end`.
+      const drained = (stream: NodeJS.ReadableStream): Promise<void> =>
+        new Promise((resolve) => { stream.once('end', resolve); stream.once('close', resolve) })
+      const stdoutDrained = drained(stdout)
+      const stderrDrained = drained(stderr)
 
       // Line-framed JSON reader over fd 3. The unframed buffer is bounded: a
       // hostile program can loop `os.write(3, b"A"*4096)` with no newline to
@@ -2054,11 +2063,19 @@ export class PythonPtcRuntime extends PtcRuntime {
         void (async () => {
           try {
             handle.terminate()
-            const [, drained] = await Promise.all([
+            const [, exitConfirmed] = await Promise.all([
               handle.done.catch(() => {}),
               handle.waitForExit(AbortSignal.timeout(this.config.graceMs + CLOSE_REAP_MARGIN_MS)),
             ])
-            if (!drained) decided = { error: { kind: 'worker-exit', message: 'Python managed process cleanup was not confirmed' } }
+            if (!exitConfirmed) decided = { error: { kind: 'worker-exit', message: 'Python managed process cleanup was not confirmed' } }
+            // Drain both pipes to their stream end before tearing them down:
+            // output the kernel still holds at process exit would otherwise be
+            // discarded by destroy() below. The same close bound applies — a
+            // stream already destroyed upstream resolves through `close`.
+            const drainBound = new Promise<void>((resolve) => {
+              setTimeout(resolve, this.config.graceMs + CLOSE_REAP_MARGIN_MS).unref()
+            })
+            await Promise.race([Promise.all([stdoutDrained, stderrDrained]), drainBound])
           } catch (error: unknown) {
             decided = { error: { kind: 'worker-exit', message: `Python managed process cleanup failed: ${messageOf(error)}` } }
           } finally {

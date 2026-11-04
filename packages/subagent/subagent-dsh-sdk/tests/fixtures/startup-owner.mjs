@@ -67,7 +67,7 @@ try {
     { id: 'llm-deepseek', disabled: true }, { id: 'agent-instructions', disabled: true },
     { id: 'skill-filesystem', config: { includeDefaultRoots: false } },
     { insert: [{ id: 'startup-owner-child', name: new URL('./startup-owner-child.mjs', import.meta.url).href,
-      config: { record, dispatchRecord, llmEntry: new URL('packages/llm/llm/lib/index.js', root).href } }] },
+      config: { record, dispatchRecord, llmEntry: entry('llm/llm') } }] },
   ]))
   const plugins = [
     ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/system-prompt'],
