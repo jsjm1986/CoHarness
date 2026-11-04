@@ -63,7 +63,7 @@ async function bench() {
     list: { getSnapshot: () => ({ current }), subscribe: () => () => {} },
     runtimeIdentityFor,
   })
-  ctx.provide('conversation', { attachDocument })
+  ctx.provide('conversation', { attachDocument, canAttachDocument: () => true })
   ctx.provide('connection', { privateResourceUrl: (url: string) => url } as never)
   ctx.provide('deploymentContext', {
     getSnapshot: () => ({ phase: 'ready', showComputer: false, aggregateComputers: false }),

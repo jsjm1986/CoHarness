@@ -162,13 +162,19 @@ export class DeploymentContextRuntime {
     if (channel !== undefined) channel.onmessage = (event) => {
       if (typeof event.data === 'object' && event.data !== null && typeof (event.data as { revision?: unknown }).revision === 'string') void this.invalidate()
     }
-    globalThis.addEventListener('focus', focus)
-    globalThis.document.addEventListener('visibilitychange', focus)
+    const browserFocus = typeof globalThis.addEventListener === 'function' && globalThis.document !== undefined
+    if (browserFocus) {
+      globalThis.addEventListener('focus', focus)
+      globalThis.document.addEventListener('visibilitychange', focus)
+    }
     changed()
     return async () => {
       this.disposed = true; clearTimeout(this.timer); this.request?.abort(); channel?.close()
-      stopAccount(); stopHost(); globalThis.removeEventListener('focus', focus)
-      globalThis.document.removeEventListener('visibilitychange', focus)
+      stopAccount(); stopHost()
+      if (browserFocus) {
+        globalThis.removeEventListener('focus', focus)
+        globalThis.document.removeEventListener('visibilitychange', focus)
+      }
       await Promise.all([...this.pending])
     }
   }
