@@ -138,6 +138,15 @@ for (const scenario of selected === 'all' ? ['normal', 'frozen', 'recovery', 'pa
       assert.ok(observationRefusals > 0, 'The owned process-table fault must reach cleanup')
       assert.ok(logged.some(error => unavailable(error) || error?.errors?.some(unavailable)))
       assert.ok(retainedExits.every(listener => process.listeners('exit').includes(listener)))
+      // The failed unload's host-exit finalizer may have force-stopped the
+      // sibling where identity signalling survived the observation fault. If it
+      // did, drain the done→release() settle while observation is still refused
+      // so release()'s terminate re-fails: the sibling stays tracked — and the
+      // exit callback armed — for the retention checks below.
+      if (alive(sibling.pid) === false) {
+        await bounded(sibling.done, 5000)
+        await assert.rejects(bounded(sibling.terminate(), 5000), /observation is unavailable/u)
+      }
       unreadable = false
     }
     if (scenario === 'partial') {
