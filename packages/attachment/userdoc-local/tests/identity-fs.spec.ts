@@ -585,7 +585,6 @@ it.each([false, true])('preserves metadata when retained-object evidence is repl
 it('retains an observed original when another editor moves it after address reconciliation', async () => {
   const f = await fixture(), original = await f.publish('a.txt')
   await rename(original.path, join(f.root, 'z.txt'))
-  // oxlint-disable-next-line typescript/unbound-method -- The spy forwards through apply() with the actual store receiver.
   const relocate = DocumentIdentityStore.prototype.relocateObserved
   const spy = vi.spyOn(DocumentIdentityStore.prototype, 'relocateObserved')
   spy.mockImplementation(function (this: DocumentIdentityStore, ...args) {

@@ -263,7 +263,7 @@ export function apply(ctx: Context, config: Config): void {
     if (!storageRechecked.has(agent.session)) {
       try { await store.probe(agent.id, storageState.requiredBytes) } catch (error) {
         recorder.failStorage(turn, error)
-        throw new Error('Historical review storage is not ready. Resolve its capacity or access problem before continuing.')
+        throw new Error('Historical review storage is not ready. Resolve its capacity or access problem before continuing.', { cause: error })
       }
       lifetime.signal.throwIfAborted()
       storageRechecked.add(agent.session)

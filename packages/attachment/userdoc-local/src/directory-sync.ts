@@ -73,7 +73,6 @@ export async function syncDocumentDirectory(path: string): Promise<void> {
  */
 export async function syncDocumentFile(path: string): Promise<void> {
   const flags = process.platform === 'win32' ? constants.O_RDWR : constants.O_RDONLY
-  // oxlint-disable-next-line typescript/no-unnecessary-condition -- filesystem constants vary by host.
   const handle = await open(path, flags | (constants.O_NOFOLLOW ?? 0))
   await withDocumentHandle(handle, () => handle.sync())
 }
