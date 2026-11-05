@@ -6345,8 +6345,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             // earlier stream generation (or history covers them), so the
             // replay stops at the constructor window instead of flooding the
             // stream with the session's whole lifecycle.
-            // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
             const replayEnd = Math.min(through, replayThrough ?? session.firstLiveSeq)
+            // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
             for (const event of session.snapshotEvents(session.firstLifecycleSeq)) {
               if (event.seq > replayEnd) break
               publishEvent(session, event)

@@ -234,7 +234,7 @@ describe('registration', () => {
     // Scope birth must not pull the catalog: commands.list resolves the
     // session's Agent, and warming it here would resume a cold Session the
     // moment the view mounts.
-    expect(source.warm).toBeUndefined()
+    expect('warm' in source).toBe(false)
     expect([...registered.keys()]).toEqual(['/ command'])
     await fiber.dispose()
     expect(registered.size).toBe(0)
