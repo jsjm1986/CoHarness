@@ -299,7 +299,7 @@ export class ConnectionController {
             ...(failure.error.cause instanceof Error ? { causeName: failure.error.cause.name } : {}),
             ...(failure.error.cause instanceof ApiTransportError ? { causeStatus: failure.error.cause.status } : {}),
             rootCauseName: (() => {
-              let root = failure.error as Error
+              let root = failure.error
               for (let depth = 0; depth < 8 && root.cause instanceof Error; depth += 1) root = root.cause
               return root.name
             })(),

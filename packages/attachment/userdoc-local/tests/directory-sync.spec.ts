@@ -7,8 +7,8 @@ import { syncDocumentDirectory, syncDocumentFile } from '../src/directory-sync.t
 
 const state = vi.hoisted(() => ({
   opened: [] as { path: string; flags: unknown }[], calls: [] as { name: string; args: unknown[] }[],
-  unloads: 0, lastError: 0, createResult: 11 as number | bigint, createError: undefined as unknown,
-  flushResult: 1, flushError: undefined as unknown, closeResult: 1, syncError: undefined as Error | undefined,
+  unloads: 0, lastError: 0, createResult: 11 as number | bigint, createError: undefined as Error | string | undefined,
+  flushResult: 1, flushError: undefined as Error | string | undefined, closeResult: 1, syncError: undefined as Error | undefined,
 }))
 
 vi.mock('node:fs/promises', () => ({
