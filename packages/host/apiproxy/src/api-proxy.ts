@@ -6376,7 +6376,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 // ending at the restored prefix stitches them live instead of
                 // repairing the tail through a second history read.
                 // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-                for (const event of session.snapshotEvents(session.firstLiveSeq)) {
+                const silent = session.snapshotEvents(session.firstLiveSeq)
+                console.warn(`[sess-diag] created ${session.id} firstLiveSeq=${String(session.firstLiveSeq)} seq=${String(session.seq)} replay=${silent.length}`)
+                for (const event of silent) {
                   publishEvent(session, event)
                 }
                 subscribe(session, session.seq - 1)
