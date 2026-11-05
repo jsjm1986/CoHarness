@@ -1006,7 +1006,7 @@ describe('ConversationContent pending intent', () => {
     id: 'intent-1',
     sessionId: sid('session-intent-1'),
     draftId: 'draft-intent-1' as ConversationIntent['draftId'],
-    target: { kind: 'personal', runtimeId: 'rt-1' as ConversationIntent['target']['runtimeId'] },
+    target: { kind: 'personal', runtimeId: 'rt-1' as NonNullable<ConversationIntent['target']['runtimeId']> },
     label: 'windows-vps-47',
     text: 'keep this draft',
     phase: 'preparing',
