@@ -1174,7 +1174,7 @@ describe('DocumentsModal', () => {
       expect.objectContaining({ nodeId: nodeA }), 'folder-a', expect.any(AbortSignal), expect.objectContaining({ query: 'report' }),
     ) })
     expect(client.browse.mock.calls.length).toBe(runtimeReads)
-    expect((screen.getByRole('textbox', { name: t('modal.search') })).value).toBe('report')
+    expect((screen.getByRole('textbox', { name: t('modal.search') }) as HTMLInputElement).value).toBe('report')
     expect(screen.getByRole('navigation', { name: t('breadcrumb.label') }).textContent).toContain('folder-a')
   })
 
