@@ -606,6 +606,11 @@
 .root[data-phase='active'] .composerSeat {
   position: sticky;
   bottom: 0;
+  /* Free space belongs below the transcript; with no session surface at all
+     (a preparing intent) it is what docks the seat at the floor instead of
+     leaving it at the column top. With a view filling the box this resolves
+     to zero, so real sessions are untouched. */
+  margin-top: auto;
   /* Above markdown CodeBlock sticky banners (z-index 6) so the footer never
      paints under a sticking code header while scrolling. */
   z-index: 7;
@@ -984,8 +989,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--dsw-space-2);
-  width: 100%;
+  /* Same geometry as the docked InputBar (`.root > .card`): the seat's flex
+     column centers the capped card, side clearance holds it off the edges,
+     and 8px lifts it off the floor — the real composer replaces it without a
+     pixel of movement. */
+  align-self: center;
+  width: calc(100% - 2 * var(--dsh-composer-side-clearance, 32px));
   max-width: var(--dsh-composer-card-max-width, none);
+  margin-bottom: 8px;
   padding: var(--dsw-space-4) var(--dsw-space-4) var(--dsw-space-3);
   border: 0;
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
@@ -1008,9 +1019,13 @@
 .pendingDraft label, .pendingDraft textarea { display: block; width: 100%; }
 .pendingDraft textarea {
   box-sizing: border-box;
-  min-height: 2em;
+  min-height: 20px;
+  max-height: 200px;
   padding: 0 2px;
-  resize: vertical;
+  /* Grows with the draft like the real composer instead of a fixed box;
+     overflow stays reachable past the cap via the element's own scroll. */
+  field-sizing: content;
+  resize: none;
   border: 0;
   outline: none;
   background: transparent;
@@ -1020,7 +1035,26 @@
 }
 .pendingDraft textarea::placeholder { color: var(--dsw-alias-label-caption); }
 .pendingFooter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--dsw-space-2); }
-.pendingFooter small { flex: 1; }
-.pendingDraft label span, .pendingFooter small { color: var(--dsw-alias-label-secondary); }
-.pendingDraft button, .resumeDraft { font: inherit; color: inherit; cursor: pointer; }
+.pendingStatus {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--dsw-space-2);
+}
+.pendingStatus[data-intent-phase='unavailable'], .pendingStatus[data-intent-phase='denied'] {
+  color: var(--dsw-alias-state-critical);
+}
+.pendingSpinner {
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--dsw-alias-state-business-primary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: pendingSpin 0.8s linear infinite;
+}
+@keyframes pendingSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pendingSpinner { animation: none; } }
+.pendingDraft label span, .pendingStatus[data-intent-phase='preparing'] { color: var(--dsw-alias-label-secondary); }
+.resumeDraft { font: inherit; color: inherit; cursor: pointer; }
 .resumeDraft { align-self: start; }

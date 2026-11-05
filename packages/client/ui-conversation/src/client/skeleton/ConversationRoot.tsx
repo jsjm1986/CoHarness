@@ -187,6 +187,7 @@ function PendingIntentComposer({ intent, t, onInput, onRetry, onHide, solo = fal
   /** Standalone surface (workbench pane body) without the composer-stack column. */
   solo?: boolean
 }) {
+  const phase = intent.phase === 'preparing' ? 'preparing' : intent.denied ? 'denied' : 'unavailable'
   return <div className={clsx(css.pendingDraft, solo && css.pendingSolo)} data-conversation-intent={intent.id}
     data-intent-runtime={intent.target.runtimeId}>
     <label>{intent.label && <span>{intent.label}</span>}
@@ -194,10 +195,13 @@ function PendingIntentComposer({ intent, t, onInput, onRetry, onHide, solo = fal
         placeholder={t('placeholder.default')} onChange={(event) => { onInput?.(intent.id, event.currentTarget.value) }} />
     </label>
     <div className={css.pendingFooter}>
-      <small role="status">{t(intent.phase === 'preparing' ? 'draft.preparing' : intent.denied ? 'draft.denied' : 'draft.unavailable')}</small>
-      {intent.phase === 'unavailable' &&
-        <button type="button" onClick={() => { onRetry?.(intent.id) }}>{t('draft.retry')}</button>}
-      <button type="button" onClick={() => { onHide?.() }}>{t('draft.back')}</button>
+      <small role="status" className={css.pendingStatus} data-intent-phase={phase}>
+        {phase === 'preparing' && <span className={css.pendingSpinner} aria-hidden="true" />}
+        {t(phase === 'preparing' ? 'draft.preparing' : phase === 'denied' ? 'draft.denied' : 'draft.unavailable')}
+      </small>
+      {phase === 'unavailable' &&
+        <Button size="sm" onClick={() => { onRetry?.(intent.id) }}>{t('draft.retry')}</Button>}
+      <Button size="sm" onClick={() => { onHide?.() }}>{t('draft.back')}</Button>
     </div>
   </div>
 }
