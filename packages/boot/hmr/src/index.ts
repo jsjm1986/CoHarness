@@ -41,11 +41,20 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-// Node's ESM resolver uses the JS realpath implementation — the first
-// canonical spelling; native realpath expands Windows short names differently
-// and would miss its cache keys.
+/** Parent of `filename` to retry after a realpath ENOENT, rethrowing any other lookup failure. */
+function missingEntryParent(filename: string, error: unknown): string {
+  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+  const parent = dirname(filename)
+  if (parent === filename) throw error
+  return parent
+}
+
 function canonicalPath(filename: string): string {
-  return canonicalSpellings(filename)[0]
+  // Node's ESM resolver uses the JS realpath implementation; native realpath
+  // expands Windows short names differently and would miss its cache keys.
+  try { return realpathSync(filename) } catch (error) {
+    return resolve(canonicalPath(missingEntryParent(filename, error)), basename(filename))
+  }
 }
 
 // Deduping by one canonical spelling misses aliases whose own realpath keeps a
@@ -59,10 +68,7 @@ function canonicalSpellings(filename: string): string[] {
     if (typeof native === 'function') spellings.push(String(Reflect.apply(native, realpathSync, [filename])))
     return [...new Set(spellings)]
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    const parent = dirname(filename)
-    if (parent === filename) throw error
-    return canonicalSpellings(parent).map(path => resolve(path, basename(filename)))
+    return canonicalSpellings(missingEntryParent(filename, error)).map(path => resolve(path, basename(filename)))
   }
 }
 
