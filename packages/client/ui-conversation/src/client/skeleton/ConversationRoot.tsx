@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import { parseClientSessionKey, SessionCreateError, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
+import { parseClientSessionKey, SessionCreateError, type ConversationIntent, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationContentProps, ConversationSlotProps, ConversationViewsProps, InputZone, WorkbenchLayoutPreset,
 } from '../contract/slots.ts'
@@ -174,11 +174,40 @@ function ConversationSessionView({ renderSlot, compact = false }: ConversationVi
   return <>{renderSlot('conversation.session', { compact })}</>
 }
 
+/** Composer-seat draft editor for a live preparation intent. The card mirrors
+ * the InputBar surface (same radius, elevation, and text metrics) so the real
+ * composer lands in the same seat without a layout step on transfer; it owns
+ * no send action because submission requires the acquired Session. */
+function PendingIntentComposer({ intent, t, onInput, onRetry, onHide, solo = false }: {
+  intent: ConversationIntent
+  t: ConversationContentOwnProps['t']
+  onInput?: ((id: string, text: string) => void) | undefined
+  onRetry?: ((id: string) => void) | undefined
+  onHide?: (() => void) | undefined
+  /** Standalone surface (workbench pane body) without the composer-stack column. */
+  solo?: boolean
+}) {
+  return <div className={clsx(css.pendingDraft, solo && css.pendingSolo)} data-conversation-intent={intent.id}
+    data-intent-runtime={intent.target.runtimeId}>
+    <label>{intent.label && <span>{intent.label}</span>}
+      <textarea autoFocus value={intent.text} aria-label={t('placeholder.default')}
+        placeholder={t('placeholder.default')} onChange={(event) => { onInput?.(intent.id, event.currentTarget.value) }} />
+    </label>
+    <div className={css.pendingFooter}>
+      <small role="status">{t(intent.phase === 'preparing' ? 'draft.preparing' : intent.denied ? 'draft.denied' : 'draft.unavailable')}</small>
+      {intent.phase === 'unavailable' &&
+        <button type="button" onClick={() => { onRetry?.(intent.id) }}>{t('draft.retry')}</button>}
+      <button type="button" onClick={() => { onHide?.() }}>{t('draft.back')}</button>
+    </div>
+  </div>
+}
+
 /** Render one Session's complete conversation surface. */
 export function ConversationContent({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
   useDisplaySettings, useProjectPolicy, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace,
   t, useFactorySlot, variant = 'main', compact = false, active = true, workbench = false, headerLeading, toolsHostId, toolsActive = active,
+  pendingIntent, onIntentInput, onIntentRetry, onIntentHide,
 }: ConversationContentOwnProps) {
   const Views = useFactorySlot('views', ConversationSessionView)
   const openState = useSession(s => s.openState)
@@ -307,12 +336,16 @@ export function ConversationContent({
   // The exemption is deliberately open-state-wide, not loading-only: a
   // summary-blank session is the hero before its open starts (`cold`) and
   // after one fails (`error`) for the same reason — there is no history.
-  const settling = sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
+  // A live intent borrows this resident frame only: the provisional id is not
+  // a Session, and an ambient committed Session must not leak its header,
+  // transcript, or takeover chain into the preparing surface.
+  const preparing = pendingIntent !== undefined
+  const settling = !preparing && sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
     && summaryBlank !== true
-  const hero = sessionId === undefined
-    || (composerPhase === 'blank' && (openState === 'open' || summaryBlank === true))
+  const hero = !preparing && (sessionId === undefined
+    || (composerPhase === 'blank' && (openState === 'open' || summaryBlank === true)))
   const zone: InputZone | undefined =
-    session === undefined || inputState === undefined ? undefined : { session, input: inputState }
+    preparing || session === undefined || inputState === undefined ? undefined : { session, input: inputState }
 
   // The chip is a selector; label resolution walks the flow top-down:
   //   1. a just-picked workspace (pending) → its title;
@@ -363,35 +396,38 @@ export function ConversationContent({
   // one disabled textarea, never a second tree. The no-workspace state wins
   // when both hold — picking a workspace is the earlier prerequisite.
   const blocked = !inert && composerBlock !== undefined
-  const inputBar = renderSlot('conversation.composer.bar', {
-    variant: hero ? 'hero' : 'composer',
-    active,
-    compact,
-    ...(inert
-      ? {
-        disabled: true,
-        placeholder: t('placeholder.workspace'),
-        workspacePickerOpen: pickerOpen,
-        onRequestWorkspace: () => { setPickerOpen(true) },
-      }
-      : blocked
-        // `blocked`, not `disabled`: the bar refuses input either way, but a
-        // block keeps the model seat live because choosing a model is how the
-        // user clears it.
-        ? { blocked: composerBlock, placeholder: composerBlock.reason }
-        // The steward maintenance space speaks to a runtime that operates
-        // on the deployment itself; its composer hints at that contract
-        // instead of the generic agent prompt, in the hero and the docked
-        // bar alike.
-        : stewardScope ? { placeholder: t('placeholder.steward') }
-          : hero ? { placeholder: t('placeholder.hero') } : {}),
-    overlay: renderSlot('conversation.input.overlay', {}),
-    leftItems: zone === undefined ? null : renderSlot('conversation.input.left', zone),
-    rightItems: zone === undefined ? null : renderSlot('conversation.input.right', zone),
-    // Stats band under the card, inside the bar's width column so both
-    // share one constraint (composer.dock = session-stats pill family).
-    footer: !hero && zone !== undefined ? renderSlot('conversation.composer.dock', zone) : null,
-  })
+  const inputBar = preparing
+    ? <PendingIntentComposer intent={pendingIntent}
+      t={t} onInput={onIntentInput} onRetry={onIntentRetry} onHide={onIntentHide} />
+    : renderSlot('conversation.composer.bar', {
+      variant: hero ? 'hero' : 'composer',
+      active,
+      compact,
+      ...(inert
+        ? {
+          disabled: true,
+          placeholder: t('placeholder.workspace'),
+          workspacePickerOpen: pickerOpen,
+          onRequestWorkspace: () => { setPickerOpen(true) },
+        }
+        : blocked
+          // `blocked`, not `disabled`: the bar refuses input either way, but a
+          // block keeps the model seat live because choosing a model is how the
+          // user clears it.
+          ? { blocked: composerBlock, placeholder: composerBlock.reason }
+          // The steward maintenance space speaks to a runtime that operates
+          // on the deployment itself; its composer hints at that contract
+          // instead of the generic agent prompt, in the hero and the docked
+          // bar alike.
+          : stewardScope ? { placeholder: t('placeholder.steward') }
+            : hero ? { placeholder: t('placeholder.hero') } : {}),
+      overlay: renderSlot('conversation.input.overlay', {}),
+      leftItems: zone === undefined ? null : renderSlot('conversation.input.left', zone),
+      rightItems: zone === undefined ? null : renderSlot('conversation.input.right', zone),
+      // Stats band under the card, inside the bar's width column so both
+      // share one constraint (composer.dock = session-stats pill family).
+      footer: !hero && zone !== undefined ? renderSlot('conversation.composer.dock', zone) : null,
+    })
 
   const composerBar = (
     <div className={clsx(css.composerStack, hero && css.composerHero)}>
@@ -417,7 +453,7 @@ export function ConversationContent({
   // end off-screen when the user is not pinned to the floor.
   const composerSeat = (
     <div ref={seatResizeRef} className={css.composerSeat} data-composer-seat="" data-conversation-region="composer">
-      {composer}
+      {preparing ? composerBar : composer}
     </div>
   )
 
@@ -508,10 +544,10 @@ export function ConversationContent({
       data-phase={phase}
       data-chat-fill={displaySettings.chatFullWidth || undefined}
     >
-      {variant === 'embedded' ? null : renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading, toolsHostId, toolsActive })}
-      <div className={css.scrollRegion} data-conversation-session={sessionId} data-conversation-region="chat">
+      {variant === 'embedded' || preparing ? null : renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading, toolsHostId, toolsActive })}
+      <div className={css.scrollRegion} data-conversation-session={preparing ? undefined : sessionId} data-conversation-region="chat">
         <div className={css.scrollBody} data-conversation-scroll="">
-          {sessionId === undefined ? null : <Views compact={compact} />}
+          {sessionId === undefined || preparing ? null : <Views compact={compact} />}
           {composerSeat}
         </div>
         {/* Width handles only while a transcript is on screen; the hero has no
@@ -689,24 +725,25 @@ export function ConversationRoot(props: ConversationRootProps) {
     setDraggingPaneId(undefined)
     setDropTarget(null)
   }
-  const editor = pending === undefined ? null : <div className={css.pendingDraft} data-conversation-intent={pending.id}
-    data-intent-runtime={pending.target.runtimeId}>
-    <label>{pending.label && <span>{pending.label}</span>}
-      <textarea autoFocus value={pending.text} aria-label={props.t('placeholder.default')}
-        placeholder={props.t('placeholder.default')} onChange={(event) => { props.onIntentInput(pending.id, event.currentTarget.value) }} />
-    </label>
-    <div><small role="status">{props.t(pending.phase === 'preparing' ? 'draft.preparing' : pending.denied ? 'draft.denied' : 'draft.unavailable')}</small>
-      {pending.phase === 'unavailable' && <button type="button" onClick={() => { props.onIntentRetry(pending.id) }}>{props.t('draft.retry')}</button>}
-      <button type="button" onClick={props.onIntentHide}>{props.t('draft.back')}</button>
-    </div>
-  </div>
+  const editor = pending === undefined ? null : <PendingIntentComposer intent={pending} t={props.t}
+    onInput={props.onIntentInput} onRetry={props.onIntentRetry} onHide={props.onIntentHide} solo />
   const retryStorage = draftFailures.length ? <div role="status" className={css.resumeDraft}>
     {props.t(draftFailures.some(row => row.versionUnavailable) ? 'draft.versionUnavailable' : 'draft.storageUnavailable')} <button type="button"
       onClick={() => { for (const row of draftFailures) props.onRetryNodeDraft(row.sessionId) }}>{props.t('draft.retry')}</button>
   </div> : null
   const saved = intents.saved.map(draft => <button type="button" className={css.resumeDraft} key={draft.id}
     onClick={() => { props.onIntentRetry(draft.id) }}>{props.t('draft.resume')} · {draft.label || draft.text.slice(0, 32)}</button>)
-  if (!workbench && pending !== undefined) return <div className={css.workbenchRoot}>{retryStorage}{saved}{editor}</div>
+  // A live intent outside the Workbench still mounts the resident content
+  // frame: the full page chrome is real, only the transcript and session-only
+  // regions stay empty until the Session lands, and the composer seat edits
+  // the intent draft directly.
+  if (!workbench && pending !== undefined) return (
+    <div className={css.workbenchRoot}>
+      {retryStorage}{saved}
+      {props.renderFactorySlot('conversation.content', { variant: 'main', compact, workbench: false,
+        pendingIntent: pending, onIntentInput: props.onIntentInput, onIntentRetry: props.onIntentRetry, onIntentHide: props.onIntentHide })}
+    </div>
+  )
   if (!workbench) return available ? (
     <div className={css.workbenchRoot}>
       {retryStorage}{saved}

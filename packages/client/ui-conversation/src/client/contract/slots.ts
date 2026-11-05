@@ -7,11 +7,10 @@ import type {
   SlotHookFactory, SnapshotSelectorHook,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
-  CommandNode, CompactionSummaryNode, ConversationSnapshot, ConversationTurnDataMap,
-  ObservableSnapshot, PendingWait, SessionId, SessionPendingEntry, ToolCallBlock,
-  TurnLocation, WorkspaceId,
+  CommandNode, CompactionSummaryNode, ConversationIntent, ConversationIntentsSnapshot, ConversationSnapshot,
+  ConversationTurnDataMap, ConversationViewportSnapshot, ObservableSnapshot, PendingWait, ProjectUiPolicySnapshot,
+  SessionId, SessionPendingEntry, ToolCallBlock, TurnLocation, WorkspaceId,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationIntentsSnapshot, ConversationViewportSnapshot, ProjectUiPolicySnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { MarkdownFileMentions, MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MessageId } from '@deepseek-ai/dsh-client-connection/client'
 import type { PermissionCatalog } from '@deepseek-ai/dsh-permission-presets/client'
@@ -913,6 +912,14 @@ export interface ConversationContentInputProps {
   active?: boolean
   /** Whether this pane is rendered inside the multi-session Workbench. */
   workbench?: boolean
+  /** Live preparation intent: the frame shows no session surface and the
+      composer seat edits `pendingIntent.text` while the Session is acquired.
+      The provisional `sessionId` is not a Session yet, and an ambient
+      committed Session must not leak its header, transcript, or takeovers. */
+  pendingIntent?: ConversationIntent | undefined
+  onIntentInput?: ((id: string, text: string) => void) | undefined
+  onIntentRetry?: ((id: string) => void) | undefined
+  onIntentHide?: (() => void) | undefined
 }
 
 /** Values passed from shared content to its occurrence-selected view position. */

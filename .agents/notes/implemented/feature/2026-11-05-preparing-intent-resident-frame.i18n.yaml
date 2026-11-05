@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-05-preparing-intent-resident-frame.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-05-preparing-intent-resident-frame.md
+document:
+  en: 7dbc413323de5b6a8b55e25862a71dff7889838e
+  zh: 797caf0fa9a56ff2cf4575c8f772edf8e5b1eaae
+/agent-note-preparing-intents-mount-the-resident-conversation-frame:
+  en: 48e0e76625995da7
+  zh: ac98a3f1a8f6890b
+/agent-note-preparing-intents-mount-the-resident-conversation-frame/problem:
+  en: 646d5e749969cfff
+  zh: 85b973329ae13e0f
+/agent-note-preparing-intents-mount-the-resident-conversation-frame/decision:
+  en: 96d95f4eacf404fc
+  zh: bbef61751b71c143
+/agent-note-preparing-intents-mount-the-resident-conversation-frame/alternatives-considered:
+  en: 5f1a67e4fec7513e
+  zh: 0751dc6ba05e0117
+/agent-note-preparing-intents-mount-the-resident-conversation-frame/consequences:
+  en: 9b8073b34380c6a0
+  zh: 268171f7e2ab906f

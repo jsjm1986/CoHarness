@@ -975,20 +975,52 @@
 :global([data-viewport='compact']) .workbenchContent .header .tabs button { min-height: 44px; }
 :global([data-viewport='compact']) .workbenchContent .header .tabs::before { bottom: 0; }
 
+/* Preparation-intent draft editor: mirrors the InputBar card (same 22px
+   radius, input-major fill, soft elevation over the l2 stroke, 16/16/12
+   padding, 14/20 text) so the real composer lands in the same seat without a
+   layout step on transfer. */
 .pendingDraft {
-  margin: auto auto var(--dsw-space-4);
-  width: min(46rem, calc(100% - 32px));
-  padding: 12px 16px;
   box-sizing: border-box;
-  border-radius: var(--dsw-radius-lg);
-  box-shadow: var(--dsw-elevation-stroke);
-  background: var(--dsw-alias-bg-base);
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsw-space-2);
+  width: 100%;
+  max-width: var(--dsh-composer-card-max-width, none);
+  padding: var(--dsw-space-4) var(--dsw-space-4) var(--dsw-space-3);
+  border: 0;
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
+  border-radius: 22px;
+  background: var(--dsw-specific-input-major);
+  box-shadow: var(--dsw-elevation-soft);
+  font-size: 14px;
+  line-height: 20px;
 }
 
+/* Standalone surface (workbench pane body): no composer-stack column exists,
+   so the card centers itself inside the pane. */
+.pendingSolo {
+  margin: auto auto var(--dsw-space-4);
+  width: min(46rem, calc(100% - 32px));
+}
+
+.pendingDraft:focus-within { --dsw-elevation-stroke-color: var(--dsw-alias-border-l4); }
+
 .pendingDraft label, .pendingDraft textarea { display: block; width: 100%; }
-.pendingDraft textarea { min-height: 4em; resize: vertical; border: 0; background: transparent; color: inherit; font: inherit; }
-.pendingDraft > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.pendingDraft small { flex: 1; }
-.pendingDraft label span, .pendingDraft small { color: var(--dsw-alias-label-secondary); }
+.pendingDraft textarea {
+  box-sizing: border-box;
+  min-height: 2em;
+  padding: 0 2px;
+  resize: vertical;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  caret-color: var(--dsw-alias-state-business-primary);
+}
+.pendingDraft textarea::placeholder { color: var(--dsw-alias-label-caption); }
+.pendingFooter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--dsw-space-2); }
+.pendingFooter small { flex: 1; }
+.pendingDraft label span, .pendingFooter small { color: var(--dsw-alias-label-secondary); }
 .pendingDraft button, .resumeDraft { font: inherit; color: inherit; cursor: pointer; }
 .resumeDraft { align-self: start; }
