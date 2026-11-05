@@ -227,24 +227,31 @@ const req = (query: string, position: 'leading' | 'inline' = 'leading') =>
   ({ query, position, signal: new AbortController().signal })
 
 describe('registration', () => {
-  it('registers the "/" source with matchSpace/matchEnter/warm hooks and removes it on fiber disposal', async () => {
+  it('registers the "/" source and removes it on fiber disposal', async () => {
     const { registered, source, fiber } = await bench()
     expect(typeof source.matchSpace).toBe('function')
     expect(typeof source.matchEnter).toBe('function')
-    expect(typeof source.warm).toBe('function')
+    // Scope birth must not pull the catalog: commands.list resolves the
+    // session's Agent, and warming it here would resume a cold Session the
+    // moment the view mounts.
+    expect(source.warm).toBeUndefined()
     expect([...registered.keys()]).toEqual(['/ command'])
     await fiber.dispose()
     expect(registered.size).toBe(0)
   })
 
-  it('the warm hook prewarms the session key: one pull per session, no duplicate over pending', async () => {
-    const { source, listCalls } = await bench()
-    source.warm!(proj('s1'))
+  it('the first candidate pull fetches the session key once with no duplicate over pending', async () => {
+    const { source, mint, listCalls } = await bench()
+    await source.candidates(proj('s1'), req(''))
     expect(listCalls).toEqual([{ sessionId: sid('s1') }])
-    source.warm!(proj('s2'))
+    await source.candidates(proj('s2'), req(''))
     expect(listCalls).toEqual([{ sessionId: sid('s1') }, { sessionId: sid('s2') }])
-    source.warm!(proj('s1')) // s1 already pending → no duplicate pull
-    expect(listCalls).toHaveLength(2)
+    mint('s3')
+    await Promise.all([
+      source.candidates(proj('s3'), req('')),
+      source.candidates(proj('s3'), req('')),
+    ])
+    expect(listCalls).toHaveLength(3)
   })
 })
 

@@ -746,7 +746,6 @@ export class Session implements SessionFace {
   handleMuxEnvelope(rpcId: RpcId, frame: MuxFrame): void {
     switch (frame.type) {
       case 'session/event': {
-        console.warn(`[sess-diag] live ${this.sessionId} seq=${frame.event.seq} type=${frame.event.type} state=${this.openState} tail=${String(this.windowTailSeq())}`)
         this.acceptLiveEvent(frame.event, frame.view)
         return
       }
@@ -764,7 +763,6 @@ export class Session implements SessionFace {
         return
       }
       case 'session/subscribed': {
-        console.warn(`[sess-diag] subscribed ${this.sessionId} lastSeq=${frame.lastSeq} state=${this.openState} tail=${String(this.windowTailSeq())} buffered=${this.liveBuffer.length}`)
         this.subscribedLastSeq = frame.lastSeq
         this.pendingStreamBaseline = frame.assistantStream
         // New mux-generation baseline: the host pushes this session's queue
@@ -1830,7 +1828,6 @@ export class Session implements SessionFace {
     projections?: ProjectionsBaseline
     omittedSpans?: readonly HistoryOmittedSpan[]
   }>> {
-    console.warn(`[sess-diag] history ${this.sessionId} state=${this.openState} tail=${String(this.windowTailSeq())}\n${new Error('trace').stack?.split('\n').slice(2, 7).join('\n') ?? ''}`)
     const detail = this.historyDetail === 'conversation' ? 'conversation' as const : 'full' as const
     return this.address === undefined
       ? this.api.sessions.history({ sessionId: this.sessionId, ...payload, detail }, signal)

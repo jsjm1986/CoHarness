@@ -6330,9 +6330,27 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             }
           }
 
-          const subscribe = (session: Session, lastSeq?: number): void => {
+          const subscribe = (session: Session, lastSeq?: number, replayThrough?: number): void => {
             if (subscribed.has(session.id)) return
             subscribed.add(session.id)
+            const through = lastSeq ?? session.seq - 1
+            // Appends committed before this Session object's session/event
+            // emissions could reach a listener — the durable resume marker is
+            // the known case — never produce frames of their own. Stream them
+            // ahead of the baseline so a window ending at the restored prefix
+            // stitches them live instead of repairing the tail through a
+            // second history read. Post-construction events stay unframed only
+            // for the attach-race callers that pass their own bound; for
+            // initial and straggler subscriptions they were delivered to the
+            // earlier stream generation (or history covers them), so the
+            // replay stops at the constructor window instead of flooding the
+            // stream with the session's whole lifecycle.
+            // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
+            const replayEnd = Math.min(through, replayThrough ?? session.firstLiveSeq)
+            for (const event of session.snapshotEvents(session.firstLifecycleSeq)) {
+              if (event.seq > replayEnd) break
+              publishEvent(session, event)
+            }
             const stream = assistantStreams.snapshot(session.id)
             streamBaseOrdinals.set(session.id, stream.ordinal)
             subscribeSession(queue, session, lastSeq, stream.baseline)
@@ -6370,18 +6388,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             }),
             ctx.on('session/created', (session: Session) => {
               publishFor(session.id, () => {
-                // Appends committed before store entry — the durable resume
-                // marker is the known case — never reach session/event
-                // observers. Stream them BEFORE the baseline so a window
-                // ending at the restored prefix stitches them live instead of
-                // repairing the tail through a second history read.
-                // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-                const silent = session.snapshotEvents(session.firstLiveSeq)
-                console.warn(`[sess-diag] created ${session.id} firstLiveSeq=${String(session.firstLiveSeq)} seq=${String(session.seq)} replay=${silent.length}`)
-                for (const event of silent) {
-                  publishEvent(session, event)
-                }
-                subscribe(session, session.seq - 1)
+                // The attach-time bound also covers events appended inside
+                // the enter window, which never reached a session/event
+                // observer either.
+                subscribe(session, session.seq - 1, session.seq - 1)
               })
             }),
             ctx.on('session/disposed', (session: Session) => {

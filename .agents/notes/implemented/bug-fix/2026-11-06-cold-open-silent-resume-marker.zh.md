@@ -6,13 +6,15 @@ Status: implemented
 
 ## Problem
 
-打开已保存会话会发出两次 `/api/session.history`:detached 预读在会话挂接前完成,`Session` 构造器随后追加 `session/end-seed` —— 一个在 store 条目建立前就已提交的持久事件,因此没有任何 `session/event` 观察者见过它 —— 而 `session/subscribed` 基线报告的 `session.seq - 1` 越过了客户端窗口尾,迫使 `repairGap` 为这一个标记重拉相同的历史页。同一打开流程还在用户不知情时恢复了 Agent:`sessions.models` 仅为填充选择器就调用 `agentFor`,于是一次只读的目录加载冷恢复了会话、追加了标记,并凭空造出一个活跃 Agent。
+打开已保存会话会发出两次 `/api/session.history`:detached 预读在会话挂接前完成,`Session` 构造器随后追加 `session/end-seed` —— 一个在 store 条目建立前就已提交的持久事件,因此没有任何 `session/event` 观察者见过它 —— 而 `session/subscribed` 基线报告的 `session.seq - 1` 越过了客户端窗口尾,迫使 `repairGap` 为这一个标记重拉相同的历史页。同一打开流程还在用户不知情时恢复了 Agent —— 而且有两处来源:`sessions.models` 仅为填充选择器就调用 `agentFor`,而命令输入源在 scope 诞生时触发的 `warm` 钩子发起了 `commands.list`,其 `agent` 参数同样经 `agentFor` 解析;两条只读加载各自冷恢复了会话、追加了标记,并凭空造出一个活跃 Agent。
 
 ## Decision
 
-mux 的 `session/created` 发布把构造期静默后缀 —— `session.firstLiveSeq` 及其之后的全部持久事件 —— 作为普通 `session/event` 帧先下发,再推送 `session/subscribed` 基线。已打开的客户端窗口以 `tail + 1` 实时缝合该标记,基线落地时已被覆盖,不再触发 gap 修复。对早于流存在的会话,初始基线本就包含该标记;新建会话没有可回放的后缀。
+mux 的 `subscribe()` 把静默后缀 —— `session.firstLifecycleSeq` 起、从未产生过 `session/event` 帧的持久事件 —— 在 `session/subscribed` 基线之前下发。已打开的客户端窗口以 `tail + 1` 实时缝合该标记,基线落地时已被覆盖,不再触发 gap 修复。回放必须放在共享的 `subscribe()` 内部而不是 `session/created` 监听器里:resume 时发射的 `session/event` 会把各自的 `subscribe(seq - 1)` 发布排在 created 发布之前先行冲刷;早于流开启就挂接的会话也经 `initialSessions` 走同一条路径,因此所有订阅路径都只覆盖一次静默窗口。`session/created` 发布以挂接时刻的 `seq - 1` 为上界回放,连同 enter 窗口内的追加一并覆盖;其余路径统一止于 `firstLiveSeq` —— 构造窗口 —— 因为构造之后的事件要么已由上一代流投递、要么由客户端历史读覆盖,回放它们会把整个会话生命周期灌进每次重连。
 
 `sessions.models` 对 Agent 既不活跃也未在恢复中的会话,直接由持久日志作答而不再走 `agentFor`:`detachedSelection` 用 `modelSelectionProjectionDefinition` 折叠事件得到 pending 层、用 `foldRequestHeader` 得到已记录的请求头层,完整镜像 `selectionFor` 的分层,包括省略 adapter 默认推理档位的规则。subagent 归属栅栏先于所有分支执行,与 `agentFor` 的顺序一致;已在途的恢复仍然被汇入。
+
+命令源不再注册 `warm` 钩子:预期式的目录预热会解析一个 `agent` 类型的远程参数,不激活它要服务的冷会话就无法运行。`CommandDirectory` 本就是惰性拉取 —— 首个 `candidates`/`matchEnter`/`matchSpace` 读取会调用 `ensureReady` —— 目录改为在 `/` 意图出现时加载,而恢复该会话 Agent 在此时才属正当。`directory.warm()` 已无任何调用方,一并移除。
 
 ## Alternatives considered
 
@@ -22,13 +24,15 @@ mux 的 `session/created` 发布把构造期静默后缀 —— `session.firstLi
 
 **`sessions.models` 保留 `agentFor`,只回放标记。** 它能修掉历史读数,但仍为一次持久日志本可作答的读取恢复了 Agent,违反"打开已保存会话不产生 Agent"的启动契约。
 
+**保留 `warm`,但仅在存在活跃 Agent 时拉取。** 客户端快照不暴露 Agent 存活事实,钩子无法区分"免费预热"与"冷恢复";用 `running` 之类的启发式门控会在静止中的活跃 Agent 上误判。`commands.list` 也可以像 `sessions.models` 那样加一条 detached standing-scope 目录路径,但 standing 组合的命令视图与 Agent 解析后的视图并不一致,而惰性路径已满足全部消费方。
+
 ## Consequences
 
-启动自动选择端到端断言 `historyCalls === 1` 在慢速 CI 时序下成立;同规格中 `ctx.agents.get(id) === undefined` 也成立,因为打开已保存会话不再为模型选择器恢复 Agent。任何其他构造期静默追加 —— 不只 `session/end-seed` —— 都由同一循环回放,而真实缺失的历史仍按原样走 `mergeTail` 修复。`sessions.models` 对冷会话不再执行 live SSH 准入;读取仍由授权门控。
+启动自动选择端到端断言 `historyCalls === 1` 在慢速 CI 时序下成立;同规格中 `ctx.agents.get(id) === undefined` 也成立,因为挂载期间模型选择器与命令目录都不再恢复 Agent。任何构造期静默追加 —— 不只 `session/end-seed` —— 都在每条订阅路径上由同一循环回放,而真实缺失的历史仍按原样走 `mergeTail` 修复。`sessions.models` 对冷会话不再执行 live SSH 准入;读取仍由授权门控。在冷会话中输入 `/` 会恢复其 Agent —— 这正是契约所保留的意图驱动激活。
 
 ## Verification
 
-`api-proxy-collaboration.spec.ts` 断言 mux 流对带 seed 的恢复先产出 `session/event(session/end-seed, seq 1)` 再产出 `session/subscribed(lastSeq 1)`。`api-proxy-models.spec.ts` 与 `api-proxy-cold.spec.ts` 覆盖 detached 选择分层与归属栅栏(48 个用例)。web 端到端规格保留 `historyCalls === 1` 与无 Agent 断言不变。
+`api-proxy-collaboration.spec.ts` 断言 mux 流对带 seed 的恢复先产出 `session/event(session/end-seed, seq 1)` 再产出 `session/subscribed(lastSeq 1)`。`api-proxy-models.spec.ts` 与 `api-proxy-cold.spec.ts` 覆盖 detached 选择分层与归属栅栏(48 个用例)。`service.client.spec.ts` 钉住契约:`/` 源不再注册 `warm` 钩子,首个 `candidates` 拉取对每个会话键只取一次。web 端到端规格保留 `historyCalls === 1` 与无 Agent 断言不变。
 
 ## Related
 
