@@ -10,6 +10,8 @@ import type {
 } from '../contract/slots.ts'
 import { HeroGlow, HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import { CHAT_CONTENT_WIDTH_RANGE } from '../../submission-settings.ts'
+import inputCss from './InputBar.module.css'
+import statsCss from '../chat/StatsPills.module.css'
 import css from './ConversationRoot.module.css'
 
 function invokePointerCapture(target: HTMLElement, method: 'setPointerCapture' | 'releasePointerCapture', pointerId: number): void {
@@ -177,32 +179,45 @@ function ConversationSessionView({ renderSlot, compact = false }: ConversationVi
 /** Composer-seat draft editor for a live preparation intent. The card mirrors
  * the InputBar surface (same radius, elevation, and text metrics) so the real
  * composer lands in the same seat without a layout step on transfer; it owns
- * no send action because submission requires the acquired Session. */
-function PendingIntentComposer({ intent, t, onInput, onRetry, onHide, solo = false }: {
+ * no send action because submission requires the acquired Session. The wrapper
+ * clones the bar's `.root` two-child skeleton — card plus the strip slot the
+ * stats pills occupy when the Session lands — so the swap shifts no metric at
+ * any user font size or content width. */
+function PendingIntentComposer({ intent, t, onInput, onRetry, onHide, onFocusChange, solo = false }: {
   intent: ConversationIntent
   t: ConversationContentOwnProps['t']
   onInput?: ((id: string, text: string) => void) | undefined
   onRetry?: ((id: string) => void) | undefined
   onHide?: (() => void) | undefined
+  /** Reports the draft textarea's focus so the real composer can inherit it. */
+  onFocusChange?: ((focused: boolean) => void) | undefined
   /** Standalone surface (workbench pane body) without the composer-stack column. */
   solo?: boolean
 }) {
   const phase = intent.phase === 'preparing' ? 'preparing' : intent.denied ? 'denied' : 'unavailable'
-  return <div className={clsx(css.pendingDraft, solo && css.pendingSolo)} data-conversation-intent={intent.id}
+  return <div className={clsx(inputCss.root, css.pendingRoot, solo && css.pendingSolo)} data-conversation-intent={intent.id}
     data-intent-runtime={intent.target.runtimeId}>
-    <label>{intent.label && <span>{intent.label}</span>}
-      <textarea autoFocus value={intent.text} aria-label={t('placeholder.default')}
-        placeholder={t('placeholder.default')} onChange={(event) => { onInput?.(intent.id, event.currentTarget.value) }} />
-    </label>
-    <div className={css.pendingFooter}>
-      <small role="status" className={css.pendingStatus} data-intent-phase={phase}>
-        {phase === 'preparing' && <span className={css.pendingSpinner} aria-hidden="true" />}
-        {t(phase === 'preparing' ? 'draft.preparing' : phase === 'denied' ? 'draft.denied' : 'draft.unavailable')}
-      </small>
-      {phase === 'unavailable' &&
-        <Button size="sm" onClick={() => { onRetry?.(intent.id) }}>{t('draft.retry')}</Button>}
-      <Button size="sm" onClick={() => { onHide?.() }}>{t('draft.back')}</Button>
+    <div className={clsx(inputCss.card, css.pendingCard)}>
+      <div className={inputCss.scroll}>
+        <textarea autoFocus value={intent.text} className={clsx(inputCss.input, css.pendingTextarea)}
+          aria-label={t('placeholder.default')}
+          placeholder={t('placeholder.default')} onChange={(event) => { onInput?.(intent.id, event.currentTarget.value) }}
+          onFocus={() => { onFocusChange?.(true) }} onBlur={() => { onFocusChange?.(false) }} />
+      </div>
+      <div className={clsx(inputCss.row, css.pendingRow)}>
+        <small role="status" className={css.pendingStatus} data-intent-phase={phase}>
+          {phase === 'preparing' && <span className={css.pendingSpinner} aria-hidden="true" />}
+          {t(phase === 'preparing' ? 'draft.preparing' : phase === 'denied' ? 'draft.denied' : 'draft.unavailable')}
+        </small>
+        {phase === 'unavailable' &&
+          <Button size="sm" onClick={() => { onRetry?.(intent.id) }}>{t('draft.retry')}</Button>}
+        <Button size="sm" onClick={() => { onHide?.() }}>{t('draft.back')}</Button>
+      </div>
     </div>
+    {/* The strip the session stats pills take over: it rides their .root
+        class, so the handoff is a content swap at an identical seat and
+        metrics, not a layout event. */}
+    <p className={clsx(statsCss.root, css.pendingCaption)}>{intent.label}</p>
   </div>
 }
 
@@ -266,6 +281,13 @@ export function ConversationContent({
     })
     seatObserver.current.observe(seat)
   }, [])
+
+  // Focus handoff: typing already started in the preparation draft, so the
+  // swap must not strand the caret — when the intent resolves while its
+  // textarea held focus, the incoming composer gets focus back at the draft
+  // tail.
+  const pendingDraftFocused = useRef(false)
+  const wasPreparing = useRef(false)
 
   const sessionWorkspace = sessionId === undefined
     ? undefined
@@ -344,6 +366,17 @@ export function ConversationContent({
   // a Session, and an ambient committed Session must not leak its header,
   // transcript, or takeover chain into the preparing surface.
   const preparing = pendingIntent !== undefined
+  useEffect(() => {
+    if (wasPreparing.current && !preparing && pendingDraftFocused.current) {
+      pendingDraftFocused.current = false
+      const textarea = rootRef.current?.querySelector<HTMLTextAreaElement>('[data-composer-seat] textarea')
+      if (textarea) {
+        textarea.focus()
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+      }
+    }
+    wasPreparing.current = preparing
+  }, [preparing])
   const settling = !preparing && sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
     && summaryBlank !== true
   const hero = !preparing && (sessionId === undefined
@@ -402,7 +435,8 @@ export function ConversationContent({
   const blocked = !inert && composerBlock !== undefined
   const inputBar = preparing
     ? <PendingIntentComposer intent={pendingIntent}
-      t={t} onInput={onIntentInput} onRetry={onIntentRetry} onHide={onIntentHide} />
+      t={t} onInput={onIntentInput} onRetry={onIntentRetry} onHide={onIntentHide}
+      onFocusChange={(focused) => { pendingDraftFocused.current = focused }} />
     : renderSlot('conversation.composer.bar', {
       variant: hero ? 'hero' : 'composer',
       active,

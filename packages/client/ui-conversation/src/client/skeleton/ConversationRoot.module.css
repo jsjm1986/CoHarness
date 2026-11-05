@@ -980,66 +980,53 @@
 :global([data-viewport='compact']) .workbenchContent .header .tabs button { min-height: 44px; }
 :global([data-viewport='compact']) .workbenchContent .header .tabs::before { bottom: 0; }
 
-/* Preparation-intent draft editor: mirrors the InputBar card (same 22px
-   radius, input-major fill, soft elevation over the l2 stroke, 16/16/12
-   padding, 14/20 text) so the real composer lands in the same seat without a
-   layout step on transfer. */
-.pendingDraft {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: var(--dsw-space-2);
-  /* Same geometry as the docked InputBar (`.root > .card`): the seat's flex
-     column centers the capped card, side clearance holds it off the edges,
-     and 8px lifts it off the floor — the real composer replaces it without a
-     pixel of movement. */
-  align-self: center;
-  width: calc(100% - 2 * var(--dsh-composer-side-clearance, 32px));
-  max-width: var(--dsh-composer-card-max-width, none);
-  margin-bottom: 8px;
-  padding: var(--dsw-space-4) var(--dsw-space-4) var(--dsw-space-3);
-  border: 0;
-  --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
-  border-radius: 22px;
-  background: var(--dsw-specific-input-major);
-  box-shadow: var(--dsw-elevation-soft);
-  font-size: 14px;
-  line-height: 20px;
-}
+/* Preparation-intent draft editor: rides the live composer classes —
+   InputBar's .root/.card/.scroll/.row for the card skeleton and StatsPills'
+   .root for the under-card strip — so radius, padding, gap, row seat, strip
+   metrics and the width/clearance/font variables track the ready composer by
+   construction at every user font size and width setting. Local classes
+   cover only what has no ready-state counterpart. */
+.pendingRoot { align-self: stretch; }
 
 /* Standalone surface (workbench pane body): no composer-stack column exists,
-   so the card centers itself inside the pane. */
-.pendingSolo {
-  margin: auto auto var(--dsw-space-4);
-  width: min(46rem, calc(100% - 32px));
-}
+   so the card centers itself inside the pane. Two-class selectors keep these
+   overrides winning over the borrowed .card metrics regardless of sheet
+   order. */
+.pendingSolo { margin: auto auto var(--dsw-space-4); }
+.pendingSolo .pendingCard { max-width: min(46rem, 100%); }
 
-.pendingDraft:focus-within { --dsw-elevation-stroke-color: var(--dsw-alias-border-l4); }
-
-.pendingDraft label, .pendingDraft textarea { display: block; width: 100%; }
-.pendingDraft textarea {
-  box-sizing: border-box;
+/* The draft textarea is its own glyph layer: .input supplies every shared
+   metric (padding, font and line-height inheritance, wrapping rules, caret
+   color, the no-resize no-chrome reset); these overrides only undo what makes
+   the real input a transparent absolute overlay on its mirror stack. The
+   descendant selector keeps the wins order-independent against .input. */
+.pendingCard textarea {
+  display: block;
+  position: static;
+  width: 100%;
+  height: auto;
   min-height: 20px;
-  max-height: 200px;
-  padding: 0 2px;
-  /* Grows with the draft like the real composer instead of a fixed box;
-     overflow stays reachable past the cap via the element's own scroll. */
+  color: var(--dsw-alias-label-primary);
+  -webkit-text-fill-color: var(--dsw-alias-label-primary);
+  /* Grows with the draft like the real composer's mirror does; the .scroll
+     wrapper caps and scrolls it past the shared text height variable. */
   field-sizing: content;
-  resize: none;
-  border: 0;
-  outline: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  caret-color: var(--dsw-alias-state-business-primary);
 }
-.pendingDraft textarea::placeholder { color: var(--dsw-alias-label-caption); }
-.pendingFooter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--dsw-space-2); }
+
+/* The 28px sm buttons stand in for the row's 32px controls. .row resolves
+   content-box, so this min-height sizes the content area: 32 + the row's own
+   2px top padding reproduces the real row's measured 34px — the card's own
+   metrics never move on transfer, only the row's contents. */
+.pendingRow { min-height: 32px; }
 .pendingStatus {
   display: flex;
   flex: 1;
   align-items: center;
   gap: var(--dsw-space-2);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .pendingStatus[data-intent-phase='unavailable'], .pendingStatus[data-intent-phase='denied'] {
   color: var(--dsw-alias-state-critical);
@@ -1055,6 +1042,23 @@
 }
 @keyframes pendingSpin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .pendingSpinner { animation: none; } }
-.pendingDraft label span, .pendingStatus[data-intent-phase='preparing'] { color: var(--dsw-alias-label-secondary); }
+.pendingStatus[data-intent-phase='preparing'] { color: var(--dsw-alias-label-secondary); }
+
+/* Caption text treatment only: the strip's metrics come from the borrowed
+   StatsPills .root (where pills carry color/clip on their children, the
+   caption needs them on itself). Ellipsis needs a block box, so display/text
+   alignment drop the flex mode here — the nested selector wins over .root
+   regardless of sheet order. The bottom pad mirrors the .pill pair of 1px
+   boxes so the caption lands on the same 24px strip seat the pills occupy
+   at every user font size (root pad 4 + text 18 + 2). */
+.pendingRoot .pendingCaption {
+  display: block;
+  padding-bottom: 2px;
+  text-align: center;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .resumeDraft { font: inherit; color: inherit; cursor: pointer; }
 .resumeDraft { align-self: start; }
