@@ -779,7 +779,6 @@ export class SessionRuntime implements ISessions {
 
   /** Rebuild the Session baseline and every opened window after connection. */
   handleConnected(): void {
-    console.warn('[sess-diag] service.handleConnected')
     this.manager.handleConnected()
     this.prefetchRestoredHistory()
   }
@@ -790,10 +789,8 @@ export class SessionRuntime implements ISessions {
     this.restoredHistoryId = undefined
     if (this.closed || id === undefined || this.selection.getSnapshot().sessionId !== id
       || this.scopes.has(id)) {
-      console.warn(`[sess-diag] prefetch skipped id=${String(id)} closed=${this.closed} scoped=${id !== undefined && this.scopes.has(id)} selected=${String(this.selection.getSnapshot().sessionId)}`)
       return
     }
-    console.warn(`[sess-diag] prefetch open ${id}`)
     const session = this.manager.get(id)
     const prefetch = { session, opening: session.open() }
     this.restoredHistory = prefetch
@@ -809,7 +806,6 @@ export class SessionRuntime implements ISessions {
   private cancelRestoredHistory(): void {
     const prefetch = this.restoredHistory
     if (prefetch === undefined) return
-    console.warn(`[sess-diag] cancelRestoredHistory ${prefetch.session.sessionId}`)
     this.restoredHistory = undefined
     prefetch.session.dispose()
     this.manager.drop(prefetch.session.sessionId, prefetch.session)
@@ -817,7 +813,6 @@ export class SessionRuntime implements ISessions {
 
   /** Drop generation-scoped live interaction state the moment a connection generation dies. */
   handleDisconnected(): void {
-    console.warn('[sess-diag] service.handleDisconnected')
     this.cancelRestoredHistory()
     this.manager.handleDisconnected()
   }
@@ -1083,7 +1078,6 @@ export class SessionRuntime implements ISessions {
 
   private retireScope(id: SessionId, record: ScopeRecord, disposeFiber = true): void {
     if (record.ended.signal.aborted) return
-    console.warn(`[sess-diag] retireScope ${id}`)
     record.ended.abort(new Error(`Session generation "${id}" is disposed`))
     const removed = this.scopes.get(id) === record
     if (removed) this.scopes.delete(id)
@@ -1096,7 +1090,6 @@ export class SessionRuntime implements ISessions {
 
   /** Materialize one validated local generation for its first reference. */
   private materializeScope(id: SessionId): ScopeRecord {
-    console.warn(`[sess-diag] materializeScope ${id}`)
     const session = this.manager.get(id)
     if (this.restoredHistory?.session === session) this.restoredHistory = undefined
     const presentationId = this.presentationKey(id)

@@ -370,7 +370,6 @@ export class SessionManager {
    */
   drop(sessionId: SessionId, expected?: Session): void {
     if (expected !== undefined && this.sessions.get(sessionId) !== expected) return
-    console.warn(`[sess-diag] manager.drop ${sessionId} present=${this.sessions.has(sessionId)}`)
     this.sessions.delete(sessionId)
     // A reconnect worker may have queued the instance before its scope was
     // pruned. Remove that stale reference so disposal cannot resurrect history
@@ -387,7 +386,6 @@ export class SessionManager {
   get(sessionId: SessionId): Session {
     let session = this.sessions.get(sessionId)
     if (session === undefined) {
-      console.warn(`[sess-diag] manager.get create ${sessionId}`)
       session = this.createSession(sessionId)
       this.sessions.set(sessionId, session)
       // Replay approval/question/queued frames buffered before instantiation (rpcId

@@ -5,8 +5,9 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { collaborationCapabilities, CollaborationError, type CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import type { Session } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import {
   TypertLookupFailure,
   type TypertGatewayAuthorizationRequest,
@@ -507,6 +508,44 @@ describe('project collaboration streams', () => {
       controlled.firstRead.resolve(new Set([secretId, witnessId]))
       const first = await stream.next()
       expect(first).toMatchObject({ done: false, value: { payload: { type: 'session/subscribed', sessionId: witnessId } } })
+    } finally {
+      abort.abort()
+      await stream.return?.()
+    }
+  })
+
+  it('streams a constructor-silent append before its subscription baseline', async () => {
+    const authority = controlledAuthority().authority
+    authority.readableSessionIds = sessionIds => Promise.resolve(new Set(sessionIds))
+    const { ctx, api } = await harness(authority)
+    const abort = new AbortController()
+    const stream = api.events.mux(request({}), abort.signal)[Symbol.asyncIterator]()
+    try {
+      // A restored seed lacking the resume marker appends `session/end-seed`
+      // inside the Session constructor — before the store entry exists, so no
+      // session/event observer sees it. The baseline publish must stream that
+      // durable event first; otherwise a client window ending at the seed tail
+      // reads lastSeq past its tail and repulls the same history page.
+      const sessionId = SessionId('silent-resume-marker')
+      ctx.sessions.create(sessionId, {
+        seed: [{
+          type: 'user/message', seq: SessionSeq(0), time: 2000,
+          data: createUserMessage({ content: [{ type: 'text', text: 'stored' }], source: { kind: 'user' } }),
+          surfaceOp: 'append',
+        } satisfies SessionEvent],
+        meta: { cwd: PROJECT_ROOT, createdAt: 1000 },
+      })
+      const frames: MuxFrame[] = []
+      while (frames.length < 2) {
+        const next = await stream.next()
+        expect(next.done).toBe(false)
+        if (next.done) break
+        const payload = next.value.payload
+        if ('sessionId' in payload && payload.sessionId === sessionId) frames.push(payload)
+      }
+      const [live, baseline] = frames
+      expect(live).toMatchObject({ type: 'session/event', sessionId, event: { type: 'session/end-seed', seq: 1 } })
+      expect(baseline).toMatchObject({ type: 'session/subscribed', sessionId, lastSeq: 1 })
     } finally {
       abort.abort()
       await stream.return?.()

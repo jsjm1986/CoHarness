@@ -35,7 +35,7 @@ import { errorChain } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-model-access'
 import type {} from '@deepseek-ai/dsh-model-provider-config'
-import { isAppendSurfaceEvent, isJsonValue, materializesSession, SessionId as brandSessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import { foldRequestHeader, isAppendSurfaceEvent, isJsonValue, materializesSession, SessionId as brandSessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { hasConversationContent as hasSessionConversationContent } from '@deepseek-ai/dsh-session/surface'
 import type {
   JsonValue,
@@ -92,7 +92,7 @@ import type {} from '@deepseek-ai/dsh-tools'
 import type {
   ApiProxy, ConfigurableProviderView, CredentialView, DiscoveredModelView, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
   HostFrame,
-  ModelCatalogFailure, ModelProviderGroup,
+  ModelCatalogFailure, ModelProviderGroup, ModelSelectionProjectionState,
   ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionAssistantStreamBaseline, SessionHistoryIndex,
   SessionListMetadata,
   SessionProjectionsBlock, SessionSearchItem,
@@ -2422,6 +2422,38 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     installModelSelection(agent.ctx, selection)
     selections.set(agent, selection)
     return selection
+  }
+
+  /**
+   * Derive the same pending/header selection tiers as {@link selectionFor}
+   * from a durable log alone, so a cold or agent-less session's directory
+   * read does not resume an Agent to render the picker.
+   * @param events - the session's complete durable event log.
+   * @returns the effective selection, or undefined to use the default tier.
+   */
+  function detachedSelection(events: readonly SessionEvent[]): ModelSelection | undefined {
+    let state: ModelSelectionProjectionState = modelSelectionProjectionDefinition.init()
+    for (const event of events) state = modelSelectionProjectionDefinition.apply(state, event)
+    if (state.pending !== null) {
+      return {
+        provider: state.pending.provider,
+        model: state.pending.model,
+        ...state.pending.reasoningEffort === undefined
+          ? {}
+          : { reasoningEffort: ReasoningEffortId(state.pending.reasoningEffort) },
+      }
+    }
+    const header = foldRequestHeader(events)
+    if (header === undefined) return undefined
+    const logged = header.config
+    return {
+      provider: logged.provider,
+      model: logged.model,
+      // An effort the adapter defaulted is not a conversation choice: see selectionFor.
+      ...logged.reasoningEffort === undefined || header.adapterDefaults?.reasoningEffort === true
+        ? {}
+        : { reasoningEffort: logged.reasoningEffort },
+    }
   }
 
   /**
@@ -4773,9 +4805,45 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const { sessionId } = request.payload
         const authorized = await authorizeSession(sessionId, 'read')
         if ('error' in authorized) return err(request, authorized.error)
-        const found = await agentFor(sessionId)
-        if ('error' in found) return err(request, found.error)
-        const current = selectionFor(found.agent).current
+        // The picker is a read: a session whose Agent is not live — and not
+        // already resuming for another reason — is served from its durable log
+        // instead of resuming one just to render the trigger label. The
+        // ownership fence mirrors agentFor's: generic reads never serve
+        // subagent-owned identities, live or cold.
+        const live = ctx.agents.get(sessionId)
+        const attached = ctx.sessions.get(sessionId)
+        if (attached !== undefined && hasSubagentOwner(attached, live)) {
+          return err(request, subagentOwnershipError(sessionId))
+        }
+        let current: ModelSelection
+        if (live !== undefined) {
+          current = selectionFor(live).current
+        } else if (pendingResume(sessionId) !== undefined) {
+          const found = await agentFor(sessionId)
+          if ('error' in found) return err(request, found.error)
+          current = selectionFor(found.agent).current
+        } else {
+          let events: readonly SessionEvent[]
+          if (attached !== undefined) {
+            // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
+            events = attached.snapshotEvents()
+          } else {
+            let inspected: Awaited<ReturnType<typeof inspectServable>>
+            try {
+              inspected = await inspectServable(sessionId)
+            } catch (error: unknown) {
+              if (error instanceof SessionNotFound) {
+                return err(request, { code: 'session-not-found', message: error.message, details: { sessionId } })
+              }
+              throw error
+            }
+            if (hasApiRemoteSubagentOwner(ctx, { header: inspected.meta }, undefined)) {
+              return err(request, subagentOwnershipError(sessionId))
+            }
+            events = inspected.events
+          }
+          current = detachedSelection(events) ?? defaults.defaultModelSelection()
+        }
         const { groups, failures } = await buildModelCatalog(ctx)
         const routable = routeServed(current.provider)
           && modelRefusal(current.provider, current.model) === undefined
@@ -6301,8 +6369,18 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               })
             }),
             ctx.on('session/created', (session: Session) => {
-              const lastSeq = session.seq - 1
-              publishFor(session.id, () => { subscribe(session, lastSeq) })
+              publishFor(session.id, () => {
+                // Appends committed before store entry — the durable resume
+                // marker is the known case — never reach session/event
+                // observers. Stream them BEFORE the baseline so a window
+                // ending at the restored prefix stitches them live instead of
+                // repairing the tail through a second history read.
+                // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
+                for (const event of session.snapshotEvents(session.firstLiveSeq)) {
+                  publishEvent(session, event)
+                }
+                subscribe(session, session.seq - 1)
+              })
             }),
             ctx.on('session/disposed', (session: Session) => {
               openCalls.delete(session.id)

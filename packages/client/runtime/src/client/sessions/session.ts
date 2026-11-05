@@ -686,7 +686,6 @@ export class Session implements SessionFace {
    *  and must not settle the fresh generation into 'error'. Pending waits always clear for the
    *  baseline replay. */
   async resync(): Promise<void> {
-    console.warn(`[sess-diag] resync ${this.sessionId} state=${this.openState}`)
     // The queue mirror is NOT cleared here: onConnected (which drives resync)
     // races the mux frames — the fresh generation's baseline may have landed
     // already, and the host never resends it. The mirror re-baselines on the
@@ -1057,7 +1056,6 @@ export class Session implements SessionFace {
   /** @param generation - openGeneration at launch; every await re-checks it and a stale pass
    *  drops all writes (resync superseded this open — its outcome belongs to a dead connection). */
   private async doOpen(generation: number): Promise<void> {
-    console.warn(`[sess-diag] doOpen ${this.sessionId} gen=${generation} state=${this.openState}`)
     this.openState = 'loading'
     this.openError = null
     this.notifier.markDirty()
@@ -1680,7 +1678,6 @@ export class Session implements SessionFace {
    * competing one.
    */
   private repairGap(): Promise<void> {
-    console.warn(`[sess-diag] repairGap ${this.sessionId} state=${this.openState}`)
     if (this.repairPromise !== null) {
       this.repairRequested = true
       return this.repairPromise
