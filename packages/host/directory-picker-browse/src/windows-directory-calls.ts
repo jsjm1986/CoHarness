@@ -101,7 +101,9 @@ export async function loadWindowsDirectoryCalls(): Promise<WindowsDirectoryCalls
     }
     return {
       openRoot: async (path) => {
-        const handle = await invoke(createRoot, [path, 0x001000a0, 7, null, 3, 0x02000000 | 0x00200000, 0])
+        // FILE_ADD_SUBDIRECTORY keeps descendants creatable through this handle;
+        // NT checks the parent's granted access on relative FILE_CREATE.
+        const handle = await invoke(createRoot, [path, 0x001000a4, 7, null, 3, 0x02000000 | 0x00200000, 0])
         if (BigInt(handle) === -1n) throw new Error('Windows filesystem root could not be opened')
         return handle
       },
@@ -115,10 +117,15 @@ export async function loadWindowsDirectoryCalls(): Promise<WindowsDirectoryCalls
           || /[\u0000-\u001f]/.test(name))) {
           throw new Error('Windows directory child is not a valid Windows filename')
         }
-        // Ancestors need traversal and attributes, not permission to list their contents.
-        return open(parent, name, create ? 2 : 1, create ? 0 : 0x001000a0, !create)
+        // Ancestors need traversal and attributes, not permission to list their
+        // contents; FILE_ADD_SUBDIRECTORY lets a retained ancestor parent a
+        // later create (NT rejects with STATUS_ACCESS_DENIED when RootDirectory
+        // lacks it).
+        return open(parent, name, create ? 2 : 1, create ? 0 : 0x001000a4, !create)
       },
-      reader: parent => open(parent, '.', 1, 0x00100081, true),
+      // An empty ObjectName re-opens the directory RootDirectory already names;
+      // '.' and '..' are Win32 notation the NT object manager rejects.
+      reader: parent => open(parent, '', 1, 0x00100081, true),
       identity: async (handle) => {
         const info = Buffer.alloc(52)
         if (await invoke(inspect, [handle, info]) === 0) throw new Error('Windows directory identity could not be read')
