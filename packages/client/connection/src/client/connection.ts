@@ -112,6 +112,8 @@ export interface ConnectionFailureDiagnostic {
   readonly cause: 'stream-eof' | 'queue-overflow' | 'rpc-error' | 'transport-rejection'
   readonly phase: 'opening' | 'connected'
   readonly elapsedMs: number
+  /** Constructor name of the failure value; the message stays on the error itself. */
+  readonly errorName?: string
   readonly connectedForMs?: number
   readonly closeCode?: number
   readonly wasClean?: boolean
@@ -285,6 +287,7 @@ export class ConnectionController {
           ...(termination?.closure === undefined ? {} : {
             closeCode: termination.closure.closeCode, wasClean: termination.closure.wasClean,
           }),
+          ...(failure.kind === 'transport' && failure.error instanceof Error ? { errorName: failure.error.name } : {}),
         }
         firstFailure = diagnostic
         this.callSink(() => { this.sinks.onFailure?.({ ...failure, diagnostic }) })
