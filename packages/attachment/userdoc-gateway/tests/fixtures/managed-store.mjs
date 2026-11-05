@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { createHash, generateKeyPairSync, randomUUID } from 'node:crypto'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { setImmediate } from 'node:timers/promises'
 
 const mode = process.argv[2], wrongPriority = process.argv[3] === 'borrow-viewer'
@@ -122,7 +123,7 @@ export function apply(ctx) {
     ['client/connection'], ['context/gateway-runtime'], ['context/collaboration-gateway'],
     [authorityModule], ['attachment/userdoc-gateway', { documentRoot: documents, maxMetadataBytes: 8192, requestTimeoutMs: 10_000 }], ['host/userdoc-http'],
   ]
-  await writeFile(configFile, plugins.map(([name, config]) => `- name: ${JSON.stringify(name.startsWith('/') ? name : moduleUrl(name).href)}${config === undefined ? '' : `\n  config: ${JSON.stringify(config)}`}`).join('\n') + '\n')
+  await writeFile(configFile, plugins.map(([name, config]) => `- name: ${JSON.stringify(isAbsolute(name) ? pathToFileURL(name).href : moduleUrl(name).href)}${config === undefined ? '' : `\n  config: ${JSON.stringify(config)}`}`).join('\n') + '\n')
   process.env.DSH_GATEWAY_CREDENTIAL_FILE = credentialFile
   ctx = await boot('managed-document-store-fixture', configFile)
   delete process.env.DSH_GATEWAY_CREDENTIAL_FILE
