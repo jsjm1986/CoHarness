@@ -139,6 +139,7 @@ export class GatewayEntryRequests {
       const account = this.principal(), bootstrap = this.connection.hostDescription.getSnapshot()?.runtimeTarget
       if (this.closed || account === undefined || bootstrap?.runtimeId === undefined) throw new Error('Computer directory owner is unavailable')
       if (!this.directory.ready) await this.directory.manifest(account, bootstrap, signal)
+      this.directory.prewarm()
       if (visible === undefined || visible.scope === undefined) return this.directory.snapshot()
       const scope = visible.scope
       if (scope === '' && visible.q) return this.directory.snapshot({ ...visible, scope })
