@@ -76,6 +76,19 @@ try {
     } else {
       const socket = await connection.connectStream(prepared.streams.stdout)
       socket.destroy()
+      // The socket's 'close' dispatches asynchronously before the cancel
+      // command reaches the carrier; wait for that command's audit entry and
+      // the forward's removal instead of racing the first permit release.
+      const waitUntil = Date.now() + 10_000
+      for (;;) {
+        const landed = (await readFile(audit, 'utf8')).trim().split('\n').filter(Boolean)
+          .map(line => JSON.parse(line)).some(command => command.method === 'cancel')
+        const allocated = (await readFile(audit, 'utf8')).trim().split('\n').filter(Boolean)
+          .map(line => JSON.parse(line)).find(command => command.method === 'forward' && !command.reverse)
+        if (landed && (allocated === undefined || !existsSync(allocated.forward.split(':')[0]))) break
+        if (Date.now() >= waitUntil) break
+        await new Promise(ready => { setTimeout(ready, 25) })
+      }
       let deadline
       try {
         stoppedAfterFailure = await Promise.race([
