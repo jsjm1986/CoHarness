@@ -114,6 +114,8 @@ export interface ConnectionFailureDiagnostic {
   readonly elapsedMs: number
   /** Constructor name of the failure value; the message stays on the error itself. */
   readonly errorName?: string
+  /** Constructor name of the failure's `cause` when it is itself an Error. */
+  readonly causeName?: string
   readonly connectedForMs?: number
   readonly closeCode?: number
   readonly wasClean?: boolean
@@ -287,7 +289,10 @@ export class ConnectionController {
           ...(termination?.closure === undefined ? {} : {
             closeCode: termination.closure.closeCode, wasClean: termination.closure.wasClean,
           }),
-          ...(failure.kind === 'transport' && failure.error instanceof Error ? { errorName: failure.error.name } : {}),
+          ...(failure.kind === 'transport' && failure.error instanceof Error ? {
+            errorName: failure.error.name,
+            ...(failure.error.cause instanceof Error ? { causeName: failure.error.cause.name } : {}),
+          } : {}),
         }
         firstFailure = diagnostic
         this.callSink(() => { this.sinks.onFailure?.({ ...failure, diagnostic }) })
