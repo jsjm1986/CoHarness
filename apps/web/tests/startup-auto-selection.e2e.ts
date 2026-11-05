@@ -619,12 +619,32 @@ describe('web e2e: startup auto-selection', () => {
       let terminalCalls = 0
       const countHistory = (request: import('playwright').Request): void => {
         const path = new URL(request.url()).pathname
-        if (path === '/api/session.history') historyCalls++
+        if (path === '/api/session.history') {
+          historyCalls++
+          console.log(`[diag] history call #${String(historyCalls)} payload=${request.postData() ?? 'null'} nav=${targetPage.url()}`)
+        }
         if (path === '/api/session.historyIndex') indexCalls++
         if (path === '/api/terminal/list') terminalCalls++
       }
       targetPage.on('request', countHistory)
       targetPage.on('response', observeHistory)
+      targetPage.on('framenavigated', (frame) => { if (frame === targetPage.mainFrame()) console.log(`[diag] navigated -> ${frame.url()}`) })
+      targetPage.on('console', (message) => {
+        const type = message.type()
+        if (type === 'error' || type === 'warning') console.log(`[diag] ${type}: ${message.text()}`)
+      })
+      targetPage.on('request', (request) => {
+        const path = new URL(request.url()).pathname
+        if (path === '/api/events.mux' || path === '/api/events.host' || path === '/api/host.describe') {
+          console.log(`[diag] request: ${path}`)
+        }
+      })
+      targetPage.on('requestfinished', (request) => {
+        const path = new URL(request.url()).pathname
+        if (path === '/api/events.mux' || path === '/api/events.host') console.log(`[diag] stream ended: ${path}`)
+      })
+      targetPage.on('pageerror', (error) => { console.log(`[diag] pageerror: ${String(error)}`) })
+      targetPage.on('requestfailed', (request) => { console.log(`[diag] requestfailed: ${new URL(request.url()).pathname} ${request.failure()?.errorText ?? ''}`) })
       const listRoute = /\/api\/session\.list(?:\?.*)?$/
       const listReads: Promise<void>[] = []
       await targetPage.route(listRoute, (route) => {
