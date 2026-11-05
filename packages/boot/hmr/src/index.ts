@@ -41,15 +41,11 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
+// Node's ESM resolver uses the JS realpath implementation — the first
+// canonical spelling; native realpath expands Windows short names differently
+// and would miss its cache keys.
 function canonicalPath(filename: string): string {
-  // Node's ESM resolver uses the JS realpath implementation; native realpath
-  // expands Windows short names differently and would miss its cache keys.
-  try { return realpathSync(filename) } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    const parent = dirname(filename)
-    if (parent === filename) throw error
-    return resolve(canonicalPath(parent), basename(filename))
-  }
+  return canonicalSpellings(filename)[0]
 }
 
 // Deduping by one canonical spelling misses aliases whose own realpath keeps a

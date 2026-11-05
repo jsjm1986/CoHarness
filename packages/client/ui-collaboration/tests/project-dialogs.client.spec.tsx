@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { PendingInvitationsDialog } from '../src/client/PendingInvitationsDialog.tsx'
 import { ProjectManagerModal, type ProjectManagerModalProps } from '../src/client/ProjectManagerModal.tsx'
 import { ProjectSettingsModal, type ProjectSettingsModalProps } from '../src/client/ProjectSettingsModal.tsx'
 import type { ProjectConfiguration, ProjectInvitation } from '../src/client/collaboration-client.ts'
@@ -328,5 +329,102 @@ describe('project invitation views', () => {
     expect((screen.getByRole<HTMLButtonElement>('button', { name: '邀请成员' })).disabled).toBe(true)
     expect(props.listUsers).not.toHaveBeenCalled()
     expect(props.inviteMember).not.toHaveBeenCalled()
+  })
+})
+
+describe('pending invitations dialog', () => {
+  type PendingProps = Parameters<typeof PendingInvitationsDialog>[0]
+  function pendingProps(overrides: Partial<PendingProps> = {}): PendingProps {
+    return { open: true, onClose: vi.fn(), t, currentUserId: 7,
+      listInvitations: vi.fn().mockResolvedValue([incoming, outgoing]), acceptInvitation: vi.fn().mockResolvedValue(undefined),
+      ...overrides }
+  }
+
+  it('lists only pending invitations addressed to the signed-in account', async () => {
+    const listInvitations = vi.fn().mockResolvedValue([
+      incoming, { ...incoming, id: 'answered', status: 'accepted' as const }, { ...incoming, id: 'other', invitee: incoming.inviter },
+    ])
+    render(<PendingInvitationsDialog {...pendingProps({ listInvitations })} />)
+    expect(await screen.findByText('业务空间', { selector: 'strong' })).toBeTruthy()
+    expect(screen.getByText('周工 邀请你加入')).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: '接受' })).toHaveLength(1)
+    expect(listInvitations).toHaveBeenCalledOnce()
+  })
+
+  it('defers its read while closed and reports an empty pending list', async () => {
+    const listInvitations = vi.fn().mockResolvedValue([])
+    render(<PendingInvitationsDialog {...pendingProps({ open: false, listInvitations })} />)
+    expect(listInvitations).not.toHaveBeenCalled()
+    cleanup()
+    render(<PendingInvitationsDialog {...pendingProps({ listInvitations })} />)
+    expect(await screen.findByText('暂无待处理邀请')).toBeTruthy()
+  })
+
+  it('drops list updates that settle after the dialog closes', async () => {
+    let resolve!: (value: ProjectInvitation[]) => void, reject!: (error: unknown) => void
+    const listInvitations = vi.fn().mockImplementation(() =>
+      new Promise<ProjectInvitation[]>((accept, refuse) => { resolve = accept; reject = refuse }))
+    const view = render(<PendingInvitationsDialog {...pendingProps({ listInvitations })} />)
+    expect(await screen.findByRole('status')).toBeTruthy()
+    view.rerender(<PendingInvitationsDialog {...pendingProps({ open: false, listInvitations })} />)
+    await act(async () => { resolve([incoming]) })
+    expect(screen.queryByText('业务空间', { selector: 'strong' })).toBeNull()
+    cleanup()
+    const failed = render(<PendingInvitationsDialog {...pendingProps({ listInvitations })} />)
+    await screen.findByRole('status')
+    failed.rerender(<PendingInvitationsDialog {...pendingProps({ open: false, listInvitations })} />)
+    await act(async () => { reject(new Error('offline')) })
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('retries a failed read', async () => {
+    const listInvitations = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue([incoming])
+    render(<PendingInvitationsDialog {...pendingProps({ listInvitations })} />)
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.getByText('邀请记录读取失败，请重试')).toBeTruthy()
+    fireEvent.click(screen.getByRole<HTMLButtonElement>('button', { name: '重试' }))
+    await screen.findByText('业务空间', { selector: 'strong' })
+    expect(listInvitations).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries a read that fails after it already failed once', async () => {
+    const listInvitations = vi.fn().mockRejectedValue(new Error('offline'))
+    render(<PendingInvitationsDialog {...pendingProps({ listInvitations })} />)
+    await screen.findByRole('alert')
+    fireEvent.click(screen.getByRole<HTMLButtonElement>('button', { name: '重试' }))
+    await screen.findByRole('alert')
+    expect(listInvitations).toHaveBeenCalledTimes(2)
+  })
+
+  it('removes an accepted invitation and reports a refresh failure', async () => {
+    const acceptInvitation = vi.fn().mockResolvedValue(undefined)
+    render(<PendingInvitationsDialog {...pendingProps({ acceptInvitation })} />)
+    fireEvent.click(await screen.findByRole<HTMLButtonElement>('button', { name: '接受' }))
+    await waitFor(() => { expect(screen.queryByText('业务空间', { selector: 'strong' })).toBeNull() })
+    expect(acceptInvitation).toHaveBeenCalledWith('incoming')
+    await screen.findByText('暂无待处理邀请')
+  })
+
+  it('surfaces an accept failure and keeps the invitation listed', async () => {
+    const acceptInvitation = vi.fn().mockRejectedValue(new Error('gone'))
+    render(<PendingInvitationsDialog {...pendingProps({ acceptInvitation })} />)
+    fireEvent.click(await screen.findByRole<HTMLButtonElement>('button', { name: '接受' }))
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.getByText('邀请已接受，但列表更新失败，请重新读取')).toBeTruthy()
+    expect(screen.getByText('业务空间', { selector: 'strong' })).toBeTruthy()
+  })
+
+  it('blocks closing while an accept request is busy', async () => {
+    let release!: () => void
+    const acceptInvitation = vi.fn().mockImplementation(async () => { await new Promise<void>((accept) => { release = accept }) })
+    const onClose = vi.fn()
+    render(<PendingInvitationsDialog {...pendingProps({ acceptInvitation, onClose })} />)
+    fireEvent.click(await screen.findByRole<HTMLButtonElement>('button', { name: '接受' }))
+    await waitFor(() => { expect((screen.getByRole<HTMLButtonElement>('button', { name: '取消' })).disabled).toBe(true) })
+    fireEvent.click(screen.getByRole<HTMLButtonElement>('button', { name: '关闭' }))
+    expect(onClose).not.toHaveBeenCalled()
+    await act(async () => { release() })
+    fireEvent.click(screen.getByRole<HTMLButtonElement>('button', { name: '关闭' }))
+    expect(onClose).toHaveBeenCalledOnce()
   })
 })

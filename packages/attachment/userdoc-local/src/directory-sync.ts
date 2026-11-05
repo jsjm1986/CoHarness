@@ -8,9 +8,10 @@ import { withDocumentHandle } from './handle.ts'
 const FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
 const FILE_READ_ATTRIBUTES = 0x80
 
-/* v8 ignore next -- Windows omits O_NOFOLLOW; lexical links and opened-file evidence are checked separately. */
+/* v8 ignore start -- Windows omits O_NOFOLLOW; lexical links and opened-file evidence are checked separately. */
 // oxlint-disable-next-line typescript/no-unnecessary-condition -- some supported platforms omit O_NOFOLLOW.
 const NOFOLLOW = constants.O_NOFOLLOW ?? 0
+/* v8 ignore stop */
 
 function windowsDirectoryError(syscall: string, nativeCode: number, path: string): NodeJS.ErrnoException {
   const code = ({ 2: 'ENOENT', 3: 'ENOENT', 5: 'EACCES' } as Record<number, string>)[nativeCode] ?? 'EIO'
