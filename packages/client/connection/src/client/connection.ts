@@ -1,4 +1,5 @@
 import type { HostDescription, IApiClient, HostFrame, MuxFrame, RpcError, RpcRequest } from './api.ts'
+import { ApiTransportError } from './api.ts'
 import { StreamTermination } from './stream-termination.ts'
 
 /** Reconnect/backoff tunables (deployment-varying — no hardcoded tunables; these become the
@@ -116,6 +117,10 @@ export interface ConnectionFailureDiagnostic {
   readonly errorName?: string
   /** Constructor name of the failure's `cause` when it is itself an Error. */
   readonly causeName?: string
+  /** Constructor name of the deepest Error in the cause chain. */
+  readonly rootCauseName?: string
+  /** HTTP status of a nested ApiTransportError cause; 0 means no response arrived. */
+  readonly causeStatus?: number
   readonly connectedForMs?: number
   readonly closeCode?: number
   readonly wasClean?: boolean
@@ -292,6 +297,12 @@ export class ConnectionController {
           ...(failure.kind === 'transport' && failure.error instanceof Error ? {
             errorName: failure.error.name,
             ...(failure.error.cause instanceof Error ? { causeName: failure.error.cause.name } : {}),
+            ...(failure.error.cause instanceof ApiTransportError ? { causeStatus: failure.error.cause.status } : {}),
+            rootCauseName: (() => {
+              let root = failure.error as Error
+              for (let depth = 0; depth < 8 && root.cause instanceof Error; depth += 1) root = root.cause
+              return root.name
+            })(),
           } : {}),
         }
         firstFailure = diagnostic

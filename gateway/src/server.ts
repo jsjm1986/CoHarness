@@ -2353,6 +2353,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     const settlePerformance = performanceObserver.beginRequest('websocket')
     let upgradeStatus = 400
     socket.once('close', (hadError: boolean) => { settlePerformance(upgradeStatus, hadError) })
+    // The handler owns this socket until a channel or proxy adopts it, and the
+    // authorization window awaits a database round-trip: a peer reset in that
+    // window would otherwise reach 'error' with no listener and take down the
+    // process. The 'close' listener above still records the failed upgrade.
+    socket.on('error', () => {})
     const finish = async (): Promise<void> => {
       const pathname = new URL(req.url ?? '/', 'http://x').pathname
       if (pathname === NODE_CHANNEL_PATH) {
