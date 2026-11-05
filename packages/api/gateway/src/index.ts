@@ -425,6 +425,9 @@ export class TypertGatewayService extends Service implements TypertGateway {
       )
     }
     const identity = args[invocation.wire]
+    if (invocation.context === 'agent') {
+      console.warn(`[sess-diag] context agent endpoint=${endpoint} wire=${invocation.wire} identity=${JSON.stringify(identity)}`)
+    }
     let context: Context | undefined
     try {
       context = await provider.resolve(identity)
@@ -469,6 +472,9 @@ export class TypertGatewayService extends Service implements TypertGateway {
         `lookup parameter ${JSON.stringify(parameter.name)} has no provider key`,
         { field: parameter.wire },
       )
+    }
+    if (key === 'agent' || key === 'session') {
+      console.warn(`[sess-diag] lookup ${key} endpoint=${endpoint} wire=${parameter.wire} value=${JSON.stringify(value)}`)
     }
     const provider = this.ctx.typert.lookups.get(key)
     if (provider === undefined) {
