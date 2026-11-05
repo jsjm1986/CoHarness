@@ -9,7 +9,9 @@ kind: "package-reference"
 
 客户端 cordis 启动与不依赖 React 的对象服务：SlotRegistry 包装 SlotCore 并提供 renderer 数据源；SessionRuntime 拥有 Session 对象、列表与 scope 状态，以及供已注册 conversation view target 共用的事件窗口与历史分页。WorkspaceRuntime 依赖 SessionRuntime，拥有 Workspace 对象、列表／操作、默认目标派生、历史优先的 Workspace 入口（`openWorkspace`）、Workspace 重连入口（`connectWorkspace`），以及不带草稿选项的 New Session 全新 Session+Agent 铸造（`startSession`）。运行时把共享 Host 流分发给 Session 与 Workspace 所有者，并把每个通用 `host/remote-event` 帧交给 `ctx.remote.$dispatch`；各领域包通过 `ctx.remote.$on` 订阅自身 owner 事件，并自行决定使哪些缓存或会话行失效。客户端会话由 Host 创建；目录成员关系本身不分配浏览器 scope。首个显式引用创建本地代次，最后一个引用释放后销毁 scope 和历史窗口，但不终止 Host Agent。每个 `Session` 持有一个通用的 `ProjectionValueStore`，由历史记录尾部的 `projections` 块播种，并经 `session/projection` 帧按 seq 高者胜更新；领域键（含 `todos`）经 `projections.faceOf`／`useProjection` 读取，不经 `ConversationSnapshot`。该 store 还会通过 `SessionSummary.projectionValues` 发布一份引用稳定的完整值映射，使全局列表消费方无需为每个会话创建订阅，即可复用同一组投影。
 
-账户工作台在此对象层上增加惰性的 `SessionRuntimePool`。池只为当前账户聚合列表和标准 props 查询，每个目标运行时仍保留自己的 API client、ConnectionController、SessionManager、事件流和 scope 资源。目标只有在 Gateway 校验成员关系并签发绑定 generation 的 principal 后才会接入；移除面板只释放其引用，不会停止 Host 任务。独立消费方持有引用期间，目标连接继续保留。
+受管多电脑入口分别读取已授权的 Runtime 列表和会话、工作区分页。展开电脑只读取对应 Runtime 的目录，此操作无需启动 Host。打开或新建对话时，客户端固定目标 Runtime，核验原生回执，并合并此次确认的工作区成员。用户重试同一次新建操作时，沿用原会话和预留标识。 经验证的新建回执可以直接用所属电脑的实际历史尾页初始化该会话。较早的 Host 或过大的尾页会对同一会话单独发起授权读取。首次连接时用事件流的订阅水位核对该尾页，出现缺口或后续重新连接时补读。
+
+账户工作台在此对象层上增加惰性的 `SessionRuntimePool`。池只为当前账户聚合列表和标准 props 查询，每个目标运行时仍保留自己的 API client、ConnectionController、SessionManager、事件流和 scope 资源。目标只有在 Gateway 校验成员关系并签发绑定 generation 的 principal 后才会接入；移除面板只释放其引用，不会停止 Host 任务。独立消费方持有引用期间，目标连接继续保留。 Runtime 的来源快照、目标和可见会话集合都未变化时，复用该 Runtime 的会话列表。工作区通知只在草稿变化或前次写入需要重试时保存标签页恢复索引。
 
 直接读取 JSON 的浏览器消费方共用 Host carrier 的流式 reader；它会在解析前拒绝声明长度或实际分块超过默认 16 MiB 的 body。该 helper 只负责传输上限，不替代端点自己的响应校验。
 
@@ -129,6 +131,10 @@ SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 
 <a id="new-session-and-the-blank-mirror"></a>
 ## New Session 与 blank 镜像
 
+`ctx.conversationIntents` 在当前浏览器标签页中将输入内容绑定到所选 Runtime 和预留的 Session。`workspaces/start-prepared` 会立即打开可编辑的输入框。进入已有对话时，`conversation/prepare-input` 先读取获准访问的草稿，再由 `conversation/append-input` 追加输入。`ctx.gatewayEntryRequests` 在本标签页内合并相同的目录读取，最后一个使用方退出时取消请求。
+
+多电脑模式下，浏览器只保存已确认的草稿标识和修订号。复制标签页会向所属电脑读取该修订并保存独立副本。临时断线后可重试同一版本；超过保留窗口时，输入继续留在本标签页。
+
 新建的 Session 仍为空白时，列表行会携带仅客户端使用的 `workspaceId` 提示，因此 Host 刷新期间占位行仍留在目标 Workspace 下；首条可见内容或移除后提示会清掉，且不会发送到 wire。
 
 `WorkspaceRuntime.connectWorkspace(workspaceId)` 解析 Workspace 重连最终落入的会话——`openWorkspace` 的历史回退以及携带草稿的新会话启动：它从列表镜像收集该 Workspace 的既有空会话（`blank && cwd == workspace.path && sessionIds.includes(id)`——Host 自己的成员规则，绝不只按 cwd，避免劫持 cwd 匹配但未入账的空白会话），排除已归档行，再让 `SessionRuntime.createOrReuse()` 返回首个与插件创建选项兼容的候选项，或者创建新会话。新建分支携带稳定的 draft id 和预分配 Session id；收到可见消息前，这对身份会保存在受限浏览器存储中，因此刷新或并发的草稿启动操作会复用同一 reservation，但不会保存凭据。草稿预留保存原始 Host ID；仅对池化创建返回值解码回该表示，避免再次创建时把浏览器键预留为新的 Session。共享的 `startSession` 操作优先使用明确指定的 Workspace，其次使用当前 Session 所属 Workspace，再其次使用派生的最近活跃 Workspace；一个 Workspace 都没有时则清空选择，进入空白 New Session 页面。不带草稿选项的 `startSession` 调用始终新建 Session+Agent：只携带 Workspace 身份发送 `session.create`，不提供成员空会话，也不采用该 Workspace 未完成的草稿预留——预留 Session 会按其记录的组合恢复，因此裸调用将其留给草稿流程复用或退役。同一 Workspace 的并发裸调用合并到进行中的创建；重连复用尝试与已完成的创建各自只服务自己的调用方。携带草稿初始化的 `startSession(workspaceId?, options?)` 仍走重连分支：`prompt` 为最终保留的 Session 预填编辑器（不发送），`clearPreviousDraft` 先丢弃其草稿文字；`conversation/draft-initialize` 事件只作用于已提交导航所保留的 Session，被取代的导航不会写稿。`SessionSummary.blank` 镜像 Host 的“没有可见内容”位：由 `session.list`／`host/session-added` 帧播种，只有收到非空对话事件才转为非 blank，因此已受理但最终为空的轮次仍可复用；列表重拉会在合并本地已观测证据后重新对齐。列表界面隐藏 blank 行；store 保留每一行。`SessionRuntime.create` 接受可选的、由调用方预先分配的 SessionId，失败时抛出 `SessionCreateError`（携带 `requestedSessionId`）。
@@ -220,4 +226,4 @@ reason 为 `max-tokens` 的 `turn/end` 会在该轮位置投影出一个 `turn-m
 
 </details>
 
-入口所属的 `deploymentContext` 服务在资源转发前读取 Gateway 策略，为个人目录、文档和协作界面提供展示与聚合信息，与选中的 Runtime 分离。同源消息只通知策略修订号失效；刷新不改变当前选择或草稿。本机入口保留当前本机 Runtime 的私有工作区隔离。参见[部署模式](../../../gateway/docs/deployment-topology/README.zh.md)。
+入口所属的 `deploymentContext` 服务在资源转发前读取 Gateway 策略，为个人目录、文档和协作界面提供展示与聚合信息，与选中的 Runtime 分离。同源消息只通知策略修订号失效；刷新不改变当前选择或草稿。本机入口保留当前本机 Runtime 的私有工作区隔离。参见[部署模式](../../../gateway/docs/deployment-topology/README.zh.md)。 标签页保留个人对话的 Session、Runtime 和上次核验的电脑身份，直到用户完成新选择或主动清空。断线后须由原电脑重新授权历史，编辑器才能发送。切回页面时重新核验使用权，并读取视窗内已展开的目录，无需启动这些 Runtime。

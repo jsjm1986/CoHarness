@@ -1,0 +1,11 @@
+{
+  "at": "2026-11-04T21:48:55.376591+00:00",
+  "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/current-allocation-scan.json",
+  "productionSourceFiles": 2991,
+  "rawAllocationSites": 44,
+  "unmatchedHistoricalOwnerKeys": 16,
+  "classification": "Nine sites belong to the peer-owned node content/private database/native backup work. Seven sites are known subprocess provider internals or scanner key-name differences: shared SubprocessRuntime admission precedes protected provider allocation; managed range exit owns release. This source inspection does not independently accept the new peer helpers.",
+  "newConfirmedBugs": 0,
+  "wholeResourceReviewComplete": false,
+  "wholeProjectComplete": false
+}

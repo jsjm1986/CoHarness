@@ -53,9 +53,11 @@ export class InputHub implements SessionInputResolver {
     private readonly rootCtx: ClientContext,
     private readonly t: TranslateNS<'conversation'>,
     private readonly draftIsSaved?: (sessionId: SessionId) => boolean,
+    private readonly pendingNodeWrites?: () => boolean,
   ) {}
 
   hasUnsavedDrafts(): boolean {
+    if (this.pendingNodeWrites?.()) return true
     for (const pending of this.pendingInits.values()) {
       if (pending.prompt !== undefined && pending.prompt !== '') return true
     }

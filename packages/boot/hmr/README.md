@@ -19,6 +19,8 @@ Reload plugin source and configuration while an application is running. Module r
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
+The `hmr/authorize-reload` event lets deployment plugins verify prospective profile, configuration and module changes before they can affect the running tree. A refused check preserves the running plugin.
+
 -----
 
 <a id="use-this-package"></a>

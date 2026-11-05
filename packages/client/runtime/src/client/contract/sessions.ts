@@ -9,7 +9,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type {
-  JobView, RpcResult, SessionId, SubagentAddress,
+  JobView, RpcResult, SessionId, SubagentAddress, WorkspaceView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ConnectionRuntimeTarget } from '@deepseek-ai/dsh-client-connection/client'
 import type { HostObservable, SessionMaybeProvideInfo, SessionProvideInfo } from '@deepseek-ai/dsh-client-ui-slots'
@@ -243,6 +243,18 @@ export interface ISessions {
    * @returns completion after the exact target's initial connection and Session directory settle.
    */
   prepareRuntime?(target: SessionRuntimeTarget, signal: AbortSignal): Promise<void>
+  /** Check whether the verified entry supports prepared Session operations on this allocation.
+   * @param target - captured Runtime and personal or project space.
+   * @returns whether the versioned operations are available.
+   */
+  preparedOperationsAvailable?(target: SessionRuntimeTarget): boolean
+  /** Create an explicitly addressed Session and return its verified Workspace location.
+   * @param target - exact selected allocation.
+   * @param options - one intent's fixed Session and draft identifiers, and optional Workspace.
+   * @param signal - view owner cancellation.
+   * @returns the qualified Session and the Workspace hint for this conversation only.
+   */
+  createPreparedSession?(target: SessionRuntimeTarget, options: import('./session-create.ts').SessionCreateOptions, signal: AbortSignal): Promise<{ sessionId: SessionId; workspace: WorkspaceView }>
   /** Discover an account-visible Session in its target runtime before retaining history.
    * @param target - account runtime that owns the session's workbench binding.
    * @param id - listed session identity to materialize.

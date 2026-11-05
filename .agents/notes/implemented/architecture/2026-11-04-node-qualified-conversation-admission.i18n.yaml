@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-04-node-qualified-conversation-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-04-node-qualified-conversation-admission.md
+document:
+  en: 91c4a9d60b2c04676c805c210bc940aa715e1da9
+  zh: 3e020dd1c096ec8d5da13af45aa03c7a52157e18
+/agent-note-node-qualified-conversation-admission:
+  en: e30fdaf185e85213
+  zh: 6e1394e0356dab53
+/agent-note-node-qualified-conversation-admission/problem:
+  en: 4913ea4df9c26e87
+  zh: 2c696eb9e530e4b1
+/agent-note-node-qualified-conversation-admission/decision:
+  en: f599979b44bedf5f
+  zh: 4e7c03b79f07158a
+/agent-note-node-qualified-conversation-admission/alternatives-considered:
+  en: 1733905aef64ce1c
+  zh: 2d43c6e7b768d3d8
+/agent-note-node-qualified-conversation-admission/consequences:
+  en: 71f0a4e75ba05892
+  zh: 461ca57849c34f20
+/agent-note-node-qualified-conversation-admission/verification:
+  en: e61b1a93799c0ec7
+  zh: a986ee73454a229e

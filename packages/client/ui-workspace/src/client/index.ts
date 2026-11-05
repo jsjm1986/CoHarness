@@ -188,8 +188,37 @@ export function apply(ctx: ClientContext): void {
     sessionId: SessionId,
     navigation = AbortSignal.any([ctx.sessions.beginNavigation(), lifetime.signal]),
   ): Promise<void> => {
+    ctx.get('conversationIntents')?.hide()
     const address = parseClientSessionKey(sessionId)
     const ensure = ctx.sessions.ensureSession?.bind(ctx.sessions)
+    const intents = ctx.get('conversationIntents')
+    if (intents !== undefined && address !== undefined && ensure !== undefined
+      && ctx.sessions.preparedOperationsAvailable?.(address.runtime)
+      && ctx.sessions.list.getSnapshot().current !== sessionId) {
+      const summary = ctx.sessions.list.getSnapshot().byId[sessionId]
+      const target = summary?.runtime ?? address.runtime
+      const pane = viewport?.snapshot.getSnapshot()
+      ctx.layout.selectPanel(null)
+      intents.begin({ target, label: [summary?.displayTitle, target.nodeName].filter(Boolean).join(' · '),
+        ...(pane?.mode === 'workbench' && pane.activePaneId ? { paneId: pane.activePaneId } : {}) },
+      async (intent, editing, transferred) => {
+        const current = AbortSignal.any([editing, ctx.sessions.beginNavigation(), lifetime.signal])
+        const perform = async (active: AbortSignal): Promise<void> => {
+          if (!ctx.sessions.preparedOperationsAvailable?.(target)) throw new Error('The original managed Runtime is unavailable')
+          if (!await ensure(target, address.sessionId, active)) throw new Error('Session is unavailable')
+          if (await ctx.bail('conversation/prepare-input', sessionId) !== true) throw new Error('Saved draft is unavailable')
+          await commitOpen(sessionId, active, () => {
+            const pending = intents.snapshot.getSnapshot().active
+            if (pending?.id !== intent.id) return
+            if (pending.text !== '' && ctx.bail('conversation/append-input', { sessionId, text: pending.text }) !== true) return
+            transferred()
+          })
+        }
+        if (ctx.sessions.usingRuntime === undefined) return perform(current)
+        await ctx.sessions.usingRuntime(target, current, perform)
+      })
+      return
+    }
     if (address !== undefined && ctx.sessions.runtimeIdentityFor?.(sessionId) === undefined
       && ctx.sessions.usingRuntime !== undefined && ensure !== undefined) {
       return ctx.sessions.usingRuntime(address.runtime, navigation, async (signal) => {
@@ -201,7 +230,7 @@ export function apply(ctx: ClientContext): void {
     }
     return commitOpen(sessionId, navigation)
   }
-  const commitOpen = async (sessionId: SessionId, navigation: AbortSignal): Promise<void> => {
+  const commitOpen = async (sessionId: SessionId, navigation: AbortSignal, onCommitted?: () => void): Promise<void> => {
     await commitSessionNavigation(ctx.sessions, sessionId, navigation, () => {
       if (ctx.sessions.list.getSnapshot().archivedById[sessionId] !== undefined
         || ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
@@ -213,6 +242,7 @@ export function apply(ctx: ClientContext): void {
         throw new Error(ctx.locale.bind(NS)('navigation.unavailable'))
       }
       ctx.sessions.open(sessionId)
+      onCommitted?.()
       // Opening a Session always reveals its Conversation, including the
       // no-op reselection of the current Session from another main panel.
       ctx.layout.selectPanel(null)
@@ -262,6 +292,33 @@ export function apply(ctx: ClientContext): void {
     return String(reason)
   }
   const startRuntimeSession = async (target: SessionRuntimeTarget, workspaceId?: WorkspaceId, signal?: AbortSignal): Promise<void> => {
+    const intents = ctx.get('conversationIntents')
+    if (intents !== undefined && ctx.sessions.preparedOperationsAvailable?.(target)) {
+      const create = ctx.workspaces.createRuntimeSession?.bind(ctx.workspaces)
+      if (create === undefined) throw new Error('Runtime conversation creation is unavailable')
+      const workspace = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)
+      const pane = viewport?.snapshot.getSnapshot()
+      ctx.layout.selectPanel(null)
+      intents.begin({ target, ...(workspaceId === undefined ? {} : { workspaceId }),
+        ...(pane?.mode === 'workbench' && pane.activePaneId !== undefined ? { paneId: pane.activePaneId } : {}),
+        label: [workspace?.title, target.nodeName].filter(Boolean).join(' · ') }, async (intent, editing, transferred) => {
+        const navigation = AbortSignal.any([ctx.sessions.beginNavigation(),
+          editing, lifetime.signal, ...(signal === undefined ? [] : [signal])])
+        const perform = async (active: AbortSignal): Promise<void> => {
+          const id = await create(target, workspaceId, active, intent)
+          active.throwIfAborted()
+          await commitOpen(id, active, () => {
+            const current = intents.snapshot.getSnapshot().active
+            if (current?.id !== intent.id) return
+            if (current.text !== '') ctx.emit('conversation/draft-initialize', { sessionId: id, prompt: current.text, clearPreviousDraft: true })
+            transferred()
+          })
+        }
+        if (ctx.sessions.usingRuntime === undefined) return perform(navigation)
+        await ctx.sessions.usingRuntime(target, navigation, perform)
+      })
+      return
+    }
     const navigation = AbortSignal.any([ctx.sessions.beginNavigation(), lifetime.signal, ...signal === undefined ? [] : [signal]])
     const create = ctx.workspaces.createRuntimeSession?.bind(ctx.workspaces)
     if (ctx.sessions.usingRuntime === undefined || create === undefined) throw new Error('Runtime is unavailable')
@@ -275,6 +332,10 @@ export function apply(ctx: ClientContext): void {
       console.warn('personal Workspace directory refresh failed:', error)
     })
   }
+  ctx.on('workspaces/start-prepared', ({ target, workspaceId }) => {
+    void startRuntimeSession(target, workspaceId).catch((reason: unknown) => { notify({ kind: 'createFailed', message: createFailureMessage(reason) }) })
+    return true
+  })
   const uiWorkspace: UiWorkspace = {
     openSession: (sessionId) => {
       void openSession(sessionId).catch((reason: unknown) => {
@@ -287,6 +348,15 @@ export function apply(ctx: ClientContext): void {
       // clear and a same-session reuse emit no selection change, so the panel
       // reset cannot ride the session-list subscription `openSession` enjoys.
       ctx.layout.selectPanel(null)
+      const fresh = options?.prompt === undefined && options?.clearPreviousDraft !== true
+      const destination = fresh ? ctx.workspaces.newSessionDestination?.(workspaceId) : undefined
+      if (destination?.target !== undefined && ctx.sessions.preparedOperationsAvailable?.(destination.target) === true) {
+        void startRuntimeSession(destination.target, destination.workspaceId).catch((reason: unknown) => {
+          notify({ kind: 'createFailed', message: createFailureMessage(reason) })
+        })
+        return
+      }
+      ctx.get('conversationIntents')?.hide()
       ctx.workspaces.startSession(workspaceId, {
         ...options,
         onFailure: (reason) => {
@@ -435,7 +505,10 @@ export function apply(ctx: ClientContext): void {
     closeAddWorkspace: shortcutControls.closeAdd,
     setDirectoryBusy: shortcutControls.directoryBusy,
     dismissForkError: shortcutControls.dismissForkError,
+    computerPageConcurrency: Math.max(1, Math.floor((connection.entryRequestLimit ?? 1) / 2)),
     refreshComputers: () => ctx.workspaces.refreshPersonalDirectory?.() ?? Promise.resolve(),
+    ...(ctx.workspaces.loadPersonalRows === undefined ? {} : { loadComputerRows: ctx.workspaces.loadPersonalRows }),
+    ...(ctx.workspaces.loadMoreComputers === undefined ? {} : { loadMoreComputers: ctx.workspaces.loadMoreComputers }),
     startRuntimeSession,
     hooks: {
       directoryFlow: browserFlowSource,

@@ -13,8 +13,20 @@ Project name, theme, Provider and credential mutations authorize the authenticat
 
 Administrator membership overrides also recheck the current active administrator role inside their write transaction. Demotion or account disablement after an earlier HTTP check cannot authorize these overrides, even when the account owns the project. Administrator permission denials return403, preserve project data and record a failed attempt.
 
+Project model reads recheck current account, membership, project and target-computer eligibility after preparation. Required password changes and withdrawn steward qualification also refuse publication. Former owners who remain members receive read-only settings and credential state; discovery results require current management authority. Already dispatched catalog requests may finish, but their metadata is withheld after withdrawal.
+
+Shared management [password qualification](../user-administration-authority/guide.md) also applies after authority waits; complete required password changes before retrying queued management.
+
+Project directory, detail, configuration and project invitation publication recheck current browser qualification after preparation. Withdrawn directory entries disappear; other withdrawn reads return403. Ownership, theme and capabilities reflect current authority. Project invitation lists withhold other accounts’ invitations after management loss; eligible members retain incoming and outgoing history. Changed project computers require refreshed reads; Steward spaces return `members: false`.
+
+Account invitation history and pending counts recheck browser session validity, including logout, expiry and required password changes. The account retains its own participant history after project or computer permission loss. Other accounts’ invitations require current management and the custom project read provider; provider failures withhold data.
+
 ## Migration
 
 Upgrade the complete Gateway build, including its PostgreSQL authority helper. Database schemas, project data and browser request fields are unchanged. Custom service consumers pass the authenticated account id to manager mutations, membership overrides and discovery preparation; omitting it is reserved for trusted internal maintenance. A browser-provided actor id does not supply authentication.
+
+Custom project model service implementations also provide `authorizeProjectModelRead(projectId, actorUserId)`. It returns the current reader’s management flag or refuses the read, using current account and exact-computer permissions without asynchronous node metadata loading. The Gateway calls it after preparing each read; implementations without this capability return501.
+
+Custom collaboration adapters provide `projectReadAuthorities(userId, projectId?)`, returning current ownership, theme and management flags without node I/O. Preserve `nodeId` consistently across initial and final project views. Omission selects the current directory; the optional project id selects one project. Missing providers return501; lookup failures return503 without prepared metadata. Existing Runtime authorization methods retain their behavior.
 
 Reopen project settings after a403 response to refresh current ownership and capabilities. Verify that the current owner can update the project and that a previous owner cannot change its data or credentials. See the [Gateway management rules](../../../../gateway/README.md).

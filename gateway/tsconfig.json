@@ -65,6 +65,7 @@
       "@deepseek-ai/dsh-userdoc-gateway/server": [
         "../packages/attachment/userdoc-gateway/lib/types/server.d.ts"
       ],
+      "@deepseek-ai/dsh-schedule": ["../packages/schedule/schedule/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-userdoc-local": [
         "../packages/attachment/userdoc-local/lib/types/index.d.ts"
       ],

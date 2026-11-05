@@ -156,7 +156,16 @@ export class DeploymentContextRuntime {
       }
       void this.refresh()
     }
-    const focus = (): void => { if (globalThis.document?.visibilityState !== 'hidden') void this.invalidate(); else clearTimeout(this.timer) }
+    let foreground: Promise<void> | undefined
+    const focus = (): void => {
+      if (globalThis.document?.visibilityState === 'hidden') {
+        foreground = undefined
+        clearTimeout(this.timer)
+      } else if (foreground === undefined) {
+        const flight = this.invalidate().finally(() => { if (foreground === flight) foreground = undefined })
+        foreground = flight
+      }
+    }
     const stopAccount = policy.subscribe(changed), stopHost = connection.hostDescription.subscribe(changed)
     const channel = typeof BroadcastChannel === 'undefined' ? undefined : new BroadcastChannel('hgw-deployment-policy')
     if (channel !== undefined) channel.onmessage = (event) => {

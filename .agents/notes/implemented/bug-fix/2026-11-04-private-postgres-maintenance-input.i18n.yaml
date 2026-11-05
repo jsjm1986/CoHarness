@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-04-private-postgres-maintenance-input.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-04-private-postgres-maintenance-input.md
+document:
+  en: 04707453c74d9dfe351696ca71b61370ebf947d2
+  zh: 62bdc4a23b84e3571ae0156db37841e9578e6048
+/agent-note-private-postgresql-maintenance-input:
+  en: 616a1194d0d11c31
+  zh: 80855ed3d541dc58
+/agent-note-private-postgresql-maintenance-input/problem:
+  en: 77cf882088136c85
+  zh: 9a6436ca887b0e4f
+/agent-note-private-postgresql-maintenance-input/decision:
+  en: 158e8ff02f9ab3a5
+  zh: 13b8ae36738ade7f
+/agent-note-private-postgresql-maintenance-input/alternatives-considered:
+  en: 36f71015e868bf09
+  zh: a304cd5af8fe5314
+/agent-note-private-postgresql-maintenance-input/consequences:
+  en: f208e67ba20cd4be
+  zh: 9a0368348acad237
+/agent-note-private-postgresql-maintenance-input/verification:
+  en: fa265014adaae9cd
+  zh: ddfddc140dfabec4

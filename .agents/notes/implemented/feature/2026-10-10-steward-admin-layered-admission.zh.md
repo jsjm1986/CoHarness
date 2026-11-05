@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决定
 
-单一谓词裁决所有 steward 入口：活跃组织成员资格且 `role='admin'`，**并且**存在启用的 `steward_access_policies` 行。这一决定反转了[维护中枢空间 note](2026-10-10-steward-maintenance-space.zh.md) 中资格通道独立准入的原决定。
+单一谓词裁决所有 steward 入口：活跃组织成员资格且 `role='admin'`，**并且**存在 Runtime 所在电脑对应的已启用 `steward_access_policies` 行。这一决定反转了[维护中枢空间 note](2026-10-10-steward-maintenance-space.zh.md) 中资格通道独立准入的原决定。
 
 - **同一谓词覆盖每条路径。** 空间准入、会话读写、`claimInteraction`、`readableSessionIds`、成员侧文档元数据与修改，以及 `steward_query` 写批准应答者校验一律评估管理员成员资格加启用授权，因此绕过 API 直写数据库或残留的旧行都无法抬升任何人。文档事务在目录等待结束后重新检查资格；回滚限制由[文档生命周期决策](../architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.zh.md)说明。
 - **授予写入在授权事务内拒绝非管理员。** `ResourceAccess.set` 新增通道钩子（`checkEnabledOwner`），在 owner 行锁定后调用；`StewardAccess` 覆盖它要求活跃管理员成员资格，否则返回 409。撤销不经过该钩子，陈旧或降级后残留的行永远可以清除。
@@ -28,4 +28,4 @@ Status: implemented
 
 ## 影响
 
-维护中枢由构造上就是仅管理员的通道。授予之前必须先提升为管理员，管理 UI 在原地说明这一点；持有残留授权行的普通成员读作失效授权，直到被清除。普通项目准入不受影响，`eligibleActors` 也不需要 steward 例外——每个获准的主体本来就已经是管理员。
+维护中枢由构造上就是仅管理员的通道。授予之前必须先提升为管理员，管理 UI 在原地说明这一点；持有残留授权行的普通成员读作失效授权，直到被清除。会话执行在锁定账户后检查每个已捕获参与者的授权。签名调用者与会话资源请求在登记和轮询许可时都检查当前资格。

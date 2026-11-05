@@ -19,10 +19,12 @@ const [{ createPostgresPool, runMigrations }, { resolvePostgresRuntimeContext },
   'postgres/collaboration-service', 'postgres/conversation-repository', 'runtime-router', 'principal', 'workbench',
 ].map(name => import(new URL(`${name}.${mode === 'src' ? 'ts' : 'js'}`, base))))
 const url = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL); assert.ok(url)
+const { PersonalNodeIndex } = await import(new URL(`personal-index.${mode === 'src' ? 'ts' : 'js'}`, base))
+const { workbenchRows } = await import(new URL(`workbench-rows.${mode === 'src' ? 'ts' : 'js'}`, base))
 const { PostgresWorkspaceCatalog } = await import(new URL(`workspace-catalog.${mode === 'src' ? 'ts' : 'js'}`, base))
 const pool = createPostgresPool(url, { max: 4, application_name: `workbench-computers-${randomUUID()}` })
 const root = await mkdtemp(join(tmpdir(), 'workbench-computers-'))
-let organizationId, gateway, manager, primaryError
+let organizationId, gateway, manager, personalIndex, primaryError
 async function removeOrganization(id) {
   const tables = (await pool.query("SELECT table_name FROM information_schema.columns WHERE table_schema='harness' AND column_name='organization_id' AND table_name<>'organizations'")).rows
   for (let pass = 0; pass < 12; pass += 1) {
@@ -77,7 +79,9 @@ try {
   const principals = new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, slug, 60_000)
   let workbenchCatalog = createGatewayWorkbenchCatalogHandler({ instances: manager, collaboration, principals,
     maxResponseBytes: cfg.upstreamResponseLimitBytes, upstreamTimeoutMs: cfg.upstreamTimeoutMs })
-  gateway = createGatewayServer(deps, { workbenchCatalog: (...args) => workbenchCatalog(...args) })
+  personalIndex = new PersonalNodeIndex(root)
+  const localCatalog = new PostgresWorkspaceCatalog(b,b.nodeId,personalIndex)
+  gateway = createGatewayServer(deps, { workbenchRows: workbenchRows(b, localCatalog, collaboration, cfg.runtimeCatalog), workbenchCatalog: (...args) => workbenchCatalog(...args) })
   await new Promise((ready, fail) => { gateway.once('error', fail); gateway.listen(0, '127.0.0.1', ready) })
   cfg.port = gateway.address().port
   const origin = `http://127.0.0.1:${cfg.port}`; cfg.publicOrigins.push(origin)
@@ -121,11 +125,54 @@ try {
   await pool.query('UPDATE harness.computer_use_permissions SET enabled=false WHERE organization_id=$1 AND user_id=$2 AND node_id=$3', [organizationId, userUuid, a.nodeId])
   await observe('cached-source-computer-revoked', cookie, remote.runtimeId)
   await observe('cached-independent-account', strangerCookie, strangerRemote.runtimeId)
+  const rowsUrl = new URL(`/account/api/workbench/rows?dshTarget=personal&limit=1&dshRuntime=${remote.runtimeId}`,origin)
+  const readPage = (url, session) => fetch(url, { headers: { cookie: session } })
+  const first = await readPage(rowsUrl, cookie); assert.equal(first.status, 200)
+  assert.equal(first.headers.get('x-dsh-runtime-id'), remote.runtimeId)
+  const page1 = await first.json(); assert.ok(page1.nextCursor); assert.equal(page1.items.length, 1)
+  rowsUrl.searchParams.set('cursor', page1.nextCursor)
+  const next = await readPage(rowsUrl, cookie); assert.equal(next.status, 200)
+  const page2 = await next.json(); assert.equal(page2.items.length, 1); assert.equal(page2.nextCursor,null)
+  assert.deepEqual(new Set([...page1.items, ...page2.items].map(row => row.title)), new Set(['b-primary private title','cached-b-primary title']))
+  rowsUrl.searchParams.set('q','irrelevant')
+  assert.equal((await readPage(rowsUrl, cookie)).status, 400)
+  rowsUrl.searchParams.delete('cursor'); rowsUrl.searchParams.delete('q')
+  assert.equal((await readPage(rowsUrl, strangerCookie)).status, 404)
+  console.log(JSON.stringify({ stage: 'exact-owner-pagination', pages: 2, indexedAndLegacy: true, mismatchedCursorRejected: true, foreignRuntimeRefused: true }))
+  await assert.rejects(localCatalog.promotePersonal(admin.id,remote.runtimeId),/complete current directory publication/)
+  const existingSession=[...labels].find(([,label])=>label==='b-primary')[0]
+  const source={organizationId,target:{kind:'user',id:user.id,runtimeId:remote.runtimeId},generation:Number(before.find(r=>r.runtime_id===remote.runtimeId).generation)}
+  const items=[{workspaceId:'box',path:'/owner/work',title:'Box',createdAt:'2026-11-04T00:00:00.000Z',updatedAt:'2026-11-04T00:00:00.000Z',sessionIds:[existingSession]}]
+  const conversations=[{sessionId:existingSession,title:'indexed history',updatedAt:2,blank:false}]
+  await localCatalog.publish(source,{revision:2,items,conversations})
+  await localCatalog.promotePersonal(admin.id,remote.runtimeId)
+  await localCatalog.publish(source,{revision:3,items,conversations:[...conversations,{sessionId:'new-local-entry',title:'only on node',updatedAt:3,blank:false}]})
+  const page=await readPage(rowsUrl,cookie); assert.equal(page.status,200); assert.equal((await page.json()).items[0].title,'only on node')
+  const overview = new URL(rowsUrl)
+  overview.searchParams.set('kind','workspaces'); overview.searchParams.set('include','conversations')
+  const combined = await readPage(overview,cookie); assert.equal(combined.status,200)
+  const body = await combined.json()
+  assert.deepEqual(body.workspaces.map(row=>row.title),['Box'])
+  assert.equal(body.conversationPage.runtimeId,remote.runtimeId)
+  assert.deepEqual(body.conversationPage.items.map(row=>row.title),['only on node'])
+  assert.ok(body.conversationPage.nextCursor)
+  assert.equal((await readPage(overview,strangerCookie)).status,404)
+  const invalid = new URL(overview); invalid.searchParams.set('cursor',body.conversationPage.nextCursor)
+  assert.equal((await readPage(invalid,cookie)).status,400)
+  const shared=await pool.query('SELECT revision::text,conversations::text FROM harness.runtime_workspace_catalog WHERE runtime_id=$1',[remote.runtimeId])
+  assert.equal(shared.rows[0].revision,'2'); assert.ok(!shared.rows[0].conversations.includes('only on node'))
+  await assert.rejects(pool.query('UPDATE harness.runtime_workspace_catalog SET revision=4 WHERE runtime_id=$1',[remote.runtimeId]),/owned by its computer/)
+  await pool.query('UPDATE harness.computer_use_permissions SET enabled=false WHERE organization_id=$1 AND user_id=$2 AND node_id=$3',[organizationId,userUuid,b.nodeId])
+  assert.ok([403,404].includes((await readPage(rowsUrl,cookie)).status))
+  assert.ok([403,404].includes((await readPage(overview,cookie)).status))
+  console.log(JSON.stringify({stage:'passive-personal-overview',requests:1,independentCursors:true,foreignOwnerRefused:true,revokedOwnerRefused:true}))
+  console.log(JSON.stringify({stage:'promoted-personal-directory',incompleteBlocked:true,ownerRead:true,centralNewTitles:0,oldPublisherRefused:true,revoked:true}))
   assert.deepEqual((await pool.query('SELECT runtime_id,generation,observed_state FROM harness.instances WHERE organization_id=$1 ORDER BY runtime_id', [organizationId])).rows, before)
 } catch (error) { primaryError = error; throw error }
 finally {
   const errors = [], close = async fn => { try { await fn() } catch (error) { errors.push(error) } }
   if (gateway?.listening) await close(() => new Promise((ready, fail) => { gateway.closeAllConnections(); gateway.close(error => error ? fail(error) : ready()) }))
+  if (personalIndex !== undefined) await close(() => personalIndex.close())
   if (manager !== undefined) await close(() => manager.stopAll())
   if (organizationId !== undefined) await close(() => removeOrganization(organizationId))
   await close(() => pool.end()); await close(() => rm(root, { recursive: true, force: true }))

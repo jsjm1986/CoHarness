@@ -1,0 +1,69 @@
+{
+  "at": "2026-11-04T21:35:47.629675+00:00",
+  "scope": "Reconcile retained Linux acceptance for B158/B164 without rerunning or claiming the current whole application was tested on Linux.",
+  "retainedReport": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T231031Z/linux-arm64-musl-document-package-final-cases.json",
+  "retainedReportSha256": "09174866311da4a0b895b6e4a7383373d9bb5d60ad935622790b763e313080d3",
+  "retainedAcceptance": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261102T231031Z/linux-document-final-acceptance.json",
+  "targetSourceAndFixtureChecks": [
+    {
+      "path": "packages/attachment/userdoc-local/src/store.ts",
+      "retainedSnapshotSha256": "a022eabfd943994342afe0875beec8ecaa32ca9f9167c9f72f1743dd6c67a179",
+      "currentSha256": "a022eabfd943994342afe0875beec8ecaa32ca9f9167c9f72f1743dd6c67a179"
+    },
+    {
+      "path": "packages/attachment/userdoc-local/src/upload.ts",
+      "retainedSnapshotSha256": "93beab304ab85d0b72f0bc43b816a3747c85364c6cdc9dd6abe6b5fb9db1e8d8",
+      "currentSha256": "93beab304ab85d0b72f0bc43b816a3747c85364c6cdc9dd6abe6b5fb9db1e8d8"
+    },
+    {
+      "path": "packages/attachment/userdoc-local/src/directory-move.ts",
+      "retainedSnapshotSha256": "176ad961fa4a5ae347a28e0e599dcb38ea693082cae2af59737877b6ea727e32",
+      "currentSha256": "176ad961fa4a5ae347a28e0e599dcb38ea693082cae2af59737877b6ea727e32"
+    },
+    {
+      "path": "packages/attachment/userdoc-local/tests/parts-loader.spec.ts",
+      "retainedSnapshotSha256": "44160d2c46657dddaecdb412618d64e5f99917ba8863c85cd32e7ff323d9c4ed",
+      "currentSha256": "44160d2c46657dddaecdb412618d64e5f99917ba8863c85cd32e7ff323d9c4ed"
+    },
+    {
+      "path": "packages/attachment/userdoc-local/tests/move-rollback.spec.ts",
+      "retainedSnapshotSha256": "79927802d591c1bc3c7c755fff6657e7d1f57eff7a6384021c49ef12589db10c",
+      "currentSha256": "79927802d591c1bc3c7c755fff6657e7d1f57eff7a6384021c49ef12589db10c"
+    },
+    {
+      "path": "packages/attachment/userdoc-local/tests/fixtures/move-rollback-driver.mjs",
+      "retainedSnapshotSha256": "4fb3d79173411e25e3665a0cf398996d0f677fd3409645f5a5c7508247700178",
+      "currentSha256": "4fb3d79173411e25e3665a0cf398996d0f677fd3409645f5a5c7508247700178"
+    },
+    {
+      "path": "packages/attachment/userdoc-local/tests/fixtures/fifo-driver.mjs",
+      "retainedSnapshotSha256": "01464c635efadeb2f76efdd2e45a22895c12ae22b6a91e431a2d9faeb41b15e9",
+      "currentSha256": "01464c635efadeb2f76efdd2e45a22895c12ae22b6a91e431a2d9faeb41b15e9"
+    }
+  ],
+  "exactPassedCases": [
+    {
+      "file": "/opt/repo/packages/attachment/userdoc-local/tests/move-rollback.spec.ts",
+      "title": "retains original bytes after post-move validation fails (source occupied: false)",
+      "status": "passed"
+    },
+    {
+      "file": "/opt/repo/packages/attachment/userdoc-local/tests/move-rollback.spec.ts",
+      "title": "retains original bytes after post-move validation fails (source occupied: true)",
+      "status": "passed"
+    },
+    {
+      "file": "/opt/repo/packages/attachment/userdoc-local/tests/parts-loader.spec.ts",
+      "title": "refuses existing and replaced POSIX named pipes through the Loader",
+      "status": "passed"
+    },
+    {
+      "file": "/opt/repo/packages/attachment/userdoc-local/tests/parts-loader.spec.ts",
+      "title": "retains moved bytes when a replaced Linux parent prevents rollback through the Loader",
+      "status": "passed"
+    }
+  ],
+  "newTestsExecuted": 0,
+  "currentTransitiveApplicationLinuxAcceptanceClaimed": false,
+  "wholeProjectComplete": false
+}

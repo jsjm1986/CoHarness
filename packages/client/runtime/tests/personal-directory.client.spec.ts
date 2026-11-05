@@ -244,6 +244,89 @@ it('waits for bootstrap identity verification before restoring only the saved fo
   } finally { await f.ctx.fiber.dispose() }
 })
 
+it.each(['recover', 'clear', 'relocated', 'unqualified'] as const)('keeps the offline selection until an authorized restore or explicit clear (%s)', async (action) => {
+  const raw = 'offline-on-b' as SessionId, saved = clientSessionKey(action === 'unqualified' ? { kind: 'personal' } : target(2), raw)
+  const key = `dsh.personal.current.v1.account:7.runtime:${target(1).runtimeId}`
+  const pointer = { sessionId: saved, ...(action === 'relocated' ? { nodeId: target(3).nodeId } : {}) }
+  const storage = new Map([[key, JSON.stringify(pointer)]])
+  vi.stubGlobal('sessionStorage', { getItem: (k: string) => storage.get(k) ?? null,
+    setItem: (k: string, v: string) => { storage.set(k, v) } })
+  vi.stubGlobal('location', { search: `?dshRuntime=${target(1).runtimeId}` })
+  const f = await fixture(), policy = new ProjectUiPolicyRuntime()
+  ctxPolicy(f.ctx, policy)
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url.startsWith('/account/api/scope?')
+    ? new Response(null, { status: 204, headers: { location: `/?dshRuntime=${target(2).runtimeId}` } })
+    : Response.json({ activeRuntime: target(1), personalWorkspaces: [group(1), group(2)], paged: true, items: [] })))
+  f.remoteApi.onList = async () => ok({ items: [{ sessionId: raw, updatedAt: 1, running: false, blank: false }] })
+  const check = vi.spyOn(f.sessions, 'ensureSession').mockRejectedValueOnce(new Error('Computer is offline'))
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    installPersonalDirectory(f.ctx, f.connection, f.sessions, f.workspaces)
+    f.hostDescription.set({ version: 'test', cwd: '/work', attachedSessions: 0,
+      home: '/home/test', canOpenPath: true, executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(7)
+    if (action === 'relocated' || action === 'unqualified') {
+      await vi.waitFor(() => { expect(f.workspaces.list.getSnapshot().directoryState).toBe('ready') })
+      await f.workspaces.refreshPersonalDirectory()
+      expect(check).not.toHaveBeenCalled()
+      expect(f.forTarget).not.toHaveBeenCalled()
+      expect(JSON.parse(storage.get(key)!)).toEqual(pointer)
+      return
+    }
+    await vi.waitFor(() => { expect(check).toHaveBeenCalledTimes(1) })
+    f.sessions.list.set({ ...f.sessions.list.getSnapshot(), phase: 'ready', current: undefined })
+    expect(JSON.parse(storage.get(key)!)).toEqual({ sessionId: saved })
+    if (action === 'clear') f.sessions.clear()
+    await f.workspaces.refreshPersonalDirectory()
+    if (action === 'recover') {
+      await vi.waitFor(() => { expect(f.sessions.list.getSnapshot().current).toBe(saved) })
+      expect(check.mock.calls.map(([runtime]) => runtime.runtimeId)).toEqual([target(2).runtimeId, target(2).runtimeId])
+    } else {
+      expect(JSON.parse(storage.get(key)!)).toEqual({})
+      expect(check).toHaveBeenCalledTimes(1)
+    }
+  } finally { log.mockRestore(); await f.ctx.fiber.dispose() }
+})
+
+it('lets a new navigation supersede the saved target while the initial directory is loading', async () => {
+  const saved = clientSessionKey(target(2), 'previous' as SessionId)
+  const key = `dsh.personal.current.v1.account:7.runtime:${target(1).runtimeId}`
+  const storage = new Map([[key, JSON.stringify({ sessionId: saved })]])
+  vi.stubGlobal('sessionStorage', { getItem: (k: string) => storage.get(k) ?? null,
+    setItem: (k: string, v: string) => { storage.set(k, v) } })
+  vi.stubGlobal('location', { search: `?dshRuntime=${target(1).runtimeId}` })
+  const f = await fixture(), policy = new ProjectUiPolicyRuntime()
+  ctxPolicy(f.ctx, policy)
+  const response = Promise.withResolvers<Response>()
+  const request = vi.fn(() => response.promise)
+  vi.stubGlobal('fetch', request)
+  const check = vi.spyOn(f.sessions, 'ensureSession')
+  try {
+    installPersonalDirectory(f.ctx, f.connection, f.sessions, f.workspaces)
+    f.hostDescription.set({ version: 'test', cwd: '/work', attachedSessions: 0, home: '/home/test',
+      canOpenPath: true, executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(7)
+    await vi.waitFor(() => { expect(request).toHaveBeenCalledTimes(1) })
+    const navigation = f.sessions.beginNavigation()
+    response.resolve(Response.json({ activeRuntime: target(1), personalWorkspaces: [group(1), group(2)], paged: true, items: [] }))
+    await vi.waitFor(() => { expect(f.workspaces.list.getSnapshot().directoryState).toBe('ready') })
+    expect(navigation.aborted).toBe(false)
+    expect(check).not.toHaveBeenCalled()
+    expect(JSON.parse(storage.get(key)!)).toEqual({ sessionId: saved })
+  } finally { await f.ctx.fiber.dispose() }
+})
+
+it('keeps the bootstrap connection pinned when the same Runtime is reported on another computer', async () => {
+  const f = await fixture()
+  const moved = { ...target(1), nodeId: target(2).nodeId, nodeName: target(2).nodeName }
+  try {
+    f.sessions.setBaseRuntimeTarget(moved)
+    expect(f.sessions.bootstrapRuntimeTarget()).toEqual(target(1))
+    await expect(f.sessions.ensureSession(moved, 'reassigned' as SessionId)).rejects.toThrow('different computer')
+    expect(f.forTarget).not.toHaveBeenCalled()
+  } finally { await f.ctx.fiber.dispose() }
+})
+
 it('keeps captured directory operations on B after selection returns to the bootstrap computer', async () => {
   const f = await fixture()
   try {

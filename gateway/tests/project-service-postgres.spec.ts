@@ -20,6 +20,7 @@ import { ConversationRepository, PostgresConversationStore } from '../src/postgr
 import { connectFromPool, createPostgresPool, runMigrations, type Queryable } from '../src/postgres/database.ts'
 import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import { lockProjectManagement } from '../src/postgres/project-management-authority.ts'
+import { lockAdministrator } from '../src/postgres/administrator-authority.ts'
 import { PostgresModelGovernanceService, projectProviderCredentialRef } from '../src/postgres/model-governance-service.ts'
 import { OrganizationModelCredentialCipher } from '../src/organization-model-credentials.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
@@ -86,6 +87,8 @@ describePg('PostgreSQL project creation and mutations', () => {
       ) VALUES($1,$2::text,$2::text,$3) RETURNING id,public_id::text`, [context.organizationId, username, join(root, 'users', username, 'home')])
       await pool.query(`INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')`,
         [context.organizationId, user.rows[0]!.id])
+      await pool.query('INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,$2,false)',
+        [user.rows[0]!.id, 'fixture-password-hash'])
       await pool.query(`INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled)
         VALUES($1,$2,$3,true)`, [context.organizationId, context.nodeId, user.rows[0]!.id])
       people.push(Number(user.rows[0]!.public_id))
@@ -459,12 +462,12 @@ describePg('PostgreSQL project creation and mutations', () => {
   })
 
   it.each(['owner', 'administrator', 'member', 'disabled-account', 'disabled-membership', 'deleted-account',
-    'removed-membership', 'disabled-organization', 'disabled-project', 'missing-project'] as const)(
+    'removed-membership', 'password-required', 'missing-credential', 'computer-withdrawn', 'disabled-organization', 'disabled-project', 'missing-project'] as const)(
     'holds management authority only for a current %s', async (state) => {
       const f = await fixture(), users = new PostgresUserService(f.context, f.cfg)
       const project = await f.service.createManaged({ name: 'Current manager', ownerUserId: f.creator })
       let actor = f.member
-      if (state === 'owner' || state === 'removed-membership') {
+      if (state === 'owner' || state === 'removed-membership' || state === 'computer-withdrawn') {
         actor = f.creator; await users.setRole(actor, 'user')
       } else if (state === 'member') {
         await users.setRole(actor, 'user'); await f.service.setMember(project.id, actor, 'rw')
@@ -474,9 +477,16 @@ describePg('PostgreSQL project creation and mutations', () => {
       [f.context.organizationId, actor])
       else if (state === 'deleted-account') await users.remove(actor)
       else if (state === 'disabled-organization') await pool.query("UPDATE harness.organizations SET status='disabled' WHERE id=$1", [f.context.organizationId])
+      else if (state === 'password-required') await pool.query(`UPDATE harness.password_credentials SET must_change_password=true
+        WHERE user_id=(SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2)`, [f.context.organizationId, actor])
+      else if (state === 'missing-credential') await pool.query(`DELETE FROM harness.password_credentials
+        WHERE user_id=(SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2)`, [f.context.organizationId, actor])
       else if (state === 'disabled-project') await pool.query("UPDATE harness.projects SET status='archived' WHERE organization_id=$1 AND public_id=$2", [f.context.organizationId, project.id])
       else if (state === 'missing-project') await f.service.remove(project.id)
       if (state === 'removed-membership') await pool.query('DELETE FROM harness.project_members WHERE organization_id=$1 AND project_id=(SELECT id FROM harness.projects WHERE organization_id=$1 AND public_id=$2)', [f.context.organizationId, project.id])
+      if (state === 'computer-withdrawn') await pool.query(`UPDATE harness.computer_use_permissions SET enabled=false
+        WHERE organization_id=$1 AND node_id=$2 AND user_id=(SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$3)`,
+      [f.context.organizationId, f.context.nodeId, actor])
       const client = await connectFromPool(pool)
       try {
         await client.query('BEGIN')
@@ -486,6 +496,35 @@ describePg('PostgreSQL project creation and mutations', () => {
       } finally { await client.query('ROLLBACK'); client.release() }
     },
   )
+
+  it.each(['administrator', 'project-manager'] as const)('allows admitted %s work to finish after a later password reset', async (kind) => {
+    const f = await fixture(), users = new PostgresUserService(f.context, f.cfg)
+    const project = await f.service.createManaged({ name: 'Admitted password reset', ownerUserId: f.creator })
+    if (kind === 'project-manager') await users.setRole(f.creator, 'user')
+    const reset = isolated(f.context, 'admitted-password-reset')
+    const resetUsers = new PostgresUserService(reset.context, f.cfg)
+    const client = await connectFromPool(pool)
+    const admit = () => kind === 'administrator' ? lockAdministrator(client, f.context, f.creator)
+      : lockProjectManagement(client, f.context, project.id, f.creator)
+    let resetting: Promise<unknown> | undefined, resetSettled = false
+    try {
+      await client.query('BEGIN')
+      await admit()
+      resetting = resetUsers.resetPassword(f.creator, 'pw-replacement').then(
+        () => { resetSettled = true },
+        (error: unknown) => { resetSettled = true; return error },
+      )
+      await expect.poll(async () => resetSettled || await waiting(reset.applicationName), { timeout: 10_000 }).toBe(true)
+      await client.query("UPDATE harness.projects SET ui_theme_policy='dark' WHERE organization_id=$1 AND public_id=$2",
+        [f.context.organizationId, project.id])
+      await client.query('COMMIT')
+      expect(await resetting).not.toBeInstanceOf(Error)
+      expect((await users.getById(f.creator))?.mustChangePassword).toBe(true)
+      expect((await f.service.getById(project.id))?.uiThemePolicy).toBe('dark')
+      await client.query('BEGIN')
+      await expect(admit()).rejects.toMatchObject({ code: 'forbidden' })
+    } finally { try { await client.query('ROLLBACK') } finally { client.release(); await resetting } }
+  })
 
   it.each(['unqualified', 'qualified', 'downgraded'] as const)('retains steward management qualification (%s)', async (state) => {
     const f = await fixture(), directory = join(f.root, 'steward-management'); await mkdir(directory)

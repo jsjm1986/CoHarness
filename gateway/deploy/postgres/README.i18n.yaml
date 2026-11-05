@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/deploy/postgres/README.md
 document:
-  en: 5bc0b59a7f2f0a4e8ad894ed1f5f4f45f145870f
-  zh: 92d62abd570c9f914a3f23afe10b30f56aa9dca0
+  en: fa024bd086706934367af0f137103d9d02b4ce42
+  zh: 8512a41ecd4a2cc8b3d39669f6b674d5f0eebcb9
 /local-postgresql-control-plane:
   en: 1b46bc3e1b1e3377
   zh: 1f273d4682df985f
@@ -22,7 +22,10 @@ document:
   zh: 3fd109f6af42f9d7
 /local-postgresql-control-plane/backup-and-restore-check:
   en: 23026fa3e9f0d395
-  zh: fd09a4c0028f7432
+  zh: 9b95dd8d47eba968
+/local-postgresql-control-plane/private-maintenance-connections:
+  en: 802a63a96f27f221
+  zh: da4f9af66952b8ed
 /local-postgresql-control-plane/tests:
   en: 08ec3c0e4a499b4a
   zh: b150fe02521976e2

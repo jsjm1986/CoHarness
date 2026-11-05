@@ -605,6 +605,58 @@ it('refuses inaccessible environments and mismatched targets without a local fal
   expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
 })
 
+it('checks the selected computer before each versioned operation on the primary and directly on the owner', async () => {
+  const f = await fixture({}, true)
+  const services = ['/api/prepare/v1/session.create', '/api/prepare/v1/session.history',
+    '/api/admit/v1/session.prompt', '/api/admit/v1/session.status']
+  const send = async (base: string, path: string, selector: string, forwardedTo?: string) => {
+    const response = await fetch(`${base}${path}?dshRuntime=${f.environment.id}&dshTarget=personal${selector}`, {
+      method: 'POST', headers: { cookie: f.cookie, origin: base,
+        ...(forwardedTo ? { [NODE_SERVICE_TARGET_HEADER]: forwardedTo } : {}) },
+      ...(path === '/account/api/scope' ? { body: JSON.stringify({ kind: 'personal' }) } : {}),
+    })
+    await response.arrayBuffer()
+    return response.status
+  }
+  for (const path of [...services, '/account/api/scope']) {
+    // The first hop already chose this Gateway. A move cannot turn the receiver into a second forwarder.
+    expect(await send(f.base, path, '', f.localNodeId)).toBe(409)
+    for (const base of [f.base, f.remoteBase]) {
+      expect(await send(base, path, '&dshNode=' + f.localNodeId)).toBe(400)
+      expect(await send(base, path, `&dshNode=${f.nodeId}&dshNode=${f.localNodeId}`)).toBe(400)
+    }
+  }
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
+  expect(f.remoteStarts).toEqual([])
+  for (const path of services) {
+    expect(await send(f.base, path, '&dshNode=' + f.nodeId)).toBe(200)
+    expect(await send(f.base, path, '')).toBe(200)
+  }
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 8 })
+  expect(await send(f.base, '/account/api/scope', '&dshNode=' + f.nodeId)).toBe(204)
+  expect(f.remoteStarts).toEqual([f.admin.id])
+})
+
+it.each([true, false])('rechecks a placement moved after the outgoing service stream opens (original node pin %s)', async pinned => {
+  const f = await fixture({}, true)
+  const open = f.services.open.bind(f.services)
+  const moved = vi.spyOn(f.services, 'open').mockImplementationOnce(async (node, signal) => {
+    const stream = await open(node, signal)
+    f.environment.node = { ...f.environment.node, id: f.localNodeId }
+    return stream
+  })
+  const selectors = new URLSearchParams({ dshRuntime: f.environment.id, dshTarget: 'personal' })
+  if (pinned) selectors.set('dshNode', f.nodeId)
+  const response = await fetch(`${f.base}/api/admit/v1/session.prompt?${selectors}`, {
+    method: 'POST', headers: { cookie: f.cookie, origin: f.base }, body: '{}',
+  })
+  expect(moved).toHaveBeenCalledOnce()
+  expect(response.status).toBe(pinned ? 400 : 409)
+  expect(await response.json()).toEqual({ error: pinned ? 'node-service/invalid-target' : 'node-service/mismatch' })
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
+  expect(f.remoteStarts).toEqual([])
+})
+
 it('keeps control probes available at the service limit and closes admitted streams on revocation', async () => {
   const f = await fixture({ HGW_NODE_SERVICE_MAX_CONNECTIONS: '1', HGW_NODE_SERVICE_MAX_PER_NODE: '1' })
   const response = await fetch(`${f.base}/api/slow?dshRuntime=${f.environment.id}`, { headers: { cookie: f.cookie } })

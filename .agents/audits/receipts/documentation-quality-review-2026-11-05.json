@@ -1,0 +1,80 @@
+{
+  "at": "2026-11-05T02:27:11.082689+00:00",
+  "receipt": "receipts/documentation-quality-review-2026-11-05.json",
+  "status": "two_retained_documentation_quick_failures_repaired_current_checks_pass_remaining_business_review_open",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T015443Z",
+  "newBusinessFindings": 0,
+  "productionBusinessSourceChanged": false,
+  "wholeProjectComplete": false,
+  "corrections": [
+    "Regenerated the historical Session format catalog from its existing v0-through-v7 records without changing a Session schema, committed generation or migration.",
+    "Authored terminology names the relevant actor, source or captured identity. Structured historical command records and exact artifact identifiers remain literal; malformed or incomplete command captures and authored descriptions remain checked."
+  ],
+  "checks": {
+    "documentationQuick": {
+      "command": "pnpm --config.verify-deps-before-run=false run test:docs",
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T015443Z/documentation-quick-current.log",
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "dependencyInstallOrPostinstall": false
+    },
+    "targetedTests": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T015443Z/terminology-and-behavior-regression.json",
+      "passed": 148,
+      "failed": 0,
+      "pending": 0,
+      "files": 3,
+      "qualification": "Concrete terminology gate, job start/teardown and document creator identity regressions. No model provider or production Runtime."
+    },
+    "lint": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T015443Z/documentation-current-lint.json",
+      "selectedFiles": 6,
+      "actualFiles": 5,
+      "diagnostics": 0,
+      "qualification": "The MJS fixture is ignored by existing configuration; its edit only changes a comment."
+    },
+    "scopedStrictTypecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T015443Z/concrete-terms-typecheck-accepted.log",
+    "sourceGateNode22And24": [
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T015443Z/concrete-terms-node22.log",
+      "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T015443Z/concrete-terms-current.log"
+    ],
+    "historicalRecordedData": {
+      "capturedFieldsCompared": 1847,
+      "commandWorkingDirectoryAndDiagnosticsUnchanged": true,
+      "artifactPathValuesUnchanged": true,
+      "historicalRecordKeysRetained": true,
+      "authoredLabelsClarified": true
+    },
+    "earlierBusinessSourcesUnchanged": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T015443Z/prior-frozen-sources-check.json",
+    "whitespace": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T015443Z/documentation-quality-whitespace.log"
+  },
+  "noteReview": {
+    "retainedActive": [
+      "2026-08-09-concrete-prose-names-actors-and-recorded-facts",
+      "2026-10-30-postgres-session-runtime-namespace",
+      "2026-10-31-memory-recall-addresses"
+    ],
+    "newNote": false,
+    "archivedNotesEdited": false,
+    "reason": "Existing notes retain future process, ownership and compatibility decisions; their current descriptions and capture-preservation rule are updated."
+  },
+  "delivery": {
+    "at": "2026-11-05T02:26:26.777584+00:00",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T015443Z/documentation-quality-review.delta.tar.gz",
+    "archiveSha256": "2c0b5f6cfd4b3fe3eafb1c6d6486d3601a10fc68472bade78ce87aaae903c645",
+    "manifestSha256": "7d8d91473073b68dae5bb90aad8e44713320381a6f49a58f69e62d30ff17e214",
+    "ownedPaths": 34,
+    "readOnlySources": 10,
+    "newBusinessFinding": false,
+    "wholeProjectComplete": false
+  },
+  "limits": [
+    "Documentation quick checks are current; this does not claim complete source, platform, coverage or business review.",
+    "Prior individual receipts retain their historical failures and diagnostics. This record supersedes only the current two-failure documentation checkpoint.",
+    "All12business domains remain in progress; B520 remains unassigned.",
+    "Real paid Responses verification remains explicitly deferred."
+  ],
+  "productionWrites": false,
+  "paidModelApisCalled": false
+}

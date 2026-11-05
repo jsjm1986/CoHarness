@@ -16,7 +16,7 @@ import { createSnapshotStore } from '../contract/store.ts'
 import type { SessionsPort, SessionsPortList } from '../contract/sessions-port.ts'
 import type { IWorkspaces, StartSessionOptions } from '../contract/workspaces.ts'
 import { commitSessionNavigation } from '../navigation.ts'
-import { WorkspaceManager, type WorkspaceListPhase } from './manager.ts'
+import { mergeWorkspaceLocation, WorkspaceManager, type WorkspaceListPhase } from './manager.ts'
 import { prepareGatewayRuntime } from '../prepare-runtime.ts'
 
 /** Generate one opaque browser draft reservation id. */
@@ -32,7 +32,7 @@ function newDraftSessionId(): SessionId {
 interface ActiveDraft {
   draftId: SessionDraftId
   sessionId: SessionId
-  workspacePath: string
+  workspacePath?: string
 }
 
 const ACTIVE_DRAFTS_KEY = 'dsh.workspace.drafts.v1'
@@ -48,11 +48,11 @@ function loadActiveDrafts(storage: Storage | undefined, name: string): Map<Works
       const row = value as Record<string, unknown>
       if (typeof row.draftId !== 'string' || row.draftId.length === 0
         || typeof row.sessionId !== 'string' || row.sessionId.length === 0
-        || typeof row.workspacePath !== 'string' || row.workspacePath.length === 0) continue
+        || row.workspacePath !== undefined && (typeof row.workspacePath !== 'string' || row.workspacePath.length === 0)) continue
       result.set(workspaceId as WorkspaceId, {
         draftId: row.draftId as SessionDraftId,
         sessionId: row.sessionId as SessionId,
-        workspacePath: row.workspacePath,
+        ...(row.workspacePath === undefined ? {} : { workspacePath: row.workspacePath }),
       })
     }
     return result
@@ -61,14 +61,16 @@ function loadActiveDrafts(storage: Storage | undefined, name: string): Map<Works
   }
 }
 
-function saveActiveDrafts(drafts: ReadonlyMap<WorkspaceId, ActiveDraft>, storage: Storage | undefined, name: string): void {
-  if (storage === undefined) return
+function saveActiveDrafts(drafts: ReadonlyMap<WorkspaceId, ActiveDraft>,
+  storage: Storage | undefined, name: string, idsOnly: boolean): boolean {
+  if (storage === undefined) return false
   try {
     const value: Record<string, ActiveDraft> = {}
-    for (const [workspaceId, draft] of drafts) value[workspaceId] = draft
+    for (const [workspaceId, draft] of drafts) value[workspaceId] = idsOnly ? { draftId: draft.draftId, sessionId: draft.sessionId } : draft
     storage.setItem(name, JSON.stringify(value))
+    return true
   } catch {
-    // A private-mode or quota failure only disables recovery; the live draft remains usable.
+    return false // Retry the unchanged index after a temporary storage failure.
   }
 }
 
@@ -81,6 +83,8 @@ export interface WorkspaceListState {
   computerGroups?: readonly PersonalRuntimeDirectory[]
   /** Exact owning Runtime for each projected Workspace identity. */
   workspaceRuntimeIds?: Readonly<Record<string, string>>
+  /** More authorized Runtime metadata is available on an explicit page request. */
+  moreComputers?: boolean
   /** Central catalog load state; a failure retains the preceding directory. */
   directoryState?: 'loading' | 'ready' | 'error'
   /**
@@ -144,12 +148,18 @@ export class WorkspaceRuntime implements IWorkspaces {
   private readonly externalOwners = new Map<WorkspaceId, { runtime: SessionRuntimeTarget; workspaceId: WorkspaceId }>()
   private computerGroups: readonly PersonalRuntimeDirectory[] | undefined
   private groupComputers = true
+  private moreComputers = false
   private directoryState: WorkspaceListState['directoryState']
   private baseRuntimeId = ''
   private readonly foreignPins = new Map<string, readonly SessionId[]>()
   private readonly foreignPinRequests = new Map<string, number>()
   /** Refresh central metadata; the installed directory owner supplies this callback. */
   refreshPersonalDirectory: () => Promise<void> = async () => {}
+
+  /** Installed by the passive personal directory owner. */
+  loadPersonalRows?: NonNullable<IWorkspaces['loadPersonalRows']>
+  /** Installed by the central Runtime directory owner. */
+  loadMoreComputers?: NonNullable<IWorkspaces['loadMoreComputers']>
 
   /** Publish directory state while retaining cached metadata.
    * @param state - central metadata request state.
@@ -160,8 +170,11 @@ export class WorkspaceRuntime implements IWorkspaces {
    * @param groups - currently authorized personal Runtime metadata.
    * @param baseRuntimeId - verified bootstrap Runtime identity.
    * @param groupComputers - whether the entry exposes computer groups.
+   * @param moreComputers - whether another authorized directory page can be requested.
    */
-  installPersonalDirectory(groups: readonly PersonalRuntimeDirectory[], baseRuntimeId: string, groupComputers = true): void {
+  installPersonalDirectory(groups: readonly PersonalRuntimeDirectory[],
+    baseRuntimeId: string, groupComputers = true, moreComputers = false): void {
+    this.moreComputers = moreComputers
     this.groupComputers = groupComputers
     this.externalOwners.clear()
     this.externalItems = []
@@ -220,7 +233,8 @@ export class WorkspaceRuntime implements IWorkspaces {
 
   private async preparedApi(runtimeTarget?: SessionRuntimeTarget | null, signal?: AbortSignal): Promise<IApiClient> {
     const target = runtimeTarget === undefined ? this.selectedTarget() : runtimeTarget ?? undefined
-    if (target !== undefined) await prepareGatewayRuntime(this.rootCtx.get('connection') as ConnectionHandle | undefined, target, signal)
+    if (target !== undefined) await (this.rootCtx.get('gatewayEntryRequests')?.prepare(target, signal)
+      ?? prepareGatewayRuntime(this.rootCtx.get('connection') as ConnectionHandle | undefined, target, signal))
     signal?.throwIfAborted()
     return this.selectedApi(target ?? null)
   }
@@ -230,10 +244,31 @@ export class WorkspaceRuntime implements IWorkspaces {
    * @param target - exact Runtime owning the new conversation.
    * @param workspaceId - projected Workspace chosen on that Runtime; omission uses its Host default directory.
    * @param signal - owning navigation cancellation, checked before publishing a result.
+   * @param intent - one click’s stable reservation for explicit retry.
    * @returns a runtime-qualified Session identity for navigation.
    */
-  async createRuntimeSession(target: SessionRuntimeTarget, workspaceId?: WorkspaceId, signal?: AbortSignal): Promise<SessionId> {
+  async createRuntimeSession(target: SessionRuntimeTarget, workspaceId?: WorkspaceId, signal?: AbortSignal,
+    intent?: { sessionId: SessionId; draftId: SessionDraftId }): Promise<SessionId> {
     signal?.throwIfAborted()
+    const base = (this.rootCtx.get('connection') as ConnectionHandle | undefined)?.hostDescription.getSnapshot()?.runtimeTarget
+    const owner = workspaceId === undefined ? undefined : this.externalOwners.get(workspaceId)
+    if (workspaceId !== undefined) {
+      this.requireWorkspace(workspaceId)
+      if ((owner?.runtime.runtimeId ?? base?.runtimeId ?? this.baseRuntimeId) !== target.runtimeId) throw new Error('Workspace belongs to another Runtime')
+    }
+    const prepared = this.sessions.preparedOperationsAvailable?.(target) === true
+    if (intent !== undefined && !prepared) throw new Error('The original managed Runtime is unavailable')
+    if (prepared) {
+      if (this.sessions.createPreparedSession === undefined) throw new Error('Runtime preparation is unavailable')
+      const reservation = intent ?? { sessionId: newDraftSessionId(), draftId: newDraftId() }
+      const { sessionId, workspace } = await this.sessions.createPreparedSession(target, {
+        ...reservation, ...(workspaceId === undefined ? {} : { workspaceId: owner?.workspaceId ?? workspaceId }),
+      }, signal ?? new AbortController().signal)
+      signal?.throwIfAborted()
+      if (target.runtimeId === (base?.runtimeId ?? this.baseRuntimeId)) this.manager.acceptLocation(workspace)
+      else this.presentRuntimeWorkspace(target, workspace, true)
+      return sessionId
+    }
     const create = this.sessions.createSession?.bind(this.sessions)
     if (create === undefined) throw new Error('Runtime conversation creation is unavailable')
     let originalId: WorkspaceId
@@ -250,9 +285,6 @@ export class WorkspaceRuntime implements IWorkspaces {
       if (target.runtimeId === this.baseRuntimeId) await this.manager.refresh()
       else this.presentRuntimeWorkspace(target, view)
     } else {
-      this.requireWorkspace(workspaceId)
-      const owner = this.externalOwners.get(workspaceId)
-      if ((owner?.runtime.runtimeId ?? this.baseRuntimeId) !== target.runtimeId) throw new Error('Workspace belongs to another Runtime')
       originalId = owner?.workspaceId ?? workspaceId
     }
     signal?.throwIfAborted()
@@ -261,10 +293,12 @@ export class WorkspaceRuntime implements IWorkspaces {
     return id
   }
 
-  private presentRuntimeWorkspace(runtime: SessionRuntimeTarget, view: WorkspaceView): WorkspaceView {
+  private presentRuntimeWorkspace(runtime: SessionRuntimeTarget, view: WorkspaceView, location = false): WorkspaceView {
     const workspaceId = `dsh-workspace:${runtime.runtimeId}:${encodeURIComponent(view.workspaceId)}` as WorkspaceId
     this.externalOwners.set(workspaceId, { runtime, workspaceId: view.workspaceId })
-    const projected = { ...view, workspaceId, sessionIds: view.sessionIds.map(id => clientSessionKey(runtime, id)) }
+    const row = { ...view, workspaceId, sessionIds: view.sessionIds.map(id => clientSessionKey(runtime, id)) }
+    const previous = this.externalItems.find(item => item.workspaceId === workspaceId)
+    const projected = location && previous !== undefined ? mergeWorkspaceLocation(previous, row) : row
     this.externalItems = [...this.externalItems.filter(item => item.workspaceId !== workspaceId), projected]
     this.project()
     return projected
@@ -294,6 +328,7 @@ export class WorkspaceRuntime implements IWorkspaces {
   /** Draft reservations survive a reload without storing prompt text or credentials. */
   private readonly activeDrafts = new Map<WorkspaceId, ActiveDraft>()
   private draftStorageKey: string | undefined
+  private retryDraftStorage = false
   /** Guards the runtime-owned one-shot initial-selection subscription. */
   private initialSelectionStarted = false
 
@@ -353,12 +388,13 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.activeDrafts.clear()
     for (const [id, draft] of loadActiveDrafts(owner.storage, owner.name)) this.activeDrafts.set(id, draft)
     this.draftStorageKey = owner.name
+    this.retryDraftStorage = true
   }
 
   private persistDrafts(): void {
     const owner = this.draftStorage()
     if (owner === undefined || owner.name !== this.draftStorageKey) return
-    saveActiveDrafts(this.activeDrafts, owner.storage, owner.name)
+    this.retryDraftStorage = !saveActiveDrafts(this.activeDrafts, owner.storage, owner.name, this.rootCtx.get('deploymentContext')?.getSnapshot().context?.mode === 'multi')
   }
 
   /**
@@ -406,7 +442,7 @@ export class WorkspaceRuntime implements IWorkspaces {
         && !archived.includes(summary.id)) reusableSessionIds.push(summary.id)
     }
     const active = this.activeDrafts.get(workspaceId)
-    const draft = active !== undefined && active.workspacePath === workspace.path
+    const draft = active !== undefined && (active.workspacePath === undefined || active.workspacePath === workspace.path)
       ? active
       : { draftId: newDraftId(), sessionId: newDraftSessionId(), workspacePath: workspace.path }
     this.activeDrafts.set(workspaceId, draft)
@@ -601,6 +637,27 @@ export class WorkspaceRuntime implements IWorkspaces {
     }
   }
 
+  /** Resolve the personal or project Runtime before displaying a new composer.
+   * @param workspaceId - explicitly selected projected Workspace.
+   * @returns the exact known location for this navigation.
+   */
+  newSessionDestination(workspaceId?: WorkspaceId): { target?: SessionRuntimeTarget; workspaceId?: WorkspaceId } {
+    const workspace = this.list.getSnapshot()
+    const sessions = this.sessions.list.getSnapshot()
+    const current = sessions.current
+    const selectedRuntime = this.selectedTarget()
+    const currentWorkspaceId = current === undefined
+      ? undefined
+      : workspace.items.find(item => item.sessionIds.includes(current))?.workspaceId
+        ?? workspace.items.find(item => item.workspaceId === sessions.byId[current]?.workspaceId)?.workspaceId
+        ?? workspace.items.find(item => item.path === sessions.byId[current]?.cwd
+          && this.externalOwners.get(item.workspaceId)?.runtime.runtimeId === selectedRuntime?.runtimeId)?.workspaceId
+    const target = workspaceId ?? currentWorkspaceId ?? (selectedRuntime === undefined ? workspace.recentWorkspaceId : undefined)
+    const base = (this.rootCtx.get('connection') as ConnectionHandle | undefined)?.hostDescription.getSnapshot()?.runtimeTarget
+    const runtime = target === undefined ? selectedRuntime ?? base : this.externalOwners.get(target)?.runtime ?? base
+    return { ...(runtime === undefined ? {} : { target: runtime }), ...(target === undefined ? {} : { workspaceId: target }) }
+  }
+
   /**
    * The shared New Session action behind the shell entry points (sidebar
    * button, workspace browser): resolve the target Workspace — explicit wins,
@@ -619,17 +676,13 @@ export class WorkspaceRuntime implements IWorkspaces {
    */
   startSession(workspaceId?: WorkspaceId, options: StartSessionOptions = {}): void {
     const { prompt, clearPreviousDraft, onFailure } = options
-    const workspace = this.list.getSnapshot()
-    const sessions = this.sessions.list.getSnapshot()
-    const current = sessions.current
+    const destination = this.newSessionDestination(workspaceId)
+    const target = destination.workspaceId
+    if (prompt === undefined && clearPreviousDraft !== true && destination.target !== undefined
+      && this.sessions.preparedOperationsAvailable?.(destination.target)
+      && this.rootCtx.bail('workspaces/start-prepared', { target: destination.target, ...(target === undefined ? {} : { workspaceId: target }) })) return
     const selectedRuntime = this.selectedTarget()
-    const currentWorkspaceId = current === undefined
-      ? undefined
-      : workspace.items.find(item => item.sessionIds.includes(current))?.workspaceId
-        ?? workspace.items.find(item => item.workspaceId === sessions.byId[current]?.workspaceId)?.workspaceId
-        ?? workspace.items.find(item => item.path === sessions.byId[current]?.cwd
-          && this.externalOwners.get(item.workspaceId)?.runtime.runtimeId === selectedRuntime?.runtimeId)?.workspaceId
-    const target = workspaceId ?? currentWorkspaceId ?? (selectedRuntime === undefined ? workspace.recentWorkspaceId : undefined)
+    const current = this.sessions.list.getSnapshot().current
     if (target === undefined && selectedRuntime === undefined) {
       this.sessions.clear()
       return
@@ -948,11 +1001,12 @@ export class WorkspaceRuntime implements IWorkspaces {
       archivedSessionIds: raw.archivedSessionIds.map(key),
     }
     const sessions = this.sessions.list.getSnapshot()
+    const draftCount = this.activeDrafts.size
     for (const [workspaceId, draft] of this.activeDrafts) {
       const summary = sessions.byId[key(draft.sessionId)]
       if (summary !== undefined && !summary.blank) this.activeDrafts.delete(workspaceId)
     }
-    this.persistDrafts()
+    if (draftCount !== this.activeDrafts.size || this.retryDraftStorage) this.persistDrafts()
     const baselinesReady = workspace.phase === 'ready' && sessions.phase === 'ready'
     // An archived current selection clears into the New Session view state —
     // a hidden row must not stay open behind the list. Sweeping here covers
@@ -966,6 +1020,7 @@ export class WorkspaceRuntime implements IWorkspaces {
       items: this.groupComputers || this.computerGroups === undefined ? workspace.items : workspace.items.filter(item =>
         (this.externalOwners.get(item.workspaceId)?.runtime.runtimeId ?? this.baseRuntimeId)
           === (this.selectedTarget()?.runtimeId ?? this.baseRuntimeId)),
+      ...(this.moreComputers ? { moreComputers: true } : {}),
       directoryRuntime: this.selectedTarget() ?? null,
       ...(this.computerGroups === undefined ? {} : { workspaceRuntimeIds: Object.fromEntries(workspace.items.map(item =>
         [item.workspaceId, this.externalOwners.get(item.workspaceId)?.runtime.runtimeId ?? this.baseRuntimeId])) }),

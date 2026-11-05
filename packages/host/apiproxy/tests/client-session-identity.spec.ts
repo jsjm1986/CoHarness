@@ -19,5 +19,5 @@ it('distinguishes equal Session ids in two personal Runtimes and ignores display
 it('retains standalone legacy addresses and rejects malformed allocated identities', () => {
   const legacy = clientSessionKey({ kind: 'project', projectId: 7 }, 'same' as SessionId)
   expect(parseClientSessionKey(legacy)).toEqual({ runtime: { kind: 'project', projectId: 7 }, sessionId: 'same' })
-  expect(parseClientSessionKey('dsh-session:v2:not-json' as SessionId)).toBeUndefined()
+  expect(parseClientSessionKey('dsh-session:v2:not-json')).toBeUndefined()
 })

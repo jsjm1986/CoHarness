@@ -1,5 +1,5 @@
 import { chmodSync, mkdirSync, realpathSync, rmSync, statSync } from 'node:fs'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type Database from 'better-sqlite3'
 import type { GatewayConfig } from './config.ts'
 import { assertProjectImportPathAllowed } from './project-directories.ts'
@@ -47,6 +47,10 @@ export interface EffectiveGrant {
 export type ProjectKind = 'standard' | 'steward'
 
 export interface ProjectRow {
+  /** A placed project resolves its display fields only on this node and allocation. */
+  metadataOnNode?: true
+  nodeId?: import('./runtime-catalog.ts').RuntimeNodeId
+  runtimeId?: import('./runtime-catalog.ts').RuntimeId
   id: number
   name: string
   path: string
@@ -114,7 +118,7 @@ export function projectPathsOverlap(left: string, right: string): boolean {
   const leftRelative = relative(left, right)
   const rightRelative = relative(right, left)
   const contained = (value: string): boolean => value === ''
-    || (!value.startsWith('../') && value !== '..' && !isAbsolute(value))
+    || (!value.startsWith('..'+sep) && value !== '..' && !isAbsolute(value))
   return contained(leftRelative) || contained(rightRelative)
 }
 
@@ -122,7 +126,7 @@ export function projectPathsOverlap(left: string, right: string): boolean {
 export function isProjectPathIsolated(path: string, roots: readonly string[]): boolean {
   return roots.some((root) => {
     const nested = relative(root, path)
-    return nested !== '' && !nested.startsWith('../') && nested !== '..' && !isAbsolute(nested)
+    return nested !== '' && !nested.startsWith('..'+sep) && nested !== '..' && !isAbsolute(nested)
   })
 }
 

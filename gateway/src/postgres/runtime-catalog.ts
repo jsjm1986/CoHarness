@@ -9,6 +9,7 @@ import type { Queryable } from './database.ts'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
 
 interface Row {
+  metadata_on_node?:boolean
   id: string
   kind: 'user' | 'project'
   public_id: string
@@ -70,8 +71,12 @@ export class PostgresRuntimeCatalog {
    * @returns one page restricted to current account and project access.
    * @throws RuntimeCatalogError for malformed pagination, revoked authority, or an oversized row.
    */
-  pageForAccount(actor: UserRow, query: RuntimeCatalogQuery): Promise<RuntimeCatalogPage> {
-    return this.page(actor, query, 'account')
+  async pageForAccount(actor: UserRow, query: RuntimeCatalogQuery): Promise<RuntimeCatalogPage> {
+    if (query.projectId === undefined) return this.page(actor, query, 'account')
+    if (!/^[1-9][0-9]*$/u.test(query.projectId) || !Number.isSafeInteger(Number(query.projectId))) {
+      throw new RuntimeCatalogError(400, 'runtime-catalog/invalid-id')
+    }
+    return this.page(actor, query, 'account', undefined, { kind: 'project', id: Number(query.projectId) })
   }
 
   /**
@@ -174,7 +179,8 @@ export class PostgresRuntimeCatalog {
         AND ($3<>'admin' OR m.role='admin')
     ), entries AS (
       SELECT r.id,r.owner_kind kind,COALESCE(u.public_id,p.public_id)::text public_id,
-        COALESCE(NULLIF(u.display_name,''),u.username::text,p.name::text) name,
+        CASE WHEN b.project_id IS NOT NULL THEN '#'||p.public_id::text ELSE COALESCE(NULLIF(u.display_name,''),u.username::text,p.name::text) END name,
+        b.project_id IS NOT NULL metadata_on_node,
         n.id node_id,n.name::text node_name,n.status node_status,n.last_heartbeat_at,
         i.observed_state,i.generation::text,i.provisioning_state,
         CASE WHEN $11::boolean AND r.node_id=$12::uuid THEN 0 ELSE 1 END landing_node,
@@ -190,6 +196,7 @@ export class PostgresRuntimeCatalog {
         AND owner_membership.organization_id=r.organization_id AND ($3='admin' OR owner_membership.status='active')
       LEFT JOIN harness.projects p ON r.owner_kind='project' AND p.id=r.owner_id
         AND p.organization_id=r.organization_id AND ($3='admin' OR p.status='active')
+      LEFT JOIN harness.project_content_placement b ON b.organization_id=r.organization_id AND b.runtime_id=r.id
       LEFT JOIN harness.project_members pm ON pm.project_id=p.id AND pm.organization_id=r.organization_id AND pm.user_id=a.id
       WHERE r.organization_id=$1 AND r.retired_at IS NULL AND ($4::uuid IS NULL OR r.id>$4::uuid)
         AND ($6::uuid IS NULL OR r.id=$6::uuid)
@@ -217,6 +224,7 @@ export class PostgresRuntimeCatalog {
     for (const row of page.entries.slice(0, limit)) {
       const entry: RuntimeCatalogEntry = {
         id: row.id as RuntimeId,
+        ...row.metadata_on_node?{metadataOnNode:true as const}:{},
         owner: { kind: row.kind === 'user' ? 'personal' : 'project', id: publicNumber(row.public_id, 'Runtime owner'), name: row.name },
         node: { id: row.node_id as RuntimeNodeId, name: row.node_name, status: row.node_status,
           lastHeartbeatAt: row.last_heartbeat_at === null ? null : new Date(row.last_heartbeat_at).toISOString() },

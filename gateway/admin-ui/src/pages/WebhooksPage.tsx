@@ -1,3 +1,4 @@
+import { useProjectChoices } from '../components/project-choices.tsx'
 import { usePendingEdits } from '../pending-edits.tsx'
 import { RuntimePicker } from '../components/RuntimePicker.tsx'
 import type { RuntimeId } from '../api.ts'
@@ -144,7 +145,7 @@ export function WebhooksPage() {
   const [endpoints, setEndpoints] = useState<AdminWebhookEndpoint[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<Array<{ id: number; username: string; active: boolean }>>([])
-  const [projects, setProjects] = useState<Array<{ id: number; name: string }>>([])
+  const { projects, setProjects, readNames, moreNames } = useProjectChoices()
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [runtimeAvailable, setRuntimeAvailable] = useState(false)
@@ -161,11 +162,12 @@ export function WebhooksPage() {
   useEffect(() => {
     let disposed = false
     setLoading(true)
-    void Promise.all([listWebhookEndpoints(), listUsers(), listProjects()]).then(([listed, userRows, projectRows]) => {
+    void Promise.all([listWebhookEndpoints(), listUsers(), listProjects(undefined, 'directory')]).then(([listed, userRows, projectRows]) => {
       if (disposed) return
       setEndpoints(listed.endpoints)
       setUsers(userRows.map(user => ({ id: user.id, username: user.username, active: user.status === 'active' })))
-      setProjects(projectRows.map(project => ({ id: project.id, name: project.name })))
+      setProjects(projectRows)
+      readNames(listed.endpoints.filter(endpoint => endpoint.runtimeKind === 'project').map(endpoint => endpoint.runtimePublicId))
       setError('')
     }).catch((cause: unknown) => { if (!disposed) setError(messageOf(cause)) })
       .finally(() => { if (!disposed) setLoading(false) })
@@ -352,12 +354,13 @@ export function WebhooksPage() {
             </Field>
             {editing.draft.runtimeKind === 'project' && (
               <Field label={t('fieldRuntimeTarget')} hint={t('hintRuntimeTarget')}>
-                <select className="input" value={editing.draft.runtimePublicId} onChange={event => { patchDraft({ runtimePublicId: event.target.value, runtimeId: undefined }) }}>
+                <select className="input" value={editing.draft.runtimePublicId} onFocus={() => readNames()} onChange={event => { readNames([Number(event.target.value)]); patchDraft({ runtimePublicId: event.target.value, runtimeId: undefined }) }}>
                   <option value="">{t('optionSelectTarget')}</option>
                   {projects.map(project => <option key={project.id} value={String(project.id)}>{project.name}</option>)}
                 </select>
               </Field>
             )}
+            {editing.draft.runtimeKind === 'project' && moreNames()}
             {Number(editing.draft.runtimeKind === 'user' ? editing.draft.executionUserId : editing.draft.runtimePublicId) > 0 ? <RuntimePicker
               key={`${editing.draft.runtimeKind}:${editing.draft.runtimeKind === 'user' ? editing.draft.executionUserId : editing.draft.runtimePublicId}`}
               owner={{ kind: editing.draft.runtimeKind, id: Number(editing.draft.runtimeKind === 'user' ? editing.draft.executionUserId : editing.draft.runtimePublicId) }}

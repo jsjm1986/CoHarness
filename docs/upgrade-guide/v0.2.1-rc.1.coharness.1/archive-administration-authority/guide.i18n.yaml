@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.md
 document:
-  en: d899949fbab69780056ddbfbbdcdd37a75ed5da1
-  zh: 7aafb7923e2ce56ac2f22699f5203df60d070900
+  en: 0759e9e009ed51a1cff7d96f364853afdae577cf
+  zh: 226584f3624dd50cdded6ab3d8576adb3498fca1
 /:
   en: 5b6ea0396279d159
   zh: 53d4c02fe824e843
@@ -12,8 +12,8 @@ document:
   en: aff6e2baef71d64d
   zh: 84575757290ae772
 /upgrade-archive-identity-and-administration/change:
-  en: b7e543e75d1533c4
-  zh: cd91573d3575fd0c
+  en: 2120216d9f5f1bda
+  zh: 04e71746eacbc6bb
 /upgrade-archive-identity-and-administration/migration:
-  en: 8a002b7bd91b599c
-  zh: aad41d4e23d03d3d
+  en: 91d1cacdac4709e5
+  zh: 47ba150ab8cf960c

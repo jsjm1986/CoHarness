@@ -52,6 +52,76 @@ describe('concrete terminology policy', () => {
     )).toEqual([])
   })
 
+  it('preserves recorded audit commands and diagnostics while checking authored descriptions', () => {
+    const file = '.agents/audits/receipts/capture.json'
+    const source = JSON.stringify({
+      [`capture-${blockedTerm}`]: {
+        cwd: `/recorded/${blockedTerm}`,
+        startedAt: '2026-01-01T00:00:00Z',
+        command: ['node', `/recorded/${blockedTerm}.mjs`, blockedTerm],
+        exitCode: 1,
+        outputTail: `recorded diagnostic: ${blockedTerm}\n`,
+        description: blockedTerm,
+      },
+    }, null, 2)
+    const line = source.split('\n').findIndex(value => value.includes('"description"')) + 1
+    expect(findConcreteTermViolations(file, source)).toEqual([{ file, line }])
+    expect(findConcreteTermViolations('packages/example/capture.json', source).length).toBeGreaterThan(1)
+  })
+
+  it('preserves exact audit artifact references and matching identifiers without exempting prose or field names', () => {
+    const file = '.agents/audits/current.json'
+    const source = JSON.stringify({
+      receipt: `/recorded/source-${blockedTerm}.json`,
+      name: `source-${blockedTerm}`,
+      relativeFile: `source-${blockedTerm}.log`,
+      archivedFile: `.agents/notes/archived/process/source-${blockedTerm}.md`,
+      description: `the ${blockedTerm}.json file`,
+      [`field${blockedTerm}`]: '/recorded/source.json',
+    }, null, 2)
+    expect(findConcreteTermViolations(file, source)).toEqual([{ file, line: 6 }, { file, line: 7 }])
+    expect(findConcreteTermViolations(file, JSON.stringify({ name: blockedTerm, receipt: '/different.json' })))
+      .toEqual([{ file, line: 1 }])
+  })
+
+  it.each([
+    { exitCode: undefined }, { exitCode: '0' }, { exitCode: -1 },
+    { cwd: undefined }, { cwd: '' }, { startedAt: 'not a timestamp' },
+    { command: undefined }, { command: [] }, { command: ['', blockedTerm] },
+    { command: ['node', { description: blockedTerm }] },
+  ])('checks raw output when audit command metadata is incomplete: %j', (fields) => {
+    const file = '.agents/audits/receipts/capture.json'
+    const source = JSON.stringify({
+      cwd: '/recorded', startedAt: '2026-01-01T00:00:00Z', command: ['node', blockedTerm],
+      exitCode: 0, outputTail: blockedTerm, ...fields,
+    }, null, 2)
+    expect(findConcreteTermViolations(file, source).length).toBeGreaterThan(0)
+  })
+
+  it('preserves a Windows audit command without treating structured output as captured text', () => {
+    const file = '.agents/audits/receipts/windows.json'
+    const source = JSON.stringify({
+      cwd: `C:\\recorded\\${blockedTerm}`, startedAt: '2026-01-01T00:00:00Z',
+      command: `node --case ${blockedTerm}`, exitCode: 0,
+      stdout: { description: blockedTerm },
+    }, null, 2)
+    const line = source.split('\n').findIndex(value => value.includes('"description"')) + 1
+    expect(findConcreteTermViolations(file, source)).toEqual([{ file, line }])
+  })
+
+  it('preserves a recorded command whose working directory is relative', () => {
+    const file = '.agents/audits/receipts/capture.json'
+    const source = JSON.stringify({ cwd: '.', startedAt: '2026-01-01T00:00:00Z', command: `tool ${blockedTerm}`,
+      exitCode: 1, outputTail: blockedTerm }, null, 2)
+    expect(findConcreteTermViolations(file, source)).toEqual([])
+  })
+
+  it('checks malformed audit JSON and unrelated audit prose', () => {
+    const file = '.agents/audits/receipts/capture.json'
+    expect(findConcreteTermViolations(file, `{ "outputTail": "${blockedTerm}", }`)).toEqual([{ file, line: 1 }])
+    expect(findConcreteTermViolations(file, JSON.stringify({ outputTail: blockedTerm }))).toEqual([{ file, line: 1 }])
+  })
+
   it('excludes vendored sources and frozen Agent Notes', () => {
     expect(findConcreteTermViolations(`vendor/example/${blockedTerm}.ts`, blockedTerm)).toEqual([])
     expect(findConcreteTermViolations(

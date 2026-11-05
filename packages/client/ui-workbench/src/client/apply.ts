@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import type { WorkbenchCatalog } from './catalog.ts'
+import { parseWorkbenchCatalog, type WorkbenchCatalog } from './catalog.ts'
 import type { LegacyWorkbenchRestore, WorkbenchRestoreOptions } from './layout-restore.ts'
 import { WorkbenchEmpty } from './components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from './components/WorkbenchPaneHeader.tsx'
@@ -167,6 +167,14 @@ export function apply(ctx: ClientContext): void {
     openResource(request)
     return true
   })
+  const openVerifiedPane = async (id: SessionId, replace: boolean, signal: AbortSignal) => {
+    let result: ReturnType<ConversationViewport['add']> = { ok: false, reason: 'unknown' }
+    await commitSessionNavigation(ctx.sessions, id, signal, () => {
+      if (disposed || viewport.snapshot.getSnapshot().pendingIdentity) return
+      result = replace ? viewport.replaceActive(id) : viewport.add(id)
+    })
+    return result
+  }
   const chooseSession = async (item: import('./catalog.ts').WorkbenchConversation, replace: boolean, navigation = ctx.sessions.beginNavigation()) => {
     const original = item.sessionId
     const id = ctx.sessions.keyFor?.(original, item.runtime) ?? original
@@ -179,11 +187,7 @@ export function apply(ctx: ClientContext): void {
     return ctx.sessions.usingRuntime(item.runtime, AbortSignal.any([navigation, lifetime.signal]), async (signal) => {
       const available = await ctx.sessions.ensureSession?.(item.runtime, original, signal)
       if (disposed || navigation.aborted || available !== true) return { ok: false as const, reason: 'unknown' as const }
-      let result: ReturnType<ConversationViewport['add']> = { ok: false, reason: 'unknown' }
-      await commitSessionNavigation(ctx.sessions, id, signal, () => {
-        result = replace ? viewport.replaceActive(id) : viewport.add(id)
-      })
-      return result
+      return openVerifiedPane(id, replace, signal)
     })
   }
   // The files entry appears wherever the toolbar hosts a Session: the toolbar
@@ -214,8 +218,13 @@ export function apply(ctx: ClientContext): void {
     store: chooser,
     inject: () => {
       const wb = viewport as WorkbenchViewport
+      const gatewayEntries = ctx.get('gatewayEntryRequests')
       return {
         hooks: { deployment: ctx.deploymentContext },
+        ...(gatewayEntries === undefined ? {} : { catalogAuthority: gatewayEntries.catalogAuthority, moreComputers: (signal: AbortSignal) => gatewayEntries.moreComputers(signal),
+          readProjectDisplay: (scope: string, signal: AbortSignal) => gatewayEntries.selectedProjectDisplay(scope, signal),
+          readCatalog: async (signal: AbortSignal, visible?: { scope?: string; q?: string; cursor?: string }) =>
+            parseWorkbenchCatalog(await gatewayEntries.catalog(signal, visible)) }),
         listWorkbenches: () => wb.listWorkbenches?.() ?? [],
         currentWorkbench: () => wb.currentWorkbench?.(),
         createWorkbench: (name: string) => wb.createWorkbench?.(name) ?? '',
@@ -236,17 +245,12 @@ export function apply(ctx: ClientContext): void {
           if (ctx.sessions.usingRuntime === undefined) return { ok: false as const, reason: 'unknown' as const }
           return ctx.sessions.usingRuntime(target, AbortSignal.any([navigation, lifetime.signal]), async (signal) => {
             const id = await ctx.workspaces.createRuntimeSession?.(target, undefined, signal)
-            if (id === undefined) return { ok: false as const, reason: 'unknown' as const }
-            return disposed || navigation.aborted ? { ok: false as const, reason: 'unknown' as const } : chooseSession({
-              sessionId: parseClientSessionKey(id)?.sessionId ?? id,
-              runtime: target,
-              visibility: target.kind === 'personal' ? 'personal' : 'project',
-              creatorUserId: 0,
-              creatorDisplayName: '',
-              updatedAt: Date.now(),
-              blank: true,
-              canWrite: true,
-            }, replace, navigation)
+            if (id === undefined || disposed || signal.aborted) return { ok: false as const, reason: 'unknown' as const }
+            const address = parseClientSessionKey(id)
+            if (address ? runtimeTargetKey(address.runtime) !== runtimeTargetKey(target) : target.runtimeId !== undefined) {
+              return { ok: false as const, reason: 'unknown' as const }
+            }
+            return openVerifiedPane(id, replace, signal)
           })
         },
         hydrateCatalog: async (catalog: WorkbenchCatalog, paneIds: readonly SessionId[],
@@ -270,6 +274,15 @@ export function apply(ctx: ClientContext): void {
             const rows = catalog.items.filter(candidate =>
               encoding === 2 || (encoding === undefined && parseClientSessionKey(id) === undefined)
                 ? candidate.sessionId === id : clientSessionKey(candidate.runtime, candidate.sessionId) === id)
+            if (encoding === 2 && catalog.paged) {
+              const targets: SessionRuntimeTarget[] = [...(catalog.personalRuntimes ?? []), ...catalog.projects.flatMap(project =>
+                project.runtimeId === undefined ? [] : [{ kind: 'project' as const, ...project, projectName: project.name }])]
+              for (const runtime of targets) {
+                if (rows.some(row => runtimeTargetKey(row.runtime) === runtimeTargetKey(runtime))) continue
+                rows.push({ sessionId: id, runtime, visibility: runtime.kind, creatorUserId: 0, creatorDisplayName: '',
+                  blank: false, updatedAt: 0, canWrite: false })
+              }
+            }
             const candidates = [...new Map(rows.map(row => [clientSessionKey(row.runtime, row.sessionId), row])).values()]
             const chosen = options.selection?.owners[id]
             return encoding !== 2 || chosen === undefined ? candidates : candidates.filter(row =>
@@ -284,17 +297,44 @@ export function apply(ctx: ClientContext): void {
             })
             if (issues.length > 0) return { workbenchId, issues }
           }
+          const verifyingLegacyOwners = version === 2 && catalog.paged === true && options.selection !== undefined
+          if (verifyingLegacyOwners) {
+            const activeIds = new Set(ids)
+            await Promise.all(allIds.filter(id => !activeIds.has(id)).map(async (id) => {
+              const candidate = candidatesFor(id, version)[0]
+              if (candidate === undefined || catalog.items.some(row => row.sessionId === id
+                && runtimeTargetKey(row.runtime) === runtimeTargetKey(candidate.runtime))) return
+              const source = ctx.get('gatewayEntryRequests')
+              const target = candidate.runtime
+              if (source === undefined || target.runtimeId === undefined) throw new Error('Saved Session owner is unavailable')
+              const scope = target.kind === 'project' ? String(target.projectId) : `personal:${target.runtimeId}`
+              const found = parseWorkbenchCatalog(await source.catalog(signal, { scope, q: id }))
+              if (!found.items.some(row => row.sessionId === id && runtimeTargetKey(row.runtime) === runtimeTargetKey(target))) {
+                throw new Error('Saved Session is unavailable in its selected computer directory')
+              }
+            }))
+          }
           const items = ids.flatMap((id) => {
             const candidates = candidatesFor(id, version)
             // Old records without a runtime never choose the first colliding ID.
             const item = candidates.length === 1 ? candidates[0] : undefined
-            return item === undefined ? [] : [item]
+            if (item !== undefined) return [item]
+            const address = version === 3 && catalog.paged ? parseClientSessionKey(id) : undefined
+            if (address?.runtime.runtimeId === undefined) return []
+            // Pinned exact identities authorize their own history even when absent from the current page.
+            return [{ ...address, visibility: address.runtime.kind, canWrite: false, creatorUserId: 0, creatorDisplayName: '', blank: false, updatedAt: 0 }]
           })
           const targets = [...new Map(items.map(item => [runtimeTargetKey(item.runtime), item.runtime])).values()]
           const restore = async (): Promise<void> => {
             const unavailable = new Set<SessionId>()
             const denied = new Set<SessionId>()
-            if (viewport.snapshot.getSnapshot().mode === 'workbench') {
+            const checking = new Map<SessionId, 'checking' | 'unavailable'>()
+            const current = (): boolean => !signal.aborted && !disposed && workbench.currentWorkbench?.().id === workbenchId
+              && workbench.sessionKeyVersion?.() === version
+            const publish = (): void => { if (version === 3 && current()) viewport.setPaneVerification?.(Object.fromEntries(checking)) }
+            if (verifyingLegacyOwners || viewport.snapshot.getSnapshot().mode === 'workbench') {
+              for (const id of ids) checking.set(id, 'checking')
+              publish()
               await Promise.all(items.map(async (item) => {
                 const key = ctx.sessions.keyFor?.(item.sessionId, item.runtime) ?? item.sessionId
                 try {
@@ -304,11 +344,16 @@ export function apply(ctx: ClientContext): void {
                     || error instanceof Error && 'status' in error && (error.status === 401 || error.status === 403)) denied.add(key)
                   else unavailable.add(key)
                 }
+                if (denied.has(key) || unavailable.has(key)) checking.set(key, 'unavailable')
+                else checking.delete(key)
+                publish()
               }))
             }
-            if (!signal.aborted && !disposed && workbench.currentWorkbench?.().id === workbenchId
-              && workbench.sessionKeyVersion?.() === version) {
+            if (current()) {
+              if (version === 2 && catalog.paged && (denied.size || unavailable.size)) throw new Error('Selected Session owner could not be verified')
               workbench.reconcileSessionKeys?.((id, version) => {
+                if (version === 3 && catalog.paged
+                  && parseClientSessionKey(id)?.runtime.runtimeId !== undefined) return denied.has(id) ? undefined : id
                 const matches = candidatesFor(id, version)
                 const item = matches.length === 1 ? matches[0] : undefined
                 if (matches.length === 0 && version === 3 && !catalog.personalComplete
@@ -322,6 +367,7 @@ export function apply(ctx: ClientContext): void {
                 return key === undefined || denied.has(key) ? undefined : key
               })
               viewport.markCatalogReady(unavailable)
+              if (version === 3) viewport.setPaneVerification?.(Object.fromEntries([...unavailable].map(id => [id, 'unavailable'])))
             }
           }
           const hold = async (index: number): Promise<void> => {

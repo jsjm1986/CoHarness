@@ -13,7 +13,7 @@ export function sessionAddressApi(
 ): IApiClient {
   type Unary = (...args: never[]) => Promise<unknown>
   const method = <F extends Unary>(select: (target: IApiClient) => F, fields: readonly string[]): F => {
-    const invoke = (payload: Readonly<Record<string, unknown>>, signal?: AbortSignal): Promise<unknown> => {
+    const invoke = (payload: Readonly<Record<string, unknown>>, signal?: AbortSignal, ...options: unknown[]): Promise<unknown> => {
       let owner: IApiClient | undefined
       let mapped: Record<string, unknown> | undefined
       for (const field of fields) {
@@ -26,7 +26,7 @@ export function sessionAddressApi(
         mapped[field] = address.sessionId
       }
       // The method roster below preserves each IApiClient signature; only its declared address fields change.
-      return Reflect.apply(select(owner ?? api), undefined, [mapped ?? payload, signal]) as Promise<unknown>
+      return Reflect.apply(select(owner ?? api), undefined, [mapped ?? payload, signal, ...options]) as Promise<unknown>
     }
     return invoke as unknown as F
   }

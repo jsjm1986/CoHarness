@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -182,6 +182,25 @@ describe('SessionComputerLabel', () => {
 })
 
 describe('ScopeControl', () => {
+  it('opens single-computer project names from the entry itself without asking the user to select a computer', async () => {
+    const nodeId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' as import('../src/client/collaboration-client.ts').CollaborationComputerId
+    const read = vi.fn().mockResolvedValue(undefined)
+    const state = snapshot({ context: { ...projectContext, scope: { kind: 'personal' }, projects: projectContext.projects.map(row => ({
+      ...row, nodeId, metadataOnNode: true, name: `#${row.projectId}`, path: '',
+    })) } })
+    render(<ScopeControl {...scopeProps(state, { loadProjectNames: read, useDeployment: selector => selector({
+      phase: 'ready', showComputer: false, aggregateComputers: false, context: {
+        mode: 'single', revision: '1', entry: { nodeId, name: 'Office' }, primary: null, scope: 'local',
+        role: 'standalone', refreshAfterMs: 30_000, legacyMigrationRequired: false,
+      },
+    }) })} />)
+    expect(read).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: t('scope.aria') }))
+    await waitFor(() =>{  expect(read).toHaveBeenCalledWith(nodeId, [9, 10], expect.any(AbortSignal)) })
+    expect(screen.queryByRole('combobox', { name: t('scope.loadNames') })).toBeNull()
+    expect(read).toHaveBeenCalledTimes(1)
+  })
+
   it('enters personal space through an available computer when the recent bootstrap computer is offline', () => {
     const offline = '10000000-0000-4000-8000-000000000011' as never
     const available = '10000000-0000-4000-8000-000000000012' as never

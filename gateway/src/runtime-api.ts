@@ -15,6 +15,7 @@ import {
 import { CollaborationDeniedError } from './collaboration.ts'
 import { DesktopCoordinationError, type DesktopCoordinator } from './desktop-coordinator.ts'
 import type { RuntimeTarget } from './instances.ts'
+import { NodeContentUnavailable, type NodeContentBinding } from './node-content-store.ts'
 import {
   PRINCIPAL_HEADER,
   type GatewayPrincipalClaims,
@@ -77,6 +78,8 @@ export interface RuntimeCredentialSubject {
   generation: number
   userInternalId?: string
   projectInternalId?: string
+  /** Read with the live generation/lease admission; absent for a legacy allocation. */
+  contentBinding?: NodeContentBinding
 }
 
 type RuntimeSessionHeader = GatewaySessionCreationHeader
@@ -109,13 +112,17 @@ interface RuntimeApiDependencies {
     & Partial<Pick<PostgresInstanceRepository, 'authenticateRuntimeCleanupToken'>>
   /** Node-wide model/process coordinator; managed launches require this service. */
   resourceBudget?: NodeResourceBudget
+  /** Node-bound execution and Session witnesses for physically placed projects. */
+  nodeContent?: Pick<import('./node-content-store.ts').NodeContentStore, 'read' | 'write'>
+  executionIdentity?: GatewayExecutionIdentity
   /** Bind every Session operation to the authenticated organization and Runtime. */
-  conversations: { forRuntime(scope: ConversationRuntimeScope): RuntimeConversationRepository }
+  conversations: { forRuntime(scope: ConversationRuntimeScope, subject?: RuntimeCredentialSubject): RuntimeConversationRepository }
   collaboration: Pick<
     PostgresCollaborationService,
     'access' | 'claimInteraction' | 'projectForUser' | 'readableSessionIds'
-  >
+  > & Partial<Pick<PostgresCollaborationService,'forAuthenticatedRuntime'>>
   archives?: Pick<ConversationArchiveService, 'syncRuntimeSnapshot' | 'acknowledgeCommand' | 'hasPendingCommands'>
+    & Partial<Pick<import('./node-archive-router.ts').NodeArchiveRouter,'forCredential'>>
   /** Runtime-owned metadata publication; absent in standalone fixtures. */
   workspaceCatalog?: Pick<import('./workspace-catalog.ts').PostgresWorkspaceCatalog, 'publish'>
   principals: GatewayPrincipalSigner
@@ -148,7 +155,7 @@ interface RuntimeApiDependencies {
   /** Optional registered SSH targets; absent in standalone compositions without managed SSH. */
   sshTargets?: Pick<PostgresSshTargetService, 'resolveForRuntime'>
   /** Optional durable plugin desired-state store; absent in compositions without PostgreSQL. */
-  pluginState?: Pick<import('./plugin-state.ts').PostgresPluginState, 'readForSubject' | 'publishForSubject'>
+  pluginState?: Pick<import('./plugin-state.ts').PostgresPluginState, 'readForSubject' | 'publishForSubject'> & Partial<Pick<import('./plugin-state.ts').PostgresPluginState,'verifyProfileForSubject'>>
   /** Optional audited SQL channel for the resident steward runtime. */
   stewardQuery?: Pick<import('./postgres/steward-query.ts').StewardQueryService, 'query' | 'stewardTarget'>
 }
@@ -478,7 +485,7 @@ function draftScopeKey(
 export function createRuntimeApiHandler(
   deps: RuntimeApiDependencies,
 ): GatewayRuntimeHandler {
-  const execution = new GatewayExecutionIdentity(deps.context.pool, deps.context.nodeId)
+  const execution = deps.executionIdentity ?? new GatewayExecutionIdentity(deps.context.pool, deps.context.nodeId, deps.nodeContent)
   const authenticate = async (req: IncomingMessage, cleanup: boolean): Promise<RuntimeCredentialSubject | null> => {
     const token = authorizationToken(req)
     if (token === undefined) return null
@@ -501,7 +508,8 @@ export function createRuntimeApiHandler(
     if (runtimeId === undefined) throw new ConversationReadError('dependency', 'conversation Runtime identity is unavailable')
     return { organizationId: subject.organizationId, runtimeId }
   }
-  const conversations = (subject: RuntimeCredentialSubject): RuntimeConversationRepository => deps.conversations.forRuntime(sessionScope(subject))
+  const collaboration = (subject: RuntimeCredentialSubject) => deps.collaboration.forAuthenticatedRuntime?.(subject) ?? deps.collaboration
+  const conversations = (subject: RuntimeCredentialSubject): RuntimeConversationRepository => deps.conversations.forRuntime(sessionScope(subject), subject)
 
   const stored = async (sessionId: string, subject: RuntimeCredentialSubject): Promise<StoredConversation | undefined> => {
     const value = await conversations(subject).load(sessionId)
@@ -882,6 +890,13 @@ export function createRuntimeApiHandler(
         ))
         return true
       }
+      if (pathname === '/internal/runtime/plugin-state/verify-profile' && req.method === 'POST') {
+        if (subject.contentBinding) {
+          if (!deps.pluginState?.verifyProfileForSubject) {send(res,503,{error:'plugin-state-unavailable'});return true}
+          await deps.pluginState.verifyProfileForSubject(subject)
+        }
+        res.writeHead(204,{'cache-control':'no-store'});res.end();return true
+      }
       if (pathname === '/internal/runtime/plugin-state' && (req.method === 'GET' || req.method === 'POST')) {
         if (deps.pluginState === undefined) { send(res, 503, { error: 'plugin-state-unavailable' }); return true }
         const reply = (status: number, body: unknown) => {
@@ -1216,7 +1231,7 @@ export function createRuntimeApiHandler(
 
       if (pathname === '/internal/runtime/archive/pending' && req.method === 'GET') {
         if (deps.archives === undefined) { send(res, 503, { error: 'conversation-archive-unavailable' }); return true }
-        send(res, 200, { pending: await deps.archives.hasPendingCommands(subject.target) })
+        send(res, 200, { pending: await (deps.archives.forCredential?.(subject) ?? deps.archives).hasPendingCommands(subject.target) })
         return true
       }
 
@@ -1309,7 +1324,7 @@ export function createRuntimeApiHandler(
             }),
           }),
         } satisfies ConversationArchiveRuntimeSnapshot
-        const commands = await deps.archives.syncRuntimeSnapshot(snapshot, subject.target)
+        const commands = await (deps.archives.forCredential?.(subject) ?? deps.archives).syncRuntimeSnapshot(snapshot, subject.target)
         send(res, 200, { commands })
         return true
       }
@@ -1324,7 +1339,7 @@ export function createRuntimeApiHandler(
           || (payload.error !== undefined && typeof payload.error !== 'string')) {
           throw new Error('invalid archive acknowledgement')
         }
-        const acknowledged = await deps.archives.acknowledgeCommand(payload.commandId, payload.revision, payload.error as string | undefined, subject.target)
+        const acknowledged = await (deps.archives.forCredential?.(subject) ?? deps.archives).acknowledgeCommand(payload.commandId, payload.revision, payload.error as string | undefined, subject.target)
         if (!acknowledged) { send(res, 409, { error: 'archive-command-not-acknowledged' }); return true }
         send(res, 200, { acknowledged: true })
         return true
@@ -1655,7 +1670,7 @@ export function createRuntimeApiHandler(
           return true
         }
         try {
-          send(res, 200, { access: await deps.collaboration.access(claims.user.id, sessionScope(subject).runtimeId, payload.sessionId, payload.action) })
+          send(res, 200, { access: await collaboration(subject).access(claims.user.id, sessionScope(subject).runtimeId, payload.sessionId, payload.action) })
         } catch (error: unknown) {
           if (!(error instanceof CollaborationDeniedError && error.code === 'conversation-not-found')
             || creationAuthorization === undefined) throw error
@@ -1681,7 +1696,7 @@ export function createRuntimeApiHandler(
           throw new Error('invalid interaction claim')
         }
         send(res, 200, {
-          claimed: await deps.collaboration.claimInteraction(
+          claimed: await collaboration(subject).claimInteraction(
             claims.user.id,
             sessionScope(subject).runtimeId,
             payload.sessionId,
@@ -1720,7 +1735,7 @@ export function createRuntimeApiHandler(
         const readable = new Set<string>()
         for (let offset = 0; offset < payload.sessionIds.length; offset += READABLE_SESSION_BATCH_SIZE) {
           const batch = payload.sessionIds.slice(offset, offset + READABLE_SESSION_BATCH_SIZE)
-          for (const id of await deps.collaboration.readableSessionIds(claims.user.id, sessionScope(subject).runtimeId, subject.target.id, batch)) {
+          for (const id of await collaboration(subject).readableSessionIds(claims.user.id, sessionScope(subject).runtimeId, subject.target.id, batch)) {
             readable.add(id)
           }
         }
@@ -1794,6 +1809,10 @@ export function createRuntimeApiHandler(
 
       return false
     } catch (error) {
+      if (error instanceof NodeContentUnavailable) {
+        send(res, error.status, { error: error.code, message: error.message })
+        return true
+      }
       if (error instanceof ExecutionIdentityError) {
         const code = error.status === 403 ? 'execution-forbidden' : error.status === 404 ? 'execution-not-found'
           : error.status === 409 ? 'execution-conflict' : 'invalid-execution-request'

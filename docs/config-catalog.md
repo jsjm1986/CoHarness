@@ -531,6 +531,8 @@ export interface ConnectionConfig {
     generationReadyWarnMs?: number
     /** Hard readiness deadline in milliseconds. */
     generationReadyTimeoutMs?: number
+    /** Concurrent explicit Runtime preparations admitted per browser document. */
+    maxConcurrentEntryRequests?: number
   }
   /**
    * Authorities this deployment serves beyond loopback: exact `host:port`, or
@@ -1350,7 +1352,7 @@ export type Config = LocalConfig
 ## `@deepseek-ai/dsh-gateway-execution`
 
 - `inject`: `gatewayRuntime` · `agents` · `sessions` · `sessionQuery` · `permissionPresets` · `sandboxPolicy` · `sessionProjections`
-- `source`: [`packages/context/gateway-execution/src/index.ts:34`](../packages/context/gateway-execution/src/index.ts)
+- `source`: [`packages/context/gateway-execution/src/index.ts:35`](../packages/context/gateway-execution/src/index.ts)
 
 ```ts config-catalog
 /** Reconnection applies to authorization updates, never to model or tool effects. */
@@ -1434,7 +1436,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-hmr`
 
 - `refs`: `ChokidarOptions` (`chokidar`)
-- `source`: [`packages/boot/hmr/src/index.ts:56`](../packages/boot/hmr/src/index.ts)
+- `source`: [`packages/boot/hmr/src/index.ts:61`](../packages/boot/hmr/src/index.ts)
 
 ```ts config-catalog
 /** Module roots and watcher timing, with Chokidar deployment options. */

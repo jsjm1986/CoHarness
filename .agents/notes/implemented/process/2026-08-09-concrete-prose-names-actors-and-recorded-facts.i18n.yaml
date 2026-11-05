@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-09-concrete-prose-names-actors-and-recorded-facts.md
 document:
-  en: b7df5403ea11ff8ba32be0f9bede5a32d5bcd6ee
-  zh: 8a45d452bfd98c1fe87a9a42bd4930273d034ca8
+  en: af6af0f055b9eb493a7ce49f0ed9a06c7a9329b3
+  zh: 4adfd86269629b21e06418c578c71688042abd81
 /agent-note-concrete-prose-names-actors-and-recorded-facts:
   en: fbfbd92c8f73d34c
   zh: fc48118b80f5dbb9
@@ -12,8 +12,8 @@ document:
   en: f0228c15ff233209
   zh: b6183fdc8dd705a0
 /agent-note-concrete-prose-names-actors-and-recorded-facts/decision:
-  en: 56c8f7e52178572e
-  zh: ccca6751db033f76
+  en: 55e93ea21dfe6d73
+  zh: d307b980219f5daf
 /agent-note-concrete-prose-names-actors-and-recorded-facts/alternatives-considered:
   en: 08a988b00edf03b2
   zh: 8614c5edbc46ca36

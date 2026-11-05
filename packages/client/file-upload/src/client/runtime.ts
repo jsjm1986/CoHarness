@@ -5,6 +5,8 @@ import { bytesToBase64 } from '@deepseek-ai/dsh-util-crypto'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { addressRuntimeUrl, parseClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { FILE_UPLOAD_ROUTE } from '../protocol.ts'
 import type {
   ClientFileUploadHooks, EncodedFileUploadRequest, FileUploadFetch, FileUploadValue,
@@ -196,10 +198,19 @@ export class FileUploadRuntime extends Service implements FileUploadService {
     onProgress?: (progress: { readonly loaded: number; readonly total?: number }) => void,
   ): Promise<RemoteResult<FileUploadValue>> {
     if (!(data instanceof Uint8Array)) {
-      const query = new URLSearchParams({ sessionId })
+      const address = parseClientSessionKey(sessionId)
+      const query = new URLSearchParams({ sessionId: address?.sessionId ?? sessionId })
       if (name !== undefined) query.set('name', name)
+      const url = new URL(FILE_UPLOAD_ROUTE + '?' + query.toString(), 'http://dsh.internal/')
+      if (address !== undefined) addressRuntimeUrl(url, address.runtime)
+      const connection = this.ctx.get('connection') as ConnectionHandle | undefined
+      const owner = address === undefined ? connection?.forSession?.(sessionId) ?? connection
+        : connection?.forTarget?.(address.runtime) ?? connection
+      const path = FILE_UPLOAD_ROUTE + url.search
+      const pinned = new URL(owner?.privateResourceUrl?.(path) ?? path, 'http://dsh.internal/')
       const response = await this.post({
-        path: `${FILE_UPLOAD_ROUTE}?${query.toString()}`,
+        // The Worker resolves the route against document.baseURI, including a proxy mount.
+        path: FILE_UPLOAD_ROUTE + pinned.search,
         body: data,
         headers: { 'content-type': 'application/octet-stream' },
         ...(signal === undefined ? {} : { signal }),

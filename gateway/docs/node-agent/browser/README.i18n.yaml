@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/docs/node-agent/browser/README.md
 document:
-  en: b696c677620ab7cd218cb1dbd252b97349e325af
-  zh: 278631ba78d7aa0f278c25eadfed0e29ef6cfa66
+  en: dd3a4994910ddf266bfff42185ff2578a9b0453d
+  zh: 18ed37499a333a4077653b56f0753be91a539ca1
 /:
   en: 688a96f55c9e991c
   zh: 1bb5cb710e93b5dd
@@ -18,11 +18,11 @@ document:
   en: d628085221869e7d
   zh: 518f68ac04467c21
 /browser-environments-and-document-locations/user-navigation:
-  en: 80c9571c9a3f32e8
-  zh: c9c3c985480302cb
+  en: bfb99b32b72a79de
+  zh: d77654002067150d
 /browser-environments-and-document-locations/admin-navigation:
-  en: 3d0a267c9b371044
-  zh: a03a84c3cae21e15
+  en: 2b7f35a4f06ba890
+  zh: d046457c598b3a6c
 /browser-environments-and-document-locations/browser-api:
   en: 90ad4b8e0498a9ca
   zh: be10acaa0a7a1710

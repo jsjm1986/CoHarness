@@ -43,6 +43,7 @@ const API_METHODS = {
     rename: 'session.rename',
     fork: 'session.fork',
     prompt: 'session.prompt',
+    promptStatus: 'session.promptStatus',
     attachment: 'session.attachment',
     updateQueue: 'session.updateQueue',
     cancel: 'session.cancel',

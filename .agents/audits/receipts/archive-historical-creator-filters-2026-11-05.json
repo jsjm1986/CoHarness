@@ -1,0 +1,117 @@
+{
+  "id": "B522",
+  "at": "2026-11-05T03:37:25.532071+00:00",
+  "title": "Node-volume archive creator filters hide retained history after the creator is disabled or logically deleted",
+  "status": "fixed_historical_creator_lookup_with_current_administrator_authority_verified_remaining_archive_search_review_open",
+  "sourceFixed": true,
+  "paths": [
+    "gateway/src/postgres/conversation-archive-service.ts"
+  ],
+  "receipt": "receipts/archive-historical-creator-filters-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z",
+  "counterproof": {
+    "scenarios": 19,
+    "failedCreatorFilters": [
+      "historical-creator-disabled",
+      "historical-creator-deleted"
+    ],
+    "failureCount": 2,
+    "historyDataPreserved": true,
+    "originalThirteenRowsUnchanged": true,
+    "productionChangedBeforeCounterproof": false
+  },
+  "correction": "Node-volume creator filters resolve retained control-database account identities by organization and public id, matching shared-store historical behavior. The creator target does not need current login eligibility. Authenticated administrator checks, Runtime admission, logical user deletion and retained archive data remain unchanged.",
+  "checks": {
+    "distinctNamedCases": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/archive-history-regression.json",
+      "passed": 99,
+      "failed": 0,
+      "pending": 0,
+      "qualification": "Archive mutations, administrator read qualification, Runtime namespace and the actual mixed-store Gateway replay. Case identities are distinct."
+    },
+    "publicHttpReplay": {
+      "spec": "gateway/tests/archive-pool-postgres.spec.ts",
+      "expected": "gateway/tests/expected/archive-pool.jsonl",
+      "scenarios": 19,
+      "originalThirteenRowsByteIdentical": true,
+      "qualification": "A real one-connection governance pool and separate attested content database. Six new scenarios cover active, disabled, logically deleted, organization-membership disabled or removed creators, and absent targets. Real user-service disablement/deletion retains both histories and labels. Existing late actor withdrawal and mixed draft controls stay intact."
+    },
+    "ordinaryNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/archive-history-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "scenariosPerVersion": 19,
+      "typescriptLoader": false,
+      "gatewayProductionJs": 262,
+      "artifactFiles": 407,
+      "physicalComputers": false,
+      "qualification": "Ordinary unchanged Gateway emit with two actual PostgreSQL databases and real node-content attestation on macOS."
+    },
+    "changedLookupMeasurements": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/archive-history-changed-lookup-v8.json",
+    "fullGatewayTypecheck": {
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/archive-history-typecheck.log",
+      "exitCode": 0
+    },
+    "ordinaryGatewayBuild": {
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/archive-history-production-build.log",
+      "exitCode": 0
+    },
+    "lint": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/archive-history-lint.json",
+      "actualFiles": 1,
+      "diagnostics": 0,
+      "qualification": "The MJS fixture is ignored by existing lint configuration and executes in source and both ordinary artifact versions."
+    },
+    "docs": {
+      "quick": {
+        "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/archive-history-documentation-quick.log",
+        "passed": 20,
+        "failed": 0,
+        "skipped": 0,
+        "dependencyInstallOrPostinstall": false
+      },
+      "markdownLinks": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/archive-history-markdown-links.json",
+      "markdownSources": 6,
+      "pairs": 3,
+      "guideWords": 491,
+      "guideStructure": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/archive-history-upgrade-guide-structure.json"
+    },
+    "ownedNativeClusters": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/native-postgres-lifecycle-summary.json",
+    "whitespace": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/archive-history-whitespace.log"
+  },
+  "verificationQualification": "An initial local fixture assertion used creatorUserId instead of the documented creator.id. It was corrected before the definitive19-scenario counterproof, which isolates only the two inactive-creator failures. Both earlier runs remain in external evidence. No production change was inferred from the fixture field error.",
+  "noteReview": {
+    "retainedActive": "2026-10-04-archive-nullable-reference-deletion",
+    "newNote": false,
+    "archivedNotesEdited": false,
+    "reason": "The existing decision owns logical removal and retained historical references. Creator filtering uses that same historical identity without changing current actor qualification or promising transcript survival after project deletion."
+  },
+  "additionalSourceReview": {
+    "retentionBatchLimit": "The mixed-store purgeDue limit currently applies independently to each store. Aggregate versus per-store semantics and retention fairness are not established as a defect; no production change or new finding is claimed.",
+    "search": "Repository search and current query consumers remain under review. Source inspection alone does not establish a current product access bug or complete the search domain."
+  },
+  "earlierSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/prior-frozen-sources-check.json",
+  "stableSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/archive-history-stable-sources.json",
+  "delivery": {
+    "at": "2026-11-05T03:35:35.683892+00:00",
+    "finding": "B522",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T032423Z/B522-archive-historical-creator-filters.delta.tar.gz",
+    "archiveSha256": "ff3690bf5ff904e4357fc3aa01e0f2ba4dfeb7eceff0ec20325595a1686544c3",
+    "manifestSha256": "9ad93b58548600a7e080ae4b7553d7f045101b461f40c5a7bc1388e6d153b5f6",
+    "ownedPaths": 12,
+    "readOnlySources": 12,
+    "gatewayProductionJs": 262,
+    "artifactFiles": 407,
+    "wholeProjectComplete": false
+  },
+  "limits": [
+    "All12business domains remain in progress. Three measured compiled lookup ranges execute in each ordinary Node version; no whole-method, whole-file or whole-project100percent claim.",
+    "Remaining archive/search, resource/helper allocation and native-platform review stays open. Peer implementation and production deployment are unchanged.",
+    "Real paid Responses verification remains explicitly deferred."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false
+}

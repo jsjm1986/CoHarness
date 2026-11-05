@@ -1,3 +1,4 @@
+import type { AdministratorResponse } from './admin-response.ts'
 /** Existing Admin authorization and instance controls with exact Runtime and computer addressing. */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
@@ -43,10 +44,11 @@ function userId(value: string | undefined): number | undefined {
  * @param actor - administrator candidate; services retain current authority through each mutation.
  * @param pathname - path without query fields.
  * @param input - bounded request body already read by the Gateway.
+ * @param reply - request-owned JSON publisher that rechecks current administrator read eligibility.
  * @returns true after handling a management route; unrelated Admin APIs retain their existing handlers.
  */
 export async function runtimeManagementApi(deps: Pick<GatewayDeps, 'runtimeManagement' | 'runtimeCatalog' | 'nodeServiceIdentity'
-  | 'instances' | 'users' | 'projects' | 'audit'>, req: IncomingMessage, res: ServerResponse, actor: UserRow, pathname: string, input: string): Promise<boolean> {
+  | 'instances' | 'users' | 'projects' | 'audit'>, req: IncomingMessage, res: ServerResponse, actor: UserRow, pathname: string, input: string, reply: AdministratorResponse): Promise<boolean> {
   const selectedPolicy = policy.exec(pathname), selectedReceipt = receipt.exec(pathname), selectedOwner = personal.exec(pathname)
   const selectedControl = controls.exec(pathname), selectedDetail = detail.exec(pathname)
   if (selectedPolicy === null && selectedReceipt === null && selectedOwner === null && selectedControl === null && selectedDetail === null) return false
@@ -54,18 +56,15 @@ export async function runtimeManagementApi(deps: Pick<GatewayDeps, 'runtimeManag
   res.setHeader('cache-control', 'no-store')
   if (actor.role !== 'admin') throw new RuntimeManagementError(403, 'runtime-management/forbidden')
   if (service === undefined) throw new RuntimeManagementError(503, 'runtime-management/unavailable')
-  const send = (status: number, value: unknown): void => {
-    res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(value))
-  }
   if (selectedPolicy !== null) {
-    if (method === 'GET') send(200, await service.policy(actor, userId(selectedPolicy[1])))
-    else if (method === 'PUT') send(200, await service.setPolicy(actor, body(input), userId(selectedPolicy[1])))
-    else { res.setHeader('allow', 'GET, PUT'); send(405, { error: 'method-not-allowed' }) }
+    if (method === 'GET') await reply.json(200, await service.policy(actor, userId(selectedPolicy[1])))
+    else if (method === 'PUT') await reply.json(200, await service.setPolicy(actor, body(input), userId(selectedPolicy[1])))
+    else { res.setHeader('allow', 'GET, PUT'); await reply.json(405, { error: 'method-not-allowed' }) }
     return true
   }
   if (selectedReceipt !== null) {
-    if (method === 'GET') send(200, await service.allocationReceipt(actor, selectedReceipt[1]!))
-    else { res.setHeader('allow', 'GET'); send(405, { error: 'method-not-allowed' }) }
+    if (method === 'GET') await reply.json(200, await service.allocationReceipt(actor, selectedReceipt[1]!))
+    else { res.setHeader('allow', 'GET'); await reply.json(405, { error: 'method-not-allowed' }) }
     return true
   }
   if (selectedOwner !== null) {
@@ -74,24 +73,24 @@ export async function runtimeManagementApi(deps: Pick<GatewayDeps, 'runtimeManag
       if (deps.runtimeCatalog?.pageForAdministratorOwner === undefined) throw new RuntimeManagementError(503, 'runtime-management/unavailable')
       if (await deps.users.getById(owner) === null) throw new RuntimeManagementError(404, 'runtime-management/not-found')
       const query = new URL(req.url ?? pathname, 'http://gateway').searchParams
-      send(200, await deps.runtimeCatalog.pageForAdministratorOwner(actor, { kind: 'personal', id: owner }, {
+      await reply.json(200, await deps.runtimeCatalog.pageForAdministratorOwner(actor, { kind: 'personal', id: owner }, {
         ...(query.has('cursor') ? { cursor: query.get('cursor')! } : {}), ...(query.has('limit') ? { limit: query.get('limit')! } : {}),
       }))
     } else if (method === 'POST') {
       const result = await service.allocate(actor, owner, body(input))
       res.setHeader('location', `/admin/api/runtimes/${result.runtimeId}`)
-      send(201, result)
-    } else { res.setHeader('allow', 'GET, POST'); send(405, { error: 'method-not-allowed' }) }
+      await reply.json(201, result)
+    } else { res.setHeader('allow', 'GET, POST'); await reply.json(405, { error: 'method-not-allowed' }) }
     return true
   }
   if (deps.runtimeCatalog?.resolveForAdministrator === undefined) throw new RuntimeManagementError(503, 'runtime-management/unavailable')
   const environment = await deps.runtimeCatalog.resolveForAdministrator(actor, (selectedControl ?? selectedDetail)![1]!)
   if (selectedDetail !== null) {
-    if (method === 'GET') send(200, environment)
-    else { res.setHeader('allow', 'GET'); send(405, { error: 'method-not-allowed' }) }
+    if (method === 'GET') await reply.json(200, environment)
+    else { res.setHeader('allow', 'GET'); await reply.json(405, { error: 'method-not-allowed' }) }
     return true
   }
-  if (method !== 'POST') { res.setHeader('allow', 'POST'); send(405, { error: 'method-not-allowed' }); return true }
+  if (method !== 'POST') { res.setHeader('allow', 'POST'); await reply.json(405, { error: 'method-not-allowed' }); return true }
   if (environment.node.id !== deps.nodeServiceIdentity?.nodeId) throw new RuntimeManagementError(503, 'runtime-management/unavailable')
   const target: RuntimeTarget = { kind: environment.owner.kind === 'personal' ? 'user' : 'project', id: environment.owner.id, runtimeId: environment.id }
   const action = selectedControl![2]!
@@ -107,10 +106,10 @@ export async function runtimeManagementApi(deps: Pick<GatewayDeps, 'runtimeManag
         await service.retire(actor, target.id, lease)
       }
     }, actor.id, parsed.data.generation, action === 'retire' ? 'destructive' : 'control')
-    if (action === 'retire') { send(200, { runtimeId: target.runtimeId, nodeId: environment.node.id, retired: true, dataRetained: true }); return true }
+    if (action === 'retire') { await reply.json(200, { runtimeId: target.runtimeId, nodeId: environment.node.id, retired: true, dataRetained: true }); return true }
     if (action === 'stop') {
       await record(parsed.data.generation)
-      send(200, { runtimeId: target.runtimeId, nodeId: environment.node.id, generation: parsed.data.generation, observedState: 'stopped' }); return true
+      await reply.json(200, { runtimeId: target.runtimeId, nodeId: environment.node.id, generation: parsed.data.generation, observedState: 'stopped' }); return true
     }
   } else if (!z.object({}).strict().safeParse(body(input)).success) throw new RuntimeManagementError(400, 'runtime-management/invalid-request')
   let subject: RuntimeSubject
@@ -125,6 +124,6 @@ export async function runtimeManagementApi(deps: Pick<GatewayDeps, 'runtimeManag
   }
   const running = await deps.instances.ensureRunning(subject, 'explicit', actor.id)
   await record(running.generation)
-  send(200, { runtimeId: target.runtimeId, nodeId: environment.node.id, generation: running.generation, observedState: 'ready' })
+  await reply.json(200, { runtimeId: target.runtimeId, nodeId: environment.node.id, generation: running.generation, observedState: 'ready' })
   return true
 }

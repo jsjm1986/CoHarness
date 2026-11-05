@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/README.md
 document:
-  en: 1ea8517d8120ca3807a06ff4c68ba19360fe5eae
-  zh: a2995ed2f233a3da71198d01b074a5a61560a0e9
+  en: 95b95e3a36a8f5757a153827d0c8e44e007e93d5
+  zh: 800ac1143817ceef059356479da88a704c539ddc
 /harness-gateway:
   en: d06b73ef2a831bb8
   zh: 8a3e3f0d5c13677e
@@ -12,17 +12,17 @@ document:
   en: b40c722ed37855ef
   zh: 6b8592f779bb25fd
 /harness-gateway/configuration-environment-variables-see-src-config-ts:
-  en: e05c84120f0e12db
-  zh: 78e4c2ba76cddfe2
+  en: a20017183d393f6f
+  zh: 64545609e5b462e3
 /harness-gateway/performance-and-runtime-admission:
-  en: e5a0a71e31abb77d
-  zh: ff644cfc5fc89065
+  en: 0924d85a545a5074
+  zh: 60c70915220b1192
 /harness-gateway/public-access-tunnel:
   en: 9a0ccbb5ac6faa3b
   zh: cb1140ec9b72f093
 /harness-gateway/admin-console-and-project-grants:
-  en: 0a13e8a3972a0ad2
-  zh: 7f327076cb5f3c26
+  en: 61ae2261e983594f
+  zh: b93cb5464a2045a0
 /harness-gateway/admin-console-and-project-grants/project-progress:
   en: 6e1585e64119d4ea
   zh: 39f2bbc0c3749326
@@ -30,8 +30,8 @@ document:
   en: 44ec9ebc7e288aee
   zh: 5040cf211a5305ac
 /harness-gateway/steward-maintenance-space:
-  en: 3fa160526a654692
-  zh: 9e005d7743458584
+  en: 70ff1f2e23a128d2
+  zh: 0978c42d651ff3ea
 /harness-gateway/user-terminals:
   en: bc98d4118d93d62c
   zh: 80109f508a0090ed
@@ -39,17 +39,17 @@ document:
   en: 2d9728bb7d41117a
   zh: 7fbf5c4367836bff
 /harness-gateway/project-collaborative-conversations:
-  en: a529be5c0986a669
-  zh: 3a47d62b004f0fc6
+  en: b44517cf9c471efc
+  zh: 066fbe4acab24e45
 /harness-gateway/model-governance-and-usage-accounting:
-  en: faf6ae9cdb0cf14e
-  zh: b450bd57cbd34b6f
+  en: f917166e964631c2
+  zh: efbc4b1bca40b1fe
 /harness-gateway/postgresql-control-plane:
   en: c27f5b4776762617
   zh: fbaeb983a8ff22b4
 /harness-gateway/deployment-maintenance-and-coordinated-restore:
-  en: 9e58e23510b0c479
-  zh: 7b639a0d16c3cd15
+  en: 3fefb19bb7204b32
+  zh: 74088ecdd9998b71
 /harness-gateway/access-revocation-across-gateways:
   en: e063983a3abb3e64
   zh: 30f2872ee4b8e7cc

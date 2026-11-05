@@ -4,8 +4,16 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
-import { ProjectService } from '../src/projects.ts'
+import { ProjectService, isProjectPathIsolated, projectPathsOverlap } from '../src/projects.ts'
 import { UserService } from '../src/users.ts'
+
+it('distinguishes sibling project and account directories on the host filesystem',()=>{
+  const projects=join(tmpdir(),'hgw-locations','projects'),account=join(tmpdir(),'hgw-locations','users','alice')
+  expect(projectPathsOverlap(join(projects,'workspace'),account)).toBe(false)
+  expect(projectPathsOverlap(projects,join(projects,'workspace'))).toBe(true)
+  expect(isProjectPathIsolated(account,[projects])).toBe(false)
+  expect(isProjectPathIsolated(join(projects,'..important'),[projects])).toBe(true)
+})
 
 async function setup() {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))

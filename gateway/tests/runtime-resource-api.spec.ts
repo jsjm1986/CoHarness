@@ -1,9 +1,10 @@
 /** Real bearer, principal, execution-scope and PostgreSQL admission integration. @module */
 import { createHash, randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { NodeResourceBudgetConfig } from '../src/node-resource-budget.ts'
+import { PostgresCollaborationService } from '../src/postgres/collaboration-service.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
 import { PRINCIPAL_HEADER } from '../src/principal.ts'
@@ -38,6 +39,19 @@ describePg('Runtime resource HTTP admission', () => {
     const grant = (count: number) => pool.query(`UPDATE harness.node_resource_state SET credits=credits+$3,valid_until='infinity'
       WHERE organization_id=$1 AND node_id=$2`, [f.organizationId, f.context.nodeId, count])
     return { ...f, grant }
+  }
+
+  async function stewardFixture() {
+    const f = await fixture()
+    await pool.query("UPDATE harness.projects SET kind='steward' WHERE id=$1", [f.project.uuid])
+    await pool.query('DELETE FROM harness.project_members WHERE project_id=$1', [f.project.uuid])
+    const otherNode = (await pool.query<{ id: string }>(`INSERT INTO harness.compute_nodes(organization_id,name)
+      VALUES($1,'Other Steward computer') RETURNING id`, [f.organizationId])).rows[0]!.id
+    await pool.query(`INSERT INTO harness.steward_access_policies(organization_id,user_id,node_id,enabled,revision)
+      VALUES($1,$2,$3,true,1),($1,$2,$4,true,1)`, [f.organizationId, f.admin.uuid, f.context.nodeId, otherNode])
+    const qualify = (enabled: boolean, database: Pool | PoolClient = pool) => database.query(`UPDATE harness.steward_access_policies SET enabled=$4,revision=revision+1
+      WHERE organization_id=$1 AND user_id=$2 AND node_id=$3`, [f.organizationId, f.admin.uuid, f.context.nodeId, enabled])
+    return { ...f, qualify, collaboration: new PostgresCollaborationService(f.context) }
   }
 
   it('reports bounded resource contention through HTTP and admits the exact operation after recovery', async () => {
@@ -238,6 +252,81 @@ describePg('Runtime resource HTTP admission', () => {
     await pool.query('DELETE FROM harness.project_members WHERE organization_id=$1 AND project_id=$2 AND user_id=$3', [f.organizationId, f.project.uuid, f.member.uuid])
     expect(await f.call(path('request'), request)).toMatchObject({ status: 403 })
     expect(await f.call(path('finish'), { sequence: request.sequence, requestId: request.requestId, outcome: 'not-started' })).toMatchObject({ status: 200 })
+  })
+
+  it('requires current Steward qualification on the resource Runtime computer', async () => {
+    const f = await stewardFixture()
+    expect((await f.collaboration.projectForUser(f.project.id, f.admin.id))?.mode).toBe('rw')
+    const ref = operation(1)
+    const origin = { kind: 'principal', assertion: f.headers(f.project, f.admin)[PRINCIPAL_HEADER]! }
+    const request = { ...ref, kind: 'process', origin }
+    const transcript = [await f.call(path('request'), request)]
+    await f.qualify(false)
+    expect(await f.collaboration.projectForUser(f.project.id, f.admin.id)).toBeNull()
+    await f.grant(1)
+    transcript.push(await f.call(path('statuses'), { operations: [ref] }))
+    transcript.push(await f.call(path('request'), request))
+    transcript.push(await f.call(path('request'), { ...request, ...operation(2) }))
+    transcript.push(await f.call(path('finish'), { ...ref, outcome: 'not-started' }))
+    const snapshot = await f.resourceBudget!.snapshot()
+    expect(transcript).toEqual([
+      { status: 200, body: { state: 'queued' } },
+      { status: 200, body: [{ state: 'refused', reason: 'authority-unavailable' }] },
+      { status: 403, body: { error: 'execution-forbidden', message: 'resource principal is no longer eligible' } },
+      { status: 403, body: { error: 'execution-forbidden', message: 'resource principal is no longer eligible' } },
+      { status: 200, body: {} },
+    ])
+    expect(snapshot.kinds.process).toMatchObject({ active: 0, queued: 0, uncertain: 0 })
+    await f.qualify(true)
+    await f.grant(1)
+    const restored = operation(2)
+    expect(await f.call(path('request'), { ...request, ...restored })).toEqual({ status: 200, body: { state: 'active' } })
+    expect(await f.call(path('finish'), { ...restored, outcome: 'quiescent' })).toEqual({ status: 200, body: {} })
+  })
+
+  it('withdraws Steward execution scopes and queued model work with the local qualification', async () => {
+    const f = await stewardFixture()
+    const sessionId = await f.session()
+    const input = await f.admit(sessionId, f.admin)
+    const entered = await f.call<{ scopeId: string }>('enter', { sessionId, inputId: input.inputId,
+      messageId: input.messageId, contentHash: input.contentHash, currentScopeId: null })
+    expect(entered.status).toBe(200)
+    const authorization = { sessionId, scopeId: entered.body.scopeId, capability: 'execute' }
+    expect(await f.call('authorize', authorization)).toMatchObject({ status: 200 })
+    const ref = operation(1)
+    const request = { ...ref, kind: 'model', origin: { kind: 'session', sessionId, scopeId: authorization.scopeId } }
+    expect(await f.call(path('request'), request)).toEqual({ status: 200, body: { state: 'queued' } })
+
+    const writer = await pool.connect()
+    let pending: ReturnType<typeof f.call>
+    try {
+      await writer.query('BEGIN')
+      const pid = (await writer.query<{ pid: number }>('SELECT pg_backend_pid() pid')).rows[0]!.pid
+      await writer.query('SELECT 1 FROM harness.users WHERE id=$1 FOR UPDATE', [f.admin.uuid])
+      await f.qualify(false, writer)
+      pending = f.call('authorize', authorization)
+      void pending.catch(() => { /* The awaited result below reports a failed request. */ })
+      await expect.poll(async () => (await pool.query<{ waiting: boolean }>(`SELECT EXISTS(
+        SELECT 1 FROM pg_stat_activity activity WHERE $1::int=ANY(pg_blocking_pids(activity.pid))
+        AND activity.query LIKE '%FOR SHARE OF u,m%') waiting`, [pid])).rows[0]!.waiting, { timeout: 5000 }).toBe(true)
+      await writer.query('COMMIT')
+    } finally {
+      try { await writer.query('ROLLBACK') } finally { writer.release() }
+    }
+    await f.grant(1)
+    const denied = [
+      await pending,
+      await f.call(path('request'), request),
+      await f.call(path('statuses'), { operations: [ref] }),
+    ]
+    expect(denied).toMatchObject([
+      { status: 403, body: { error: 'execution-forbidden' } },
+      { status: 403, body: { error: 'execution-forbidden' } },
+      { status: 200, body: [{ state: 'refused', reason: 'authority-unavailable' }] },
+    ])
+    expect(await f.call(path('finish'), { ...ref, outcome: 'not-started' })).toEqual({ status: 200, body: {} })
+    await f.qualify(true)
+    expect(await f.call('authorize', authorization)).toMatchObject({ status: 200 })
   })
 
   it('bounds malformed messages and batches before database work and isolates the cleanup method', async () => {

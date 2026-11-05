@@ -9,6 +9,8 @@ kind: "package-reference"
 
 会话领域：骨架（标题栏／标签页／编辑器／空状态）、聊天视图（分组步骤摘要流、流式尾部隔离与轮次状态）、编辑器 dock（与输入区一同 sticky 的会话统计行）、输入区 dock（队列行加 todo 计划条）、详情壳层，以及按 scope 寻址的 ConversationController。工具展示属于 [`ui-tool`](../ui-tool/README.zh.md)。
 
+在多电脑模式下，标签页在所选 Runtime 准备会话时即可输入，收到回执后才把文字交给目标会话。准备失败或被中断时，未发送内容仍可在该标签页继续编辑。已确认的草稿和引用保存在所属节点。复制标签页后，首次编辑会使用独立的写入标识。提示词持久受理后即可继续输入，已提交轮次和附件仍按事件更新。
+
 压缩（compaction）在检查点自身的消息流位置渲染为一行折叠标记，不替换其上方的 transcript（文本记录）。自动压缩使用「上下文已压缩」标题。每个已加载对应 `compaction/summary` 事件的完成标记都会显示被替换条目数量和估算 token 数量，并可点击展开摘要。手动 `/compact` 开始时显示为运行中的 `compact` 行；成功结算后，其显式摘要事件引用会在保持同一 React key 的前提下把该命令折叠进检查点行。完成的检查点静止时保留上下文压缩（context compaction）图标，仅在悬停或键盘聚焦时将其替换为收起／展开指示图标。输入被拒绝、没有可压缩历史、取消和失败时仍使用通用命令行及处理器撰写的文本。配对绝不依赖相邻关系，因为压缩运行期间可能注入持久上下文。面向模型的带框检查点载荷绝不渲染；被引用的 `compaction/summary` 事件位于已加载窗口之外时，检查点仍然可见但不可展开。
 
 常驻会话壳会跨无会话与会话状态切换而保留。没有当前会话时，它会锁定消息操作，并让整张虚线编辑器卡片成为根作用域 `conversation.hero.workspace` Workspace picker 的入口；textarea 保持只读且支持键盘操作。Hero 前方的标记是独立的根作用域 `conversation.hero.brand.mark` slot，未被占用时回退到 CoHarness 标记。选择 Workspace 会打开该空间最新的可见历史会话；没有历史时才连接或复用由 Host 拥有的空白会话，而且不会替换会话壳。根组件始终拥有同一个滚动容器与 Hero／编辑器子树；首个会话到达时，彼此独立的严格会话页头和主体 outlet 只填入各自区域，因此 Workspace picker、滚动主体、编辑器 seat 与 textarea 都保留原有 React 和 DOM identity。Hero 中存在未发送草稿时，切换 Workspace 会先要求确认；确认会清理浏览器拥有的草稿资源，取消则保持当前会话不变。否则切换会话会带走未发送草稿——文本加上在目标会话重新铸造的结构化引用记录——以及已就位的图片与已完成的文档草稿；仍在上传中的文档无法在不停用其传输的情况下迁移，因此保留在原会话中。活跃阶段，会话标题栏作为普通列 chrome，仅显示当前会话标题和视图标签；fork 谱系仍保留为会话数据，不投影到标题栏。其下滚动容器（`data-conversation-scroll`）承载流动排版的各视图与 sticky 编辑器栈（统计 dock＋输入区 dock＋输入栏）。该滚动容器无条件预留自己的滚动条槽，选用编辑器 overlay 的视图也仍把它保留为滚动容器，因此无论对话记录是否滚动、无论展示哪个视图标签，输入卡片都保持同一个横向位置（[决策](../../../.agents/notes/implemented/bug-fix/2026-08-04-composer-tab-gutter-reservation.zh.md)）。textarea 上的滚轮会链式处理：限高草稿先在本地滚动，到达边缘后再转交给该宿主。只有 Safari 会在原生编辑缩短草稿并留下陈旧软换行溢出时执行绘制前恢复；草稿增长、程序化更新与其他浏览器都不会为这项恢复读取布局（[决策](../../../.agents/notes/implemented/bug-fix/2026-08-13-safari-textarea-soft-wrap-reflow.zh.md)）。
@@ -17,6 +19,8 @@ kind: "package-reference"
 
 Hero 本身就是“新建对话”入口——它的编辑器即草稿——因此工作区行只保留 Workspace 选择器（使用作用域图标而非文件夹，避免与工作台的文件控件并置时被误读为文件操作）。选择 Workspace 仍然优先打开历史；明确的新建会话操作保留在侧边栏入口和每个真实 Workspace 行上，走既有的空白会话复用路径，因此选择历史会话后不会失去开始新聊天的入口。
 
+`conversation.hero.agentPreset` 插槽接收可选的 Session ID，预设控件据此访问所选 Runtime。
+
 别的插件可以经 `ctx.conversation.blocks` 让某个会话的编辑器变为惰性：它设置一个携带自己本地化理由的 block，输入栏就渲染同一个禁用的 textarea，并把该理由作为 placeholder——复用无 Workspace 时的那套姿态。推送方向是约束而非偏好：知道某会话发不出消息的插件（ui-model-selection，在没有适配器服务其路由时）本就依赖本包，因此本包读不到它们。模型 seat 是 block 唯一保留可用的控件——这份约定里的每个 block 都靠选模型来解除，把它一起锁上会让编辑器索要它自己拦下的那件事。block 只是提示性设计；无论客户端禁用了什么，宿主都会拒绝一个它无法路由的提示词。两者同时成立时以无 Workspace 姿态为准，因为选 Workspace 是更靠前的前提。
 
 在 compact 视口下，AppFrame 顶栏拥有手机级 Session 标题；常驻 Session header 保留 action、utility seat 和视图 Tab，但不再重复完整的 breadcrumb 标题。Chat 流会在最后一行下方预留实际 composer 高度；compact 统计 dock 只显示轮次／步骤摘要与统计入口，完整耗时和 token 分组在手机 Sheet 中展开，从而不挤占阅读行。ContextMeter 明细也使用同一套 Sheet 几何。输入触发器、命令和模型选择菜单使用共享的手机 Sheet 几何，同时保留既有焦点和提交路径。
@@ -24,6 +28,8 @@ Hero 本身就是“新建对话”入口——它的编辑器即草稿——因
 对话服务提供 `IConversation.canAttachDocument` 做实时预检，提供 `IConversation.attachDocument` 接收文档。两者均遵守会话移除、输入锁定、输入框阻止状态和同步的 `conversation/document-admission` 事件；授权插件返回 `deny` 拒绝，其余情况返回 undefined。文档管理器使用 `attachDocument`：它把已有持久 `docId` 作为就绪的输入框草稿加入对话，不会再次上传。移除管理器加入的文档只释放浏览器草稿元数据，存储中的文档仍可供历史记录和之后的会话使用。
 
 文档上传、完成后的引用和草稿删除都跟随所寻址 Session 的 runtime。可恢复上传的全部 HTTP 与 XHR 请求携带同一个已验证账号和 runtime，恢复元数据按该归属隔离。Session 所有者失效时，不能回退到页面引导 runtime 的文档存储。
+
+浏览器标签页暂停绘制时，文字和已附加的文档引用仍可发送。编码图片前，可见的输入区会先显示待发送消息。切到后台后仍会继续编码。
 
 根作用域的 `conversation` 入口声明 `conversation.content`（允许当前 Session 缺席的 Component Factory，其 `views` 局部位置默认渲染 `conversation.session`），以及可选工作台使用的工具栏、空状态、面板头和侧栏显示偏好 slots。它的 `conversationViewport` Cordis 能力通过 `slots.bindStore()` 与入口共享已声明的根级 store。提供方使用当前 Session 列表和归档列表校验恢复的 Session ID，最多保留四个面板，并协调额外历史窗口而不取消任务。旧布局等待完整身份验证时发布 `pendingIdentity`，在对账完成前拒绝布局编辑，不会把未保存的改动报告为成功。显式 SessionProvider 实例保留各面板独立的标准 props 和 store；卸载工作台贡献后恢复单会话渲染。[工作台包](../ui-workbench/README.zh.md)负责 Workspace 选择器和面板操作。
 

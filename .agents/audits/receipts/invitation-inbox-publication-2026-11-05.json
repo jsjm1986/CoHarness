@@ -1,0 +1,160 @@
+{
+  "id": "B520",
+  "at": "2026-11-05T02:45:28.176868+00:00",
+  "title": "Account invitation history and pending counts publish after browser withdrawal, and former managers retain invitations between other accounts",
+  "status": "fixed_account_invitation_final_browser_and_management_authority_verified_remaining_business_review_open",
+  "sourceFixed": true,
+  "paths": [
+    "gateway/src/server.ts"
+  ],
+  "receipt": "receipts/invitation-inbox-publication-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z",
+  "counterproof": {
+    "actualHttpScenarios": 36,
+    "failedScenarios": [
+      "list:owner-transfer",
+      "list:removed-member",
+      "list:computer-disabled",
+      "list:project-archived",
+      "list:mount-disabled",
+      "list:administrator-demoted",
+      "list:disabled-account",
+      "list:deleted-account",
+      "list:disabled-membership",
+      "list:missing-membership",
+      "list:disabled-organization",
+      "list:password-reset",
+      "list:password-required",
+      "list:missing-credential",
+      "list:logout",
+      "list:session-expired",
+      "count:disabled-account",
+      "count:deleted-account",
+      "count:disabled-membership",
+      "count:missing-membership",
+      "count:disabled-organization",
+      "count:password-reset",
+      "count:password-required",
+      "count:missing-credential",
+      "count:logout",
+      "count:session-expired"
+    ],
+    "failureCount": 26,
+    "runtimeStarts": 0,
+    "allInvitationRowsPreserved": true,
+    "sourceFixedBeforeCounterproof": false
+  },
+  "correction": "Prepared account invitation history and pending counts revalidate the browser session, account and password qualification. Invitations between other accounts additionally require current exact-computer project management; a refreshed browser role limits earlier implicit administrator authority. Participant history remains available without project membership or computer use. Reads never consume invitations.",
+  "checks": {
+    "distinctNamedCases": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-acceptance-union.json",
+      "passed": 252,
+      "failed": 0,
+      "pending": 0,
+      "repeatedRunsNotDoubleCounted": true,
+      "breakdown": {
+        "server": 114,
+        "postgresProjectAndPublicReplays": 138
+      }
+    },
+    "publicHttpReplay": {
+      "spec": "gateway/tests/invitation-inbox-read-postgres.spec.ts",
+      "expected": "gateway/tests/expected/projects/invitation-inbox-read.jsonl",
+      "scenarios": 36,
+      "governancePoolMaximum": 1,
+      "qualification": "Real PostgreSQL, browser login and Gateway responses. Eighteen committed account/session/project/management changes across list and count. Incoming unjoined invitations, accepted recipient history and outgoing history remain intact; foreign invitations require current management. No Runtime starts."
+    },
+    "normalNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "scenariosPerVersion": 36,
+      "typescriptLoader": false,
+      "gatewayProductionJs": 262,
+      "artifactFiles": 404,
+      "qualification": "Ordinary unchanged production emit, public MJS fixture and real PostgreSQL on macOS. No new Windows/Linux acceptance claim."
+    },
+    "changedRouteCoverage": {
+      "file": "gateway/src/server.ts",
+      "sourceSha256": "3a5e2651f0d2c42732d8400ae00c29f42802c0556132e43b5cccf6b701197b53",
+      "firstLine": 2338,
+      "lastLineExclusive": 2369,
+      "statements": {
+        "covered": 31,
+        "total": 31
+      },
+      "branches": {
+        "covered": 32,
+        "total": 32
+      },
+      "functions": {
+        "covered": 8,
+        "total": 8
+      },
+      "wholeFile100PercentClaimed": false
+    },
+    "fullGatewayTypecheck": {
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-typecheck-accepted.log",
+      "exitCode": 0
+    },
+    "ordinaryGatewayBuild": {
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-production-build.log",
+      "exitCode": 0
+    },
+    "lint": {
+      "reports": [
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-lint-complete.json",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-server-lint-accepted.json"
+      ],
+      "actualDistinctFiles": 3,
+      "diagnostics": 0,
+      "qualification": "MJS is ignored by the configured linter; its independent Node24syntax check passes."
+    },
+    "docs": {
+      "pairing": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-pairing-check.log",
+      "pairs": 3,
+      "markdownLinks": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-markdown-links.json",
+      "markdownSources": 6,
+      "guideStructure": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-upgrade-guide-structure.json",
+      "guideWords": 490,
+      "budgets": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-doc-budgets.log",
+      "noteFormat": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-note-format.log",
+      "concreteTerms": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-concrete-terms.log",
+      "fullQuickRerunClaimed": false
+    },
+    "ownedNativeClusters": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/native-postgres-lifecycle-summary.json",
+    "whitespace": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-whitespace.log"
+  },
+  "verificationQualification": "The first added missing-provider unit cases deleted inherited class methods and therefore left providers present. The fixture now shadows only its own instance method with undefined. Those two fixture failures and their initial reports are retained; final114server cases and252case union pass. No production change was inferred from that fixture mistake.",
+  "noteReview": {
+    "retainedActive": "2026-11-05-project-read-publication",
+    "newNote": false,
+    "archivedNotesEdited": false,
+    "reason": "Current publication authority and participant-owned history remain future design decisions; the existing note covers both project and account invitation publication."
+  },
+  "priorSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/prior-frozen-sources-check.json",
+  "stableSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/invitation-inbox-stable-sources.json",
+  "delivery": {
+    "at": "2026-11-05T02:44:22.752122+00:00",
+    "finding": "B520",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T022722Z/B520-invitation-inbox-publication.delta.tar.gz",
+    "archiveSha256": "6ab01176c91843769d4f1c5ca7460c361e0dc42d870392008676643222187237",
+    "manifestSha256": "e034afcd936fd0611d3d6eaec4468cfd3521710ff67a27b41e7efe40a4e2fe41",
+    "ownedPaths": 15,
+    "readOnlySources": 14,
+    "gatewayProductionJs": 262,
+    "artifactFiles": 404,
+    "wholeProjectComplete": false
+  },
+  "limits": [
+    "All12business domains remain in progress. Changed-route100percent measurement is not whole-file or whole-project coverage.",
+    "Remaining archive/search/business and resource/native-platform review stays open; prior peer feature reports retain their separate attribution.",
+    "The latest complete repository build remains the earlier E5168-step acceptance; current checks cover the full Gateway program and production emit.",
+    "Real paid Responses verification remains explicitly deferred."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false
+}

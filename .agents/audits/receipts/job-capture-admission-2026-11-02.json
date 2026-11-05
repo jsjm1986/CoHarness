@@ -11,8 +11,8 @@
     "fetchReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261101T212850Z/job-capture-latest-origin-fetch.json",
     "workingTreePreserved": true
   },
-  "problem": "The local registry captured execution provenance before reserving the exact-owner starting slot. An authority callback could synchronously start another job for that owner and then return to the outer starter. Both producers ran with maxConcurrentJobsPerOwner1; the original normal SDK profile opened two real HTTP work responses.",
-  "fix": "Move execution provenance capture inside the existing reserved-start try/finally, immediately before producer execution. Nested same-owner capture is refused before another producer allocates. Capture failure releases its original reservation, while another exact owner remains independent. No additional counter, queue or timer is introduced.",
+  "problem": "The local registry captured execution identity before reserving the exact-owner starting slot. An authority callback could synchronously start another job for that owner and then return to the outer starter. Both producers ran with maxConcurrentJobsPerOwner1; the original normal SDK profile opened two real HTTP work responses.",
+  "fix": "Move execution identity capture inside the existing reserved-start try/finally, immediately before producer execution. Nested same-owner capture is refused before another producer allocates. Capture failure releases its original reservation, while another exact owner remains independent. No additional counter, queue or timer is introduced.",
   "compatibility": {
     "newConfigurationFields": false,
     "newWireOrSessionFields": false,
@@ -59,9 +59,9 @@
     "fullCoreEntryRemeasuredThisBatch": false,
     "coreSourceStillMatchesB454": true,
     "originalEvidence": "Original source permits reentrant capture with no capacity refusal. The original normal JobsLocal bundle byte-matches B454. A real SDK profile configured with limit1 registers two jobs, starts two native HTTP work responses, and reports nestedRefusedfalse. Both old responses are closed and activeAfterCleanup0, so the negative control leaves no live work.",
-    "currentNativeEvidence": "The shipped SDK profile uses the real job registry and a Service Definition-backed external execution fixture. Its provenance capture starts a nested same-owner job. One producer and one actual HTTP response are admitted; the nested producer never runs. Both SDKs pin native response closure, killed settlement and no active work after cleanup.",
+    "currentNativeEvidence": "The shipped SDK profile uses the real job registry and a Service Definition-backed external execution fixture. Its execution identity capture starts a nested same-owner job. One producer and one actual HTTP response are admitted; the nested producer never runs. Both SDKs pin native response closure, killed settlement and no active work after cleanup.",
     "businessCases": [
-      "Execution provenance capture cannot reenter the same exact-owner capacity bucket",
+      "Execution identity capture cannot reenter the same exact-owner capacity bucket",
       "Capture refusal starts no producer and releases the reservation for a retry",
       "Another exact owner remains admitted while the first owner has a reserved start",
       "Service and exact-owner teardown during synchronous producer startup cancels and joins accepted work",

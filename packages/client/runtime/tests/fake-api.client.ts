@@ -207,6 +207,7 @@ export class FakeApiClient implements IApiClient {
       this.record('session.selectModel', payload, this.onSelectModel(payload)),
     rename: (payload: unknown) => this.record('session.rename', payload, this.onRename(payload)),
     fork: (payload: unknown) => this.record('session.fork', payload, this.onFork(payload)),
+    promptStatus: payload => this.record('session.promptStatus', payload, Promise.resolve(ok({ state: 'unknown' as const }))),
     prompt: (payload: unknown, signal?: AbortSignal) => {
       this.lastPromptSignal = signal
       return this.record('session.prompt', payload, this.onPrompt(payload))

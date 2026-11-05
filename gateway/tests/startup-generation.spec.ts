@@ -63,7 +63,8 @@ it.skipIf(databaseUrl === undefined)('rejects a startup whose cached files preda
     await new NodeConfigurationStore(context, cfg, env, nodeConfigurationAuthority(context)).initialize()
     const maintenance = new PostgresMaintenanceService(context, cfg.nodeStaleMs)
     await maintenance.enterMaintenance(null, 'Startup consistency fixture')
-    const commands = createDeploymentCommands(cfg.pgDumpCommand, cfg.pgRestoreCommand, cfg.psqlCommand)
+    const commands = createDeploymentCommands(cfg.pgDumpCommand, cfg.pgRestoreCommand, cfg.psqlCommand,
+      { command: cfg.pgConnectionCommand, timeoutMs: cfg.pgConnectionTimeoutMs })
     const backup = await new PostgresDeploymentBackups(context, cfg, databaseUrl!, commands, env).create(null)
     await writeFile(cfg.organizationModelCredentialKeyFile, randomBytes(32).toString('base64url') + '\n', { mode: 0o600 })
 

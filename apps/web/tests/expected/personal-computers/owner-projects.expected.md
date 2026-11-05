@@ -1,0 +1,19 @@
+- group "Switch personal or project scope":
+  - button "Close":
+    - img
+  - text: Workspaces Personal Only me All spaces · 3
+  - searchbox "Search spaces or computers"
+  - button "Load project names"
+  - text: Recent
+  - button "Personal"
+  - text: Projects
+  - button "#17 Office computer Stopped · starts on entry"
+  - button "Compute project Compute computer Stopped · starts on entry"
+  - button "Refresh spaces"
+  - text: Space settings
+  - button "Open in a new tab"
+  - button "Favorite this space"
+  - button "Invitations and tasks":
+    - text: Invitations and tasks
+    - img
+  - button "New project space"

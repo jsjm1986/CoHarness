@@ -20,8 +20,8 @@ export interface BrowserIdentityFence {
   subscribe(this: void, cleanup: () => void | Promise<void>): () => void
   /** Wait for the first HTTP identity outcome before opening a socket and pin any known account. */
   socketUrl(this: void, url: URL, signal: AbortSignal): Promise<URL>
-  /** Bind application-generated private navigation URLs to the confirmed account. */
-  privateUrl(this: void, value: string): string
+  /** Bind private navigation URLs to the confirmed account and optional owning Runtime. */
+  privateUrl(this: void, value: string, target?: ClientRuntimeTarget): string
   /** Withdraw this document after explicit authorization loss and reload only after owned cleanup. */
   invalidate(this: void): void
   /** End this document's requests without initiating navigation. */
@@ -72,10 +72,11 @@ export function createBrowserIdentityFence(fetcher: typeof fetch, origin: string
   }
   const scopeSensitive = (url: URL): boolean => url.pathname === '/api' || url.pathname.startsWith('/api/')
     || ['/account/api/context', '/account/api/workbench/catalog', '/account/api/usage', '/account/api/activity'].includes(url.pathname)
-  const pinRuntime = (url: URL): void => {
+  const pinRuntime = (url: URL, target?: ClientRuntimeTarget): void => {
     if (!scopeSensitive(url) || url.searchParams.has('dshRuntime') || url.searchParams.has('dshTarget')
       || url.pathname.startsWith('/api/documents') && url.searchParams.has('dshNode')) return
-    if (runtime !== undefined) addressRuntimeUrl(url, runtime)
+    const owner = target ?? runtime
+    if (owner !== undefined) addressRuntimeUrl(url, owner)
     else for (const key of ['dshRuntime', 'dshTarget']) {
       const value = bootstrap.get(key)
       if (value !== null) url.searchParams.set(key, value)
@@ -141,12 +142,12 @@ export function createBrowserIdentityFence(fetcher: typeof fetch, origin: string
       if (principal !== undefined) result.searchParams.set('dshPrincipal', String(principal))
       return result
     },
-    privateUrl: (value) => {
+    privateUrl: (value, target) => {
       lifetime.signal.throwIfAborted()
       const url = new URL(value, origin)
       if (url.origin !== origin || (url.pathname !== '/api' && !url.pathname.startsWith('/api/')
         && !url.pathname.startsWith('/account/api/')) || principal === undefined) return value
-      pinRuntime(url)
+      pinRuntime(url, target)
       url.searchParams.set('dshPrincipal', String(principal))
       return value.startsWith('/') && !value.startsWith('//') ? `${url.pathname}${url.search}${url.hash}` : url.toString()
     },

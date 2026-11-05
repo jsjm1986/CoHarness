@@ -372,6 +372,26 @@ describePg('PostgreSQL runtime environment directory', () => {
       body: new URLSearchParams({ username: 'admin', password: 'pw-12345678' }) })
     await login.arrayBuffer()
     const cookie = login.headers.get('set-cookie')!.split(';')[0]!
+    const memberLogin = await fetch(`${base}/login`, { method: 'POST', redirect: 'manual', headers: { origin: base },
+      body: new URLSearchParams({ username: 'member', password: 'pw-12345678' }) })
+    await memberLogin.arrayBuffer()
+    const memberCookie = memberLogin.headers.get('set-cookie')!.split(';')[0]!
+    const projectPage = async (projectId: string) => {
+      const result = await fetch(`${base}/account/api/runtimes?projectId=${projectId}`, { headers: { cookie: memberCookie } })
+      return { status: result.status, body: await result.json() as RuntimeCatalogPage }
+    }
+    const projectNumber = String(f.project.id)
+    expect(await projectPage(projectNumber)).toMatchObject({ status: 200, body: { items: [], nextCursor: null } })
+    await f.projects.setMember(f.project.id, f.member.id, 'ro', f.admin.id)
+    expect(await projectPage(projectNumber)).toMatchObject({ status: 200, body: {
+      items: [{ owner: { kind: 'project', id: f.project.id }, node: { id: f.context.nodeId } }], nextCursor: null } })
+    await pool.query(`UPDATE harness.computer_use_permissions g SET enabled=false FROM harness.users u
+      WHERE u.organization_id=$1 AND u.public_id=$2 AND g.organization_id=u.organization_id AND g.user_id=u.id AND g.node_id=$3`,
+      [f.organizationId, f.member.id, f.context.nodeId])
+    expect(await projectPage(projectNumber)).toMatchObject({ status: 200, body: { items: [], nextCursor: null } })
+    for (const invalid of ['0', '1.5', '9007199254740992', projectNumber + '&projectId=' + projectNumber]) {
+      expect((await projectPage(invalid)).status).toBe(400)
+    }
     const account = await fetch(`${base}/account/api/runtimes?limit=1`, { headers: { cookie } })
     const page = await account.json() as RuntimeCatalogPage
     const admin = await fetch(`${base}/admin/api/runtimes`, { headers: { cookie } })

@@ -1,0 +1,333 @@
+{
+  "id": "private-postgres-and-restore-authority-2026-11-04",
+  "findings": [
+    "B491",
+    "B497",
+    "B498",
+    "B499"
+  ],
+  "status": "fixed_named_scenarios_verified_global_review_open",
+  "at": "2026-11-04T16:00:32.776437+00:00",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z",
+  "delivery": {
+    "at": "2026-11-04T15:58:45.738898+00:00",
+    "findings": [
+      "B491",
+      "B497",
+      "B498",
+      "B499"
+    ],
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/B491-B497-B499-maintenance",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/B491-B497-B499-maintenance.delta.tar.gz",
+    "archiveSha256": "0dc125029d27122fb2dfdb36beb2ff3cda005352d3d1d85a583baa1ab18f2057",
+    "manifestSha256": "2ee0efee3552c3e251a55c219bab829c2c103d2701bf60b2bc6def15579778cc",
+    "ownedPaths": 52,
+    "readonlyPrerequisites": 13,
+    "wholeProjectComplete": false
+  },
+  "verified": {
+    "B491": "Resolve native connection options with libpq and transfer connection input through a bounded framed private channel. Passwords stay out of actual native pg_dump/psql arguments; wrapper SQL waits for the exact nonce acknowledgement, including early-EOF refusal and joined local child lifetime.",
+    "B497": "Require a nonempty normalized strict-descendant result; reject Windows drive and share roots and retain disjoint paths on different volumes. Four Windows grammar counterexamples now pass alongside actual Gateway source/built refusal checks.",
+    "B498": "Pair uppercase PG_RESTORE.EXE with psql.exe using case-insensitive executable recognition.",
+    "B499": "Execute current content and peer backup authority guards around the actual SQL archive import in its existing single transaction, preventing retired Runtime resurrection and credential/policy rollback."
+  },
+  "reports": [
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/command-plan-current-cases.json",
+      "passed": 169,
+      "failed": 0,
+      "skipped": 0,
+      "sha256": "114b50882f9aae9370d19d57b1f157593c0a95d42db87e6e9966a2cb575a7b4a"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/command-plan-current-postgres-identity.json",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 32,
+      "sha256": "480d94f67bc51e0e06cf7d6ecb3bfd4bf2892160efaba64882d01b1ffbdaadb9"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/candidate-maintenance-v3-cases.json",
+      "passed": 111,
+      "failed": 0,
+      "skipped": 0,
+      "sha256": "1a53841e8c5a5f81be3f7febb48e3625aa9d59edce720db9e08e9a498599f03b"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/windows-project-root-fixed.json",
+      "passed": 43,
+      "failed": 0,
+      "skipped": 0,
+      "sha256": "3238196df6b7b8aa426d8cf283ed002390bdf641c92c1d67f2e00f1d884043bf"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/paired-executable-case-fixed.json",
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "sha256": "da702485ef6a383d56be6e8eed33d15bdedd1ffc45788a8b978fea6484d7b929"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/private-channel-early-eof-fixed.json",
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "sha256": "65e55a448a2ccfcc1d6db60d8815bc3bb3e7a88b2291c328437aa4f720e826d0"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/private-native-extra-credential-fixed.json",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 1,
+      "sha256": "28e7a1f0ccf32ac940c5451bbd2400e4059e36ea021394ea8cf597881fda9790"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/private-pg-real-maintenance-v3.json",
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "sha256": "b6e368e1493ba69b9e761a645fb7b90e16e195027709e0e762205365d7837e4c"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/private-pg-docker-restore-v2.json",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "sha256": "43f4bfd8010200d14a892acfdad0f5db54349482e424e78131e44ed55691614c"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/private-pg-multiline-native.json",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "sha256": "3340aeaf80674cce74f9c01f507e7fac07abc3cfe7753e182320f7fd4764dd0d"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/private-pg-multiline-docker.json",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "sha256": "3ae01fbbbd8bf4064b647ebf68aa094bf976997772428831b2ac7e4afd9ac851"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/current-content-restore-schema114.json",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "sha256": "4f71849d3bbadf5636dc41b06e2e3746c3dee28e13e9a0e46ecbbeec35feb8eb"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/current-peer-backup-restore-integration-v2.json",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "sha256": "7e8d7a0f9986a50ea5008cd61361742a2505697eedf801de3e4d1ce56171160b"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/final-built22-configuration-and-environment-v2-cases.json",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "sha256": "d9922ea076ae26bc2b49b43a5b9080c46cd6ea11f3e15b65e57cb49d64e576cb"
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/final-built24-configuration-and-environment-v2-cases.json",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "sha256": "9c885488d3b36bbc7ba83f195da5e7bd0b6395e725b5f6b59fe22d195f6b1c5f"
+    }
+  ],
+  "nativeAuthMatrices": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/current-host-native-auth.stdout.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/current-host-native-psql-auth.stdout.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/compiled-gateway-native-auth-matrix-v2.stdout.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/confidential-linux-native-auth-matrix.stdout.json"
+  ],
+  "caseCounting": "Named rosters are separate. Repeated builds, overlapping source selections and filtered skips are not added as different scenarios.",
+  "commandPlanSourceCoverage": {
+    "total": {
+      "lines": {
+        "total": 338,
+        "covered": 338,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 371,
+        "covered": 371,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 67,
+        "covered": 67,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 279,
+        "covered": 279,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/src/index.ts": {
+      "lines": {
+        "total": 184,
+        "covered": 184,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 42,
+        "covered": 42,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 200,
+        "covered": 200,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 139,
+        "covered": 139,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/plan/plan-mode/src/index.ts": {
+      "lines": {
+        "total": 154,
+        "covered": 154,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 25,
+        "covered": 25,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 171,
+        "covered": 171,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 140,
+        "covered": 140,
+        "skipped": 0,
+        "pct": 100
+      }
+    }
+  },
+  "maintenanceSourceCoverage": {
+    "total": {
+      "lines": {
+        "total": 210,
+        "covered": 204,
+        "skipped": 0,
+        "pct": 97.14
+      },
+      "statements": {
+        "total": 262,
+        "covered": 246,
+        "skipped": 0,
+        "pct": 93.89
+      },
+      "functions": {
+        "total": 46,
+        "covered": 45,
+        "skipped": 0,
+        "pct": 97.82
+      },
+      "branches": {
+        "total": 168,
+        "covered": 142,
+        "skipped": 0,
+        "pct": 84.52
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/maintenance-candidate/gateway/src/deployment-commands.ts": {
+      "lines": {
+        "total": 174,
+        "covered": 168,
+        "skipped": 0,
+        "pct": 96.55
+      },
+      "functions": {
+        "total": 36,
+        "covered": 35,
+        "skipped": 0,
+        "pct": 97.22
+      },
+      "statements": {
+        "total": 212,
+        "covered": 196,
+        "skipped": 0,
+        "pct": 92.45
+      },
+      "branches": {
+        "total": 130,
+        "covered": 105,
+        "skipped": 0,
+        "pct": 80.76
+      }
+    },
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T121523Z/maintenance-candidate/gateway/src/pg-client-protocol.ts": {
+      "lines": {
+        "total": 36,
+        "covered": 36,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 10,
+        "covered": 10,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 50,
+        "covered": 50,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 38,
+        "covered": 37,
+        "skipped": 0,
+        "pct": 97.36
+      }
+    }
+  },
+  "limits": [
+    "Physical Windows and real SSH carrier authentication/cancellation acceptance remain open; Windows path grammar is covered separately.",
+    "The maintenance integration fixtures publish governance references directly and do not establish complete node-content production readiness.",
+    "Current shared Gateway build fails at documents-local.ts:565 because the parallel document publication adapter omits mandatory LocalUserDocFs options; the isolated maintenance build passes.",
+    "The global Agent Note format and Markdown wrapping gates report the pre-existing Windows document storage note; no repository-wide documentation pass is claimed.",
+    "Extra confidential non-password libpq credentials are explicitly refused; no fallback or equivalence for unsupported TLS/OAuth/SCRAM credentials is claimed.",
+    "Remote proxy exit does not prove a detached remote native child has stopped; SQL restore retains its backend lease checks and transaction exclusion.",
+    "All 12 global review domains remain in progress. Real paid Responses verification is deferred by the user."
+  ],
+  "sourceFixed": true,
+  "wholeProjectComplete": false,
+  "paidModelApisCalled": false,
+  "productionWrites": false
+}

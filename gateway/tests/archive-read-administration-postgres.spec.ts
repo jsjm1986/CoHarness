@@ -21,7 +21,7 @@ describePg('PostgreSQL archive administrative read', () => {
     await runMigrations(pool, resolve(import.meta.dirname, '../deploy/postgres/migrations'))
   })
   afterAll(async () => { await pool?.end() })
-  const changes = ['current', 'role', 'disabled-account', 'deleted-account', 'disabled-membership', 'missing-membership', 'disabled-organization'] as const
+  const changes = ['current', 'role', 'disabled-account', 'deleted-account', 'disabled-membership', 'missing-membership', 'disabled-organization', 'password-required', 'missing-credential'] as const
   for (const action of ['list', 'preview', 'status', 'detail', 'export'] as const) {
     const scenarios = action === 'list' ? [...changes, 'held-qualification'] as const
       : action === 'preview' ? [...changes, 'empty-cutoff-role'] as const : changes
@@ -44,6 +44,7 @@ describePg('PostgreSQL archive administrative read', () => {
             VALUES($1,$2::text,$2::text,$3) RETURNING id,public_id`, [organizationId, username, join(tmpdir(), organizationId, username)])).rows[0]!
           await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [organizationId, user.id])
           await pool.query('INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled) VALUES($1,$2,$3,true)', [organizationId, context.nodeId, user.id])
+          await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [user.id])
           accounts.push({ id: user.id, publicId: Number(user.public_id) })
         }
         const [actor, owner] = accounts
@@ -86,6 +87,8 @@ describePg('PostgreSQL archive administrative read', () => {
         if (change === 'disabled-membership') await blocker.query("UPDATE harness.memberships SET status='disabled' WHERE user_id=$1", [actor!.id])
         if (change === 'missing-membership') await blocker.query('DELETE FROM harness.memberships WHERE user_id=$1', [actor!.id])
         if (change === 'disabled-organization') await blocker.query("UPDATE harness.organizations SET status='disabled' WHERE id=$1", [organizationId])
+        if (change === 'password-required') await blocker.query('UPDATE harness.password_credentials SET must_change_password=true WHERE user_id=$1', [actor!.id])
+        if (change === 'missing-credential') await blocker.query('DELETE FROM harness.password_credentials WHERE user_id=$1', [actor!.id])
         await blocker.query('COMMIT')
         const result = await pending
         if (change === 'current' || change === 'held-qualification') { expect(result).toHaveProperty('value'); expect(JSON.stringify(result)).toContain(root); expect(await stored()).toEqual(before) }

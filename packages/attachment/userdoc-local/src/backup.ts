@@ -1,7 +1,7 @@
 /** Verified deployment snapshots rebind logical document identities to restored filesystem objects. */
 import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
-import { link, lstat, open, rename, rm, utimes } from 'node:fs/promises'
+import { link, lstat, open, readFile, rename, rm, utimes } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
@@ -10,6 +10,7 @@ import { DocumentIdentityStore, type DocumentIdentityRecord } from './identity.t
 import { DocumentIdentityStorage, type DocumentIdentityLocations } from './identity-storage.ts'
 import { isInside, pathForDocId } from './name.ts'
 import { withDocumentHandle } from './handle.ts'
+import { replaceRecoveredFileWindows } from './directory-move-win32.ts'
 import type { DocumentFileObjectId } from './file-object.ts'
 
 /** Immutable membership and digests from the deployment's verified complete snapshot. */
@@ -190,6 +191,32 @@ async function withVerifiedDomain<T>(
   })
 }
 
+async function syncRestoredFile(path:string):Promise<void>{
+  // FlushFileBuffers requires a writable Windows file handle. POSIX permits fsync on the verified read handle.
+  const flags=(process.platform==='win32'?constants.O_RDWR:constants.O_RDONLY)|constants.O_NOFOLLOW|constants.O_NONBLOCK
+  const handle=await open(path,flags)
+  await withDocumentHandle(handle,()=>handle.sync())
+}
+
+async function syncRestoreState(locations:DocumentIdentityLocations,directories:ReadonlySet<string>,databasePath:string):Promise<void>{
+  if(process.platform==='win32'){
+    const marker=join(locations.filesRoot,'domain.json')
+    const temporary=join(locations.filesRoot,'.dsh-restore-'+randomUUID()+'.part')
+    try{
+      const bytes=await readFile(marker)
+      const handle=await open(temporary,'wx',0o600)
+      await withDocumentHandle(handle,async()=>{await handle.writeFile(bytes);await handle.sync()})
+      await replaceRecoveredFileWindows(temporary,marker)
+    }finally{await rm(temporary,{ force:true })}
+  } else {
+    for(const directory of directories){
+      const handle=await open(directory,'r')
+      await withDocumentHandle(handle,()=>handle.sync())
+    }
+  }
+  await syncRestoredFile(databasePath)
+}
+
 /**
  * Verify logical identity and original filesystem witnesses before accepting a deployment backup.
  * @param locations - Gateway-owned public, metadata and retained-object roots.
@@ -220,14 +247,17 @@ export async function restoreDocumentIdentityBackup(
         if (path === item.source) continue
         signal?.throwIfAborted()
         const temporary = join(dirname(path), `.dsh-restore-${randomUUID()}.part`)
-        try { await link(item.source, temporary); await rename(temporary, path) } finally { await rm(temporary, { force: true }) }
+        try {
+          await link(item.source, temporary)
+          if(process.platform==='win32')await replaceRecoveredFileWindows(temporary,path)
+          else await rename(temporary,path)
+        } finally { await rm(temporary, { force: true }) }
       }
     }
     for (const item of retained) {
       await utimes(item.source, item.record.modifiedAt / 1000, item.record.modifiedAt / 1000)
       const info = await lstat(item.source, { bigint: true })
-      const handle = await open(item.source, constants.O_RDONLY | constants.O_NOFOLLOW)
-      await withDocumentHandle(handle, () => handle.sync())
+      await syncRestoredFile(item.source)
       records.push({ ...item.record, file: { device: String(info.dev), inode: String(info.ino) }, modifiedAt: Number(info.mtimeNs) / 1e6 })
     }
     signal?.throwIfAborted()
@@ -252,12 +282,7 @@ export async function restoreDocumentIdentityBackup(
     const changedDirectories = new Set([
       locations.stateRoot, locations.filesRoot, ...[...retained, ...markers].flatMap(item => item.paths.map(path => dirname(path))),
     ])
-    for (const directory of changedDirectories) {
-      const handle = await open(directory, 'r')
-      await withDocumentHandle(handle, () => handle.sync())
-    }
-    const handle = await open(storage.databasePath, constants.O_RDONLY | constants.O_NOFOLLOW)
-    await withDocumentHandle(handle, () => handle.sync())
+    await syncRestoreState(locations,changedDirectories,storage.databasePath)
     signal?.throwIfAborted()
   })
 }
@@ -379,9 +404,6 @@ export async function recoverDocumentIdentityMount(
     const database = new DatabaseSync(storage.databasePath)
     try { new DocumentIdentityStore(locations.root, database).recoverMount(storage.binding) } finally { database.close() }
     await storage.bindDomain(rootId, false)
-    for (const path of [locations.filesRoot, locations.stateRoot, storage.databasePath]) {
-      const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
-      await withDocumentHandle(handle, () => handle.sync())
-    }
+    await syncRestoreState(locations,new Set([locations.filesRoot,locations.stateRoot]),storage.databasePath)
   })
 }

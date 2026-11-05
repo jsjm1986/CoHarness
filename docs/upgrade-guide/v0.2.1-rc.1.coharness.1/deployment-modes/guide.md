@@ -26,3 +26,7 @@ Custom Gateway assemblies supply topology policy to HTTP/WebSocket routing and e
 Normal login enters the existing Harness UI even when an account has several personal Runtime assignments. Deploy matching Gateway routing and catalog code. Verify the bare `/` entry redirects to the authorized personal default without a mandatory environment chooser or starting other Runtimes; saved exact links must retain their original destinations.
 
 Custom Client compositions must provide the Runtime-owned management directory, target-aware Workspace creation and matching Connection/Remote libraries. Rebuild browser bundles together. Saved layouts with unqualified Session IDs retain their references until original environments are confirmed; removing an unresolved pane changes only its layout. Workspace resource keys include the allocation UUID. No committed Session generation or user file is rewritten.
+
+Upgraded Web clients may request a bounded initial history page with a versioned prepared create. If a node omits the optional page, the client reads history for the returned Session on that node. Its draft reservation and workspace are retained.
+
+Existing draft IDs still read the current value from their owning node. Updated clients pin a revision so a copied tab can recover its text after the original tab edits. A revision predating retained history or outside the configured window is reported unavailable, and input stays in the tab. Apply node-content migration 015 to placed projects. Personal draft databases upgrade in place.

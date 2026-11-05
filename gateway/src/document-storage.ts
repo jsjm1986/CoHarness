@@ -60,10 +60,12 @@ async function privateDirectory(path: string, owner: number | undefined): Promis
  * @param runtimeRoot - the whole user or project directory mounted into the runtime.
  * @param documentRoot - its public documents directory.
  * @param scope - authenticated scope and committed ownership lookup for path-only private stores.
+ * @param prepareFilesRoot - optional recovery owner that exclusively creates the private files directory and records its physical identity.
  * @returns locations tied to this canonical runtime and logical scope; storage creation still validates all inodes.
  */
 export async function documentIdentityLocations(
   cfg: Pick<GatewayConfig, 'stateRoot'>, runtimeRoot: string, documentRoot: string, scope: DocumentIdentityScope,
+  prepareFilesRoot?: (path: string) => Promise<void>,
 ): Promise<DocumentIdentityLocations> {
   // Windows has no POSIX owner uid; ownership verdicts come from ACL probes
   // anchored on the object's owner SID instead of the process account.
@@ -119,7 +121,8 @@ export async function documentIdentityLocations(
   for (const [kind, path] of [['public', canonicalDocumentRoot], ['metadata', identityStateRoot], ['files', filesRoot]] as const) {
     registerManagedDataPath({ owner: `gateway-documents/${runtimeHash}/${kind}`, kind: 'directory', path }, inventory)
   }
-  await privateDirectory(filesRoot, owner)
+  if (prepareFilesRoot) await prepareFilesRoot(filesRoot)
+  else await privateDirectory(filesRoot, owner)
   return { root: documentRoot, stateRoot: identityStateRoot, filesRoot }
 }
 

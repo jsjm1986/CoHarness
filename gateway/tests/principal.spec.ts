@@ -17,6 +17,20 @@ const USER: UserRow = {
 }
 
 describe('GatewayPrincipalSigner', () => {
+  it('preserves the absolute expiry and refuses times before the signer’s platform-specific validity start', () => {
+    const now = 100_000, lifetimeMs = 15 * 60_000
+    const { privateKey } = generateKeyPairSync('ed25519')
+    const signer = new GatewayPrincipalSigner(privateKey, 'acme', lifetimeMs)
+    const assertion = signer.issue({
+      user: USER, scope: { kind: 'personal' }, runtime: { kind: 'user', id: USER.id, generation: 52 }, now,
+    })
+    const first = process.platform === 'win32' ? now - 16 : now
+    expect(signer.verify(assertion, first)).toMatchObject({ issuedAt: first, expiresAt: now + lifetimeMs })
+    expect(() => signer.verify(assertion, first - 1)).toThrow('expired')
+    expect(signer.verify(assertion, now + lifetimeMs - 1).runtime.generation).toBe(52)
+    expect(() => signer.verify(assertion, now + lifetimeMs)).toThrow('expired')
+  })
+
   it('issues generation-bound assertions and rejects tampering, expiry, and foreign organizations', () => {
     const { privateKey } = generateKeyPairSync('ed25519')
     const signer = new GatewayPrincipalSigner(privateKey, 'acme', 1000)

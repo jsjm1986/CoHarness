@@ -6,7 +6,9 @@ import type { DeploymentCommands } from '../deployment-commands.ts'
 import { parseManagedSnapshot } from '../managed-files.ts'
 import { verifyGatewayDocumentBackup } from '../document-backups.ts'
 import { PostgresBackupService, BackupError, type BackupRecordView } from './backup-service.ts'
-import { migrationPlan } from './database.ts'
+import { migrationPlan, transaction } from './database.ts'
+import { lockAdministrator } from './administrator-authority.ts'
+import { CollaborationDeniedError } from '../collaboration.ts'
 import { collectDeploymentData } from './deployment-data.ts'
 import { previewBackupNodeConfiguration, type BackupNodeConfigurationView } from './deployment-control-files.ts'
 import { acquireDeploymentDataLock } from './deployment-lock.ts'
@@ -35,6 +37,10 @@ export class PostgresDeploymentBackups {
     this.records = new PostgresBackupService(context)
   }
 
+  private async authorize(actor?: number): Promise<void> {
+    if (actor !== undefined) await transaction(this.context.pool, client => lockAdministrator(client, this.context, actor))
+  }
+
   /**
    * Capture the database and all claimed local data only after writers have stopped.
    * @param actor - administrator public ID, or null for the independent applier.
@@ -61,13 +67,14 @@ export class PostgresDeploymentBackups {
     const operation = await this.maintenance.logOperation('backup', 'running', actor, {})
     try {
       const roots = await collectDeploymentData(this.context, this.cfg)
+      await this.authorize(actor ?? undefined)
       const dump = await this.commands.backup(directory, this.databaseUrl, roots, signal)
       await verifyGatewayDocumentBackup(dump.managedSnapshot, backupFilesDirectory(dump.dumpPath), signal)
       const plan = await migrationPlan(this.context.pool, this.cfg.deployMigrationsDir)
       const record = await this.records.record({ path: dump.dumpPath, migrationVersion: plan.current,
         writeEpoch: BigInt(state.writeEpoch), sizeBytes: dump.sizeBytes, sha256: dump.sha256,
         managedSnapshot: dump.managedSnapshot, actor })
-      const verified = await this.verify(record.id, signal)
+      const verified = await this.verify(record.id, signal, actor ?? undefined)
       signal.throwIfAborted()
       await this.maintenance.finishOperation(operation, 'completed', { backupId: verified.id, path: verified.path,
         files: dump.managedSnapshot.files.length, roots: dump.managedSnapshot.roots.length })
@@ -82,21 +89,24 @@ export class PostgresDeploymentBackups {
    * Verify both the dump identity and every copied data member against the registry.
    * @param id - organization-scoped backup record.
    * @param signal - optional operation lease lifetime.
+   * @param actor - server-authenticated administrator retained before native work and registry writes; omission permits trusted applier work.
    * @returns the verified row; failure is recorded and propagated.
    */
-  async verify(id: string, signal?: AbortSignal): Promise<BackupRecordView> {
-    const record = await this.records.get(id)
+  async verify(id: string, signal?: AbortSignal, actor?: number): Promise<BackupRecordView> {
+    const record = await this.records.get(id, actor)
     try {
       if (record.managedSnapshot === null || record.sha256 === null) throw new BackupError(409, 'backup-lacks-complete-managed-data-manifest')
       const filesDir = backupFilesDirectory(record.path)
       const stored = parseManagedSnapshot(JSON.parse(await readFile(join(filesDir, 'manifest.json'), 'utf8')))
       if (JSON.stringify(stored) !== JSON.stringify(record.managedSnapshot)) throw new BackupError(409, 'backup-manifest-differs-from-registry')
+      await this.authorize(actor)
       await this.commands.verifyDump(record.path, signal, record.sha256)
       await this.commands.verifyStoredFiles(filesDir, stored, signal)
       signal?.throwIfAborted()
-      return await this.records.setVerified(id, true)
+      return await this.records.setVerified(id, true, undefined, actor)
     } catch (error) {
-      await this.records.setVerified(id, false, error instanceof Error ? error.message : String(error))
+      if (error instanceof CollaborationDeniedError) throw error
+      await this.records.setVerified(id, false, error instanceof Error ? error.message : String(error), actor)
       throw error
     }
   }
@@ -104,11 +114,14 @@ export class PostgresDeploymentBackups {
   /**
    * Read applied non-secret node settings only after the complete backup passes verification.
    * @param id - organization-scoped backup registry identity.
+   * @param actor - initiating administrator rechecked after configuration preparation; omission permits trusted internal review.
    * @returns settings for explicit review; the operation never saves or applies them.
    */
-  async previewNodeConfiguration(id: string): Promise<BackupNodeConfigurationView> {
-    const record = await this.verify(id)
-    return previewBackupNodeConfiguration(id, record.managedSnapshot!, backupFilesDirectory(record.path),
+  async previewNodeConfiguration(id: string, actor?: number): Promise<BackupNodeConfigurationView> {
+    const record = await this.verify(id, undefined, actor)
+    const result = await previewBackupNodeConfiguration(id, record.managedSnapshot!, backupFilesDirectory(record.path),
       this.context, this.cfg, this.environment)
+    await this.authorize(actor)
+    return result
   }
 }

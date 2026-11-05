@@ -1,7 +1,7 @@
 /** Management authority is checked independently of profile and tool permissions. */
 import { expect, it, vi } from 'vitest'
 import type { GatewayRequestPrincipal } from '@deepseek-ai/dsh-gateway-runtime'
-import { gatewayPluginManagementAuthorization, parseInstallSourcePolicy } from '../src/plugin-management.ts'
+import { gatewayPluginManagementAuthorization, parseInstallSourcePolicy, verifyGatewayProjectProfile } from '../src/plugin-management.ts'
 
 function fixture() {
   const principal: GatewayRequestPrincipal = {
@@ -123,4 +123,13 @@ it('defaults the source policy to registry specs only and opens every form witho
 it('fails startup on a malformed source policy entry', () => {
   expect(() => parseInstallSourcePolicy('registry,floppy')).toThrow('HGW_PLUGIN_INSTALL_SOURCES')
   expect(() => parseInstallSourcePolicy('git:')).toThrow('HGW_PLUGIN_INSTALL_SOURCES')
+})
+
+it('refuses project reload until the Runtime credential verifies the on-disk profile', async () => {
+  const { request, lifetime } = fixture()
+  request.mockResolvedValue(new Response('{}', { status:503 }))
+  await expect(verifyGatewayProjectProfile({ request },lifetime.signal)).rejects.toMatchObject({ code:'plugin-management/forbidden' })
+  request.mockResolvedValue(new Response(null,{ status:204 }))
+  await expect(verifyGatewayProjectProfile({ request },lifetime.signal)).resolves.toBeUndefined()
+  expect(request).toHaveBeenLastCalledWith('/internal/runtime/plugin-state/verify-profile',{ method:'POST',signal:lifetime.signal })
 })

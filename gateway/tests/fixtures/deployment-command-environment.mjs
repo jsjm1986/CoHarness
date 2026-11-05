@@ -21,11 +21,17 @@ const desired = ${JSON.stringify(credentials === 'configured' ? {
 const postgresCredentialPolicyHonored = ['PGPASSWORD','PGPASSFILE','PGSSLKEY'].every(name=>process.env[name]===desired[name])
   && process.env.PGDATABASE === 'fixture-db'
 appendFileSync(${JSON.stringify(report)}, JSON.stringify({ operation, unrelatedSecretsAbsent, postgresCredentialPolicyHonored })+'\\n', { mode: 0o600 })
-process.stdin.resume()
-process.stdin.on('end', () => {
-  if(operation==='backup')process.stdout.write('synthetic database archive')
-  if(operation==='render')process.stdout.write('SELECT 1;\\n')
-})
+const marker = process.argv.find(value => value.startsWith('--hgw-connection-stdin-v1='))
+let pending = Buffer.alloc(0), acknowledged = marker === undefined
+for await (const chunk of process.stdin) {
+  if (acknowledged) continue
+  pending = Buffer.concat([pending, chunk])
+  if (pending.length < 4 || pending.length < 4 + pending.readUInt32BE()) continue
+  acknowledged = true
+  process.stdout.write('hgw-pg-client/1 ' + marker.slice('--hgw-connection-stdin-v1='.length) + '\\n')
+}
+if(operation==='backup')process.stdout.write('synthetic database archive')
+if(operation==='render')process.stdout.write('SELECT 1;\\n')
 `, { mode: 0o600 })
 const commands = createDeploymentCommands([process.execPath, executable, 'dump'],
   [process.execPath, executable, 'archive'], [process.execPath, executable, 'psql'])

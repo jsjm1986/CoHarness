@@ -9,6 +9,7 @@ import { SESSION_FORMAT_VERSION, SessionSeq } from '@deepseek-ai/dsh-session'
 import { Context } from '@deepseek-ai/cordis'
 import { stat } from 'node:fs/promises'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
+import { CollaborationError } from '@deepseek-ai/dsh-collaboration'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
@@ -165,6 +166,88 @@ describe('session.search', () => {
       value: { items: [], hasMore: false },
     })
     expect(searchSessions).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { name: 'refills from a later page', count: 41, revoked: [0, 20], first: 20, hasMore: true, calls: 3 },
+    { name: 'keeps the remainder of the current page', count: 41, revoked: [0, 2], first: 2, hasMore: true, calls: 2 },
+    { name: 'drops a withdrawn lookahead', count: 21, revoked: [20, 21], first: 0, hasMore: false, calls: 2 },
+  ])('$name after collaboration access is withdrawn', async ({ count, revoked, first, hasMore, calls }) => {
+    const ctx = await baseContext()
+    const hits = Array.from({ length: count }, (_, i) => hit(`session-${i}`, i))
+    const readable = new Set(hits.map(({ header }) => header.id))
+    for (const { header } of hits) ctx.sessions.create(header.id, { meta: header })
+    const authority = {
+      authorize: () => Promise.resolve({ projectId: 1, visibility: 'project' }),
+      readableSessionIds: (ids: readonly SessionId[]) => Promise.resolve(new Set(ids.filter(id => readable.has(id)))),
+    }
+    const capture = vi.fn(() => authority)
+    ctx.provide('collaboration', { capture } as never)
+    const searchSessions = vi.fn(async ({ cursor, limit }: SessionSearchRequest) => {
+      const start = cursor === undefined ? 0 : Number(cursor)
+      if (start === 20) {
+        await Promise.resolve()
+        for (const { header } of hits.slice(...revoked)) readable.delete(header.id)
+      }
+      const end = start + limit!
+      return {
+        items: hits.slice(start, end),
+        ...(end < hits.length ? { nextCursor: String(end) } : {}),
+      }
+    })
+    ctx.provide('sessionQuery', { searchSessions } as never)
+
+    const response = await createApiProxy(ctx, defaults).sessions.search(request('match'), new AbortController().signal)
+
+    expect(response.result).toEqual({ ok: true, value: {
+      items: hits.slice(first, first + 20).map(({ header, bestMatch }) => ({ sessionId: header.id, snippet: bestMatch.snippet })),
+      hasMore,
+    } })
+    expect(capture).toHaveBeenCalledOnce()
+    expect(searchSessions).toHaveBeenCalledTimes(calls)
+  })
+
+  it.each([false, true])('honors cancellation during the final collaboration check (lookup failure: %s)', async (fails) => {
+    const ctx = await baseContext()
+    const match = hit('session')
+    ctx.sessions.create(match.header.id, { meta: match.header })
+    const abort = new AbortController()
+    const readableSessionIds = vi.fn((ids: readonly SessionId[]) => Promise.resolve(new Set(ids)))
+      .mockImplementationOnce(ids => Promise.resolve(new Set(ids)))
+      .mockImplementationOnce(async (ids) => {
+        abort.abort()
+        if (fails) throw new CollaborationError('gateway-unavailable')
+        return new Set(ids)
+      })
+    ctx.provide('collaboration', { capture: () => ({
+      authorize: () => Promise.resolve({ visibility: 'project' }),
+      readableSessionIds,
+    }) } as never)
+    ctx.provide('sessionQuery', { searchSessions: () => Promise.resolve({ items: [match] }) } as never)
+
+    const response = await createApiProxy(ctx, defaults).sessions.search(request('match'), abort.signal)
+
+    expect(response.result).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+    expect(readableSessionIds).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps managed search provider diagnostics in the Host log', async () => {
+    const ctx = await baseContext()
+    const match = hit('session')
+    ctx.sessions.create(match.header.id, { meta: match.header })
+    ctx.provide('collaboration', { capture: () => ({
+      authorize: () => Promise.resolve({ visibility: 'project' }),
+      readableSessionIds: (ids: readonly SessionId[]) => Promise.resolve(new Set(ids)),
+    }) } as never)
+    const diagnostic = 'cannot open /private/search.sqlite'
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    ctx.provide('sessionQuery', { searchSessions: () => Promise.reject(new Error(diagnostic)) } as never)
+
+    try {
+      const response = await createApiProxy(ctx, defaults).sessions.search(request('match'), new AbortController().signal)
+      expect(response.result).toEqual({ ok: false, error: { code: 'internal', message: 'session search failed', details: {} } })
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(diagnostic))
+    } finally { warn.mockRestore() }
   })
 
   it('rejects snippets whose recorded provider violates the Host filters', async () => {

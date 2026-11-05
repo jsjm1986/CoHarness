@@ -1,0 +1,85 @@
+{
+  "id": "B512",
+  "title": "Organization model discovery publishes private results after administrator authority is withdrawn during the provider request",
+  "status": "fixed_final_read_authority_source_and_normal_node_artifacts_verified_remaining_review_open",
+  "sourceFixed": true,
+  "at": "2026-11-04T21:48:55.376591+00:00",
+  "paths": [
+    "gateway/src/admin-api.ts"
+  ],
+  "receipt": "receipts/model-discovery-read-publication-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z",
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/model-discovery-before.log",
+  "originalObservation": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/model-discovery-negative-observations.json",
+  "originalResult": "Real PostgreSQL and authenticated Gateway HTTP return200 with the private catalog for both stored and explicit draft credentials after a role withdrawal commits while the owned loopback provider response is held. Current-administrator controls return200.",
+  "correction": "The POST discovery route uses the same current-administrator read publication check as other management reads, after the catalog request settles. Already admitted provider requests may finish; their metadata is withheld after authority withdrawal.",
+  "checks": {
+    "actualGateway": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/model-discovery-public-cases.json",
+      "passed": 2,
+      "postgresScenarios": 46,
+      "sqliteScenarios": 11,
+      "newLateWithdrawalScenarios": 14,
+      "expectedTranscript": "gateway/tests/expected/projects/model-administration-postgres.jsonl",
+      "qualification": "Both stored and explicit draft credential paths cover role, account disable/delete, organization membership disable/removal, organization disable and required password change. The ordinary admitted HTTP catalog request may complete once; response contains no catalog metadata after withdrawal."
+    },
+    "httpUnit": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/model-discovery-api-cases.json",
+      "passed": 90,
+      "skipped": 0
+    },
+    "sharedReadResponderCoverage": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/response-coverage/coverage-summary.json",
+      "metrics": {
+        "lines": 100,
+        "statements": 100,
+        "functions": 100,
+        "branches": 100
+      },
+      "wholeAdminApiCoverageClaimed": false
+    },
+    "normalNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/discovery-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "scenariosPerVersion": 46,
+      "typescriptLoader": false,
+      "qualification": "Unchanged ordinary Gateway build, actual PostgreSQL services and owned loopback catalog; no real model API."
+    },
+    "typecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/model-discovery-typecheck.log",
+    "ordinaryFullGatewayBuild": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/model-discovery-production-build.log",
+    "focusedLint": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/model-discovery-lint.json",
+      "files": 1,
+      "diagnostics": 0
+    },
+    "fourBilingualPairs": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/model-discovery-pairing-check.log",
+    "eightMarkdownSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/model-discovery-markdown-links.log",
+    "ownedClusterCleanup": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/native-postgres-lifecycle-summary.json"
+  },
+  "limits": [
+    "No cancellation or rollback of an already dispatched catalog HTTP request is promised.",
+    "Ordinary Node22/24 acceptance is macOS; no fresh Linux or Windows execution is claimed.",
+    "The full Admin API file is not100% covered. The shared read responder has100% measured coverage.",
+    "Scoped documentation checks pass; earlier repository-wide documentation debt and all12 business review domains remain open.",
+    "Official paid Responses API validation remains explicitly deferred."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false,
+  "frozenDelivery": {
+    "at": "2026-11-04T21:47:47.753633+00:00",
+    "finding": "B512",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/B512-model-discovery",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T211126Z/B512-model-discovery.delta.tar.gz",
+    "archiveSha256": "c114515940c43b0b12579a11bdb20644c3fc15bdccb4c0cef31137f8b05fe2de",
+    "manifestSha256": "d1f561691728c1d77d31b5c37743ce0e9a88f05486f6fd155bd41a097585847d",
+    "ownedPaths": 15,
+    "readOnlyPrerequisites": 4,
+    "compiledProductionJs": 257,
+    "artifactFiles": 377,
+    "wholeProjectComplete": false
+  }
+}

@@ -162,7 +162,7 @@ export async function readDocumentLocations(signal: AbortSignal, cursor?: string
       scope: scope.kind === 'personal' ? { kind: 'personal' as const, ...location }
         : { kind: 'project' as const, projectId: scope.projectId as number, ...location } }
   })
-  return { items, nextCursor: body.nextCursor as string | null }
+  return { items, nextCursor: body.nextCursor }
 }
 
 /**

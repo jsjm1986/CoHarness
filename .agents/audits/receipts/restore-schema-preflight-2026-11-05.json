@@ -1,0 +1,88 @@
+{
+  "id": "B503",
+  "title": "A verified older-schema backup reaches the restoring fence before predictable SQL incompatibility is rejected, leaving no usable ordinary retry or maintenance exit",
+  "status": "fixed_named_complete_backup_cli_native_docker_and_node_matrix_verified_remaining_project_review_open",
+  "paths": [
+    "gateway/scripts/deploy-apply.ts",
+    "gateway/src/postgres/maintenance-service.ts",
+    "gateway/src/deployment-commands.ts",
+    "gateway/src/pg-dump-schema.ts",
+    "gateway/src/postgres/restore-schema.ts"
+  ],
+  "sourceFixed": true,
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z/registered-restore-before.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z",
+  "receipt": "receipts/restore-schema-preflight-2026-11-05.json",
+  "evidence": "Real complete backup107with3managed files and verified registry request against upgraded schema116. Actual standalone applier fails SQL dependency removal, leaves restoring; retry fails, selecting protection backup is rejected by immutable target checkpoint and maintenance exit refuses. Same-schema116full backup/applier control succeeds. All data and clusters are disposable.",
+  "wholeProjectComplete": false,
+  "at": "2026-11-04T17:38:15.210028+00:00",
+  "observations": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z/registered-restore-older-protected-schema-observations.json",
+  "positiveControl": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z/registered-restore-same-schema-observations.json",
+  "fixPlan": "Check registry migration version before acceptance; inspect the actual immutable dump migration rows and require exact current versions/names/checksums before protection copy, restoring fence and data mutation. Support backup-id and dump-file entry paths.",
+  "productionWrites": false,
+  "paidModelApisCalled": false,
+  "currentRecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z/schema118-preflight-authority-controls.json",
+  "archiveWrapperRecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z/schema-docker-wrapper-cases.json",
+  "normalArtifacts": [
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z/schema-applier-built22.json",
+    "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z/schema-applier-built24.json"
+  ],
+  "currentScenarios": {
+    "actualCompleteBackupAndCli": 9,
+    "fullSqlAuthorityGuards": 4,
+    "parser": 26,
+    "offlineReaderProcessCases": 6,
+    "parallelFkRecheck": 1,
+    "repeatedDockerCases": 9,
+    "repeatedNormalArtifactNode22Cases": 4,
+    "repeatedNormalArtifactNode24Cases": 4,
+    "artifactFilteredCasesPerEngine": 5
+  },
+  "correctness": "Backup request409checks recorded version under the administrator transaction; the independent applier checks actual complete migration versions/names/checksums before protection capture or a new restoring fence. Verified matching restore succeeds. Legacy107, protected114/115, preceding117, same-version checksum/name drift, missing intermediate migration and INSERT metadata refuse without a new fence or protection backup. Full actual SQL also refuses reactivating retired Runtime, offline node or cancelled takeover and preserves current peer rotations and disabled work.",
+  "sourceCoverage": {
+    "newFullParser": {
+      "lines": 100,
+      "statements": 100,
+      "functions": 100,
+      "branches": 100
+    },
+    "noOtherFullFileOrGlobalCoverageClaim": true
+  },
+  "build": {
+    "ordinaryGatewayProduction": "passed",
+    "finalGatewayTypecheck": "passed",
+    "focusedLint": "passed",
+    "standaloneActualApplierProductionOptions": "passed",
+    "normalNode22And24": "four named repeated cases each;five filtered each"
+  },
+  "documentation": {
+    "changedBilingualPairs": "three passed",
+    "globalMarkdownLinks": "passed",
+    "docQuick": "12passed8failed",
+    "remainingFailures": "Current jobs/client source-document drift, concurrent pairing/model-experience edits, existing Windows note format/wrap, historical concrete-term records. Root baseline commit identities moved to linked external evidence; narrow reference recheck follows. No global documentation completion."
+  },
+  "limitations": [
+    "Existing restoring checkpoints remain immutable and are not automatically exited.",
+    "Same-schema ownership incompatibility remains protected by atomic SQL rollback; this preflight covers schema incompatibility.",
+    "Canonical COPY migration metadata is supported; INSERT-formatted metadata is explicitly refused before mutation.",
+    "Native Windows and SSH execution-host acceptance remain open.",
+    "No physical two-computer acceptance is implied by governance-only metadata fixtures."
+  ],
+  "frozenDelivery": {
+    "at": "2026-11-04T17:38:15.408967+00:00",
+    "findings": [
+      "B503"
+    ],
+    "independentlyRechecked": [
+      "B504"
+    ],
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z/B503-restore-schema-preflight",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T164654Z/B503-restore-schema-preflight.delta.tar.gz",
+    "archiveSha256": "2d1c7ba93d576dfdd2207576764be5c381e667bf573508573ee66bb1f081c0d9",
+    "manifestSha256": "5f0afa68276fc9291ab063c1e85107f19504c676ec92d249ecbefdf7ca59bbb8",
+    "ownedPaths": 22,
+    "readOnlyPeerFiles": 20,
+    "compiledApplierFiles": 200,
+    "wholeProjectComplete": false
+  }
+}

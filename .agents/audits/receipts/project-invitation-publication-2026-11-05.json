@@ -1,0 +1,107 @@
+{
+  "id": "B519",
+  "title": "Project invitation lists publish withdrawn project data and invitations between other accounts after management loss",
+  "status": "fixed_project_invitation_final_authority_and_participant_visibility_verified_remaining_business_review_open",
+  "sourceFixed": true,
+  "at": "2026-11-05T01:21:32.404562+00:00",
+  "paths": [
+    "gateway/src/server.ts"
+  ],
+  "receipt": "receipts/project-invitation-publication-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z",
+  "counterproof": {
+    "realPostgresHttp": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-negative.jsonl",
+      "result": "The69earlier metadata controls pass while16new project invitation cases retain revoked account/project/computer responses or publish other accounts invitations after ownership transfer and administrator downgrade. All92cases complete before the expected failure."
+    }
+  },
+  "correction": "Project-scoped invitation GET uses final current browser, project and prepared-computer authority after preparation. Current managers retain the prepared list. Other eligible members receive only invitations they sent or received; withdrawn project reads return403. Pending invitations and global recipient-history semantics remain unchanged. Missing read adapters return501 and lookup failures return503 without prepared records.",
+  "checks": {
+    "distinctNamedCases": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-acceptance-union.json",
+      "passed": 233,
+      "skipped": 0,
+      "repeatedRunsNotDoubleCounted": true,
+      "breakdown": {
+        "server": 96,
+        "registry": 3,
+        "projectService": 131,
+        "publicProjectReads": 1,
+        "publicManagementWrites": 1,
+        "publicInvitationAdmission": 1
+      }
+    },
+    "publicHttpReplay": {
+      "spec": "gateway/tests/project-directory-read-postgres.spec.ts",
+      "expected": "gateway/tests/expected/projects/directory-read.jsonl",
+      "scenarios": 92,
+      "qualification": "Real login, Gateway and one-connection PostgreSQL. Earlier69rows remain byte-identical. The23new cases cover project invitation publication and preserve incoming history created by real invitation acceptance, outgoing invitations and pending rows after management loss. Existing management13and invitation-admission8scenario replays also pass. No Runtime or model provider starts."
+    },
+    "normalNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "scenariosPerVersion": 92,
+      "typescriptLoader": false,
+      "gatewayProductionJs": 262,
+      "artifactFiles": 403,
+      "qualification": "Unchanged ordinary production emit and public MJS fixture; macOS only."
+    },
+    "changedMethodMeasurements": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-changed-path-v8.json",
+      "qualification": "Every measured participant-filter range executes in both ordinary Node versions. No whole-file100percent claim for the large HTTP owner."
+    },
+    "fullGatewayTypecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-typecheck.log",
+    "ordinaryGatewayBuild": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-production-build.log",
+    "focusedLint": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-lint.json",
+      "actualFiles": 3,
+      "selectedFiles": 4,
+      "diagnostics": 0,
+      "qualification": "The MJS fixture is ignored by existing lint configuration and separately passes Node24syntax checking."
+    },
+    "docs": {
+      "pairing": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-pairing-check.log",
+      "pairs": 4,
+      "markdownLinks": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-markdown-links.json",
+      "sources": 8,
+      "guideStructure": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-upgrade-guide-structure.json",
+      "guideWords": 453,
+      "documentBudgets": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-doc-budgets.log",
+      "globalQuickPassClaimed": false,
+      "retainedGlobalFailures": [
+        "Historical Session format catalog is stale",
+        "Existing concrete terminology findings in retained code and audit records"
+      ]
+    },
+    "ownedClusters": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/native-postgres-lifecycle-summary.json",
+    "whitespace": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-owned-whitespace.log"
+  },
+  "earlierAuthorityArchiveSqlReadAndConfigurationSourcesUnchanged": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/prior-frozen-sources-check.json",
+  "stableSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-stable-sources.json",
+  "frozenDelivery": {
+    "at": "2026-11-05T01:20:39.072113+00:00",
+    "finding": "B519",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/B519-project-invitation-publication",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/B519-project-invitation-publication.delta.tar.gz",
+    "archiveSha256": "f5554a8e78af518dccde06c2f42269b6f629e4dafae37e5b543e087efbf98bb5",
+    "manifestSha256": "d21bbd8f921a699082cbefb86b811827218f79e6c44b4e084a980e207d8de698",
+    "ownedPaths": 14,
+    "readOnlyPrerequisites": 12,
+    "gatewayProductionJs": 262,
+    "artifactFiles": 403,
+    "wholeProjectComplete": false
+  },
+  "externalPackagingQualification": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T011425Z/project-invitation-delivery-label-qualification.json",
+  "limits": [
+    "All12business domains remain in progress; project invitation acceptance is not whole-file review.",
+    "Global invitation recipient history/count publication is separate and remains to be reviewed alongside archive/business flows, resource ownership and peer capabilities.",
+    "Earlier E516complete repository build8steps remains retained evidence; current checks cover full Gateway typecheck and ordinary emit.",
+    "Real paid Responses validation remains explicitly deferred."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false
+}

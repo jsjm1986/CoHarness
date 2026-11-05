@@ -7,6 +7,8 @@ export type ProjectThemePolicy = 'follow-user' | 'light' | 'dark'
 
 /** Active project available to one authenticated account. */
 export interface ProjectScopeView {
+  /** Workflow names and roots are fetched from the selected computer. */
+  metadataOnNode?:true
   projectId: number
   name: string
   path: string
@@ -31,6 +33,11 @@ export interface ProjectAuthorityView extends ProjectScopeView {
   canManage: boolean
   /** Current project theme policy, read with membership. */
   uiThemePolicy: ProjectThemePolicy
+}
+
+/** Browser publication includes ownership read in the same current authority snapshot. */
+export interface ProjectReadAuthorityView extends ProjectAuthorityView {
+  owner: Exclude<ProjectScopeView['owner'], undefined>
 }
 
 export interface ConversationParticipantView {

@@ -1,18 +1,25 @@
+import {requireNodeContentRelations,type NodeContentCheckInput} from '../node-content-publication.ts'
+import { getProjectContentBinding, NodeContentUnavailable, type NodeContentBinding, type NodeContentStore } from '../node-content-store.ts'
+import { NodeContentCollaboration, type CollaborationContentStore } from '../node-content-collaboration.ts'
 import { escapeLiteral, type PoolClient } from 'pg'
 import type { RuntimeId } from '../runtime-catalog.ts'
+import type { RuntimeCredentialSubject } from '../runtime-api.ts'
+import { NodeProjectMetadata,localProjectDisplays } from '../node-content-projects.ts'
 import {
   CollaborationDeniedError,
   type CollaborationAction,
   type ConversationAccess,
   type ConversationCollaborationView,
   type ProjectAuthorityView,
+  type ProjectReadAuthorityView,
   type ProjectScopeView,
 } from '../collaboration.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
 import { publicNumber } from './runtime-context.ts'
 import { transaction } from './database.ts'
 import type { ConversationVisibility } from './conversation-repository.ts'
-import type { ProjectActivityItem, ProjectActivityPage } from '../services.ts'
+import type { ProjectActivityPage } from '../services.ts'
+import { readProjectActivity } from '../node-content-activity.ts'
 
 interface AccessRow {
   session_id: string
@@ -33,115 +40,57 @@ interface LockedAuthority {
   administrator: boolean
 }
 
-interface ActivityRow {
-  kind: 'message' | 'answer'
-  session_id: string
-  seq: string
-  ts: Date
-  text: string | null
-  actor_label: string | null
-  actor_uid: string
-  question_args: string | null
-  outcome: unknown
-  conversation_title: string | null
-  cursor_ts: string
-  entry_id: string
-}
-
-interface ActivityCursor {
-  ts: string
-  sessionId: string
-  seq: number
-  /** Absent for millisecond cursors issued before individual answer identifiers were included. */
-  entryId?: string
-}
-
-/** Decode a Runtime-qualified precision-preserving cursor; unscoped, foreign or malformed input reads the first page. */
-function parseActivityCursor(raw: string | undefined, organizationId: string, runtimeId: RuntimeId): ActivityCursor | undefined {
-  if (raw === undefined) return undefined
-  if (raw.startsWith('v2.')) {
-    const encoded = raw.slice(3), bytes = Buffer.from(encoded, 'base64url')
-    if (bytes.toString('base64url') !== encoded) return undefined
-    let value: unknown
-    try { value = JSON.parse(bytes.toString('utf8')) } catch { return undefined }
-    if (!Array.isArray(value) || value.length !== 6 || value[0] !== organizationId || value[1] !== runtimeId) return undefined
-    const [, , ts, sessionId, seq, entryId] = value as unknown[]
-    if (typeof ts !== 'string' || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z$/.test(ts)
-      || ts.startsWith('0000') || !Number.isFinite(Date.parse(ts))
-      || new Date(ts).toISOString().slice(0, 23) !== ts.slice(0, 23)
-      || typeof sessionId !== 'string' || sessionId === '' || sessionId.includes('\0')
-      || typeof entryId !== 'string' || entryId === '' || entryId.includes('\0')
-      || typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < -1) return undefined
-    return { ts, sessionId, seq, entryId }
-  }
-  return undefined
-}
-
-/** Render a claimed answer's selected labels and custom text into one bounded line. */
-function answerSummary(outcome: unknown): string {
-  const answers = (outcome as { answers?: unknown } | null)?.answers
-  if (!Array.isArray(answers)) return ''
-  return answers.map((entry) => {
-    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return ''
-    const item = entry as { selected?: unknown; custom?: unknown }
-    const selected = Array.isArray(item.selected)
-      ? item.selected.filter((label): label is string => typeof label === 'string').join('、')
-      : ''
-    return [selected, typeof item.custom === 'string' ? item.custom : '']
-      .filter(text => text !== '').join('：')
-  }).filter(text => text !== '').join('；').slice(0, 300)
-}
-
-/** Extract the asked question texts from a serialized tool-call arguments payload. */
-function questionText(raw: string | null): string | undefined {
-  if (raw === null) return undefined
-  try {
-    const questions = (JSON.parse(raw) as { questions?: unknown }).questions
-    if (!Array.isArray(questions)) return undefined
-    const text = questions
-      .map(entry => (entry as { question?: unknown }).question)
-      .filter((question): question is string => typeof question === 'string' && question !== '')
-      .join('；').slice(0, 300)
-    return text === '' ? undefined : text
-  } catch {
-    return undefined
-  }
-}
-
-/** Normalize one UNION feed row into the wire item; `seq` -1 marks an unanchored answer. */
-function activityItem(row: ActivityRow): ProjectActivityItem {
-  const seq = Number(row.seq)
-  if (row.kind === 'message') {
-    return {
-      kind: 'message', sessionId: row.session_id, conversationTitle: row.conversation_title,
-      actorUserId: publicNumber(row.actor_uid, 'user'), actorLabel: row.actor_label ?? '',
-      occurredAt: row.ts.toISOString(), seq, text: row.text ?? '',
-    }
-  }
-  const question = questionText(row.question_args)
-  return {
-    kind: 'answer', sessionId: row.session_id, conversationTitle: row.conversation_title,
-    actorUserId: publicNumber(row.actor_uid, 'user'), actorLabel: row.actor_label ?? '',
-    occurredAt: row.ts.toISOString(), seq: seq < 0 ? null : seq,
-    text: answerSummary(row.outcome),
-    ...(question === undefined ? {} : { questionText: question }),
-    outcome: row.outcome,
-  }
-}
-
 /** PostgreSQL authority for project membership and shared-conversation access. */
 export class PostgresCollaborationService {
-  constructor(private readonly context: PostgresRuntimeContext, private readonly catalogEntryNodeId?: import('../runtime-catalog.ts').RuntimeNodeId) {}
+  constructor(private readonly context: PostgresRuntimeContext, private readonly catalogEntryNodeId?: import('../runtime-catalog.ts').RuntimeNodeId,
+    private readonly contentStore?: CollaborationContentStore,private readonly nodeProjects=contentStore?new NodeProjectMetadata(context,contentStore):undefined) {}
+
+  /** Check local collaboration storage and the actual owning computer reader. */
+  async verifyNodeContent(input:NodeContentCheckInput):Promise<void>{
+    if(!this.contentStore?.confirmCollaborationRead || !this.nodeProjects || input.binding.nodeId!==this.context.nodeId || input.binding.organizationId!==this.context.organizationId) throw new NodeContentUnavailable()
+    await requireNodeContentRelations(input.local,['conversation_sessions','conversation_participants','conversation_interaction_responses','project_name_versions','conversation_acl_versions'])
+  }
+
+  /** Open only the local collaboration service named by the authenticated credential.
+   * @param binding - allocation returned by current control authorization.
+   * @returns the local access/participation implementation.
+   */
+  forContent(binding: NodeContentBinding, generation?:number): NodeContentCollaboration {
+    if (this.contentStore === undefined || binding.nodeId !== this.context.nodeId || binding.organizationId !== this.context.organizationId) throw new NodeContentUnavailable()
+    return new NodeContentCollaboration(this.context.pool,this.contentStore,binding,generation)
+  }
+
+  /** Use the binding returned by the same live credential query that selected the Runtime.
+   * @param subject - verified Runtime principal.
+   * @returns access operations retaining account and membership revalidation.
+   */
+  forAuthenticatedRuntime(subject:RuntimeCredentialSubject): Pick<PostgresCollaborationService,'access'|'readableSessionIds'|'claimInteraction'> {
+    return {
+      access:(user,runtime,id,action)=>this.access(user,runtime,id,action,subject),
+      readableSessionIds:(user,runtime,project,ids)=>this.readableSessionIds(user,runtime,project,ids,subject),
+      claimInteraction:(user,runtime,id,kind,interaction,outcome,callId)=>this.claimInteraction(user,runtime,id,kind,interaction,outcome,callId,subject),
+    }
+  }
+
+  private async localContent(runtimeId: RuntimeId,credential?:RuntimeCredentialSubject): Promise<NodeContentCollaboration | undefined> {
+    if (credential !== undefined && (credential.organizationId!==this.context.organizationId || credential.target.runtimeId!==runtimeId)) {
+      throw new CollaborationDeniedError('forbidden')
+    }
+    const binding = credential!==undefined ? credential.contentBinding : await getProjectContentBinding(this.context.pool,this.context.organizationId,runtimeId)
+    return binding === undefined ? undefined : this.forContent(binding,credential?.generation)
+  }
 
   private runtimePredicate(alias: string, runtimeId: RuntimeId): string {
     return `${alias}.runtime_namespace=${escapeLiteral(runtimeId)} AND EXISTS (
       SELECT 1 FROM harness.runtime_environments selected_runtime
       WHERE selected_runtime.organization_id=${alias}.organization_id AND selected_runtime.id=${alias}.runtime_id
-        AND selected_runtime.node_id=${escapeLiteral(this.context.nodeId)}::uuid)`
+        AND selected_runtime.node_id=${escapeLiteral(this.context.nodeId)}::uuid) AND NOT EXISTS(SELECT FROM harness.project_content_placement b WHERE b.organization_id=${alias}.organization_id AND b.runtime_id=${alias}.runtime_id)`
   }
 
-  private async projectAuthorities(userId: number, projectId: number | undefined, directory: boolean): Promise<ProjectAuthorityView[]> {
+  private async projectAuthorities(userId: number, projectId: number | undefined, directory: boolean,
+    browserAccount = false): Promise<ProjectReadAuthorityView[]> {
     const result = await this.context.pool.query<{
+      content:NodeContentBinding|null
       public_id: string
       name: string
       path: string
@@ -154,7 +103,7 @@ export class PostgresCollaborationService {
       node_name: string
       origin: NonNullable<ProjectAuthorityView['origin']>
       owner: { id: string; username: string; displayName: string } | null
-    }>(`SELECT p.public_id::text,p.name::text,pm.local_path path,p.kind,pm.node_id,node.name::text node_name,
+    }>(`SELECT p.public_id::text,p.name::text,pm.local_path path,harness.project_content_key(p.organization_id,p.id) content,p.kind,pm.node_id,node.name::text node_name,
       CASE WHEN p.kind='steward' THEN 'rw'::text
         WHEN membership.role='admin' THEN 'rw'::text
         WHEN membership.role='member' THEN member.access_mode ELSE NULL END access_mode,
@@ -174,6 +123,8 @@ export class PostgresCollaborationService {
       LEFT JOIN harness.project_members member ON member.organization_id=p.organization_id
         AND member.project_id=p.id AND member.user_id=actor.id
       WHERE actor.organization_id=$1 AND actor.public_id=$2 AND actor.status='active'
+        AND (NOT $6::boolean OR EXISTS (SELECT 1 FROM harness.password_credentials credential
+          WHERE credential.user_id=actor.id AND NOT credential.must_change_password))
         AND harness.computer_use_allowed(actor.organization_id,actor.id,pm.node_id)
         AND (($5::uuid IS NULL AND pm.node_id=$3)
           OR ($5::uuid IS NOT NULL AND harness.entry_node_visible(actor.organization_id,$5,pm.node_id)))
@@ -188,11 +139,13 @@ export class PostgresCollaborationService {
         AND ($4::bigint IS NULL OR p.public_id=$4)
       ORDER BY p.name,p.public_id`,
     [this.context.organizationId, userId, this.context.nodeId, projectId ?? null,
-      directory ? this.catalogEntryNodeId ?? null : null])
+      directory ? this.catalogEntryNodeId ?? null : null, browserAccount])
+    const display=directory?new Map<string,{name:string;rootPath:string}>():await localProjectDisplays(this.nodeProjects,result.rows)
     return result.rows.map(row => ({
       projectId: publicNumber(row.public_id, 'project'),
-      name: row.name,
-      path: row.path,
+      name:row.content ? directory?'#'+row.public_id:display.get(row.content.projectId)!.name : row.name,
+      path:row.content ? directory?'':display.get(row.content.projectId)!.rootPath : row.path,
+      ...row.content&&directory?{metadataOnNode:true as const}:{ },
       mode: row.access_mode,
       nodeId: row.node_id,
       nodeName: row.node_name,
@@ -209,6 +162,11 @@ export class PostgresCollaborationService {
     return (await this.projectAuthorities(userId, undefined, true)).map(({ administrator: _, ...project }) => project)
   }
 
+  /** Final browser read admission uses current directory authority without loading node-owned names or paths. */
+  async projectReadAuthorities(userId: number, projectId?: number): Promise<ProjectReadAuthorityView[]> {
+    return this.projectAuthorities(userId, projectId, true, true)
+  }
+
   async projectForUser(projectId: number, userId: number): Promise<ProjectAuthorityView | null> {
     return (await this.projectAuthorities(userId, projectId, false))[0] ?? null
   }
@@ -222,22 +180,24 @@ export class PostgresCollaborationService {
   } | null> {
     const result = await this.context.pool.query<{
       id: string
+      content:NodeContentBinding|null
       public_id: string
       name: string
       path: string
       kind: 'standard' | 'steward'
-    }>(`SELECT p.id,p.public_id::text,p.name::text,pm.local_path path,p.kind
+    }>(`SELECT p.id,p.public_id::text,p.name::text,pm.local_path path,p.kind,harness.project_content_key(p.organization_id,p.id) content
       FROM harness.projects p
       JOIN harness.project_mounts pm ON pm.project_id=p.id AND pm.organization_id=p.organization_id
         AND pm.node_id=$2 AND pm.status='active'
       WHERE p.organization_id=$1 AND p.public_id=$3 AND p.status='active'`,
     [this.context.organizationId, this.context.nodeId, projectId])
     const row = result.rows[0]
+    const display=await localProjectDisplays(this.nodeProjects,result.rows)
     return row === undefined ? null : {
       id: row.id,
       publicId: publicNumber(row.public_id, 'project'),
-      name: row.name,
-      path: row.path,
+      name:row.content?display.get(row.content.projectId)!.name:row.name,
+      path:row.content?display.get(row.content.projectId)!.rootPath:row.path,
       kind: row.kind,
     }
   }
@@ -345,7 +305,9 @@ export class PostgresCollaborationService {
     }
   }
 
-  async access(userId: number, runtimeId: RuntimeId, sessionId: string, action: CollaborationAction): Promise<ConversationAccess> {
+  async access(userId: number, runtimeId: RuntimeId, sessionId: string, action: CollaborationAction,credential?:RuntimeCredentialSubject): Promise<ConversationAccess> {
+    const local = await this.localContent(runtimeId,credential)
+    if (local !== undefined) return local.access(userId,runtimeId,sessionId,action)
     const row = await this.accessRow(this.context.pool, userId, runtimeId, sessionId)
     if (row === null) throw new CollaborationDeniedError('conversation-not-found')
     if (row.access_mode === null) throw new CollaborationDeniedError('not-member')
@@ -372,6 +334,8 @@ export class PostgresCollaborationService {
   }
 
   async listConversations(userId: number, runtimeId: RuntimeId, projectId: number): Promise<ConversationCollaborationView[]> {
+    const local = await this.localContent(runtimeId)
+    if (local !== undefined) return local.listConversations(userId,runtimeId,projectId)
     if (await this.projectForUser(projectId, userId) === null) throw new CollaborationDeniedError('not-member')
     const result = await this.context.pool.query<{
       session_id: string
@@ -437,7 +401,8 @@ export class PostgresCollaborationService {
    * @param userId - authenticated account public number.
    * @returns authorized personal/project metadata; another Runtime's computer grant cannot expose a personal root.
    */
-  async listAccountConversations(userId: number): Promise<import('../collaboration.ts').AccountConversationView[]> {
+  async listAccountConversations(userId: number, page?: { runtimeId: RuntimeId; query: string; afterTime: number | null;
+    afterId: string; limit: number; workspaceId?: string | null; excludePublished?: boolean }): Promise<import('../collaboration.ts').AccountConversationView[]> {
     const result = await this.context.pool.query<{
       session_id: string
       runtime_id: import('../runtime-catalog.ts').RuntimeId | null
@@ -455,7 +420,7 @@ export class PostgresCollaborationService {
       visible_content_seq: string | null
       last_prompt_at_ms: string | null
       can_write: boolean
-    }>(`SELECT r.id session_id,r.runtime_id,environment.node_id,node.name::text node_name,p.public_id::text project_public_id,p.name::text project_name,
+    }>(`${page === undefined ? '' : 'WITH visible AS ('}SELECT r.id session_id,r.runtime_id,environment.node_id,node.name::text node_name,p.public_id::text project_public_id,p.name::text project_name,
       COALESCE(to_json(harness.human_session_title(r.title)), (SELECT harness.conversation_search_text(search.content,search.content_nul_parts,80) FROM harness.conversation_search search
         WHERE search.organization_id=r.organization_id AND search.runtime_namespace=r.runtime_namespace AND search.session_id=r.id AND search.role='user'
           AND harness.human_session_title(search.content) IS NOT NULL
@@ -496,7 +461,18 @@ export class PostgresCollaborationService {
                 SELECT 1 FROM harness.steward_access_policies sp
                 WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.node_id=harness.project_node_id(p.organization_id,p.id) AND sp.enabled)
               OR p.kind<>'steward' AND (membership.role='admin' OR member.user_id IS NOT NULL))))
-      ORDER BY r.updated_at DESC,r.runtime_namespace,r.id`, [this.context.organizationId, userId, this.catalogEntryNodeId ?? null])
+        AND NOT EXISTS (SELECT 1 FROM harness.project_content_placement b WHERE b.organization_id=r.organization_id AND b.runtime_id=r.runtime_id)
+        AND NOT EXISTS (SELECT 1 FROM harness.personal_directory_placement b WHERE b.organization_id=r.organization_id AND b.runtime_id=r.runtime_id)
+      ${page === undefined ? 'ORDER BY r.updated_at DESC,r.runtime_namespace,r.id' : `AND r.runtime_id=$4
+        AND ($10::text IS NULL OR EXISTS(SELECT 1 FROM harness.runtime_workspace_catalog rc,LATERAL jsonb_array_elements(rc.items) w
+          WHERE rc.organization_id=r.organization_id AND rc.runtime_id=r.runtime_id AND w->>'workspaceId'=$10 AND (w->'sessionIds') ? r.id))
+        AND (NOT $9::boolean OR NOT EXISTS (SELECT 1 FROM harness.runtime_workspace_catalog c,
+          LATERAL jsonb_array_elements(c.conversations) v WHERE c.organization_id=r.organization_id
+            AND c.runtime_id=r.runtime_id AND v->>'sessionId'=r.id)) ) SELECT * FROM visible
+        WHERE ($5::text='' OR strpos(lower(concat_ws(' ',title #>> '{}',cwd,session_id)),lower($5))>0)
+        AND ($6::bigint IS NULL OR updated_at_ms::bigint < $6 OR (updated_at_ms::bigint=$6 AND session_id COLLATE "C" > $7))
+        ORDER BY updated_at_ms::bigint DESC,session_id COLLATE "C" LIMIT $8`}`, [this.context.organizationId, userId, this.catalogEntryNodeId ?? null,
+          ...(page === undefined ? [] : [page.runtimeId, page.query, page.afterTime, page.afterId, page.limit, page.excludePublished === true, page.workspaceId ?? null])])
     return result.rows.map(row => ({
       sessionId: row.session_id,
       runtime: { ...(row.project_public_id === null
@@ -519,7 +495,9 @@ export class PostgresCollaborationService {
     }))
   }
 
-  async readableSessionIds(userId: number, runtimeId: RuntimeId, projectId: number, sessionIds: readonly string[]): Promise<string[]> {
+  async readableSessionIds(userId: number, runtimeId: RuntimeId, projectId: number, sessionIds: readonly string[],credential?:RuntimeCredentialSubject): Promise<string[]> {
+    const local = await this.localContent(runtimeId,credential)
+    if (local !== undefined) return local.readableSessionIds(userId,runtimeId,projectId,sessionIds)
     if (sessionIds.length === 0) return []
     const result = await this.context.pool.query<{ session_id: string }>(`SELECT c.id session_id
       FROM unnest($4::text[]) requested(session_id)
@@ -548,6 +526,8 @@ export class PostgresCollaborationService {
   }
 
   async setVisibility(userId: number, runtimeId: RuntimeId, sessionId: string, visibility: 'project' | 'private'): Promise<void> {
+    const local = await this.localContent(runtimeId)
+    if (local !== undefined) return local.setVisibility(userId,runtimeId,sessionId,visibility)
     await transaction(this.context.pool, async (client) => {
       const locked = await this.lockedAccessRow(client, userId, runtimeId, sessionId, 'update')
       if (locked === null) throw new CollaborationDeniedError('conversation-not-found')
@@ -578,7 +558,10 @@ export class PostgresCollaborationService {
     interactionId: string,
     outcome: unknown,
     callId?: string,
+    credential?:RuntimeCredentialSubject,
   ): Promise<boolean> {
+    const local = await this.localContent(runtimeId,credential)
+    if (local !== undefined) return local.claimInteraction(userId,runtimeId,sessionId,kind,interactionId,outcome,callId)
     return transaction(this.context.pool, async (client) => {
       const locked = await this.lockedAccessRow(client, userId, runtimeId, sessionId, 'share')
       if (locked === null) throw new CollaborationDeniedError('conversation-not-found')
@@ -612,15 +595,11 @@ export class PostgresCollaborationService {
     projectId: number,
     options: { limit: number; before?: string },
   ): Promise<ProjectActivityPage> {
+    const local = await this.localContent(runtimeId)
+    if (local !== undefined) return local.listActivity(userId,projectId,options)
     if (await this.projectForUser(projectId, userId) === null) throw new CollaborationDeniedError('not-member')
-    const before = parseActivityCursor(options.before, this.context.organizationId, runtimeId)
-    const result = await this.context.pool.query<ActivityRow>(`WITH visible AS (
-      SELECT r.organization_id,r.runtime_namespace,r.id,COALESCE(to_json(harness.human_session_title(r.title)), (SELECT harness.conversation_search_text(search.content,search.content_nul_parts,80)
-        FROM harness.conversation_search search
-        WHERE search.organization_id=r.organization_id AND search.runtime_namespace=r.runtime_namespace AND search.session_id=r.id AND search.role='user'
-          AND harness.human_session_title(search.content) IS NOT NULL
-        ORDER BY search.occurred_at,search.event_seq LIMIT 1)) title
-      FROM harness.conversation_sessions r
+    return readProjectActivity(this.context.pool, { schema:'harness',organizationId:this.context.organizationId,runtimeId,
+      coordinates:[this.context.organizationId,projectId,userId],...options,rootRelation:`FROM harness.conversation_sessions r
       JOIN harness.projects p ON p.id=r.project_id AND p.organization_id=r.organization_id
       JOIN harness.users creator ON creator.id=r.creator_user_id AND creator.organization_id=r.organization_id
       JOIN harness.users actor ON actor.organization_id=r.organization_id
@@ -635,50 +614,7 @@ export class PostgresCollaborationService {
         AND (p.kind='steward' AND membership.role='admin' AND EXISTS (
             SELECT 1 FROM harness.steward_access_policies sp
             WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.node_id=harness.project_node_id(p.organization_id,p.id) AND sp.enabled)
-          OR p.kind<>'steward' AND (membership.role='admin' OR member.user_id IS NOT NULL))
-    ), feed AS (
-      SELECT 'message'::text kind,e.organization_id,e.runtime_namespace,e.session_id,e.seq,e.occurred_at ts,
-        harness.conversation_search_text(search_row.content,search_row.content_nul_parts,500) text,
-        (e.query_fields->>'actorLabelJson')::json actor_label,
-        e.query_fields->>'actorUid' actor_uid,
-        NULL::json question_args,NULL::jsonb outcome,'message:' || e.seq::text entry_id
-      FROM harness.conversation_search search_row
-      JOIN harness.conversation_events e ON e.organization_id=search_row.organization_id AND e.runtime_namespace=search_row.runtime_namespace AND e.session_id=search_row.session_id
-        AND e.seq=search_row.event_seq
-      JOIN visible v ON v.organization_id=e.organization_id AND v.runtime_namespace=e.runtime_namespace AND v.id=e.session_id
-      WHERE search_row.role='user' AND e.query_fields->>'actorUid' IS NOT NULL
-      UNION ALL
-      SELECT 'answer',c.organization_id,c.runtime_namespace,c.conversation_id,COALESCE(res.seq,-1),c.responded_at,
-        NULL,to_json(u.display_name),u.public_id::text,
-        (call_args.query_fields->>'argumentsJson')::json,c.outcome,'question:' || c.interaction_id
-      FROM harness.conversation_interaction_responses c
-      JOIN visible v ON v.organization_id=c.organization_id AND v.runtime_namespace=c.runtime_namespace AND v.id=c.conversation_id
-      JOIN harness.users u ON u.id=c.responder_user_id AND u.organization_id=c.organization_id
-      LEFT JOIN harness.conversation_events res ON res.organization_id=c.organization_id AND res.runtime_namespace=c.runtime_namespace AND res.session_id=c.conversation_id
-        AND res.event_type='tool/result' AND res.query_fields->>'callId'=c.call_id
-      LEFT JOIN harness.conversation_events call_args ON call_args.organization_id=c.organization_id AND call_args.runtime_namespace=c.runtime_namespace AND call_args.session_id=c.conversation_id
-        AND call_args.event_type='tool/call' AND call_args.query_fields->>'callId'=c.call_id
-      WHERE c.interaction_kind='question' AND jsonb_typeof(c.outcome->'answers')='array'
-    )
-    SELECT f.*,v.title conversation_title,
-      to_char(f.ts AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') cursor_ts
-    FROM feed f JOIN visible v ON v.organization_id=f.organization_id AND v.runtime_namespace=f.runtime_namespace AND v.id=f.session_id
-    WHERE ($4::timestamptz IS NULL OR f.ts<$4 OR (f.ts=$4 AND (
-      f.session_id>$5 OR (f.session_id=$5 AND (
-        f.seq<$6::bigint OR (f.seq=$6::bigint AND $7::text IS NOT NULL AND f.entry_id>$7))))))
-    ORDER BY f.ts DESC,f.session_id,f.seq DESC,f.entry_id LIMIT $8`,
-      [this.context.organizationId, projectId, userId,
-        before?.ts ?? null, before?.sessionId ?? '', before?.seq ?? 0, before?.entryId ?? null,
-        Math.min(Math.max(options.limit, 1), 200) + 1])
-    const rows = result.rows.slice(0, Math.min(Math.max(options.limit, 1), 200))
-    const items = rows.map(row => activityItem(row))
-    const last = result.rows.length > rows.length ? rows.at(-1) : undefined
-    return {
-      items,
-      ...(last === undefined ? {} : { nextBefore: 'v2.' + Buffer.from(JSON.stringify([
-        this.context.organizationId, runtimeId, last.cursor_ts, last.session_id, Number(last.seq), last.entry_id,
-      ])).toString('base64url') }),
-    }
+          OR p.kind<>'steward' AND (membership.role='admin' OR member.user_id IS NOT NULL))` })
   }
 
 }

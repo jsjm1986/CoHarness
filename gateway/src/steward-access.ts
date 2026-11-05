@@ -74,43 +74,46 @@ export class StewardAccess extends ResourceAccess {
   /**
    * List every organization member's steward qualification for the admin
    * surface, joining the membership facts that decide effectiveness.
+   * @param actorUserId - current administrator; omission permits trusted internal reads.
    * @returns member rows ordered for review: effective first, then stale grants, then administrators.
    */
-  async list(): Promise<StewardAccessEntry[]> {
-    const result = await this.pg.pool.query<{
-      public_id: string
-      username: string
-      display_name: string
-      role: 'admin' | 'member'
-      user_status: string
-      membership_status: string
-      enabled: boolean | null
-      computer_allowed: boolean
-      revision: string | null
-    }>(`SELECT u.public_id::text,u.username,u.display_name,u.status user_status,
-      m.role,m.status membership_status,sp.enabled,sp.revision::text,harness.computer_use_allowed(u.organization_id,u.id,$2) computer_allowed
-      FROM harness.users u
-      JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
-      LEFT JOIN harness.steward_access_policies sp ON sp.organization_id=u.organization_id AND sp.user_id=u.id AND sp.node_id=$2
-      WHERE u.organization_id=$1 AND u.deleted_at IS NULL
-      ORDER BY (m.status='active' AND m.role='admin' AND COALESCE(sp.enabled,false)) DESC,
-        COALESCE(sp.enabled,false) DESC, m.role='admin' DESC, u.public_id`,
-    [this.pg.organizationId, this.pg.nodeId])
-    return result.rows.map(row => {
-      const adminActive = row.role === 'admin' && row.membership_status === 'active' && row.user_status === 'active'
-      const qualified = row.enabled === true
-      return {
-        userId: Number(row.public_id),
-        username: row.username,
-        displayName: row.display_name,
-        role: row.role,
-        userStatus: row.user_status,
-        membershipStatus: row.membership_status,
-        grantable: adminActive,
-        qualified,
-        effective: adminActive && qualified && row.computer_allowed,
-        revision: row.revision ?? '0',
-      }
+  async list(actorUserId?: number): Promise<StewardAccessEntry[]> {
+    return this.readWithAdministrator(actorUserId, async database => {
+      const result = await database.query<{
+        public_id: string
+        username: string
+        display_name: string
+        role: 'admin' | 'member'
+        user_status: string
+        membership_status: string
+        enabled: boolean | null
+        computer_allowed: boolean
+        revision: string | null
+      }>(`SELECT u.public_id::text,u.username,u.display_name,u.status user_status,
+        m.role,m.status membership_status,sp.enabled,sp.revision::text,harness.computer_use_allowed(u.organization_id,u.id,$2) computer_allowed
+        FROM harness.users u
+        JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
+        LEFT JOIN harness.steward_access_policies sp ON sp.organization_id=u.organization_id AND sp.user_id=u.id AND sp.node_id=$2
+        WHERE u.organization_id=$1 AND u.deleted_at IS NULL
+        ORDER BY (m.status='active' AND m.role='admin' AND COALESCE(sp.enabled,false)) DESC,
+          COALESCE(sp.enabled,false) DESC, m.role='admin' DESC, u.public_id`,
+      [this.pg.organizationId, this.pg.nodeId])
+      return result.rows.map(row => {
+        const adminActive = row.role === 'admin' && row.membership_status === 'active' && row.user_status === 'active'
+        const qualified = row.enabled === true
+        return {
+          userId: Number(row.public_id),
+          username: row.username,
+          displayName: row.display_name,
+          role: row.role,
+          userStatus: row.user_status,
+          membershipStatus: row.membership_status,
+          grantable: adminActive,
+          qualified,
+          effective: adminActive && qualified && row.computer_allowed,
+          revision: row.revision ?? '0',
+        }
+      })
     })
   }
 }

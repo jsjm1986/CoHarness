@@ -129,6 +129,10 @@ type PrincipalInput = {
     now?: number
   }
 
+// Windows V8 processes resample their own coarse system-clock baseline every minute.
+// One rounded-up 15.625 ms clock tick covers an immediately delivered assertion.
+const WINDOWS_PRINCIPAL_CLOCK_TICK_MS = 16
+
 /** Signs short-lived request principals for one Gateway organization. */
 export class GatewayPrincipalSigner {
   private readonly publicKey: KeyObject
@@ -162,7 +166,8 @@ export class GatewayPrincipalSigner {
   }
 
   private signPrincipal(input: PrincipalInput, lifetimeMs: number): string {
-    const issuedAt = input.now ?? Date.now()
+    const now = input.now ?? Date.now()
+    const issuedAt = process.platform === 'win32' ? now - WINDOWS_PRINCIPAL_CLOCK_TICK_MS : now
     const claims: GatewayPrincipalClaims = {
       version: 1,
       issuer: 'harness-gateway',
@@ -177,7 +182,7 @@ export class GatewayPrincipalSigner {
       scope: input.scope,
       runtime: input.runtime,
       issuedAt,
-      expiresAt: issuedAt + lifetimeMs,
+      expiresAt: now + lifetimeMs,
       nonce: randomUUID(),
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     }

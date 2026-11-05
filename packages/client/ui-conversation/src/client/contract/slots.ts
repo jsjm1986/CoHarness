@@ -11,7 +11,7 @@ import type {
   ObservableSnapshot, PendingWait, SessionId, SessionPendingEntry, ToolCallBlock,
   TurnLocation, WorkspaceId,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationViewportSnapshot, ProjectUiPolicySnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationIntentsSnapshot, ConversationViewportSnapshot, ProjectUiPolicySnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { MarkdownFileMentions, MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MessageId } from '@deepseek-ai/dsh-client-connection/client'
 import type { PermissionCatalog } from '@deepseek-ai/dsh-permission-presets/client'
@@ -278,10 +278,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.hero.brand.mark': { kind: 'single'; scope: 'root'; owner: HeroBrandMarkOwnerProps }
     /**
      * The agent-preset chip beside the workspace picker on the new-session
-     * screen. Root scope: no session exists yet, so the choice is staged for
-     * the next one rather than applied to a current one.
+     * screen. A blank Session uses its own Runtime. Without a Session the
+     * entry roster supplies choices for the next conversation.
      */
-    'conversation.hero.agentPreset': { kind: 'single'; scope: 'root'; owner: HeroAgentPresetOwnerProps }
+    'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe'; owner: HeroAgentPresetOwnerProps }
     // 'conversation.input.overlay' merges in ui-input-trigger (the dependency
     // direction is the hard constraint — ui-input-trigger cannot import
     // this package, while this package's input contract already imports
@@ -413,7 +413,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         'conversation.hero.brand.mark': { kind: 'single'; scope: 'root' }
         'conversation.hero.workspace': { kind: 'single'; scope: 'root' }
         'conversation.hero.context': { kind: 'list'; scope: 'root' }
-        'conversation.hero.agentPreset': { kind: 'single'; scope: 'root' }
+        'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe' }
       }
       inject: ConversationInjected
       locale: 'conversation'
@@ -997,7 +997,15 @@ export interface ConversationViewportInjected {
   onViewportSolo: (sessionId: SessionId) => void
   onViewportMaximize: (sessionId: SessionId, maximized: boolean) => void
   onViewportEnabled: (enabled: boolean) => void
-  hooks: { viewportAvailable: ObservableSnapshot<boolean> }
+  onIntentInput: (id: string, text: string) => void
+  onIntentRetry: (id: string) => void
+  onIntentHide: () => void
+  onRetryNodeDraft: (sessionId: SessionId) => void
+  hooks: {
+    viewportAvailable: ObservableSnapshot<boolean>
+    conversationIntents: ObservableSnapshot<ConversationIntentsSnapshot>
+    draftFailures: ObservableSnapshot<readonly { sessionId: SessionId; versionUnavailable: boolean }[]>
+  }
 }
 
 /** Full props of the current-session or multi-pane conversation host. */

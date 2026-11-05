@@ -39,6 +39,10 @@ export function spaceDestinations(state: CollaborationSnapshot, entryNodeId?: st
       ? target.runtimeId === context.environment.id
       : target.kind === context.scope.kind && (target.kind === 'personal'
         || context.scope.kind === 'project' && target.projectId === context.scope.projectId)
+    if (project?.metadataOnNode && target.kind === 'project') {
+      name = project.name
+      target = { ...target, projectName: name }
+    }
     destinations.push({ id, target, name, current, ...(state === undefined ? {} : { state }),
       ...(nodeName === undefined ? {} : { nodeName }), ...(project === undefined ? {} : { project }) })
   }

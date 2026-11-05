@@ -561,6 +561,9 @@ export function ConversationRoot(props: ConversationRootProps) {
   const toolsId = useId()
   const viewport = props.useStore(snapshot => snapshot)
   const available = props.useViewportAvailable(value => value)
+  const intents = props.useConversationIntents(value => value)
+  const pending = intents.active
+  const draftFailures = props.useDraftFailures(value => value)
   useEffect(() => {
     props.onViewportEnabled(available)
     return () => { props.onViewportEnabled(false) }
@@ -686,13 +689,34 @@ export function ConversationRoot(props: ConversationRootProps) {
     setDraggingPaneId(undefined)
     setDropTarget(null)
   }
+  const editor = pending === undefined ? null : <div className={css.pendingDraft} data-conversation-intent={pending.id}
+    data-intent-runtime={pending.target.runtimeId}>
+    <label>{pending.label && <span>{pending.label}</span>}
+      <textarea autoFocus value={pending.text} aria-label={props.t('placeholder.default')}
+        placeholder={props.t('placeholder.default')} onChange={(event) => { props.onIntentInput(pending.id, event.currentTarget.value) }} />
+    </label>
+    <div><small role="status">{props.t(pending.phase === 'preparing' ? 'draft.preparing' : pending.denied ? 'draft.denied' : 'draft.unavailable')}</small>
+      {pending.phase === 'unavailable' && <button type="button" onClick={() => { props.onIntentRetry(pending.id) }}>{props.t('draft.retry')}</button>}
+      <button type="button" onClick={props.onIntentHide}>{props.t('draft.back')}</button>
+    </div>
+  </div>
+  const retryStorage = draftFailures.length ? <div role="status" className={css.resumeDraft}>
+    {props.t(draftFailures.some(row => row.versionUnavailable) ? 'draft.versionUnavailable' : 'draft.storageUnavailable')} <button type="button"
+      onClick={() => { for (const row of draftFailures) props.onRetryNodeDraft(row.sessionId) }}>{props.t('draft.retry')}</button>
+  </div> : null
+  const saved = intents.saved.map(draft => <button type="button" className={css.resumeDraft} key={draft.id}
+    onClick={() => { props.onIntentRetry(draft.id) }}>{props.t('draft.resume')} · {draft.label || draft.text.slice(0, 32)}</button>)
+  if (!workbench && pending !== undefined) return <div className={css.workbenchRoot}>{retryStorage}{saved}{editor}</div>
   if (!workbench) return available ? (
     <div className={css.workbenchRoot}>
+      {retryStorage}{saved}
       {props.renderFactorySlot('conversation.content', { variant: 'main', compact, workbench: false, headerLeading: props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed: false, inline: true }) })}
     </div>
   ) : props.renderFactorySlot('conversation.content', { variant: 'main', compact })
   return (
     <div ref={root} className={css.workbenchRoot} data-workbench="" data-tabbed={tabbed || undefined} data-maximized={maximized !== undefined || undefined}>
+      {retryStorage}{saved}
+      {pending !== undefined && (pending.paneId === undefined || !paneIds.includes(pending.paneId)) && editor}
       {props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed, layout: layoutPreset, onSelectLayout: applyLayout, toolsHostId })}
       {paneIds.length === 0 ? props.renderSlot('conversation.workbench.empty', { viewport }) : (
         <div
@@ -736,7 +760,9 @@ export function ConversationRoot(props: ConversationRootProps) {
                       onDrop={(event) => { onPaneDrop(event, id) }}
                       onDragEnd={onPaneDragEnd}
                     >
-                      <props.SessionProvider sessionId={id} empty={() => <p className={css.workbenchUnavailable} role="status">{props.t('viewport.unavailable')}</p>}>
+                      {pending?.paneId === id ? editor : viewport.paneVerification?.[id] !== undefined ? <p className={css.workbenchUnavailable} role="status"
+                        aria-busy={viewport.paneVerification[id] === 'checking'}>{props.t(viewport.paneVerification[id] === 'checking'
+                          ? 'viewport.checking' : 'viewport.unavailable')}</p> : <props.SessionProvider sessionId={id} empty={() => <p className={css.workbenchUnavailable} role="status">{props.t('viewport.unavailable')}</p>}>
                         {() => (
                           <>
                             {props.renderSlot('conversation.workbench.pane.header', {
@@ -762,7 +788,7 @@ export function ConversationRoot(props: ConversationRootProps) {
                             </div>
                           </>
                         )}
-                      </props.SessionProvider>
+                      </props.SessionProvider>}
                       {nextId !== undefined && !isCollapsed && !collapsed.has(nextId) && (
                         <div
                           className={css.paneSeparator}

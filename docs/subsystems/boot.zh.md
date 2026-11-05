@@ -390,6 +390,22 @@ Source: [`packages/boot/app-boot/src/index.ts`](../../packages/boot/app-boot/src
 
 ### `hmr/*` events
 
+<a id="hmrauthorize-reload--parallel"></a>
+
+#### `hmr/authorize-reload` — parallel
+
+Check prospective configuration or module replacement before the live tree changes.
+
+```ts cordis-catalog
+/** Check prospective configuration or module replacement before the live tree changes.
+ * @mode parallel
+ * @param source - the kind of reload the supervisor is about to apply.
+ */
+'hmr/authorize-reload'(source: 'profile' | 'configuration' | 'modules'): void | Promise<void>
+```
+
+Source: [`packages/boot/hmr/src/index.ts`](../../packages/boot/hmr/src/index.ts)
+
 <a id="hmrchange--emit"></a>
 
 #### `hmr/change` — emit

@@ -65,6 +65,27 @@ it.each(['plain', 'encoded-looking'] as const)('keeps %s draft reservations in w
   } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
 })
 
+it('retries failed workspace recovery writes and skips unchanged indices on subsequent directory updates', async () => {
+  let blocked = true
+  const write = vi.fn(() => { if (blocked) throw new Error('Storage busy') })
+  vi.stubGlobal('localStorage', { getItem: () => null, setItem: write })
+  const ctx = new Context()
+  await ctx.plugin(() => {}).await()
+  try {
+    const api = new FakeApiClient()
+    const workspaces = new WorkspaceRuntime(ctx, api, new SessionRuntime(ctx, api, fakeRemote(api)))
+    workspaces.setDirectoryState('loading')
+    const failed = write.mock.calls.length
+    expect(failed).toBeGreaterThan(0)
+    blocked = false
+    workspaces.setDirectoryState('ready')
+    expect(write).toHaveBeenCalledTimes(failed + 1)
+    workspaces.setDirectoryState('loading')
+    workspaces.setDirectoryState('ready')
+    expect(write).toHaveBeenCalledTimes(failed + 1)
+  } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
+})
+
 describe('WorkspaceManager', () => {
   it('replays changed frames over hydration and adopts the durable order on refresh', async () => {
     const api = new FakeApiClient()

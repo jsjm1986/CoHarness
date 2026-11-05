@@ -1,0 +1,120 @@
+{
+  "id": "B513",
+  "title": "Project model settings and credential reads retain obsolete access and editing authority; discovery publishes after ownership or membership withdrawal",
+  "status": "fixed_current_project_and_exact_computer_read_authority_source_and_normal_node_artifacts_verified_remaining_review_open",
+  "sourceFixed": true,
+  "at": "2026-11-04T22:07:16.024623+00:00",
+  "paths": [
+    "gateway/src/server.ts",
+    "gateway/src/services.ts",
+    "gateway/src/postgres/model-governance-service.ts"
+  ],
+  "receipt": "receipts/project-model-read-publication-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z",
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/project-model-read-before.log",
+  "originalObservation": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/project-model-read-negative-observations.json",
+  "originalResult": "Actual PostgreSQL and authenticated HTTP return200 and writable=true for settings/credentials after ownership transfer, return private metadata after project membership removal, and publish stored-credential discovery results after either change. Three unchanged-authority controls succeed; six ordinary interleavings fail before the repair.",
+  "correction": "The service exposes current project read qualification through one SQL snapshot of account, organization/password eligibility, current project/membership, exact computer grant, active mount and steward qualification. Gateway settings/credential responses use its current management flag after loading data; discovery additionally requires management. The query performs no asynchronous node metadata work. Committed mutation responses remain unchanged.",
+  "checks": {
+    "httpUnit": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/project-model-read-owned-unit.json",
+      "passed": 8,
+      "skipped": 0,
+      "newCases": 4
+    },
+    "actualPostgres": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/project-model-read-public-cases.json",
+      "passed": 128,
+      "skipped": 0,
+      "newPublicSpecCases": 1,
+      "newPublicSpecInternalScenarios": 78,
+      "retainedManagerMutationSnapshotAndServiceCases": 127,
+      "expectedTranscript": "gateway/tests/expected/projects/model-read-publication.jsonl",
+      "qualification": "Current owners/administrators, ro/rw members, ownership transfer and administrator promotion/demotion; account, organization membership, organization, required-password, exact-computer, project/mount and steward withdrawal. Both stored and explicit discovery keys use only owned loopback providers and a one-checkout business pool."
+    },
+    "normalNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/read-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "scenariosPerVersion": 78,
+      "typescriptLoader": false,
+      "productionModules": "unchanged ordinary full Gateway emit"
+    },
+    "changedMethodCoverage": {
+      "scope": "Actual unchanged ordinary emitted method; generated JavaScript V8 block counters, not whole source-file coverage.",
+      "functions": [
+        {
+          "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/read-built-coverage/coverage-56893-1793829552556-0.json",
+          "url": "file:///Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/read-artifact/gateway/lib/postgres/model-governance-service.js",
+          "functionName": "authorizeProjectModelRead",
+          "ranges": [
+            {
+              "startOffset": 33137,
+              "endOffset": 35114,
+              "count": 78
+            },
+            {
+              "startOffset": 35025,
+              "endOffset": 35073,
+              "count": 52
+            },
+            {
+              "startOffset": 35073,
+              "endOffset": 35113,
+              "count": 26
+            }
+          ],
+          "isBlockCoverage": true
+        }
+      ],
+      "allMeasuredRangesExecuted": true,
+      "wholeFile100PercentClaimed": false
+    },
+    "fullGatewayTypecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/project-model-read-final-typecheck.log",
+    "ordinaryFullGatewayBuild": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/project-model-read-production-build.log",
+    "focusedLint": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/project-model-read-lint.json",
+      "files": 6,
+      "diagnostics": 0
+    },
+    "threeBilingualPairs": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/project-model-read-pairing-check.log",
+    "sixMarkdownSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/project-model-read-markdown-links.log",
+    "postgresCommandWiring": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/postgres-suite-command-wiring.json",
+      "gate": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/project-model-read-postgres-wiring-cases.json",
+      "gateCasesPassed": 3,
+      "qualification": "The new read spec and ten already existing omitted specs are registered in the serialized command. Registration does not claim those ten suites were executed in this continuation."
+    },
+    "latestBaseline": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/latest-baseline.json",
+    "ownedClusterCleanup": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/native-postgres-lifecycle-summary.json"
+  },
+  "resolvedIntegrationChecks": {
+    "priorFullTypecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/project-model-read-typecheck.log",
+    "priorWiringGate": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/project-model-read-final-unit.json",
+    "resolution": "Peer added the missing Windows fixture work gate and the driver-aware test database selector. Root registered every currently omitted directly gated spec. Final whole Gateway checking face and all three wiring gates pass."
+  },
+  "limits": [
+    "The V8 counters cover the changed ordinary emitted method, not100% of its large source file. No exclusions or thresholds changed.",
+    "Catalog requests already admitted may finish. Withdrawal prevents publication and does not roll back committed database writes.",
+    "Current normal Node execution is macOS; no fresh Linux or Windows execution is claimed.",
+    "All12 business domains remain in progress, prior full documentation debt is not closed, and real paid Responses remains explicitly deferred."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false,
+  "frozenDelivery": {
+    "at": "2026-11-04T22:06:13.532062+00:00",
+    "finding": "B513",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/B513-project-model-read",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T214932Z/B513-project-model-read.delta.tar.gz",
+    "archiveSha256": "63c4f908fdc096df2f7b0b80adc05f1c08c67d7c16634609e6f500904386e360",
+    "manifestSha256": "543dda883354a5581b65543a55f735624236e1f4f57a706998fb4dbfab8dcb4c",
+    "ownedPaths": 18,
+    "readOnlyPrerequisites": 5,
+    "compiledProductionJs": 261,
+    "artifactFiles": 382,
+    "wholeProjectComplete": false
+  }
+}

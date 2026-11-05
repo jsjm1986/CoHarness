@@ -17,6 +17,23 @@ function row(type: string, seq: number, data: Record<string, SessionFormatJsonVa
   return { type, seq, time: seq + 1, data, ...extra }
 }
 
+it('preserves optional managed admission and participant attribution when reopening current inputs', () => {
+  const admission = { key: '1'.repeat(64), digest: '2'.repeat(64) }
+  const participant = { userId: 7, username: 'qa', displayName: 'QA', role: 'user',
+    scope: { kind: 'project', projectId: 9, projectName: 'Test project', mode: 'rw', canManage: false } }
+  const sources: Record<string, SessionFormatJsonValue>[] = [
+    { kind: 'user', rpcId: 'action' },
+    { kind: 'user', rpcId: 'action', admission },
+    { kind: 'user-question-reply', callId: 'question', outcome: 'answered', participant },
+  ]
+  for (const source of sources) {
+    const message = { id: 'm1', role: 'user', content: [{ type: 'text', text: 'The same input' }], source }
+    const events = [row('agent/inbox/spliced', 0, { target: 'next-turn', start: 0, inserted: [message] }),
+      row('user/message', 1, message, { surfaceOp: 'append' })]
+    expect(restore(7, events, { isSeeded: false }).events).toEqual(events)
+  }
+})
+
 const user = { id: 'question', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'question' }] }
 const assistant = { id: 'answer', role: 'assistant', source: { kind: 'model', provider: 'p', model: 'm' }, content: [{ type: 'text', text: 'hello' }] }
 const system = { id: 'system', role: 'system', source: { kind: 'system-prompt' }, content: [] }

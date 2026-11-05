@@ -1,9 +1,13 @@
+import { publishNewPersonalDocumentRoot } from '../node-content-personal-documents.ts'
 import { randomUUID } from 'node:crypto'
 import type { UserDocRootId } from '@deepseek-ai/dsh-userdoc'
 import { escapeLiteral, type Pool, type PoolClient } from 'pg'
 import { transaction } from './database.ts'
 import { literalLikePattern } from './literal-like-pattern.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
+import { documentUpdateTime } from '../node-content-documents-admin.ts'
+import { mergeDocumentOverview, type DocumentOverviewSource, type DocumentOverviewPage } from '../node-content-documents-overview.ts'
+import type { NodeContentDocuments } from '../node-content-documents.ts'
 import type { RuntimeNodeId } from '../runtime-catalog.ts'
 
 /** Scope addressed by the organization document catalog. */
@@ -222,6 +226,7 @@ interface ScopeIds {
 }
 
 interface CatalogDbRow {
+  catalog_updated_us?: number
   catalog_id: string
   node_id: RuntimeNodeId
   scope_kind: 'personal' | 'project'
@@ -421,6 +426,7 @@ export class PostgresDocumentCatalogService {
     private readonly context: PostgresRuntimeContext,
     private readonly retentionDays = 30,
     private readonly entryNodeId?: RuntimeNodeId,
+    private readonly nodeDocuments?: NodeContentDocuments,
   ) {
     this.nodeSql = `${escapeLiteral(context.nodeId)}::uuid`
     if (!Number.isSafeInteger(retentionDays) || retentionDays < 1
@@ -429,9 +435,18 @@ export class PostgresDocumentCatalogService {
     }
   }
 
+  /** A new local account keeps its UserDoc UUID when its initially empty catalog moves onto the declared node volume. */
+  async publishNewPersonalRoot(user:number,inspect:(cursor:{sequence:number;ordinal:number})=>Promise<import('../node-content-documents-publication.ts').DocumentRootWitness>){
+    if(this.nodeDocuments)await publishNewPersonalDocumentRoot(this.nodeDocuments.authority,user,inspect)
+  }
+
+  /** Admin migration commands operate only on the verified account owner of this Gateway. */
+  get personalHistory(){return this.nodeDocuments?.personalHistory}
+
   /** Node-filtered rows retain the underlying table's row-locking and join behavior. */
   private nodeRows(table: 'document_catalog' | 'document_projection_checkpoints' | 'document_operations'): string {
-    return `(SELECT * FROM harness.${table} WHERE node_id=${this.nodeSql})`
+    const read=table==='document_catalog'?'legacy_document_catalog':table==='document_projection_checkpoints'?'legacy_document_checkpoints':table
+    return `(SELECT * FROM harness.${read} WHERE node_id=${this.nodeSql})`
   }
 
   /**
@@ -440,6 +455,8 @@ export class PostgresDocumentCatalogService {
    * @returns its current scope after a nonempty journal prefix committed, or null when no committed owner remains.
    */
   async projectionOwner(rootId: UserDocRootId): Promise<DocumentCatalogScope | null> {
+    const published = await this.nodeDocuments?.ownerOf(rootId)
+    if (published) return published
     const result = await this.context.pool.query<{ scope_kind: 'personal' | 'project'; user_id: string | null; project_id: string | null }>(
       `SELECT checkpoint.scope_kind,u.public_id::text user_id,p.public_id::text project_id
        FROM ${this.nodeRows('document_projection_checkpoints')} checkpoint
@@ -504,6 +521,8 @@ export class PostgresDocumentCatalogService {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(rootId)) {
       throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Invalid document projection root.')
     }
+    const published = await this.nodeDocuments?.authority.placement(scope)
+    if (published && this.nodeDocuments) return this.nodeDocuments.projectionCursor(published, actorUserId, rootId, administrator)
     return transaction(this.context.pool, async (client) => {
       const { ids } = await this.projectionAuthority(client, actorUserId, scope, administrator)
       await this.lockDocumentScope(client, ids)
@@ -562,6 +581,8 @@ export class PostgresDocumentCatalogService {
       || batch.changes.length === 0 && compareProjectionPosition(batch.after, batch.next) !== 0) {
       throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Document projection cursor does not match its changes.')
     }
+    const published = await this.nodeDocuments?.authority.placement(scope)
+    if (published && this.nodeDocuments) return this.nodeDocuments.project(published, actorUserId, batch, administrator)
     return transaction(this.context.pool, async (client) => {
       const { ids } = await this.projectionAuthority(client, actorUserId, scope, administrator)
       await this.lockDocumentScope(client, ids)
@@ -1223,6 +1244,8 @@ export class PostgresDocumentCatalogService {
     if (unique.size !== requestedDocuments.length) {
       throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Duplicate document authorization target.')
     }
+    const published = await this.nodeDocuments?.authority.placement(input.scope)
+    if (published && this.nodeDocuments) return this.nodeDocuments.authorize(published, input.actorUserId, input.action, requestedDocuments, input.administrator === true)
     return transaction(this.context.pool, async (client) => {
       const actorId = await this.actorInternalId(client, input.actorUserId)
       const ids = await this.scopeIds(client, input.scope)
@@ -1295,11 +1318,50 @@ export class PostgresDocumentCatalogService {
     })
   }
 
+  /** Combine local published roots and legacy rows. The browser entry supplies authenticated remote source readers. */
+  async overview(actorUserId: number, options: DocumentCatalogOverviewOptions = {}, allNodes = false,
+    remote?: (nodeId: string, offset: number, limit: number, signal?: AbortSignal) => Promise<DocumentOverviewPage>,
+    signal?: AbortSignal, concurrency = 1) {
+    if (!this.nodeDocuments) return this.legacyOverview(actorUserId, options, allNodes)
+    const grants = await this.nodeDocuments.authority.readable(actorUserId, allNodes)
+    if (!grants.length) return this.legacyOverview(actorUserId,options,allNodes)
+    const nodes = [...new Set(grants.map(grant=>grant.placement.nodeId))].sort()
+    const sources: DocumentOverviewSource[] = [{ id:'legacy', read:(offset,limit)=>this.legacyOverview(actorUserId,
+      {...options,cursor:undefined,limit},allNodes,offset) }]
+    for (const nodeId of nodes) sources.push({id:nodeId,read:async(offset,limit,lifetime)=>{
+      if (nodeId===this.context.nodeId && this.nodeDocuments) return this.nodeDocuments.overview(actorUserId,options,offset,limit)
+      if (!remote) throw new DocumentCatalogError('DOCUMENT_SCOPE_UNAVAILABLE',503,'The selected computer is unavailable.')
+      const page=await remote(nodeId,offset,limit,lifetime)
+      const allowed=new Set(grants.filter(grant=>grant.placement.nodeId===nodeId).map(grant=>grant.placement.kind+':'+grant.placement.publicId))
+      if (page.documents.some(row=>row.scope.nodeId!==nodeId || !allowed.has(row.scope.kind+':'+row.scope.id))) {
+        throw new DocumentCatalogError('COLLABORATION_FORBIDDEN',403,'The computer returned documents outside the selected account scope.')
+      }
+      return page
+    }})
+    const page=await mergeDocumentOverview({organizationId:this.context.organizationId,userId:actorUserId,entryNodeId:this.context.nodeId},
+      options,sources,concurrency,signal)
+    const current=await this.nodeDocuments.authority.readable(actorUserId,allNodes)
+    if (current.length!==grants.length || current.some((item,i)=>item.placement.rootId!==grants[i]?.placement.rootId || item.mode!==grants[i]?.mode)) {
+      throw new DocumentCatalogError('COLLABORATION_FORBIDDEN',403,'Document access changed during the query.')
+    }
+    return page
+  }
+
+  /** Only the addressed computer may return its own published document rows. */
+  async localOverview(actorUserId:number, options:DocumentCatalogOverviewOptions, offset:number,limit:number) {
+    if (!this.nodeDocuments) throw new DocumentCatalogError('DOCUMENT_SCOPE_UNAVAILABLE',503,'The document volume is unavailable.')
+    if (!Number.isSafeInteger(offset) || offset<0 || !Number.isSafeInteger(limit) || limit<1 || limit>200) {
+      throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA',400,'Invalid document page.')
+    }
+    return this.nodeDocuments.overview(actorUserId,options,offset,limit)
+  }
+
   /** Return readable metadata from active projects, including Steward qualification checks. */
-  async overview(
+  private async legacyOverview(
     actorUserId: number,
     options: DocumentCatalogOverviewOptions = {},
     allNodes = false,
+    sourceOffset?: number,
   ): Promise<{ version: 1; documents: readonly DocumentCatalogRow[]; metrics: DocumentCatalogMetrics; totalDocuments?: number; nextCursor?: string }> {
     if (options.query !== undefined && (options.query.length > 255 || /[\u0000-\u001f\u007f]/u.test(options.query))
       || options.limit !== undefined && (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 200)
@@ -1350,18 +1412,18 @@ export class PostgresDocumentCatalogService {
     }
     const sort = options.sort ?? 'date-desc'
     const orderBy = sort === 'date-asc' ? 'c.modified_at_ms ASC,c.id ASC'
-      : sort === 'name-asc' ? 'LOWER(c.name) ASC,c.id ASC'
-        : sort === 'name-desc' ? 'LOWER(c.name) DESC,c.id ASC'
+      : sort === 'name-asc' ? 'LOWER(c.name) COLLATE "C" ASC,c.id ASC'
+        : sort === 'name-desc' ? 'LOWER(c.name) COLLATE "C" DESC,c.id ASC'
           : sort === 'size-asc' ? 'c.bytes ASC,c.id ASC'
             : sort === 'size-desc' ? 'c.bytes DESC,c.id ASC'
               : 'c.modified_at_ms DESC,c.id ASC'
     const limit = Math.min(Math.max(options.limit ?? 50, 1), 200)
     const fingerprint = `${allNodes ? 'all-computers' : this.context.nodeId}:${this.entryNodeId ?? ''}:${actorUserId}:${overviewFilterFingerprint(options)}`
-    const offset = decodeCatalogCursor(options.cursor, fingerprint)
+    const offset = sourceOffset ?? decodeCatalogCursor(options.cursor, fingerprint)
     const rowValues = [...values, limit + 1, offset]
     const limitArg = `$${String(values.length + 1)}`
     const offsetArg = `$${String(values.length + 2)}`
-    const from = `FROM ${allNodes ? 'harness.document_catalog' : this.nodeRows('document_catalog')} c
+    const from = `FROM ${allNodes ? 'harness.legacy_document_catalog' : this.nodeRows('document_catalog')} c
       LEFT JOIN harness.users u ON u.id=c.scope_user_id AND u.organization_id=c.organization_id
       LEFT JOIN harness.projects p ON p.id=c.scope_project_id AND p.organization_id=c.organization_id
       LEFT JOIN harness.memberships membership ON membership.organization_id=c.organization_id
@@ -1427,6 +1489,8 @@ export class PostgresDocumentCatalogService {
 
   /** Return recent metadata operations for one authorized current scope. */
   async history(actorUserId: number, scope: DocumentCatalogScope, limit = 200): Promise<readonly DocumentCatalogScopeHistoryRow[]> {
+    const published = await this.nodeDocuments?.authority.placement(scope)
+    if (published && this.nodeDocuments) return this.nodeDocuments.history(published, actorUserId, limit)
     const actorId = await this.actorInternalId(this.context.pool, actorUserId)
     const ids = await this.scopeIds(this.context.pool, scope)
     if (ids.kind === 'project' && await this.projectAuthority(this.context.pool, ids.projectId!, actorId) === null) {
@@ -1454,7 +1518,13 @@ export class PostgresDocumentCatalogService {
   }
 
   /** List rows for the administrator dashboard. */
-  async adminList(filter: DocumentCatalogAdminFilter = {}): Promise<readonly DocumentCatalogRow[]> {
+  async adminList(filter: DocumentCatalogAdminFilter = {}, actor?:number): Promise<readonly DocumentCatalogRow[]> {
+    validateAdminFilter(filter)
+    const combined=await this.nodeDocuments?.admin.page(actor,filter,(offset,limit)=>this.legacyAdminList({...filter,cursor:undefined,offset,limit}))
+    return combined?.documents ?? this.legacyAdminList(filter)
+  }
+
+  private async legacyAdminList(filter: DocumentCatalogAdminFilter): Promise<readonly DocumentCatalogRow[]> {
     validateAdminFilter(filter)
     const clauses = ['c.organization_id=$1']
     const values: unknown[] = [this.context.organizationId]
@@ -1481,7 +1551,7 @@ export class PostgresDocumentCatalogService {
     values.push(offset); const offsetArg = `$${String(values.length)}`
     // The two placeholders above are assembled separately to keep all user
     // values parameterized; the query below is deliberately metadata-only.
-    const result = await this.context.pool.query<CatalogDbRow>(`SELECT c.id catalog_id,c.node_id,c.scope_kind,
+    const result = await this.context.pool.query<CatalogDbRow>(`SELECT (extract(epoch FROM c.updated_at)*1000000)::float8 catalog_updated_us,c.id catalog_id,c.node_id,c.scope_kind,
       CASE WHEN c.scope_kind='personal' THEN u.public_id::text ELSE p.public_id::text END scope_public_id,
       CASE WHEN c.scope_kind='personal' THEN '个人文档' ELSE p.name::text END scope_label,
       NULL::text access_mode,c.runtime_doc_id,c.directory_id,c.name,c.bytes::text,c.media_type,c.modified_at_ms::text,
@@ -1496,16 +1566,18 @@ export class PostgresDocumentCatalogService {
       LEFT JOIN harness.projects p ON p.id=c.scope_project_id AND p.organization_id=c.organization_id
       LEFT JOIN harness.users owner ON owner.id=c.owner_user_id AND owner.organization_id=c.organization_id
       WHERE ${clauses.join(' AND ')} ORDER BY c.updated_at DESC,c.id LIMIT ${limitArg} OFFSET ${offsetArg}`, values)
-    return result.rows.map(scopeRow)
+    return result.rows.map(row=>Object.assign(scopeRow(row),{[documentUpdateTime]:row.catalog_updated_us}))
   }
 
   /** Return one bounded administrator page with an opaque continuation cursor. */
-  async adminListPage(filter: DocumentCatalogAdminFilter = {}): Promise<DocumentCatalogAdminPage> {
+  async adminListPage(filter: DocumentCatalogAdminFilter = {}, actor?:number): Promise<DocumentCatalogAdminPage> {
     validateAdminFilter(filter)
+    const combined=await this.nodeDocuments?.admin.page(actor,filter,(offset,limit)=>this.legacyAdminList({...filter,cursor:undefined,offset,limit}))
+    if(combined)return combined
     const limit = Math.min(Math.max(filter.limit ?? 50, 1), 200)
     const fingerprint = `${this.context.nodeId}:${adminFilterFingerprint(filter)}`
     const initialOffset = filter.cursor === undefined ? Math.max(filter.offset ?? 0, 0) : undefined
-    const rows = await this.adminList({
+    const rows = await this.legacyAdminList({
       ...filter,
       limit: limit + 1,
       cursor: filter.cursor,
@@ -1523,7 +1595,15 @@ export class PostgresDocumentCatalogService {
   }
 
   /** Return dashboard counters, including recent failed operations. */
-  async adminMetrics(): Promise<DocumentCatalogMetrics> {
+  async adminMetrics(actor?:number): Promise<DocumentCatalogMetrics> {
+    const local=await this.nodeDocuments?.admin.metrics(actor)
+    const legacy=await this.legacyAdminMetrics()
+    if(!local)return legacy
+    for(const key of Object.keys(legacy) as (keyof DocumentCatalogMetrics)[]) Object.assign(legacy,{[key]:(legacy[key]??0)+(local[key]??0)})
+    return legacy
+  }
+
+  private async legacyAdminMetrics(): Promise<DocumentCatalogMetrics> {
     const result = await this.context.pool.query<{
       total: string; active: string; trash: string; purged: string; deleted: string; personal: string; project: string; bytes: string; operations: string; failures: string
     }>(`SELECT
@@ -1550,7 +1630,9 @@ export class PostgresDocumentCatalogService {
   }
 
   /** Load one document's metadata, lineage history, and copy attempts. */
-  async detail(catalogId: string): Promise<DocumentCatalogDetail | null> {
+  async detail(catalogId: string, actor?:number): Promise<DocumentCatalogDetail | null> {
+    const local=await this.nodeDocuments?.admin.lookup(actor,catalogId,true)
+    if(local)return local
     const row = await this.context.pool.query<CatalogDbRow>(`SELECT c.id catalog_id,c.node_id,c.scope_kind,
       CASE WHEN c.scope_kind='personal' THEN u.public_id::text ELSE p.public_id::text END scope_public_id,
       CASE WHEN c.scope_kind='personal' THEN '个人文档' ELSE p.name::text END scope_label,
@@ -1601,7 +1683,9 @@ export class PostgresDocumentCatalogService {
   }
 
   /** Resolve a catalog row to the runtime scope and opaque document id. */
-  async target(catalogId: string): Promise<DocumentCatalogTarget | null> {
+  async target(catalogId: string, actor?:number): Promise<DocumentCatalogTarget | null> {
+    const local=await this.nodeDocuments?.admin.lookup(actor,catalogId,false)
+    if(local&&this.nodeDocuments)return this.nodeDocuments.admin.target(local.document)
     const result = await this.context.pool.query<{
       id: string
       scope_kind: 'personal' | 'project'
@@ -1639,6 +1723,7 @@ export class PostgresDocumentCatalogService {
 
   /** Transfer ownership with an explicit audit event. */
   async transferOwnership(actorUserId: number, catalogId: string, ownerUserId: number): Promise<void> {
+    if(await this.nodeDocuments?.transferOwnership(actorUserId,catalogId,ownerUserId))return
     await transaction(this.context.pool, async (client) => {
       await this.actorInternalId(client, actorUserId)
       const row = await client.query<{ id: string; scope_project_id: string | null; owner_user_id: string | null }>(`SELECT id,scope_project_id,owner_user_id
@@ -1665,6 +1750,11 @@ export class PostgresDocumentCatalogService {
     catalogId: string,
     target: 'trash' | 'active' | 'purged',
   ): Promise<void> {
+    const local=await this.nodeDocuments?.admin.lookup(actorUserId,catalogId,false)
+    if(local){
+      if(local.document.state===target)return
+      throw new DocumentCatalogError('DOCUMENT_STORE_UNAVAILABLE',503,'The owning document store has not confirmed this physical operation.')
+    }
     await transaction(this.context.pool, async (client) => {
       const actor = await this.actorInternalId(client, actorUserId)
       const row = await client.query<{ id: string; state: DocumentCatalogState }>(`SELECT id,state
@@ -1728,6 +1818,7 @@ export class PostgresDocumentCatalogService {
   /** Purge only trash whose current retention deadline has passed after row-lock admission. */
   async purgeDue(limit = 100): Promise<number> {
     const bounded = Math.min(Math.max(limit, 1), 500)
+    await this.nodeDocuments?.deliverPending(Math.min(bounded,16))
     const due = await this.context.pool.query<{ id: string }>(`SELECT id
       FROM ${this.nodeRows('document_catalog')} document_catalog
       WHERE organization_id=$1 AND state='trash' AND purge_after IS NOT NULL AND purge_after <= clock_timestamp()
@@ -1766,14 +1857,16 @@ export class PostgresDocumentCatalogService {
     target?: DocumentCatalogInput
     error?: { code: string; message: string }
     operationId?: string
-  }): Promise<{ operationId: string; targetCatalogId: string | null }> {
-    if (input.targetNodeId !== undefined && input.targetNodeId !== this.context.nodeId) {
-      return new PostgresDocumentCatalogService({ ...this.context, nodeId: input.targetNodeId }, this.retentionDays).recordCopy(input)
-    }
+  }): Promise<{ operationId: string; targetCatalogId: string | null; nodeOwned?:true }> {
     if (input.target !== undefined) validScopeInput(input.target)
     if (input.sourceIdentity !== undefined && (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(input.sourceIdentity.incarnationId)
       || !Number.isSafeInteger(input.sourceIdentity.revision) || input.sourceIdentity.revision < 1)) {
       throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Invalid copied document identity.')
+    }
+    const queued = await this.nodeDocuments?.enqueueTransfer(input)
+    if (queued) return {...queued,nodeOwned:true}
+    if (input.targetNodeId !== undefined && input.targetNodeId !== this.context.nodeId) {
+      return new PostgresDocumentCatalogService({ ...this.context, nodeId: input.targetNodeId }, this.retentionDays).recordCopy(input)
     }
     return transaction(this.context.pool, async (client) => {
       const actor = await this.actorInternalId(client, input.actorUserId)

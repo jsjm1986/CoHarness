@@ -248,6 +248,9 @@ describePg('PostgreSQL baseline', () => {
       { table_name: 'document_operation_items' },
       { table_name: 'document_operations' },
       { table_name: 'document_projection_checkpoints' },
+      { table_name: 'document_scope_placement' },
+      { table_name: 'document_scope_writers' },
+      { table_name: 'document_transfer_delivery' },
     ])
     const archiveTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables WHERE table_schema='harness' AND table_name LIKE 'conversation_archive_%' ORDER BY table_name`)
@@ -1647,6 +1650,12 @@ describePg('PostgreSQL baseline', () => {
       path: `/tmp/project-${suffix}`,
       mode: 'rw',
       kind: 'standard',
+      nodeId,
+      nodeName: context.nodeName,
+      origin: 'admin',
+      owner: null,
+      uiThemePolicy: 'follow-user',
+      canManage: true,
     })
     await expect(collaboration.projectForUser(projectPublicId, administratorPublicId)).resolves.toMatchObject({
       mode: 'rw',
@@ -3130,6 +3139,7 @@ describePg('PostgreSQL baseline', () => {
     const actor = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.users(
       organization_id,username,display_name,home_path) VALUES($1,'archive-owner','Archive owner','/tmp/archive-owner') RETURNING id,public_id`, [org])).rows[0]!
     await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [org, actor.id])
+    await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture',false)", [actor.id])
     await pool.query('INSERT INTO harness.instances(organization_id,user_id,assigned_node_id,port) VALUES($1,$2,$3,47500)',
       [org, actor.id, context.nodeId])
     const runtime = await new PostgresInstanceRepository(context, 47500).resolveTarget({ kind: 'user', id: Number(actor.public_id) })

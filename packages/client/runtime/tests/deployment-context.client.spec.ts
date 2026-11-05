@@ -75,7 +75,7 @@ it('does not drop a second mode change while the follow-up snapshot is still in 
   const f = fixture()
   const invalidated = f.runtime.invalidate()
   first.resolve(Response.json(response('1')))
-  await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2))
+  await vi.waitFor(() =>{  expect(fetcher).toHaveBeenCalledTimes(2) })
   expect(f.runtime.invalidate()).toBe(invalidated)
   second.resolve(Response.json(response('2')))
   await invalidated
@@ -97,7 +97,7 @@ it('refreshes visible metadata on the configured interval and preserves the last
 it('times out a stalled initial read, reports it, and retries without waiting for a focus event', async () => {
   vi.useFakeTimers(); vi.spyOn(console, 'error').mockImplementation(() => {})
   const fetcher = vi.fn().mockImplementationOnce((_url, init: RequestInit) => new Promise((_resolve, reject) => {
-    init.signal!.addEventListener('abort', () => reject(new DOMException('Cancelled', 'AbortError')), { once: true })
+    init.signal!.addEventListener('abort', () =>{  reject(new DOMException('Cancelled', 'AbortError')) }, { once: true })
   })).mockResolvedValue(Response.json(response('2')))
   vi.stubGlobal('fetch', fetcher)
   const f = fixture()
@@ -138,4 +138,19 @@ it('broadcasts only invalidate policy and cannot replace another tab’s current
   await second.runtime.refresh()
   expect(second.runtime.getSnapshot()).toMatchObject({ context: { entry: { nodeId: a } } })
   expect(first.forTarget).not.toHaveBeenCalled(); expect(second.forTarget).not.toHaveBeenCalled()
+})
+
+it('coalesces foreground events while rechecking a deployment read that began before focus', async () => {
+  const pending = Promise.withResolvers<Response>()
+  const fetcher = vi.fn().mockReturnValueOnce(pending.promise).mockResolvedValueOnce(Response.json(response('2')))
+  vi.stubGlobal('fetch', fetcher)
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+  const f = fixture()
+  window.dispatchEvent(new Event('focus'))
+  document.dispatchEvent(new Event('visibilitychange'))
+  window.dispatchEvent(new Event('focus'))
+  expect(fetcher).toHaveBeenCalledTimes(1)
+  pending.resolve(Response.json(response('1')))
+  await vi.waitFor(() =>{  expect(f.runtime.getSnapshot().context?.revision).toBe('2') })
+  expect(fetcher).toHaveBeenCalledTimes(2)
 })

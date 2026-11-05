@@ -34,6 +34,8 @@ Use this package to choose the agent preset for a new Web GUI session, see the a
 
 A staged preset for the next bootstrap conversation is not consumed by a blank conversation on another Runtime. Foreign creation uses that Runtime’s existing defaults. Settings-roster invalidations remain bound to the bootstrap Runtime.
 
+A blank conversation reads preset choices from its own Runtime. Its visible picker and title share a pending read for that Session. The picker requests choices when developer tools are enabled. An unbound new conversation uses the entry Runtime.
+
 A session's preset is fixed when the session is created — the host refuses to adopt an existing session under a different one, because that session's history was produced under the first preset's tools. So this row cannot be a live switch, and it says so: changing it applies to sessions started afterwards while running sessions keep the composition they began with.
 
 <a id="the-new-session-chip"></a>

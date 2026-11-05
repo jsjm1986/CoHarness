@@ -1,4 +1,7 @@
 import { useDeploymentContext } from '../deployment-context.tsx'
+import { NodeContentMigrationSection } from './NodeContentMigrationSection.tsx'
+import { NodeContentSection } from './NodeContentSection.tsx'
+import { PeerBackupSection } from './PeerBackupSection.tsx'
 import { DeploymentTopologySection, NodeConnectionSection } from './DeploymentTopologySection.tsx'
 /** Deployment control: maintenance windows, node convergence, backups, restore requests, and the operation ledger. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -168,6 +171,9 @@ export function DeploymentPage() {
       </Section>
 
       <DeploymentTopologySection />
+      {deployment.value?.mode === 'multi' && state && <NodeContentSection entry={deployment.value.entry} nodes={state.nodes}/>}
+      {deployment.value?.mode === 'multi' && state && <NodeContentMigrationSection />}
+      {deployment.value?.scope === 'organization' && state && <PeerBackupSection nodes={state.nodes}/>}
       <NodeConnectionSection />
       <Section title={t('runtimeLimits')}><RuntimeAllocationPolicyEditor /></Section>
       {deployment.value?.scope === 'organization' && <NodeAccessSection />}

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md
 document:
-  en: 340833a856d0b1b3663d2824e6a24826a19468cd
-  zh: 231bf87f46e904a6f2bd724fb7748b1cc142ba41
+  en: 038303d3b7c26930db6bcf2f986f2f52bc8bb456
+  zh: 70e17894971e5d484b0a8d3dac3a5f5df06849a4
 /agent-note-gateway-deployment-maintenance-control-plane:
   en: f3b830c302725ee4
   zh: c2626494cf61ef9a
@@ -12,8 +12,8 @@ document:
   en: 212843a2b35461fa
   zh: 8dcab785b7202aeb
 /agent-note-gateway-deployment-maintenance-control-plane/decision:
-  en: a0042b84f73b4a91
-  zh: 86e5f142917dec9a
+  en: 9f0bad40251ba7e1
+  zh: 16beb4086c9f3cf8
 /agent-note-gateway-deployment-maintenance-control-plane/alternatives-considered:
   en: 4bd6fc79196458eb
   zh: b0aeaee1533a8c6a

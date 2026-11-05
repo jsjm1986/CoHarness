@@ -6,6 +6,7 @@ import buttonCss from '../src/client/DocumentsButton.module.css'
 import { DocumentsModal } from '../src/client/DocumentsModal.tsx'
 import modalCss from '../src/client/DocumentsModal.module.css'
 import { zh, type DocumentsKey } from '../src/client/locales.ts'
+import { clientSessionKey, type ClientRuntimeTarget, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 
 const useNoCurrentSession = (select: (state: { current: undefined }) => unknown) => select({ current: undefined })
 
@@ -144,7 +145,7 @@ function makeClient() {
       version: 1,
       directoryId,
       directories: [] as UserDocDirectoryRef[],
-      scope: { kind: 'project' as UserDocScope['kind'], label: 'Compiler' },
+      scope: { kind: 'project', label: 'Compiler' },
       documents: [{
         docId: 'project/report.pdf', name: 'report.pdf', bytes: 2048,
         mediaType: 'application/pdf', modifiedAt: 1,
@@ -729,12 +730,12 @@ describe('DocumentsModal', () => {
     try {
       view.rerender(<DocumentsModal {...props} allowedNodeId={local} />)
       expect(screen.queryByText('remote.pdf')).toBeNull()
-      await waitFor(() => expect(overview).toHaveBeenCalledTimes(2))
+      await waitFor(() =>{  expect(overview).toHaveBeenCalledTimes(2) })
     } finally {
       pending.resolve({ ...result, documents: documents.slice(0, 1), totalDocuments: 1,
         metrics: { ...result.metrics, total: 1, active: 1, personal: 1, bytes: 4 } })
     }
-    await waitFor(() => expect(screen.queryByText(t('modal.loading'))).toBeNull())
+    await waitFor(() =>{  expect(screen.queryByText(t('modal.loading'))).toBeNull() })
     expect(await screen.findByText('local.pdf')).toBeTruthy()
     expect(screen.queryByText('remote.pdf')).toBeNull()
   })
@@ -1169,11 +1170,11 @@ describe('DocumentsModal', () => {
     expect(screen.getByText(t('selection.destination', { name: '个人文档 · Computer B' }))).toBeTruthy()
     view.rerender(<DocumentsModal showComputer open={false} onClose={() => {}} t={t} />)
     view.rerender(<DocumentsModal showComputer open onClose={() => {}} t={t} />)
-    await waitFor(() => expect(client.browseScope).toHaveBeenLastCalledWith(
+    await waitFor(() =>{  expect(client.browseScope).toHaveBeenLastCalledWith(
       expect.objectContaining({ nodeId: nodeA }), 'folder-a', expect.any(AbortSignal), expect.objectContaining({ query: 'report' }),
-    ))
+    ) })
     expect(client.browse.mock.calls.length).toBe(runtimeReads)
-    expect((screen.getByRole('textbox', { name: t('modal.search') }) as HTMLInputElement).value).toBe('report')
+    expect((screen.getByRole('textbox', { name: t('modal.search') })).value).toBe('report')
     expect(screen.getByRole('navigation', { name: t('breadcrumb.label') }).textContent).toContain('folder-a')
   })
 
@@ -1203,14 +1204,14 @@ describe('DocumentsModal', () => {
     try {
       fireEvent.click(await screen.findByRole('button', { name: /个人文档\s*Computer A/ }))
       fireEvent.click(await screen.findByRole('button', { name: t('folder.openNamed', { name: 'folder-a' }) }))
-      await waitFor(() => expect(folderSignal).toBeDefined())
+      await waitFor(() =>{  expect(folderSignal).toBeDefined() })
       fireEvent.change(screen.getByRole('textbox', { name: t('modal.search') }), { target: { value: 'report' } })
       expect(folderSignal?.aborted).toBe(false)
       releaseFolder()
       await screen.findByText('report.pdf')
-      await waitFor(() => expect(client.browseScope).toHaveBeenLastCalledWith(
+      await waitFor(() =>{  expect(client.browseScope).toHaveBeenLastCalledWith(
         expect.objectContaining({ nodeId: nodeA }), 'folder-a', expect.any(AbortSignal), expect.objectContaining({ query: 'report' }),
-      ))
+      ) })
       expect(screen.getByRole('navigation', { name: t('breadcrumb.label') }).textContent).toContain('folder-a')
       expect(client.browseScope.mock.calls.some(([, directoryId, , query]) => directoryId === '' && query?.query === 'report')).toBe(false)
     } finally { releaseFolder() }
@@ -1238,11 +1239,11 @@ describe('DocumentsModal', () => {
     fireEvent.click(screen.getByRole('button', { name: t('action.moreNamed', { name: 'report.pdf' }) }))
     fireEvent.click(screen.getByRole('menuitem', { name: t('scope.copy') }))
     fireEvent.click(within(await screen.findByRole('dialog', { name: t('copy.title') })).getByRole('button', { name: t('copy.confirm') }))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: t('copy.title') })).toBeNull())
+    await waitFor(() =>{  expect(screen.queryByRole('dialog', { name: t('copy.title') })).toBeNull() })
     expect(client.transfer).toHaveBeenCalledWith(expect.objectContaining({
       source: expect.objectContaining({ nodeId: nodeA }), target: expect.objectContaining({ nodeId: nodeB }),
     }))
-    await waitFor(() => expect(client.browseScope).toHaveBeenLastCalledWith(expect.objectContaining({ nodeId: nodeA }), 'folder-a', expect.any(AbortSignal), expect.anything()))
+    await waitFor(() =>{  expect(client.browseScope).toHaveBeenLastCalledWith(expect.objectContaining({ nodeId: nodeA }), 'folder-a', expect.any(AbortSignal), expect.anything()) })
     expect(client.browse.mock.calls.length).toBe(runtimeReads)
     expect(screen.getByRole('navigation', { name: t('breadcrumb.label') }).textContent).toContain('folder-a')
   })
@@ -1265,7 +1266,7 @@ describe('DocumentsModal', () => {
     fireEvent.click(screen.getByRole('button', { name: t('action.moreNamed', { name: 'report.pdf' }) }))
     fireEvent.click(screen.getByRole('menuitem', { name: t('scope.copy') }))
     const dialog = await screen.findByRole('dialog', { name: t('copy.title') })
-    await waitFor(() => expect(within(dialog).getByRole('button', { name: t('copy.confirm') })).toHaveProperty('disabled', false))
+    await waitFor(() =>{  expect(within(dialog).getByRole('button', { name: t('copy.confirm') })).toHaveProperty('disabled', false) })
     const localReads = client.browse.mock.calls.length
     view.rerender(<DocumentsModal {...props} showComputer={false} allowedNodeId={nodeB} />)
     expect(within(dialog).getByRole('alert').textContent).toContain(t('scope.entryUnavailable'))
@@ -1335,6 +1336,31 @@ describe('DocumentsModal', () => {
     expect(attach).not.toHaveBeenCalled()
   })
 
+  it.each([false, true])('binds a conversation copy to the captured Runtime rather than the shared document scope (%s)', async (mismatch) => {
+    const client = makeClient(), attach = vi.fn(() => true)
+    const runtimeId = '11111111-1111-4111-8111-111111111111' as NonNullable<ClientRuntimeTarget['runtimeId']>
+    const other = '22222222-2222-4222-8222-222222222222' as NonNullable<ClientRuntimeTarget['runtimeId']>
+    const nodeId = '33333333-3333-4333-8333-333333333333' as NonNullable<ClientRuntimeTarget['nodeId']>
+    const sessionId = 'captured-native-session' as SessionId
+    const key = clientSessionKey({ kind: 'project', projectId: 41, runtimeId }, sessionId)
+    createUserDocClient.mockReturnValue(client)
+    render(<DocumentsModal open onClose={() => {}} t={t} mode="select" attachmentTargetId={key}
+      attachmentScope={{ kind: 'project', projectId: 41, runtimeId: mismatch ? other : runtimeId, nodeId }}
+      onAttachDocument={attach} canAttachDocument={() => true} />)
+    await screen.findByText('report.pdf')
+    fireEvent.click(namedButton('attach', 'report.pdf'))
+    if (mismatch) {
+      expect(await screen.findByRole('alert')).toHaveProperty('textContent', t('action.attach.error'))
+      expect(client.transfer).not.toHaveBeenCalled()
+      expect(attach).not.toHaveBeenCalled()
+    } else {
+      await waitFor(() =>{  expect(client.transfer).toHaveBeenCalledOnce() })
+      expect(client.transfer).toHaveBeenCalledWith(expect.objectContaining({
+        target: { kind: 'project', projectId: 41, runtimeId, nodeId }, targetSessionId: sessionId,
+      }))
+    }
+  })
+
   it('retains a completed copy if the target locks during transfer, and retries attachment without another transfer', async () => {
     const client = makeClient()
     const result = await client.transfer()
@@ -1349,7 +1375,7 @@ describe('DocumentsModal', () => {
       attachmentScope={{ kind: 'project', projectId: 41 }} onAttachDocument={attach} canAttachDocument={() => ready} />)
     await screen.findByText('report.pdf')
     fireEvent.click(namedButton('attach', 'report.pdf'))
-    await waitFor(() => expect(client.transfer).toHaveBeenCalledOnce())
+    await waitFor(() =>{  expect(client.transfer).toHaveBeenCalledOnce() })
     ready = false
     finish(result)
     const retry = await screen.findByRole('button', { name: t('copy.retryAttachment') })

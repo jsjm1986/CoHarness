@@ -49,6 +49,7 @@ const [
 
 const cfg = loadConfig({
   HGW_ORGANIZATION_SLUG: slug, HGW_COMPUTE_NODE_NAME: nodeName,
+  ...(process.env.HGW_TEST_VERSIONED_OPERATIONS?{HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE:join(root,'..','fixture-organization-model.key')}:{}),
   HGW_STATE_ROOT: join(root, 'state'), HGW_USERS_ROOT: join(root, 'users'),
   HGW_PROJECT_RUNTIMES_ROOT: join(root, 'project-runtimes'), HGW_PROJECTS_ROOT: join(root, 'projects'),
   HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'), HGW_DEFAULT_ENV_FILE: '',
@@ -63,6 +64,20 @@ await mkdir(root, { recursive: true })
 const modelFixture = createHttpServer((req, res) => {
   req.resume(); res.setHeader('content-type', 'application/json')
   if (req.method === 'GET') res.end(JSON.stringify({ object: 'list', data: [{ id: 'deepseek-chat', object: 'model', owned_by: 'fixture' }] }))
+  else if(process.env.HGW_TEST_VERSIONED_OPERATIONS && (req.url?.endsWith('/chat/completions') || req.url?.endsWith('/messages'))){
+    if(req.headers.authorization!=='Bearer private-fixture-model-access'){res.writeHead(401);res.end('{}');return}
+    res.setHeader('content-type','text/event-stream')
+    if(req.url.endsWith('/messages')){
+      const events=[{type:'message_start',message:{id:'test',role:'assistant',model:'fixture-chat',usage:{input_tokens:12,output_tokens:0},content:[]}},
+        {type:'content_block_start',index:0,content_block:{type:'text',text:''}},
+        {type:'content_block_delta',index:0,delta:{type:'text_delta',text:'controlled-node-response'}},{type:'content_block_stop',index:0},
+        {type:'message_delta',delta:{stop_reason:'end_turn'},usage:{output_tokens:1}},{type:'message_stop'}]
+      res.end(events.map(e=>'event: '+e.type+'\ndata: '+JSON.stringify(e)+'\n\n').join(''))
+    } else {
+      const chunk=(delta,finish_reason)=>({id:'fixture-reply',object:'chat.completion.chunk',created:1,model:'fixture-chat',choices:[{index:0,delta,finish_reason}]})
+      res.end([chunk({role:'assistant',content:'controlled-node-response'},null),chunk({},'stop')].map(e=>'data: '+JSON.stringify(e)+'\n\n').join('')+'data: [DONE]\n\n')
+    }
+  }
   else { res.writeHead(503); res.end(JSON.stringify({ error: { message: 'Inference is not part of this metadata fixture' } })) }
 })
 await new Promise(resolve => modelFixture.listen(0, '127.0.0.1', resolve))
@@ -88,8 +103,8 @@ const governance = new PostgresModelGovernanceService(context,
   new OrganizationModelCredentialCipher(loadOrganizationModelCredentialKey(cfg.organizationModelCredentialKeyFile)), 'UTC')
 if (nodeName === 'center') {
   const provider = { provider: 'org-topology', displayName: 'Topology fixture', driver: 'pi-ai', protocol: 'openai-completions',
-    baseURL: process.env.DEEPSEEK_BASE_URL, authMode: 'none' }
-  await governance.upsertProvider({ ...provider, status: 'draft' })
+    baseURL: process.env.DEEPSEEK_BASE_URL, authMode: process.env.HGW_TEST_VERSIONED_OPERATIONS?'api-key':'none' }
+  await governance.upsertProvider({ ...provider, status: 'draft',...(process.env.HGW_TEST_VERSIONED_OPERATIONS?{credential:'private-fixture-model-access'}:{}) })
   await governance.upsertModel({ provider: provider.provider, model: 'fixture-chat', displayName: 'Fixture Chat', enabled: true,
     adminAllowed: true, userAllowed: true, inputMicrosPerMillion: 0, outputMicrosPerMillion: 0,
     cacheReadMicrosPerMillion: 0, cacheWriteMicrosPerMillion: 0 })

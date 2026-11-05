@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/context/gateway-runtime/README.md
 document:
-  en: 90d0f8dfa3d48128901427829a5e54f15c2f9085
-  zh: a6c9608accaa2c92694446b58d937a0349011cc8
+  en: b5ed9806238b0efc30e3ac00be7c8db05505b175
+  zh: a27fa3f757ef03e7d6f49d37e0728be732d393a1
 /:
   en: dcc9184d9f94910d
   zh: 61495d48365178df
@@ -24,8 +24,8 @@ document:
   en: 82edbea79a6d3a99
   zh: f221e1d427035ada
 /deepseek-ai-dsh-gateway-runtime/resource-admission:
-  en: df71ffc5323adfa1
-  zh: b0281f69fda4f026
+  en: ae777badd849cc58
+  zh: 1f29a55985cfe956
 /deepseek-ai-dsh-gateway-runtime/model-experience:
   en: b947e97275aa5f8b
   zh: d0336b8632c879c4

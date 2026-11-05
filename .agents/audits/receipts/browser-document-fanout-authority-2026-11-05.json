@@ -1,0 +1,190 @@
+{
+  "id": "B502",
+  "title": "Browser administrator document fan-out continues both target uploads after administrator demotion when project write memberships remain",
+  "status": "fixed_named_scenarios_source_and_artifacts_verified_global_review_open",
+  "paths": [
+    "gateway/src/document-transfer.ts",
+    "gateway/src/browser-documents.ts"
+  ],
+  "sourceFixed": true,
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/browser-copy-before.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z",
+  "receipt": "receipts/browser-document-fanout-authority-2026-11-05.json",
+  "evidence": "Normal createBrowserDocumentHandler and real loopback upload requests with actual PostgreSQL role and project permissions: demotion commits after first upload creation, yet both target chunk writes and completions succeed as member. Stable administrator and single-member copy controls pass. Controlled protocol upstream is explicitly identified; no physical two-computer acceptance is claimed.",
+  "wholeProjectComplete": false,
+  "at": "2026-11-04T16:24:47.037334+00:00",
+  "observations": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/browser-copy-demote-during-first-target-observations.json",
+  "owner": "Root owns narrow current-role renewal and corresponding regressions; peer owns new node document adapters",
+  "fullGatewayFixture": "gateway/tests/fixtures/browser-document-fanout.mjs",
+  "fullGatewayStatus": "authenticated_source_and_ordinary_Node22_Node24_JS_transcript_passed",
+  "productionWrites": false,
+  "paidModelApisCalled": false,
+  "updatedAt": "2026-11-04T16:42:03.240427+00:00",
+  "delivery": {
+    "at": "2026-11-04T16:40:38.832197+00:00",
+    "findings": [
+      "B502"
+    ],
+    "independentlyRechecked": [
+      "B500",
+      "B501"
+    ],
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/B502-browser-fanout-authority",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/B502-browser-fanout-authority.delta.tar.gz",
+    "archiveSha256": "d3b34e9acce67d968a7a5cdf9637937608e69a0e81991969150f864f8f40296f",
+    "manifestSha256": "45eaf5b55132c688fdcd127cc4009f12482290930a49175cdcd3002c656ebe10",
+    "ownedPaths": 15,
+    "readOnlyPeerFiles": 10,
+    "compiledConsumptionFiles": 182,
+    "wholeProjectComplete": false
+  },
+  "verification": [
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/fanout-transfer-final-cases.json",
+      "passed": 38,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/browser-fanout-current-source-cases.json",
+      "passed": 36,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/browser-copy-current-source-cases.json",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/fanout-built22-cases.json",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/fanout-built24-cases.json",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "path": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/admin-document-node-current-recheck.json",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "originalCounterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/browser-copy-before.json",
+  "fullGatewayCounterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/browser-fanout-full-gateway-original.json",
+  "rawProtocolObservationPhase": "fixed_source",
+  "wholeSourceCoverage": {
+    "total": {
+      "lines": {
+        "total": 956,
+        "covered": 597,
+        "skipped": 0,
+        "pct": 62.44
+      },
+      "statements": {
+        "total": 1079,
+        "covered": 644,
+        "skipped": 0,
+        "pct": 59.68
+      },
+      "functions": {
+        "total": 141,
+        "covered": 95,
+        "skipped": 0,
+        "pct": 67.37
+      },
+      "branches": {
+        "total": 1062,
+        "covered": 554,
+        "skipped": 0,
+        "pct": 52.16
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway/src/document-transfer.ts": {
+      "lines": {
+        "total": 956,
+        "covered": 597,
+        "skipped": 0,
+        "pct": 62.44
+      },
+      "functions": {
+        "total": 141,
+        "covered": 95,
+        "skipped": 0,
+        "pct": 67.37
+      },
+      "statements": {
+        "total": 1079,
+        "covered": 644,
+        "skipped": 0,
+        "pct": 59.68
+      },
+      "branches": {
+        "total": 1062,
+        "covered": 554,
+        "skipped": 0,
+        "pct": 52.16
+      }
+    }
+  },
+  "builds": {
+    "fanout-gateway-build.json": {
+      "status": "failed",
+      "startedAt": "2026-11-04T16:27:38.319184+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/typescript/bin/tsc",
+        "-p",
+        "tsconfig.build.json"
+      ],
+      "exitCode": 2,
+      "finishedAt": "2026-11-04T16:27:45.284799+00:00"
+    },
+    "fanout-selected-artifact-build.json": {
+      "status": "passed",
+      "startedAt": "2026-11-04T16:30:40.333079+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/tsconfig.fanout-build.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-04T16:30:46.844988+00:00"
+    },
+    "fanout-gateway-typecheck.json": {
+      "status": "passed",
+      "startedAt": "2026-11-04T16:30:41.452705+00:00",
+      "cwd": "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/gateway",
+      "command": [
+        "/Users/a1234/.nvm/versions/node/v22.22.1/bin/node",
+        "/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.json"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-11-04T16:30:52.099395+00:00"
+    }
+  },
+  "counting": "38 unit cases; one real Gateway transcript contains3 scenarios. The3 independent protocol controls and repeated Node22/24 transcript runs are not counted as new business scenarios.",
+  "limits": [
+    "Selected19-entry Gateway consumption build passes; whole shared production build was blocked at16:27 by the parallel node-content-plugin-proofs app-boot declaration mapping.",
+    "Full document-transfer file coverage remains62.44% lines; no100% or whole-project coverage claim.",
+    "No physical two-computer or paid model acceptance."
+  ]
+}

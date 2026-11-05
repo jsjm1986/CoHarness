@@ -1,3 +1,4 @@
+import type { OwnerProjectDisplay, ProjectOwnerRef } from '@deepseek-ai/dsh-client-runtime/client'
 import { addressRuntimeUrl, parseClientSessionKey, runtimeTargetKey } from '@deepseek-ai/dsh-client-runtime/client'
 import { createSnapshotStore, readApiResponseJson } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
@@ -37,6 +38,10 @@ export type ProjectThemePolicy = 'follow-user' | 'light' | 'dark'
 
 /** One project membership exposed by the Gateway account context. */
 export interface ProjectMembership {
+  /** Private name and root path live on the project's computer. */
+  metadataOnNode?: true
+  /** This verified document has resolved its owner metadata. */
+  ownerDisplayLoaded?: true
   projectId: number
   name: string
   path: string
@@ -220,6 +225,7 @@ export interface CollaborationSnapshot {
 
 /** HTTP operations required by the collaboration state owner. */
 export interface CollaborationTransport {
+  loadProjectMetadata?: (nodeId: string, projects: readonly ProjectOwnerRef[], signal: AbortSignal) => Promise<OwnerProjectDisplay[]>
   loadContext: (signal: AbortSignal) => Promise<CollaborationContext>
   switchScope: (scope: SessionRuntimeTarget, signal: AbortSignal) => Promise<void | string>
   /** Read one center-owned directory page without connecting to its computers. */
@@ -348,8 +354,8 @@ function project(value: unknown): ProjectMembership {
   if (row.nodeId !== undefined && !uuid(row.nodeId)) throw new Error('invalid collaboration project computer')
   return {
     projectId: integer(row.projectId),
-    name: string(row.name),
-    path: string(row.path),
+    ...(row.metadataOnNode === true ? { metadataOnNode: true as const, name: `#${integer(row.projectId)}`, path: '' }
+      : { name: string(row.name), path: string(row.path) }),
     mode: mode(row.mode),
     ...(row.nodeId === undefined ? {} : { nodeId: row.nodeId as CollaborationComputerId }),
     ...(row.nodeName === undefined ? {} : { nodeName: string(row.nodeName) }),
@@ -358,6 +364,17 @@ function project(value: unknown): ProjectMembership {
     ...(row.owner === null ? { owner: null } : row.owner === undefined ? {} : { owner: actor(row.owner) }),
     ...(row.uiThemePolicy === undefined ? {} : { uiThemePolicy: themePolicy(row.uiThemePolicy) }),
     ...(row.kind === 'steward' ? { kind: 'steward' as const } : {}),
+  }
+}
+
+function hideOwnerProjectNames(context: CollaborationContext | undefined, selected?: (row: ProjectMembership) => boolean): void {
+  if (!context) return
+  for (const project of context.projects) {
+    if (!project.metadataOnNode || selected && !selected(project)) continue
+    project.name = `#${project.projectId}`
+    project.path = ''
+    delete project.ownerDisplayLoaded
+    if (context.scope.kind === 'project' && context.scope.projectId === project.projectId) context.scope.projectName = project.name
   }
 }
 
@@ -395,13 +412,14 @@ export function parseCollaborationContext(value: unknown): CollaborationContext 
   if (environment !== undefined && (!uuid(environment.id) || !uuid(environment.nodeId)
     || environment.nodeName !== undefined && typeof environment.nodeName !== 'string')) throw new Error('invalid collaboration environment')
   if (!Array.isArray(root.projects)) throw new Error('invalid collaboration response')
+  const projects = root.projects.map(project)
   const parsedScope: CollaborationScope = scope.kind === 'personal'
     ? { kind: 'personal' }
     : scope.kind === 'project'
       ? {
         kind: 'project',
         projectId: integer(scope.projectId),
-        projectName: string(scope.projectName),
+        projectName: projects.some(row => row.metadataOnNode && row.projectId === scope.projectId) ? `#${integer(scope.projectId)}` : string(scope.projectName),
         mode: mode(scope.mode),
         ...(scope.canManage === true ? { canManage: true } : {}),
         ...(scope.steward === true ? { steward: true } : {}),
@@ -416,7 +434,7 @@ export function parseCollaborationContext(value: unknown): CollaborationContext 
       role: string(user.role),
     },
     scope: parsedScope,
-    projects: root.projects.map(project),
+    projects,
     ...(environment === undefined ? {} : { environment: {
       id: environment.id as NonNullable<SessionRuntimeTarget['runtimeId']>,
       nodeId: environment.nodeId as NonNullable<SessionRuntimeTarget['nodeId']>,
@@ -441,11 +459,13 @@ function environmentPage(value: unknown): CollaborationEnvironmentPage {
     const location = { runtimeId: row.id as NonNullable<SessionRuntimeTarget['runtimeId']>,
       nodeId: node.id as NonNullable<SessionRuntimeTarget['nodeId']>, nodeName: node.name }
     const target: SessionRuntimeTarget = owner.kind === 'personal' ? { kind: 'personal', ...location }
-      : { kind: 'project', projectId: integer(owner.id), projectName: string(owner.name), ...location }
+      : { kind: 'project', projectId: integer(owner.id),
+        projectName: row.metadataOnNode === true ? `#${integer(owner.id)}` : string(owner.name), ...location }
     if (node.status !== undefined && node.status !== 'active' && node.status !== 'draining' && node.status !== 'offline'
       || row.provisioning !== undefined && row.provisioning !== 'ready' && row.provisioning !== 'preparing'
       || row.routing !== undefined && row.routing !== 'local' && row.routing !== 'unavailable') throw new Error('invalid environment state')
-    return { target, name: string(owner.name), nodeName: node.name, observedState: string(row.observedState),
+    return { target, name: target.kind === 'project' && row.metadataOnNode === true ? `#${target.projectId}` : string(owner.name),
+      nodeName: node.name, observedState: string(row.observedState),
       ...(node.status === undefined ? {} : { nodeStatus: node.status }),
       ...(row.provisioning === undefined ? {} : { provisioning: row.provisioning }),
       ...(row.routing === undefined ? {} : { routing: row.routing }) }
@@ -625,6 +645,7 @@ export function createBrowserCollaborationTransport(options: {
   reload?: (destination?: string) => void
   canNavigate?: () => boolean
   projectModels?: ProjectModelSettingsTransport
+  loadProjectMetadata?: CollaborationTransport['loadProjectMetadata']
 } = {}): CollaborationTransport {
   const fetcher = options.fetch ?? globalThis.fetch
   const reload = options.reload ?? ((destination?: string) => {
@@ -635,6 +656,7 @@ export function createBrowserCollaborationTransport(options: {
   const projectModels = options.projectModels
   return {
     canNavigate: options.canNavigate ?? (() => true),
+    ...(options.loadProjectMetadata === undefined ? {} : { loadProjectMetadata: options.loadProjectMetadata }),
     loadContext: (signal) => {
       const runtime = new URLSearchParams((globalThis as { location?: Pick<Location, 'search'> }).location?.search).get('dshRuntime')
       const path = `/account/api/context${runtime === null ? '' : `?dshRuntime=${encodeURIComponent(runtime)}`}`
@@ -820,6 +842,7 @@ export class CollaborationClient {
   private readonly abortController = new AbortController()
   private readonly conversationLoads = new Map<string, Promise<void>>()
   private readonly conversationRefreshPending = new Set<string>()
+  private membershipRevision = 0
   private contextLoad: { promise: Promise<void>; controller: AbortController } | undefined
   private disposed = false
   private environmentLoad: { promise: Promise<void>; controller: AbortController; userId: number } | undefined
@@ -991,6 +1014,7 @@ export class CollaborationClient {
       .then((context) => {
         if (this.disposed || controller.signal.aborted || this.contextLoad?.controller !== controller) return
         if (this.getSnapshot().context?.user.id !== context.user.id) this.clearEnvironments()
+        this.membershipRevision++
         this.store.update((draft) => {
           draft.status = 'ready'
           draft.contextVerified = true
@@ -1013,6 +1037,7 @@ export class CollaborationClient {
         if (this.disposed || controller.signal.aborted || this.contextLoad?.controller !== controller) return
         this.store.update((draft) => {
           draft.contextVerified = false
+          hideOwnerProjectNames(draft.context)
           if (draft.status !== 'ready') draft.status = 'unavailable'
         })
       })
@@ -1029,10 +1054,11 @@ export class CollaborationClient {
 
   /** Revoke account eligibility and pending context reads from an old connection generation. */
   invalidateContext(): void {
+    this.membershipRevision++
     this.contextLoad?.controller.abort()
     this.contextLoad = undefined
     this.clearEnvironments()
-    this.store.update((draft) => { draft.contextVerified = false })
+    this.store.update((draft) => { draft.contextVerified = false; hideOwnerProjectNames(draft.context) })
   }
 
   /**
@@ -1044,6 +1070,48 @@ export class CollaborationClient {
     if (this.disposed || this.getSnapshot().context?.scope.kind !== 'project') return
     await Promise.all(Object.keys(this.getSnapshot().conversations)
       .map(sessionId => this.loadConversation(sessionId, { force: true })))
+  }
+
+  /** Read the next names and roots for one selected computer. A new account or permission snapshot cannot adopt an old result.
+   * @param nodeId - computer explicitly chosen in the space selector.
+   * @param ids - up to 32 visible project memberships, or just the active project.
+   * @param signal - selector lifetime.
+   */
+  async loadProjectNames(nodeId: CollaborationComputerId, ids: readonly number[], signal: AbortSignal): Promise<void> {
+    const state = this.getSnapshot(), context = state.context, revision = this.membershipRevision
+    if (!state.contextVerified || context === undefined || !this.transport.loadProjectMetadata || !ids.length || ids.length > 32) {
+      throw new Error('Project names are unavailable')
+    }
+    const references = [...new Set(ids)].map((projectId) => {
+      const entry = context.projects.find(item => item.projectId === projectId && item.nodeId === nodeId && item.metadataOnNode)
+      if (!entry) throw new Error('Project is unavailable on the selected computer')
+      const target = state.environments?.items.find(item => item.target.kind === 'project' && item.target.projectId === projectId
+        && item.target.nodeId === nodeId)?.target
+      return { projectId, ...(target?.runtimeId === undefined ? {} : { runtimeId: target.runtimeId }) }
+    })
+    const active = AbortSignal.any([signal, this.abortController.signal])
+    const current = (): boolean => this.membershipRevision === revision && this.getSnapshot().contextVerified
+      && this.getSnapshot().context?.user.id === context.user.id
+    const rows = await this.transport.loadProjectMetadata(nodeId, references, active).catch((cause: unknown) => {
+      if (!active.aborted && current()) this.store.update((draft) => {
+        hideOwnerProjectNames(draft.context, row => row.nodeId === nodeId && ids.includes(row.projectId))
+      })
+      throw cause
+    })
+    active.throwIfAborted()
+    if (!current()) throw new Error('Project membership changed')
+    const verified = new Map(rows.map(row => [row.projectId, row]))
+    this.store.update((draft) => {
+      if (!draft.context) return
+      for (const project of draft.context.projects) {
+        const name = verified.get(project.projectId)
+        if (!name || project.nodeId !== name.nodeId || !project.metadataOnNode) continue
+        project.name = name.name
+        project.path = name.rootPath
+        project.ownerDisplayLoaded = true
+        if (draft.context.scope.kind === 'project' && draft.context.scope.projectId === project.projectId) draft.context.scope.projectName = name.name
+      }
+    })
   }
 
   /**

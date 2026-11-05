@@ -185,8 +185,9 @@ describePg('Gateway maintenance control', () => {
     const f = await fixture()
     const maintenance = new PostgresMaintenanceService(f.context, STALE_MS)
     const backups = new PostgresBackupService(f.context)
+    const migrationVersion = (await pool.query<{ version: number }>('SELECT MAX(version) version FROM harness.schema_migrations')).rows[0]!.version
     const backup = await backups.record({
-      path: '/tmp/harness-1.dump', migrationVersion: 41, writeEpoch: 1n,
+      path: '/tmp/harness-1.dump', migrationVersion, writeEpoch: 1n,
       sizeBytes: 128, sha256: 'a'.repeat(64), managedSnapshot: { version: 1, roots: [], directories: [], absent: [], files: [] }, actor: f.admin.id,
     })
     await backups.setVerified(backup.id, true)

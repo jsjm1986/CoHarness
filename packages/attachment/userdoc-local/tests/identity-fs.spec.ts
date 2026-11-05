@@ -421,7 +421,7 @@ it('retains ordinary files with directory-marker names when no private anchor pr
   expect(await readFile(join(f.root, name), 'utf8')).toBe('ordinary bytes')
 })
 
-it('keeps creator provenance on in-place edits and refuses a previously selected revision', async () => {
+it('keeps creator identity on in-place edits and refuses a previously selected revision', async () => {
   const f = await fixture(), original = await f.publish()
   await writeFile(join(f.root, original.docId), 'edited bytes')
   const edited = await f.owner.stat(original.docId)
@@ -454,7 +454,7 @@ it.each(['bytes', 'time'] as const)('refuses a directory selection after documen
   expect(await readFile(join(f.root, 'renamed', 'a.txt'), 'utf8')).toBe(content)
 })
 
-it('recovers a physically moved directory with a later in-place edit and preserves creator provenance', async () => {
+it('recovers a physically moved directory with a later in-place edit and preserves creator identity', async () => {
   const f = await fixture()
   await mkdir(join(f.root, 'folder'))
   const original = await f.publish('folder/a.txt')
@@ -475,7 +475,7 @@ it('recovers a physically moved directory with a later in-place edit and preserv
   await expect(stat(join(f.root, 'folder'))).rejects.toMatchObject({ code: 'ENOENT' })
 })
 
-it('assigns unknown provenance to an external identical-byte replacement instead of inheriting the old owner', async () => {
+it('assigns an unknown creator identity to an external identical-byte replacement instead of inheriting the old owner', async () => {
   const f = await fixture(), original = await f.publish()
   await unlink(join(f.root, original.docId)); await writeFile(join(f.root, original.docId), 'same bytes')
   const replacement = await f.owner.stat(original.docId)

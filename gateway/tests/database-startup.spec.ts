@@ -50,6 +50,9 @@ describe('database startup retry', () => {
     expect(errorCodeForDiagnostics(wrapped)).toBe('unknown')
     expect(errorCodeForDiagnostics({ code: 'ECONNRESET' })).toBe('ECONNRESET')
     expect(errorCodeForDiagnostics('not-an-error')).toBe('unknown')
+    expect(isTransientDatabaseError(new Error('Connection terminated unexpectedly'))).toBe(true)
+    expect(isTransientDatabaseError(Object.assign(new Error('Connection terminated unexpectedly'), {code: '28P01'}))).toBe(false)
+    expect(isTransientDatabaseError(new Error('Connection terminated'))).toBe(false)
   })
 
   it('aborts a pending retry when the process is being replaced', async () => {

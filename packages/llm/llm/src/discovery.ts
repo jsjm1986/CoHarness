@@ -27,6 +27,9 @@ const MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 const MAX_ERROR_DETAIL_CHARS = 240
 /** Largest model-list page accepted by Anthropic's public endpoint; discovery reads one page and does not follow `has_more`. */
 const ANTHROPIC_MODEL_LIMIT = 1000
+/** Match Fetch's redirect bound while retaining credentials only on the configured origin. */
+const MODEL_LISTING_REDIRECT_LIMIT = 20
+const MODEL_LISTING_REDIRECT_STATUSES: readonly number[] = [301, 302, 303, 307, 308]
 
 /** Response facts used to decide whether an endpoint path is mismatched. */
 export interface LlmEndpointResponseMetadata {
@@ -452,6 +455,32 @@ async function cancelCandidate(response: Response): Promise<void> {
   }
 }
 
+/** Follow bounded same-origin redirects, cancelling each discarded response before another request. */
+async function fetchListingResponse(url: string, headers: Headers, signal?: AbortSignal): Promise<Response> {
+  let current = new URL(url)
+  const origin = current.origin
+  for (let redirects = 0; ; redirects += 1) {
+    const response = await fetch(current, {
+      method: 'GET',
+      headers,
+      redirect: 'manual',
+      ...(signal === undefined ? {} : { signal }),
+    })
+    const location = response.headers.get('location')
+    if (!MODEL_LISTING_REDIRECT_STATUSES.includes(response.status) || location === null) return response
+    await cancelCandidate(response)
+    signal?.throwIfAborted()
+    if (redirects === MODEL_LISTING_REDIRECT_LIMIT) {
+      throw new LlmError('model discovery exceeded the redirect limit', 'DISCOVERY_FAILED')
+    }
+    const next = new URL(location, current)
+    if (next.origin !== origin || next.username !== '' || next.password !== '') {
+      throw new LlmError('model discovery redirects must stay on the configured origin without URL credentials', 'DISCOVERY_FAILED')
+    }
+    current = next
+  }
+}
+
 /** Order candidates with a previously successful URL first. */
 function orderedCandidates(
   rawBaseURL: string,
@@ -482,15 +511,12 @@ async function fetchListingCandidate(
     headers.set('accept', 'application/json')
     for (const [name, value] of Object.entries(listingHeaders(api, apiKey))) headers.set(name, value)
     for (const [name, value] of Object.entries(attributionHeaders())) headers.set(name, value)
-    response = await fetch(url, {
-      method: 'GET',
-      headers,
-      ...(request.signal === undefined ? {} : { signal: request.signal }),
-    })
+    response = await fetchListingResponse(url, headers, request.signal)
   } catch (error: unknown) {
     if (request.signal?.aborted) {
       throw new LlmError('model discovery aborted by caller', 'ABORTED', { cause: error })
     }
+    if (error instanceof LlmError) throw error
     throw new LlmError(`could not reach ${url}`, 'DISCOVERY_FAILED', { cause: error })
   }
   const metadata: LlmEndpointResponseMetadata = {
@@ -548,6 +574,7 @@ async function fetchListingCandidate(
 /**
  * Interrogate candidate endpoint prefixes and return the one that answered.
  * Only explicit endpoint-path mismatches advance to the next candidate.
+ * Redirects retain the configured origin and refuse URL credentials; discarded responses are cancelled.
  *
  * @param request - endpoint, protocol, one-shot credential, and cancellation.
  * @param cache - optional process-local cache shared with the requesting adapter.

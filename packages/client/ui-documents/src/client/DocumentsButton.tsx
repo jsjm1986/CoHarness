@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { PropsLocale, PropsRuntime, InjectFace, HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientRuntimeTarget, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { IconBrowseOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { DocumentsModal } from './DocumentsModal.tsx'
-import type { UserDocRef, UserDocScope } from './documents-client.ts'
+import type { UserDocRef } from './documents-client.ts'
 import { NS } from './locales.ts'
 import css from './DocumentsButton.module.css'
 
@@ -11,7 +11,7 @@ import css from './DocumentsButton.module.css'
 export interface DocumentsButtonInjected {
   hooks: { deployment: HostObservable<import('@deepseek-ai/dsh-client-runtime/client').DeploymentContextSnapshot> }
   /** Runtime owning documents attached to one captured conversation. */
-  documentScopeFor?: ((sessionId: SessionId) => UserDocScope | undefined) | undefined
+  documentScopeFor?: ((sessionId: SessionId) => ClientRuntimeTarget | undefined) | undefined
   /** Bind private resource navigation to the verified account. */
   privateResourceUrl?: ((url: string) => string) | undefined
   /** Add a durable document to the current conversation composer. */
@@ -39,7 +39,7 @@ export function DocumentsButton({
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'manage' | 'select'>('manage')
   const [targetSessionId, setTargetSessionId] = useState<SessionId | undefined>()
-  const [attachmentScope, setAttachmentScope] = useState<UserDocScope | undefined>()
+  const [attachmentScope, setAttachmentScope] = useState<ClientRuntimeTarget | undefined>()
   const handleOpen = useCallback(() => {
     setMode('manage')
     setTargetSessionId(currentSessionId)

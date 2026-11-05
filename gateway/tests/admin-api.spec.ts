@@ -13,6 +13,7 @@ import { AuditService } from '../src/audit.ts'
 import { DesktopCoordinator, SqliteDesktopCoordinatorRepository } from '../src/desktop-coordinator.ts'
 import { AuthService } from '../src/auth.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
+import { BackupError } from '../src/postgres/backup-service.ts'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager, RuntimeStartBlockedError, type RuntimeTargetInput } from '../src/instances.ts'
@@ -541,14 +542,21 @@ describe('admin JSON API', () => {
   })
 
   it('includes inherited project quota configuration on project detail', async () => {
-    const { base, cookie, root } = await setup()
+    const { base, cookie, root, deps } = await setup()
     const shared = join(root, 'shared-quota'); mkdirSync(shared)
     const created = await fetch(`${base}/admin/api/projects`, {
       method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
       body: JSON.stringify({ name: 'Quota', path: shared }),
     })
     const project = await created.json() as { id: number }
+    const list = vi.spyOn(deps.projects, 'list')
+    const get = vi.spyOn(deps.projects, 'getById')
+    expect((await fetch(`${base}/admin/api/projects?display=directory`, { headers: { cookie } })).status).toBe(200)
+    expect(list).toHaveBeenCalledWith('directory')
+    expect((await fetch(`${base}/admin/api/projects/${project.id}?display=directory`, { headers: { cookie } })).status).toBe(200)
+    expect(get).toHaveBeenCalledWith(project.id, 'directory')
     const detail = await fetch(`${base}/admin/api/projects/${project.id}`, { headers: { cookie } })
+    expect(get).toHaveBeenCalledWith(project.id)
     expect(detail.status).toBe(200)
     expect(await detail.json()).toMatchObject({
       id: project.id,
@@ -1293,4 +1301,25 @@ it('admin plugin routes preserve target identity, stream bytes and deny ordinary
   const denied = await fetch(`${base}/admin/api/plugins/invoke`, { method: 'POST', headers: { cookie: memberCookie, origin: base, 'content-type': 'application/json' }, body: JSON.stringify(invocation) })
   expect(denied.status).toBe(403)
   expect(invoked).toHaveLength(1)
+})
+
+it.each(['verify', 'node-configuration'])('refuses malformed %s backup selections before invoking its service', async operation => {
+  const { deps, base, cookie } = await setup()
+  const lookup = vi.fn(async () => { throw new BackupError(404, 'backup-not-found') })
+  deps.backups = { list: lookup, get: lookup, record: lookup, setVerified: lookup }
+  deps.backupWork = { create: lookup, verify: lookup, previewNodeConfiguration: lookup }
+  const request = (selection: Record<string, unknown>) => fetch(`${base}/admin/api/backups/${operation}`, {
+    method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' }, body: JSON.stringify({ ...selection, actorUserId: 999 }),
+  })
+  for (const selection of [{}, { id: null }, { id: 17 }, { id: 'invalid' }, { id: '-'.repeat(36) }, { id: 'f'.repeat(36) }, { id: 'a'.repeat(32) }]) {
+    const response = await request(selection)
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: typeof selection.id === 'string' ? 'invalid-backup-id' : 'backup-id-required' })
+  }
+  expect(lookup).not.toHaveBeenCalled()
+  const id = 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA', response = await request({ id })
+  expect(response.status).toBe(404); expect(await response.json()).toEqual({ error: 'backup-not-found' })
+  const administrator = (await deps.users.list()).find(user => user.username === 'boss')!
+  if (operation === 'verify') expect(lookup).toHaveBeenCalledExactlyOnceWith(id, undefined, administrator.id)
+  else expect(lookup).toHaveBeenCalledExactlyOnceWith(id, administrator.id)
 })

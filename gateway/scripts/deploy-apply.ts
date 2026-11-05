@@ -12,7 +12,8 @@ import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { loadConfig } from '../src/config.ts'
 import { loadManagedNodeEnvironment } from '../src/node-config-store.ts'
-import { createDeploymentCommands, DeploymentCommandError, type ManagedSnapshot } from '../src/deployment-commands.ts'
+import { createDeploymentCommands, inspectDumpMigrations, DeploymentCommandError, type ManagedSnapshot } from '../src/deployment-commands.ts'
+import { assertRestoreSchema } from '../src/postgres/restore-schema.ts'
 import {
   createPostgresPool,
   databaseUrlFromFile,
@@ -124,7 +125,8 @@ const effectiveEnvironment = await loadManagedNodeEnvironment(process.env)
 const cfg = loadConfig(effectiveEnvironment)
 const databaseUrl = await databaseUrlFromFile(effectiveEnvironment)
 const pool = createPostgresPool(databaseUrl)
-const commands = createDeploymentCommands(cfg.pgDumpCommand, cfg.pgRestoreCommand, cfg.psqlCommand)
+const commands = createDeploymentCommands(cfg.pgDumpCommand, cfg.pgRestoreCommand, cfg.psqlCommand,
+  { command: cfg.pgConnectionCommand, timeoutMs: cfg.pgConnectionTimeoutMs })
 
 
 async function filesDirForDump(dumpPath: string, override?: string): Promise<string> {
@@ -248,6 +250,7 @@ try {
         throw new Error(`managed-file manifest unreadable under ${filesDir}; pass --files or fix the snapshot`)
       })
       const targetHash = await commands.verifyDump(dumpPath, restoring.signal, expectedDumpHash)
+      await assertRestoreSchema(pool, await inspectDumpMigrations(cfg.pgRestoreCommand, dumpPath, restoring.signal))
       await commands.verifyStoredFiles(filesDir, manifest, restoring.signal)
       const diskManifest = await manifestFromFilesDir(filesDir)
       if (JSON.stringify(diskManifest) !== JSON.stringify(manifest)) throw new Error('backup manifest differs from registry')

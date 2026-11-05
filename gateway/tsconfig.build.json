@@ -9,6 +9,9 @@
     "rewriteRelativeImportExtensions": true,
     "tsBuildInfoFile": "./lib/tsconfig.tsbuildinfo",
     "paths": {
+      "@deepseek-ai/dsh-subprocess-local": ["../packages/subprocess/subprocess-local/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-subprocess": ["../packages/subprocess/subprocess/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-app-boot": ["../packages/boot/app-boot/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-session": ["../packages/core/session/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-llm": ["../packages/llm/llm/lib/types/index.d.ts"],
       "@deepseek-ai/node-addon-system/flock": ["../native/system/packages/entry/lib/flock.d.ts"],
@@ -48,6 +51,7 @@
       "@deepseek-ai/dsh-userdoc-gateway/server": [
         "../packages/attachment/userdoc-gateway/lib/types/server.d.ts"
       ],
+      "@deepseek-ai/dsh-schedule": ["../packages/schedule/schedule/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-userdoc-local": [
         "../packages/attachment/userdoc-local/lib/types/index.d.ts"
       ],

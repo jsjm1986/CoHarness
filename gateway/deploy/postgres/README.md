@@ -89,6 +89,28 @@ npm run pg:restore-check -- "$HOME/harness-postgres-backups/harness-YYYYMMDD-HHM
 
 The named volume and host backup directory are on the same machine. This protects against logical mistakes and a broken container, not whole-host or disk loss. Copy successful dumps to a second machine or NAS before treating this as an enterprise backup.
 
+## Private maintenance connections
+
+Gateway maintenance and `pg:deploy` supply the deployment connection through a pipe. The native `pg_dump` and `psql` argument vectors contain resolved non-password options; the selected password travels in `PGPASSWORD`. The Gateway's scrubbed child environment still retains its explicit PostgreSQL credential exceptions. This prevents database passwords appearing in ordinary command-argument inspection; operating-system administrators and processes allowed to inspect another process's environment can still read them.
+
+Install a C compiler, PostgreSQL client tools, libpq headers and its development library on a maintenance execution host. Build against the same libpq installation used by those clients, after the Gateway workspace dependencies are built:
+
+```bash
+npm run build:pg-client -- --pg-config /path/to/postgres/bin/pg_config
+```
+
+The adapter is emitted at `gateway/lib/native/hgw-pg-client` (`.exe` on Windows). `HGW_PG_CONNECTION_COMMAND` selects an alternative local resolver command. `HGW_PG_CONNECTION_TIMEOUT_MS` bounds local resolution and wrapper readiness, defaults to `30000`, and accepts positive integers up to `2147483647`. The admitted dump or SQL transaction has its existing cancellation lifetime, rather than this readiness deadline. Missing adapters and incompatible wrappers fail the maintenance operation without publishing a backup or submitting restore SQL. Normal Gateway and node-agent builds remain independent of libpq development tools.
+
+Resolved TLS key passwords, OAuth client secrets and SCRAM keys require an additional private credential transport. The built-in adapter refuses those nonempty fields before exposing client arguments; it does not drop them or attempt weaker authentication.
+
+The deployment connection supplies the database, account and connection settings. Put connection selection in that value, rather than relying on fixed client flags to override unspecified fields. Libpq resolves URI and keyword syntax, duplicate values, service-file selection, environment defaults and passfile fallback. An explicitly selected password retains its exact bytes, including line breaks. Resolution starts and closes a nonblocking auxiliary connection before the actual client; its readiness deadline also bounds resolver startup and DNS work.
+
+Configured wrappers must run `hgw-pg-client` in the PostgreSQL client's execution environment and keep stdin and stdout binary. For example, set `HGW_PGDUMP_COMMAND` to `docker compose exec -T postgres /usr/local/bin/hgw-pg-client pg_dump`, and `HGW_PGRESTORE_COMMAND` to the same prefix ending in `pg_restore`. Install the adapter inside that container against its own libpq. SSH uses the corresponding remote prefix without a pseudo-terminal. `HGW_PSQL_COMMAND` can provide an explicit SQL executor; otherwise its `psql` executable is paired with `pg_restore`. PostgreSQL credential environment forwarding and referenced files must be available on the execution host; a Gateway-local file path is insufficient inside a container or remote computer. POSIX wrapper mode uses `exec` to keep the native client's process identity. Windows maintenance uses the local resolver followed by a direct native client.
+
+A database invocation adds `--hgw-connection-stdin-v1=<32 lowercase hexadecimal characters>`. Stdin starts with a four-byte unsigned big-endian UTF-8 byte count and that many connection bytes, bounded to one MiB and excluding NUL. The adapter resolves the connection and writes exactly `hgw-pg-client/1 <nonce>\n` before native stdout. Gateway strips that prefix from dumps and withholds subsequent restore SQL until it matches. Offline `pg_restore` inspection and rendering carry no marker or connection frame. The local resolver mode `--resolve-stdin-v1 <nonce>` returns a versioned nonce header and bounded NUL-delimited libpq keyword/value pairs on its private stdout pipe; it never emits them to operator output.
+
+Cancellation joins the local command's actual exit and removes partial backup files. A Docker or SSH carrier can outlive or lose its remote connection; transactional restoration retains its separate database lock and verifies the exact coordinating lease before mutation and commit. Carrier cancellation does not certify that a remote SQL transaction has stopped. See the [maintenance decision](../../../.agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md).
+
 ## Tests
 
 `HGW_TEST_DATABASE_URL` explicitly enables the integration suite:

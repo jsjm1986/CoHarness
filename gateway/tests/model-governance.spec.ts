@@ -1,7 +1,7 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { defaultModelFromPolicy } from '../src/apply-model-governance.ts'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
@@ -11,9 +11,11 @@ import { UserService } from '../src/users.ts'
 async function setup() {
   const root = mkdtempSync(join(tmpdir(), 'hgw-governance-'))
   const db = openDb(join(root, 'g.sqlite'))
+  onTestFinished(() => { if (db.open) db.close(); rmSync(root, { recursive: true, force: true }) })
   const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users') })
   const users = new UserService(db, cfg)
   const admin = await users.create({ username: 'admin-governance', password: 'pw-12345678', role: 'admin' })
+  await users.changeOwnPassword(admin.id, 'pw-12345678')
   const user = await users.create({ username: 'user-governance', password: 'pw-12345678', role: 'user' })
   return { db, users, admin, user, governance: new ModelGovernanceService(db) }
 }
@@ -27,6 +29,17 @@ function event(overrides: Partial<UsageEvent> = {}): UsageEvent {
 }
 
 describe('ModelGovernanceService', () => {
+  it('refuses management after password reset until the required change is completed', async () => {
+    const { governance, users, admin } = await setup()
+    governance.setQuota('role', 'user', 50, 90, admin.id)
+    await users.resetPassword(admin.id, 'pw-replacement')
+    expect(() => governance.setQuota('role', 'user', 0, null, admin.id)).toThrow('forbidden')
+    expect(governance.roleQuota('user')).toEqual({ tokenLimit: 50, companyCostMicrosLimit: 90 })
+    await users.changeOwnPassword(admin.id, 'pw-replacement')
+    governance.setQuota('role', 'user', 0, null, admin.id)
+    expect(governance.roleQuota('user')).toEqual({ tokenLimit: 0, companyCostMicrosLimit: null })
+  })
+
   it('refuses execution proofs in SQLite instead of silently accepting unverified attribution', async () => {
     const { governance, user, db } = await setup()
     try {

@@ -1,0 +1,6 @@
+{"step":"shared","result":{"items":[{"session":"restricted","snippet":"Windmill restricted plan"},{"session":"shared","snippet":"Windmill shared status"}],"hasMore":false}}
+{"step":"private-during-search","result":{"items":[{"session":"shared","snippet":"Windmill shared status"}],"hasMore":false}}
+{"step":"creator","result":{"items":[{"session":"restricted","snippet":"Windmill restricted plan"},{"session":"shared","snippet":"Windmill shared status"}],"hasMore":false}}
+{"step":"local-computer-withdrawn-during-search","result":{"error":{"code":"collaboration-forbidden","message":"You do not have permission to perform this action.","details":{"action":"read","reason":"forbidden"}}}}
+{"step":"private-during-list","result":["shared"]}
+{"step":"index-unavailable","result":{"error":{"code":"internal","message":"session search failed","details":{}}}}

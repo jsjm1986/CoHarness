@@ -1,0 +1,126 @@
+{
+  "id": "B508",
+  "title": "Admin JSON reads publish prepared cross-account data and metadata after administrator withdrawal commits",
+  "status": "fixed_161_assembled_read_scenarios_normal_node22_node24_and_named_regressions_verified_global_review_open",
+  "sourceFixed": true,
+  "at": "2026-11-04T19:52:04.827409+00:00",
+  "receipt": "receipts/administrator-read-publication-2026-11-05.json",
+  "paths": [
+    "gateway/src/admin-api.ts",
+    "gateway/src/admin-response.ts",
+    "gateway/src/runtime-management-api.ts"
+  ],
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z",
+  "originalCounterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-read-users-before.json",
+  "originalObservation": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-read-users-original-observations.json",
+  "originalResult": "An actual authenticated Gateway user-directory read reaches its service barrier. Another administrator remains active; a committed membership demotion is confirmed before release. The request still returned200and three account records. No Runtime or model is started.",
+  "correction": "A request-owned awaited JSON responder resolves the authenticated actor again after data preparation. Organization, membership, account, deletion, administrator role and required password eligibility precede data plus sensitive headers. Known withdrawal returns403 and unavailable lookup returns503; committed mutations retain their service result. The router and its Runtime-management delegate both use the responder, including node-health JSON and archive JSON export.",
+  "checks": {
+    "apiAndHelper": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-response-current-cases.json",
+      "passed": 85,
+      "newHelperCases": 13,
+      "existingApiCases": 72
+    },
+    "newHelperCoverage": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-response-coverage/coverage-summary.json",
+      "lines": 100,
+      "statements": 100,
+      "functions": 100,
+      "branches": 100,
+      "thresholdOrExclusionChanges": false
+    },
+    "postgres17ActualGateway": {
+      "transcript": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-read-real-gateway-transcript-final.jsonl",
+      "scenarios": 161,
+      "entries": 20,
+      "postgresReadEntries": 17,
+      "controlledReadAdapters": [
+        "node-health-adapter",
+        "runtime-policy-adapter",
+        "archive-export-adapter"
+      ],
+      "reasonForAdapters": "Only the HTTP publication path is accepted for these three external read services; their data preparation is controlled and does not establish physical node-content, Runtime allocation or archive bytes acceptance.",
+      "variants": [
+        "current",
+        "role",
+        "disabled-account",
+        "deleted-account",
+        "disabled-membership",
+        "missing-membership",
+        "disabled-organization",
+        "password-reset"
+      ],
+      "additionalActualClosedPoolCase": 1
+    },
+    "postgres18PublicSnapshot": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-response-native18-public-cases.json",
+      "passed": 1,
+      "internalScenarios": 161,
+      "unixSocketOnly": true,
+      "temporaryClusterStoppedAndRemoved": true
+    },
+    "priorPolicyIntegration": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-response-prior-policy-regression.json",
+      "passed": 1,
+      "internalScenarios": 51,
+      "fixtureChange": "Concurrent withdrawal now holds its transaction uncommitted through the authorized response; the real UPDATE is first proven blocked by the policy reader. This preserves the database lock-order proof while the final JSON publisher checks only committed eligibility."
+    },
+    "typecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-response-current-typecheck.log",
+    "ordinaryFullGatewayBuild": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-response-production-build.log",
+    "focusedLint": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-response-final-lint.log",
+    "fourBilingualPairs": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-response-pairing-check.log",
+    "eightMarkdownSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-response-markdown-links.log",
+    "normalNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-read-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "passed": 2,
+      "scenariosPerVersion": 33,
+      "typescriptLoader": false,
+      "databaseVersion": "Independent PostgreSQL18.4 on a private Unix socket",
+      "scope": "Existing fixture src mode is replaced by ordinary compiled Gateway modules; all authentication and qualification lookups still use PostgreSQL."
+    }
+  },
+  "dockerFailure": {
+    "publicRepetitionNotRun": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/admin-response-public-postgres-cases.log",
+    "reason": "containerd metadata became read-only before test execution; no Vitest report exists for that invocation",
+    "ownedContainer": {
+      "id": "2317a38eb07171b9501eee5340a48df2c15b232b5eeb0284fa17ba52ebace308",
+      "name": "hgw-b491-8cb93451db1f41ed9b365cb9755db463",
+      "label": "com.codex.audit=B491-nov4",
+      "state": "owned_container_and_anonymous_volumes_removed"
+    },
+    "inspection": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/owned-postgres-after-readonly.json",
+    "sharedDockerRecoveryOwner": "parallel Codex, with explicit user approval; Root uses independent native clusters and performs no global Docker actions",
+    "recoveryCleanupReceipt": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/owned-docker-recovery-cleanup.json"
+  },
+  "rejectedHypothesis": {
+    "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/permission-service-reload-rejected-hypothesis.json",
+    "findingAssigned": false,
+    "result": "The old permission service could not access required services from its inactive Cordis context; no permission mutation occurred."
+  },
+  "limits": [
+    "The161-case transcript is one assembled fixture, not161Vitest test files. The public snapshot and compiled subsets repeat named scenarios.",
+    "The three external read adapters do not establish physical node, Runtime or archive backend acceptance.",
+    "The publication rule governs GET/HEAD JSON replies; mutation admission and streaming transport revocation retain their owning services. Read-only POST diagnostics still require separate business review.",
+    "The existing global documentation debts and all12project domains remain open."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false,
+  "frozenDelivery": {
+    "at": "2026-11-04T19:53:35.990797+00:00",
+    "finding": "B508",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/B508-administrator-read-publication",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T191823Z/B508-administrator-read-publication.delta.tar.gz",
+    "archiveSha256": "0360e997c9aea1a25d79fcd0b3eac0cc9971dbf85320035c2091dced38eeaa3f",
+    "manifestSha256": "1e73c67c0b3b60521d5e5b592dfab5b1b21730c20a3fd79850ef546c16e141ba",
+    "ownedPaths": 21,
+    "readOnlyPrerequisites": 7,
+    "compiledGatewayFiles": 256,
+    "wholeProjectComplete": false
+  }
+}

@@ -92,6 +92,68 @@ describe('endpoint candidate resolution', () => {
 })
 
 describe('discoverModelsAtEndpoint', () => {
+  it.each([301, 302, 303, 307, 308])('follows a same-origin %s redirect with the selected credentials and cancels its body', async (status) => {
+    const cancelled = vi.fn()
+    const requests: FetchRecord[] = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({ url: requestUrl(input), init: init ?? {} })
+      if (requests.length === 1) return new Response(new ReadableStream({ cancel: cancelled }), { status, headers: { location: '../catalog/models' } })
+      expect(cancelled).toHaveBeenCalledOnce()
+      return jsonResponse({ data: [{ id: 'same-origin' }] })
+    })
+    await expect(discoverModelsAtEndpoint({ baseURL: 'https://provider.example/api', api: 'anthropic-messages', apiKey: 'synthetic-key' }))
+      .resolves.toEqual([{ id: 'same-origin', name: 'same-origin' }])
+    expect(requests.map(row => row.url)).toEqual(['https://provider.example/api/v1/models?limit=1000', 'https://provider.example/api/catalog/models'])
+    for (const row of requests) {
+      expect(row.init.redirect).toBe('manual')
+      expect(new Headers(row.init.headers).get('x-api-key')).toBe('synthetic-key')
+    }
+  })
+
+  it.each([
+    'https://other.example/models', 'http://provider.example/models', 'https://provider.example:8443/models',
+    'https://user@provider.example/models', 'https://:password@provider.example/models',
+  ])('refuses credential forwarding to %s before another fetch', async (location) => {
+    const cancelled = vi.fn()
+    const fetch = vi.fn(async () => new Response(new ReadableStream({ cancel: cancelled }), { status: 302, headers: { location } }))
+    vi.stubGlobal('fetch', fetch)
+    await expect(discoverModelsAtEndpoint({ baseURL: 'https://provider.example', apiKey: 'synthetic-key', headers: { 'x-route-secret': 'synthetic-header' } }))
+      .rejects.toMatchObject({ code: 'DISCOVERY_FAILED', message: expect.stringContaining('configured origin') as unknown })
+    expect(fetch).toHaveBeenCalledOnce()
+    expect(cancelled).toHaveBeenCalledOnce()
+  })
+
+  it('bounds same-origin redirect loops and cancels the final discarded response', async () => {
+    const cancelled = vi.fn(), fetch = vi.fn(async () => new Response(new ReadableStream({ cancel: cancelled }), { status: 302, headers: { location: '/models' } }))
+    vi.stubGlobal('fetch', fetch)
+    await expect(discoverModelsAtEndpoint({ baseURL: 'https://provider.example' })).rejects.toMatchObject({
+      code: 'DISCOVERY_FAILED', message: expect.stringContaining('redirect limit') as unknown,
+    })
+    expect(fetch).toHaveBeenCalledTimes(21)
+    expect(cancelled).toHaveBeenCalledTimes(21)
+  })
+
+  it('settles cancellation between redirects without dispatching another request', async () => {
+    const controller = new AbortController()
+    const fetch = vi.fn(async () => new Response(new ReadableStream({ cancel: () => { controller.abort('stopped between redirects') } }), { status: 302, headers: { location: '/models/' } }))
+    vi.stubGlobal('fetch', fetch)
+    await expect(discoverModelsAtEndpoint({ baseURL: 'https://provider.example', signal: controller.signal })).rejects.toMatchObject({ code: 'ABORTED' })
+    expect(fetch).toHaveBeenCalledOnce()
+  })
+
+  it('rejects malformed redirect locations and redirects without a location', async () => {
+    const cancelled = vi.fn()
+    stubResponse(new Response(new ReadableStream({ cancel: cancelled }), { status: 302, headers: { location: 'http://[' } }))
+    await expect(discoverModelsAtEndpoint({ baseURL: 'https://provider.example' })).rejects.toMatchObject({
+      code: 'DISCOVERY_FAILED', cause: expect.any(TypeError) as unknown,
+    })
+    expect(cancelled).toHaveBeenCalledOnce()
+    vi.unstubAllGlobals()
+    const requests = stubResponse(new Response(null, { status: 302 }))
+    await expect(discoverModelsAtEndpoint({ baseURL: 'https://provider.example' })).rejects.toThrow('answered 302')
+    expect(requests).toHaveLength(1)
+  })
+
   it('normalizes only a trailing Anthropic version segment on a copied URL', () => {
     const input = new URL('https://gateway.example/tenant/v1/?region=cn')
     expect(normalizeAnthropicBaseURL(input).toString()).toBe('https://gateway.example/tenant?region=cn')

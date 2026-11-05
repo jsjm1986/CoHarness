@@ -44,6 +44,12 @@ export class NavigationController {
   /** Composer held until this intent settles; other panes and windows remain independent. */
   blockedSessionId: SessionId | undefined
 
+  /** Current document intent, cancelled as soon as navigation changes. */
+  get signal(): AbortSignal {
+    if (this.closed) return AbortSignal.abort()
+    return (this.current ??= new AbortController()).signal
+  }
+
   /**
    * Supersede the previous intent without cancelling its Host-side mutation.
    * @param blockedSessionId - Composer to hold during preparation; omission leaves input available.

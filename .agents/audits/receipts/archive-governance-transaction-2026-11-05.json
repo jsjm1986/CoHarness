@@ -1,0 +1,122 @@
+{
+  "id": "B516",
+  "title": "Mixed shared and node-volume archive operations wait for another connection from their own exhausted governance pool",
+  "status": "fixed_shared_archive_transaction_and_physical_volume_http_artifacts_verified_remaining_archive_review_open",
+  "sourceFixed": true,
+  "at": "2026-11-05T00:07:08.765113+00:00",
+  "paths": [
+    "gateway/src/node-archive-router.ts",
+    "gateway/src/postgres/conversation-archive-service.ts"
+  ],
+  "receipt": "receipts/archive-governance-transaction-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z",
+  "counterproof": {
+    "emptyList": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-pool-negative-observations.json",
+      "result": "A real attested content volume with an active project causes an empty archive list to wait for a second checkout from its sole retained governance connection. One waiting checkout is observed before timeout. The predecessor shared-store control succeeds."
+    },
+    "draftCleanup": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-shared-draft-negative-qualified.log",
+      "result": "Prior emitted production code with complete migration assets returns HTTP400 and timeout exceeded when trying to connect for a legitimate shared empty-draft cleanup while the outer routing transaction retains the sole connection.",
+      "assetQualification": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/prior-archive-code-notes.json"
+    }
+  },
+  "correction": "The shared archive service can borrow a caller-owned governance transaction without acquiring, beginning, committing or releasing it. NodeArchiveRouter reuses that service while merging shared/node-volume pages and cleaning legacy drafts. The node content transaction, placement locks, current administrator qualification, pagination and per-root eligibility remain intact.",
+  "checks": {
+    "distinctNamedCases": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-acceptance-union.json",
+      "passed": 159,
+      "skipped": 0,
+      "breakdown": {
+        "adjacentArchiveUnitAndPostgres": 133,
+        "physicalContentMainFlow": 1,
+        "clientUploadAndWorkbenchFixtures": 25
+      },
+      "repeatedRunsNotDoubleCounted": true
+    },
+    "newPasswordQualificationCases": {
+      "mutation": 10,
+      "read": 10,
+      "qualification": "Current raw SQL administrators now have a present completed password record; original role/account/membership withdrawal cases retain their original assertions. Real organization-lock waits also cover required and missing password records."
+    },
+    "publicHttpReplay": {
+      "spec": "gateway/tests/archive-pool-postgres.spec.ts",
+      "expected": "gateway/tests/expected/archive-pool.jsonl",
+      "scenarios": 13,
+      "qualification": "Actual Gateway login, real separate governance/content databases, volume attestation, interleaved pagination, creator/project filters, three parallel retained transactions, late role/password revocation and shared/mixed draft cleanup. No Runtime or model provider is started."
+    },
+    "normalNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "scenariosPerVersion": 13,
+      "typescriptLoader": false,
+      "gatewayProductionJs": 262,
+      "artifactFiles": 402,
+      "qualification": "Unchanged ordinary Gateway emit and both unmodified migration directories, with a public MJS fixture. macOS execution only."
+    },
+    "changedMethodMeasurements": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-changed-path-v8.json",
+      "qualification": "Both ordinary Node versions execute every measured range of shared, page and inTransaction. The database getter retains an unexecuted fallback range in these replays. No whole-file100percent coverage is claimed for the two large owners."
+    },
+    "fullRepositoryBuild": {
+      "log": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-complete-build-accepted.log",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "clientArtifacts": 266,
+      "qualification": "Native, Host compiler/bundle, Client compiler/bundle, Web, Host aggregate and Client aggregate all pass. The final Host-only check after mechanical test formatting also passes. Initial99diagnostics are retained; most came from four Web tests importing Client Context declarations into the Host program."
+    },
+    "finalHostAggregate": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-host-aggregate-final.log",
+    "fullGatewayTypecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-gateway-typecheck-accepted.log",
+    "ordinaryGatewayBuild": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-gateway-production-build.log",
+    "focusedLint": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-final-lint.json",
+      "actualFiles": 19,
+      "diagnostics": 0
+    },
+    "docs": {
+      "pairing": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-pairing-check.log",
+      "pairs": 3,
+      "markdownLinks": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-markdown-links.json",
+      "sources": 6,
+      "guideStructure": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-upgrade-guide-structure.json",
+      "guideWords": 489,
+      "documentBudgets": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-doc-budgets.log",
+      "globalQuickPassClaimed": false,
+      "retainedGlobalFailures": [
+        "Historical Session format catalog is stale",
+        "Existing concrete terminology findings in retained code and audit records"
+      ]
+    },
+    "ownedClusters": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/native-postgres-lifecycle-summary.json",
+    "whitespace": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-owned-whitespace.log"
+  },
+  "earlierAuthoritySourceHashesUnchanged": true,
+  "stableSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/archive-stable-sources.json",
+  "frozenDelivery": {
+    "at": "2026-11-05T00:05:00.813261+00:00",
+    "finding": "B516",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/B516-archive-governance-transaction",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T234030Z/B516-archive-governance-transaction.delta.tar.gz",
+    "archiveSha256": "f1a0e0b7aa1319071492a7ccbd09d4127c74ec354f038a27f849da383b272da5",
+    "manifestSha256": "4eaa1315054c7bcbd1f644ada199b2fc6b3fb3b76f59b65c019d634593160fd2",
+    "ownedPaths": 32,
+    "readOnlyPrerequisites": 7,
+    "gatewayProductionJs": 262,
+    "artifactFiles": 402,
+    "wholeProjectComplete": false
+  },
+  "limits": [
+    "All12business domains remain in progress. A successful complete build does not establish complete business review.",
+    "The new ordinary Node replays are macOS only; no fresh Windows/Linux acceptance by this task is claimed.",
+    "The four Web test changes are type/import and measurement-guard integration repairs; their complete browser latency workloads were not re-executed here.",
+    "Direct/helper/third-party allocation, remaining archive/project read publication, new peer features and unsupported native-platform acceptance remain open.",
+    "Real paid Responses validation remains explicitly deferred."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false
+}

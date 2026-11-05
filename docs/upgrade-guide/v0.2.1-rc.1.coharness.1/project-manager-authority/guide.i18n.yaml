@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-manager-authority/guide.md
 document:
-  en: bed54c9bf792c0cdf87ec7c0cdb00a5eab0adf22
-  zh: 89e5a365c98dfc074d4e709136e77d99c329da31
+  en: 9dc75edf59f77e23f1ce7fc9548468391d321dfa
+  zh: b7c2649ed5f77c714896891e63ffa117569a5d3a
 /:
   en: b9b4d232622881a6
   zh: 0a551ef2d9dad995
@@ -12,8 +12,8 @@ document:
   en: 6c0deb3d037fc662
   zh: 95e9a0035b78e15a
 /upgrade-project-management-authority/change:
-  en: 032a0aaef188faec
-  zh: 4da653e8d63e84f8
+  en: 867a5388d0403b49
+  zh: c25b23d52da1bc6f
 /upgrade-project-management-authority/migration:
-  en: 540fecc6e108653c
-  zh: 7e10551c309cb2b9
+  en: 7546c883790b5233
+  zh: f530494e15d66adc

@@ -9,9 +9,13 @@ English | [中文](README.zh.md)
 
 Gateway collaboration UI for the Web client. One plugin owns the account-context HTTP state, personal/project scope selector, staged root-conversation visibility, conversation sharing menu, and read-only project composer policy through existing Client slots and session-create waterfall events.
 
+A scope change checks both the current composers and input held by an unfinished conversation navigation. Unconfirmed node writes and offline text keep the leave warning active in the owning tab.
+
 Workbench sharing, read-only composer selection and creation eligibility follow the pane or requested runtime, independently of the page’s current space. Browser sharing requests carry the original Session ID, explicit project ID and the Session’s Runtime allocation; unqualified standalone histories retain the Runtime selected in the tab URL. Gateway verifies the project and Runtime before reading or changing visibility. Personal panes do not inherit a project pane’s read-only state or sharing controls.
 
 Environment discovery starts after account verification. Pending reads and retained pages belong to that account and connection; account changes and connection invalidation discard them. One space selector appends directory pages and refreshes from the first page without connecting to each computer. Account-qualified browser preferences retain favorite Runtime IDs and up to eight recent entries; authorized directory metadata supplies their names, and preferences never select another tab's environment. Saved IDs outside loaded pages are resolved in batches of at most 32 through the same authorized directory query; withdrawn IDs supply no shortcuts. Rows retain computer and Runtime availability separately, and a stopped Runtime starts on entry. Switch failures keep the source document and name an actionable recovery. The pushed selector focuses its back button and makes only the covered sidebar region inert, without trapping focus in the main workbench.
+
+The space picker lists authorized project numbers immediately. Choose a computer to read up to 32 project names from it. An open project requests its own name. Losing access hides the name and local path.
 
 Settings and Plugin Manager show their verified bootstrap computer independently of the selected conversation. The primary entry can open the existing environment picker in another tab, preserving unsaved configuration in this document. Single mode hides these computer controls; a direct secondary entry has no cross-computer action.
 

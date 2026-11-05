@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-cross-scope-document-workbench.md
 document:
-  en: db2c1ab50dd8a5da850fe0edb8a438a5153fed53
-  zh: e1956f53d617e64955e03667ef281e8981b892b5
+  en: 7d685e96537773919b38f2841f4bb98503ef9165
+  zh: f52276e58a2a4460303f0e0b2e4a31949072f528
 /agent-note-cross-scope-document-catalog-and-workbench:
   en: a06a5484c26ac76e
   zh: 721947eeac639bb0
@@ -12,8 +12,8 @@ document:
   en: c934ff7fb8649bda
   zh: 539c08f19d3b4aee
 /agent-note-cross-scope-document-catalog-and-workbench/decision:
-  en: 5225c1dc1fe0e976
-  zh: 61f097691e5e230b
+  en: b654abc8a656ad4c
+  zh: 92b5975aba72ca51
 /agent-note-cross-scope-document-catalog-and-workbench/alternatives-considered:
   en: e095d8b706a56242
   zh: dad1aa23d59f9a1a

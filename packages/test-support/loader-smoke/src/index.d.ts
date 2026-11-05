@@ -24,7 +24,7 @@ export declare const EXAMPLE_MODE_ENV = 'DSH_EXAMPLE_MODE'
  * @param raw - the raw value; defaults to `process.env.DSH_EXAMPLE_MODE`.
  * @returns the validated mode.
  */
-export declare function resolveExampleMode(raw?: string | undefined): ExampleMode
+export declare function resolveExampleMode(raw?: string  ): ExampleMode
 /** Inputs to {@link resolveExampleLaunch}. */
 export interface ExampleLaunchOptions {
   /** Absolute path to the example bin's TypeScript source entry (`<pkg>/src/bin.ts`); the `lib` bin is derived from it. */

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-05-administrator-read-publication.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-05-administrator-read-publication.md
+document:
+  en: 43879c0c894a8d47c28afde0d2859d7ef80397cd
+  zh: dfdb727773534f482cf7aef1992175f37aeb7669
+/agent-note-administrator-json-reads-recheck-eligibility-at-publication:
+  en: a76a0608137452b0
+  zh: f934dfdea986843d
+/agent-note-administrator-json-reads-recheck-eligibility-at-publication/problem:
+  en: 24f64fbf44051c7a
+  zh: be275db7f01ddb29
+/agent-note-administrator-json-reads-recheck-eligibility-at-publication/decision:
+  en: 79be7a2b875510ce
+  zh: 96f7fd2e7920d31f
+/agent-note-administrator-json-reads-recheck-eligibility-at-publication/alternatives-considered:
+  en: a151f038426d5370
+  zh: 200e59449608e7dd
+/agent-note-administrator-json-reads-recheck-eligibility-at-publication/consequences:
+  en: 63711f7c973d911a
+  zh: e1e4b84af1dcbe59

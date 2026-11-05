@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-administration-authority/guide.md
 document:
-  en: cbcf60e979200da0f1ecf5b14ae576ab520e7802
-  zh: b39bfdffc7b3040a023a37d26ae11902218be85e
+  en: 7282608101c8d0acf29192d3235016c52c638cd5
+  zh: fede4fef9b0132e55a21a497ea865fb11b90c244
 /:
   en: e85df9377c933842
   zh: 769bba0b988b5f47
@@ -12,8 +12,8 @@ document:
   en: a46bdcb945357ae2
   zh: ad9df0f9afbb1dbb
 /upgrade-model-administration-authority/change:
-  en: 92d3eb36a5cf2fab
-  zh: b91a941d2d698c38
+  en: fad0228a12f9cba5
+  zh: d7820a47ca481c6c
 /upgrade-model-administration-authority/migration:
-  en: 1170cb2d32a05968
-  zh: 2356d002460ac70d
+  en: 26e0126bf5cc8b97
+  zh: 30fc5ba18c5f7189

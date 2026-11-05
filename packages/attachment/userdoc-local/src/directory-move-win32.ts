@@ -123,3 +123,22 @@ export async function withWindowsDirectoryMove<T>(
   if (!outcome.ok) throw outcome.error
   return outcome.value
 }
+
+/**
+ * Replace one verified, private recovery file by a same-volume write-through move.
+ * @param source - newly created and flushed sibling or verified replacement hard link.
+ * @param destination - existing file within the exclusively owned restore directory.
+ * @returns after Windows completes the namespace change.
+ */
+export async function replaceRecoveredFileWindows(source: string, destination: string): Promise<void> {
+  const koffi = (await import('koffi')).default
+  const library = koffi.load('kernel32.dll')
+  try {
+    const move = library.func('__stdcall', 'MoveFileExW', 'int', ['str16', 'str16', 'uint']) as (from: string, to: string, flags: number) => number
+    const lastError = library.func('__stdcall', 'GetLastError', 'uint', []) as () => number
+    const MOVEFILE_REPLACE_EXISTING = 1
+    if (!move(toNamespacedPath(source), toNamespacedPath(destination), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+      throw windowsError('MoveFileExW', lastError(), destination)
+    }
+  } finally { library.unload() }
+}

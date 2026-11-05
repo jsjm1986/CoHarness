@@ -1,0 +1,119 @@
+{
+  "id": "B517",
+  "title": "Project metadata and management flags can retain withdrawn membership, ownership or login authority after asynchronous preparation",
+  "status": "fixed_directory_detail_current_authority_and_computer_binding_verified_remaining_project_read_review_open",
+  "sourceFixed": true,
+  "at": "2026-11-05T01:02:31.069265+00:00",
+  "paths": [
+    "gateway/src/collaboration.ts",
+    "gateway/src/services.ts",
+    "gateway/src/postgres/collaboration-service.ts",
+    "gateway/src/server.ts"
+  ],
+  "receipt": "receipts/project-read-publication-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z",
+  "counterproof": {
+    "realPostgresHttp": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-read-negative-observations.json",
+      "result": "Four real authenticated Gateway reads publish withdrawn private project metadata or stale management flags after committed membership, ownership and role changes during a preparation barrier."
+    },
+    "borrowedAdapterComputer": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-borrowed-node-before.json",
+      "result": "Two HTTP adapter regressions show that retaining borrowed project views lets an in-place computer refresh pair prepared metadata with a different computer grant."
+    },
+    "preparedMetadataComputer": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-metadata-node-before.json",
+      "result": "Two HTTP adapter regressions show that current initial and final authority alone can publish older metadata from another known computer."
+    }
+  },
+  "correction": "Browser directory/detail reads perform one final control-database-only account, password, membership, project, mount, exact-computer and Steward admission after metadata preparation. Prepared computer identifiers are copied before authority waits. Current ownership, theme and management flags come from the final snapshot. Withdrawn entries are omitted and detail reads refuse publication. Missing adapters return501 and lookup failures return503 without prepared data or database diagnostics. Ordinary Runtime authority remains separate.",
+  "checks": {
+    "distinctNamedCases": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-acceptance-union.json",
+      "passed": 136,
+      "skipped": 0,
+      "repeatedRunsNotDoubleCounted": true,
+      "qualification": "Accept passing files individually from the initial mixed report and supersede repaired fixture failures with final passing reports. The final source set includes86server,3registry,43baseline,1physical flow and3public replay cases."
+    },
+    "publicHttpReplay": {
+      "spec": "gateway/tests/project-directory-read-postgres.spec.ts",
+      "expected": "gateway/tests/expected/projects/directory-read.jsonl",
+      "scenarios": 44,
+      "qualification": "Actual Gateway login and one-connection PostgreSQL, list/detail publication after22account or project changes, exact other-computer refusal, owner transfer, administrator and Steward changes. No Runtime or provider starts. Existing management13and model-read78scenario replays also pass."
+    },
+    "normalNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "scenariosPerVersion": 44,
+      "typescriptLoader": false,
+      "gatewayProductionJs": 262,
+      "artifactFiles": 403,
+      "qualification": "Unmodified ordinary Gateway emit, public MJS fixture and unchanged migration assets; macOS execution only."
+    },
+    "changedMethodMeasurements": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-changed-path-v8.json",
+      "qualification": "Both Node versions execute the new browser SQL wrapper and every measured range of its shared selector. The server lookup wrapper catch is exercised by six HTTP unit behaviors but is not reached by these PostgreSQL goldens. No whole-file100percent claim."
+    },
+    "physicalVolume": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-physical-cases.json",
+      "qualification": "The full real separated content-database project flow passes; a metadata lookup spy throws if the new final browser authority attempts node I/O, and observes no calls."
+    },
+    "fullGatewayTypecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-gateway-typecheck-accepted.log",
+    "ordinaryGatewayBuild": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-production-build.log",
+    "focusedLint": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-lint.json",
+      "actualFiles": 9,
+      "diagnostics": 0,
+      "selectedFiles": 11,
+      "qualification": "Two selected MJS fixtures are ignored by the existing lint configuration."
+    },
+    "docs": {
+      "pairing": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-pairing-check.log",
+      "pairs": 4,
+      "markdownLinks": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-markdown-links.json",
+      "sources": 8,
+      "guideStructure": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-upgrade-guide-structure.json",
+      "guideWords": 424,
+      "documentBudgets": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-doc-budgets.log",
+      "globalQuickPassClaimed": false,
+      "retainedGlobalFailures": [
+        "Historical Session format catalog is stale",
+        "Existing concrete terminology findings in retained code and audit records"
+      ]
+    },
+    "designAudit": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/impeccable-server-test-audit.json",
+      "qualification": "Requested detector returns no findings for this backend HTTP test file. No rendered UI behavior or production UI edit is claimed."
+    },
+    "ownedClusters": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/native-postgres-lifecycle-summary.json",
+    "whitespace": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-owned-whitespace.log"
+  },
+  "earlierAuthorityAndArchiveSourcesUnchanged": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/prior-frozen-sources-check.json",
+  "stableSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/project-directory-stable-sources.json",
+  "frozenDelivery": {
+    "at": "2026-11-05T01:01:26.737185+00:00",
+    "finding": "B517",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/B517-project-read-publication",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261105T000813Z/B517-project-read-publication.delta.tar.gz",
+    "archiveSha256": "09117411b681ec0885351a59d2eb23820acd24f335774da8802db2d26c989b7d",
+    "manifestSha256": "2db918b22f1270ee9707e6543bd5fc9a5007a1902067b4fe379fc455dfb1abea",
+    "ownedPaths": 25,
+    "readOnlyPrerequisites": 8,
+    "gatewayProductionJs": 262,
+    "artifactFiles": 403,
+    "wholeProjectComplete": false
+  },
+  "limits": [
+    "All12business domains remain in progress; current named cases do not establish whole-file review.",
+    "Remaining configuration/invitation read publication, archive/business flows, allocation ownership, new peer capabilities and native platform acceptance remain open.",
+    "Earlier E516complete repository build8steps remains retained evidence; this change reruns full Gateway typecheck and emit, not all repository build faces.",
+    "Initial obsolete schema/authority expectations and incomplete-password test seeds were repaired without changing committed SQL migrations or weakening assertions.",
+    "Real paid Responses validation remains explicitly deferred."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false
+}

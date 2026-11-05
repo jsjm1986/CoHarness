@@ -306,7 +306,7 @@ function serviceError(error: unknown): never {
 /** Create handlers backed by one PostgreSQL catalog service. */
 export function createDocumentCatalogHandlers(
   catalog: Pick<PostgresDocumentCatalogService, 'sync' | 'markDeleted' | 'authorize' | 'overview' | 'history' | 'projectionCursor' | 'project'>
-    & Partial<Pick<PostgresDocumentCatalogService, 'markDeletedBatch' | 'projectionOwner'>>,
+    & Partial<Pick<PostgresDocumentCatalogService, 'markDeletedBatch' | 'projectionOwner' | 'publishNewPersonalRoot'>>,
   audit?: Pick<GatewayAuditService, 'write'>,
 ): {
   sync: RuntimeDocumentCatalogSyncHandler
@@ -315,6 +315,7 @@ export function createDocumentCatalogHandlers(
   history: RuntimeDocumentCatalogHistoryHandler
   purge: RuntimeDocumentCatalogPurgeHandler
   projection: RuntimeDocumentCatalogProjectionHandler
+  publishNewPersonalRoot?:PostgresDocumentCatalogService['publishNewPersonalRoot']
   projectionOwner(rootId: UserDocRootId): Promise<DocumentCatalogScope | null>
 } {
   const sync: RuntimeDocumentCatalogSyncHandler = async ({ subject, principal, payload }) => {
@@ -461,6 +462,7 @@ export function createDocumentCatalogHandlers(
     }
   }
   return { sync, authorize, overview, history, purge, projection,
+    publishNewPersonalRoot:catalog.publishNewPersonalRoot?.bind(catalog),
     async projectionOwner(rootId) {
       if (catalog.projectionOwner === undefined) {
         throw new DocumentCatalogError('DOCUMENT_CATALOG_UNAVAILABLE', 503, 'Document scope ownership is unavailable.')

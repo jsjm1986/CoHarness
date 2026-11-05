@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-workbench/README.md
 document:
-  en: 5cc163f5c10735c29831cccaedbf17703f8cd786
-  zh: 40c8c7aecc3c322c9703d12bcac1d3dbf0c30565
+  en: a396f0c2675b1638952f9bfe4a61cb6e154c7e87
+  zh: 66a9a6840b4d8b0f41d238a74b7a85dc4ce8abf1
 /:
   en: aabfdc4257b4c0a6
   zh: 61495d48365178df
 /deepseek-ai-dsh-client-ui-workbench:
-  en: b17718bb4a189fb9
-  zh: 2521fab2cff6d0fb
+  en: acbeb14028c38ff6
+  zh: 51c5b93c40d2d5b0
 /deepseek-ai-dsh-client-ui-workbench/summary:
   en: 42a9f36cbc282bf4
   zh: 746e9f0e6cdf3f99
@@ -21,13 +21,13 @@ document:
   en: 1e7d08861dccd130
   zh: 2a8c24b4d8ab31be
 /deepseek-ai-dsh-client-ui-workbench/view-state:
-  en: 266cd10e96811795
+  en: 6baf1e7254883f26
   zh: 4124015a812fbbcc
 /deepseek-ai-dsh-client-ui-workbench/model-experience:
   en: 12c1543c765e2289
   zh: 52f69ac8007ecdd4
 /deepseek-ai-dsh-client-ui-workbench/model-experience/kv-cache-effect:
-  en: 1c9d1a16fa9fa886
+  en: 47f982e326fe77fd
   zh: 10b529588772b11d
 /deepseek-ai-dsh-client-ui-workbench/known-limitations-and-deferred-work:
   en: ebc00cf7d889b757

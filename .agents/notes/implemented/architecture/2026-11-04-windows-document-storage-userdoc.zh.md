@@ -15,7 +15,7 @@
 3. `gateway/src/launcher.ts` 只给 Runtime 子进程设 `HOME`，但 Windows 上 Node 的 `os.homedir()` 读 `USERPROFILE`——Runtime 的 `~/documents` 展开到 SYSTEM profile，而 Gateway 通告的是属主根，报 `Document service root does not match this runtime`。
 4. `packages/attachment/userdoc-local/src/identity-storage.ts` 要求持久 marker 带 `volume`；Windows 的 `persistentObject()` 无卷标识，所有 Windows 写出的 marker 重开都报 `belong to another metadata domain`。
 
-## 变更
+## 决策
 
 - `gateway/src/node-private-file.ts`
   - 新增 `protectedDirectoryState()`——Windows 判定走 PowerShell 探针：零条非 `InheritOnly` 的 Deny 规则 + 零条向属主/LocalSystem(`S-1-5-18`)/Administrators(`S-1-5-32-544`) 之外 SID 授予修改类权限（`WINDOWS_MODIFY_RIGHTS_MASK`：Delete、DeleteSubdirectoriesAndFiles、ChangePermissions、TakeOwnership、WriteAttributes、WriteExtendedAttributes、GENERIC_ALL、GENERIC_WRITE）的 Allow 规则。`InheritOnly` ACE（如 `CREATOR OWNER` 模板）跳过——它们只约束未来子对象，对本目录无效，与 POSIX `mode & 0o022` 祖先检查所见一致。创建类权限（CreateFiles/CreateDirectories）同理保持无害。
@@ -29,7 +29,11 @@
 - `packages/attachment/userdoc-local/src/identity-storage.ts`
   - `recordedObject()` 仅在任一侧携带 `volume` 时才比较卷标识；Windows marker 用 device+inode 校验，POSIX v2 marker 保留卷要求。
 
-## 源码无法表达的部署事实
+## 考虑过的替代方案
+
+用 POSIX 模式判断 Windows 目录会漏掉其他账号的 ACL 写权限。Runtime 自行解析用户目录也可能打开另一份文档。Gateway 和 Runtime 都要核对账号和文件系统对象身份。
+
+## 后果
 
 已在生产路径验证，记录于此避免下个 release 重踩：
 

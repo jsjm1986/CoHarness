@@ -207,6 +207,8 @@ export interface DocumentTransferRequest {
   readonly target: DocumentTransferScope
   /** Administrator-only fan-out targets; absent for the ordinary one-target form. */
   readonly targets?: readonly DocumentTransferScope[]
+  /** Raw Session ID used only when copying for an addressed conversation. */
+  readonly targetSessionId?: string
   readonly directory?: string
   readonly documents: readonly DocumentTransferSelection[]
 }
@@ -225,6 +227,8 @@ export interface DocumentTransferTargetRef {
 export type DocumentTransferItem =
   | {
     readonly status: 'copied'
+    /** The bytes exist on the destination, but the catalog or audit receipt could not be confirmed. */
+    readonly historyUnconfirmed?: true
     readonly source: { readonly name: string; readonly bytes: number; readonly mediaType: string }
     readonly target: DocumentTransferTargetRef
   }
@@ -465,6 +469,7 @@ export interface DocumentTransferDependencies {
     authorize(scope: DocumentTransferScope, action: 'read' | 'write'): Promise<ScopeIdentity>
     url(scope: DocumentTransferScope, path: string): string
     headers(signal: AbortSignal): Promise<Headers>
+    validateConversation?(scope: DocumentTransferScope, sessionId: string, signal: AbortSignal): Promise<void>
   }
 }
 
@@ -686,8 +691,13 @@ function requestValue(value: unknown): DocumentTransferRequest {
     seen.add(item.docId)
     return { docId: item.docId }
   })
+  const targetSessionId = candidate.targetSessionId
+  if (targetSessionId !== undefined && (typeof targetSessionId !== 'string' || targetSessionId.length < 1 || targetSessionId.length > 512 ||
+    /[\u0000-\u001f\u007f]/u.test(targetSessionId) || !target.nodeId || !target.runtimeId || targets || candidate.planId)) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'A conversation attachment requires one exact target computer and Runtime.')
+  }
   return {
-    version: 1,
+    version: 1, ...(targetSessionId === undefined ? {} : { targetSessionId }),
     ...(typeof candidate.planId === 'string' && candidate.planId !== '' ? { planId: candidate.planId } : {}),
     source,
     target,
@@ -1263,6 +1273,25 @@ async function transferScope(
   }
 }
 
+/** Resolve the current initiating account and any organization-wide copy permission. */
+async function currentTransferActor(
+  deps: DocumentTransferDependencies,
+  actorId: number,
+  administratorOnly: boolean,
+): Promise<UserRow> {
+  let actor: UserRow | null
+  try { actor = await deps.users.getById(actorId) } catch {
+    throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document transfer account lookup is unavailable.')
+  }
+  if (actor === null || actor.status !== 'active') {
+    throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'Document transfer account is no longer available.')
+  }
+  if (administratorOnly && actor.role !== 'admin') {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_MULTI_TARGET_FORBIDDEN', 403, 'Only organization administrators can copy to multiple project targets.')
+  }
+  return actor
+}
+
 /** Renew one request only after both scopes and the initiating account remain authorized. */
 async function transferRequestHeaders(
   deps: DocumentTransferDependencies,
@@ -1274,16 +1303,7 @@ async function transferRequestHeaders(
   signal: AbortSignal,
 ): Promise<Headers> {
   signal.throwIfAborted()
-  let actor: UserRow | null
-  try { actor = await deps.users.getById(actorId) } catch {
-    throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document transfer account lookup is unavailable.')
-  }
-  if (actor === null || actor.status !== 'active') {
-    throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'Document transfer account is no longer available.')
-  }
-  if (administratorOnly && actor.role !== 'admin') {
-    throw new DocumentTransferError('DOCUMENT_TRANSFER_MULTI_TARGET_FORBIDDEN', 403, 'Only organization administrators can copy to multiple project targets.')
-  }
+  const actor = await currentTransferActor(deps, actorId, administratorOnly)
   const [sourceScope, targetScope] = await Promise.all([
     transferScope(deps, actor, source, 'read'),
     transferScope(deps, actor, target, 'write'),
@@ -1368,6 +1388,7 @@ async function audit(
   source: ScopeIdentity,
   target: ScopeIdentity,
   item: { docId: string; name: string; status: string; targetDocId?: string; bytes?: number; code?: string },
+  nodeOwned:boolean,
 ): Promise<void> {
   if (deps.audit === undefined) return
   await deps.audit.write({
@@ -1377,11 +1398,11 @@ async function audit(
     detail: JSON.stringify({
       version: 1,
       transferId,
-      source: { kind: source.kind, id: source.id, nodeId: source.nodeId, documentId: item.docId, name: item.name },
+      source: { kind: source.kind, id: source.id, nodeId: source.nodeId, ...(nodeOwned ? {} : {documentId:item.docId,name:item.name}) },
       target: {
         kind: target.kind,
         id: target.id, nodeId: target.nodeId,
-        ...(item.targetDocId === undefined ? {} : { documentId: item.targetDocId }),
+        ...(nodeOwned || item.targetDocId === undefined ? {} : { documentId: item.targetDocId }),
       },
       status: item.status,
       ...(item.bytes === undefined ? {} : { bytes: item.bytes }),
@@ -1408,6 +1429,8 @@ async function copyDocuments(
       signal.throwIfAborted()
       const name = sourceName(document.docId)
       let sourceResponse: Response | undefined
+      let sourceDocumentIdentity:ReturnType<typeof contentIdentity>
+      let item:DocumentTransferItem
       try {
         const contentUrl = new URL(sourceUrl)
         contentUrl.searchParams.set('id', document.docId)
@@ -1427,7 +1450,7 @@ async function copyDocuments(
           const status = sourceResponse.status >= 400 && sourceResponse.status < 500 ? sourceResponse.status : 502
           throw new DocumentTransferError(error.code, status, error.message)
         }
-        const sourceDocumentIdentity = contentIdentity(sourceResponse)
+        sourceDocumentIdentity = contentIdentity(sourceResponse)
         const mediaType = (sourceResponse.headers.get('content-type') ?? 'application/octet-stream').split(';', 1)[0] ?? 'application/octet-stream'
         const lengthHeader = sourceResponse.headers.get('content-length')
         const declaredBytes = lengthHeader === null ? undefined : Number(lengthHeader)
@@ -1446,78 +1469,39 @@ async function copyDocuments(
           responseLimit(deps),
           documentScopeTimeoutMs(deps),
         )
-        const bytes = declaredBytes !== undefined && Number.isSafeInteger(declaredBytes) && declaredBytes >= 0
-          ? declaredBytes
-          : ref.bytes
-        items.push({ status: 'copied', source: { name, bytes, mediaType }, target: ref })
-        await deps.catalog?.recordCopy({
-          actorUserId: principal.user.id,
-          sourceNodeId: input.source.nodeId, targetNodeId: input.target.nodeId,
-          source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
-          targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
-          sourceDocId: document.docId,
-          ...(sourceDocumentIdentity === undefined ? {} : { sourceIdentity: sourceDocumentIdentity }),
-          sourceName: name,
-          target: {
-            docId: ref.docId,
-            directoryId: String(ref.docId).split('/').slice(0, -1).join('/'),
-            name: ref.name,
-            bytes: ref.bytes,
-            mediaType: ref.mediaType,
-            modifiedAt: ref.modifiedAt,
-            ...(ref.identity === undefined ? {} : { identity: ref.identity }),
-          },
-          operationId: transferId,
-        }).catch(() => {})
-        await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
-          docId: document.docId, name, status: 'copied', targetDocId: ref.docId, bytes,
-        })
-      } catch (error) {
-        if (error instanceof DocumentTransferError && error.status === 404) {
-          const item = { status: 'failed' as const, source: { name }, error: { code: error.code, message: error.message } }
-          items.push(item)
-          await deps.catalog?.recordCopy({
-            actorUserId: principal.user.id,
-          sourceNodeId: input.source.nodeId, targetNodeId: input.target.nodeId,
-            source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
-            targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
-            sourceDocId: document.docId,
-            sourceName: name,
-            error: item.error,
-            operationId: transferId,
-          }).catch(() => {})
-          await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
-            docId: document.docId, name, status: 'failed', code: error.code,
-          })
-          continue
-        }
-        if (signal.aborted) throw signal.reason
-        const item = {
-          status: 'failed' as const,
-          source: { name },
-          error: error instanceof DocumentTransferError
-            ? { code: error.code, message: error.message }
-            : { code: 'DOCUMENT_TRANSFER_FAILED', message: 'Document transfer failed.' },
-        }
-        items.push(item)
-        await deps.catalog?.recordCopy({
-          actorUserId: principal.user.id,
-          sourceNodeId: input.source.nodeId, targetNodeId: input.target.nodeId,
-          source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
-          targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
-          sourceDocId: document.docId,
-          sourceName: name,
-          error: item.error,
-          operationId: transferId,
-        }).catch(() => {})
-        await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
-          docId: document.docId, name, status: 'failed', code: item.error.code,
-        })
+        item={status:'copied',source:{name,bytes:declaredBytes,mediaType},target:ref}
+      }catch(error){
+        if(signal.aborted)throw signal.reason
+        item={status:'failed',source:{name},error:error instanceof DocumentTransferError
+          ?{code:error.code,message:error.message}:{code:'DOCUMENT_TRANSFER_FAILED',message:'Document transfer failed.'}}
       } finally {
         if (sourceResponse?.body !== null && sourceResponse?.body !== undefined && !sourceResponse.body.locked) {
           await sourceResponse.body.cancel().catch(() => {})
         }
       }
+      let nodeOwned=sourceIdentity.nodeId!==targetIdentity.nodeId
+      let receiptFailed=false
+      try {
+        const recorded=await deps.catalog?.recordCopy({
+          actorUserId:principal.user.id,sourceNodeId:input.source.nodeId,targetNodeId:input.target.nodeId,
+          source:input.source.kind==='personal'?{kind:'personal',userId:principal.user.id}:{kind:'project',projectId:input.source.projectId},
+          targetScope:input.target.kind==='personal'?{kind:'personal',userId:principal.user.id}:{kind:'project',projectId:input.target.projectId},
+          sourceDocId:document.docId,sourceName:name,sourceIdentity:sourceDocumentIdentity,operationId:transferId,
+          ...(item.status==='failed'?{error:item.error}:{target:{...item.target,directoryId:item.target.docId.split('/').slice(0,-1).join('/')}})
+        })
+        nodeOwned||=recorded?.nodeOwned===true
+      }catch{
+        // The byte operation has a final result even if the scope directory cannot acknowledge its history.
+        receiptFailed=true
+        nodeOwned=true
+      }
+      try{
+        await audit(deps,principal,transferId,sourceIdentity,targetIdentity,{docId:document.docId,name,status:item.status,
+          ...(item.status==='copied'?{targetDocId:item.target.docId,bytes:item.source.bytes}:{code:item.error.code})},nodeOwned)
+      }catch{
+        receiptFailed=true
+      }
+      items.push(receiptFailed&&item.status==='copied'?{...item,historyUnconfirmed:true}:item)
       }
       return {
         version: 1,
@@ -1535,13 +1519,18 @@ function createSingleDocumentTransferHandler(
 ): RuntimeDocumentTransferHandler {
   return async ({ subject, principal, payload, signal }) => {
     const input = requestValue(payload)
+    if (input.targetSessionId && !deps.browser?.validateConversation) {
+      throw new DocumentTransferError('DOCUMENT_ATTACHMENT_TARGET_UNAVAILABLE', 409, 'The selected conversation cannot be verified at this entry.')
+    }
     const actor = syntheticUser(principal)
     if (deps.browser !== undefined) {
       const browser = deps.browser
       const [source, target] = await Promise.all([browser.authorize(input.source, 'read'), browser.authorize(input.target, 'write')])
+      if (input.targetSessionId) await browser.validateConversation!(input.target, input.targetSessionId, signal)
       if (source.kind === target.kind && source.nodeId === target.nodeId && source.id === target.id) throw new DocumentTransferError('DOCUMENT_TRANSFER_SAME_SCOPE', 409, 'The source and target document roots must differ.')
       const headers = async (authorizationSignal: AbortSignal): Promise<Headers> => {
         authorizationSignal.throwIfAborted()
+        if (administratorOnly) await currentTransferActor(deps, principal.user.id, true)
         await Promise.all([browser.authorize(input.source, 'read'), browser.authorize(input.target, 'write')])
         return browser.headers(authorizationSignal)
       }

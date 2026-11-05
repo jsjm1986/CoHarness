@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/steward-worktree-preparation/guide.md
+document:
+  en: 8ff2b45ba6fd04950d6de76797a8ec6153d9346f
+  zh: 6efe92eb1e2ec230b9526c6d4947cb9ca2b9b09b
+/:
+  en: 1469346a781b104e
+  zh: 4c7920d0c342fa3b
+/bounded-steward-workspace-preparation:
+  en: 58cce8f1aa784fdb
+  zh: dc8939be13579b2f
+/bounded-steward-workspace-preparation/change:
+  en: 9d8216fdbb878dfb
+  zh: 1a078d61e904b05b
+/bounded-steward-workspace-preparation/migration:
+  en: 1701bba64e123e50
+  zh: cb2ac5ed8961327e

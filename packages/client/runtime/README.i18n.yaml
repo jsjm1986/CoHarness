@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/runtime/README.md
 document:
-  en: 554b8eb601bf89ca3dd3bdacdb6daca995692a28
-  zh: af6caa7717496f6f6196f55c2deef1c2cc793b14
+  en: 1329d938c9f3e4895d232d886b019a30731f4b6b
+  zh: a9663818fce5ed0c36419d58f1e620f0992a551d
 /:
   en: d263c68503f0be45
   zh: 61495d48365178df
 /deepseek-ai-dsh-client-runtime:
-  en: e27065f647c4e256
-  zh: ca2ee1791e8ad4bb
+  en: 95eddd43f8ac3662
+  zh: fe5b9b253ada51ba
 /deepseek-ai-dsh-client-runtime/summary:
   en: 153df193e733af10
   zh: a65fe81e387c717d
@@ -33,8 +33,8 @@ document:
   en: 78d7eeacb5369438
   zh: 63bc1da9b1efabc6
 /deepseek-ai-dsh-client-runtime/new-session-and-the-blank-mirror:
-  en: 0e1c55e0b0fd90f7
-  zh: 8832ab88bc9a61c0
+  en: 195af68108ecfbba
+  zh: 28cac9d77fe60fd6
 /deepseek-ai-dsh-client-runtime/pending-queue-projection:
   en: f3f4a78241f2fdd5
   zh: 2d7b0f43fb01a702
@@ -69,5 +69,5 @@ document:
   en: 603150ef8ca837d3
   zh: af79fedbfd266873
 /deepseek-ai-dsh-client-runtime/known-limitations-and-deferred-work/dev-note:
-  en: 7975b42164513ea8
-  zh: 64b3bd2cbdba963c
+  en: 4150d578ec390cae
+  zh: ea4c33409bfb7dbc

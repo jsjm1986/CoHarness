@@ -127,6 +127,8 @@ export function nodeSettingsFromConfig(cfg: GatewayConfig, environment: NodeJS.P
     HGW_RESOURCE_MAX_QUEUED: String(cfg.resourceBudget.maxQueued),
     HGW_RESOURCE_MAX_QUEUED_PER_USER: String(cfg.resourceBudget.maxQueuedPerUser),
     HGW_RESOURCE_MAX_QUEUED_PER_PROJECT: String(cfg.resourceBudget.maxQueuedPerProject),
+    HGW_DRAFT_HISTORY_REVISIONS: String(cfg.draftHistory.revisions),
+    HGW_DRAFT_HISTORY_BYTES: String(cfg.draftHistory.bytes),
     HGW_RESOURCE_MAX_QUEUED_BYTES: String(cfg.resourceBudget.maxQueuedBytes),
     HGW_RESOURCE_QUEUE_WAIT_MS: String(cfg.resourceBudget.maxWaitMs),
     HGW_PERFORMANCE_ENABLED: String(cfg.performanceEnabled),

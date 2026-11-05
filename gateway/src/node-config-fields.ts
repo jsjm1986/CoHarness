@@ -30,6 +30,8 @@ export const NODE_CONFIG_FIELDS = [
   { key: 'HGW_RESOURCE_CPU_TARGET_PERCENT', label: 'CPU 准入目标', group: 'runtime', kind: 'integer', help: '达到此使用率时新任务公平等待；不停止现有任务。', unit: '%', defaultValue: '85' },
   { key: 'HGW_RESOURCE_EVENT_LOOP_TARGET_MS', label: '事件循环延迟目标', group: 'runtime', kind: 'integer', help: 'Gateway 事件循环 P99 超过目标时暂停新任务。', unit: '毫秒', defaultValue: '100' },
   { key: 'HGW_RESOURCE_MEMORY_RESERVE_PERCENT', label: 'Linux 可用内存余量', group: 'runtime', kind: 'integer', help: 'Linux 按 MemAvailable 判断；macOS 使用系统内存压力。', unit: '%', defaultValue: '10' },
+  { key: 'HGW_DRAFT_HISTORY_REVISIONS', label: '每份草稿的历史版本数', group: 'runtime', kind: 'integer', help: '复制标签页可从所在电脑取回最近的草稿修订。两个保留上限同时生效。', unit: '个', defaultValue: '16' },
+  { key: 'HGW_DRAFT_HISTORY_BYTES', label: '每份草稿的历史容量', group: 'runtime', kind: 'integer', help: '限制同一份草稿保留版本的序列化总字节数。当前正文单独保存。', unit: '字节', defaultValue: '262144' },
   { key: 'HGW_RESOURCE_MAX_QUEUED', label: '任务等待总上限', group: 'runtime', kind: 'integer', help: '所有资源类别的待执行请求共同计数。', unit: '个', defaultValue: '256' },
   { key: 'HGW_RESOURCE_MAX_QUEUED_PER_USER', label: '单用户任务等待上限', group: 'runtime', kind: 'integer', help: '同用户的个人、项目和子任务共享，防止占满总队列。', unit: '个', defaultValue: '32' },
   { key: 'HGW_RESOURCE_MAX_QUEUED_PER_PROJECT', label: '单项目任务等待上限', group: 'runtime', kind: 'integer', help: '共享项目的所有参与用户共同使用。', unit: '个', defaultValue: '64' },

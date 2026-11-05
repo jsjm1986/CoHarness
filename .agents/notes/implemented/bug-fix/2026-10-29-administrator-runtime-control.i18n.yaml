@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-29-administrator-runtime-control.md
 document:
-  en: 4782f490197c334e34c76fed8e6499f2f95618ad
-  zh: 60b21fecab4ebe21de2a3b8525b1b82f1a133605
+  en: b21480c55afb7a43aa143713c2bb025b61aa0cbe
+  zh: 10a010fac974b642d8a05c5232c6b14acd091a67
 /agent-note-runtime-control-retains-the-initiating-administrator:
   en: e02f8997a07429d6
   zh: c69a4147dbe19a11
@@ -12,8 +12,8 @@ document:
   en: 961b34e88c3f53ad
   zh: 8a7a58083ac3029b
 /agent-note-runtime-control-retains-the-initiating-administrator/decision:
-  en: 6bdbbd7604e8d61a
-  zh: 4c155b6a869696e5
+  en: 614e62419bae9e92
+  zh: 260859a02f5a484b
 /agent-note-runtime-control-retains-the-initiating-administrator/alternatives-considered:
   en: 3eb104d1df9fc81e
   zh: 32018c25e1360774
@@ -21,5 +21,5 @@ document:
   en: cf1c6315b2c5f815
   zh: eaeed30510b88a98
 /agent-note-runtime-control-retains-the-initiating-administrator/verification:
-  en: 41cb80e43d488f40
-  zh: e009c799e2cde9e1
+  en: cc74ac6c03e0b399
+  zh: 0ab7e7a0992ef869

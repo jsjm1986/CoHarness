@@ -1,11 +1,13 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import * as api from '../api.ts'
 import { ProjectListPage } from './ProjectListPage.tsx'
 
 vi.mock('../api.ts', () => ({
   listProjects: vi.fn(),
+  getOwnerProjectDisplays: vi.fn(),
   listProjectDirectories: vi.fn(),
   createProject: vi.fn(),
 }))
@@ -22,8 +24,27 @@ describe('ProjectListPage', () => {
 
   beforeEach(() => {
     vi.mocked(api.listProjects).mockReset().mockResolvedValue([])
+    vi.mocked(api.getOwnerProjectDisplays).mockReset()
     vi.mocked(api.listProjectDirectories).mockReset()
     vi.mocked(api.createProject).mockReset()
+  })
+
+  it('reads 32 visible project displays on this Admin computer and requests the rest only after More', async () => {
+    const rows = Array.from({ length: 33 }, (_, i): api.Project => ({
+      id: i + 1, name: `#${i + 1}`, path: '', memberCount: 1, metadataOnNode: true,
+      nodeId: '20000000-0000-4000-8000-000000000001' as NonNullable<api.Project['nodeId']>,
+      runtimeId: `10000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}` as NonNullable<api.Project['runtimeId']>,
+    }))
+    vi.mocked(api.listProjects).mockResolvedValue(rows)
+    vi.mocked(api.getOwnerProjectDisplays).mockImplementation(async page => new Map(page.map(row => [row.id, { name: `Ubuntu ${row.id}`, path: `/srv/${row.id}` }])))
+    const user = userEvent.setup()
+    render(<MemoryRouter><ProjectListPage /></MemoryRouter>)
+    expect((await screen.findAllByText('Ubuntu 32')).length).toBeGreaterThan(0)
+    expect([...screen.queryAllByText('Ubuntu 33')]).toHaveLength(0)
+    expect(vi.mocked(api.getOwnerProjectDisplays).mock.calls.map(([page]) => page.map(row => row.id))).toEqual([rows.slice(0, 32).map(row => row.id)])
+    await user.click(screen.getByRole('button', { name: '更多项目' }))
+    expect((await screen.findAllByText('Ubuntu 33')).length).toBeGreaterThan(0)
+    expect(vi.mocked(api.getOwnerProjectDisplays).mock.calls[1]?.[0].map(row => row.id)).toEqual([33])
   })
 
   it('creates a project from its name without asking for a host path', async () => {

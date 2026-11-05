@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-这四条命令路径均使用既有的 Gateway 工具环境清理规则。PostgreSQL 已配置的密码、密码文件和 SSL 私钥输入通过 `PGPASSWORD`、`PGPASSFILE` 和 `PGSSLKEY` 作为显式例外保留；未配置时仍保持缺省。共享规则保留的其他 PostgreSQL 连接设置继续可用。显式数据库参数和进程关闭归属维持既有行为。
+这四条命令路径均使用既有的 Gateway 工具环境清理规则。PostgreSQL 已配置的密码、密码文件和 SSL 私钥输入通过 `PGPASSWORD`、`PGPASSFILE` 和 `PGSSLKEY` 作为显式例外保留；未配置时仍保持缺省。共享规则保留的其他 PostgreSQL 连接设置继续可用。数据库连接传递遵循[私密维护输入决策](2026-11-04-private-postgres-maintenance-input.zh.md)；进程关闭归属保持不变。
 
 ## Alternatives considered
 
@@ -20,4 +20,4 @@ Status: implemented
 
 ## Consequences
 
-自定义封装使用数据库参数和 PostgreSQL 配置，不再依赖其他 Harness 变量。无需密钥的源码及编译命令回放，分别在配置和不配置合成数据库凭据时检查四类真实子进程调用。独立的真实 PostgreSQL 备份和恢复套件验证数据库兼容性。这项环境规则不改变既有的数据库参数传递方式。
+自定义封装使用私密数据库输入和 PostgreSQL 配置，不依赖其他 Harness 变量。无需密钥的源码及编译命令回放，分别在配置和不配置合成数据库凭据时检查四类真实子进程调用。独立的真实 PostgreSQL 备份和恢复套件验证数据库兼容性。连接适配器单独负责密码传递。

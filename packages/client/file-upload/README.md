@@ -25,7 +25,7 @@ This package lets browser features store a `Blob`, exact bytes, or a `ReadableSt
 <a id="use-this-package"></a>
 ## Use this package
 
-Mount the package before a consumer that injects `fileUpload`, then call `ctx.fileUpload.upload(sessionId, body, name, signal, onProgress)`. The Session identity addresses both the raw route and generated Remote fallback; callers do not assemble either request.
+Mount the package before a consumer that injects `fileUpload`, then call `ctx.fileUpload.upload(sessionId, body, name, signal, onProgress)`. The Session identity addresses both the raw route and generated Remote fallback; callers do not assemble either request. For a Runtime-qualified browser Session, streamed requests carry the original Host Session ID and explicit Runtime selectors. The owning connection pins the confirmed account before the body leaves the page.
 
 ```yaml
 - id: file-upload

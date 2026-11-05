@@ -17,7 +17,7 @@ import WorkspaceRegistry from '@deepseek-ai/dsh-workspace'
 import type { HostFrame, WorkspaceId } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { RpcRequest, RpcResponse } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
-import { createApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
+import { createApiProxy, toFetchHandler } from '@deepseek-ai/dsh-host-apiproxy'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
@@ -375,6 +375,79 @@ describe('workspace.insertBefore', () => {
 })
 
 describe('session creation and Workspace membership', () => {
+  it('returns the real pinned tail for a reserved create and its retry without reading an archived conversation', async () => {
+    const { api, ctx } = await harness()
+    Object.assign(ctx.sessionPersistence, { reserveDraft: async ({ sessionId }: { sessionId: SessionId }) => ({ sessionId }) })
+    const host = toFetchHandler(api)
+    const read = async (path: string, method: string, payload: object) => {
+      const response = await host.fetch(`http://host/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'client-request', rpcId: 'initial-history', method, payload }) })
+      expect(response.status).toBe(200)
+      const body = await response.json() as { result: {
+        ok: boolean
+        value?: {
+          sessionId?: string
+          workspace?: { workspaceId: string }
+          initialHistory?: { records: unknown[] }
+          records?: unknown[]
+        }
+        error?: { code: string }
+      } }
+      return body.result
+    }
+    try {
+      const sessionId = SessionId('reserved-with-initial-history')
+      const payload = { sessionId, defaultWorkspace: true, includeInitialHistory: true, draftId: 'draft-reserved' }
+      const create = () => read('prepare/v1/session.create', 'session.create', payload)
+      const first = await create()
+      expect(first.value?.sessionId).toBe(sessionId)
+      expect(first.value?.initialHistory?.records).toBeInstanceOf(Array)
+      const history = () => read('prepare/v1/session.history', 'session.history', { sessionId, detail: 'conversation' })
+      expect(first.value?.initialHistory).toEqual((await history()).value)
+      const agent = ctx.agents.get(sessionId)
+      if (!agent) throw new Error('Missing prepared Session')
+      const message = createUserMessage({ content: [{ type: 'text', text: 'previously persisted turn' }], source: { kind: 'user' } })
+      agent.session.append('user/message', message, { surfaceOp: 'append' })
+      const retried = await create()
+      expect(retried.value?.workspace?.workspaceId).toBe(first.value?.workspace?.workspaceId)
+      expect(retried.value?.initialHistory).toEqual((await history()).value)
+      expect(JSON.stringify(retried.value?.initialHistory)).toContain('previously persisted turn')
+      expectOk(await api.workspace.archiveSession(request({ sessionId })))
+      expect((await create()).error?.code).toBe('session-archived')
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('prepares independent sessions in the Host workspace and refuses an archived pane while ordinary history remains readable', async () => {
+    const { api, ctx, root } = await harness()
+    const host = toFetchHandler(api)
+    const call = async (path: string, method: string, payload: object) => {
+      const response = await host.fetch(`http://host/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'client-request', rpcId: 'test-prepare', method, payload }) })
+      expect(response.status).toBe(200)
+      const body = await response.json() as { result: {
+        ok: boolean
+        value?: { sessionId: string; workspace?: { path: string; sessionIds: string[] } }
+        error?: { code: string }
+      } }
+      return body.result
+    }
+    try {
+      const create = (sessionId: string) => call('prepare/v1/session.create', 'session.create', { defaultWorkspace: true, sessionId })
+      const first = await create('prepared-one')
+      expect(first.value?.workspace).toMatchObject({ path: root, sessionIds: ['prepared-one'] })
+      expect(await create('prepared-one')).toEqual(first)
+      expect((await create('prepared-two')).value?.workspace?.sessionIds).toEqual(['prepared-two'])
+      expect((await api.workspace.list(request({}))).result).toMatchObject({ ok: true, value: {
+        items: [{ path: root, sessionIds: ['prepared-two', 'prepared-one'] }],
+      } })
+      expect((await call('prepare/v1/session.create', 'session.create', { defaultWorkspace: true, cwd: root })).error?.code).toBe('bad-request')
+      expect((await call('prepare/v1/session.history', 'session.history', { sessionId: 'prepared-one' })).ok).toBe(true)
+      expectOk(await api.workspace.archiveSession(request({ sessionId: SessionId('prepared-one') })))
+      expect((await call('prepare/v1/session.history', 'session.history', { sessionId: 'prepared-one' })).error?.code).toBe('session-archived')
+      expect((await call('session.history', 'session.history', { sessionId: 'prepared-one' })).ok).toBe(true)
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('attaches a preallocated idempotent session while cwd-only sessions stay ungrouped', async () => {
     const { api, ctx, root } = await harness()
     const workspace = expectOk(await api.workspace.create(request({ path: stageDir(root, 'project') }))).workspace

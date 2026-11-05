@@ -1,7 +1,7 @@
 /** Concrete Cordis provider against real Gateway HTTP and durable PostgreSQL admission. @module */
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { resolve } from 'node:path'
-import { mkdtemp, rm, stat } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { setImmediate } from 'node:timers/promises'
 import type { Pool } from 'pg'
@@ -137,6 +137,38 @@ describePg('managed Runtime resource provider', () => {
     expect((await f.budget.snapshot()).kinds.model.active).toBe(0)
   })
 
+  it('rechecks each queued grant before delivering it from a batch', async () => {
+    const f = await fixture()
+    let current = f.principal(f.member)
+    let queuedBatch = false
+    let withdrew = false
+    const { provider } = await f.mount({
+      interactive: () => current,
+      receive: async (pathname, response) => {
+        if (pathname !== path('statuses') || !response.ok) return
+        const statuses = await response.clone().json() as Array<{ state: string }>
+        if (statuses.length !== 2) return
+        if (statuses.every(status => status.state === 'queued')) queuedBatch = true
+        if (withdrew || !statuses.every(status => status.state === 'active')) return
+        withdrew = true
+        await pool.query('DELETE FROM harness.project_members WHERE organization_id=$1 AND project_id=$2 AND user_id=$3',
+          [f.organizationId, f.project.uuid, f.member.uuid])
+      },
+    })
+    const first = provider.acquire({ kind: 'process', origin: 'interactive' })
+    current = f.principal(f.admin)
+    const second = provider.acquire({ kind: 'process', origin: 'interactive' })
+    const outcomes = Promise.allSettled([first, second])
+    await expect.poll(() => queuedBatch, { timeout: 5000 }).toBe(true)
+    await f.grant(2)
+    const [member, admin] = await outcomes
+    await Promise.all([member, admin].flatMap(outcome => outcome.status === 'fulfilled' ? [outcome.value.release()] : []))
+    expect(withdrew).toBe(true)
+    expect(member).toMatchObject({ status: 'rejected', reason: { reason: 'refused' } })
+    expect(admin.status).toBe('fulfilled')
+    expect((await f.budget.snapshot()).kinds.process).toMatchObject({ active: 0, queued: 0, uncertain: 0 })
+  })
+
   it.each(['missing', 'archive-read'] as const)('refuses %s interactive authority before registering an operation', async mode => {
     const f = await fixture(), caller = f.principal(f.admin)
     const assertion = f.principals.issue({ user: f.admin, runtime: caller.claims.runtime,
@@ -147,6 +179,94 @@ describePg('managed Runtime resource provider', () => {
     const rows = await pool.query<{ total: string }>(`SELECT count(*)::text total
       FROM harness.node_resource_requests WHERE organization_id=$1`, [f.organizationId])
     expect(rows.rows[0]!.total).toBe('0')
+  })
+
+  it.each([
+    { origin: 'interactive', change: 'project' },
+    { origin: 'interactive', change: 'computer' },
+    { origin: 'interactive', change: 'account' },
+    { origin: 'interactive', change: 'membership' },
+    { origin: 'interactive', change: 'administrator-role' },
+    { origin: 'execution', change: 'project' },
+    { origin: 'execution', change: 'computer' },
+  ] as const)('withholds a real $origin process after $change withdrawal during node admission', async ({ origin, change }) => {
+    const f = await fixture(), directory = await mkdtemp(resolve(tmpdir(), 'hgw-resource-withdrawal-'))
+    cleanups.push(() => rm(directory, { recursive: true, force: true }))
+    const person = change === 'administrator-role' ? f.admin : f.member
+    let principal = f.principal(person)
+    if (change === 'administrator-role') {
+      const assertion = f.principals.issue({ user: person, runtime: principal.claims.runtime,
+        scope: principal.claims.scope, purpose: 'terminal-admin' })
+      principal = { assertion, claims: f.principals.verify(assertion) }
+    }
+    let execution: { parentSessionId: string; scopeId: string } | undefined
+    if (origin === 'execution') {
+      const sessionId = await f.session(), input = await f.admit(sessionId, person)
+      const entered = await f.call<{ scopeId: string }>('enter', { sessionId, inputId: input.inputId,
+        messageId: input.messageId, contentHash: input.contentHash, currentScopeId: null })
+      expect(entered.status).toBe(200)
+      if (entered.body.scopeId === undefined) throw new Error('The accepted input requires its immutable execution scope.')
+      execution = { parentSessionId: sessionId, scopeId: entered.body.scopeId }
+    }
+    const initialReplies: unknown[] = []
+    const { ctx } = await f.mount({ interactive: () => principal,
+      prepare: ctx => { if (execution !== undefined) ctx.provide('executionAuthority', { current: () => execution }) },
+      receive: async (pathname, response) => { if (pathname === path('request')) initialReplies.push(await response.clone().json()) },
+    })
+    await ctx.plugin(LocalSubprocessRuntime)
+    await f.grant(1)
+    const holder = await pool.connect()
+    let retained = true
+    const unlock = async () => { if (retained) { retained = false; try { await holder.query('ROLLBACK') } finally { holder.release() } } }
+    cleanups.push(unlock)
+    await holder.query('BEGIN')
+    const holderPid = (await holder.query<{ pid: number }>('SELECT pg_backend_pid() pid')).rows[0]!.pid
+    await holder.query('SELECT 1 FROM harness.node_resource_state WHERE organization_id=$1 AND node_id=$2 FOR UPDATE',
+      [f.organizationId, f.context.nodeId])
+    const marker = resolve(directory, 'started'), controller = new AbortController()
+    let handle: Awaited<ReturnType<typeof ctx.subprocess.spawn>> | undefined
+    const spawn = () => ctx.subprocess.spawn({ argv: [process.execPath, '-e',
+      'require("node:fs").writeFileSync(process.argv[1],"started")', marker], cwd: directory, graceMs: 500,
+      stdio: { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' }, resourceOrigin: origin, signal: controller.signal,
+    }).then(value => { handle = value; return value })
+    const outcome = Promise.allSettled([spawn()])
+    const changeAuthority = {
+      project: (restore: boolean) => pool.query(restore
+        ? "INSERT INTO harness.project_members(organization_id,project_id,user_id,access_mode) VALUES($1,$2,$3,'rw')"
+        : 'DELETE FROM harness.project_members WHERE organization_id=$1 AND project_id=$2 AND user_id=$3',
+      [f.organizationId, f.project.uuid, person.uuid]),
+      computer: (restore: boolean) => pool.query('UPDATE harness.computer_use_permissions SET enabled=$4 WHERE organization_id=$1 AND node_id=$2 AND user_id=$3',
+        [f.organizationId, f.context.nodeId, person.uuid, restore]),
+      account: (restore: boolean) => pool.query('UPDATE harness.users SET status=$2 WHERE id=$1', [person.uuid, restore ? 'active' : 'disabled']),
+      membership: (restore: boolean) => pool.query('UPDATE harness.memberships SET status=$3 WHERE organization_id=$1 AND user_id=$2',
+        [f.organizationId, person.uuid, restore ? 'active' : 'disabled']),
+      'administrator-role': (restore: boolean) => pool.query('UPDATE harness.memberships SET role=$3 WHERE organization_id=$1 AND user_id=$2',
+        [f.organizationId, person.uuid, restore ? 'admin' : 'member']),
+    }
+    try {
+      await expect.poll(async () => (await pool.query<{ waiting: boolean }>(`SELECT EXISTS(
+        SELECT FROM pg_stat_activity activity WHERE activity.datname=current_database()
+          AND $1::int=ANY(pg_blocking_pids(activity.pid)) AND activity.query LIKE '%lock_node_resources%') waiting`, [holderPid])).rows[0]!.waiting,
+      { timeout: 5000 }).toBe(true)
+      await changeAuthority[change](false)
+      await unlock()
+      expect((await outcome)[0]).toMatchObject({ status: 'rejected', reason: { reason: 'refused' } })
+      expect(initialReplies[0]).toEqual({ state: 'active' })
+      await expect(stat(marker)).rejects.toMatchObject({ code: 'ENOENT' })
+      await expect.poll(async () => (await f.budget.snapshot()).kinds.process).toMatchObject({ active: 0, queued: 0, uncertain: 0 })
+      await changeAuthority[change](true)
+      await f.grant(1)
+      const restored = await spawn()
+      expect((await restored.done).exitCode).toBe(0)
+      expect(await restored.waitForExit()).toBe(true)
+      expect(await readFile(marker, 'utf8')).toBe('started')
+      expect((await f.budget.snapshot()).kinds.process.active).toBe(0)
+    } finally {
+      await unlock()
+      controller.abort()
+      await outcome
+      if (handle !== undefined) { handle.terminate(); await handle.waitForExit() }
+    }
   })
 
   it.each(['origin-failure', 'cancel-before-registration'] as const)(

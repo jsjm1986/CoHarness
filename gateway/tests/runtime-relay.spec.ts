@@ -8,17 +8,20 @@ import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { RUNTIME_PORT_PUBLISHER, runtimeRelay } from './runtime-relay.ts'
 
-it.each(['', '0', '65536', 'invalid'])('reports invalid listener %j through awaited fixture cleanup', async value => {
+it.each([
+  ['', 'text'], ['0', 'text'], ['65536', 'text'], ['invalid', 'text'], ['{"port":0}', 'json'], ['{', 'json'],
+] as const)('reports invalid listener %j (%s) through awaited fixture cleanup', async (value, format) => {
   const root = await mkdtemp(join(tmpdir(), 'hgw-relay-input-')), file = join(root, 'port')
   let dispose: (() => Promise<void>) | undefined
   try {
     await writeFile(file, value)
-    const port = await runtimeRelay(file, cleanup => { dispose = cleanup })
+    const port = await runtimeRelay(file, cleanup => { dispose = cleanup }, format)
     const socket = connect(port, '127.0.0.1')
     socket.on('error', () => { socket.destroy() })
     await once(socket, 'close')
     const cleanup = dispose!; dispose = undefined
-    await expect(cleanup()).rejects.toThrow('fixture child published an invalid listener')
+    if (value === '{') await expect(cleanup()).rejects.toBeInstanceOf(SyntaxError)
+    else await expect(cleanup()).rejects.toThrow('fixture child published an invalid listener')
   } finally { try { await dispose?.() } finally { await rm(root, { recursive: true, force: true }) } }
 })
 

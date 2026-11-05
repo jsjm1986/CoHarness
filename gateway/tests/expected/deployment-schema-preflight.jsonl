@@ -1,0 +1,9 @@
+{"scenario":"same-schema","requestAccepted":true,"restoreCompleted":true,"backupIdRefused":false,"dumpPathRefused":false,"mode":"maintenance","protectionCreated":true}
+{"scenario":"legacy-schema","requestAccepted":false,"restoreCompleted":false,"backupIdRefused":true,"dumpPathRefused":true,"mode":"maintenance","protectionCreated":false}
+{"scenario":"before-retirement","requestAccepted":false,"restoreCompleted":false,"backupIdRefused":true,"dumpPathRefused":true,"mode":"maintenance","protectionCreated":false}
+{"scenario":"before-takeover","requestAccepted":false,"restoreCompleted":false,"backupIdRefused":true,"dumpPathRefused":true,"mode":"maintenance","protectionCreated":false}
+{"scenario":"previous-version","requestAccepted":false,"restoreCompleted":false,"backupIdRefused":true,"dumpPathRefused":true,"mode":"maintenance","protectionCreated":false}
+{"scenario":"checksum-drift","requestAccepted":true,"restoreCompleted":false,"backupIdRefused":true,"dumpPathRefused":true,"mode":"maintenance","protectionCreated":false}
+{"scenario":"name-drift","requestAccepted":true,"restoreCompleted":false,"backupIdRefused":true,"dumpPathRefused":true,"mode":"maintenance","protectionCreated":false}
+{"scenario":"missing-migration","requestAccepted":true,"restoreCompleted":false,"backupIdRefused":true,"dumpPathRefused":true,"mode":"maintenance","protectionCreated":false}
+{"scenario":"insert-export","requestAccepted":true,"restoreCompleted":false,"backupIdRefused":true,"dumpPathRefused":true,"mode":"maintenance","protectionCreated":false}

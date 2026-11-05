@@ -13,6 +13,8 @@ Each personal root in the account workbench catalog requires the current compute
 
 Revoking one computer hides its personal roots while retaining authorized roots on other computers. Other accounts and project conversation rules retain their existing visibility. Unknown or retired Runtime assignments do not establish a current computer grant. An unavailable personal listing keeps its existing incomplete result, so absence is not proof of Session deletion.
 
+All spaces searches the authorized personal and project conversations already loaded in this tab. Choose a specific personal Runtime or project to search further pages. The account Runtime directory accepts `projectId` for a selected project outside the loaded pages. A new workbench pane uses the selected Runtime’s creation receipt and Workspace, while independent selections verify access before opening.
+
 ## Migration
 
 1. Upgrade the complete Gateway and Runtime packages together. Apply PostgreSQL migration `104_personal_conversation_catalog.sql`; it adds nullable personal conversation metadata without changing Session generations, files or Runtime identities. Existing running personal Runtimes publish their summaries after restart; stopped Runtimes publish when explicitly started. Reading the chooser never starts them.

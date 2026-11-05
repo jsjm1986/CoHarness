@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-28-user-administration-authority.md
 document:
-  en: 6c92af8f99a776b93f6da1a314ef0240c744b6b0
-  zh: 20b2daa837807ec06ad12337f58c4ed50ac1ac21
+  en: 298f1c908f6535bb5fcb5fd6db16a39e1b0ca438
+  zh: 63859b520d7b547f1716ea9f96bbb10f1a7d02f4
 /agent-note-account-administration-retains-current-actor-authority:
   en: 30845856bde68708
   zh: 73b50a1bdf5d59da
@@ -12,8 +12,8 @@ document:
   en: 0e48e7a7585fc4d0
   zh: 80ed18e60ebe6bbd
 /agent-note-account-administration-retains-current-actor-authority/decision:
-  en: 1decca8c53af19c0
-  zh: e56980387483115d
+  en: 0a4570907cce67a3
+  zh: 2e37a088b3636d90
 /agent-note-account-administration-retains-current-actor-authority/alternatives-considered:
   en: 461307a16b0682ee
   zh: e20f8967976e205a

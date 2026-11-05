@@ -26,6 +26,8 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 
 已认证的 `GET /account/api/runtimes` 列出调用人的个人环境和获授权项目环境；`GET /admin/api/runtimes` 重新核验管理员资格后列出组织环境。两者均以 `items` 和 `nextCursor` 返回有界元数据分页；可选的 `limit` 和 `cursor` 查询字段选择下一页。读取不启动运行时、不探测节点、不扫描目录。环境 ID 跨普通进程代次变化保持稳定，已退役实例分配的身份仍保留记录。远端条目的 `routing: 'unavailable'` 表示无法在本地直接执行；受管分发通过所属电脑的[节点服务](docs/node-agent/README.zh.md#existing-gateway-services)执行，该服务默认关闭。可选的 `ids` 筛选接受最多 32 个以逗号分隔的 UUID，重新检查当前访问权，并将续传游标绑定到该组 ID，用于解析已保存的快捷入口，不枚举或启动电脑。
 
+在账号接口中，`projectId=<项目公开号>` 可精确查找所选项目，即使它的 Runtime 尚未出现在已载入的分页中。项目成员资格、电脑使用权或当前入口范围不允许访问时，返回空页。
+
 API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式环境选择优先于作用域 Cookie；与 `dshTarget` 冲突时返回 400。未知、不可访问和已退役身份返回 404，畸形 ID 返回 400，关闭转发时分配到远端的环境返回 503。现有属主选择要求只有一个获授权匹配；存在歧义时返回409。分配、配额、精确进程控制、私有存储及电脑本地数据参见[运行时隔离与管理](docs/node-agent/README.zh.md#runtime-isolation)。用户管理按账号返回一行；`runtimeCount` 汇总本机实例分配，没有唯一的本机 Runtime 时 `port` 为 null。
 
 | 变量 | 默认 | 说明 |
@@ -33,6 +35,10 @@ API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式
 | `HGW_PORT` | 8899 | 网关监听端口 |
 | `HGW_DATABASE_URL` | （未设置文件时必需） | PostgreSQL 连接 URL；生产优先使用文件形式 |
 | `HGW_DATABASE_URL_FILE` | （未设置 URL 时必需） | 包含 PostgreSQL 连接 URL 的 `0600` 权限文件 |
+| `HGW_NODE_CONTENT_DATABASE_URL_FILE`、`HGW_NODE_CONTENT_VOLUME_ID`、`HGW_NODE_CONTENT_PGDATA` | 未设置 | 节点专用数据库连接文件、登记的数据卷 UUID 和 PostgreSQL 数据目录绝对路径。三项一并配置。 |
+| `HGW_PROJECT_NAME_KEY_FILE` | 未设置 | 主入口专用的项目名查重密钥文件。参见[组织内项目名设置](deploy/node-content/README.zh.md)。 |
+| `HGW_DOCUMENT_OVERVIEW_DEADLINE_MS` | `1200` | 一次文档概览中所有远端查询共用的等待时间。部分结果会标出未及时响应的电脑。 |
+| `HGW_PEER_BACKUP_CONFIG_FILE` | 未设置 | 密文备份仓库及后台任务的节点私有配置文件。 |
 | `HGW_DATABASE_MAX_CONNECTIONS` | 10 | Gateway 连接池最大连接数，包含访问撤销监听连接 |
 | `HGW_DATABASE_MAX_CHECKOUT_QUEUE` | 256 | query、callback 与 promise 调用共享的未完成连接获取上限 |
 | `HGW_DATABASE_CONNECTION_TIMEOUT_MS` | 5 秒 | 最长连接池连接等待时间 |
@@ -75,10 +81,13 @@ API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式
 | `HGW_RUNTIME_MAX_STARTING` | 2 | 当前 Gateway 同时冷启动的 Runtime 数 |
 | `HGW_RUNTIME_CATALOG_PAGE_SIZE` | 50 | 每页运行环境目录的最大行数，范围 1–200 |
 | `HGW_RUNTIME_CATALOG_MAX_BYTES` | 131072 | 完整运行环境目录分页 JSON 的字节预算，至少 512；不可分割的超限条目返回 413 |
+| `HGW_DRAFT_HISTORY_REVISIONS` | 16 | 每份节点草稿保留的最近前版本数，必须为正整数 |
+| `HGW_DRAFT_HISTORY_BYTES` | 262144 | 每份草稿所有前版本序列化后的 UTF-8 字节上限，必须为正整数。当前正文单独保存 |
 | `HGW_RUNTIME_MAX_RESIDENT` | 0 | 常驻与启动中 Runtime 预约的可选应急上限；`0` 禁用此上限 |
 | `HGW_RUNTIME_MAX_QUEUED` | 32 | 等待冷启动准入的 Runtime 数 |
 | `HGW_RUNTIME_QUEUE_WAIT_MS` | 30 秒 | 冷启动准入最长等待时间 |
 | `HGW_PERFORMANCE_ENABLED` | `true` | 启用有界累计请求与进程诊断；仅接受 `true` 或 `false` |
+| `HGW_PERFORMANCE_OPERATION_SAMPLES` | 256 | 每个 Gateway 在内存中保留的版本化对话操作耗时数量，最多 4096 条。管理员可按浏览器操作 UUID 查询 `GET /admin/api/performance/operations?id=<uuid>`。 |
 | `HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS` | 20 毫秒 | 原生事件循环延迟采样间隔 |
 | `HGW_UPSTREAM_TIMEOUT_MS` | 30 秒 | 单次 HTTP/WebSocket 代理操作或已转发的指定作用域文档元数据请求等待运行时上游的最长时间，最大 2,147,483,647 毫秒 |
 | `HGW_RUNTIME_REQUEST_TIMEOUT_MS` | 5 秒 | 受管 Runtime 资源登记请求期限，按当前电脑的数据库往返延迟配置 |
@@ -106,10 +115,14 @@ API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式
 | `HGW_STEWARD_ROOT` | `~/harness-steward` | 拥有维护工作区的绝对非根目录；启用时并入 systemd 项目路径根，且不得与 Gateway 保留目录重叠 |
 | `HGW_STEWARD_WORKSPACE` | `<HGW_STEWARD_ROOT>/workspace` | 常驻维护运行时的工作目录；必须是 steward 根的严格子目录 |
 | `HGW_STEWARD_SOURCE` | （空） | 以其 `HEAD` 在维护工作区供给 `git worktree` 的仓库检出；为空时保留普通目录 |
+| `HGW_STEWARD_PREPARE_TIMEOUT_MS` | `60000` | Git 工作区准备的总毫秒期限；必须适用于正整数 Node 计时器 |
+| `HGW_STEWARD_PREPARE_KILL_GRACE_MS` | `1000` | 受管 Git 进程终止升级前的宽限时间；以毫秒表示的正整数 Node 计时器 |
 | `HGW_STEWARD_TOOLS_PACKAGE` | `<仓库>/plugins/dsh-steward-tools` | 物化进维护运行时 profile 的 steward 查询工具包；release 模式固定在 `HGW_RELEASE_ROOT` 内 |
 | `HGW_STEWARD_RUNTIME_USER` | `HGW_PROJECT_RUNTIME_USER` | 维护 systemd 单元使用的专用 Linux 账户；不得为 `root` |
 | `HGW_STEWARD_READ_ROOTS` | （空） | 维护运行时在部署树之外可读的额外绝对目录 JSON 数组——例如日志目录 |
 | `HGW_STEWARD_PROJECT_NAME` | `维护中枢` | 保留维护项目的显示名称 |
+
+Admin 的本机配置可调整草稿保留上限。每次保存新内容时，节点在两项预算内保留最近的连续修订。读取指定修订的 GET 请求只返回该版本；已移除的版本返回 HTTP 410，当前正文保持独立。
 
 生产安装、切流与验收见 [deploy/README.md](deploy/README.zh.md)。
 
@@ -142,7 +155,7 @@ macOS 压力命令具有采样期限，并等待进程实际关闭，包括客�
 
 个人启动在容量准入后解析当前符合条件的账号。策略准备或压力等待期间身份、主目录、角色发生变化时，以 `503 INSTANCE_UNAVAILABLE` 拒绝分配；新请求按当前权限重新准备。热策略刷新也使用当前符合条件的角色。已经运行的进程仍由现有失效通知和停止流程处理。Admin 准入错误保留可读的 `error` 文本并提供稳定 `code`，策略不可用或容量不足使用503，停止状态或资源代次冲突使用409。Linux 启动预检发现配置的 Unix 账号缺失时返回409 `RUNTIME_ACCOUNT_NOT_PROVISIONED`，查询不可用时返回503 `RUNTIME_ACCOUNT_VERIFICATION_UNAVAILABLE`，并提供账号准备指引。拒绝时不分配进程、凭据或单元。自定义适配器遵循[个人权限升级指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/personal-runtime-authority/guide.zh.md)。 Admin 客户端分别保留 Gateway 错误码与翻译后的显示文本，确认窗口和修订冲突恢复按原始错误码处理。
 
-显式 Admin 启动、停止、重启在生命周期和准入等待期间保留服务端认证的发起管理员。撤权会在后续影响之前返回403；已经获准的停止或取消可能保持完成。停止之后撤权会使重启保持 Runtime 停止。数据库取连接容量不足返回 `503 DB_CHECKOUT_QUEUE_FULL`；决定是否重试之前先重新加载当前状态。自定义适配器遵循[管理员控制指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-runtime-control/guide.zh.md)。
+显式 Admin 启动、停止、重启在生命周期和准入等待期间保留服务端认证的发起管理员。撤权会在后续影响之前返回403；已经获准的停止或取消可能保持完成。停止之后撤权会使重启保持 Runtime 停止。数据库取连接容量不足返回 `503 DB_CHECKOUT_QUEUE_FULL`；决定是否重试之前先重新加载当前状态。项目设置链接也在被动启动和热复用期间保留同一发起管理员；手动停止的 Runtime 仍需显式启动。自定义适配器遵循[管理员控制指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-runtime-control/guide.zh.md)。
 
 终端和插件管理采用相同的[当前管理员响应规则](../.agents/notes/implemented/bug-fix/2026-10-29-administrator-runtime-control.zh.md)：撤权会阻止普通响应返回，并中断后续流式片段。重试已获准的修改前，先检查当前状态。
 
@@ -181,6 +194,10 @@ Linux Runtime 单元使用 `Type=exec`，并保留其所有者私有的凭据源
 发现、版本探测和解压共用子进程环境过滤。停止会取消命名配置的准备请求和连接器注册，Gateway 关闭还会取消安装。下载失败会关闭响应与文件流；安装先在目标文件系统中验证可执行候选文件，再替换已有二进制。
 
 ## 管理端与项目授权
+
+资源资格与管家成员的管理读取会将当前活动组织管理员资格保留到数据库读取完成。准入前已撤销资格时返回403；并发撤销会等待已准入读取完成。服务读取器从 Admin 路由接收已认证账号 id。参见[资源读取升级说明](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/resource-policy-read-authority/guide.zh.md)。
+
+Admin JSON 读取会在发送数据及专用响应头前复核当前账号资格。撤权返回403；查询不可用返回503 `admin-authorization-unavailable`。已提交变更结果保留所属服务的准入。自定义账号适配器和 Runtime 管理组装遵循[读取发送指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-read-publication/guide.zh.md)。
 
 Admin 表单在自己的浏览器页面中登记待保存编辑。切换电脑、跟随导航链接或使用浏览器前进后退时，可在新标签页打开目标，原表单保持挂载；刷新和关闭使用浏览器的未保存提示。模型页视图切换也会在 Provider、计价或辅助模型仍处于编辑状态时使用同一保护。表单值和凭证不会复制到浏览器共享存储。字段恢复到已保存值或编辑器卸载时，该编辑器的保护随之移除。
 
@@ -222,6 +239,14 @@ Linux 项目启动前，配置的执行账号必须已存在。Gateway 通过保
 
 项目逻辑设置与服务器资源使用不同的所有权路径。`/account/api/preferences` 按账户保存语言、外观、六项字体字段和会话展示偏好，即使当前处于项目作用域也仍然属于个人。偏好事务会保留当前账号、成员及组织资格；资格撤销的请求返回403。无法读取旧设置时返回503，不提交默认值，因此存储修复后可以重试迁移。账号偏好不要求电脑执行授权，参见[升级指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/account-preferences/guide.zh.md)。`/account/api/projects/:id/configuration` 返回项目主题策略和能力标记；项目 owner 与组织管理员可以更新它。`/account/api/projects/:id/model-settings` 及其凭据/发现子路径通过加密 PostgreSQL 行和 revision 栅栏管理项目 Provider。其他成员看到的项目设置面板保持只读，但仍会解释每项所有权边界。`/admin` 只汇总这些设置并链接到选定的项目作用域；目录路径、挂载、生命周期、额度和组织模型授权仍由管理员操作。
 
+项目目录、详情、配置与项目邀请在准备完成后再次核验浏览器资格。成员资格或电脑授权撤回时不发布已准备的项目数据；所有者、主题与 `canManage` 采用当前权限，包括角色或所有权变化的情况。项目所属电脑变化后需要重新读取。配置能力采用当前权限，保留的 Steward 空间不声明成员管理能力。项目邀请列表在管理权失效后不再返回其他账号之间的邀请；仍有资格的成员保留本人收发邀请的历史。自定义协作适配器遵循[项目权限指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-manager-authority/guide.zh.md)。
+
+账号邀请历史与待处理数量在准备完成后核验当前浏览器会话。注销、过期和要求改密时不返回响应数据。账号保留本人收发邀请的历史，不要求项目成员资格或电脑使用权；其他账号之间的邀请要求当前项目管理权限。读取保留邀请记录。
+
+用量汇总保留所选个人或项目的计费归属，并在准备完成后再次核验浏览器资格。项目汇总要求当前项目和精确电脑权限；个人汇总仍归属账号。被拒绝的项目读取不会回退为个人总数。月份校验与自定义适配器遵循[用量读取指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/account-usage-publication/guide.zh.md)。
+
+项目模型设置、凭据状态及发现结果在返回前重新检查当前账户、成员资格、项目和目标电脑访问权限。当前所有权决定可编辑控件；转移所有权后，仍有成员资格的用户保留只读访问。已发出的目录请求可以完成，但已撤权的读取返回403且不包含元数据。参见[项目权限升级指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/project-manager-authority/guide.zh.md)。
+
 项目管理变更在所属数据库事务内重新核验认证参与者。账户及组织成员行的锁先于项目锁获取，并保留到提交；所有权及维护空间资格按当前记录检查。旧所有者及已撤权参与者会在变更或凭据准备前收到403。模型发现会在访问配置的目录端点前释放准备事务。浏览器提供的参与者字段不能授予权限；服务调用省略参与者仅用于受信任的内部维护。
 
 项目路由和代理复核在同一条 PostgreSQL 语句中读取成员资格、当前管理权限及主题策略。Runtime 请求不读取完整项目成员目录。每次复核均读取当前授权，不在请求之间缓存权限结果。
@@ -230,9 +255,13 @@ Admin 的**归档**频道从 Gateway 归档索引列出组织级根对话，包�
 
 归档记录使用稳定的 `archiveId`，独立于 Runtime 内的 Host Session ID。元数据、搜索、运行时命令、详情缓存和文件清理都保留该身份；正文读取与删除还要求匹配已记录的 Runtime。不同 Runtime 的同名 Host ID 独立保留，未分配的历史数据不授予新 Runtime 归属。Admin 表格标明所属 Runtime；选择、轮询和操作使用归档 ID。草稿预留接收已认证的 Runtime UUID，因此兄弟 Runtime 的清理标记不能阻止新建本地草稿。参见[归档身份升级指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.zh.md)。
 
+归档创建者筛选在共享存储和电脑内容卷中均包含保留的停用及逻辑删除账号。操作者仍须满足当前管理员资格；创建者的登录资格不决定历史记录是否可见。
+
 归档恢复、移入回收站、永久清理、结束等待和空白草稿清理将当前活跃组织、管理员账号及成员资格保留到事务提交，幂等重试也需要当前权限。准入前资格被撤销时拒绝操作，不改动归档或命令账本。批量端点继续逐项返回结果；空白草稿清理返回403。服务调用中省略永久清理或结束等待的操作者只用于可信维护。参见[归档管理权限升级指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/archive-administration-authority/guide.zh.md)。
 
 归档列表、状态与空白草稿预览将当前管理员资格保留到数据库读取完成。正文与导出在访问个人 Runtime 前释放数据库连接，将已认证管理员带入排队启动和归档读取 principal，并在返回 Runtime 数据或索引回退数据前重新核验资格。运行时操作租约将精确的就绪 generation 保留到响应消费和清理完成。服务调用省略操作者只用于可信内部读取。
+
+共享库与电脑独立内容库的混合归档分页、空白草稿批次复用同一个治理事务，因此有界连接池不会让请求等待自己已持有的连接。
 
 归档永久清理先排队，所属运行时确认空闲资源释放后才执行。有活跃轮次、子任务、终端或待处理输入时拒绝，不删除历史。先清理 Review 数据，再按子级到祖先删除个人日志；项目数据在回执事务内删除。Admin 显示等待状态或保留失败原因，确认后才更新结果；状态轮询只读元数据，不重载正文。离线实例保留队列，后台不会启动它。实例长时间不可达时，管理员可对其队列强制完成：待清理请求立即删除服务端数据并收尾，待恢复或回收站请求标记为实例未确认。运行时若日后再上报已清理的根会话，会收到新的清理命令，本地残留仍会被移除。
 
@@ -285,7 +314,11 @@ SSH 目标元数据在 `/admin/ssh` 管理。可选的 `passwordRef` 是连接�
 
 `HGW_STEWARD=on` 为每个组织保留一个项目空间（`kind='steward'`，默认名称 `维护中枢`），作为维护部署本身的常驻运行时。迁移 051 增加项目类别、按用户授权的 `steward_access_policies` 资格通道和 `steward_query_log` 审计表；启动时播种项目行、供给 `HGW_STEWARD_WORKSPACE`（配置了 `HGW_STEWARD_SOURCE` 时为其 `git worktree`），并调用一次 `ensureRunning`——崩溃由 supervisor 的 `Restart=always` 恢复，管理员显式停止则保持停止，直到下一次 Gateway 启动或显式拉起。本地 launcher 在 Gateway 失效后保留活跃 Runtime，但不自动重启崩溃的 Runtime。精确管理员停止和重启按当前管理员权限及所选代次准入，不要求 Steward 数据资格；项目删除继续拒绝保留项目。
 
+Git 工作区准备异步执行，并使用 Gateway 工具环境过滤。`HGW_STEWARD_PREPARE_TIMEOUT_MS` 限制准备时间，Gateway 退出会在项目播种或 Runtime 分配前取消准备。取消通过本地子进程提供者等待 Git 与普通检出钩子结束；`HGW_STEWARD_PREPARE_KILL_GRACE_MS` 控制终止升级。已有供给分支保留其提交，重建的工作区从源 `HEAD` 分离检出。其他 Git 失败会直接报告，不再尝试分离检出来恢复；部分检出文件保留供检查。参见[准备流程升级说明](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/steward-worktree-preparation/guide.zh.md)。
+
 维护空间的准入把授权叠加在管理员身份之上：启用的 `steward_access_policies` 行让活跃组织管理员以 `rw` 进入，无授权的管理员和持有授权行的普通成员同样被拒——成员表保持为空，成员与邀请变更一律拒绝。对非管理员的启用写入在授权事务内失败，每条准入路径读时复核角色，降级立即终止准入，迁移 052 删除永不可能生效的授权行。管理员在 `/admin/steward` 页集中管理授权，也可在用户详情页以版本栅栏逐用户编辑。steward 运行时的目录授权覆盖其工作区（`rw`）加部署树（`HGW_RELEASE_ROOT` 布局下是 releases 集合目录，否则是仓库根）以及 `HGW_STEWARD_READ_ROOTS` 声明的根（`ro`）。维护运行时运行固定组装（`dsh-steward-tools` 经 profile 补丁挂载）；插件状态与插件管理写入拒绝 steward owner，因此常驻运行时永远不会因组装变更重启自己。
+
+以维护中枢调用者身份申请资源，需要当前管理员角色及 Runtime 所在电脑的有效授权。队列轮询在返回许可前复核同一组条件。会话执行会检查每个已捕获参与者的资格。被拒绝的任务仍可由原归属方报告尚未启动。
 
 Agent 的 `steward_query` 工具到达 `POST /internal/runtime/steward/query`：校验运行时令牌、确认目标项目是活跃的 steward 行、在服务端重新分类 SQL，并把每次尝试连同运行时 generation 写入 `steward_query_log`。PostgreSQL extended protocol 强制每次只执行一条语句；判为只读的语句在 `READ ONLY` 事务内执行——关键字测试只选择通道，由 PostgreSQL 强制只读，因此 `EXPLAIN ANALYZE` 和可写 CTE 会失败并被审计，而不是被夹带放行——外加语句（64 KiB）、行数（至多 5000）、结果（256 KiB）与超时（15 秒）限额；`dry_run` 改为返回 `EXPLAIN` 计划。写语句需要同一 steward 项目会话内、仍具资格的应答者在 15 分钟内授予的 `allowed-once` 交互批准；审批上的 advisory 锁把并发写串行化，使一次批准恰好只能放行一次写入，写入随后在同时写入审计行的事务内执行。v1 刻意不提供通用运行时调用代理和发版激活自动化：代码改动仍走 worktree → PR → 发版流水线，审计 SQL 之外的管理操作仍在 `/admin` 完成。
 
@@ -352,6 +385,8 @@ Session ACL 检查会在每次操作中查询当前成员身份。会话创建�
 
 本地文档 broker 直接从各授权作用域的文档根目录服务 `/api/documents/scope/*`、transfer 列表、上传会话、目录元数据和管理员生命周期请求——个人作用域解析为所有者的 `documents/` 目录，项目作用域解析为项目根目录下的 `documents/` 树，并经过与运行时启动相同的项目路径校验。broker 在每个文档根上运行运行时自己的请求处理器和文件系统引擎，因此授权、命名、可续传上传、回收站和目录同步行为在两条路径上完全一致；目录所有权检查使用带签名的 principal，在运行时存活时携带其实时实例代次。文档是普通文件，运行中的运行时在下一次目录扫描时即可看到 Gateway 发布的文档。内容下载带着运行时的 attachment 与 nosniff 响应头直接流式写入客户端响应，JSON 操作则在内存中捕获、脱敏路径后经普通发送器返回。broker 为每个文档根保留一个引擎。作用域移除或根目录变更会等待已接收的 HTTP／目录索引工作结束，并在权限确认前关闭引擎；重新打开前会核对当前根目录归属。查询不可用时关闭缓存存储，并在恢复前拒绝新开存储。Gateway 退出时关闭其余引擎。未配置 broker 时，上述路由全部回退到运行时转发。
 
+Gateway 退出先关闭 Runtime 启动准入并取消待完成的容量和压力额度等待，再清空已接纳写入。已有就绪进程保持可用，直到既有 Runtime 停止阶段；已关闭的 manager 拒绝后续启动与热复用。
+
 文档服务关闭时先停止 broker 准入，再等待已接收的授权与 HTTP 工作。每个根目录都会保留其 HTTP 作用域、延后的目录队列和文件系统引擎，直到这些 Consumer 结束；所有作用域均尝试清理后，关闭会报告引擎清理失败。一个关闭阶段失败时会保留其原因，后续阶段仍会尝试清理；任一阶段失败都会使最终状态为失败。强制退出定时器会保持进程运行，直到清理结束或截止时间触发。
 
 浏览器使用的 `POST /api/documents/transfer/list` 由 Gateway 自己负责，而不再交给通用运行时代理。Gateway 先完成作用域检查，再从选定作用域的文档根直接应答，文档浏览不依赖目标运行时启动。就绪检查使用一次性 nonce，以及由运行时 bearer token 和身份派生的 HMAC 证明，而不是接受端口上的任意 HTTP 响应；运行时启动失败会返回经过认证的 JSON 错误，绝不会把浏览器重定向到回环运行时端口。作为最后一道代理保护，其他上游响应中的回环 `Location` 也会在返回公网响应前转换为同源路径。
@@ -366,7 +401,7 @@ Gateway 还负责 `/api/documents/transfer/uploads` 下的目标作用域可续�
 
 用户详情页展示的有效模型访问来自目标账号的服务端策略，包含其角色、Provider/模型启用状态和按用户的覆盖项。角色默认与用户覆盖只描述配置来源，均不能替代有效授权结果。
 
-模型、Provider、凭据、访问及额度管理写入会保留当前管理员，直到提交。账号与项目覆盖还会保留未删除的目标账号或活跃目标项目。模型发现在准备已存或草稿凭据前检查当前管理员权限，再释放数据库连接并发出 HTTP 探测。浏览器 actor 字段不授予权限。撤权管理员收到403，不改变配置，也不产生发现请求。参见[模型管理指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-administration-authority/guide.zh.md)。
+模型、Provider、凭据、访问及额度管理写入会保留当前管理员，直到提交。账号与项目覆盖还会保留未删除的目标账号或活跃目标项目。模型发现在准备已存或草稿凭据前检查当前管理员权限，再释放数据库连接并发出 HTTP 探测。浏览器 actor 字段不授予权限。准备前撤权返回403，不改变配置，也不产生发现请求；已获准探测期间撤权，则在发布模型元数据前返回403。参见[模型管理指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-administration-authority/guide.zh.md)。 共享管理员及项目管理准入也会在权限等待后检查当前强制改密资格；在准入前完成的密码重置会拒绝排队的管理操作。已经获准的变更保留其完成结果。
 
 批量策略投影会在目录查询已经返回的活跃用户和项目行上使用有界 worker。文件或凭据发生临时失败时会安排重试；重试期间到达的触发会保留后续一遍，读取最新持久策略。个人策略在准入后读取当前账号及成员权限。主动与惰性刷新同时比较有效内容和目录版本，因为账号角色变化不会推进该版本。凭据存储故障会保留现有策略和 intake Bearer。参见[模型策略权限指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-policy-authority/guide.zh.md)。
 
@@ -375,6 +410,8 @@ Gateway 还负责 `/api/documents/transfer/uploads` 下的目标作用域可续�
 home patch 投影按 YAML 序列编辑，保留用户条目、注释和未经求值的 `!!js` 表达式。空文档、行内序列及显式文档标记在默认模型变更和移除后仍可加载。无效 patch 会在替换前失败；序列化可能规范化 YAML 格式。
 
 文档目录 reconcile 会在写入前校验完整的元数据请求；PostgreSQL 批量方法可用时，删除列表会在同一作用域事务中一次应用，兼容提供方则保留逐文档回退。普通项目目录读取放行当前成员与组织管理员，写入要求 `rw` 成员身份或管理员权限。Steward 文档还要求当前管理员成员身份及已启用的 Steward 资格。用户总览的列表、总数与统计均排除已归档项目。只读成员已获准的文件系统列表，在尽力而为的目录同步被拒绝后仍然可用。
+
+浏览器文档多目标复制会在每次源文件读取、上传请求及后续目标前，重新检查有效管理员角色。账号降权后，即使保留项目写成员资格，剩余请求仍会停止；成员获准的单目标复制继续可用。参见[多目标复制授权指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/browser-document-fanout-authority/guide.zh.md)。
 
 目录转换保留永久清理状态，在等待行锁后检查当前状态和保留截止时间。成员修改在提交前重新检查企业、账号、成员身份的活跃状态及项目写权限，所有权转移还会重新检查接收方资格。管理员生命周期操作会重新检查当前管理员权限。拒绝会回滚目录变更和历史，但无法撤销目录回调之前已完成的文件系统操作。详见[文档生命周期决策](../.agents/notes/implemented/architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.zh.md)。
 
@@ -404,6 +441,10 @@ Admin 用量 API 保留原有主体汇总，并新增 `/admin/api/usage/overview
 
 ## 部署维护与协调恢复
 
+治理库恢复保留当前节点内容与互备授权；归属或受保护 schema 不兼容时，需要隔离恢复。参见[维护决策](../.agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.zh.md)。
+
+数据库维护使用私密连接输入；原生客户端需要单独构建 libpq 适配器，自定义 Docker／SSH 包装命令必须实现其就绪协议。安装、配置及取消语义见 [PostgreSQL 维护客户端参考](deploy/postgres/README.zh.md#private-maintenance-connections)。
+
 维护管理在读取和已提交的状态转换期间检查并保留当前活跃企业管理员资格。进入、退出和节点状态变更与操作记录一同提交，并发进入只产生一条窗口记录。恢复登记还将属于本企业、已验证且完整的备份保留到接受请求。已撤销的账号、角色或成员资格返回403；数据库意外失败返回503，不会提交一半的状态转换。可信独立应用器仍按其部署归属执行。
 
 写者收敛前，全部运行时进程必须确认已停止，已登记为离线的节点也不例外。部署页显示尚未停止的实例数量。管理员可在维护期间按所属用户或项目停止实例，也可停止指定 Runtime 代次；当前授权和代次检查仍然有效。恢复前的陈旧进程不能停止任何一种目标。恢复应用器在文件核对完成前持有独占数据库咨询锁。恢复 SQL 还持有自己的事务锁，并在变更前和提交前核验协调后端身份；本机 Docker 命令代理退出不能解除数据库互斥。失败的恢复保持 `restoring` 并阻止退出维护，可通过 `pg:deploy restore` 重试；只有完整文件核对通过后才返回维护状态。
@@ -412,15 +453,17 @@ Admin 用量 API 保留原有主体汇总，并新增 `/admin/api/usage/overview
 
 维护窗口开启时，Gateway 以 503（`maintenance`）拒绝变更类 HTTP 与 runtime 调用；恢复后推进的写纪元会拒绝所有在恢复前启动的进程（`stale-epoch`）。管理端 Deployment 页与 `pnpm pg:deploy backup` 通过同一服务创建并验证备份；恢复请求由独立的 `pnpm pg:deploy restore` 应用器执行。`HGW_PGDUMP_COMMAND` 和 `HGW_PGRESTORE_COMMAND` 配置 PostgreSQL 命令封装，`HGW_PSQL_COMMAND` 可选择配套的 SQL 执行器，`HGW_BACKUP_DIR` 选择私有备份存储。
 
-PostgreSQL 命令子进程使用 Gateway 清理后的工具环境。无关的 Gateway、Runtime 和凭据类变量不会继承；标准的 `PGPASSWORD`、`PGPASSFILE` 和 `PGSSLKEY` 输入在已配置时仍然可用。自定义封装应使用显式数据库参数及 PostgreSQL 设置，不依赖其他 Harness 配置。
+PostgreSQL 命令子进程使用 Gateway 清理后的工具环境。无关的 Gateway、Runtime 和凭据类变量不会继承；标准的 `PGPASSWORD`、`PGPASSFILE` 和 `PGSSLKEY` 输入在已配置时仍然可用。自定义封装接收私密数据库输入与 PostgreSQL 设置，不依赖其他 Harness 配置。
 
 命令失败详情最多保留 stderr 的 8 KiB 完整 UTF-8 前缀；进程状态和命令上下文不计入该 stderr 字节上限。
 
-完整备份要求维护状态、运行时已停止，以及数据库数据操作租约。 用户删除导致运行实例行移除后，保留的用户仍是数据所有者；缺少该行时，本地归属必须以已确认的单组织、单节点拓扑为前提。创建账号在数据库事务内先登记将预建的文档目录，再创建目录，因此从未启动运行时的账号也在覆盖范围内。数据库提交失败时保留诊断文件，不把它们归到其他账号。每个运行时的存储提供者在 `DSH_MANAGED_DATA_MANIFEST` 中登记实际解析后的路径；配置改变后仍保留之前的路径。备份捕获获准根目录下的全部普通文件和空目录，以及节点所有的配置与凭据，并记录副本字节摘要、权限和所有者。会话保留全部已提交代次，包括损坏的原始记录；附件、User Documents、历史 Review、外部成员绑定和待投递的治理 outbox 记录保留各自所有者定义的存储。项目源码、SSH 工作区、未知文件和链接不会因递归打包状态目录而被认领。缺失清单、未批准的自定义根、符号链接逃逸或不完整快照均拒绝操作。文件复制拒绝零进度写入，在部分写入之间响应取消，并在同步后再次检查取消，再发布捕获摘要。完整数据包目前要求一个组织和一个计算节点；本机数据包不能证明其他节点文件系统已被覆盖。
+完整备份要求维护状态、运行时已停止，以及数据库数据操作租约。创建与校验在命令准入和注册记录写入期间保留认证管理员。配置预览也在发布 POST 读取结果前检查当前权限。校验与配置预览要求标准格式的注册记录 UUID；格式错误返回400，合法但不存在的身份返回404。撤权拒绝后续准入，不把有效备份误标失败；注册被拒绝前已捕获的文件保留供操作员清理。 用户删除导致运行实例行移除后，保留的用户仍是数据所有者；缺少该行时，本地归属必须以已确认的单组织、单节点拓扑为前提。创建账号在数据库事务内先登记将预建的文档目录，再创建目录，因此从未启动运行时的账号也在覆盖范围内。数据库提交失败时保留诊断文件，不把它们归到其他账号。每个运行时的存储提供者在 `DSH_MANAGED_DATA_MANIFEST` 中登记实际解析后的路径；配置改变后仍保留之前的路径。备份捕获获准根目录下的全部普通文件和空目录，以及节点所有的配置与凭据，并记录副本字节摘要、权限和所有者。会话保留全部已提交代次，包括损坏的原始记录；附件、User Documents、历史 Review、外部成员绑定和待投递的治理 outbox 记录保留各自所有者定义的存储。项目源码、SSH 工作区、未知文件和链接不会因递归打包状态目录而被认领。缺失清单、未批准的自定义根、符号链接逃逸或不完整快照均拒绝操作。文件复制拒绝零进度写入，在部分写入之间响应取消，并在同步后再次检查取消，再发布捕获摘要。完整数据包目前要求一个组织和一个计算节点；本机数据包不能证明其他节点文件系统已被覆盖。
 
 对于提供者记录未包含的历史根，节点管理员使用[受管数据记录格式](../packages/util/managed-data/README.zh.md)提供私有的 `HGW_MANAGED_DATA_APPROVAL_FILE`，owner 前缀为 `user:<public-id>/` 或 `project:<public-id>/`。复核当前和已停用的存储位置并停止写者后，执行 `pnpm pg:deploy inventory adopt --runtime user:<public-id>`（或 `project:<public-id>`）。此命令只追加明确批准的根，保留已有记录并登记采纳操作。批准也不能认领整个项目工作区或 Harness home。不会根据熟悉的目录名推断缺失记录。
 
-恢复较旧备份前，应用器先创建并验证当前数据库与受管数据的完整保护备份。保护备份身份及选中转储／清单摘要与恢复保护状态同时提交；重试复用第一次保护副本。数据库事务保留当前维护、操作和备份记录，并拒绝不同的组织或计算节点身份。文件核对只在受管根内移除后来新增的成员，恢复记录中的字节和元数据，且完整成员验证通过后才返回维护状态。恢复保留当前节点配置、修订号和数据库连接文件。当前节点尚未执行的应用请求仍须通过写纪元核验；数据库恢复不能重新授予旧请求执行资格。可预览备份中已应用的设置供管理员另行审阅；恢复不会应用旧的待处理请求或旧地址。数据位置或节点身份不同会在替换数据库前拒绝，要求明确迁移。台账同时记录选中的清单和保留这些控制文件的派生清单。保护副本保留到管理员明确清理。失败保持写入关闭；`pnpm pg:deploy restore` 继续已登记的目标，不会重新备份部分恢复状态。旧式浅层清单不能作为完整备份。持久性与恢复规则见[维护说明](../.agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.zh.md)。
+恢复在打开写入保护状态前检查 schema 资格。已登记备份必须匹配当前迁移版本；应用器在捕获保护副本前，比较实际转储的完整迁移版本、名称及校验和。元数据不可读或不一致时，备份 id 和直接转储恢复都会被拒绝，并保持维护窗口。可接受的归档元数据与已有窗口的恢复限制见[恢复 schema 升级说明](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/restore-schema-preflight/guide.zh.md)。
+
+恢复合格备份前，应用器先创建并验证当前数据库与受管数据的完整保护备份。保护备份身份及选中转储／清单摘要与恢复保护状态同时提交；重试复用第一次保护副本。数据库事务保留当前维护、操作和备份记录，并拒绝不同的组织或计算节点身份。文件核对只在受管根内移除后来新增的成员，恢复记录中的字节和元数据，且完整成员验证通过后才返回维护状态。恢复保留当前节点配置、修订号和数据库连接文件。当前节点尚未执行的应用请求仍须通过写纪元核验；数据库恢复不能重新授予旧请求执行资格。可预览备份中已应用的设置供管理员另行审阅；恢复不会应用旧的待处理请求或旧地址。数据位置或节点身份不同会在替换数据库前拒绝，要求明确迁移。台账同时记录选中的清单和保留这些控制文件的派生清单。保护副本保留到管理员明确清理。失败保持写入关闭；`pnpm pg:deploy restore` 继续已登记的目标，不会重新备份部分恢复状态。旧式浅层清单不能作为完整备份。持久性与恢复规则见[维护说明](../.agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.zh.md)。
 
 文档身份清单包括公开文件、私有元数据、同文件系统保留对象及目录归属记录。目录绑定只序列化逻辑所有者类型和公开 id；Runtime UUID 和代次仍属于请求授权字段。活动身份域保留原始对象证据、摘要和目录 setgid 权限。恢复先核对完整字节，再重建活动文档的硬链接并重新绑定新的内核身份；逻辑 id、创建者、回收操作及投递位置保持不变。退役私有存储的原始元数据、回收站字节和上传清单保存在经字节校验的归档中；恢复时保持其与活动身份重新绑定的分离。同一物理公开目录对应多个活动身份域、未经对账的活动文件编辑或不完整证据会使备份无法通过验证。已有存储连接会拒绝被替换的元数据文件，并需在恢复后的写纪元保护下重启。
 

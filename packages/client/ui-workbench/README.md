@@ -9,6 +9,8 @@ English | [中文](README.zh.md)
 
 The Cordis browser plugin that presents up to four existing Workspace Sessions as one multi-pane conversation workbench. It owns the Workspace/session chooser and controls for pane selection, ordering, ratios, and mode switching; it consumes the `conversationViewport` capability and contributes toolbar, empty-state, and pane-header entries through ui-conversation's declared slots, plus a sidebar panel through ui-workspace's `sidebar.workspaces.workbench` hole.
 
+On a multi-computer entry, All spaces searches the personal and project conversations already loaded in this tab. Choose a computer’s personal Runtime or a project to search its authorized pages. Unread locations stay idle, and a permission refresh removes previously displayed results until access is verified. A new pane uses the Workspace and initial history confirmed by its selected Runtime. Opening an existing conversation verifies it again. Project conversations can open while their computer resolves the project name, and each saved pane opens as soon as its own verification finishes.
+
 The plugin never imports ConversationRoot, ChatView, InputBar, or another presentation implementation. The conversation slot owner renders each pane through an explicit SessionProvider, so every pane receives the ordinary Session standard kit, session-scoped stores, projections, and injected actions from the same object layer. Root-slot injected controls resolve the active pane at render time; a cached root injection never owns a fixed Session or runtime target. The layout menu’s open state belongs to the transient root chooser store, so movement between the Hero and Session header retains the user’s opening gesture; selection and explicit dismissal close it.
 
 The chooser includes personal conversations from each authorized computer and project conversations under their existing membership rules. Personal history summaries are synchronized by already running Runtimes; browsing the directory does not start other Runtimes. Each personal creation captures an exact Runtime, and identical Session ids on different Runtimes remain separate. Single-computer presentation omits computer labels and keeps each entry-local Runtime choice separate.
@@ -65,6 +67,8 @@ The catalog’s `personalComplete` flag distinguishes a verified personal direct
 
 An authorized catalog entry remains in the saved layout when its runtime is manually stopped or temporarily unreachable. An unloaded pane shows that state without conversation content; background restoration never requests an explicit start. The existing workspace start action and catalog refresh can restore it. Explicit authorization denial or a confirmed missing Session removes the pane, and account changes clear the active view.
 
+Empty project choices retain their fixed computer from the authorized directory. The chooser shows that name only when the deployment exposes computer information, and first-conversation creation keeps the same project and computer target.
+
 <a id="model-experience"></a>
 ## Model Experience
 
@@ -73,8 +77,6 @@ None, as browser-only pane controls register nothing model-facing; the existing 
 #### KV Cache effect
 
 None; the package never assembles or sends provider requests.
-
-Empty project choices retain their fixed computer from the authorized directory. The chooser shows that name only when the deployment exposes computer information, and first-conversation creation keeps the same project and computer target.
 
 ## Known Limitations and Deferred Work
 

@@ -1,0 +1,88 @@
+{
+  "id": "B509",
+  "title": "Browser administrator project-settings entry omits the initiating actor at Runtime startup",
+  "status": "fixed_mac_native_withdrawal_snapshot_and_normal_node_artifacts_verified_remaining_platforms_open",
+  "sourceFixed": true,
+  "at": "2026-11-04T20:20:29.160567+00:00",
+  "paths": [
+    "gateway/src/server.ts"
+  ],
+  "receipt": "receipts/administrator-project-settings-start-2026-11-05.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z",
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/admin-settings-start-before.json",
+  "originalObservation": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/admin-settings-start-negative-observations.json",
+  "originalResult": "Real Gateway browser authentication against an isolated current PostgreSQL schema; commit administrator demotion after authentication and before InstanceManager admission. The settings request returns302, omits the initiating administrator and physically allocates a new live LocalLauncher process for another administrator project. A separate earlier warm-reuse observation is not counted as a physical allocation.",
+  "correction": "The settings entry forwards passive intent and the server-authenticated administrator id to the existing InstanceManager authorization and allocation path. Omitted actors remain reserved for trusted internal lifecycle work. The existing explicit-start requirement after a manual stop is retained.",
+  "checks": {
+    "unitRegression": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/admin-settings-server-relay-cases.json",
+      "passed": 82,
+      "server": 74,
+      "relay": 8,
+      "skipped": 0
+    },
+    "actualGateway": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/admin-settings-public-current-cases.json",
+      "passed": 1,
+      "internalScenarios": 10,
+      "withdrawalScenarios": 6,
+      "expectedTranscript": "gateway/tests/expected/administrator-settings-start.jsonl",
+      "result": "Current and restored administrators start actual signed-readiness local processes. Role, disabled/deleted account, disabled/missing membership and disabled organization after authentication return403 without process allocation or selection-cookie writes. Warm reuse succeeds for current authority; manual-stop navigation returns409 without waking the Runtime."
+    },
+    "normalNodeArtifacts": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/settings-compiled-matrix.json",
+      "versions": [
+        "22.22.1",
+        "24.19.0"
+      ],
+      "scenariosPerVersion": 10,
+      "typescriptLoader": false,
+      "productionModules": "Unchanged ordinary full Gateway tsc output; three checked test support files are emitted separately as ESM."
+    },
+    "typecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/admin-settings-typecheck-final.log",
+    "ordinaryFullGatewayBuild": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/admin-settings-production-build.log",
+    "focusedLint": {
+      "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/admin-settings-lint-cases.json",
+      "files": 6,
+      "diagnostics": 0
+    },
+    "threeBilingualPairs": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/admin-settings-pairing-check.log",
+    "sixMarkdownSources": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/admin-settings-markdown-links.log",
+    "nativePostgresOwnership": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/native-postgres-lifecycle-summary.json",
+    "latestBaseline": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/latest-baseline.json"
+  },
+  "coverageQualification": {
+    "changedCall": "Real route-to-allocation execution covers current cold start, warm reuse, six queued authority refusals, restored eligibility and manual-stop policy. The relay JSON publication path and malformed JSON refusal are exercised.",
+    "fullFileOrProject100PercentClaimed": false,
+    "thresholdsOrExclusionsChanged": false,
+    "testLaneRegistration": "Added only to the existing PostgreSQL lane and excluded from the keyless no-database lane."
+  },
+  "intermediateCorrections": [
+    "The first cold-start setup used idle stop, which correctly retained the Runtime without an idle-resource decision; the physical counterproof instead uses confirmed failed-stop cleanup.",
+    "The public fixture was aligned with the existing structured INSTANCE_STOPPED error rather than changing the response.",
+    "Checked test support requires an explicit ESM compiler mode when emitted without a package-aware project; the failed external artifact attempt is retained.",
+    "An initial fixture parse failure and optional native-handle type errors are retained and corrected without production compiler changes."
+  ],
+  "limits": [
+    "Native acceptance is macOS with an owned PostgreSQL18.4 x86_64-apple-darwin binary; Linux account provisioning and native Windows supervision remain separate acceptance.",
+    "The assembled fixture owns real browser authentication, PostgreSQL, signed readiness and local process lifetime. It does not call a model provider or prove containment of arbitrary escaped descendants.",
+    "Global documentation quick-pass debt remains recorded from the earlier repository run; only the affected pairs and links are accepted here.",
+    "All12 audit domains remain in progress; paid real Responses validation stays deferred by explicit user instruction."
+  ],
+  "wholeProjectComplete": false,
+  "productionWrites": false,
+  "paidModelApisCalled": false,
+  "frozenDelivery": {
+    "at": "2026-11-04T20:19:38.165156+00:00",
+    "finding": "B509",
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/B509-project-settings-actor",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T195651Z/B509-project-settings-actor.delta.tar.gz",
+    "archiveSha256": "29908ff3a5be1268895fde3c3c701ce5b99a647312b5993ceae3efe4b9009366",
+    "manifestSha256": "ac8083f140fb80c863de16a12883754e100457e5377bfb5e1404cead55960ec2",
+    "ownedPaths": 17,
+    "readOnlyPrerequisites": 7,
+    "compiledProductionJs": 257,
+    "artifactFiles": 382,
+    "wholeProjectComplete": false
+  }
+}

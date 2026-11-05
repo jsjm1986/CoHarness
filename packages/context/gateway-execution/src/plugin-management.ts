@@ -26,6 +26,18 @@ const protectedModules = new Set([
   '@deepseek-ai/dsh-archive-gateway',
 ])
 
+/** Admit the effective on-disk project profile before hot reload can import or stop a plugin.
+ * @param runtime - current Gateway connection.
+ * @param signal - Runtime lifetime.
+ */
+export async function verifyGatewayProjectProfile(runtime:Pick<GatewayRuntime,'request'>,signal:AbortSignal):Promise<void> {
+  const response=await runtime.request('/internal/runtime/plugin-state/verify-profile',{ method:'POST',signal })
+  if(response.status!==204) {
+    discardGatewayRead(response.body)
+    throw new RemoteError('plugin-management/forbidden','The Gateway could not verify the project’s plugin storage.',{})
+  }
+}
+
 const pluginStatePath = '/internal/runtime/plugin-state'
 
 /**

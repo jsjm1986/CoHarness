@@ -359,11 +359,15 @@ describe('Gateway document transfer broker', () => {
     expect(forwardedBody).toBe('hello')
   })
 
-  it('streams a personal snapshot into a rw project and returns no host path', async () => {
+  it.each(['legacy','published','catalog-unavailable','audit-unavailable'] as const)('streams the file exactly once with %s history and reports its actual receipt', async (mode) => {
     const runtime = fixture()
     const identity = { incarnationId: 'target-incarnation', revision: 1, origin: 'transfer', createdBy: 'user:7' }
     const sourceIdentity = { incarnationId: 'source-incarnation', revision: 4, origin: 'upload', createdBy: 'user:7' }
-    const recordCopy = vi.fn(async () => ({ operationId: 'copied', targetCatalogId: 'copied-target' }))
+    const recordCopy = vi.fn(async () => {
+      if(mode==='catalog-unavailable')throw new Error('Scoped catalog was not available')
+      return {operationId:'copied',targetCatalogId:'copied-target',...(mode==='published'?{nodeOwned:true as const}:{})}
+    })
+    if(mode==='audit-unavailable')runtime.audit.mockRejectedValueOnce(new Error('Audit write could not complete'))
     const handler = createDocumentTransferHandler({ ...runtime.dependencies, audit: { write: runtime.audit }, catalog: { recordCopy } })
     const fetch = vi.fn()
       .mockResolvedValueOnce(new Response('hello', {
@@ -402,6 +406,11 @@ describe('Gateway document transfer broker', () => {
     expect(fetch.mock.calls[1]?.[0]).toContain('/api/documents/uploads')
     expect(runtime.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'documents.transfer' }))
     expect(recordCopy).toHaveBeenCalledWith(expect.objectContaining({ sourceIdentity, target: expect.objectContaining({ identity }) }))
+    expect(result.items.length).toBe(1)
+    expect(result.items[0]?.status==='copied'&&result.items[0].historyUnconfirmed===true).toBe(mode==='catalog-unavailable'||mode==='audit-unavailable')
+    const ledger=JSON.stringify(runtime.audit.mock.calls)
+    if(mode==='published'||mode==='catalog-unavailable')expect(ledger).not.toContain('report.txt')
+    else expect(ledger).toContain('report.txt')
   })
 
   it.each(['invalid++', Buffer.from('not JSON').toString('base64url'), Buffer.from('{"revision":0}').toString('base64url')])(
@@ -522,6 +531,51 @@ describe('Gateway document transfer broker', () => {
         signal: new AbortController().signal,
       })).resolves.toMatchObject({ targets: [denied, denied] })
       expect(fetch).toHaveBeenCalledTimes(2)
+    } finally { vi.unstubAllGlobals() }
+  })
+
+  it.each(['administrator', 'demoted', 'single-member'] as const)('retains current browser copy authority for %s', async scenario => {
+    const runtime = fixture()
+    let role: UserRow['role'] = scenario === 'single-member' ? 'user' : 'admin'
+    const handler = createDocumentTransferHandler({
+      ...runtime.dependencies, users: { getById: async () => ({ ...USER, role }) },
+      browser: {
+        authorize: async scope => ({ kind: scope.kind, id: scope.kind === 'personal' ? USER.id : scope.projectId,
+          label: 'Document scope', mode: 'rw' }),
+        headers: async () => new Headers(),
+        url: (_scope, path) => 'http://browser-documents.invalid' + path,
+      },
+    })
+    let completed = 0
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/api/documents/scope/content') return new Response('hello', { headers: { 'content-length': '5' } })
+      if (url.pathname === '/api/documents/transfer/uploads') {
+        if (scenario === 'demoted') role = 'user'
+        return responseForTargetStart('report.txt', 5)
+      }
+      if (url.pathname.endsWith('/complete')) { completed++; return responseForTarget('report.txt') }
+      return responseForTargetChunk()
+    }))
+    try {
+      const result = await handler({
+        request: {} as never, subject: SUBJECT, principal: { ...PRINCIPAL, user: { ...PRINCIPAL.user, role } },
+        payload: { version: 1, source: { kind: 'personal' }, documents: [{ docId: 'report.txt' }],
+          ...scenario === 'single-member' ? { target: { kind: 'project', projectId: 41 } }
+            : { targets: [{ kind: 'project', projectId: 41 }, { kind: 'project', projectId: 43 }] } },
+        signal: new AbortController().signal,
+      })
+      expect(runtime.ensureRunning).not.toHaveBeenCalled()
+      if (scenario === 'demoted') {
+        expect(completed).toBe(0)
+        expect(result).toMatchObject({ targets: [
+          { items: [{ status: 'failed', error: { code: 'DOCUMENT_TRANSFER_MULTI_TARGET_FORBIDDEN' } }] },
+          { items: [{ status: 'failed', error: { code: 'DOCUMENT_TRANSFER_MULTI_TARGET_FORBIDDEN' } }] },
+        ] })
+      } else {
+        expect(completed).toBe(scenario === 'single-member' ? 1 : 2)
+        expect(result.items).toMatchObject([{ status: 'copied' }])
+      }
     } finally { vi.unstubAllGlobals() }
   })
 

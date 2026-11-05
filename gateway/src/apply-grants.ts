@@ -30,7 +30,7 @@ export function writeRuntimeGrantsFile(dshHome: string, grants: EffectiveGrant[]
     const canonicalRoot = resolve(realpathSync(containmentRoot))
     const canonicalHome = resolve(realpathSync(resolvedHome))
     const nested = relative(canonicalRoot, canonicalHome)
-    if (nested === '' || nested.startsWith('../') || nested === '..' || isAbsolute(nested)) {
+    if (nested === '' || nested.startsWith('..'+sep) || nested === '..' || isAbsolute(nested)) {
       throw new Error(`runtime dsh home is outside its managed root: ${resolvedHome}`)
     }
   }

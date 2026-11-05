@@ -246,6 +246,7 @@ export class ConversationController extends Service implements IConversation {
     const submission = session.beginSubmission({
       mode,
       text,
+      ...(documents.length === 0 ? {} : { documentIds: documents.map(document => document.docId) }),
       images: attachments.map(attachment => ({
         previewUrl: attachment.previewUrl,
         ...(attachment.file.name === '' ? {} : { name: attachment.file.name }),
@@ -257,9 +258,12 @@ export class ConversationController extends Service implements IConversation {
     })
     let content: Parameters<SessionFace['prompt']>[0]
     try {
-      // Give React a chance to paint the local echo before expensive encoding.
-      await nextPaint()
-      const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file))
+      signal?.throwIfAborted()
+      let uploaded: Parameters<SessionFace['prompt']>[0] = []
+      if (attachments.length > 0) {
+        await beforeImageEncoding(signal)
+        uploaded = await this.serializeImages(attachments.map(attachment => attachment.file), signal)
+      }
       content = [
         ...uploaded,
         ...documents.map(document => ({ type: 'document' as const, docId: document.docId })),
@@ -269,8 +273,13 @@ export class ConversationController extends Service implements IConversation {
       submission.abandon()
       throw error
     }
+    const durableAdmission = session.hasDurableAdmission?.() === true
     const result = await session.prompt(content, mode, signal, submission.requestId)
     if (!result.ok) return { kind: 'error' }
+    if (durableAdmission) {
+      void retirement.then((settled) => { if (settled.reason === 'observed') this.releaseDraftDocuments(session.sessionId, documentIds) })
+      return { kind: 'success' }
+    }
     if ((await retirement).reason !== 'observed') return { kind: 'error' }
     this.releaseDraftDocuments(session.sessionId, documentIds)
     return { kind: 'success' }
@@ -833,10 +842,22 @@ function revokePreview(url: string): void {
   if (url.startsWith('blob:')) URL.revokeObjectURL(url)
 }
 
-/** Resolve after the browser has had one paint opportunity. */
-function nextPaint(): Promise<void> {
-  if (typeof requestAnimationFrame === 'function') {
-    return new Promise((resolve) => { requestAnimationFrame(() => { resolve() }) })
-  }
-  return new Promise((resolve) => { setTimeout(resolve, 0) })
+/** Let a visible composer show the local echo before encoding images. Hidden tabs may suspend animation frames. */
+function beforeImageEncoding(signal?: AbortSignal): Promise<void> {
+  const doc = globalThis.document
+  if (doc?.hidden) return Promise.resolve()
+  if (typeof requestAnimationFrame !== 'function') return new Promise((resolve) => { setTimeout(resolve, 0) })
+  return new Promise((resolve) => {
+    let frame: number | undefined
+    const finish = () => {
+      if (frame !== undefined) globalThis.cancelAnimationFrame?.(frame)
+      doc?.removeEventListener('visibilitychange', visibility)
+      signal?.removeEventListener('abort', finish)
+      resolve()
+    }
+    const visibility = () => { if (doc?.hidden) finish() }
+    doc?.addEventListener('visibilitychange', visibility)
+    signal?.addEventListener('abort', finish, { once: true })
+    frame = requestAnimationFrame(finish)
+  })
 }

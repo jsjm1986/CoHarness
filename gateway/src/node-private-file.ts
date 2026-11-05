@@ -20,12 +20,14 @@ const windowsAclSchema = z.object({
 // `& { }` and the file path arrives as the script block's positional argument.
 // Privacy anchors on the file's owner SID rather than the reader's account so an
 // operator-written connection file stays readable to a SYSTEM-hosted agent.
-const WINDOWS_ACL_PROBE = '& { ' + [
+function windowsPrivateProbe(requireReference:boolean):string {return '& { ' + [
   '$acl = Get-Acl -LiteralPath $args[0]',
   '$sids = @($acl.Access | ForEach-Object { try { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { "S-1-0-0" } })',
   '$deny = @($acl.Access | Where-Object { $_.AccessControlType -ne "Allow" }).Count',
+  ...(requireReference?["$subject=$acl.GetOwner([Security.Principal.SecurityIdentifier]).Value", "$reference=(Get-Acl -LiteralPath $args[1]).GetOwner([Security.Principal.SecurityIdentifier]).Value", "$service=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value", "if ($subject -ne $reference -and $subject -ne $service -and $subject -ne 'S-1-5-18' -and $subject -ne 'S-1-5-32-544') { $deny++ }"]:[]),
+  ...(requireReference?['$sids = @($sids | ForEach-Object { if ($_ -eq $service) { $subject } else { $_ } })']:[]),
   '@{ owner = $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value; deny = $deny; sids = $sids } | ConvertTo-Json -Compress',
-].join('; ') + ' }'
+].join('; ') + ' }'}
 
 // icacls `:r` replaces only the named trustee's grant, so the ACL is rebuilt
 // exactly: inheritance cut and dropped, every existing rule removed, then the
@@ -87,13 +89,27 @@ const WINDOWS_MODIFY_RIGHTS_MASK = 0x500d0150
 // any modification-class bit from WINDOWS_MODIFY_RIGHTS_MASK. Both counts skip
 // InheritOnly (PropagationFlags bit 2) rules — templates like CREATOR OWNER
 // grant nothing on the directory itself, which is all the POSIX mode test sees.
-const WINDOWS_PROTECTION_PROBE = '& { ' + [
+function windowsProtectionProbe(mask: number,requireReferenceOwner: boolean,allowService: boolean):string { return '& { ' + [
   '$acl = Get-Acl -LiteralPath $args[0]',
   '$owner = $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value',
+  ...(allowService?['$service=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value']:[]),
   '$deny = @($acl.Access | Where-Object { $_.AccessControlType -ne "Allow" -and ($_.PropagationFlags.value__ -band 2) -eq 0 }).Count',
-  '$foreign = @($acl.Access | Where-Object { $sid = try { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { "S-1-0-0" }; ($_.PropagationFlags.value__ -band 2) -eq 0 -and (($_.FileSystemRights.value__) -band ' + `0x${WINDOWS_MODIFY_RIGHTS_MASK.toString(16)}` + ') -ne 0 -and $sid -ne $owner -and $sid -ne "S-1-5-18" -and $sid -ne "S-1-5-32-544" }).Count',
+  '$foreign = @($acl.Access | Where-Object { $sid = try { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { "S-1-0-0" }; ($_.PropagationFlags.value__ -band 2) -eq 0 -and (($_.FileSystemRights.value__) -band ' + `0x${mask.toString(16)}` + ') -ne 0 -and $sid -ne $owner ' + (allowService ? '-and $sid -ne $service ' : '') + '-and $sid -ne "S-1-5-18" -and $sid -ne "S-1-5-32-544" }).Count',
+  ...(requireReferenceOwner ? ["$referenceOwner = (New-Object System.Security.Principal.NTAccount((Get-Acl -LiteralPath $args[1]).Owner)).Translate([System.Security.Principal.SecurityIdentifier]).Value","if ($owner -ne $referenceOwner -and $owner -ne 'S-1-5-18' -and $owner -ne 'S-1-5-32-544') { $foreign++ }"] : []),
   '@{ owner = $owner; deny = $deny; foreignWriters = $foreign } | ConvertTo-Json -Compress',
-].join('; ') + ' }'
+].join('; ') + ' }' }
+
+/** @returns static PowerShell checks for a service's own SQLite store and protected ancestors. */
+export function windowsServiceStoreAclChecks():string {
+  return `function Test-HgwAcl($path,$private,$reference) {
+    if($private) { $result=${windowsPrivateProbe(true)} $path $reference | ConvertFrom-Json
+      if($result.deny -ne 0 -or @($result.sids).Count -eq 0) { throw 'private acl' }
+      foreach($sid in $result.sids) { if($sid -notin @($result.owner,'S-1-5-18','S-1-5-32-544')) { throw 'foreign access' } }
+    } else { $result=${windowsProtectionProbe(WINDOWS_MODIFY_RIGHTS_MASK,false,true)} $path | ConvertFrom-Json
+      if($result.deny -ne 0 -or $result.foreignWriters -ne 0 -or $result.owner -notin @([Security.Principal.WindowsIdentity]::GetCurrent().User.Value,'S-1-5-18','S-1-5-32-544','S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')) { throw 'ancestor acl' }
+    }
+  }`
+}
 
 const windowsProtectionSchema = z.object({
   owner: z.string().regex(/^S-1(?:-[0-9]+)+$/u), deny: z.number().int().nonnegative().max(1024),
@@ -114,19 +130,29 @@ export type ProtectedDirectoryState = 'protected' | 'unreadable' | 'unprotected'
  * @param directory - absolute directory path.
  * @param info - stat result already read from the path.
  * @param signal - caller cancellation for the Windows ACL probe.
+ * @param ownerReference - optional reference owner for the object.
  * @returns 'protected' when foreign accounts cannot alter existing entries.
  */
 export async function protectedDirectoryState(directory: string,
-  info: { isDirectory(): boolean; mode: number }, signal?: AbortSignal): Promise<ProtectedDirectoryState> {
-  if (!info.isDirectory()) return 'unprotected'
-  if (process.platform !== 'win32') {
-    return (info.mode & 0o022) === 0 ? 'protected' : 'unprotected'
-  }
+  info: { isDirectory(): boolean; mode: number }, signal?: AbortSignal, ownerReference?:string): Promise<ProtectedDirectoryState> {
+  return info.isDirectory() ? protectedObjectState(directory,info.mode,false,signal,ownerReference) : 'unprotected'
+}
+
+/** Check an operator-owned release file that a separate Runtime account may read.
+ * @param path - canonical regular file. @param info - open-file metadata. @param signal - cancellation for the ACL probe.
+ * @returns whether other accounts are prevented from modifying this object.
+ */
+export async function protectedFileState(path:string,info:{isFile():boolean;mode:number},signal?:AbortSignal,ownerReference?:string):Promise<ProtectedDirectoryState>{
+  return info.isFile() ? protectedObjectState(path,info.mode,true,signal,ownerReference) : 'unprotected'
+}
+
+async function protectedObjectState(directory:string,mode:number,file:boolean,signal?:AbortSignal,ownerReference?:string):Promise<ProtectedDirectoryState>{
+  if (process.platform !== 'win32') return (mode & 0o022) === 0 ? 'protected' : 'unprotected'
   const link = await lstat(directory).catch(() => undefined)
   if (link === undefined) return 'unreadable'
   if (link.isSymbolicLink()) return 'unprotected'
   const probe = await runGatewayChildCommand('powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-Command', WINDOWS_PROTECTION_PROBE, directory], 10_000, signal, 4096).catch(() => undefined)
+    ['-NoProfile', '-NonInteractive', '-Command', windowsProtectionProbe(WINDOWS_MODIFY_RIGHTS_MASK|(file?6:0),ownerReference!==undefined,false), directory,...(ownerReference?[ownerReference]:[])], 10_000, signal, 4096).catch(() => undefined)
   let acl: z.infer<typeof windowsProtectionSchema> | undefined
   try { acl = probe === undefined ? undefined : windowsProtectionSchema.parse(JSON.parse(probe.stdout)) } catch { acl = undefined }
   if (acl === undefined || acl.deny !== 0) return 'unprotected'
@@ -157,7 +183,7 @@ async function windowsAclPrivate(file: string, signal?: AbortSignal): Promise<Pr
   if (link === undefined) return 'unreadable'
   if (link.isSymbolicLink()) return 'not-private'
   const probe = await runGatewayChildCommand('powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-Command', WINDOWS_ACL_PROBE, file], 10_000, signal, 4096).catch(() => undefined)
+    ['-NoProfile', '-NonInteractive', '-Command', windowsPrivateProbe(false), file], 10_000, signal, 4096).catch(() => undefined)
   let acl: z.infer<typeof windowsAclSchema> | undefined
   try { acl = probe === undefined ? undefined : windowsAclSchema.parse(JSON.parse(probe.stdout)) } catch { acl = undefined }
   if (acl === undefined || acl.deny !== 0 || acl.sids.length === 0) return 'not-private'

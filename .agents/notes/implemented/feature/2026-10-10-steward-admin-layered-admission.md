@@ -10,7 +10,7 @@ The steward space ships privileges beyond an organization administrator's: a res
 
 ## Decision
 
-One predicate decides every steward entry point: an active organization membership with `role='admin'` **and** an enabled `steward_access_policies` row. This reverses the lane-alone decision in [the steward maintenance-space note](2026-10-10-steward-maintenance-space.md).
+One predicate decides every steward entry point: an active organization membership with `role='admin'` **and** an enabled `steward_access_policies` row for the Runtime computer. This reverses the lane-alone decision in [the steward maintenance-space note](2026-10-10-steward-maintenance-space.md).
 
 - **The same predicate covers every path.** Scope admission, conversation read/write, `claimInteraction`, `readableSessionIds`, member-facing document metadata and mutations, and the `steward_query` write-approval responder check all evaluate administrator membership plus the enabled grant, so a direct database write or a stale row cannot elevate anyone. Document transactions recheck qualification after catalog waits; the [document lifecycle decision](../architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.md) owns their rollback limits.
 - **Grant writes reject a non-administrator inside the policy transaction.** `ResourceAccess.set` gained a lane hook (`checkEnabledOwner`) invoked after the owner row locks; `StewardAccess` overrides it to require an active administrator membership, returning 409 otherwise. Revocation skips the hook, so a stale or post-downgrade row can always be cleared.
@@ -28,4 +28,4 @@ Interaction claims and visibility changes recheck the active project, current ad
 
 ## Consequences
 
-The steward space is an administrator-only channel by construction. Granting requires promotion first, which the admin UI states in place; a member holding a leftover row reads as an ineffective grant until cleared. Ordinary project admission is untouched, and `eligibleActors` needed no steward exception because every admitted subject is already an administrator.
+The steward space is an administrator-only channel by construction. Granting requires promotion first, which the admin UI states in place; a member holding a leftover row reads as an ineffective grant until cleared. Session execution checks the grant for every captured actor after locking the accounts. Signed-principal and Session resource requests use current eligibility when registering and polling for a grant.

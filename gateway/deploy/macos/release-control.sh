@@ -112,6 +112,7 @@ validate_release() {
       dsh-userdoc-local
       dsh-host-userdoc-http
     )
+    if [[ -f "$release/gateway/lib/peer-backup-takeover-schedule.js" ]]; then runtime_links+=(dsh-schedule); fi
     for required in "${runtime_links[@]}"; do
       [[ -s "$release/gateway/node_modules/@deepseek-ai/$required/package.json" ]] \
         || fail "release Gateway runtime link is missing or broken: $release/gateway/node_modules/@deepseek-ai/$required"

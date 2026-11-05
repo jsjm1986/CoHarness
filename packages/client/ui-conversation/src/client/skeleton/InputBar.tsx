@@ -294,7 +294,8 @@ export const InputBar = memo(function InputBar({
     if (promptError === null) return
     showToast(promptError.error.code === 'attachment-error'
       ? attachmentErrorText(t, promptError.error.details.reason, imageLimits)
-      : `${promptError.error.message} (${promptError.error.code})`)
+      : promptError.error.code === 'prompt-durability-unavailable' ? t('input.unconfirmed')
+        : `${promptError.error.message} (${promptError.error.code})`)
   }, [promptError, showToast, t, imageLimits])
   useEffect(() => {
     if (notice?.level === 'error') showToast(notice.text)

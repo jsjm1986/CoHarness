@@ -7,6 +7,9 @@ import {
   type DocumentTransferDependencies, type DocumentTransferScope,
 } from './document-transfer.ts'
 import type { PostgresDocumentLocations } from './postgres/document-locations.ts'
+import { parseDocumentOverviewOptions } from './document-catalog.ts'
+import { DocumentCatalogError, type PostgresDocumentCatalogService } from './postgres/document-catalog-service.ts'
+import { readDocumentNodePage } from './node-content-documents-overview.ts'
 import { readResponseJson } from './response-budget.ts'
 
 /** Dependencies retained by the center; node access is rechecked on each transfer request. */
@@ -16,6 +19,9 @@ interface Dependencies {
   organizationId: string
   origin: string
   responseLimit: number
+  overview?: Pick<PostgresDocumentCatalogService,'overview'>
+  overviewConcurrency?: number
+  overviewDeadlineMs?: number
 }
 
 /**
@@ -31,6 +37,28 @@ export function createBrowserDocumentHandler(deps: Dependencies) {
       return new Headers({ cookie: req.headers.cookie ?? '', origin: typeof req.headers.origin === 'string' ? req.headers.origin : deps.origin,
         'x-dsh-expected-principal-id': String(actor.id) })
     }
+    if (operation==='overview') {
+      if (!deps.overview) throw new DocumentCatalogError('DOCUMENT_SCOPE_UNAVAILABLE',503,'The document directory is unavailable.')
+      const options=parseDocumentOverviewOptions(payload)
+      const budget=AbortSignal.timeout(deps.overviewDeadlineMs ?? 1200)
+      return deps.overview.overview(actor.id,options,true,async(nodeId,offset,limit,lifetime)=>{
+        const destination=new URL('/account/api/node-document-overview',base)
+        destination.searchParams.set('dshNode',nodeId)
+        destination.searchParams.set('offset',String(offset))
+        destination.searchParams.set('limit',String(limit))
+        if (options.query) destination.searchParams.set('q',options.query)
+        if (options.type) destination.searchParams.set('type',options.type)
+        if (options.sort) destination.searchParams.set('sort',options.sort)
+        const deadline=AbortSignal.any([lifetime ?? signal,budget])
+        deadline.throwIfAborted()
+        const response=await fetch(destination,{headers:await headers(deadline),signal:deadline,redirect:'error'})
+        if (!response.ok || response.headers.get('x-dsh-target-node')!==nodeId) {
+          await response.body?.cancel()
+          throw new DocumentCatalogError('DOCUMENT_SCOPE_UNAVAILABLE',503,'The selected computer is unavailable.')
+        }
+        return readDocumentNodePage(await readResponseJson(response,deps.responseLimit),nodeId,limit)
+      },signal,deps.overviewConcurrency ?? 1)
+    }
     const url = (scope: DocumentTransferScope, path: string): string => {
       const result = new URL(path, base)
       result.searchParams.set('scope', scope.kind === 'personal' ? 'personal' : `project:${String(scope.projectId)}`)
@@ -38,6 +66,22 @@ export function createBrowserDocumentHandler(deps: Dependencies) {
       return result.toString()
     }
     const transfer: DocumentTransferDependencies = { ...deps.transfer, browser: {
+      async validateConversation(scope, sessionId, lifetime) {
+        const endpoint = new URL(url(scope, '/account/api/workbench/rows'))
+        if (!scope.runtimeId || !scope.nodeId) throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'A complete conversation target is required.')
+        endpoint.searchParams.set('dshRuntime', scope.runtimeId)
+        endpoint.searchParams.set('dshTarget', scope.kind === 'personal' ? 'personal' : 'project:' + String(scope.projectId))
+        endpoint.searchParams.set('documentSession', sessionId)
+        const result = await fetch(endpoint, { headers: await headers(lifetime), redirect: 'error', signal: lifetime })
+        if (!result.ok) {
+          await result.body?.cancel()
+          throw new DocumentTransferError('DOCUMENT_ATTACHMENT_TARGET_UNAVAILABLE', result.status === 503 ? 503 : 409, 'The selected conversation is unavailable or read-only.')
+        }
+        const checked = await readResponseJson(result, 4096) as { runtimeId?: string; sessionId?: string; canWrite?: boolean }
+        if (checked?.runtimeId !== scope.runtimeId || checked?.sessionId !== sessionId || checked?.canWrite !== true) {
+          throw new DocumentTransferError('DOCUMENT_ATTACHMENT_TARGET_UNAVAILABLE', 409, 'The selected conversation changed.')
+        }
+      },
       async authorize(scope, action) {
         const location = await deps.locations.resolve(actor.id, scope, action)
         return { kind: scope.kind, id: scope.kind === 'personal' ? actor.id : scope.projectId,

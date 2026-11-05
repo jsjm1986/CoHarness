@@ -15,6 +15,8 @@
     "strict": true,
     "allowImportingTsExtensions": true,
     "paths": {
+      "@deepseek-ai/dsh-subprocess-local": ["../packages/subprocess/subprocess-local/lib/types/index.js"],
+      "@deepseek-ai/dsh-subprocess": ["../packages/subprocess/subprocess/lib/types/index.js"],
       "@deepseek-ai/node-addon-system/flock": ["../native/system/packages/entry/lib/flock.js"],
       "@deepseek-ai/dsh-resource-budget/wire": ["../packages/context/resource-budget/lib/types/wire.js"],
       "@deepseek-ai/dsh-userdoc-gateway/protocol": ["../packages/attachment/userdoc-gateway/lib/types/protocol.js"],
@@ -47,6 +49,7 @@
       "@deepseek-ai/dsh-util-values": ["../packages/util/values/lib/types/index.js"],
       "@deepseek-ai/dsh-home-paths": ["../packages/util/home-paths/lib/types/index.js"],
       "@deepseek-ai/dsh-userdoc": ["../packages/attachment/userdoc/lib/types/index.js"],
+      "@deepseek-ai/dsh-schedule": ["../packages/schedule/schedule/lib/index.js"],
       "@deepseek-ai/dsh-userdoc-local": ["../packages/attachment/userdoc-local/lib/types/index.js"],
       "@deepseek-ai/dsh-host-userdoc-http": ["../packages/host/userdoc-http/lib/types/index.js"]
     }

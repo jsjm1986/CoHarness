@@ -72,6 +72,30 @@ describe('cross-computer personal conversation picker', () => {
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
     return p
   }
+  it('clears authorized results and disables the selected destination before a revoked directory can reload', async () => {
+    const p = props(), revision = createSnapshotStore(0)
+    const initial = parseWorkbenchCatalog({ personal: { id: 1, name: 'Me' }, activeRuntime: a, personalComplete: false,
+      projects: [], paged: true, scopePartial: true, personalWorkspaces: [a, b].map(runtime => ({ runtime, items: [] })),
+      items: [{ ...row(b), title: 'Private on Ubuntu' }] })
+    const held = Promise.withResolvers<typeof initial>()
+    const readCatalog = vi.fn(() => revision.getSnapshot() === 0 ? Promise.resolve(initial) : held.promise)
+    p.deploymentStore.set({ phase: 'ready', aggregateComputers: true, showComputer: true })
+    render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] }}
+      tabbed={false} chooseSession={vi.fn()} focusSession={vi.fn()} createSession={vi.fn()} setMode={vi.fn()} t={t}
+      readCatalog={readCatalog} catalogAuthority={revision} />)
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    await screen.findByRole('button', { name: /Private on Ubuntu/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Ubuntu/ }))
+    const create = screen.getByRole('button', { name: '新建对话' })
+    expect(create.hasAttribute('disabled')).toBe(false)
+    await act(async () => { revision.set(1) })
+    expect(screen.queryByRole('button', { name: /Private on Ubuntu/ })).toBeNull()
+    expect(create.hasAttribute('disabled')).toBe(true)
+    await act(async () => { held.reject(new Error('Revoked')) })
+    expect(screen.queryByRole('button', { name: /Alpha|Private on Ubuntu/ })).toBeNull()
+    expect(await screen.findByText('会话目录暂时不可用。')).toBeTruthy()
+  })
   it('keeps identical raw ids on two computers selectable and filters all personal histories', async () => {
     serve()
     const choose = vi.fn(async () => ({ ok: true as const }))
@@ -83,6 +107,28 @@ describe('cross-computer personal conversation picker', () => {
     expect(screen.getByRole('button', { name: '新建对话' }).hasAttribute('disabled')).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Same conversation /home/me Ubuntu' }))
     expect(choose).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'same-id', runtime: b }), false, expect.any(AbortSignal))
+  })
+  it('offers authorized conversations before their selected project name finishes loading', async () => {
+    const p = props()
+    p.deploymentStore.set({ phase: 'ready', aggregateComputers: true, showComputer: true })
+    const pending = Promise.withResolvers<{ projectId: number; name: string } | undefined>()
+    const project = { ...b, kind: 'project', projectId: 9, projectName: '#9' }
+    const catalog = parseWorkbenchCatalog({ personal: { id: 1, name: 'Me' }, personalComplete: false, activeRuntime: a,
+      projects: [{ ...project, name: '#9', mode: 'rw' }], paged: true,
+      items: [{ ...row(b), runtime: project, visibility: 'project', title: 'Authorized conversation' }] })
+    const read = vi.fn(async (scope: string) => scope === '9' ? pending.promise : undefined)
+    render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench', paneIds: [], paneRatios: [], collapsedIds: [] }}
+      tabbed={false} chooseSession={vi.fn()} focusSession={vi.fn()} createSession={vi.fn()} setMode={vi.fn()} t={t}
+      readCatalog={async () => catalog} readProjectDisplay={read} />)
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    await screen.findByRole('button', { name: /Authorized conversation/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /#9/ }))
+    await waitFor(() =>{  expect(read).toHaveBeenCalledWith('9', expect.any(AbortSignal)) })
+    expect(screen.getByRole('button', { name: /Authorized conversation/ }).hasAttribute('disabled')).toBe(false)
+    expect(screen.queryByText('From owner')).toBeNull()
+    await act(async () => { pending.resolve({ projectId: 9, name: 'From owner' }) })
+    expect(await screen.findByText('From owner', { exact: true })).toBeTruthy()
   })
 
   it('bounds rendered rows for a large granted catalog while searching every computer without starting work', async () => {
@@ -473,7 +519,7 @@ describe('workbench account targets and asynchronous chooser', () => {
     await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
   })
 
-  it('creates without a name when the project left the reloaded catalog', async () => {
+  it('retains the selection but refuses creation when its project has left the verified catalog', async () => {
     serve()
     const createSession = vi.fn(async () => ({ ok: true as const }))
     toolbar({ createSession })
@@ -483,15 +529,12 @@ describe('workbench account targets and asynchronous chooser', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /Team/ }))
     fireEvent.click(screen.getByRole('button', { name: '关闭选择器' }))
 
-    // Reopening the picker refetches the catalog; project 7 vanished, so the
-    // stale workspace id no longer resolves a name to stamp.
     serve({ ...directory, projects: [], items: [] })
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
-    await screen.findByRole('button', { name: '新建对话' })
-    fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
-    await waitFor(() => {
-      expect(createSession).toHaveBeenCalledWith({ kind: 'project', projectId: 7 }, false, expect.any(AbortSignal))
-    })
+    const create = await screen.findByRole('button', { name: '新建对话' })
+    await waitFor(() => { expect(create.hasAttribute('disabled')).toBe(true) })
+    fireEvent.click(create)
+    expect(createSession).not.toHaveBeenCalled()
   })
 
   it('ignores catalog completion after unmount and reports a failed catalog separately', async () => {

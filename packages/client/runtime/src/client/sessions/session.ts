@@ -15,6 +15,8 @@ import type {
 } from '@deepseek-ai/dsh-api-remotes/client'
 // Value import from the inline-safe wire layer (not the connection plugin):
 // plugin-to-plugin value imports are a bundle purity error.
+import type { PreparedSessionApi } from '../prepare-runtime.ts'
+import type { RequestPayload } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { transportError } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type {
   BeginSubmissionInput, PendingSubmissionRetirement, SessionFace, SubmissionHandle,
@@ -37,6 +39,7 @@ import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionRemotes } from './remotes.ts'
 import { ProjectionValueStore } from './projection-store.ts'
 import type { ProjectionsBaseline } from './projection-store.ts'
+import { PromptRecovery, promptInputProof } from '../prompt-recovery.ts'
 import { resolvedClientTimeZone } from '../time-zone.ts'
 import { SessionQueueMirror } from './queue-mirror.ts'
 
@@ -67,6 +70,8 @@ interface HistoryPage {
 
 /** Manager-owned observers of a Session object's local state edges. */
 export interface SessionOptions {
+  /** Exact, currently verified node admission transport for a managed root Session. */
+  admission?: (forRecovery?: boolean) => PreparedSessionApi | undefined
   /** Catalog-discovered address selecting non-activating subagent transport. */
   address?: SubagentAddress
   /** Whether the exact direct parent Agent was live at the latest catalog read. */
@@ -102,6 +107,16 @@ export function hasConversationContent(event: SessionEvent): boolean {
 export class Session implements SessionFace {
   // ---- Window and derived state (all private; the snapshot is the only read API) ----
   private events: SessionEvent[] = []
+  private readonly submissionKeys = new Map<RpcId, string>()
+  private uncertain: { id: RpcId; inputKey: string } | undefined
+  private disposed = false
+  private recovery?: PromptRecovery
+  private stagedReceipt: { journal: PromptRecovery; node: string | null } | undefined
+  private admissions: Promise<void> = Promise.resolve()
+
+  /** @returns whether this Session's current transport confirms durable acceptance. */
+  hasDurableAdmission(): boolean { return this.address === undefined && this.options.admission?.() !== undefined }
+
   /** Wire views aligned with `events` by index (envelope-level annotations; undefined = no view).
    *  Kept parallel rather than merged so `events` stays the raw log slice (model-visible ⟺ logged). */
   private views: (ToolEventView | undefined)[] = []
@@ -193,6 +208,7 @@ export class Session implements SessionFace {
   private repairRequested = false
   /** subscribed.lastSeq baseline (gap detection; null when no subscribed frame arrived — degrade to the liveBuffer dedup path). */
   private subscribedLastSeq: number | null = null
+  private openedFromPreparedTail = false
   /** Fold joining transient assistant-stream frames to their durable settlement; owns the visible window. */
   private readonly assistantStream = new ClientAssistantStream()
   /** Latest `session/subscribed` assistant baseline, consumed by the next window install. */
@@ -329,7 +345,10 @@ export class Session implements SessionFace {
     if (this.stageActive) return
     this.stageActive = true
     if (this.openState !== 'open') void this.open()
-    else this.scheduleHistoryNavigationRead()
+    else {
+      this.prepareEmptyReceipt()
+      this.scheduleHistoryNavigationRead()
+    }
     if (this.running) this.beginLiveHistory()
     else this.notifier.markDirty()
   }
@@ -342,6 +361,8 @@ export class Session implements SessionFace {
   leaveStage(): void {
     if (!this.stageActive) return
     this.stageActive = false
+    this.stagedReceipt?.journal.close()
+    this.stagedReceipt = undefined
     this.resetOpenWindow()
     this.hasMore = false
     this.loadingOlder = false
@@ -358,13 +379,25 @@ export class Session implements SessionFace {
 
   // ---- Operations ----
 
+  private prepareEmptyReceipt(): void {
+    if (!this.stageActive || this.disposed || this.address || this.recovery || this.stagedReceipt || !PromptRecovery.canPrepareEmpty) return
+    let source: PreparedSessionApi | undefined
+    try { source = this.options.admission?.() }
+    catch { return } // A Session can open before its managed account policy is available.
+    if (!source) return
+    const journal = new PromptRecovery(source.recoveryKey(this.sessionId), source.receiptHandoffTimeoutMs)
+    if (journal.prepareEmpty()) this.stagedReceipt = { journal, node: source.receiptNode }
+  }
+
   /**
    * Register one local submission echo before serialization and transport.
    * @param input - echo text, image previews, and settlement callback.
    * @returns prompt identity plus a pre-admission abandon operation.
    */
   beginSubmission(input: BeginSubmissionInput): SubmissionHandle {
-    const requestId = randomUUID() as RpcId
+    const key = JSON.stringify([input.mode, input.text, input.images, input.documentIds ?? []])
+    const requestId = this.uncertain?.inputKey === key ? this.uncertain.id : randomUUID() as RpcId
+    this.submissionKeys.set(requestId, key)
     const placement = this.running ? input.mode === 'steer' ? 'steering' : 'queued' : 'transcript'
     this.pendingSubmissions = [...this.pendingSubmissions, {
       requestId,
@@ -378,7 +411,7 @@ export class Session implements SessionFace {
     this.notifier.markDirty()
     return {
       requestId,
-      abandon: () => { this.retireFailedSubmission(requestId) },
+      abandon: () => { this.submissionKeys.delete(requestId); this.retireFailedSubmission(requestId) },
     }
   }
 
@@ -405,13 +438,23 @@ export class Session implements SessionFace {
     let result: RpcResult<{ accepted: true }> | RemoteResult<{ accepted: true }>
     try {
       if (this.address === undefined) {
-        result = (await this.api.sessions.prompt({
-          sessionId: this.sessionId,
-          mode,
-          content,
-          clientTimeZone: resolvedClientTimeZone(),
-          ...(requestId === undefined ? {} : { requestId }),
-        }, signal)).result
+        const payload = { sessionId: this.sessionId, mode, content, clientTimeZone: resolvedClientTimeZone(),
+          ...(requestId === undefined ? {} : { requestId }) }
+        const source = this.options.admission?.()
+        if (source === undefined) {
+          const current = this.options.admission?.(true)
+          if (this.uncertain || this.recovery && await this.recovery.pending()
+            || current && PromptRecovery.exists(current.recoveryKey(this.sessionId))) {
+            throw new Error('Cannot verify the original account and Runtime for this draft.')
+          }
+        }
+        if (this.uncertain !== undefined || source !== undefined) {
+          const key = requestId === undefined ? JSON.stringify([mode, content]) : this.submissionKeys.get(requestId) ?? requestId
+          const id = requestId ?? (this.uncertain?.inputKey === key ? this.uncertain.id : randomUUID() as RpcId)
+          const action = this.admissions.then(() => this.admit({ ...payload, requestId: id }, key, source, signal))
+          this.admissions = action.then(() => {}, () => {})
+          result = await action
+        } else result = (await this.api.sessions.prompt(payload, signal)).result
       } else if (this.address.mode === 'one-shot') {
         result = {
           ok: false,
@@ -447,6 +490,7 @@ export class Session implements SessionFace {
     } catch (error) {
       result = transportError(error)
     }
+    if (requestId !== undefined) this.submissionKeys.delete(requestId)
     if (!result.ok) {
       if (requestId !== undefined) this.retireFailedSubmission(requestId)
       this.promptError = { op: 'send', error: result.error }
@@ -458,6 +502,100 @@ export class Session implements SessionFace {
     // actually arrives rather than at the RPC response.
     this.beginLiveHistory()
     return result
+  }
+
+  private async admit(
+    payload: RequestPayload<'session.prompt'>,
+    inputKey: string,
+    source: PreparedSessionApi | undefined,
+    signal?: AbortSignal,
+  ): Promise<RpcResult<{ accepted: true }>> {
+    const echoId = payload.requestId
+    if (!echoId || !source) throw new Error('Cannot confirm this submission’s original account and Runtime')
+    const namespace = source.recoveryKey(this.sessionId)
+    const verify = () => {
+      signal?.throwIfAborted()
+      const current = this.options.admission?.()
+      if (this.disposed || current?.recoveryKey(this.sessionId) !== namespace || current.receiptNode !== source.receiptNode) {
+        throw new Error('The message account, computer or Runtime changed.')
+      }
+    }
+    verify()
+    if (this.recovery && this.recovery.key !== namespace) throw new Error('This draft belongs to another account or Runtime.')
+    const staged = this.stagedReceipt
+    this.stagedReceipt = undefined
+    if (staged) {
+      if (!this.recovery && staged.journal.key === namespace && staged.node === source.receiptNode) this.recovery = staged.journal
+      else staged.journal.close()
+    }
+    const recovery = this.recovery ??= new PromptRecovery(namespace, source.receiptHandoffTimeoutMs)
+    const prior = await recovery.pending(source.receiptNode, signal)
+    const status = async (requestId: RpcId, proof: string) => {
+      verify()
+      const response = (await source.status({ sessionId: this.sessionId, requestId, confirmInput: true }, signal)).result
+      verify()
+      if (response.ok && response.value.state === 'accepted' && response.value.inputProof !== proof) {
+        throw new Error('The Runtime could not confirm this exact input. The draft is still available.')
+      }
+      return response
+    }
+    const confirmed = (id: RpcId) => {
+      recovery.clear(id)
+      this.uncertain = undefined
+    }
+    let id = echoId
+    let replaying = false
+    if (prior) {
+      const { clientTimeZone: _currentZone, ...input } = payload
+      const original: RequestPayload<'session.prompt'> = prior.zone === null ? input : { ...input, clientTimeZone: prior.zone }
+      const matches = promptInputProof(prior.id, original) === prior.proof
+      const receipt = await status(prior.id, prior.proof)
+      if (!receipt.ok) return receipt
+      if (receipt.value.state === 'accepted') {
+        confirmed(prior.id)
+        if (matches) {
+          this.finishSubmission(echoId, { reason: 'observed', attachments: [] })
+          return { ok: true, value: { accepted: true } }
+        }
+        throw new Error('The previous message was received. Your current draft is different. Review it and send again.')
+      } else {
+        if (!matches) throw new Error('The prior input is still unconfirmed. Keep the draft and retry the original message.')
+        id = prior.id
+        payload = original
+        replaying = true
+      }
+    }
+
+    verify()
+    const proof = promptInputProof(id, payload)
+    recovery.save(id, proof, payload.clientTimeZone, source.receiptNode)
+    try {
+      const received = (await source.sessions.prompt({ ...payload, requestId: id }, signal)).result
+      if (received.ok) {
+        verify()
+        confirmed(id)
+        if (id !== echoId) this.finishSubmission(echoId, { reason: 'observed', attachments: [] })
+        return received
+      }
+      if (received.error.code !== 'prompt-durability-unavailable') {
+        verify()
+        // A refused replay cannot disprove an earlier in-flight submission.
+        if (!replaying) confirmed(id)
+        return received
+      }
+    } catch (error) {
+      if (this.disposed || signal?.aborted || error instanceof Error && 'status' in error && typeof error.status === 'number'
+        && error.status >= 400 && error.status < 500) throw error
+    }
+    this.uncertain = { id, inputKey }
+    const receipt = await status(id, proof)
+    if (!receipt.ok) return receipt
+    if (receipt.value.state === 'accepted') {
+      confirmed(id)
+      this.finishSubmission(echoId, { reason: 'observed', attachments: [] })
+      return { ok: true, value: { accepted: true } }
+    }
+    return { ok: false, error: { code: 'prompt-durability-unavailable', message: 'Message receipt is unconfirmed', details: { sessionId: this.sessionId } } }
   }
 
   /**
@@ -566,11 +704,14 @@ export class Session implements SessionFace {
     return { ok: true, value: { matched: result.value !== undefined } }
   }
 
-  /** First open: pull the tail page (idempotent — in-flight/already-open returns the existing promise). */
-  open(): Promise<void> {
+  /** Open a retained tail once and keep subsequent frames continuous with that tail.
+   * @param prepared - an authenticated history response from the same Runtime and Session.
+   * @returns after the initial tail is available or its failure is recorded.
+   */
+  open(prepared?: Awaited<ReturnType<IApiClient['sessions']['history']>>): Promise<void> {
     if (this.openState === 'open') return Promise.resolve()
     if (this.openPromise !== null) return this.openPromise
-    const promise = this.doOpen(this.openGeneration).finally(() => {
+    const promise = this.doOpen(this.openGeneration, prepared).finally(() => {
       // Identity-guarded: a superseded open must not null out the promise resync just started.
       if (this.openPromise === promise) this.openPromise = null
     })
@@ -684,8 +825,13 @@ export class Session implements SessionFace {
    *  request is still valid history, so the open generation is not bumped. A window still
    *  loading or in error is reset and reopened: that history request rode the dead connection
    *  and must not settle the fresh generation into 'error'. Pending waits always clear for the
-   *  baseline replay. */
-  async resync(): Promise<void> {
+   *  baseline replay.
+   * @param firstConnection - no previous stream or disconnect occurred for this Runtime.
+   */
+  async resync(firstConnection = false): Promise<void> {
+    // An authenticated HTTP tail can precede the first mux handshake. Its subscribed watermark still repairs any missing events.
+    if (firstConnection && this.openState === 'open' && this.openedFromPreparedTail) return
+    this.openedFromPreparedTail = false
     // The queue mirror is NOT cleared here: onConnected (which drives resync)
     // races the mux frames — the fresh generation's baseline may have landed
     // already, and the host never resends it. The mirror re-baselines on the
@@ -779,7 +925,7 @@ export class Session implements SessionFace {
         // after its next live event exposes the gap.
         if (this.openState === 'open') {
           const tailSeq = this.windowTailSeq()
-          if (tailSeq !== null && frame.lastSeq > tailSeq) void this.repairGap()
+          if ((tailSeq !== null || this.openedFromPreparedTail) && frame.lastSeq > (tailSeq ?? -1)) void this.repairGap()
         }
         return
       }
@@ -888,6 +1034,10 @@ export class Session implements SessionFace {
 
   /** Stop in-flight history work and release submission observers for this scope. */
   dispose(): void {
+    this.disposed = true
+    this.stagedReceipt?.journal.close()
+    this.stagedReceipt = undefined
+    this.recovery?.close()
     this.lifetime.abort(new Error('session disposed'))
     this.disposeInboxProjection()
     this.openGeneration++
@@ -1055,14 +1205,14 @@ export class Session implements SessionFace {
 
   /** @param generation - openGeneration at launch; every await re-checks it and a stale pass
    *  drops all writes (resync superseded this open — its outcome belongs to a dead connection). */
-  private async doOpen(generation: number): Promise<void> {
+  private async doOpen(generation: number, prepared?: Awaited<ReturnType<IApiClient['sessions']['history']>>): Promise<void> {
     this.openState = 'loading'
     this.openError = null
     this.notifier.markDirty()
     const controller = new AbortController()
     this.historyAbortController = controller
     try {
-      let { result } = await this.history({ maxMessages: PAGE_MESSAGES }, controller.signal)
+      let { result } = prepared ?? await this.history({ maxMessages: PAGE_MESSAGES }, controller.signal)
       if (generation !== this.openGeneration) return
       if (!result.ok) {
         this.openState = 'error'
@@ -1077,7 +1227,7 @@ export class Session implements SessionFace {
       )
       // Gap detection: baseline past the window tail and liveBuffer did not cover it -> pull the tail page once more.
       const tailSeq = this.windowTailSeq()
-      if (this.subscribedLastSeq !== null && tailSeq !== null && this.subscribedLastSeq > tailSeq) {
+      if (this.subscribedLastSeq !== null && (tailSeq !== null || prepared !== undefined) && this.subscribedLastSeq > (tailSeq ?? -1)) {
         result = (await this.history({ maxMessages: PAGE_MESSAGES }, controller.signal)).result
         if (generation !== this.openGeneration) return
         if (result.ok) {
@@ -1090,6 +1240,8 @@ export class Session implements SessionFace {
         }
       }
       this.openState = 'open'
+      this.prepareEmptyReceipt()
+      this.openedFromPreparedTail = prepared !== undefined
       this.scheduleHistoryNavigationRead()
       if (this.stageActive && this.running) this.beginLiveHistory()
     } catch (error) {

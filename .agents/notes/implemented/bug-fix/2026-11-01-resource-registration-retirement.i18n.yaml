@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-resource-registration-retirement.md
 document:
-  en: fd6b064d97af7503fd0182fa77c953878f7376d9
-  zh: 0e6383c556121f55f3af9f13250208c5ae42ffce
+  en: 2d16bca72275e68aff9df22f1ed935408667af28
+  zh: 84a5353d741feb3d358177c519e6c117ee6ff4b1
 /agent-note-unsubmitted-resource-requests-retire-independently-of-remote-registration:
   en: 6acd485d89af32c7
   zh: d02761694657f02e
@@ -12,8 +12,8 @@ document:
   en: b06a9d5c0d8329d3
   zh: 421d74006b0c5947
 /agent-note-unsubmitted-resource-requests-retire-independently-of-remote-registration/decision:
-  en: de32d867d6a7f09b
-  zh: 9487762e8392f3fd
+  en: 81355c8e64218298
+  zh: e57f57c4d35e0455
 /agent-note-unsubmitted-resource-requests-retire-independently-of-remote-registration/alternatives-considered:
   en: 96fa91e2d4757c40
   zh: e40556d61f728f44
@@ -21,5 +21,5 @@ document:
   en: fadf6ac2662e4086
   zh: b5716f4e5883e5a7
 /agent-note-unsubmitted-resource-requests-retire-independently-of-remote-registration/verification:
-  en: 3c96cbcd61faf784
-  zh: ba6e9de9b652d746
+  en: ec30794d017bc0fd
+  zh: 70d6efa2cba42dbb

@@ -30,6 +30,8 @@ import type { SessionListEntry } from './lineage.ts'
 import type { PendingInteractionStatus } from './pending.ts'
 import { SessionProvideChannel } from './provide.ts'
 import type { Session } from './session.ts'
+import { PreparedSessionApi } from '../prepare-runtime.ts'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 
 /**
  * Session list row projected from Host state. Runtime and pooled lists preserve
@@ -403,7 +405,7 @@ export class SessionRuntime implements ISessions {
     api: IApiClient,
     remote: SessionRemotes,
     conversationRuntime?: ConversationRuntime,
-    options: { persistSelection?: boolean; provideService?: boolean; hostDescription?: HostDescriptionSource } = {},
+    options: { persistSelection?: boolean; provideService?: boolean; hostDescription?: HostDescriptionSource; runtimeTarget?: import('../contract/sessions.ts').SessionRuntimeTarget } = {},
   ) {
     this.hostDescription = options.hostDescription
     rootCtx.effect(() => () => { this.navigation.dispose() }, 'sessions: navigation lifetime')
@@ -438,6 +440,18 @@ export class SessionRuntime implements ISessions {
       restored.sessionId,
       restored.subagentAddress,
       conversation,
+      (forRecovery = false) => {
+        const connection = this.rootCtx.get('connection') as ConnectionHandle | undefined
+        const managed = this.rootCtx.get('deploymentContext')?.getSnapshot().context?.mode === 'multi'
+        if (!managed && !forRecovery) return undefined
+        const account = this.rootCtx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId
+        const target = options.runtimeTarget ?? options.hostDescription?.getSnapshot()?.runtimeTarget
+        if (account === undefined || connection === undefined || target?.runtimeId === undefined) {
+          if (!managed) return undefined
+          throw new Error('Cannot verify this conversation’s account and Runtime')
+        }
+        return new PreparedSessionApi(connection, target, account)
+      },
     )
     this.list = createSnapshotStore<SessionListState>({
       ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'pending',
@@ -528,6 +542,9 @@ export class SessionRuntime implements ISessions {
    * @returns the renderer kit used while an account is being withdrawn.
    */
   unboundProvideInfo(): SessionMaybeProvideInfo { return this.provideChannel.maybeInfo }
+
+  /** Observe navigation without superseding an explicit user action. */
+  get navigationSignal(): AbortSignal { return this.navigation.signal }
 
   beginNavigation(options?: { readonly blockInputFor?: SessionId | undefined }): AbortSignal {
     const previous = this.navigation.blockedSessionId
@@ -802,6 +819,20 @@ export class SessionRuntime implements ISessions {
     return this.rootCtx.waterfall(
       'sessions/prepare-create', this.runtimeTarget === undefined ? opts : { ...opts, runtimeTarget: this.runtimeTarget }, () => Promise.resolve(this.runtimeTarget === undefined ? opts : { ...opts, runtimeTarget: this.runtimeTarget }),
     )
+  }
+
+  /** Adopt an authorized response into this Runtime without issuing a second mutation or tail request.
+   * @param id - original Host Session identity.
+   * @param options - returned creation metadata, or an empty object for history.
+   * @param history - authoritative tail page when opening an existing Session.
+   * @returns after the addressed history window is available.
+   * @param created - whether this is the receipt for a reserved root create.
+   */
+  async acceptPrepared(id: SessionId, options: SessionCreateOptions, history?: Awaited<ReturnType<IApiClient['sessions']['history']>>,
+    created = history === undefined): Promise<void> {
+    this.manager.acceptPrepared(id, created, options)
+    this.projectList()
+    if (history !== undefined) await this.manager.get(id).open(history)
   }
 
   private async createPrepared(prepared: SessionCreateOptions, reuseSessionId?: SessionId): Promise<SessionId> {

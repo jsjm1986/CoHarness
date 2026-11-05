@@ -1682,6 +1682,7 @@ export function createFixtureFaces(options: FixtureOptions = {}): FixtureWorld {
 function createFixtureWorld(options: FixtureOptions): FixtureWorld {
   const noneMode = options.interactions === 'none'
   // The resident fixture sessions all carry history, so none of them is blank.
+  const admittedPrompts = new Map<SessionId, Set<string>>()
   const sessions: SessionSummary[] = options.empty ? [] : [
     { sessionId: sid('fx-alpha'), updatedAt: Date.now(), running: true, blank: false, cwd: '/tmp/fixture' },
     { sessionId: sid('fx-beta'), updatedAt: Date.now() - 60_000, running: false, blank: false, parentSessionId: sid('fx-alpha'), cwd: '/tmp/fixture' },
@@ -2784,12 +2785,27 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         append(request.payload.sessionId, { type: 'model/selection', data: selected })
         return ok(request, { selected })
       },
+      promptStatus: (request) => {
+        const { sessionId, requestId } = request.payload
+        if (summaryOf(sessionId) === undefined) return err(request, { code: 'session-not-found', message: 'Session not found', details: { sessionId } })
+        return ok(request, { state: admittedPrompts.get(sessionId)?.has(requestId) ? 'accepted' as const : 'unknown' as const })
+      },
       prompt: (request) => {
         const { sessionId: id, mode, content } = request.payload
         const summary = summaryOf(id)
         if (summary === undefined) {
           return err(request, { code: 'session-not-found', message: `no session ${id}`, details: { sessionId: id } })
         }
+        const requestId = request.payload.requestId
+        const receipt = () => {
+          if (requestId !== undefined) {
+            const receipts = admittedPrompts.get(id) ?? new Set<string>()
+            receipts.add(requestId)
+            admittedPrompts.set(id, receipts)
+          }
+          return ok(request, { accepted: true as const })
+        }
+        if (requestId !== undefined && admittedPrompts.get(id)?.has(requestId)) return receipt()
         if (options.rejectPrompt) {
           if (content.some(block => block.type === 'image')) {
             return err(request, {
@@ -2831,7 +2847,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         if (mode === 'steer' && replays.has(id)) {
           // Steering: the durable user/message lands inside the current turn; the replay continues.
           append(id, { type: 'user/message', surfaceOp: 'append', data: userMessage(durable) })
-          return ok(request, { accepted: true as const })
+          return receipt()
         }
         const turn = nextTurn.get(id) ?? 0
         nextTurn.set(id, turn + 1)
@@ -2867,7 +2883,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
               })()
               : `回声：${userText}。这是 fixture 的流式回复，用于验证打字机增长与定稿切换。`,
         )
-        return ok(request, { accepted: true as const })
+        return receipt()
       },
       attachment: (request) => {
         const stored = attachments.get(String(request.payload.attachmentId))
@@ -3590,6 +3606,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'session.selectModel': return this.api.sessions.selectModel(request)
       case 'session.rename': return this.api.sessions.rename(request)
       case 'session.fork': return this.api.sessions.fork(request)
+      case 'session.promptStatus': return this.api.sessions.promptStatus(request)
       case 'session.prompt': return this.api.sessions.prompt(request)
       case 'session.attachment': return this.api.sessions.attachment(request)
       case 'session.updateQueue': return this.api.sessions.updateQueue(request)

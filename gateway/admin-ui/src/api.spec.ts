@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   applyArchiveAction,
   AdminRequestError,
+  getOwnerProjectDisplays, getProject, listProjects, type Project,
   getArchive,
   getArchiveStatus,
   listArchives,
@@ -281,4 +282,31 @@ describe('Runtime-qualified empty-draft maintenance', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonOk({ cutoff: 42, candidates: [{ rootSessionId: 'same-host', runtime: { kind: 'user', id: 7, runtimeId: value } }] })))
     expect((await previewEmptyDrafts()).candidates[0]!.runtime.runtimeId).toBe(runtimeId)
   })
+})
+
+it('loads only a bounded owner page for the selected Admin computer and refuses mixed allocations', async () => {
+  const nodeId = '20000000-0000-4000-8000-000000000001' as NonNullable<Project['nodeId']>
+  const runtimeId = '10000000-0000-4000-8000-000000000001' as NonNullable<Project['runtimeId']>
+  const row: Project = { id: 9, metadataOnNode: true, runtimeId, nodeId, name: 'unverified', path: '/unverified', memberCount: 1 }
+  const display = { projectId: row.id, runtimeId, nodeId, name: 'From Ubuntu', rootPath: '/srv/ubuntu' }
+  const fetch = vi.fn().mockResolvedValueOnce(jsonOk([row]))
+  vi.stubGlobal('fetch', fetch)
+  vi.stubGlobal('location', new URL(`https://harness.invalid/admin/computers/${nodeId}/projects`))
+  const page = await listProjects(undefined, 'directory')
+  expect(page[0]).toMatchObject({ id: 9, name: '#9', path: '' })
+  expect(fetch).toHaveBeenCalledTimes(1)
+  const other = '30000000-0000-4000-8000-000000000001' as NonNullable<Project['nodeId']>
+  await expect(getOwnerProjectDisplays([{ ...row, nodeId: other }])).rejects.toThrow()
+  await expect(getOwnerProjectDisplays(Array.from({ length: 33 }, (_, i) => ({ ...row, id: i + 1 })))).rejects.toThrow()
+  expect(fetch).toHaveBeenCalledTimes(1)
+  fetch.mockResolvedValueOnce(jsonOk({ items: [display] }))
+  expect((await getOwnerProjectDisplays(page)).get(9)).toEqual({ name: display.name, path: display.rootPath })
+  expect(fetch.mock.calls[1]![0]).toBe(`/admin/api/project-metadata?dshNode=${nodeId}&ids=9`)
+  fetch.mockResolvedValueOnce(jsonOk({ ...row, members: [{ userId: 7 }] }))
+  await expect(getProject(9, 'members')).resolves.toMatchObject({ id: 9, name: '#9', path: '', members: [{ userId: 7 }] })
+  expect(String(fetch.mock.calls[2]![0])).toContain('/admin/api/projects/9?display=directory')
+  for (const items of [[], [display, display], [{ ...display, nodeId: other }], [{ ...display, runtimeId: other }], [{ ...display, projectId: 8 }]]) {
+    fetch.mockResolvedValueOnce(jsonOk({ items }))
+    await expect(getOwnerProjectDisplays(page)).rejects.toThrow()
+  }
 })

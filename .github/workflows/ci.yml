@@ -831,6 +831,21 @@ jobs:
       # tsconfig paths instead.
       - name: Build Gateway
         run: npm run build:check --prefix gateway
+      - name: Build private PostgreSQL maintenance adapters
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libpq-dev postgresql-client
+          node gateway/scripts/build-pg-client.mjs
+          docker cp gateway/deploy/postgres/pg-client.c "$POSTGRES_CONTAINER:/tmp/hgw-pg-client.c"
+          docker exec --user 0 "$POSTGRES_CONTAINER" sh -ec '
+            apt-get update
+            apt-get install -y --no-install-recommends gcc libc6-dev libpq-dev
+            cc -std=c11 -Wall -Wextra -Werror -I"$(pg_config --includedir)" /tmp/hgw-pg-client.c -L"$(pg_config --libdir)" -lpq -o /usr/local/bin/hgw-pg-client
+            /usr/local/bin/hgw-pg-client --protocol-version
+            rm /tmp/hgw-pg-client.c
+          '
       # Gateway tests materialize the bundle into staged instance homes; the
       # ci face emits transpile-only because this lane has no workspace lib/types.
       - name: Build the directory guard bundle used by Gateway tests
@@ -844,8 +859,8 @@ jobs:
         run: npm test --prefix gateway
       - name: Test Gateway PostgreSQL authorization and invalidation
         env:
-          HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","pg_dump"]'
-          HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","pg_restore"]'
+          HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_dump"]'
+          HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_restore"]'
         run: npm run test:postgres --prefix gateway
       - name: Preserve gate evidence
         if: always()

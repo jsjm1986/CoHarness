@@ -101,6 +101,8 @@ A cancelled bridge retains its node service slot until socket and pipeline clean
 
 ## Runtime isolation
 
+On Windows, the Gateway signs a validity start one system-clock tick (16 ms) before issuance. The expiration deadline still comes from the actual issuance time and the configured lifetime. The receiving Runtime checks the signature, exact identity, generation and both time boundaries.
+
 Lifecycle queues, private credentials, signed principals, resource registrations and Session execution records retain the allocated Runtime UUID. A credential and principal must agree on that UUID, owner and process generation. PostgreSQL preserves an owner/node generation counter across assignment retirement; generations are monotonic and may skip values. Confirmed-stop cleanup reclaims only the stopped Runtime's registrations. Queued work loses admission when its exact node connection becomes invalid, while active or uncertain occupation remains until owned cleanup is confirmed.
 
 Each computer records its account working directory independently. Existing personal assignments retain `<usersRoot>/<username>/dsh`; an isolated assignment uses `<usersRoot>/<username>/runtimes/<Runtime UUID>/dsh` and a distinct supervisor name. Settings, plugin state and Session data belong to that private directory. Working-directory grants retain their existing account/project rules. Account preferences remain account-wide, including their existing legacy settings migration source.

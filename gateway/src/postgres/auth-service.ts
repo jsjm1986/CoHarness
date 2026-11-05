@@ -152,7 +152,14 @@ export class PostgresAuthService {
     })
   }
 
-  async validate(token: string): Promise<UserRow | null> {
+  async validate(token: string): Promise<UserRow | null> { return this.validateSession(token,false) }
+
+  /** Recheck the browser account and this computer grant from the same post-renewal authorization snapshot.
+   * @param token - current browser session. @returns the active account or null after expiry, revocation, or loss of computer use.
+   */
+  validateOnComputer(token:string):Promise<UserRow|null> { return this.validateSession(token,true) }
+
+  private async validateSession(token:string,requireComputer:boolean):Promise<UserRow|null> {
     const renewed = await this.context.pool.query<{ id: string }>(`WITH locked AS MATERIALIZED (
         SELECT id,expires_at,absolute_expires_at FROM harness.auth_sessions
         WHERE organization_id=$1 AND token_hash=$2 AND revoked_at IS NULL
@@ -175,7 +182,7 @@ export class PostgresAuthService {
     // Authority comes from a fresh snapshot after renewal releases the session lock.
     const result = await this.context.pool.query<PostgresAuthUser>(`SELECT
         u.public_id::text,u.username::text,u.display_name,u.status,u.deleted_at,u.home_path,
-        m.role,m.status membership_status,c.must_change_password,c.password_hash,u.auto_review_eligible
+        m.role,m.status membership_status,c.must_change_password,u.auto_review_eligible
       FROM harness.auth_sessions s
       JOIN harness.users u ON u.id=s.user_id AND u.organization_id=s.organization_id
       JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
@@ -183,8 +190,9 @@ export class PostgresAuthService {
       WHERE s.organization_id=$1 AND s.id=$2 AND s.revoked_at IS NULL
         AND s.expires_at > clock_timestamp() AND s.absolute_expires_at > clock_timestamp()
         AND u.status='active' AND u.deleted_at IS NULL AND m.status='active'
-        AND (SELECT status FROM harness.organizations WHERE id=$1)='active'`,
-    [this.context.organizationId, session.id])
+        AND (SELECT status FROM harness.organizations WHERE id=$1)='active'
+        AND (NOT $3::boolean OR harness.computer_use_allowed($1,u.id,$4) AND harness.entry_node_visible($1,$4,$4))`,
+    [this.context.organizationId, session.id,requireComputer,this.context.nodeId])
     const row = result.rows[0]
     return row === undefined ? null : userRow(row)
   }

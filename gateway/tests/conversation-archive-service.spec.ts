@@ -199,6 +199,7 @@ describe('ConversationArchiveService', () => {
       query: vi.fn(async (text: string) => {
         if (text.includes("FROM harness.organizations WHERE id=$1 AND status='active' FOR SHARE")) return { rows: [{ present: 1 }], rowCount: 1 }
         if (text.includes('FROM harness.users u JOIN harness.memberships')) return { rows: [{ role: 'admin', user_status: 'active', membership_status: 'active' }], rowCount: 1 }
+        if (text.includes('JOIN harness.password_credentials')) return { rows: [{ must_change_password: false }], rowCount: 1 }
         if (text.startsWith('SELECT i.runtime_id')) return { rows: [{ runtime_id: runtimeUUID }], rowCount: 1 }
         if (text.includes('SELECT id FROM harness.users')) return { rows: [{ id: 'user-internal' }], rowCount: 1 }
         if (text.includes('SELECT state,runtime_kind,runtime_public_id::text,sync_revision::text')) {

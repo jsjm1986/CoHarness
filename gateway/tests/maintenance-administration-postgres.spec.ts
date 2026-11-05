@@ -32,10 +32,12 @@ describePg('PostgreSQL maintenance administration', () => {
         const actor = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.users(organization_id,username,display_name,home_path)
           VALUES($1,$2::text,$2::text,'/unused') RETURNING id,public_id`, [organizationId, name])).rows[0]!
         await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')", [organizationId, actor.id])
+        await pool.query('INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,$2,false)', [actor.id, 'fixture-password-hash'])
         actors.push({ uuid: actor.id, id: Number(actor.public_id) })
       }
       const actor = actors[0]!, other = actors[1]!, maintenance = new PostgresMaintenanceService(context, 60_000), backups = new PostgresBackupService(context)
-      const backup = await backups.record({ path: '/unused/accepted.dump', migrationVersion: 95, writeEpoch: 1n,
+      const migrationVersion = (await pool.query<{ version: number }>('SELECT MAX(version) version FROM harness.schema_migrations')).rows[0]!.version
+      const backup = await backups.record({ path: '/unused/accepted.dump', migrationVersion, writeEpoch: 1n,
         sizeBytes: 128, sha256: 'a'.repeat(64), managedSnapshot: { version: 1, roots: [], directories: [], absent: [], files: [] }, actor: actor.id })
       await backups.setVerified(backup.id, true)
       return { context, actor, other, maintenance, backups, backup,
@@ -57,6 +59,14 @@ describePg('PostgreSQL maintenance administration', () => {
     await expect(f.maintenance.exitMaintenance(other.actor.id)).rejects.toMatchObject({ code: 'forbidden' })
     await expect(f.maintenance.setNodeStatus(other.actor.id, f.context.nodeId, 'offline')).rejects.toMatchObject({ code: 'forbidden' })
     await expect(f.maintenance.requestRestore(other.actor.id, f.backup.id)).rejects.toMatchObject({ code: 'forbidden' })
+    await expect(f.maintenance.logOperation('backup', 'running', other.actor.id, {})).rejects.toMatchObject({ code: 'forbidden' })
+    await expect(f.backups.get(f.backup.id, other.actor.id)).rejects.toMatchObject({ code: 'forbidden' })
+    await expect(f.backups.setVerified(f.backup.id, false, 'foreign verifier', other.actor.id)).rejects.toMatchObject({ code: 'forbidden' })
+    await expect(f.backups.record({ path: '/unused/foreign.dump', migrationVersion: f.backup.migrationVersion,
+      writeEpoch: 1n, sizeBytes: 128, sha256: 'b'.repeat(64), managedSnapshot: f.backup.managedSnapshot!, actor: other.actor.id }))
+      .rejects.toMatchObject({ code: 'forbidden' })
+    expect((await f.backups.get(f.backup.id)).status).toBe('verified')
+    expect(await f.backups.list()).toHaveLength(1)
     expect((await f.maintenance.listOperations()).map(operation => operation.kind)).toEqual(['enter-maintenance'])
   })
 
@@ -100,6 +110,32 @@ describePg('PostgreSQL maintenance administration', () => {
     } finally { await blocker.query('ROLLBACK'); blocker.release(); await Promise.all(pending); await Promise.all(workers.map(worker => worker.end())) }
   })
 
+  it('retains the verifying administrator until the backup status and returned row commit', async () => {
+    await using f = await fixture()
+    const name = `backup-verifier-${randomUUID()}`, revokeName = `backup-revoke-${randomUUID()}`
+    const worker = createPostgresPool(databaseUrl!, { max: 1, application_name: name })
+    const revoker = createPostgresPool(databaseUrl!, { max: 1, application_name: revokeName })
+    const blocker = await pool.connect()
+    let pending: Promise<unknown> | undefined, revoked: Promise<unknown> | undefined, settled = false
+    try {
+      await blocker.query('BEGIN'); await blocker.query('SELECT 1 FROM harness.backup_records WHERE id=$1 FOR UPDATE', [f.backup.id])
+      pending = new PostgresBackupService({ ...f.context, pool: worker }).setVerified(f.backup.id, true, undefined, f.actor.id).catch((error: unknown) => error)
+      await expect.poll(async () => (await pool.query<{ waiting: boolean }>("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock') waiting", [name])).rows[0]!.waiting).toBe(true)
+      revoked = revoker.query("UPDATE harness.memberships SET role='member' WHERE user_id=$1", [f.actor.uuid])
+        .then(value => { settled = true; return value }, (error: unknown) => { settled = true; return error })
+      await expect.poll(async () => settled || (await pool.query<{ waiting: boolean }>(`SELECT EXISTS(SELECT 1 FROM pg_stat_activity r JOIN pg_stat_activity w
+        ON w.pid=ANY(pg_blocking_pids(r.pid)) WHERE r.application_name=$1 AND w.application_name=$2) waiting`, [revokeName, name])).rows[0]!.waiting).toBe(true)
+      expect(settled).toBe(false)
+      await blocker.query('COMMIT')
+      expect(await pending).toMatchObject({ id: f.backup.id, status: 'verified' }); expect(await revoked).not.toBeInstanceOf(Error)
+      await expect(f.backups.setVerified(f.backup.id, false, 'revoked verifier', f.actor.id)).rejects.toMatchObject({ code: 'forbidden' })
+      expect((await f.backups.get(f.backup.id)).status).toBe('verified')
+    } finally {
+      await blocker.query('ROLLBACK'); blocker.release()
+      await Promise.all([pending, revoked]); await Promise.all([worker.end(), revoker.end()])
+    }
+  })
+
   it.each(['enter', 'exit', 'node-status'] as const)('rolls back %s when its operation row cannot commit', async operation => {
     await using f = await fixture()
     if (operation === 'exit') await f.maintenance.enterMaintenance(null)
@@ -131,6 +167,15 @@ describePg('PostgreSQL maintenance administration', () => {
       expect((await maintenance.setNodeStatus(f.actor.id, f.context.nodeId, 'draining')).status).toBe('draining')
       expect((await maintenance.exitMaintenance(f.actor.id)).mode).toBe('serving')
       expect((await maintenance.requestRestore(f.actor.id, f.backup.id)).createdBy).toBe(f.actor.id)
+      const backups = new PostgresBackupService({ ...f.context, pool: worker })
+      const created = await backups.record({ path: '/unused/new.dump', migrationVersion: f.backup.migrationVersion, writeEpoch: 1n,
+        sizeBytes: 128, sha256: 'b'.repeat(64), managedSnapshot: f.backup.managedSnapshot!, actor: f.actor.id })
+      expect((await backups.get(created.id, f.actor.id)).status).toBe('recording')
+      expect((await backups.setVerified(created.id, true, undefined, f.actor.id)).status).toBe('verified')
+      expect((await backups.setVerified(created.id, false, 'controlled verification failure', f.actor.id)).status).toBe('failed')
+      await expect(backups.get(randomUUID(), f.actor.id)).rejects.toMatchObject({ status: 404 })
+      await expect(backups.setVerified(randomUUID(), true, undefined, f.actor.id)).rejects.toMatchObject({ status: 409 })
+      expect(await maintenance.logOperation('backup', 'running', f.actor.id, {})).toBeTypeOf('string')
     } finally { await worker.end() }
   })
 

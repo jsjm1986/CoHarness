@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-29-model-administration-authority.md
 document:
-  en: 464fe19d6348f6c3a5e9ef26e66e440482098287
-  zh: a726df71bf9d79fea145676e710cae2bf392bddd
+  en: a1c588aa1bce57fc88c065125023ccd294d41a48
+  zh: 6d8c5c02e7df46732767ed0541fb6d41bd75b3d2
 /agent-note-model-administration-retains-current-authority-and-target-lifetime:
   en: 1c8375354fc0acec
   zh: 893b540ca1aed0cd
@@ -12,8 +12,8 @@ document:
   en: 742156144a4668ce
   zh: 179e6f20a70ef987
 /agent-note-model-administration-retains-current-authority-and-target-lifetime/decision:
-  en: 0278a12453a63d60
-  zh: da23178440831707
+  en: 913bb3001bb160dc
+  zh: 35642d6aa4e2e8c8
 /agent-note-model-administration-retains-current-authority-and-target-lifetime/alternatives-considered:
   en: c4cf2c37a727e8f3
   zh: 98e75cf077b1d126
@@ -21,5 +21,5 @@ document:
   en: 17b90f71c6ed313b
   zh: ff72215abe3d9b10
 /agent-note-model-administration-retains-current-authority-and-target-lifetime/verification:
-  en: 002ad9dcf2d1b3af
-  zh: 7687238342b2a02c
+  en: c3043e9a44cb5f6e
+  zh: 1eb59dd36aa227ef

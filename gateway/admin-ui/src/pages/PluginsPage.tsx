@@ -1,3 +1,4 @@
+import { useProjectChoices } from '../components/project-choices.tsx'
 /** Per-owner plugin management: one friendly plugin list over the shared composition, with the entry-level matrix folded below. */
 import { usePendingEdits, useProtectedNavigation } from '../pending-edits.tsx'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
@@ -175,7 +176,9 @@ function CompositionView({ composition, open, t }: { readonly composition: Plugi
 
 export function PluginsPage() {
   const t = useMemo(() => translatePlugin(adminLanguage()), [])
-  const [targets, setTargets] = useState<Array<{ key: string; kind: 'user' | 'project'; id: number; label: string }>>([])
+  const [userTargets, setUserTargets] = useState<Array<{ key: string; kind: 'user' | 'project'; id: number; label: string }>>([])
+  const { projects: projectChoices, setProjects, readNames, moreNames } = useProjectChoices()
+  const targets = useMemo(() => [...userTargets, ...projectChoices.map(project => ({ key: `project:${project.id}`, kind: 'project' as const, id: project.id, label: t('targetProject', { name: project.name }) }))], [userTargets, projectChoices, t])
   const [selected, setSelected] = useState('')
   const navigation = useProtectedNavigation()
   const [runtime, setRuntime] = useState<RuntimeCatalogEntry>()
@@ -190,36 +193,43 @@ export function PluginsPage() {
   }, [])
   useEffect(() => {
     let disposed = false
-    void Promise.all([listUsers(), listProjects()]).then(([users, projects]) => {
+    void Promise.all([listUsers(), listProjects(undefined, 'directory')]).then(([users, projects]) => {
       if (disposed) return
-      setTargets([...users.map(user => ({ key: `user:${user.id}`, kind: 'user' as const, id: user.id, label: t('targetUser', { name: user.displayName }) })),
-        ...projects.map(project => ({ key: `project:${project.id}`, kind: 'project' as const, id: project.id, label: t('targetProject', { name: project.name }) }))])
+      setProjects(projects)
+      setUserTargets(users.map(user => ({ key: `user:${user.id}`, kind: 'user' as const, id: user.id, label: t('targetUser', { name: user.displayName }) })))
     }).catch(cause => { if (!disposed) setError(String(cause)) })
     return () => { disposed = true }
   }, [reload, t])
+  const selectedOwner = targets.find(item => item.key === selected)
+  const ownerId = selectedOwner?.id, ownerKind = selectedOwner?.kind
   useEffect(() => {
-    const target = targets.find(item => item.key === selected)
-    if (target === undefined || runtime === undefined || runtime.owner.id !== target.id || runtime.owner.kind !== (target.kind === 'user' ? 'personal' : 'project')) return
+    if (ownerId === undefined || ownerKind === undefined || runtime === undefined || runtime.owner.id !== ownerId
+      || runtime.owner.kind !== (ownerKind === 'user' ? 'personal' : 'project')) {
+      setBinding(null); setLoading(false)
+      return
+    }
     const attempt = ++generation.current, abort = new AbortController()
     setLoading(true); setBinding(null); setError('')
-    void pluginManagementTarget(target.kind, target.id, abort.signal, runtime.id).then(value => {
+    void pluginManagementTarget(ownerKind, ownerId, abort.signal, runtime.id).then(value => {
       if (attempt !== generation.current) return
-      if (value.target.kind !== target.kind || value.target.id !== target.id || value.target.runtimeId !== runtime.id) throw new Error(t('targetMismatch'))
+      if (value.target.kind !== ownerKind || value.target.id !== ownerId || value.target.runtimeId !== runtime.id) throw new Error(t('targetMismatch'))
       setBinding(value)
     }).catch(cause => { if (attempt === generation.current) setError(String(cause)) })
       .finally(() => { if (attempt === generation.current) setLoading(false) })
     return () => { generation.current++; abort.abort() }
-  }, [selected, targets, runtime, t])
+  }, [ownerId, ownerKind, runtime, reload, t])
   return <div className="page">
     <PageHeader title={t('title')} description={t('pageDescription')} />
     <SpacesOverview t={t} onPick={key => { if (!navigation.canReplace()) return; generation.current++; setBinding(null); setRuntime(undefined); setSelected(key) }} />
     <Section title={t('targetSection')}>
       <ErrorBanner message={error} />
       <div className="targetPicker">
-        <Field label={t('targetField')}><select className="select" aria-label={t('targetAria')} value={selected} onChange={event => {
+        <Field label={t('targetField')}><select className="select" aria-label={t('targetAria')} value={selected} onFocus={() => readNames()} onChange={event => {
           if (!navigation.canReplace()) return
+          if (event.target.value.startsWith('project:')) readNames([Number(event.target.value.slice(8))])
           generation.current++; setBinding(null); setRuntime(undefined); setSelected(event.target.value)
         }}><option value="">{t('targetPlaceholder')}</option>{targets.map(target => <option key={target.key} value={target.key}>{target.label}</option>)}</select></Field>
+        {moreNames()}
         <Button onClick={() => { if (!navigation.canReplace()) return; setBinding(null); setReload(value => value + 1) }}>{t('pageReload')}</Button>
       </div>
       {targets.find(item => item.key === selected) === undefined ? null : <RuntimePicker key={selected} owner={targets.find(item => item.key === selected)!} value={runtime} onAvailabilityChange={setRuntimeAvailable}

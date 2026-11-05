@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/apiproxy/README.md
 document:
-  en: f1952f1f2dd06aadcbb3501933c711acdcb2ea7d
-  zh: 4e561fbe10a109172c5ed307f6a5e7be0107073a
+  en: b8e83dc7c959b56438a71180d0ca9387f0f81e3c
+  zh: 242fdbecc5907e77d2a19bf2ca334b3909121db9
 /:
   en: 58a220bf8b4cd5b4
   zh: 61495d48365178df
 /deepseek-ai-dsh-host-apiproxy:
-  en: 91ed84c07e68f851
-  zh: 8555843d130fd884
+  en: 28a22c4d96855cf6
+  zh: 6bc8a71be2f02b6f
 /deepseek-ai-dsh-host-apiproxy/summary:
   en: aa261052146068ab
   zh: c81e85c2c46889e5
@@ -21,8 +21,8 @@ document:
   en: fc8be113271938cc
   zh: fbbc3369b9b88279
 /deepseek-ai-dsh-host-apiproxy/contract-layer-api:
-  en: 821eff20fabb423e
-  zh: 0465e132d5155505
+  en: 23a054830fba6d0c
+  zh: 1a6cf3cb1ff74d57
 /deepseek-ai-dsh-host-apiproxy/carrier-layer-client-root:
   en: 44062696527cc81a
   zh: 21e59fe23e19baf5

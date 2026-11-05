@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { SessionSeq } from '@deepseek-ai/dsh-session'
+import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { ApiProxy, HostFrame, MuxFrame } from '../src/api/index.ts'
 import type { ResponseValue } from '../src/api/rpc-map.ts'
@@ -158,6 +158,9 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
       },
       async prompt(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { accepted: true as const } } }
+      },
+      async promptStatus(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { state: 'unknown' as const } } }
       },
       async attachment(request) {
         return {
@@ -424,6 +427,39 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     expect(addressed.result).toEqual({ ok: true, value: { events, hasMore: false } })
     const invalid = await client.sessions.history({ sessionId: 'old-session' as never, toolCallId: 'old-call' as never, beforeSeq: 2 })
     expect(invalid.result).toMatchObject({ ok: false, error: { code: 'bad-request' } })
+  })
+
+  it('bounds the optional prepared tail, checks its exact binding and propagates a refused read', async () => {
+    const api = fakeApi()
+    const id = SessionId('controlled')
+    const workspace = { workspaceId: 'exact' as never, title: 'W', path: '/w', sessionIds: [], createdAt: 't', updatedAt: 't' }
+    const create = vi.spyOn(api.sessions, 'create').mockImplementation(async request =>
+      ({ rpcId: request.rpcId, result: { ok: true, value: { sessionId: id, workspace } } }))
+    const history = vi.spyOn(api.sessions, 'history').mockImplementation(async request =>
+      ({ rpcId: request.rpcId, result: { ok: true, value: SCRIPTED_HISTORY_PAGE } }))
+    const call = async (body: object, bounded = false) => {
+      const handler = toFetchHandler(api, bounded ? { historyPageTargetBytes: 64 } : {})
+      const response = await handler.fetch('http://test/api/prepare/v1/session.create', { method: 'POST',
+        headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: 'qa', method: 'session.create', payload: body }) })
+      const envelope = await response.json() as { result: {
+        ok: boolean
+        value?: { sessionId?: string; initialHistory?: unknown }
+        error?: { code: string }
+      } }
+      return envelope.result
+    }
+    const exact = { sessionId: id, draftId: 'draft-qa', workspaceId: workspace.workspaceId, includeWorkspace: true, includeInitialHistory: true }
+    expect((await call({ ...exact, draftId: undefined })).error?.code).toBe('bad-request')
+    expect(create).not.toHaveBeenCalled()
+    expect((await call({ ...exact, workspaceId: 'wrong' })).error?.code).toBe('bad-request')
+    expect(history).not.toHaveBeenCalled()
+    expect((await call({ ...exact, includeInitialHistory: undefined })).value?.initialHistory).toBeUndefined()
+    expect(history).not.toHaveBeenCalled()
+    expect((await call(exact, true)).value).toEqual({ sessionId: id, workspace })
+    expect(history.mock.calls[0]?.[0].payload).toEqual({ sessionId: id, detail: 'conversation', onlyActive: true })
+    history.mockImplementationOnce(async request => ({ rpcId: request.rpcId, result: { ok: false,
+      error: { code: 'collaboration-forbidden', message: 'access revoked', details: { action: 'read', reason: 'forbidden', sessionId: id } } } }))
+    expect((await call(exact)).error?.code).toBe('collaboration-forbidden')
   })
 
   it('packs session history on Fetch and restores the exact logical page for IApiClient', async () => {

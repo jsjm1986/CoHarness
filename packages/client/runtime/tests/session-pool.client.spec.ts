@@ -30,6 +30,29 @@ function connection(api: FakeApiClient, onStart?: (sinks: Parameters<ConnectionH
 }
 
 describe('SessionRuntimePool', () => {
+  it('reuses a verified Runtime list when another directory publication leaves its source and target unchanged', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const id = 'verified-list' as SessionId
+    api.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    try {
+      await base.refresh()
+      const state = base.list.getSnapshot()
+      const keys = vi.fn(Reflect.ownKeys)
+      base.list.set({ ...state, byId: new Proxy<typeof state.byId>(state.byId, { ownKeys: keys }) })
+      await vi.waitFor(() =>{  expect(keys.mock.calls.length).toBeGreaterThan(0) })
+      const reads = keys.mock.calls.length
+      pool.installPersonalDirectory([], false)
+      pool.installPersonalDirectory([], false)
+      expect(keys).toHaveBeenCalledTimes(reads)
+      expect(pool.list.getSnapshot().ids).toContain(pool.keyFor(id))
+      pool.setBaseRuntimeTarget({ kind: 'project', projectId: 8, projectName: 'Next' })
+      expect(keys.mock.calls.length).toBeGreaterThan(reads)
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('keeps unrelated pooled summaries stable and refreshes renamed runtime labels', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()

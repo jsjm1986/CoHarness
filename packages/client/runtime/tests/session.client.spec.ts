@@ -1529,6 +1529,21 @@ describe('remaining branches', () => {
     expect(session.getSnapshot().nodes.map(n => n.seq)).toEqual([1, 3, 7, 9])
   })
 
+  it('uses a prepared empty tail on first connection, repairs a later watermark, and rechecks history after a real disconnect', async () => {
+    const { api, session } = makeSession()
+    const read = vi.fn(() => histResponse(plainTurn(0, 0, 'first', 'reply')))
+    api.onHistory = read
+    await session.open(await histResponse([]))
+    await session.resync(true)
+    session.handleMuxEnvelope('initial' as never, { type: 'session/subscribed', sessionId: SID, lastSeq: -1 })
+    expect(read).not.toHaveBeenCalled()
+    session.handleMuxEnvelope('newer' as never, { type: 'session/subscribed', sessionId: SID, lastSeq: 5 })
+    await vi.waitFor(() => { expect(read).toHaveBeenCalledTimes(1) })
+    await vi.waitFor(() => { expect(session.getSnapshot().nodes).toHaveLength(2) })
+    await session.resync(false)
+    expect(read).toHaveBeenCalledTimes(2)
+  })
+
   it('a failed second stitch pull keeps the first window and still opens', async () => {
     const { api, session } = makeSession()
     let call = 0

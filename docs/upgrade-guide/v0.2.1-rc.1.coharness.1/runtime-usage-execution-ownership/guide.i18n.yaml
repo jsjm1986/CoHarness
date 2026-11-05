@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/runtime-usage-execution-ownership/guide.md
 document:
-  en: e1d42e04fa2a1b2c854230bd8cd2c156740e08b4
-  zh: a7a8b17fe78dcdf2320807e298231fc178628146
+  en: 5cd24c3429145878e1becc76cae0257a87554086
+  zh: 3fc003546ac3643f837add197abe5d92f7514132
 /:
   en: 21889936664dfdd5
   zh: 0674a1e6c97446bf
@@ -15,5 +15,5 @@ document:
   en: 31ac66770ad40c5d
   zh: 1b9db7d60531aa7f
 /upgrade-runtime-usage-attribution/migration:
-  en: 5f5879fcac493f93
-  zh: b6ab3f12ac184cec
+  en: b45f15dca29ae9cc
+  zh: a5724fc230677451

@@ -2,6 +2,7 @@
 import type { PoolClient } from 'pg'
 import { CollaborationDeniedError } from '../collaboration.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
+import { requirePasswordChangeComplete } from './administrator-authority.ts'
 
 interface ManagementActor {
   id: string
@@ -11,7 +12,7 @@ interface ManagementActor {
 }
 
 /**
- * Retain current management authority and the selected project until the caller commits.
+ * Retain current management authority and selected project, then check password qualification after authority waits.
  * @param client - caller-owned transaction; no other pool connection is acquired.
  * @param context - organization owning the project and acting account.
  * @param projectId - public project identifier.
@@ -57,5 +58,6 @@ export async function lockProjectManagement(
     [context.organizationId, project.id, actor.id])).rowCount === 1
     if (!member) throw new CollaborationDeniedError('forbidden')
   }
+  await requirePasswordChangeComplete(client, context, actorUserId!)
   return project.id
 }

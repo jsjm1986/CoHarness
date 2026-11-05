@@ -35,7 +35,7 @@ it('rejects a handshake for another Runtime before exposing account-owned state'
   const runtime = '10000000-0000-4000-8000-000000000001'
   const fence = createBrowserIdentityFence(vi.fn(), ORIGIN, vi.fn(), `?dshRuntime=${runtime}`)
   try {
-    expect(() => fence.setRuntimeTarget({ kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000002' as NonNullable<import('../src/client/index.ts').ConnectionRuntimeTarget['runtimeId']> }))
+    expect(() =>{  fence.setRuntimeTarget({ kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000002' as NonNullable<import('../src/client/index.ts').ConnectionRuntimeTarget['runtimeId']> }) })
       .toThrow(BrowserIdentityChanged)
   } finally { fence.dispose() }
 })

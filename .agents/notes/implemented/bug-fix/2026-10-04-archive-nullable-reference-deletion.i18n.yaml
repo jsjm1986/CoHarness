@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-archive-nullable-reference-deletion.md
 document:
-  en: bbb8d7c190f9254e8da86666be6715aebc838199
-  zh: 76bd7296d7420eb43bdd2dd0bfc63dfe2923d17a
+  en: d15bfd02c894e0a251e4b2fc01fe7d57678a73ca
+  zh: bd60a33edad0f87315378cda173a15859b37b997
 /agent-note-null-only-nullable-archive-references-on-deletion:
   en: 90c7f06191092b51
   zh: aff51bee9ee0a408
@@ -12,8 +12,8 @@ document:
   en: 09b4cbce9fc1bebd
   zh: b73e4c32c549cdc6
 /agent-note-null-only-nullable-archive-references-on-deletion/decision:
-  en: 352222fc1836fe5e
-  zh: 1cae86b2abe555fe
+  en: 1723b381588465b2
+  zh: 93af347f2596db92
 /agent-note-null-only-nullable-archive-references-on-deletion/alternatives-considered:
   en: 38628fc3da4abfd6
   zh: c73003abc4b0b140

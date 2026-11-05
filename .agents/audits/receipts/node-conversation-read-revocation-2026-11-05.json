@@ -1,0 +1,108 @@
+{
+  "id": "B501",
+  "title": "Node content conversation reads return project metadata after membership revocation commits during the content query",
+  "status": "peer_fixed_named_scenarios_independently_verified_global_review_open",
+  "paths": [
+    "gateway/src/node-content-collaboration.ts",
+    "gateway/src/workbench-rows.ts"
+  ],
+  "sourceFixed": true,
+  "counterproof": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/admin-document-node-and-revocation-before.json",
+  "evidenceDirectory": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z",
+  "receipt": "receipts/node-conversation-read-revocation-2026-11-05.json",
+  "evidence": "A real ACCESS EXCLUSIVE content relation lock stops listProjectRows after governance actor resolution. Project membership deletion commits and is verified absent; releasing the content lock still returns Session ID, title and cwd. Exact production NodeContentStore queries and separate databases; the Session-only project publication is explicitly synthetic and does not establish full application publication readiness.",
+  "wholeProjectComplete": false,
+  "at": "2026-11-04T16:12:18.150959+00:00",
+  "observations": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/node-revocation-and-admin-observations-before.json",
+  "sourceWitness": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/revocation-before-source-hashes.json",
+  "fixOwnerThread": "01a1821f-1577-7472-93db-3bd83ee42345",
+  "requiredReview": [
+    "access",
+    "readableSessionIds",
+    "listActivity",
+    "listProjectRows",
+    "listConversations"
+  ],
+  "safeOutcomes": [
+    "Refuse or remove data after completed governance revocation",
+    "Hold current governance authorization through content read so revocation cannot complete first"
+  ],
+  "syntheticOnly": true,
+  "productionWrites": false,
+  "paidModelApisCalled": false,
+  "updatedAt": "2026-11-04T16:42:03.240427+00:00",
+  "currentRecheck": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/admin-document-node-current-recheck.json",
+  "currentObservations": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/admin-document-node-recheck-observations.json",
+  "rootReadOnlyPeerSourceWitness": [
+    {
+      "path": "gateway/src/browser-documents.ts",
+      "sha256": "08ad83c9e02c14995b23a4f5422f084721f2e21601f72227093f8c315a8e1786",
+      "owner": "parallel_feature_not_root_patch"
+    },
+    {
+      "path": "gateway/src/admin-api.ts",
+      "sha256": "dc7aa717e3c60324150665cce49dfb8916950b1139b1584f0a03e4fefbadb0b3",
+      "owner": "parallel_feature_not_root_patch"
+    },
+    {
+      "path": "gateway/src/postgres/document-catalog-service.ts",
+      "sha256": "a43bcdf48e070019427ce23c06638c585337d63d20d6a35afe1c85d7ad0758ff",
+      "owner": "parallel_feature_not_root_patch"
+    },
+    {
+      "path": "gateway/src/node-content-documents.ts",
+      "sha256": "7b791483b12c9f630740c8ca3aafa4dfec908965260ab198e12bd433137b3c27",
+      "owner": "parallel_feature_not_root_patch"
+    },
+    {
+      "path": "gateway/src/node-content-documents-admin.ts",
+      "sha256": "626b761579735a7abe69ac37e288b477aafbfcc1b4de701c67ae6d0acf826a34",
+      "owner": "parallel_feature_not_root_patch"
+    },
+    {
+      "path": "gateway/src/node-content-documents-authority.ts",
+      "sha256": "47c3006cebcaeb73d0f7f57681586bf5fd121484cb54981b1736417a9c056305",
+      "owner": "parallel_feature_not_root_patch"
+    },
+    {
+      "path": "gateway/src/node-content-collaboration.ts",
+      "sha256": "a3abd3b026260f010f8454c35ec659e500c71549cfdb0c2d1266caa3421c25ac",
+      "owner": "parallel_feature_not_root_patch"
+    },
+    {
+      "path": "gateway/src/node-content-store.ts",
+      "sha256": "15bbd2ae87432a4d440c666c9e53650b62837d62adeec432f1da4df6b0a5a1ba",
+      "owner": "parallel_feature_not_root_patch"
+    },
+    {
+      "path": "gateway/src/workbench-rows.ts",
+      "sha256": "c9bb4dfb951c88c3d1351da5a1db49f22ffe09202c60c3dd69b79f28ab62a8ff",
+      "owner": "parallel_feature_not_root_patch"
+    },
+    {
+      "path": "gateway/deploy/node-content/migrations/013_conversation_acl.sql",
+      "sha256": "9cd6ff2ecba43a95f1837383fbed9e4015d401d8afde608b56be2855507e1b0c",
+      "owner": "parallel_feature_not_root_patch"
+    }
+  ],
+  "independentRecheckDelivery": {
+    "at": "2026-11-04T16:40:38.832197+00:00",
+    "findings": [
+      "B502"
+    ],
+    "independentlyRechecked": [
+      "B500",
+      "B501"
+    ],
+    "stage": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/B502-browser-fanout-authority",
+    "archive": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T160305Z/B502-browser-fanout-authority.delta.tar.gz",
+    "archiveSha256": "d3b34e9acce67d968a7a5cdf9637937608e69a0e81991969150f864f8f40296f",
+    "manifestSha256": "45eaf5b55132c688fdcd127cc4009f12482290930a49175cdcd3002c656ebe10",
+    "ownedPaths": 15,
+    "readOnlyPeerFiles": 10,
+    "compiledConsumptionFiles": 182,
+    "wholeProjectComplete": false
+  },
+  "wholeFeatureProductionAcceptance": false,
+  "verifiedCurrentOrdering": "Real content relation lock; project membership deletion commits before unlocking; authorized read refuses and returns no rows."
+}

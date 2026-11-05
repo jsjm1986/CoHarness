@@ -1,0 +1,21 @@
+{
+  "at": "2026-11-04T21:07:02.557489+00:00",
+  "status": "named_current_source_cases_passed",
+  "scope": "Command cancellation, plan ownership and manual-summary attribution after concurrent Session-field additions; not a full review of the peer Session changes.",
+  "core": {
+    "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T205132Z/command-plan-latest-cases.json",
+    "passed": 169,
+    "failed": 0,
+    "skipped": 0
+  },
+  "postgres": {
+    "report": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T205132Z/command-plan-latest-postgres-identity.json",
+    "passed": 2,
+    "failed": 0,
+    "filteredNotExecuted": 32,
+    "realModelProviders": false
+  },
+  "nativeClusterCleanup": "/Users/a1234/.codex/audit-evidence/coharness-business-20261027/continuation-20261104T205132Z/native-postgres-lifecycle-summary-current.json",
+  "wholeProjectComplete": false,
+  "paidModelApisCalled": false
+}

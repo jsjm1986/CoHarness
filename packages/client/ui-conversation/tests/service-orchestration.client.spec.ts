@@ -286,6 +286,49 @@ describe('ConversationController', () => {
     }
   })
 
+  it('submits plain text to the addressed Session while browser frames are suspended', async () => {
+    const programmable = programmableSubmissionBegin()
+    const b = await bench(undefined, programmable.beginSubmission)
+    const frame = vi.fn(() => 1)
+    vi.stubGlobal('requestAnimationFrame', frame)
+    try {
+      const sending = b.root.sendSession(b.session, 'background tab', [], [], 'queue')
+      expect(b.prompt).toHaveBeenCalledOnce()
+      expect(frame).not.toHaveBeenCalled()
+      programmable.inputs[0]!.onRetire?.({ reason: 'observed', attachments: [] })
+      await expect(sending).resolves.toEqual({ kind: 'success' })
+    } finally { vi.unstubAllGlobals(); await b.runtime.dispose() }
+  })
+
+  it('continues image submission when the tab is hidden before its first frame', async () => {
+    const programmable = programmableSubmissionBegin()
+    const b = await bench(undefined, programmable.beginSubmission)
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    const frame = vi.fn(() => 1)
+    vi.stubGlobal('requestAnimationFrame', frame)
+    const preview = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:tab')
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockReturnValue(undefined)
+    try {
+      const file = new File([Uint8Array.of(1)], 'tab.png', { type: 'image/png' })
+      Object.defineProperty(file, 'arrayBuffer', { value: async () => Uint8Array.of(1).buffer })
+      const [attachment] = b.root.createDraftImages([file])
+      const sending = b.root.sendSession(b.session, '', [attachment!.id], [], 'queue')
+      expect(frame).toHaveBeenCalledOnce()
+      expect(b.prompt).not.toHaveBeenCalled()
+      hidden.mockReturnValue(true)
+      document.dispatchEvent(new Event('visibilitychange'))
+      await vi.waitFor(() => { expect(b.prompt).toHaveBeenCalledOnce() })
+      programmable.inputs[0]!.onRetire?.({ reason: 'observed', attachments: [] })
+      await expect(sending).resolves.toEqual({ kind: 'success' })
+    } finally {
+      await b.runtime.dispose()
+      revoke.mockRestore()
+      preview.mockRestore()
+      hidden.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('registers a local echo before slow image encoding and forwards its requestId', async () => {
     const frame = vi.fn((callback: FrameRequestCallback) => { callback(0); return 1 })
     vi.stubGlobal('requestAnimationFrame', frame)

@@ -6,7 +6,7 @@
  * the concrete class. Widening this interface is the explicit act of
  * widening what features may do to the workspaces domain.
  */
-import type { DirectoryListing, SessionId, WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-remotes/client'
+import type { DirectoryListing, SessionDraftId, SessionId, WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionRuntimeTarget } from './sessions.ts'
 import type { WorkspaceListState } from '../workspaces/service.ts'
 import type { ObservableSnapshot } from './store.ts'
@@ -31,16 +31,27 @@ export interface IWorkspaces {
   readonly list: ObservableSnapshot<WorkspaceListState>
   /** Refresh metadata for granted personal Runtimes without starting them; absent on standalone Hosts. */
   refreshPersonalDirectory?: () => Promise<void>
+  /** Read one expanded personal Runtime's bounded metadata pages. */
+  loadPersonalRows?: (target: SessionRuntimeTarget, more?: boolean, signal?: AbortSignal) => Promise<void>
+  /** Fetch the next authorized Runtime page after the user requests more computers. */
+  loadMoreComputers?: () => Promise<void>
   /** Foreign Runtime to retain through Workspace navigation; undefined uses the bootstrap connection. */
   runtimeForWorkspace?: (workspaceId: WorkspaceId) => import('./sessions.ts').SessionRuntimeTarget | undefined
+  /** Resolve the destination shared by the global action and the Workspace row.
+   * @param workspaceId - explicit projected Workspace, if selected.
+   * @returns verified exact Runtime and optionally a projected Workspace.
+   */
+  newSessionDestination?(workspaceId?: WorkspaceId): { target?: SessionRuntimeTarget; workspaceId?: WorkspaceId }
   /**
    * Create a fresh conversation in an exact Runtime's Workspace.
    * @param target - captured Runtime; another computer is never substituted.
    * @param workspaceId - selected projected Workspace; omission registers the target Host's default directory.
    * @param signal - cancellation prevents a late navigation after preparation or creation.
+   * @param intent - stable identities of a single user action, including its explicit retry.
    * @returns the runtime-qualified Session identity, attached to a real Workspace.
    */
-  createRuntimeSession?: (target: SessionRuntimeTarget, workspaceId?: WorkspaceId, signal?: AbortSignal) => Promise<SessionId>
+  createRuntimeSession?: (target: SessionRuntimeTarget, workspaceId?: WorkspaceId, signal?: AbortSignal,
+    intent?: { sessionId: SessionId; draftId: SessionDraftId }) => Promise<SessionId>
   /**
    * Connect a Workspace to its reusable or freshly created blank session —
    * the workspace-reconnection arm ({@link openWorkspace} fallback and

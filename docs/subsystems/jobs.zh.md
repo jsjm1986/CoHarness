@@ -109,7 +109,8 @@ interface JobHooks {
   cancel(reason?: string): void
   /**
    * Resolves after the producer releases its resources, not merely when work
-   * finishes. Must not reject; the runtime converts a rejection to `failed`.
+   * finishes. Must not reject; the runtime converts a rejection to a `failed`
+   * record while unconfirmed resource release keeps automatic idle release blocked.
    * If teardown cancellation throws, the runtime may force-fail only the
    * registry record without claiming that the work stopped.
    */

@@ -26,6 +26,8 @@ Browser documents retain their current selection, drafts and unsaved forms when 
 
 The Deployment page uses existing Gateway configuration, public-access and service controls. Enable multiple computers at the intended primary and select a configured `HGW_PUBLIC_ORIGINS` address. The primary can run local Runtimes. Every other computer keeps its own Gateway URL and accepts both its own browser origin and the primary origin through existing origin configuration.
 
+The Admin project list reads names and local paths for up to 32 visible projects on the selected computer. Opening a project requests that project alone. An unavailable owner leaves its project number visible. Document, plugin, SSH, webhook and membership controls request labels for their visible or selected projects. Membership-only checks do not read names or paths.
+
 Admin project model assignments, project quotas, project usage and member-contribution reports follow the computer selected in that browser document. An explicit primary-computer link uses the selector's named primary option and preserves the link's target. Organization model providers, role/user model permissions, role/user quotas and organization-wide usage remain available at the primary independently of that selection. Reading these settings does not start the project's Runtime.
 
 The Admin deployment page loads entry policy before status and backup snapshots, keeps one status/backup read in flight, skips overlapping periodic ticks and cancels its reads on unmount. Explicit refreshes wait for a subsequent snapshot when a preceding read is pending. Entry mode metadata uses the same account read endpoint as the user interface; configuration mutations retain administrator checks.

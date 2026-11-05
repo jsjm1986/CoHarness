@@ -9,6 +9,7 @@ import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { ProjectService } from '../src/projects.ts'
+import { CollaborationDeniedError } from '../src/collaboration.ts'
 import type { GatewayCollaborationService, GatewayModelGovernanceService } from '../src/services.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
@@ -55,6 +56,11 @@ async function setup() {
     policyForProject: vi.fn(async () => ({ version: 1, defaultAllowed: false, models: [], providers: [] })),
     issueIntakeToken: vi.fn(async () => 'token'),
     subjectForIntakeToken: vi.fn(async () => ({ kind: 'project' as const, id: project.id })),
+    authorizeProjectModelRead: vi.fn(async (projectId: number, userId: number) => {
+      const current = await authority(projectId, userId)
+      if (current === null) throw new CollaborationDeniedError('forbidden')
+      return current.canManage
+    }),
     describeProjectModelSettings: vi.fn(async () => view()),
     mutateProjectModelSettings: vi.fn(async () => view()),
     describeProjectCredentials: vi.fn(async (_id: number, refs: string[]) => Object.fromEntries(refs.map(ref => [ref, { configured: false, source: 'project' as const, writable: true as const }]))),
@@ -77,10 +83,72 @@ async function setup() {
     const response = await fetch(`${base}/login`, { method: 'POST', redirect: 'manual', headers: { origin: base, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ username, password: 'pw-12345678' }) })
     return (response.headers.get('set-cookie') ?? '').split(';')[0] ?? ''
   }
-  return { base, project, login, governance }
+  return { base, project, login, governance, admin }
 }
 
 describe('project model settings API', () => {
+  it('refuses a model service without current project read qualification', async () => {
+    const { base, project, login, governance } = await setup()
+    const cookie = await login('admin')
+    governance.authorizeProjectModelRead = undefined
+    const response = await fetch(`${base}/account/api/projects/${String(project.id)}/model-settings`, { headers: { cookie } })
+    expect(response.status).toBe(501)
+    expect(await response.json()).toEqual({ error: 'project-model-settings-unsupported' })
+    expect(governance.describeProjectModelSettings).not.toHaveBeenCalled()
+  })
+
+  it('qualifies every model read after preparing its result using the authenticated actor', async () => {
+    const { base, project, login, governance, admin } = await setup()
+    const cookie = await login('admin')
+    const qualify = vi.mocked(governance.authorizeProjectModelRead!)
+    qualify.mockResolvedValue(false)
+    const read = await fetch(`${base}/account/api/projects/${String(project.id)}/model-settings`, { headers: { cookie } })
+    expect(read.status).toBe(200)
+    expect(await read.json()).toMatchObject({ writable: false, namespaces: [{ writable: false }] })
+    const ref = `DSH_PROJECT_${String(project.id)}_RELAY_API_KEY`
+    const credentials = await fetch(`${base}/account/api/projects/${String(project.id)}/model-settings/credentials?refs=${ref}`, { headers: { cookie } })
+    expect(credentials.status).toBe(200)
+    expect(await credentials.json()).toMatchObject({ credentials: { [ref]: { writable: false } } })
+    const discover = await fetch(`${base}/account/api/projects/${String(project.id)}/model-settings/discover`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' }, body: JSON.stringify({ actorUserId: 999 }),
+    })
+    expect(discover.status).toBe(403)
+    expect(await discover.json()).toEqual({ error: 'forbidden' })
+    expect(qualify).toHaveBeenCalledTimes(3)
+    for (const call of qualify.mock.calls) expect(call).toEqual([project.id, admin.id])
+  })
+
+  it('withholds prepared model and credential data when current reading authority is withdrawn', async () => {
+    const { base, project, login, governance } = await setup()
+    const cookie = await login('admin')
+    vi.mocked(governance.authorizeProjectModelRead!).mockRejectedValue(new CollaborationDeniedError('forbidden'))
+    for (const suffix of ['', '/credentials?refs=DSH_PROJECT_1_RELAY_API_KEY', '/discover']) {
+      const response = await fetch(`${base}/account/api/projects/${String(project.id)}/model-settings${suffix}`, {
+        method: suffix === '/discover' ? 'POST' : 'GET',
+        headers: { cookie, origin: base, 'content-type': 'application/json' },
+        ...(suffix === '/discover' ? { body: '{}' } : {}),
+      })
+      expect(response.status).toBe(403)
+      expect(await response.json()).toEqual({ error: 'forbidden' })
+    }
+    expect(governance.describeProjectModelSettings).toHaveBeenCalledOnce()
+    expect(governance.describeProjectCredentials).toHaveBeenCalledOnce()
+    expect(governance.discoverProjectModels).toHaveBeenCalledOnce()
+  })
+
+  it('preserves a committed mutation response without applying read publication rules', async () => {
+    const { base, project, login, governance } = await setup()
+    const cookie = await login('admin')
+    vi.mocked(governance.authorizeProjectModelRead!).mockRejectedValue(new CollaborationDeniedError('forbidden'))
+    const response = await fetch(`${base}/account/api/projects/${String(project.id)}/model-settings`, {
+      method: 'PATCH', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ ops: [{ op: 'set', path: ['providers', 'relay', 'displayName'], value: 'Committed' }] }),
+    })
+    expect(response.status).toBe(200)
+    expect(governance.mutateProjectModelSettings).toHaveBeenCalledOnce()
+    expect(governance.authorizeProjectModelRead).not.toHaveBeenCalled()
+  })
+
   it('allows a project manager to read and mutate the shared provider settings', async () => {
     const { base, project, login, governance } = await setup()
     const cookie = await login('admin')

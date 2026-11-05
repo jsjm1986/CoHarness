@@ -1,3 +1,4 @@
+import { nodeContentHealthSchema, type NodeContentHealth } from '../../src/node-content-health.ts'
 import { deploymentContextSchema, deploymentCandidatesSchema, deploymentPreflightSchema, nodeConnectionViewSchema, type DeploymentContext, type DeploymentPreflight } from '../../src/deployment-protocol.ts'
 import type { NodeConnectionView } from '../../src/deployment-protocol.ts'
 import { parseConversationSessionIdentity, type ConversationSessionIdentity } from '../../src/session-identity.ts'
@@ -5,7 +6,7 @@ export type { ConversationSessionIdentity } from '../../src/session-identity.ts'
 import { parseConversationArchiveId, type ConversationArchiveId } from '../../src/archive-identity.ts'
 import type { RuntimeId, RuntimeNodeId } from '../../src/runtime-catalog.ts'
 export type { ConversationArchiveId } from '../../src/archive-identity.ts'
-import { adminComputerRequestUrl } from './computer-target.ts'
+import { adminComputerRequestUrl, adminComputerTarget } from './computer-target.ts'
 import { computerErrorMessage } from './computer.copy.ts'
 import type { DesktopEnvironment } from '@deepseek-ai/dsh-native-command'
 export type { DesktopEnvironment } from '@deepseek-ai/dsh-native-command'
@@ -31,6 +32,10 @@ export type AdminUser = {
 }
 
 export type Project = {
+  metadataOnNode?: true
+  nodeId?: RuntimeNodeId
+  runtimeId?: RuntimeId
+  ownerDisplayLoaded?: true
   id: number
   name: string
   path: string
@@ -310,6 +315,13 @@ async function request<T>(url: string, init: RequestInit = {}, target?: 'compute
   return await readResponseJson<T>(res)
 }
 
+/** Read or confirm a reviewed personal directory or account UserDoc publication at its exact computer. */
+export function personalPublication<T>(kind:'directory'|'documents', userId:number, runtimeId:string,nodeId:string, signal:AbortSignal,approval?:Record<string,unknown>):Promise<T> {
+  const path=kind==='directory' ? '/admin/api/runtimes/'+encodeURIComponent(runtimeId)+'/personal-directory/promote'
+    : '/admin/api/documents/personal/'+userId+'/migration'
+  return request(path+'?dshNode='+encodeURIComponent(nodeId),{signal,...(approval?{method:'POST',body:JSON.stringify(approval)}:{})},'organization')
+}
+
 /** Read shared account choices, or explicitly request the selected computer's instance columns. */
 export function listUsers(target: 'organization' | 'computer' = 'organization'): Promise<AdminUser[]> {
   return request('/admin/api/users', {}, target)
@@ -405,8 +417,50 @@ export function inspectBackupNodeConfiguration(id: string): Promise<BackupNodeCo
   return request('/admin/api/backups/node-configuration', { method: 'POST', body: JSON.stringify({ id }) })
 }
 
-export function listProjects(origin?: 'admin' | 'user'): Promise<Project[]> {
-  return request(`/admin/api/projects${origin === undefined ? '' : `?origin=${origin}`}`)
+/** Read only explicitly selected project names and paths on one computer. Incomplete or mixed responses fail closed.
+ * @param projects - one page of projects from the current Admin directory.
+ * @param signal - current view lifetime.
+ * @returns this computer's authorized display fields indexed by public project ID.
+ */
+export async function getOwnerProjectDisplays(projects: readonly Project[], signal?: AbortSignal): Promise<Map<number, { name: string; path: string }>> {
+  if (!projects.length) return new Map()
+  const node = projects[0]?.nodeId
+  const selected = adminComputerTarget(globalThis.location?.pathname ?? '/admin')
+  const uuid = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/iu
+  if (!node || !uuid.test(node) || selected && selected !== node || projects.length > 32 || projects.some(row => !row.metadataOnNode || row.nodeId !== node || !row.runtimeId || !uuid.test(row.runtimeId)
+    || !Number.isSafeInteger(row.id) || row.id <= 0)) throw new Error('Invalid project owner selection')
+  const expected = new Map(projects.map(row => [row.id, row.runtimeId]))
+  if (expected.size !== projects.length) throw new Error('Duplicate project selection')
+  const query = new URLSearchParams({ dshNode: node, ids: [...expected.keys()].join(',') })
+  const raw = await request<unknown>(`/admin/api/project-metadata?${query}`, { cache: 'no-store', ...(signal === undefined ? {} : { signal }) })
+  if (!raw || typeof raw !== 'object' || !('items' in raw) || !Array.isArray(raw.items)) throw new Error('Invalid project metadata')
+  const result = new Map<number, { name: string; path: string }>()
+  for (const item of raw.items as unknown[]) {
+    if (!item || typeof item !== 'object' || !('projectId' in item) || typeof item.projectId !== 'number'
+      || !expected.has(item.projectId) || result.has(item.projectId) || !('runtimeId' in item) || expected.get(item.projectId) !== item.runtimeId
+      || !('nodeId' in item) || item.nodeId !== node || !('name' in item) || typeof item.name !== 'string' || !item.name
+      || !('rootPath' in item) || typeof item.rootPath !== 'string' || !item.rootPath) throw new Error('Project owner mismatch')
+    result.set(item.projectId, { name: item.name, path: item.rootPath })
+  }
+  if (result.size !== expected.size) throw new Error('Project names unavailable from their computer')
+  return result
+}
+
+export async function listProjects(origin?: 'admin' | 'user', display?: 'directory', signal?: AbortSignal): Promise<Project[]> {
+  const query = new URLSearchParams()
+  if (origin) query.set('origin', origin)
+  if (display) query.set('display', display)
+  const rows = await request<Project[]>(`/admin/api/projects${query.size ? `?${query}` : ''}`, signal === undefined ? {} : { signal })
+  if (display !== 'directory') return rows
+  const selected = adminComputerTarget(globalThis.location?.pathname ?? '/admin')
+  const nodes = new Set(rows.filter(row => row.metadataOnNode).map(row => row.nodeId))
+  if (nodes.size > 1 || selected && nodes.size && !nodes.has(selected)) throw new Error('Project directory belongs to another computer')
+  return rows.map(row => {
+    if (!row.metadataOnNode) return row
+    const neutral = { ...row, name: `#${row.id}`, path: '' }
+    delete neutral.ownerDisplayLoaded
+    return neutral
+  })
 }
 
 export function listProjectDirectories(path?: string): Promise<ProjectDirectoryListing> {
@@ -418,8 +472,13 @@ export function createProject(body: { name: string; path?: string }): Promise<Pr
   return request('/admin/api/projects', { method: 'POST', body: JSON.stringify(body) })
 }
 
-export function getProject(id: number): Promise<ProjectDetail> {
-  return request(`/admin/api/projects/${id}`)
+export async function getProject(id: number, display?: 'directory' | 'members', signal?: AbortSignal): Promise<ProjectDetail> {
+  const row = await request<ProjectDetail>(`/admin/api/projects/${id}${display ? '?display=directory' : ''}`, signal === undefined ? {} : { signal })
+  if (row.id !== id) throw new Error('Project metadata belongs to another project')
+  if (!display || !row.metadataOnNode) return row
+  if (display === 'members') return { ...row, name: `#${id}`, path: '' }
+  const values = await getOwnerProjectDisplays([row], signal)
+  return { ...row, ...values.get(id)!, ownerDisplayLoaded: true }
 }
 
 export function renameProject(id: number, name: string): Promise<void> {
@@ -1709,4 +1768,17 @@ export async function detachNodeAccess(node: import('../../src/node-access.ts').
 /** Read one bounded page of already deployed identities without making an enrollment decision. */
 export async function listDeploymentCandidates(cursor?: string, signal?: AbortSignal): Promise<import('../../src/deployment-protocol.ts').DeploymentCandidates> {
   return deploymentCandidatesSchema.parse(await request<unknown>(`/admin/api/deployment/topology/candidates${cursor === undefined ? '' : `?cursor=${encodeURIComponent(cursor)}`}`, { cache: 'no-store', ...(signal === undefined ? {} : { signal }) }))
+}
+
+/**
+ * Verify one selected node's content volume without starting a project Runtime.
+ * @param nodeId - selected computer in this Admin document.
+ * @param signal - cancellation when the selection or page changes.
+ * @returns physical storage health reported by that computer.
+ */
+export async function getNodeContentHealth(nodeId: string, signal: AbortSignal): Promise<NodeContentHealth> {
+  const url = `/admin/api/deployment/node-content?dshNode=${encodeURIComponent(nodeId)}`
+  const parsed = nodeContentHealthSchema.safeParse(await request<unknown>(url, { cache: 'no-store', signal }, 'computer'))
+  if (!parsed.success || parsed.data.nodeId !== nodeId) throw new Error('Unexpected node content health response')
+  return parsed.data
 }

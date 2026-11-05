@@ -68,8 +68,12 @@ export const inject = ['slots', 'sessions', 'locale', 'deploymentContext']
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-collaboration: dictionaries')
 
+  const ownerDirectory = ctx.get('gatewayEntryRequests')
   const collaboration = new CollaborationClient(createBrowserCollaborationTransport({
-    canNavigate: () => ctx.get('conversation')?.input.hasUnsavedDrafts() !== true,
+    ...(ownerDirectory === undefined ? {} : {
+      loadProjectMetadata: (nodeId, ids, signal) => ownerDirectory.projectMetadata(nodeId, ids, signal),
+    }),
+    canNavigate: () => ctx.get('conversation')?.input.hasUnsavedDrafts() !== true && ctx.get('conversationIntents')?.hasUnsavedDrafts() !== true,
   }))
   ctx.on('conversation/document-admission', (sessionId) => {
     const snapshot = collaboration.getSnapshot()
@@ -166,6 +170,9 @@ export function apply(ctx: ClientContext): void {
     dismissScopeError: () => { collaboration.dismissScopeError() },
     toggleFavorite: () => { collaboration.toggleCurrentSpaceFavorite() },
     loadEnvironments: cursor => collaboration.loadEnvironments(cursor),
+    ...(ownerDirectory === undefined ? {} : {
+      loadProjectNames: (nodeId, ids, signal) => collaboration.loadProjectNames(nodeId, ids, signal),
+    }),
     chooseEnvironment: () => { window.location.assign('/?environments=1') },
     openEnvironmentTab: (runtimeId) => { window.open(`/?dshRuntime=${encodeURIComponent(runtimeId)}`, '_blank', 'noopener,noreferrer') },
     openEnvironmentPickerTab: () => { window.open('/?environments=1', '_blank', 'noopener,noreferrer') },

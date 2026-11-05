@@ -26,9 +26,14 @@ const operations = ['model', 'user-access', 'role-quota', 'user-quota', ...(back
   ? ['provider', 'settings', 'credential-set', 'credential-unset', 'project-access', 'project-access-all', 'project-quota', 'discovery', 'explicit-discovery'] : [])]
 const scenarios = [
   ...operations.flatMap(operation => ['role', 'current'].map(change => ({ operation, change }))),
+  ...operations.map(operation => ({ operation, change: 'password-reset' })),
   ...['user-access', 'user-quota'].map(operation => ({ operation, change: 'deleted-target' })),
   { operation: 'user-quota', change: 'numeric-alias' },
   ...(backend === 'postgres' ? ['project-access', 'project-access-all', 'project-quota'].map(operation => ({ operation, change: 'archived-target' })) : []),
+  ...(backend === 'postgres' ? ['discovery', 'explicit-discovery'].flatMap(operation => [
+    'late-role', 'late-disabled-account', 'late-deleted-account', 'late-disabled-membership',
+    'late-missing-membership', 'late-disabled-organization', 'late-password-reset',
+  ].map(change => ({ operation, change }))) : []),
 ]
 const selected = process.env.DSH_MODEL_ADMIN_SCENARIO
 if (selected !== undefined) assert.ok(scenarios.some(row => `${row.operation}-${row.change}` === selected))
@@ -44,6 +49,7 @@ try {
     const root = await mkdtemp(join(tmpdir(), 'model-admin-http-'))
     let db, context, manager, gateway, probe, pending, release, primaryError
     let discoveries = 0, decryptions = 0
+    const lateRead = change.startsWith('late-')
     try {
       const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_STATE_ROOT: join(root, 'state'),
         HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'),
@@ -65,12 +71,14 @@ try {
       const actor = await users.create({ username: 'administrator', password: 'pw-12345678', role: 'admin' })
       await users.changeOwnPassword(actor.id, 'pw-12345678')
       const keeper = await users.create({ username: 'keeper', password: 'pw-12345678', role: 'admin' })
+      await users.changeOwnPassword(keeper.id, 'pw-12345678')
       const target = await users.create({ username: 'member', password: 'pw-12345678' })
       const project = context === undefined ? undefined : await projects.create({ name: 'Model project', createdBy: actor.id })
-      probe = createServer((request, response) => {
+      probe = createServer(async (request, response) => {
         discoveries += 1
         const expected = operation === 'explicit-discovery' ? 'fixture-explicit-secret' : 'fixture-initial-secret'
         const authorized = request.headers.authorization === `Bearer ${expected}`
+        if (lateRead) { entered(); await gate }
         response.writeHead(authorized ? 200 : 401, { 'content-type': 'application/json' })
           .end(JSON.stringify(authorized ? { data: [{ id: 'fixture-discovered' }] } : { error: 'unauthorized' }))
       })
@@ -112,7 +120,10 @@ try {
       const observed = new Promise(done => { entered = done })
       const gate = new Promise(done => { release = done })
       const mutate = governance[member].bind(governance)
-      governance[member] = async (...args) => { entered(); await gate; return mutate(...args) }
+      governance[member] = async (...args) => {
+        if (!lateRead) { entered(); await gate }
+        return mutate(...args)
+      }
       gateway = createGatewayServer(deps, { admin: createAdminApiHandler(deps) }); await listen(gateway)
       cfg.port = gateway.address().port
       const origin = `http://127.0.0.1:${gateway.address().port}`; cfg.publicOrigins.push(origin)
@@ -135,21 +146,32 @@ try {
         body: JSON.stringify({ ...body, actorUserId: keeper.id }),
       }).then(async response => ({ status: response.status, body: await response.text() }))
       await observed
-      if (change === 'role') await users.setRole(actor.id, 'user')
+      if (change === 'role' || change === 'late-role') await users.setRole(actor.id, 'user')
+      if (lateRead) {
+        const internal = (await pool.query('SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2', [context.organizationId, actor.id])).rows[0].id
+        if (change === 'late-disabled-account') await pool.query("UPDATE harness.users SET status='disabled' WHERE id=$1", [internal])
+        if (change === 'late-deleted-account') await pool.query('UPDATE harness.users SET deleted_at=now() WHERE id=$1', [internal])
+        if (change === 'late-disabled-membership') await pool.query("UPDATE harness.memberships SET status='disabled' WHERE user_id=$1", [internal])
+        if (change === 'late-missing-membership') await pool.query('DELETE FROM harness.memberships WHERE user_id=$1', [internal])
+        if (change === 'late-disabled-organization') await pool.query("UPDATE harness.organizations SET status='disabled' WHERE id=$1", [context.organizationId])
+        if (change === 'late-password-reset') await pool.query('UPDATE harness.password_credentials SET must_change_password=true WHERE user_id=$1', [internal])
+      }
       if (change === 'deleted-target') await users.remove(target.id)
       if (change === 'archived-target') await pool.query("UPDATE harness.projects SET status='archived' WHERE organization_id=$1 AND public_id=$2", [context.organizationId, project.id])
+      if (change === 'password-reset') await users.resetPassword(actor.id, 'pw-replacement', keeper.id)
       const before = await state()
       release()
       const response = await pending
-      const expected = change === 'role' ? 403 : change === 'deleted-target' || change === 'archived-target' ? 400
+      const expected = change === 'role' || change === 'password-reset' || lateRead ? 403 : change === 'deleted-target' || change === 'archived-target' ? 400
         : discovery || operation === 'settings' ? 200 : 204
       assert.equal(response.status, expected, JSON.stringify({ operation, change, discoveryRequests: discoveries, decryptions }))
       const code = response.status >= 400 ? JSON.parse(response.body).error : null
-      if (change === 'role') assert.equal(code, 'forbidden')
+      if (change === 'role' || change === 'password-reset' || lateRead) assert.equal(code, 'forbidden')
+      if (lateRead) assert.equal(response.body.includes('fixture-discovered'), false)
       const changed = before !== await state()
       if (response.status >= 400) assert.equal(changed, false)
-      assert.equal(discoveries, discovery && change === 'current' ? 1 : 0)
-      if (change === 'role') assert.equal(decryptions, 0)
+      assert.equal(discoveries, discovery && (change === 'current' || lateRead) ? 1 : 0)
+      if (change === 'role' || change === 'password-reset') assert.equal(decryptions, 0)
       if (discovery && change === 'current') assert.deepEqual(JSON.parse(response.body).models.map(row => row.id), ['fixture-discovered'])
       let quotaApplied = null
       if (change === 'numeric-alias') { quotaApplied = (await governance.userQuota(target.id)).tokenLimit === 0; assert.equal(quotaApplied, true) }

@@ -5,7 +5,7 @@
  * that are already showing, so a default set from one converges the other.
  */
 
-import { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
@@ -202,7 +202,7 @@ function declareConversation(slots: SlotRegistry): () => void {
   return slots.register({
     name: 'conversation',
     children: {
-      'conversation.hero.agentPreset': { kind: 'single', scope: 'root' },
+      'conversation.hero.agentPreset': { kind: 'single', scope: 'session-maybe' },
       'conversation.session.header.titleMeta': { kind: 'list', scope: 'session' },
     },
   } as never, () => null)
@@ -249,10 +249,16 @@ describe('ui-agent-preset apply', () => {
     const { ctx, slots } = await bench()
     const runtime = new Context()
     const response = Promise.withResolvers<typeof ROSTER_ONE>()
-    const read = vi.fn().mockResolvedValue(ROSTER_ONE)
-    await runtime.plugin({ apply: (provider) => { provider.provide('remote.agentPresets', { list: read } as never) } }).await()
+    const read = vi.fn<() => Promise<typeof ROSTER_ONE>>().mockResolvedValue(ROSTER_ONE)
+    class PresetNamespace extends Service {
+      constructor(provider: Context) { super(provider, 'remote.agentPresets') }
+      list(): Promise<typeof ROSTER_ONE> { return read() }
+    }
+    await runtime.plugin(PresetNamespace).await()
     const child = await runtime.plugin(() => {}).await()
-    const binding = { ctx: child.ctx }
+    let hostGeneration = {}
+    const binding = { ctx: child.ctx, hostDescription: { getSnapshot: () => hostGeneration } }
+    const other = { ctx: (await runtime.plugin(() => {}).await()).ctx }
     let current: typeof binding | undefined = binding
     declareRoot(slots)
     declareConversation(slots)
@@ -261,13 +267,37 @@ describe('ui-agent-preset apply', () => {
     ctx.provide('sessions', {
       ...sessionsDouble({ current: 's1', byId: { s1: { id: 's1', blank: false, agentPreset: 'standard' } } }),
       keyFor: (id: string) => id,
-      binding: () => current,
+      binding: (id: string) => id === 's2' ? other : current,
     } as never)
     try {
       await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
       const label = callInject(slots.entries('conversation.session.header.titleMeta')[0], 's1') as AgentPresetLabelInjected
       await label.load()
       expect(label.hooks.agentPresets.getSnapshot()).toMatchObject({ error: null, options: [{ id: 'standard' }] })
+      const chip = callInject(slots.entries('conversation.hero.agentPreset')[0], 's1') as AgentPresetSeatInjected
+      const together = Promise.withResolvers<typeof ROSTER_ONE>()
+      read.mockClear().mockReturnValue(together.promise)
+      const joint = [label.load(), chip.load()]
+      expect(read).toHaveBeenCalledTimes(1)
+      const otherLabel = callInject(slots.entries('conversation.session.header.titleMeta')[0], 's2') as AgentPresetLabelInjected
+      const separate = otherLabel.load()
+      expect(read).toHaveBeenCalledTimes(2)
+      together.resolve(ROSTER_ONE)
+      await separate
+      await Promise.all(joint)
+      expect(chip.hooks.agentPresetSeat.getSnapshot().options).toEqual([{ id: 'standard', trust: 'system' }])
+      read.mockResolvedValue(ROSTER_MOVED)
+      await chip.load()
+      expect(read).toHaveBeenCalledTimes(3)
+      const previous = Promise.withResolvers<typeof ROSTER_ONE>()
+      read.mockReturnValueOnce(previous.promise)
+      const beforeReconnect = label.load()
+      hostGeneration = {}
+      await chip.load()
+      expect(read).toHaveBeenCalledTimes(5)
+      previous.resolve(ROSTER_ONE)
+      await beforeReconnect
+      expect(label.hooks.agentPresets.getSnapshot().error).toContain('generation was released')
       read.mockReturnValue(response.promise)
       const pending = label.load()
       current = undefined

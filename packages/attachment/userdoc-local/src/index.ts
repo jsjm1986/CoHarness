@@ -40,6 +40,7 @@ import {
   MAX_UPLOAD_TIMER_DELAY_MS,
 } from './upload.ts'
 
+export { withDocumentDirectoryMove } from './directory-move.ts'
 export {
   DEFAULT_UPLOAD_CHUNK_BYTES,
   DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,

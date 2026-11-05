@@ -1,3 +1,9 @@
+import { z } from 'zod'
+import { createAdministratorResponse, AdministratorReadUnavailableError, type AdministratorResponse, type AdministratorResponseHeaders } from './admin-response.ts'
+import { NodeMigrationConflict } from './node-content-migration-admin.ts'
+import { nodeMigrationPublishSchema, nodeMigrationTargetSchema, nodeRetirementOpenSchema, nodeRetirementFinalizeSchema } from './node-content-migration-protocol.ts'
+import { NodeContentUnavailable } from './node-content-store.ts'
+import { nodeUuidSchema } from './node-access.ts'
 import { parseConversationSessionIdentity } from './session-identity.ts'
 import { parseConversationArchiveId, type ConversationArchiveId } from './archive-identity.ts'
 import { auditSummary } from './audit-summary.ts'
@@ -80,8 +86,8 @@ async function selectedAdminRuntime(deps: GatewayDeps, actor: UserRow, req: Inco
   return { ...target, runtimeId: environment.id }
 }
 
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, { 'content-type': 'application/json' })
+function sendJson(res: ServerResponse, status: number, body: unknown, headers?: AdministratorResponseHeaders): void {
+  res.writeHead(status, { 'content-type': 'application/json', ...headers })
   res.end(JSON.stringify(body))
 }
 
@@ -104,6 +110,13 @@ function parseObject(body: string): Record<string, unknown> {
 function str(obj: Record<string, unknown>, key: string): string | undefined {
   const value = obj[key]
   return typeof value === 'string' ? value : undefined
+}
+
+function backupSelection(body: string): string {
+  const id = str(parseObject(body), 'id')
+  if (id === undefined) throw new BackupError(400, 'backup-id-required')
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(id)) throw new BackupError(400, 'invalid-backup-id')
+  return id
 }
 
 /** A required query id is valid only as a positive safe integer. */
@@ -139,6 +152,7 @@ async function mapInBatches<T, R>(
 }
 
 function mapError(error: unknown): { status: number; error: string; code?: string } {
+  if (error instanceof AdministratorReadUnavailableError) return { status: 503, error: error.message, code: 'admin-authorization-unavailable' }
   if (error instanceof RuntimeAccountError) return { status: error.status, error: error.message, code: error.code }
   if (error instanceof RuntimeCatalogError) return { status: error.status, error: error.code, code: error.code }
   if (error instanceof RuntimeGenerationConflictError) return { status: 409, error: error.message, code: error.code }
@@ -156,6 +170,7 @@ function mapError(error: unknown): { status: number; error: string; code?: strin
   if (error instanceof RemoteDesktopServiceError) return { status: error.status, error: error.message }
   if (error instanceof SshTargetError) return { status: error.status, error: error.message }
   if (error instanceof NodeConfigurationError) return { status: error.status, error: error.message }
+  if (error instanceof NodeContentUnavailable) return { status: error.status, error: error.code }
   if (error instanceof NodeAccessError) return { status: error.status, error: error.code }
   if (error instanceof DeploymentTopologyError || error instanceof NodeServiceError) return { status: error.status, error: error.code }
   if (error instanceof NodeChannelError) return { status: error.status, error: error.code }
@@ -163,6 +178,7 @@ function mapError(error: unknown): { status: number; error: string; code?: strin
   if (error instanceof BackupError) return { status: error.status, error: error.message }
   if (error instanceof DeploymentCommandError) return { status: 500, error: 'deployment-command-failed' }
   if (error instanceof TunnelAccessError) return { status: error.status, error: error.message }
+  if (error instanceof NodeMigrationConflict) return {status:409,error:error.code}
   if (error instanceof PluginManagementError) return { status: error.status, error: error.message }
   if (error instanceof PluginStateError) return { status: error.status === 500 ? 500 : error.status, error: error.message }
   if (error instanceof TerminalManagementError) return { status: error.status, error: error.message }
@@ -225,9 +241,123 @@ export function createAdminApiHandler(
 ): NonNullable<GatewayHandlers['admin']> {
   return async (req: IncomingMessage, res: ServerResponse, admin: UserRow, pathname: string, body: string): Promise<boolean> => {
     if (!pathname.startsWith('/admin/api')) return false
+    const reply = createAdministratorResponse(deps.users, admin.id, req.method ?? 'GET',
+      (status, value, headers) => sendJson(res, status, value, headers))
     try {
-      const ok = await dispatch(deps, req, res, admin, pathname, body, documentAdmin, invalidateAccess)
-      if (!ok) sendError(res, 404, 'not found')
+      if (pathname==='/admin/api/deployment/project-content-migrations') {
+        res.setHeader('cache-control','no-store')
+        if (req.method!=='GET') {await reply.error(405,'method-not-allowed');return true}
+        if (!deps.contentMigrations) {await reply.error(503,'node-content/unavailable');return true}
+        const cursor=new URL(req.url??pathname,'http://gateway').searchParams.get('after')??'0'
+        if (!/^(?:0|[1-9][0-9]*)$/u.test(cursor) || !Number.isSafeInteger(Number(cursor))) {await reply.error(400,'invalid-project-cursor');return true}
+        await reply.json(200,await deps.contentMigrations.choices(admin.id,Number(cursor)))
+        return true
+      }
+      const retirement=/^\/admin\/api\/deployment\/project-content-migrations\/([1-9][0-9]*)\/retirement(?:\/(review|finalize))?$/u.exec(pathname)
+      if(retirement){
+        res.setHeader('cache-control','no-store')
+        const id=Number(retirement[1]),action=retirement[2],service=deps.sourceRetirement
+        if(!Number.isSafeInteger(id)){await reply.error(400,'invalid-project-id');return true}
+        if(!service){await reply.error(503,'node-content/unavailable');return true}
+        if(!action && req.method==='GET'){
+          const reviews=new URL(req.url??pathname,'http://gateway').searchParams.getAll('review')
+          if(reviews.length>1 || reviews.length===1 && !nodeRetirementFinalizeSchema.safeParse({reviewId:reviews[0]}).success){
+            await reply.error(400,'invalid-retirement-review');return true
+          }
+          await reply.json(200,await service.report(admin.id,id,reviews[0]));return true
+        }
+        if(!action || req.method!=='POST'){await reply.error(405,'method-not-allowed');return true}
+        const input=parseObject(body)
+        let status
+        if(action==='review'){
+          const selected=nodeRetirementOpenSchema.safeParse(input)
+          if(!selected.success){await reply.error(400,'invalid-retirement-review');return true}
+          status=await service.open(admin.id,id,selected.data)
+        } else {
+          const selected=nodeRetirementFinalizeSchema.safeParse(input)
+          if(!selected.success){await reply.error(400,'invalid-retirement-review');return true}
+          try {status=await service.finalize(admin.id,id,selected.data.reviewId)}
+          catch(error){if(isCodedError(error)&&error.code==='23514'){await reply.error(409,'retirement-evidence-incomplete');return true}throw error}
+        }
+        await deps.audit.write({userId:admin.id,action:'projects.retirement.'+action,detail:JSON.stringify({projectId:id,reviewId:status.reviewId}),ip:req.socket.remoteAddress??''})
+        await reply.json(200,status);return true
+      }
+      const migration=/^\/admin\/api\/deployment\/project-content-migrations\/([1-9][0-9]*)(?:\/(prepare|publish))?$/u.exec(pathname)
+      if (migration) {
+        res.setHeader('cache-control','no-store')
+        const id=Number(migration[1]), action=migration[2]
+        if (!Number.isSafeInteger(id)) { await reply.error(400,'invalid-project-id');return true }
+        if (!deps.contentMigrations) { await reply.error(503,'node-content/unavailable');return true }
+        if (!action && req.method==='GET') { await reply.json(200,await deps.contentMigrations.preflight(admin.id,id));return true }
+        if (!action || req.method!=='POST') {await reply.error(405,'method-not-allowed');return true}
+        const raw=parseObject(body)
+        let answer:unknown
+        if (action==='prepare') {
+          const selected=nodeMigrationTargetSchema.safeParse(raw)
+          if (!selected.success) { await reply.error(400,'invalid-migration-target');return true }
+          const abort=new AbortController()
+          const disconnected=()=>{ if(!res.writableFinished) abort.abort() }
+          req.once('aborted',disconnected);res.once('close',disconnected)
+          try { answer=await deps.contentMigrations.prepare(admin.id,id,selected.data,abort.signal) }
+          finally { req.off('aborted',disconnected);res.off('close',disconnected) }
+        } else {
+          const selected=nodeMigrationPublishSchema.safeParse(raw)
+          if (!selected.success) { await reply.error(400,'invalid-migration-snapshot');return true }
+          answer=await deps.contentMigrations.publish(admin.id,id,selected.data)
+        }
+        await deps.audit.write({userId:admin.id,action:'projects.content.'+action,detail:JSON.stringify({projectId:id}),ip:req.socket.remoteAddress??''})
+        if (!res.destroyed) await reply.json(200,answer)
+        return true
+      }
+      const namePolicyAction = /^\/admin\/api\/deployment\/project-names(?:\/(prepare|activate|reindex))?$/u.exec(pathname)
+      if (namePolicyAction !== null) {
+        if (deps.projectNames === undefined) { await reply.error(503,'node-content/unavailable'); return true }
+        res.setHeader('cache-control','no-store')
+        const action = namePolicyAction[1]
+        if (action === undefined && req.method === 'GET') {
+          await reply.json(200,{policy:await deps.projectNames.status(admin.id)})
+          return true
+        }
+        if (action === undefined || req.method !== 'POST') { await reply.error(405,'method-not-allowed'); return true }
+        const input = parseObject(body)
+        let result: unknown
+        if (action === 'prepare') result = await deps.projectNames.prepare(admin.id,input)
+        else if (action === 'activate') result = await deps.projectNames.activate(admin.id,input)
+        else if (action === 'reindex' && deps.projects.reindexNames !== undefined) {
+          if (typeof input.after !== 'number' || !Number.isSafeInteger(input.after) || input.after < 0) { await reply.error(400,'invalid-project-cursor'); return true }
+          result = await deps.projects.reindexNames(admin.id,deps.projectNames.forRequest(req,admin),input.after)
+        } else { await reply.error(404,'not-found'); return true }
+        await deps.audit.write({userId:admin.id,action:'projects.name-policy.'+action,ip:req.socket.remoteAddress ?? ''})
+        await reply.json(200,result)
+        return true
+      }
+      const promote = /^\/admin\/api\/runtimes\/([0-9a-f-]{36})\/personal-directory\/promote$/u.exec(pathname)
+      if (promote !== null && (req.method === 'POST' || req.method === 'GET')) {
+        if (deps.personalDirectory === undefined) { await reply.error(503, 'node-content/unavailable'); return true }
+        const id = promote[1]! as import('./runtime-catalog.ts').RuntimeId
+        if (!nodeUuidSchema.safeParse(id).success) { await reply.error(400, 'runtime-catalog/invalid-id'); return true }
+        res.setHeader('cache-control','no-store')
+        if(req.method==='GET'){
+          if(!deps.personalDirectory.previewPersonal){await reply.error(503,'node-content/unavailable');return true}
+          await reply.json(200,await deps.personalDirectory.previewPersonal(admin.id,id));return true
+        }
+        const input=body.trim()?parseObject(body):{}
+        const approval=Object.keys(input).length ? z.object({nodeId:z.uuid(),userId:z.number().int().positive(),
+          generation:z.number().int().nonnegative(),revision:z.number().int().nonnegative()}).strict().safeParse(input) : undefined
+        if(approval && !approval.success){await reply.error(400,'invalid-personal-directory-approval');return true}
+        await deps.personalDirectory.promotePersonal(admin.id,id,approval?.data)
+        await deps.audit.write({ userId: admin.id, action:'personal-directory.promote', detail: JSON.stringify({runtimeId:id}), ip:req.socket.remoteAddress ?? '' })
+        res.writeHead(204).end()
+        return true
+      }
+      if (pathname === '/admin/api/deployment/node-content' && req.method === 'GET') {
+        res.setHeader('cache-control', 'no-store')
+        if (deps.nodeContent === undefined) { await reply.error(503, 'node-content/unavailable'); return true }
+        await reply.json(200, await deps.nodeContent.health())
+        return true
+      }
+      const ok = await dispatch(deps, req, res, admin, pathname, body, reply, documentAdmin, invalidateAccess)
+      if (!ok) await reply.error(404, 'not found')
     } catch (error) {
       if (res.writableEnded) throw error
       const mapped = mapError(error)
@@ -257,6 +387,7 @@ async function dispatch(
   admin: UserRow,
   pathname: string,
   body: string,
+  reply: AdministratorResponse,
   documentAdmin?: GatewayDocumentAdminHandler,
   invalidateAccess?: GatewayHandlers['invalidateAccess'],
 ): Promise<boolean> {
@@ -264,22 +395,22 @@ async function dispatch(
   const ip = req.socket.remoteAddress ?? ''
   if (pathname === '/admin/api/desktop-environment' && method === 'GET') {
     res.setHeader('cache-control', 'no-store')
-    sendJson(res, 200, await inspectDesktopEnvironment())
+    await reply.json(200, await inspectDesktopEnvironment())
     return true
   }
-  if (await runtimeManagementApi(deps, req, res, admin, pathname, body)) return true
+  if (await runtimeManagementApi(deps, req, res, admin, pathname, body, reply)) return true
   if (pathname === '/admin/api/deployment/current-node' && method === 'GET') {
     res.setHeader('cache-control', 'no-store')
-    if (deps.nodeServiceIdentity === undefined) { sendError(res, 503, 'node-service/unavailable'); return true }
-    sendJson(res, 200, { nodeId: deps.nodeServiceIdentity.nodeId, name: deps.cfg.computeNodeName,
+    if (deps.nodeServiceIdentity === undefined) { await reply.error(503, 'node-service/unavailable'); return true }
+    await reply.json(200, { nodeId: deps.nodeServiceIdentity.nodeId, name: deps.cfg.computeNodeName,
       forwardingEnabled: deps.topology === undefined ? deps.cfg.nodeService.forwarding : (await deps.topology.adminRead(admin)).scope === 'organization',
       ...(deps.topology === undefined ? {} : { deployment: await deps.topology.adminRead(admin) }) })
     return true
   }
   if (pathname === '/admin/api/deployment/node-connection') {
-    if (deps.nodeConnection === undefined) { sendError(res, 503, 'node-connection-unavailable'); return true }
+    if (deps.nodeConnection === undefined) { await reply.error(503, 'node-connection-unavailable'); return true }
     res.setHeader('cache-control', 'no-store')
-    if (method === 'GET') sendJson(res, 200, await deps.nodeConnection.view(admin))
+    if (method === 'GET') await reply.json(200, await deps.nodeConnection.view(admin))
     else if (method === 'POST') {
       const request = parseObject(body)
       const result = request.action === 'start' ? await deps.nodeConnection.start(admin)
@@ -288,13 +419,13 @@ async function dispatch(
       if (result === undefined) throw new NodeConfigurationError(400, 'node-connection-invalid-request')
       await deps.audit.write({ userId: admin.id, action: `admin.deployment.node-connection.${String(request.action)}`,
         detail: JSON.stringify({ revision: result.revision }), ip })
-      sendJson(res, 200, result)
-    } else { res.setHeader('allow', 'GET, POST'); sendError(res, 405, 'method-not-allowed') }
+      await reply.json(200, result)
+    } else { res.setHeader('allow', 'GET, POST'); await reply.error(405, 'method-not-allowed') }
     return true
   }
   if (pathname === '/admin/api/deployment/configuration') {
-    if (deps.nodeConfiguration === undefined) { sendError(res, 503, 'node-configuration-unavailable'); return true }
-    if (method === 'GET') { sendJson(res, 200, await deps.nodeConfiguration.view(admin.id)); return true }
+    if (deps.nodeConfiguration === undefined) { await reply.error(503, 'node-configuration-unavailable'); return true }
+    if (method === 'GET') { await reply.json(200, await deps.nodeConfiguration.view(admin.id)); return true }
     if (method !== 'POST') return false
     const input = parseObject(body)
     if (typeof input.organizationId !== 'string' || typeof input.nodeId !== 'string'
@@ -306,80 +437,80 @@ async function dispatch(
     else throw new NodeConfigurationError(400, 'invalid-node-configuration-action')
     await deps.audit.write({ userId: admin.id, action: `admin.deployment.configuration.${input.action}`,
       detail: JSON.stringify({ nodeId: identity.nodeId, revision: result.revision }), ip })
-    sendJson(res, 200, result)
+    await reply.json(200, result)
     return true
   }
   if (pathname === '/admin/api/webhook-deliveries' && method === 'GET') {
-    if (deps.webhookDeliveries === undefined) { sendError(res, 503, 'webhook-deliveries-unavailable'); return true }
+    if (deps.webhookDeliveries === undefined) { await reply.error(503, 'webhook-deliveries-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams
-    sendJson(res, 200, await deps.webhookDeliveries.list(admin.id, query.get('endpointId'), query.get('cursor') ?? undefined,
+    await reply.json(200, await deps.webhookDeliveries.list(admin.id, query.get('endpointId'), query.get('cursor') ?? undefined,
       query.has('limit') ? Number(query.get('limit')) : undefined))
     return true
   }
   if (pathname === '/admin/api/webhook-endpoints' && method === 'GET') {
-    if (deps.webhookEndpoints === undefined) { sendError(res, 503, 'webhook-endpoints-unavailable'); return true }
-    sendJson(res, 200, { endpoints: await deps.webhookEndpoints.list(admin.id) })
+    if (deps.webhookEndpoints === undefined) { await reply.error(503, 'webhook-endpoints-unavailable'); return true }
+    await reply.json(200, { endpoints: await deps.webhookEndpoints.list(admin.id) })
     return true
   }
   if (pathname === '/admin/api/webhook-endpoints' && method === 'POST') {
-    if (deps.webhookEndpoints === undefined) { sendError(res, 503, 'webhook-endpoints-unavailable'); return true }
+    if (deps.webhookEndpoints === undefined) { await reply.error(503, 'webhook-endpoints-unavailable'); return true }
     const endpoint = await deps.webhookEndpoints.create(admin.id, parseObject(body))
     await deps.audit.write({ userId: admin.id, action: 'admin.webhook-endpoints.create',
       detail: JSON.stringify({ targetId: endpoint.publicId, name: endpoint.name }), ip })
-    sendJson(res, 200, endpoint)
+    await reply.json(200, endpoint)
     return true
   }
   if (pathname === '/admin/api/webhook-endpoints/update' && method === 'POST') {
-    if (deps.webhookEndpoints === undefined) { sendError(res, 503, 'webhook-endpoints-unavailable'); return true }
+    if (deps.webhookEndpoints === undefined) { await reply.error(503, 'webhook-endpoints-unavailable'); return true }
     const endpoint = await deps.webhookEndpoints.update(parseObject(body), admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.webhook-endpoints.update',
       detail: JSON.stringify({ targetId: endpoint.publicId, revision: endpoint.revision }), ip })
-    sendJson(res, 200, endpoint)
+    await reply.json(200, endpoint)
     return true
   }
   if (pathname === '/admin/api/webhook-endpoints/mutate' && method === 'POST') {
-    if (deps.webhookEndpoints === undefined) { sendError(res, 503, 'webhook-endpoints-unavailable'); return true }
+    if (deps.webhookEndpoints === undefined) { await reply.error(503, 'webhook-endpoints-unavailable'); return true }
     const input = parseObject(body)
     const endpoint = await deps.webhookEndpoints.mutate(input, admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.webhook-endpoints.mutate',
       detail: JSON.stringify({ targetId: input.targetId, action: input.action }), ip })
-    sendJson(res, 200, endpoint === null ? { removed: true } : endpoint)
+    await reply.json(200, endpoint === null ? { removed: true } : endpoint)
     return true
   }
   if (pathname === '/admin/api/webhook-deliveries/redispatch' && method === 'POST') {
-    if (deps.webhookIntake === undefined) { sendError(res, 503, 'webhook-dispatch-unavailable'); return true }
+    if (deps.webhookIntake === undefined) { await reply.error(503, 'webhook-dispatch-unavailable'); return true }
     const input = parseObject(body)
     const receipt = await deps.webhookIntake.redispatch(input.receiptId, admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.webhook-deliveries.redispatch',
       detail: JSON.stringify({ receiptId: input.receiptId, redispatchId: receipt.id, state: receipt.state }), ip })
-    sendJson(res, 200, receipt)
+    await reply.json(200, receipt)
     return true
   }
 
   if (pathname === '/admin/api/deployment' && method === 'GET') {
-    if (deps.maintenance === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    if (deps.maintenance === undefined) { await reply.error(503, 'deployment-unavailable'); return true }
     const [state, plan] = await Promise.all([
       deps.maintenance.administration(admin.id),
       deps.migrationPlan?.() ?? Promise.resolve(undefined),
     ])
-    sendJson(res, 200, { ...state, migrations: plan ?? null })
+    await reply.json(200, { ...state, migrations: plan ?? null })
     return true
   }
   if (pathname === '/admin/api/tunnel' && method === 'GET') {
-    if (deps.tunnelAccess === undefined) { sendError(res, 503, 'tunnel-unavailable'); return true }
-    sendJson(res, 200, await deps.tunnelAccess.view())
+    if (deps.tunnelAccess === undefined) { await reply.error(503, 'tunnel-unavailable'); return true }
+    await reply.json(200, await deps.tunnelAccess.view())
     return true
   }
   if (pathname === '/admin/api/tunnel/install' && method === 'POST') {
-    if (deps.tunnelAccess === undefined) { sendError(res, 503, 'tunnel-unavailable'); return true }
+    if (deps.tunnelAccess === undefined) { await reply.error(503, 'tunnel-unavailable'); return true }
     const view = await deps.tunnelAccess.install()
     await deps.audit.write({ userId: admin.id, action: 'admin.tunnel.install',
       detail: JSON.stringify({ binary: view.binary?.path ?? null }), ip })
-    sendJson(res, 200, view)
+    await reply.json(200, view)
     return true
   }
   if (pathname === '/admin/api/tunnel/actions' && method === 'POST') {
-    if (deps.tunnelAccess === undefined) { sendError(res, 503, 'tunnel-unavailable'); return true }
+    if (deps.tunnelAccess === undefined) { await reply.error(503, 'tunnel-unavailable'); return true }
     const input = parseObject(body)
     const action = input.action
     let view
@@ -392,12 +523,12 @@ async function dispatch(
     else throw new TunnelAccessError(400, 'invalid-tunnel-action')
     await deps.audit.write({ userId: admin.id, action: `admin.tunnel.${String(action)}`,
       detail: JSON.stringify({ mode: view.mode, publicUrl: view.publicUrl, hostname: view.hostname }), ip })
-    sendJson(res, 200, view)
+    await reply.json(200, view)
     return true
   }
 
   if (pathname === '/admin/api/deployment/maintenance' && method === 'POST') {
-    if (deps.maintenance === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    if (deps.maintenance === undefined) { await reply.error(503, 'deployment-unavailable'); return true }
     const input = parseObject(body)
     const reason = str(input, 'reason')
     let state
@@ -406,36 +537,36 @@ async function dispatch(
     else throw new MaintenanceError(400, 'invalid-maintenance-action')
     await deps.audit.write({ userId: admin.id, action: `admin.deployment.maintenance.${String(input.action)}`,
       detail: JSON.stringify({ reason: reason ?? null }), ip })
-    sendJson(res, 200, state)
+    await reply.json(200, state)
     return true
   }
   if (pathname === '/admin/api/deployment/nodes/access' && method === 'GET') {
     res.setHeader('cache-control', 'no-store')
-    if (deps.nodeAccess === undefined) { sendError(res, 503, 'node-access/unavailable'); return true }
+    if (deps.nodeAccess === undefined) { await reply.error(503, 'node-access/unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://gateway').searchParams
     const cursor = query.get('cursor'), limit = query.get('limit')
-    sendJson(res, 200, await deps.nodeAccess.list(admin, { ...(cursor === null ? {} : { cursor }), ...(limit === null ? {} : { limit }) }))
+    await reply.json(200, await deps.nodeAccess.list(admin, { ...(cursor === null ? {} : { cursor }), ...(limit === null ? {} : { limit }) }))
     return true
   }
   if (pathname === '/admin/api/deployment/nodes/enrollments' && method === 'POST') {
     res.setHeader('cache-control', 'no-store')
-    if (deps.nodeAccess === undefined) { sendError(res, 503, 'node-access/unavailable'); return true }
+    if (deps.nodeAccess === undefined) { await reply.error(503, 'node-access/unavailable'); return true }
     const result = await deps.nodeAccess.issue(admin, parseObject(body))
     await deps.audit.write({ userId: admin.id, action: 'admin.deployment.nodes.enrollment',
       detail: JSON.stringify({ nodeId: result.nodeId, enrollmentId: result.enrollmentId, revision: result.revision }), ip })
-    sendJson(res, 201, result)
+    await reply.json(201, result)
     return true
   }
   const nodeProbe = /^\/admin\/api\/deployment\/nodes\/access\/([^/]+)\/probe$/u.exec(pathname)
   if (nodeProbe !== null && method === 'POST') {
     res.setHeader('cache-control', 'no-store')
-    if (deps.nodeChannels === undefined) { sendError(res, 503, 'node-channel/unavailable'); return true }
+    if (deps.nodeChannels === undefined) { await reply.error(503, 'node-channel/unavailable'); return true }
     const cancellation = new AbortController()
     const cancel = () => { if (!res.writableFinished) cancellation.abort() }
     res.once('close', cancel)
     try {
       const info = await deps.nodeChannels.probe(admin, nodeProbe[1]!, cancellation.signal)
-      if (!res.destroyed) sendJson(res, 200, info)
+      if (!res.destroyed) await reply.json(200, info)
     } catch (error) {
       if (!(error instanceof NodeChannelError && error.code === 'node-channel/cancelled' && res.destroyed)) throw error
     } finally { res.removeListener('close', cancel) }
@@ -444,7 +575,7 @@ async function dispatch(
   const nodeAccess = /^\/admin\/api\/deployment\/nodes\/access\/([^/]+)$/u.exec(pathname)
   if (nodeAccess !== null && method === 'POST') {
     res.setHeader('cache-control', 'no-store')
-    if (deps.nodeAccess === undefined) { sendError(res, 503, 'node-access/unavailable'); return true }
+    if (deps.nodeAccess === undefined) { await reply.error(503, 'node-access/unavailable'); return true }
     const input = parseObject(body)
     if (input.action === 'detach' && deps.nodeServices?.pauseIdle === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
     if (input.action === 'detach') await deps.nodeServiceProxy?.closeIdle?.(nodeAccess[1]! as import('./runtime-catalog.ts').RuntimeNodeId)
@@ -457,11 +588,11 @@ async function dispatch(
     } finally { resume?.() }
     await deps.audit.write({ userId: admin.id, action: 'admin.deployment.nodes.access',
       detail: JSON.stringify({ nodeId: result.nodeId, revision: result.revision, action: 'token' in result ? 'issue-enrollment' : result.status }), ip })
-    sendJson(res, 200, result)
+    await reply.json(200, result)
     return true
   }
   if (pathname === '/admin/api/deployment/nodes/status' && method === 'POST') {
-    if (deps.maintenance === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    if (deps.maintenance === undefined) { await reply.error(503, 'deployment-unavailable'); return true }
     const input = parseObject(body)
     const nodeId = str(input, 'nodeId')
     const status = str(input, 'status')
@@ -472,50 +603,46 @@ async function dispatch(
         : (() => { throw new MaintenanceError(400, 'invalid-node-status') })())
     await deps.audit.write({ userId: admin.id, action: 'admin.deployment.nodes.status',
       detail: JSON.stringify({ nodeId, status: node.status }), ip })
-    sendJson(res, 200, node)
+    await reply.json(200, node)
     return true
   }
   if (pathname === '/admin/api/deployment/restore' && method === 'POST') {
-    if (deps.maintenance === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    if (deps.maintenance === undefined) { await reply.error(503, 'deployment-unavailable'); return true }
     const input = parseObject(body)
     const backupId = str(input, 'backupId')
     if (backupId === undefined) throw new MaintenanceError(400, 'backup-id-required')
     const operation = await deps.maintenance.requestRestore(admin.id, backupId)
     await deps.audit.write({ userId: admin.id, action: 'admin.deployment.restore.request',
       detail: JSON.stringify({ backupId, operationId: operation.id, status: operation.status }), ip })
-    sendJson(res, 200, operation)
+    await reply.json(200, operation)
     return true
   }
   if (pathname === '/admin/api/backups' && method === 'GET') {
-    if (deps.backups === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
-    sendJson(res, 200, { backups: await deps.backups.list() })
+    if (deps.backups === undefined) { await reply.error(503, 'deployment-unavailable'); return true }
+    await reply.json(200, { backups: await deps.backups.list() })
     return true
   }
   if (pathname === '/admin/api/backups' && method === 'POST') {
-    if (deps.backups === undefined || deps.backupWork === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    if (deps.backups === undefined || deps.backupWork === undefined) { await reply.error(503, 'deployment-unavailable'); return true }
     const record = await deps.backupWork.create(admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.backups.create',
       detail: JSON.stringify({ backupId: record.id, path: record.path, status: record.status }), ip })
-    sendJson(res, 200, record)
+    await reply.json(200, record)
     return true
   }
   if (pathname === '/admin/api/backups/verify' && method === 'POST') {
-    if (deps.backups === undefined || deps.backupWork === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
-    const input = parseObject(body)
-    const id = str(input, 'id')
-    if (id === undefined) throw new BackupError(400, 'backup-id-required')
-    if (!/^[0-9a-f-]{36}$/iu.test(id)) throw new BackupError(400, 'invalid-backup-id')
-    const record = await deps.backupWork.verify(id)
+    if (deps.backups === undefined || deps.backupWork === undefined) { await reply.error(503, 'deployment-unavailable'); return true }
+    const id = backupSelection(body)
+    const record = await deps.backupWork.verify(id, undefined, admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.backups.verify',
       detail: JSON.stringify({ backupId: id, status: record.status }), ip })
-    sendJson(res, 200, record)
+    await reply.json(200, record)
     return true
   }
   if (pathname === '/admin/api/backups/node-configuration' && method === 'POST') {
-    if (deps.backupWork === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
-    const id = str(parseObject(body), 'id')
-    if (id === undefined) throw new BackupError(400, 'backup-id-required')
-    sendJson(res, 200, await deps.backupWork.previewNodeConfiguration(id))
+    if (deps.backupWork === undefined) { await reply.error(503, 'deployment-unavailable'); return true }
+    const id = backupSelection(body)
+    await reply.readJson(200, await deps.backupWork.previewNodeConfiguration(id, admin.id))
     return true
   }
 
@@ -536,13 +663,13 @@ async function dispatch(
   }
 
   if (pathname === '/admin/api/documents/metrics' && method === 'GET') {
-    if (deps.documents === undefined) { sendError(res, 503, 'document-catalog-unavailable'); return true }
-    sendJson(res, 200, await deps.documents.adminMetrics())
+    if (deps.documents === undefined) { await reply.error(503, 'document-catalog-unavailable'); return true }
+    await reply.json(200, await deps.documents.adminMetrics(admin.id))
     return true
   }
 
   if (pathname === '/admin/api/archives/records' && method === 'GET') {
-    if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
+    if (deps.archives === undefined) { await reply.error(503, 'conversation-archive-unavailable'); return true }
     const query = new URL(req.url ?? '/', 'http://admin').searchParams
     const number = (key: string, minimum = 0): number | undefined => {
       const raw = query.get(key)
@@ -552,11 +679,11 @@ async function dispatch(
     }
     const state = query.get('state')
     if (state !== null && state !== 'all' && state !== 'archived' && state !== 'trash' && state !== 'purged') {
-      sendError(res, 400, 'invalid archive state'); return true
+      await reply.error(400, 'invalid archive state'); return true
     }
     const recordKind = query.get('kind')
     if (recordKind !== null && recordKind !== 'conversation' && recordKind !== 'empty-draft' && recordKind !== 'all') {
-      sendError(res, 400, 'invalid archive record kind'); return true
+      await reply.error(400, 'invalid archive record kind'); return true
     }
     const userId = number('userId', 1)
     const projectId = number('projectId', 1)
@@ -567,7 +694,7 @@ async function dispatch(
     if ((query.has('userId') && userId === undefined) || (query.has('projectId') && projectId === undefined)
       || (query.has('from') && from === undefined) || (query.has('to') && to === undefined)
       || (query.has('limit') && limit === undefined) || (query.has('offset') && offset === undefined)) {
-      sendError(res, 400, 'invalid archive filter'); return true
+      await reply.error(400, 'invalid archive filter'); return true
     }
     const filter: ConversationArchiveAdminFilter = {
       ...(state === null ? {} : { state: state as ConversationArchiveState | 'all' }),
@@ -577,14 +704,14 @@ async function dispatch(
       ...(from === undefined ? {} : { fromMs: from }), ...(to === undefined ? {} : { toMs: to }),
       ...(limit === undefined ? {} : { limit }), ...(offset === undefined ? {} : { offset }),
     }
-    sendJson(res, 200, await deps.archives.adminList(filter, admin.id))
+    await reply.json(200, await deps.archives.adminList(filter, admin.id))
     await write('admin.archives.list', { filter: { ...filter, query: filter.query === undefined ? undefined : '[provided]' } })
     return true
   }
 
   if (pathname === '/admin/api/archives/empty-drafts/preview' && method === 'GET') {
     if (deps.archives === undefined || deps.archives.previewEmptyDrafts === undefined) {
-      sendError(res, 503, 'conversation-archive-unavailable'); return true
+      await reply.error(503, 'conversation-archive-unavailable'); return true
     }
     const query = new URL(req.url ?? '/', 'http://admin').searchParams
     const ageRaw = query.get('ageMs')
@@ -593,20 +720,20 @@ async function dispatch(
     const limit = limitRaw === null ? undefined : Number(limitRaw)
     if ((ageRaw !== null && (ageMs === undefined || !Number.isSafeInteger(ageMs) || ageMs < 0))
       || (limitRaw !== null && (limit === undefined || !Number.isSafeInteger(limit) || limit < 1))) {
-      sendError(res, 400, 'invalid empty-draft filter'); return true
+      await reply.error(400, 'invalid empty-draft filter'); return true
     }
     const preview = await deps.archives.previewEmptyDrafts({
       ...(ageMs === undefined ? {} : { olderThanMs: ageMs }),
       ...(limit === undefined ? {} : { limit }),
     }, admin.id)
-    sendJson(res, 200, preview)
+    await reply.json(200, preview)
     await write('admin.archives.empty-drafts.preview', { count: preview.candidates.length, cutoff: preview.cutoff })
     return true
   }
 
   if (pathname === '/admin/api/archives/empty-drafts/trash' && method === 'POST') {
     if (deps.archives === undefined || deps.archives.trashEmptyDrafts === undefined) {
-      sendError(res, 503, 'conversation-archive-unavailable'); return true
+      await reply.error(503, 'conversation-archive-unavailable'); return true
     }
     const input = parseObject(body)
     const rawSessions = input.sessions
@@ -617,63 +744,62 @@ async function dispatch(
       || new Set(sessions.map(session => JSON.stringify(session))).size !== sessions.length
       || (cutoff !== undefined
         && (typeof cutoff !== 'number' || !Number.isSafeInteger(cutoff) || cutoff < 0 || cutoff > Date.now()))) {
-      sendError(res, 400, 'invalid empty-draft batch'); return true
+      await reply.error(400, 'invalid empty-draft batch'); return true
     }
     const trashed = await deps.archives.trashEmptyDrafts(sessions as NonNullable<typeof sessions[number]>[], admin.id, cutoff as number | undefined)
     await write('admin.archives.empty-drafts.trash', { requested: sessions.length, trashed: trashed.length })
-    sendJson(res, 200, { trashed })
+    await reply.json(200, { trashed })
     return true
   }
 
   const archiveStatusPath = /^\/admin\/api\/archives\/records\/([^/]+)\/status$/.exec(pathname)
   if (archiveStatusPath !== null && method === 'GET') {
-    if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
+    if (deps.archives === undefined) { await reply.error(503, 'conversation-archive-unavailable'); return true }
     const archiveId = parseConversationArchiveId(archiveStatusPath[1])
-    if (archiveId === undefined) { sendError(res, 400, 'invalid archive identity'); return true }
+    if (archiveId === undefined) { await reply.error(400, 'invalid archive identity'); return true }
     const record = await deps.archives.status(archiveId, admin.id)
-    if (record === null) { sendError(res, 404, 'archive not found'); return true }
-    sendJson(res, 200, record)
+    if (record === null) { await reply.error(404, 'archive not found'); return true }
+    await reply.json(200, record)
     return true
   }
 
   const archivePath = /^\/admin\/api\/archives\/records\/([^/]+)$/.exec(pathname)
   const archiveExportPath = /^\/admin\/api\/archives\/records\/([^/]+)\/export$/.exec(pathname)
   if (archiveExportPath !== null && method === 'GET') {
-    if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
+    if (deps.archives === undefined) { await reply.error(503, 'conversation-archive-unavailable'); return true }
     const archiveId = parseConversationArchiveId(archiveExportPath[1])
-    if (archiveId === undefined) { sendError(res, 400, 'invalid archive identity'); return true }
+    if (archiveId === undefined) { await reply.error(400, 'invalid archive identity'); return true }
     const detail = deps.archives.exportDetail === undefined
       ? await deps.archives.detail(archiveId, 0, 100_000, admin.id)
       : await deps.archives.exportDetail(archiveId, admin.id)
-    if (detail === null) { sendError(res, 404, 'archive not found'); return true }
-    res.writeHead(200, {
+    if (detail === null) { await reply.error(404, 'archive not found'); return true }
+    await reply.json(200, detail, {
       'content-type': 'application/json; charset=utf-8',
       'content-disposition': `attachment; filename="${archiveId}.json"`,
     })
-    res.end(JSON.stringify(detail))
     await write('admin.archives.export', { archiveId, rootSessionId: detail.record.rootSessionId })
     return true
   }
   if (archivePath !== null && method === 'GET') {
-    if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
+    if (deps.archives === undefined) { await reply.error(503, 'conversation-archive-unavailable'); return true }
     const archiveId = parseConversationArchiveId(archivePath[1])
-    if (archiveId === undefined) { sendError(res, 400, 'invalid archive identity'); return true }
+    if (archiveId === undefined) { await reply.error(400, 'invalid archive identity'); return true }
     const fromSeq = new URL(req.url ?? '/', 'http://admin').searchParams.get('fromSeq')
     const limit = new URL(req.url ?? '/', 'http://admin').searchParams.get('limit')
     const parsedFrom = fromSeq === null ? 0 : Number(fromSeq)
     const parsedLimit = limit === null ? 200 : Number(limit)
     if (!Number.isSafeInteger(parsedFrom) || parsedFrom < 0 || !Number.isSafeInteger(parsedLimit) || parsedLimit < 1) {
-      sendError(res, 400, 'invalid archive detail pagination'); return true
+      await reply.error(400, 'invalid archive detail pagination'); return true
     }
     const detail = await deps.archives.detail(archiveId, parsedFrom, parsedLimit, admin.id)
-    if (detail === null) { sendError(res, 404, 'archive not found'); return true }
-    sendJson(res, 200, detail)
+    if (detail === null) { await reply.error(404, 'archive not found'); return true }
+    await reply.json(200, detail)
     await write('admin.archives.view', { archiveId, rootSessionId: detail.record.rootSessionId })
     return true
   }
 
   if (pathname === '/admin/api/archives/records/actions' && method === 'POST') {
-    if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
+    if (deps.archives === undefined) { await reply.error(503, 'conversation-archive-unavailable'); return true }
     const input = parseObject(body)
     const action = input.action
     const ids = input.archiveIds
@@ -682,11 +808,11 @@ async function dispatch(
       || !Array.isArray(ids) || ids.length === 0 || ids.length > 50
       || !ids.every(id => typeof id === 'string' && id !== '')
       || (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || idempotencyKey === ''))) {
-      sendError(res, 400, 'invalid archive action'); return true
+      await reply.error(400, 'invalid archive action'); return true
     }
     const archiveIds = ids.map(parseConversationArchiveId)
     if (archiveIds.some(id => id === undefined) || new Set(archiveIds).size !== archiveIds.length) {
-      sendError(res, 400, 'invalid archive identity'); return true
+      await reply.error(400, 'invalid archive identity'); return true
     }
     const results: Array<{ archiveId: ConversationArchiveId; ok: boolean; error?: string }> = []
     for (const archiveId of archiveIds as ConversationArchiveId[]) {
@@ -708,46 +834,46 @@ async function dispatch(
       }
     }
     await write(`admin.archives.${action}`, { count: ids.length, succeeded: results.filter(item => item.ok).length })
-    sendJson(res, 200, { action, results })
+    await reply.json(200, { action, results })
     return true
   }
 
   if (pathname === '/admin/api/archives' || pathname.startsWith('/admin/api/archives/')) {
-    sendError(res, 410, 'archive-api-upgrade-required')
+    await reply.error(410, 'archive-api-upgrade-required')
     return true
   }
 
   if (pathname === '/admin/api/progress/digest-model') {
-    if (deps.progress === undefined) { sendError(res, 503, 'progress unavailable'); return true }
-    if (method === 'GET') { sendJson(res, 200, await deps.progress.digestModelSettings(admin.id)); return true }
+    if (deps.progress === undefined) { await reply.error(503, 'progress unavailable'); return true }
+    if (method === 'GET') { await reply.json(200, await deps.progress.digestModelSettings(admin.id)); return true }
     if (method === 'POST') {
       const parsed = JSON.parse(body || '{}') as { model?: unknown }
       if (parsed.model !== undefined && parsed.model !== null && typeof parsed.model !== 'string') {
-        sendError(res, 400, 'digest-model-format')
+        await reply.error(400, 'digest-model-format')
         return true
       }
       const model = parsed.model === undefined || parsed.model === null ? null : parsed.model
       const settings = await deps.progress.setDigestModel(model, admin.id)
       await write('admin.progress.digest-model', { model })
-      sendJson(res, 200, settings)
+      await reply.json(200, settings)
       return true
     }
     return false
   }
   if (pathname === '/admin/api/plugins/overview' && method === 'GET') {
-    if (deps.pluginManagement === undefined) { sendError(res, 503, 'plugin-management-unavailable'); return true }
-    sendJson(res, 200, await deps.pluginManagement.overview(admin))
+    if (deps.pluginManagement === undefined) { await reply.error(503, 'plugin-management-unavailable'); return true }
+    await reply.json(200, await deps.pluginManagement.overview(admin))
     return true
   }
   if (pathname === '/admin/api/plugins/target' && method === 'GET') {
-    if (deps.pluginManagement === undefined) { sendError(res, 503, 'plugin-management-unavailable'); return true }
+    if (deps.pluginManagement === undefined) { await reply.error(503, 'plugin-management-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams
-    sendJson(res, 200, await deps.pluginManagement.target(admin, { kind: query.get('kind'), id: Number(query.get('id')),
+    await reply.json(200, await deps.pluginManagement.target(admin, { kind: query.get('kind'), id: Number(query.get('id')),
       ...(query.has('dshRuntime') ? { runtimeId: query.get('dshRuntime') } : {}) }))
     return true
   }
   if (pathname === '/admin/api/plugins/invoke' && method === 'POST') {
-    if (deps.pluginManagement === undefined) { sendError(res, 503, 'plugin-management-unavailable'); return true }
+    if (deps.pluginManagement === undefined) { await reply.error(503, 'plugin-management-unavailable'); return true }
     const input = parseObject(body), lifetime = new AbortController()
     const closed = (): void => { if (!res.writableFinished) lifetime.abort() }
     req.once('aborted', closed); res.once('close', closed)
@@ -771,48 +897,48 @@ async function dispatch(
   }
 
   if (pathname === '/admin/api/plugins/state' && (method === 'GET' || method === 'POST')) {
-    if (deps.pluginManagement === undefined) { sendError(res, 503, 'plugin-management-unavailable'); return true }
+    if (deps.pluginManagement === undefined) { await reply.error(503, 'plugin-management-unavailable'); return true }
     if (method === 'GET') {
       const query = new URL(req.url ?? pathname, 'http://admin').searchParams
-      sendJson(res, 200, await deps.pluginManagement.state(admin, { kind: query.get('kind'), id: Number(query.get('id')),
+      await reply.json(200, await deps.pluginManagement.state(admin, { kind: query.get('kind'), id: Number(query.get('id')),
         ...(query.has('dshRuntime') ? { runtimeId: query.get('dshRuntime') } : {}) }))
     } else {
       const input = parseObject(body)
       const view = await deps.pluginManagement.saveState(admin, input)
       await write('admin.plugins.state', { target: input.target, revision: view.revision })
-      sendJson(res, 200, view)
+      await reply.json(200, view)
     }
     return true
   }
 
   if (pathname === '/admin/api/terminals' && method === 'GET') {
-    if (deps.terminalManagement === undefined) { sendError(res, 503, 'terminal-management-unavailable'); return true }
+    if (deps.terminalManagement === undefined) { await reply.error(503, 'terminal-management-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams
     const target = await selectedAdminRuntime(deps, admin, req, resourcePolicyOwner(query.get('kind'), Number(query.get('id')), 'terminal'))
-    sendJson(res, 200, await deps.terminalManagement.list(admin, target))
+    await reply.json(200, await deps.terminalManagement.list(admin, target))
     return true
   }
   if (pathname === '/admin/api/terminals/close' && method === 'POST') {
-    if (deps.terminalManagement === undefined) { sendError(res, 503, 'terminal-management-unavailable'); return true }
+    if (deps.terminalManagement === undefined) { await reply.error(503, 'terminal-management-unavailable'); return true }
     const input = parseObject(body), target = await selectedAdminRuntime(deps, admin, req,
       resourcePolicyOwner(input.kind, input.targetId, 'terminal'), input.runtimeId)
     const entry = { nodeId: input.nodeId, generation: input.generation, ownerId: input.ownerId, id: input.id }
     await deps.terminalManagement.close(admin, target, entry)
     await write('admin.terminals.close', { target, ...entry })
-    sendJson(res, 200, { closed: true })
+    await reply.json(200, { closed: true })
     return true
   }
 
   if (pathname === '/admin/api/steward' && method === 'GET') {
-    if (deps.stewardAccess === undefined) { sendError(res, 503, 'steward-access-unavailable'); return true }
+    if (deps.stewardAccess === undefined) { await reply.error(503, 'steward-access-unavailable'); return true }
     const space = await deps.projects.stewardProject?.() ?? null
-    sendJson(res, 200, {
+    await reply.json(200, {
       enabled: deps.cfg.steward.enabled,
       space: space === null ? null : {
         ...space,
         runtime: await deps.instances.stateOf({ kind: 'project', id: space.id }),
       },
-      members: await deps.stewardAccess.list(),
+      members: await deps.stewardAccess.list(admin.id),
     })
     return true
   }
@@ -827,161 +953,197 @@ async function dispatch(
     const access = resource === 'terminal' ? deps.terminalAccess : resource === 'ssh' ? deps.sshAccess
       : resource === 'plugin' ? deps.pluginAccess : resource === 'steward' ? deps.stewardAccess
       : resource === 'memory' ? deps.memoryAccess : deps.desktopAccess
-    if (access === undefined) { sendError(res, 503, `${resource}-access-unavailable`); return true }
+    if (access === undefined) { await reply.error(503, `${resource}-access-unavailable`); return true }
     const ownerOf = resource === 'steward' ? stewardPolicyOwner : resourcePolicyOwner
     if (method === 'GET') {
       const query = new URL(req.url ?? pathname, 'http://admin').searchParams
       const owner = ownerOf(query.get('kind'), Number(query.get('id')), resource)
-      sendJson(res, 200, await access.get(owner))
+      await reply.json(200, await access.get(owner, admin.id))
     } else {
       const input = parseObject(body)
       const owner = ownerOf(input.kind, input.id, resource)
       const result = await access.set(owner, input.enabled, input.revision, admin.id)
       await write(`admin.${resource}s.permission`, { ...result,
         ...(deps.nodeServiceIdentity === undefined ? {} : { nodeId: deps.nodeServiceIdentity.nodeId }) })
-      sendJson(res, 200, result)
+      await reply.json(200, result)
     }
     return true
   }
 
   if (pathname === '/admin/api/ssh-targets' && method === 'GET') {
-    if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
-    sendJson(res, 200, { targets: await deps.sshTargets.list(admin.id) })
+    if (deps.sshTargets === undefined) { await reply.error(503, 'ssh-targets-unavailable'); return true }
+    await reply.json(200, { targets: await deps.sshTargets.list(admin.id) })
     return true
   }
 
   if (pathname === '/admin/api/ssh-targets' && method === 'POST') {
-    if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
+    if (deps.sshTargets === undefined) { await reply.error(503, 'ssh-targets-unavailable'); return true }
     const target = await deps.sshTargets.create(admin.id, parseObject(body))
     await write('admin.ssh-targets.create', { targetId: target.publicId, name: target.name })
-    sendJson(res, 200, target)
+    await reply.json(200, target)
     return true
   }
 
   if (pathname === '/admin/api/ssh-targets/update' && method === 'POST') {
-    if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
+    if (deps.sshTargets === undefined) { await reply.error(503, 'ssh-targets-unavailable'); return true }
     const target = await deps.sshTargets.update(parseObject(body), admin.id)
     await write('admin.ssh-targets.update', { targetId: target.publicId, name: target.name, revision: target.revision })
-    sendJson(res, 200, target)
+    await reply.json(200, target)
     return true
   }
 
   if (pathname === '/admin/api/ssh-targets/mutate' && method === 'POST') {
-    if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
+    if (deps.sshTargets === undefined) { await reply.error(503, 'ssh-targets-unavailable'); return true }
     const input = parseObject(body)
     const target = await deps.sshTargets.mutate(input, admin.id)
     await write('admin.ssh-targets.mutate', { targetId: input.targetId, action: input.action })
-    sendJson(res, 200, target === null ? { removed: true } : target)
+    await reply.json(200, target === null ? { removed: true } : target)
     return true
   }
 
   if (pathname === '/admin/api/ssh-targets/share' && method === 'POST') {
-    if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
+    if (deps.sshTargets === undefined) { await reply.error(503, 'ssh-targets-unavailable'); return true }
     const input = parseObject(body)
     const target = await deps.sshTargets.shareAsAdministrator(admin.id, input)
     await write('admin.ssh-targets.share', { targetId: input.targetId, projectId: input.projectId, shared: input.shared === true })
-    sendJson(res, 200, target)
+    await reply.json(200, target)
     return true
   }
 
   if (pathname === '/admin/api/remote-desktop/endpoints' && method === 'GET') {
-    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
-    sendJson(res, 200, { endpoints: await deps.remoteDesktop.endpoints(admin.id) })
+    if (deps.remoteDesktop === undefined) { await reply.error(503, 'remote-desktop-unavailable'); return true }
+    await reply.json(200, { endpoints: await deps.remoteDesktop.endpoints(admin.id) })
     return true
   }
   if (pathname === '/admin/api/remote-desktop/endpoints' && method === 'POST') {
-    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
+    if (deps.remoteDesktop === undefined) { await reply.error(503, 'remote-desktop-unavailable'); return true }
     const rows = await deps.remoteDesktop.saveEndpoints(parseObject(body).endpoints, admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.remote-desktop.endpoints.save',
       detail: JSON.stringify({ endpoints: rows.length }), ip })
-    sendJson(res, 200, { endpoints: rows })
+    await reply.json(200, { endpoints: rows })
     return true
   }
   if (pathname === '/admin/api/remote-desktop/grants' && method === 'GET') {
-    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
-    sendJson(res, 200, { grants: await deps.remoteDesktop.listGrants(admin.id) })
+    if (deps.remoteDesktop === undefined) { await reply.error(503, 'remote-desktop-unavailable'); return true }
+    await reply.json(200, { grants: await deps.remoteDesktop.listGrants(admin.id) })
     return true
   }
   if (pathname === '/admin/api/remote-desktop/grants' && method === 'POST') {
-    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
+    if (deps.remoteDesktop === undefined) { await reply.error(503, 'remote-desktop-unavailable'); return true }
     const input = parseObject(body)
     const row = await deps.remoteDesktop.createGrant(input, admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.remote-desktop.grant',
       detail: JSON.stringify({ principal: row.principal, target: row.target, level: row.level }), ip })
-    sendJson(res, 200, { grant: row })
+    await reply.json(200, { grant: row })
     return true
   }
   if (pathname === '/admin/api/remote-desktop/grants/level' && method === 'POST') {
-    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
+    if (deps.remoteDesktop === undefined) { await reply.error(503, 'remote-desktop-unavailable'); return true }
     const input = parseObject(body)
     const row = await deps.remoteDesktop.setLevel(input.id, input.level, admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.remote-desktop.grant-level',
       detail: JSON.stringify({ id: row.id, level: row.level }), ip })
-    sendJson(res, 200, { grant: row })
+    await reply.json(200, { grant: row })
     return true
   }
   if (pathname === '/admin/api/remote-desktop/grants/revoke' && method === 'POST') {
-    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
+    if (deps.remoteDesktop === undefined) { await reply.error(503, 'remote-desktop-unavailable'); return true }
     const input = parseObject(body)
     const row = await deps.remoteDesktop.revoke(input.id, admin.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.remote-desktop.grant-revoke',
       detail: JSON.stringify({ id: row.id }), ip })
-    sendJson(res, 200, { grant: row })
+    await reply.json(200, { grant: row })
     return true
   }
   if (pathname === '/admin/api/remote-desktop/audit' && method === 'GET') {
-    if (deps.remoteDesktop === undefined) { sendError(res, 503, 'remote-desktop-unavailable'); return true }
+    if (deps.remoteDesktop === undefined) { await reply.error(503, 'remote-desktop-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams
     const limit = Number.parseInt(query.get('limit') ?? '100', 10)
-    sendJson(res, 200, { events: await deps.remoteDesktop.audit(Number.isSafeInteger(limit) ? limit : 100, admin.id) })
+    await reply.json(200, { events: await deps.remoteDesktop.audit(Number.isSafeInteger(limit) ? limit : 100, admin.id) })
     return true
   }
   if (pathname === '/admin/api/desktops' && method === 'GET') {
-    if (deps.desktops === undefined) { sendError(res, 503, 'desktop-coordination-unavailable'); return true }
-    sendJson(res, 200, { resources: await deps.desktops.listResources() })
+    if (deps.desktops === undefined) { await reply.error(503, 'desktop-coordination-unavailable'); return true }
+    await reply.json(200, { resources: await deps.desktops.listResources() })
     return true
   }
 
   if (pathname === '/admin/api/desktops/detail' && method === 'GET') {
-    if (deps.desktops === undefined) { sendError(res, 503, 'desktop-coordination-unavailable'); return true }
+    if (deps.desktops === undefined) { await reply.error(503, 'desktop-coordination-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams
     const node = query.get('node')
     const desktop = query.get('desktop')
     if (node === null || node === '' || desktop === null || desktop === '') {
-      sendError(res, 400, 'invalid desktop detail request'); return true
+      await reply.error(400, 'invalid desktop detail request'); return true
     }
-    sendJson(res, 200, await deps.desktops.snapshot({ node, desktop }))
+    await reply.json(200, await deps.desktops.snapshot({ node, desktop }))
     return true
   }
 
   if (pathname === '/admin/api/desktops/actions' && method === 'POST') {
-    if (deps.desktops === undefined) { sendError(res, 503, 'desktop-coordination-unavailable'); return true }
+    if (deps.desktops === undefined) { await reply.error(503, 'desktop-coordination-unavailable'); return true }
     const input = parseObject(body)
     const action = input.action
     if (action === 'revoke') {
       const grantId = input.grantId
-      if (typeof grantId !== 'string' || grantId === '') { sendError(res, 400, 'invalid desktop revoke'); return true }
+      if (typeof grantId !== 'string' || grantId === '') { await reply.error(400, 'invalid desktop revoke'); return true }
       await deps.desktops.revoke(grantId, { userId: admin.id })
       await write('admin.desktops.revoke', { grantId })
-      sendJson(res, 200, { action, ok: true })
+      await reply.json(200, { action, ok: true })
       return true
     }
     if (action === 'clear') {
       const node = input.node
       const desktop = input.desktop
       if (typeof node !== 'string' || node === '' || typeof desktop !== 'string' || desktop === '') {
-        sendError(res, 400, 'invalid desktop clear'); return true
+        await reply.error(400, 'invalid desktop clear'); return true
       }
       await deps.desktops.clearUnavailable({ node, desktop }, { userId: admin.id })
       await write('admin.desktops.clear', { node, desktop })
-      sendJson(res, 200, { action, ok: true })
+      await reply.json(200, { action, ok: true })
       return true
     }
-    sendError(res, 400, 'invalid desktop action'); return true
+    await reply.error(400, 'invalid desktop action'); return true
   }
 
+  const personalDocumentMigration = /^\/admin\/api\/documents\/personal\/([1-9][0-9]*)\/migration$/u.exec(pathname)
+  if (personalDocumentMigration) {
+    const service = deps.documents?.personalHistory
+    const node = deps.nodeServiceIdentity?.nodeId
+    res.setHeader('cache-control', 'no-store')
+    if (!service || !node) {
+      await reply.error(503, 'document-migration-unavailable')
+      return true
+    }
+    const params = new URL(req.url ?? '/', 'http://gateway').searchParams
+    const selected = params.getAll('dshNode')
+    const user = Number(personalDocumentMigration[1])
+    if (!Number.isSafeInteger(user) || selected.length !== 1 || selected[0] !== node || params.has('dshRuntime')) {
+      await reply.error(409, 'document-migration-target-conflict')
+      return true
+    }
+    if (method === 'GET') {
+      if (params.getAll('maxRows').length > 1 || params.getAll('maxBytes').length > 1) {
+        await reply.error(400, 'DOCUMENT_MIGRATION_INPUT')
+        return true
+      }
+      const maxRows = Number(params.get('maxRows') ?? 10000)
+      const maxBytes = Number(params.get('maxBytes') ?? 32 * 1024 * 1024)
+      await reply.json(200, await service.preflight(admin.id, user, { nodeId: node, maxRows, maxBytes }))
+    } else if (method === 'POST') {
+      const request = parseObject(body)
+      if (request.nodeId !== node) {
+        await reply.error(409, 'document-migration-target-conflict')
+        return true
+      }
+      await reply.json(200, await service.publish(admin.id, user, request))
+    } else {
+      await reply.error(405, 'method-not-allowed')
+    }
+    return true
+  }
   if (pathname === '/admin/api/documents' && method === 'GET') {
-    if (deps.documents === undefined) { sendError(res, 503, 'document-catalog-unavailable'); return true }
+    if (deps.documents === undefined) { await reply.error(503, 'document-catalog-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams
     const scopeKind = query.get('scope')
     const state = query.get('state')
@@ -996,17 +1158,17 @@ async function dispatch(
       const number = Number(value)
       return Number.isSafeInteger(number) && number > 0 ? number : undefined
     }
-    if (scopeKind !== null && scopeKind !== 'personal' && scopeKind !== 'project') { sendError(res, 400, 'invalid scope'); return true }
-    if (state !== null && state !== 'active' && state !== 'trash' && state !== 'purged' && state !== 'missing' && state !== 'deleted' && state !== 'all') { sendError(res, 400, 'invalid state'); return true }
+    if (scopeKind !== null && scopeKind !== 'personal' && scopeKind !== 'project') { await reply.error(400, 'invalid scope'); return true }
+    if (state !== null && state !== 'active' && state !== 'trash' && state !== 'purged' && state !== 'missing' && state !== 'deleted' && state !== 'all') { await reply.error(400, 'invalid state'); return true }
     const project = positive(projectId); const owner = positive(ownerUserId)
     const requestedLimit = positive(limit)
     const requestedOffset = offset === null ? undefined : Number(offset)
-    if (cursor !== null && (cursor === '' || cursor.length > 4096)) { sendError(res, 400, 'invalid document cursor'); return true }
-    if (search !== null && search.length > 255) { sendError(res, 400, 'invalid document search'); return true }
+    if (cursor !== null && (cursor === '' || cursor.length > 4096)) { await reply.error(400, 'invalid document cursor'); return true }
+    if (search !== null && search.length > 255) { await reply.error(400, 'invalid document search'); return true }
     if ((projectId !== null && project === undefined) || (ownerUserId !== null && owner === undefined)
       || (limit !== null && requestedLimit === undefined)
       || (offset !== null && (requestedOffset === undefined || !Number.isSafeInteger(requestedOffset) || requestedOffset < 0))) {
-      sendError(res, 400, 'invalid document filter'); return true
+      await reply.error(400, 'invalid document filter'); return true
     }
     const filter: DocumentCatalogAdminFilter = {
       ...(scopeKind === null ? {} : { scopeKind }), ...(project === undefined ? {} : { projectId: project }),
@@ -1017,9 +1179,9 @@ async function dispatch(
       ...(cursor === null ? {} : { cursor }),
     }
     if (deps.documents.adminListPage !== undefined && (cursor !== null || limit !== null)) {
-      sendJson(res, 200, await deps.documents.adminListPage(filter))
+      await reply.json(200, await deps.documents.adminListPage(filter,admin.id))
     } else {
-      sendJson(res, 200, await deps.documents.adminList(filter))
+      await reply.json(200, await deps.documents.adminList(filter,admin.id))
     }
     await write('admin.documents.list', {
       filter: { ...filter, query: filter.query === undefined ? undefined : '[provided]' },
@@ -1028,19 +1190,19 @@ async function dispatch(
   }
 
   if (pathname === '/admin/api/documents/actions' && method === 'POST') {
-    if (deps.documents === undefined) { sendError(res, 503, 'document-catalog-unavailable'); return true }
+    if (deps.documents === undefined) { await reply.error(503, 'document-catalog-unavailable'); return true }
     const input = parseObject(body)
     const action = input.action
     const ids = input.ids
     if ((action !== 'trash' && action !== 'restore' && action !== 'purge')
       || !Array.isArray(ids) || ids.length === 0 || ids.length > 100
       || !ids.every(id => typeof id === 'string' && /^[0-9a-f-]{36}$/iu.test(id))) {
-      sendError(res, 400, 'invalid document action'); return true
+      await reply.error(400, 'invalid document action'); return true
     }
     const results: Array<{ catalogId: string; ok: boolean; error?: string }> = []
     for (const catalogId of ids as string[]) {
       try {
-        const target = deps.documents.target === undefined ? null : await deps.documents.target(catalogId)
+        const target = deps.documents.target === undefined ? null : await deps.documents.target(catalogId,admin.id)
         if (documentAdmin !== undefined && target === null) throw new Error('document not found')
         if (target !== null && action === 'trash' && target.state === 'purged') {
           throw new DocumentCatalogError('DOCUMENT_NOT_FOUND', 404, 'Document metadata was permanently cleaned.')
@@ -1094,26 +1256,26 @@ async function dispatch(
       }
     }
     await write(`admin.documents.${action}`, { count: ids.length, succeeded: results.filter(item => item.ok).length })
-    sendJson(res, 200, { action, results })
+    await reply.json(200, { action, results })
     return true
   }
 
   const documentPath = /^\/admin\/api\/documents\/([^/]+)$/.exec(pathname)
   if (documentPath !== null) {
-    if (deps.documents === undefined) { sendError(res, 503, 'document-catalog-unavailable'); return true }
+    if (deps.documents === undefined) { await reply.error(503, 'document-catalog-unavailable'); return true }
     const catalogId = decodeURIComponent(documentPath[1] ?? '')
-    if (!/^[0-9a-f-]{36}$/iu.test(catalogId)) { sendError(res, 400, 'invalid document id'); return true }
+    if (!/^[0-9a-f-]{36}$/iu.test(catalogId)) { await reply.error(400, 'invalid document id'); return true }
     if (method === 'GET') {
-      const detail = await deps.documents.detail(catalogId)
-      if (detail === null) { sendError(res, 404, 'document not found'); return true }
-      sendJson(res, 200, detail)
+      const detail = await deps.documents.detail(catalogId,admin.id)
+      if (detail === null) { await reply.error(404, 'document not found'); return true }
+      await reply.json(200, detail)
       await write('admin.documents.view', { catalogId })
       return true
     }
     if (method === 'DELETE') {
       if (documentAdmin !== undefined) {
-        const target = deps.documents.target === undefined ? null : await deps.documents.target(catalogId)
-        if (target === null) { sendError(res, 404, 'document not found'); return true }
+        const target = deps.documents.target === undefined ? null : await deps.documents.target(catalogId,admin.id)
+        if (target === null) { await reply.error(404, 'document not found'); return true }
         if (target.state !== 'trash') {
           const response = await documentAdmin({
             user: admin,
@@ -1125,7 +1287,7 @@ async function dispatch(
             action: 'trash',
             signal: new AbortController().signal,
           })
-          if (!response.ok) { sendError(res, response.status, 'document runtime unavailable'); return true }
+          if (!response.ok) { await reply.error(response.status, 'document runtime unavailable'); return true }
         }
       }
       await deps.documents.adminDelete(admin.id, catalogId)
@@ -1138,13 +1300,13 @@ async function dispatch(
 
   const documentOwnership = /^\/admin\/api\/documents\/([^/]+)\/ownership$/.exec(pathname)
   if (documentOwnership !== null) {
-    if (deps.documents === undefined) { sendError(res, 503, 'document-catalog-unavailable'); return true }
+    if (deps.documents === undefined) { await reply.error(503, 'document-catalog-unavailable'); return true }
     if (method !== 'POST') return false
     const catalogId = decodeURIComponent(documentOwnership[1] ?? '')
     const ownerUserId = parseObject(body).ownerUserId
     if (!/^[0-9a-f-]{36}$/iu.test(catalogId) || typeof ownerUserId !== 'number'
       || !Number.isSafeInteger(ownerUserId) || ownerUserId <= 0) {
-      sendError(res, 400, 'invalid ownership request'); return true
+      await reply.error(400, 'invalid ownership request'); return true
     }
     await deps.documents.transferOwnership(admin.id, catalogId, ownerUserId)
     await write('admin.documents.ownership-transfer', { catalogId, ownerUserId })
@@ -1179,22 +1341,22 @@ async function dispatch(
   }
 
   if (pathname === '/admin/api/users') {
-    if (method === 'GET') { sendJson(res, 200, await deps.users.list()); return true }
+    if (method === 'GET') { await reply.json(200, await deps.users.list()); return true }
     if (method === 'POST') {
       const input = parseObject(body)
       const username = str(input, 'username')
       const password = str(input, 'password')
-      if (username === undefined || password === undefined) { sendError(res, 400, 'username and password required'); return true }
+      if (username === undefined || password === undefined) { await reply.error(400, 'username and password required'); return true }
       const rawRole = str(input, 'role')
       if (Object.hasOwn(input, 'role') && rawRole !== 'admin' && rawRole !== 'user') {
-        sendError(res, 400, 'invalid role')
+        await reply.error(400, 'invalid role')
         return true
       }
       const role = rawRole === 'admin' ? 'admin' as const : 'user' as const
       const displayName = str(input, 'displayName')
       const user = await deps.users.create({ username, password, role, displayName }, admin.id)
       await write('admin.users', { username, role })
-      sendJson(res, 200, user)
+      await reply.json(200, user)
       return true
     }
     return false
@@ -1206,7 +1368,7 @@ async function dispatch(
     const userId = Number(userInstance[1])
     const op = userInstance[2] as 'start' | 'stop' | 'restart'
     const target = await deps.users.getById(userId)
-    if (target === null) { sendError(res, 404, 'user not found'); return true }
+    if (target === null) { await reply.error(404, 'user not found'); return true }
     const address = await selectedAdminRuntime(deps, admin, req, { kind: 'user', id: userId })
     const subject = { ...target, ...(address.runtimeId === undefined ? {} : { runtimeId: address.runtimeId }) }
     if (op === 'stop') await deps.instances.stop(address.runtimeId === undefined ? userId : address, 'manual', admin.id)
@@ -1224,9 +1386,9 @@ async function dispatch(
   if (userPassword !== null) {
     if (method !== 'POST') return false
     const userId = Number(userPassword[1])
-    if (await deps.users.getById(userId) === null) { sendError(res, 404, 'user not found'); return true }
+    if (await deps.users.getById(userId) === null) { await reply.error(404, 'user not found'); return true }
     const password = str(parseObject(body), 'password')
-    if (password === undefined) { sendError(res, 400, 'password required'); return true }
+    if (password === undefined) { await reply.error(400, 'password required'); return true }
     await deps.users.resetPassword(userId, password, admin.id)
     invalidateAccess?.({ userId })
     await write('admin.users.reset-password', { id: userId })
@@ -1238,9 +1400,9 @@ async function dispatch(
   if (userMemberships !== null) {
     if (method !== 'GET') return false
     const userId = Number(userMemberships[1])
-    if (await deps.users.getById(userId) === null) { sendError(res, 404, 'user not found'); return true }
-    if (deps.projects.membershipsFor === undefined) { sendError(res, 503, 'membership listing unavailable'); return true }
-    sendJson(res, 200, { memberships: await deps.projects.membershipsFor(userId) })
+    if (await deps.users.getById(userId) === null) { await reply.error(404, 'user not found'); return true }
+    if (deps.projects.membershipsFor === undefined) { await reply.error(503, 'membership listing unavailable'); return true }
+    await reply.json(200, { memberships: await deps.projects.membershipsFor(userId) })
     return true
   }
 
@@ -1248,11 +1410,11 @@ async function dispatch(
   if (userIdPath !== null) {
     const userId = Number(userIdPath[1])
     const target = await deps.users.getById(userId)
-    if (target === null) { sendError(res, 404, 'user not found'); return true }
+    if (target === null) { await reply.error(404, 'user not found'); return true }
     if (method === 'GET') {
       const listed = await deps.users.getListedById(userId)
-      if (listed === null) { sendError(res, 404, 'user not found'); return true }
-      sendJson(res, 200, listed)
+      if (listed === null) { await reply.error(404, 'user not found'); return true }
+      await reply.json(200, listed)
       return true
     }
     if (method === 'DELETE') {
@@ -1263,7 +1425,7 @@ async function dispatch(
       const remove = (index: number): Promise<boolean> => index === targets.length ? Promise.resolve(deps.users.remove(userId, admin.id))
         : deps.instances.withStopped(targets[index]!, () => remove(index + 1), admin.id)
       const removed = await remove(0)
-      if (!removed) { sendError(res, 404, 'user not found'); return true }
+      if (!removed) { await reply.error(404, 'user not found'); return true }
       invalidateAccess?.({ userId })
       await write('admin.users.delete', { id: userId, username: target.username })
       sendNoContent(res)
@@ -1276,13 +1438,13 @@ async function dispatch(
     const status = str(input, 'status')
     const autoReviewEligible = input.autoReviewEligible
     if (Object.hasOwn(input, 'autoReviewEligible') && typeof autoReviewEligible !== 'boolean') {
-      sendError(res, 400, 'invalid autoReviewEligible'); return true
+      await reply.error(400, 'invalid autoReviewEligible'); return true
     }
     if (autoReviewEligible !== undefined && deps.users.patch === undefined) {
-      sendError(res, 503, 'user-eligibility-update-unavailable'); return true
+      await reply.error(503, 'user-eligibility-update-unavailable'); return true
     }
-    if (role !== undefined && role !== 'admin' && role !== 'user') { sendError(res, 400, 'invalid role'); return true }
-    if (status !== undefined && status !== 'active' && status !== 'disabled') { sendError(res, 400, 'invalid status'); return true }
+    if (role !== undefined && role !== 'admin' && role !== 'user') { await reply.error(400, 'invalid role'); return true }
+    if (status !== undefined && status !== 'active' && status !== 'disabled') { await reply.error(400, 'invalid status'); return true }
     if (deps.users.patch !== undefined) {
       await deps.users.patch(userId, {
         ...(role === undefined ? {} : { role }),
@@ -1334,12 +1496,12 @@ async function dispatch(
   }
 
   if (pathname === '/admin/api/models') {
-    if (deps.governance === undefined) { sendError(res, 503, 'model governance unavailable'); return true }
-    if (method === 'GET') { sendJson(res, 200, await deps.governance.listModels()); return true }
+    if (deps.governance === undefined) { await reply.error(503, 'model governance unavailable'); return true }
+    if (method === 'GET') { await reply.json(200, await deps.governance.listModels()); return true }
     if (method === 'PUT') {
       const input = parseObject(body)
       const provider = str(input, 'provider'); const model = str(input, 'model'); const displayName = str(input, 'displayName')
-      if (provider === undefined || model === undefined || displayName === undefined) { sendError(res, 400, 'provider, model and displayName required'); return true }
+      if (provider === undefined || model === undefined || displayName === undefined) { await reply.error(400, 'provider, model and displayName required'); return true }
       const bool = (key: string, fallback: boolean): boolean => {
         const value = input[key]
         if (value === undefined) return fallback
@@ -1368,16 +1530,16 @@ async function dispatch(
   }
 
   if (pathname === '/admin/api/model-settings') {
-    if (deps.governance === undefined) { sendError(res, 503, 'model governance unavailable'); return true }
+    if (deps.governance === undefined) { await reply.error(503, 'model governance unavailable'); return true }
     if (method === 'GET') {
-      sendJson(res, 200, await deps.governance.describeOrganizationModelSettings())
+      await reply.json(200, await deps.governance.describeOrganizationModelSettings())
       return true
     }
     if (method === 'PUT') {
       const input = parseObject(body)
       const expectedRevision = input.expectedRevision
       if (expectedRevision !== undefined && (typeof expectedRevision !== 'number' || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0)) {
-        sendError(res, 400, 'expectedRevision must be a non-negative safe integer')
+        await reply.error(400, 'expectedRevision must be a non-negative safe integer')
         return true
       }
       const view = await deps.governance.mutateOrganizationModelSettings(
@@ -1387,26 +1549,26 @@ async function dispatch(
       )
       await refreshModelPolicies()
       await write('admin.model-settings.mutate', { opCount: (input.ops as unknown[]).length })
-      sendJson(res, 200, view)
+      await reply.json(200, view)
       return true
     }
     return false
   }
 
   if (pathname === '/admin/api/model-settings/credentials') {
-    if (deps.governance === undefined) { sendError(res, 503, 'model governance unavailable'); return true }
+    if (deps.governance === undefined) { await reply.error(503, 'model governance unavailable'); return true }
     const query = new URL(req.url ?? '/', 'http://x').searchParams
     const queryRefs = query.getAll('refs').flatMap(value => value.split(',')).map(value => value.trim()).filter(value => value !== '')
     if (method === 'GET') {
-      sendJson(res, 200, { credentials: await deps.governance.describeOrganizationCredentials([...new Set(queryRefs)]) })
+      await reply.json(200, { credentials: await deps.governance.describeOrganizationCredentials([...new Set(queryRefs)]) })
       return true
     }
     const input = parseObject(body)
     const ref = str(input, 'ref') ?? query.get('ref') ?? undefined
-    if (ref === undefined) { sendError(res, 400, 'ref required'); return true }
+    if (ref === undefined) { await reply.error(400, 'ref required'); return true }
     if (method === 'PUT') {
       const value = str(input, 'value')
-      if (value === undefined) { sendError(res, 400, 'value required'); return true }
+      if (value === undefined) { await reply.error(400, 'value required'); return true }
       await deps.governance.setOrganizationCredential(ref, value, admin.id)
       await refreshModelPolicies()
       await write('admin.model-settings.credential.set', { ref })
@@ -1430,7 +1592,7 @@ async function dispatch(
     const baseURL = str(input, 'baseURL')
     const api = str(input, 'api')
     const apiKey = str(input, 'apiKey')
-    sendJson(res, 200, {
+    await reply.readJson(200, {
       models: await deps.governance.discoverOrganizationModels({
         actorUserId: admin.id,
         ...provider === undefined ? {} : { provider },
@@ -1443,8 +1605,8 @@ async function dispatch(
   }
 
   if (pathname === '/admin/api/model-providers') {
-    if (deps.governance === undefined) { sendError(res, 503, 'model governance unavailable'); return true }
-    if (method === 'GET') { sendJson(res, 200, await deps.governance.listProviders()); return true }
+    if (deps.governance === undefined) { await reply.error(503, 'model governance unavailable'); return true }
+    if (method === 'GET') { await reply.json(200, await deps.governance.listProviders()); return true }
     if (method === 'PUT') {
       const input = parseObject(body)
       const provider = str(input, 'provider')
@@ -1461,18 +1623,18 @@ async function dispatch(
         || baseURL === undefined || (authMode !== 'api-key' && authMode !== 'none')
         || (status !== 'draft' && status !== 'enabled' && status !== 'disabled' && status !== 'archived')
         || (credential !== undefined && credential !== null && typeof credential !== 'string')) {
-        sendError(res, 400, 'valid provider, displayName, driver, protocol, baseURL, authMode and status required')
+        await reply.error(400, 'valid provider, displayName, driver, protocol, baseURL, authMode and status required')
         return true
       }
       if (!ORGANIZATION_PROVIDER_PATTERN.test(provider)) {
-        sendError(res, 400, 'organization provider must use an org- prefix and lowercase letters, digits, and single hyphens')
+        await reply.error(400, 'organization provider must use an org- prefix and lowercase letters, digits, and single hyphens')
         return true
       }
       // Provider profiles (including their model lists) are written through
       // /admin/api/model-settings; forwarding one here would desynchronize the
       // section from the catalog this route's sibling endpoints maintain.
       if (input.profile !== undefined) {
-        sendError(res, 400, 'provider profile is managed through /admin/api/model-settings')
+        await reply.error(400, 'provider profile is managed through /admin/api/model-settings')
         return true
       }
       await deps.governance.upsertProvider({
@@ -1494,20 +1656,20 @@ async function dispatch(
   }
 
   if (pathname === '/admin/api/model-access') {
-    if (deps.governance === undefined) { sendError(res, 503, 'model governance unavailable'); return true }
+    if (deps.governance === undefined) { await reply.error(503, 'model governance unavailable'); return true }
     const query = new URL(req.url ?? '/', 'http://x').searchParams
     if (method === 'GET') {
       const userId = positiveId(query.get('userId'))
-      if (userId === null) { sendError(res, 400, 'invalid userId'); return true }
+      if (userId === null) { await reply.error(400, 'invalid userId'); return true }
       const target = await deps.users.getById(userId)
-      if (target === null) { sendError(res, 404, 'user not found'); return true }
+      if (target === null) { await reply.error(404, 'user not found'); return true }
       let effective: RuntimeModelPolicy
       if (target.status === 'active') effective = await deps.governance.policyFor(target)
       else {
-        if (deps.governance.configurationRevision === undefined) { sendError(res, 503, 'model-policy-revision-unavailable'); return true }
+        if (deps.governance.configurationRevision === undefined) { await reply.error(503, 'model-policy-revision-unavailable'); return true }
         effective = { version: await deps.governance.configurationRevision(), defaultAllowed: false, models: [], providers: [] }
       }
-      sendJson(res, 200, {
+      await reply.json(200, {
         effective,
         overrides: await deps.governance.userOverrides(userId),
       }); return true
@@ -1516,9 +1678,9 @@ async function dispatch(
       const input = parseObject(body); const userId = Number(input.userId); const provider = str(input, 'provider'); const model = str(input, 'model')
       const allowed = input.allowed
       if (!Number.isSafeInteger(userId) || provider === undefined || model === undefined || (allowed !== null && typeof allowed !== 'boolean')) {
-        sendError(res, 400, 'userId, provider, model and boolean|null allowed required'); return true
+        await reply.error(400, 'userId, provider, model and boolean|null allowed required'); return true
       }
-      if (await deps.users.getById(userId) === null) { sendError(res, 404, 'user not found'); return true }
+      if (await deps.users.getById(userId) === null) { await reply.error(404, 'user not found'); return true }
       await deps.governance.setUserAccess(userId, provider, model, allowed as boolean | null, admin.id)
       await applyModelGovernanceToUser(deps, userId)
       await write('admin.models.user-access', { userId, provider, model, allowed }); sendNoContent(res); return true
@@ -1527,14 +1689,14 @@ async function dispatch(
   }
 
   if (pathname === '/admin/api/project-model-access') {
-    if (deps.governance === undefined) { sendError(res, 503, 'model governance unavailable'); return true }
+    if (deps.governance === undefined) { await reply.error(503, 'model governance unavailable'); return true }
     const query = new URL(req.url ?? '/', 'http://x').searchParams
     if (method === 'GET') {
       const projectId = positiveId(query.get('projectId'))
-      if (projectId === null) { sendError(res, 400, 'invalid projectId'); return true }
+      if (projectId === null) { await reply.error(400, 'invalid projectId'); return true }
       const project = await deps.projects.getById(projectId)
-      if (project === null) { sendError(res, 404, 'project not found'); return true }
-      sendJson(res, 200, {
+      if (project === null) { await reply.error(404, 'project not found'); return true }
+      await reply.json(200, {
         effective: await deps.governance.policyForProject(projectId),
         projectDefaultAllowed: project.modelAccessDefaultAllowed === true,
         overrides: await deps.governance.projectOverrides(projectId),
@@ -1546,14 +1708,14 @@ async function dispatch(
       const projectId = Number(input.projectId)
       const allowed = input.allowed
       if (!Number.isSafeInteger(projectId) || (allowed !== null && typeof allowed !== 'boolean')) {
-        sendError(res, 400, 'projectId and boolean|null allowed required')
+        await reply.error(400, 'projectId and boolean|null allowed required')
         return true
       }
-      if (await deps.projects.getById(projectId) === null) { sendError(res, 404, 'project not found'); return true }
+      if (await deps.projects.getById(projectId) === null) { await reply.error(404, 'project not found'); return true }
       if (input.all === true) {
         if (Object.hasOwn(input, 'provider') || Object.hasOwn(input, 'model')
           || (allowed !== true && allowed !== null)) {
-          sendError(res, 400, 'all assignment takes only projectId and true|null allowed')
+          await reply.error(400, 'all assignment takes only projectId and true|null allowed')
           return true
         }
         await deps.governance.setAllProjectAccess(projectId, allowed, admin.id)
@@ -1565,7 +1727,7 @@ async function dispatch(
       const provider = str(input, 'provider')
       const model = str(input, 'model')
       if (provider === undefined || model === undefined) {
-        sendError(res, 400, 'projectId, provider, model and boolean|null allowed required')
+        await reply.error(400, 'projectId, provider, model and boolean|null allowed required')
         return true
       }
       await deps.governance.setProjectAccess(projectId, provider, model, allowed as boolean | null, admin.id)
@@ -1584,27 +1746,27 @@ async function dispatch(
       const subjectType = query.get('subjectType')
       const subjectId = query.get('subjectId')
       if (subjectType === 'user') {
-        if (deps.governance.userQuota === undefined) { sendError(res, 503, 'user quota read unavailable'); return true }
-        if (subjectId === null) { sendError(res, 400, 'user quota subject required'); return true }
+        if (deps.governance.userQuota === undefined) { await reply.error(503, 'user quota read unavailable'); return true }
+        if (subjectId === null) { await reply.error(400, 'user quota subject required'); return true }
         const userId = Number(subjectId)
         if (!Number.isSafeInteger(userId) || userId <= 0 || await deps.users.getById(userId) === null) {
-          sendError(res, 404, 'user not found'); return true
+          await reply.error(404, 'user not found'); return true
         }
-        sendJson(res, 200, await deps.governance.userQuota(userId))
+        await reply.json(200, await deps.governance.userQuota(userId))
         return true
       }
       if (subjectType === 'role') {
-        if (deps.governance.roleQuota === undefined) { sendError(res, 503, 'role quota read unavailable'); return true }
-        if (subjectId !== 'admin' && subjectId !== 'user') { sendError(res, 400, 'invalid quota role'); return true }
-        sendJson(res, 200, await deps.governance.roleQuota(subjectId))
+        if (deps.governance.roleQuota === undefined) { await reply.error(503, 'role quota read unavailable'); return true }
+        if (subjectId !== 'admin' && subjectId !== 'user') { await reply.error(400, 'invalid quota role'); return true }
+        await reply.json(200, await deps.governance.roleQuota(subjectId))
         return true
       }
-      sendError(res, 400, 'invalid quota subject'); return true
+      await reply.error(400, 'invalid quota subject'); return true
     }
     if (method !== 'PUT') return false
     const input = parseObject(body); const subjectType = str(input, 'subjectType'); const subjectId = str(input, 'subjectId')
     if ((subjectType !== 'role' && subjectType !== 'user' && subjectType !== 'project') || subjectId === undefined) {
-      sendError(res, 400, 'invalid quota subject'); return true
+      await reply.error(400, 'invalid quota subject'); return true
     }
     const nullable = (key: string): number | null | 'inherit' => {
       if (!Object.hasOwn(input, key)) throw new Error(`${key} required`)
@@ -1627,30 +1789,30 @@ async function dispatch(
     const requestedProject = query.get('projectId')
     if (requestedProject !== null) {
       const projectId = positiveId(requestedProject)
-      if (projectId === null) { sendError(res, 400, 'invalid projectId'); return true }
-      if (await deps.projects.getById(projectId) === null) { sendError(res, 404, 'project not found'); return true }
-      sendJson(res, 200, await deps.governance.summary({ kind: 'project', id: projectId }, month)); return true
+      if (projectId === null) { await reply.error(400, 'invalid projectId'); return true }
+      if (await deps.projects.getById(projectId) === null) { await reply.error(404, 'project not found'); return true }
+      await reply.json(200, await deps.governance.summary({ kind: 'project', id: projectId }, month)); return true
     }
     const requested = query.get('userId')
     if (requested !== null) {
       const userId = positiveId(requested)
-      if (userId === null) { sendError(res, 400, 'invalid userId'); return true }
-      if (await deps.users.getById(userId) === null) { sendError(res, 404, 'user not found'); return true }
-      sendJson(res, 200, await deps.governance.summary({ kind: 'user', id: userId }, month)); return true
+      if (userId === null) { await reply.error(400, 'invalid userId'); return true }
+      if (await deps.users.getById(userId) === null) { await reply.error(404, 'user not found'); return true }
+      await reply.json(200, await deps.governance.summary({ kind: 'user', id: userId }, month)); return true
     }
     const summaries = await mapInBatches(await deps.users.list(), ADMIN_USAGE_SUMMARY_CONCURRENCY, async user => ({
       userId: user.id,
       username: user.username,
       ...await deps.governance!.summary({ kind: 'user', id: user.id }, month),
     }))
-    sendJson(res, 200, summaries)
+    await reply.json(200, summaries)
     return true
   }
 
   if (pathname === '/admin/api/usage/overview') {
     if (deps.governance?.usageOverview === undefined || method !== 'GET') return false
     const month = new URL(req.url ?? '/', 'http://x').searchParams.get('month') ?? undefined
-    sendJson(res, 200, await deps.governance.usageOverview(month))
+    await reply.json(200, await deps.governance.usageOverview(month))
     return true
   }
 
@@ -1662,17 +1824,17 @@ async function dispatch(
     if (rawProject !== null) {
       projectId = Number(rawProject)
       if (!Number.isSafeInteger(projectId) || projectId <= 0) throw new Error('projectId must be a positive safe integer')
-      if (await deps.projects.getById(projectId) === null) { sendError(res, 404, 'project not found'); return true }
+      if (await deps.projects.getById(projectId) === null) { await reply.error(404, 'project not found'); return true }
     }
     const month = query.get('month') ?? undefined
-    sendJson(res, 200, await deps.governance.usageContributors(month, projectId))
+    await reply.json(200, await deps.governance.usageContributors(month, projectId))
     return true
   }
 
   if (pathname === '/admin/api/usage/health') {
     if (deps.governance?.usageHealth === undefined || method !== 'GET') return false
     const month = new URL(req.url ?? '/', 'http://x').searchParams.get('month') ?? undefined
-    sendJson(res, 200, await deps.governance.usageHealth(month))
+    await reply.json(200, await deps.governance.usageHealth(month))
     return true
   }
 
@@ -1705,7 +1867,7 @@ async function dispatch(
       ...to === undefined ? {} : { toMs: to },
       offset: integer('offset'), limit: integer('limit'),
     }
-    sendJson(res, 200, await deps.governance.registrationReport(filter))
+    await reply.json(200, await deps.governance.registrationReport(filter))
     return true
   }
 
@@ -1713,7 +1875,7 @@ async function dispatch(
     if (method !== 'GET') return false
     const requestedPath = new URL(req.url ?? '/', 'http://x').searchParams.get('path') ?? undefined
     const [projects, users] = await Promise.all([deps.projects.list(), deps.users.list()])
-    sendJson(res, 200, listProjectDirectories(
+    await reply.json(200, listProjectDirectories(
       deps.cfg,
       requestedPath,
       [...projects.map(project => project.path), ...users.map(user => user.homePath)],
@@ -1724,19 +1886,20 @@ async function dispatch(
   if (pathname === '/admin/api/projects') {
     if (method === 'GET') {
       const source = new URL(req.url ?? '/', 'http://x').searchParams.get('origin')
-      if (source !== null && source !== 'admin' && source !== 'user') { sendError(res, 400, 'invalid origin'); return true }
-      const projects = await deps.projects.list()
-      sendJson(res, 200, source === null ? projects : projects.filter(project => project.origin === source))
+      if (source !== null && source !== 'admin' && source !== 'user') { await reply.error(400, 'invalid origin'); return true }
+      const directory = new URL(req.url ?? '/', 'http://x').searchParams.get('display') === 'directory'
+      const projects = directory ? await deps.projects.list('directory') : await deps.projects.list()
+      await reply.json(200, source === null ? projects : projects.filter(project => project.origin === source))
       return true
     }
     if (method === 'POST') {
       const input = parseObject(body)
       const name = str(input, 'name')
       const path = str(input, 'path')
-      if (name === undefined) { sendError(res, 400, 'name required'); return true }
-      const project = await deps.projects.create({ name, path, createdBy: admin.id, actorUserId: admin.id })
-      await write('admin.projects.create', { id: project.id, name, path: project.path })
-      sendJson(res, 200, project)
+      if (name === undefined) { await reply.error(400, 'name required'); return true }
+      const project = await deps.projects.create({ name, path, createdBy: admin.id, actorUserId: admin.id }, deps.projectNames?.forRequest(req,admin))
+      await write('admin.projects.create', { id: project.id })
+      await reply.json(200, project)
       return true
     }
     return false
@@ -1746,11 +1909,11 @@ async function dispatch(
   if (member !== null) {
     const projectId = Number(member[1])
     const userId = Number(member[2])
-    if (await deps.projects.getById(projectId) === null) { sendError(res, 404, 'project not found'); return true }
-    if (await deps.users.getById(userId) === null) { sendError(res, 404, 'user not found'); return true }
+    if (await deps.projects.getById(projectId) === null) { await reply.error(404, 'project not found'); return true }
+    if (await deps.users.getById(userId) === null) { await reply.error(404, 'user not found'); return true }
     if (method === 'PUT') {
       const mode = str(parseObject(body), 'mode')
-      if (mode !== 'ro' && mode !== 'rw') { sendError(res, 400, 'invalid mode'); return true }
+      if (mode !== 'ro' && mode !== 'rw') { await reply.error(400, 'invalid mode'); return true }
       await deps.projects.setMember(projectId, userId, mode as GrantMode, admin.id)
       invalidateAccess?.({ userId })
       await write('admin.members.set', { projectId, userId, mode })
@@ -1775,7 +1938,7 @@ async function dispatch(
     const projectId = Number(projectInstance[1])
     const op = projectInstance[2] as 'start' | 'stop' | 'restart'
     const project = await deps.projects.getById(projectId)
-    if (project === null) { sendError(res, 404, 'project not found'); return true }
+    if (project === null) { await reply.error(404, 'project not found'); return true }
     const target = { kind: 'project' as const, id: projectId }
     if (op !== 'start') await deps.instances.stop(target, 'manual', admin.id)
     if (op !== 'stop') await deps.instances.ensureRunning({ kind: 'project', id: project.id, name: project.name, path: project.path, steward: project.kind === 'steward' }, 'explicit', admin.id)
@@ -1787,8 +1950,9 @@ async function dispatch(
   const projectIdPath = /^\/admin\/api\/projects\/(\d+)$/.exec(pathname)
   if (projectIdPath !== null) {
     const projectId = Number(projectIdPath[1])
-    const project = await deps.projects.getById(projectId)
-    if (project === null) { sendError(res, 404, 'project not found'); return true }
+    const directory = method === 'GET' && new URL(req.url ?? '/', 'http://x').searchParams.get('display') === 'directory'
+    const project = directory ? await deps.projects.getById(projectId, 'directory') : await deps.projects.getById(projectId)
+    if (project === null) { await reply.error(404, 'project not found'); return true }
     if (method === 'GET') {
       const target = { kind: 'project' as const, id: projectId }
       let runtimeState = 'unavailable'
@@ -1814,7 +1978,7 @@ async function dispatch(
           // model-control dependency.
         }
       }
-      sendJson(res, 200, {
+      await reply.json(200, {
         ...project,
         quota: deps.governance === undefined
           ? { source: 'inherit', tokenLimit: null, companyCostMicrosLimit: null }
@@ -1832,9 +1996,9 @@ async function dispatch(
     }
     if (method === 'PATCH') {
       const name = str(parseObject(body), 'name')
-      if (name === undefined) { sendError(res, 400, 'name required'); return true }
-      await deps.projects.rename(projectId, name, admin.id)
-      await write('admin.projects.rename', { id: projectId, name })
+      if (name === undefined) { await reply.error(400, 'name required'); return true }
+      await deps.projects.rename(projectId, name, admin.id, deps.projectNames?.forRequest(req,admin))
+      await write('admin.projects.rename', { id: projectId })
       sendNoContent(res)
       return true
     }
@@ -1901,8 +2065,7 @@ async function dispatch(
       action: r.action, methodPath: r.methodPath, status: r.status, ip: r.ip,
       ...auditSummary(r),
     }))
-    if (total !== undefined) res.setHeader('x-total-count', String(total))
-    sendJson(res, 200, entries)
+    await reply.json(200, entries, total === undefined ? undefined : { 'x-total-count': String(total) })
     return true
   }
 

@@ -9,7 +9,7 @@
  * menu in between; the flow and its error dialog live in WorkspacePicker
  * (same package — direct composition, no slot between them).
  */
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import clsx from 'clsx'
 import {
@@ -1049,6 +1049,30 @@ function SearchResults({
   )
 }
 
+/** Reports only mounted computer sections visible in this sidebar's scroll viewport. */
+function ComputerSection({ id, name, onVisible, children }: {
+  id: string
+  name: string
+  onVisible: (id: string, visible: boolean) => void
+  children: ReactNode
+}) {
+  const section = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const element = section.current
+    if (element === null) return
+    if (typeof IntersectionObserver === 'undefined') {
+      onVisible(id, true)
+      return () => { onVisible(id, false) }
+    }
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) onVisible(id, entry.isIntersecting)
+    })
+    observer.observe(element)
+    return () => { observer.disconnect(); onVisible(id, false) }
+  }, [id, onVisible])
+  return <section ref={section} className={css.computerSection} aria-label={name}>{children}</section>
+}
+
 /**
  * Render the browsing region.
  * @param props - composed slot props (shell owner share + store + injected actions).
@@ -1088,16 +1112,67 @@ export function WorkspaceBrowser({
   closeAddWorkspace,
   setDirectoryBusy,
   dismissForkError,
-  refreshComputers,
+  refreshComputers, loadComputerRows, loadMoreComputers, computerPageConcurrency = 1,
   startRuntimeSession,
 }: WorkspaceBrowserProps) {
   const computerGroups = useWorkspaces(state => state.computerGroups)
   const workspaceRuntimeIds = useWorkspaces(state => state.workspaceRuntimeIds)
+  const moreComputers = useWorkspaces(state => state.moreComputers)
   const directoryState = useWorkspaces(state => state.directoryState)
   const activeComputer = useCurrentSessions(state => state.current === undefined ? undefined : state.byId[state.current]?.runtime?.nodeId)
   const [expandedComputers, setExpandedComputers] = useState<Readonly<Record<string, boolean>>>({})
   const [showAllComputers, setShowAllComputers] = useState(false)
+  const [visibleSections, setVisibleSections] = useState<ReadonlySet<string>>(new Set())
+  const sectionVisibility = useCallback((id: string, visible: boolean) => {
+    setVisibleSections((previous) => {
+      if (previous.has(id) === visible) return previous
+      const next = new Set(previous)
+      if (visible) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }, [])
   const computerRegionId = useId()
+  const computerList = useRef<HTMLDivElement>(null)
+  const pageRequests = useRef(new Map<string, AbortController>())
+  const [failedPages, setFailedPages] = useState<ReadonlySet<string>>(new Set())
+  const loadPage = (target: SessionRuntimeTarget, more = false): void => {
+    const key = target.runtimeId
+    if (loadComputerRows === undefined || key === undefined || pageRequests.current.has(key)) return
+    const guard = new AbortController()
+    pageRequests.current.set(key, guard)
+    void loadComputerRows(target, more, guard.signal).then(() => {
+      if (!guard.signal.aborted) setFailedPages((old) => { const next = new Set(old); next.delete(key); return next })
+    }, () => { if (!guard.signal.aborted) setFailedPages(old => new Set([...old, key])) }).finally(() => {
+      if (pageRequests.current.get(key) === guard) pageRequests.current.delete(key)
+    })
+  }
+  useEffect(() => {
+    const list = computerList.current
+    if (loadComputerRows === undefined || list === null) return
+    const clip = list.getBoundingClientRect()
+    const inScrollport = (id: string): boolean => {
+      if (!visibleSections.has(id)) return false
+      if (typeof IntersectionObserver === 'undefined') return true
+      // Intersection notifications can still describe the previous scroll position on focus.
+      const section = list.ownerDocument.getElementById(`${computerRegionId}-${id}`)?.parentElement
+      const bounds = section?.getBoundingClientRect()
+      return bounds !== undefined && bounds.bottom > Math.max(clip.top, 0)
+        && bounds.top < Math.min(clip.bottom, list.ownerDocument.documentElement.clientHeight)
+    }
+    for (const group of computerGroups ?? []) {
+      const key = group.runtime.runtimeId
+      if (expandedComputers[group.runtime.nodeId] ?? group.runtime.nodeId === activeComputer) {
+        if (group.syncedAt === null && !failedPages.has(key) && pageRequests.current.size < computerPageConcurrency
+          && inScrollport(group.runtime.nodeId)) loadPage(group.runtime)
+      } else {
+        const request = pageRequests.current.get(key)
+        if (request !== undefined) { request.abort(); pageRequests.current.delete(key) }
+      }
+    }
+  }, [computerGroups, expandedComputers, activeComputer, loadComputerRows, failedPages, visibleSections,
+    computerPageConcurrency, computerRegionId])
+  useEffect(() => () => { for (const request of pageRequests.current.values()) request.abort() }, [])
   const pendingRuntime = useRef(new Set<string>())
   const [busyRuntimes, setBusyRuntimes] = useState<ReadonlySet<string>>(new Set())
   const [runtimeWorkspacePicker, setRuntimeWorkspacePicker] = useState<SessionRuntimeTarget | null>(null)
@@ -1483,7 +1558,7 @@ export function WorkspaceBrowser({
       }}>{iconOnly ? <IconPlusOutline16 size={14} /> : label}</button>
     return iconOnly ? <Tooltip label={label} side="right">{button}</Tooltip> : button
   }
-  const renderComputers = (): ReactNode => <div className={css.computerList}>
+  const renderComputers = (): ReactNode => <div className={css.computerList} ref={computerList}>
     <Menu open={runtimeWorkspacePicker !== null && computerGroups?.some(group => group.status === 'active'
       && group.runtime.runtimeId === runtimeWorkspacePicker.runtimeId) === true}
     anchor={null} portal side="right"
@@ -1502,12 +1577,12 @@ export function WorkspaceBrowser({
     {visibleComputers.map((computer) => {
       const expanded = expandedComputers[computer.id] ?? computer.id === activeComputer
       const onlyRuntime = computer.runtimes[0]
-      return <section key={computer.id} className={css.computerSection} aria-label={computer.name}>
+      return <ComputerSection key={computer.id} id={computer.id} name={computer.name} onVisible={sectionVisibility}>
         <div className={css.computerHeader}><button type="button" className={css.computerHeading} aria-expanded={expanded}
           aria-controls={`${computerRegionId}-${computer.id}`} title={computer.name}
           onClick={() => {
             setExpandedComputers(previous => ({ ...previous, [computer.id]: !expanded }))
-            if (!expanded) void refreshComputers?.()
+            if (!expanded && loadComputerRows === undefined) void refreshComputers?.()
           }}>
           <IconChevronRightOutline14 className={expanded ? css.computerExpanded : undefined} size={12} />
           <IconFollowsystemOutline16 size={14} />
@@ -1522,13 +1597,19 @@ export function WorkspaceBrowser({
             {renderRuntimeCreate(group, false)}
           </div>}
           {renderRuntime(group.runtime.runtimeId, group.syncedAt === null && group.items.length === 0)}
+          {failedPages.has(group.runtime.runtimeId) && <button type="button" className={css.moreComputers}
+            onClick={() => { loadPage(group.runtime) }}>{t('computers.retry')}</button>}
+          {(group.conversationsCursor || group.workspacesCursor) && <button type="button" className={css.moreComputers}
+            onClick={() => { loadPage(group.runtime, true) }}>{t('computers.moreRows')}</button>}
         </div>)}</div>}
-      </section>
+      </ComputerSection>
     })}
     {!showAllComputers && normalizedQuery === '' && computers.length > visibleComputers.length
       && <button type="button" className={css.moreComputers} onClick={() => { setShowAllComputers(true) }}>
         {t('computers.showAll', { n: computers.length })}
       </button>}
+    {moreComputers && <button type="button" className={css.moreComputers}
+      onClick={() => { setShowAllComputers(true); void loadMoreComputers?.().catch(() => { void refreshComputers?.() }) }}>{t('computers.more')}</button>}
     {showAllComputers && normalizedQuery === '' && computers.length > 5 && <button type="button" className={css.moreComputers}
       onClick={() => { setShowAllComputers(false) }}>{t('computers.showLess')}</button>}
   </div>

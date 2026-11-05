@@ -58,7 +58,7 @@ export interface ApiProxy {
 export type {
   HistoryDetail, HistoryEntry, HistoryOmittedSpan, ModelCatalogFailure, ModelCatalogModel, ModelProviderGroup, ModelReasoning,
   ModelReasoningEffort, ModelSelection, PromptContentPart, QueueAction, SessionModels,
-  SessionDraftId, SessionHistoryIndex, SessionHistoryIndexItem, SessionListMetadata, SessionProjectionsBlock,
+  SessionDraftId, SessionHistoryIndex, SessionHistoryIndexItem, SessionHistoryPage, SessionListMetadata, SessionProjectionsBlock,
   SessionSearchItem, SessionsApi, SessionSummary,
 } from './sessions.ts'
 export type { DesktopApi, DesktopConfirmation, DesktopStatus } from './desktop.ts'
@@ -107,6 +107,7 @@ export type {
 } from './rpc.ts'
 
 // ---- Errors, ids, and the shared server-request serialization ----
+export { promptInputJson, promptProofJson } from './prompt-wire.ts'
 export { RpcId, serverRequestJson, transportError } from './rpc.ts'
 export type { RpcError, RpcErrorCode, RpcErrorDetailsMap, RpcResult } from './rpc.ts'
 export {

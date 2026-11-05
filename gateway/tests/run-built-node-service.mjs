@@ -18,10 +18,18 @@ import { PostgresNodeAccessService } from '../lib/postgres/node-access-service.j
 import { loadConfig } from '../lib/config.js'
 import { topologyBrowser } from './fixtures/topology-browser.mjs'
 import { computerWorkspaceClient } from './fixtures/computer-workspace-client.mjs'
+import {verifyEarlyClose} from './fixtures/node-service-early-close.mjs'
 
 const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 assert.ok(databaseUrl, 'HGW_TEST_DATABASE_URL must select a disposable test database')
 const pool = createPostgresPool(databaseUrl, { max: 3 })
+const operationsOnly=Boolean(process.env.HGW_TEST_VERSIONED_OPERATIONS)
+if(operationsOnly){
+  const marker=process.env.HGW_TEST_OWNED_OPERATIONS_DATABASE
+  const owned=await pool.query(`SELECT current_database()='hgw_governance_test' AND shobj_description(oid,'pg_database')=$1 AS authorized
+    FROM pg_database WHERE datname=current_database()`,[marker??null])
+  if(!marker||owned.rows[0]?.authorized!==true){await pool.end();throw new Error('Real execution inputs require the private --operations cluster lifecycle.')}
+}
 const { InProcessApiClient } = await import(createRequire(new URL('../../packages/host/apiproxy/package.json', import.meta.url))
   .resolve('@deepseek-ai/dsh-host-apiproxy/client'))
 await runMigrations(pool, fileURLToPath(new URL('../deploy/postgres/migrations', import.meta.url)))
@@ -119,7 +127,8 @@ async function uploadDocument(base, cookie, nodeId, name, bytes, diagnostics) {
   assert.equal(result.state, 'complete', JSON.stringify(result)); return result.ref
 }
 
-try {
+async function verify(){
+  await verifyEarlyClose()
   await pool.query("INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'center')", [organization])
   const context = await resolvePostgresRuntimeContext(pool, slug, 'center')
   await enableFixtureTopology(context)
@@ -149,6 +158,18 @@ try {
   assert.equal(directory.status, 200)
   const environment = (await directory.json()).items.find(item => item.owner.id === b.userId && item.node.id === b.nodeId)
   assert.ok(environment)
+  if(operationsOnly){
+    const {verifyVersionedNodeService}=await import('./fixtures/versioned-node-service.mjs')
+    const localCookie=await login(a.base,'center-owner')
+    const localDirectory=await fetch(a.base+'/account/api/runtimes',{headers:{cookie:localCookie}})
+    assert.equal(localDirectory.status,200)
+    const localEnvironment=(await localDirectory.json()).items.find(item=>item.owner.id===a.userId&&item.node.id===a.nodeId)
+    assert.ok(localEnvironment)
+    await verifyVersionedNodeService({pool,org:organization,base:a.base,secondary:b.base,
+      local:{id:localEnvironment.id,node:a.nodeId,cookie:localCookie},remote:{id:environment.id,node:b.nodeId,cookie},
+      count:Number(process.env.HGW_TEST_VERSIONED_OPERATIONS)})
+    return
+  }
   transcript.push('One center login discovers the account runtime on computer B.')
   const address = `/?dshRuntime=${environment.id}`
   const anonymous = await fetch(`${a.base}${address}`, { redirect: 'manual', headers: { accept: 'text/html' } })
@@ -680,7 +701,8 @@ try {
   transcript.push('Re-enabling aggregation neither reconnects detached computers nor revives old managed credentials.')
   assert.equal(`${transcript.join('\n')}\n`, await readFile(new URL('./expected/node-service.txt', import.meta.url), 'utf8'))
   console.log(transcript.join('\n'))
-} catch (error) { primaryFailure = error; throw error } finally {
+}
+try { await verify() } catch (error) { primaryFailure = error; throw error } finally {
   const failures = []
   if (primaryFailure !== undefined && process.env.HGW_TOPOLOGY_SCREENSHOTS !== undefined) {
     const traces = []
@@ -689,21 +711,23 @@ try {
   }
   try { await browserCheck?.close() } catch (error) { failures.push(error) }
   for (const child of children.reverse()) { try { await child.stop() } catch (error) { failures.push(error) } }
-  await pool.query('DELETE FROM harness.model_prices WHERE model_id IN (SELECT id FROM harness.model_catalog WHERE organization_id=$1)', [organization])
-  const tables = (await pool.query(`SELECT c.table_name FROM information_schema.columns c
-    JOIN information_schema.tables t USING(table_catalog,table_schema,table_name)
-    WHERE c.table_schema='harness' AND c.column_name='organization_id' AND t.table_type='BASE TABLE'`)).rows.map(row => row.table_name)
-  let removed = false
-  for (let round = 0; round <= tables.length && !removed; round++) {
-    for (const table of tables) {
-      assert.match(table, /^[a-z][a-z0-9_]+$/u)
-      try { await pool.query(`DELETE FROM harness.${table} WHERE organization_id=$1`, [organization]) }
+  if(!operationsOnly){
+    await pool.query('DELETE FROM harness.model_prices WHERE model_id IN (SELECT id FROM harness.model_catalog WHERE organization_id=$1)', [organization])
+    const tables = (await pool.query(`SELECT c.table_name FROM information_schema.columns c
+      JOIN information_schema.tables t USING(table_catalog,table_schema,table_name)
+      WHERE c.table_schema='harness' AND c.column_name='organization_id' AND t.table_type='BASE TABLE'`)).rows.map(row => row.table_name)
+    let removed = false
+    for (let round = 0; round <= tables.length && !removed; round++) {
+      for (const table of tables) {
+        assert.match(table, /^[a-z][a-z0-9_]+$/u)
+        try { await pool.query(`DELETE FROM harness.${table} WHERE organization_id=$1`, [organization]) }
+        catch (error) { if (error.code !== '23503') throw error }
+      }
+      try { await pool.query('DELETE FROM harness.organizations WHERE id=$1', [organization]); removed = true }
       catch (error) { if (error.code !== '23503') throw error }
     }
-    try { await pool.query('DELETE FROM harness.organizations WHERE id=$1', [organization]); removed = true }
-    catch (error) { if (error.code !== '23503') throw error }
+    if (!removed) failures.push(new Error('Node-service organization cleanup did not settle'))
   }
   await pool.end(); await rm(root, { recursive: true, force: true })
-  if (!removed) failures.push(new Error('Node-service organization cleanup did not settle'))
   if (failures.length) throw new AggregateError([...(primaryFailure === undefined ? [] : [primaryFailure]), ...failures], 'Node-service verification or cleanup failed')
 }

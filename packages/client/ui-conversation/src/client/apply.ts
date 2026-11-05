@@ -213,7 +213,24 @@ export function apply(ctx: Context): void {
     refreshPersistence()
     return () => { stop(); refreshPersistence() }
   }, 'ui-conversation: verified chat account'))
+  ctx.inject(['deploymentContext'], inner => inner.effect(() => {
+    const stop = inner.deploymentContext.subscribe(refreshPersistence)
+    refreshPersistence()
+    return stop
+  }, 'ui-conversation: node draft mode'))
   const chatStore = createChatStore({
+    nodeOwner: (id) => {
+      const description = connection.hostDescription.getSnapshot()
+      if (description?.executionAuthorityRequired === false) return undefined
+      const deployment = ctx.get('deploymentContext')?.getSnapshot().context
+      if (deployment?.mode === 'single') return undefined
+      if (deployment?.mode !== 'multi') return description?.executionAuthorityRequired === true || ctx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId !== undefined ? 'pending' : undefined
+      const target = sessions.runtimeIdentityFor?.(id)
+      const accountId = ctx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId
+      if (description?.executionAuthorityRequired !== true || target?.runtimeId === undefined || accountId === undefined) return 'pending'
+      return { accountId, target, sessionId: parseClientSessionKey(id)?.sessionId ?? id,
+        requestTimeoutMs: connection.metadataTiming.requestTimeoutMs }
+    },
     key: (sessionId, intent) => {
       const required = connection.hostDescription.getSnapshot()?.executionAuthorityRequired
       const owner = sessionPersistenceKey(sessions, sessionId, required, ctx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId, intent)
@@ -360,7 +377,16 @@ export function apply(ctx: Context): void {
 
   // The per-session input machine registry (SessionInputResolver face; published as
   // ctx.conversation.input by the service below sharing this one instance).
-  const inputHub = new InputHub(ctx, t, id => chatStore.canRestoreDraft(id))
+  const inputHub = new InputHub(ctx, t, id => chatStore.canRestoreDraft(id), () => chatStore.hasUnsavedNodeDrafts())
+  ctx.effect(() => {
+    const guard = (event: BeforeUnloadEvent): void => { if (inputHub.hasUnsavedDrafts()) event.preventDefault() }
+    const windowEvents = globalThis as {
+      addEventListener?: typeof window.addEventListener
+      removeEventListener?: typeof window.removeEventListener
+    }
+    windowEvents.addEventListener?.('beforeunload', guard)
+    return () => { windowEvents.removeEventListener?.('beforeunload', guard) }
+  }, 'ui-conversation: guard unsynchronized input')
 
   // The composer-block registry: a plugin that knows a session cannot send —
   // ui-model-selection, when no adapter serves the session's route — raises a block
@@ -475,6 +501,19 @@ export function apply(ctx: Context): void {
   // The per-session chat store is the durable draft owner: writes go through
   // it as well so an unmounted Session keeps the initialized text across
   // remount and reload, and a cleared draft cannot re-seed later.
+  ctx.on('conversation/prepare-input', (id) => {
+    ctx.slots.bindStore(chatStore, id)
+    return chatStore.prepareInput(id)
+  })
+  ctx.on('conversation/append-input', ({ sessionId, text }) => {
+    const chat = ctx.slots.bindStore(chatStore, sessionId), shell = inputHub.peek(sessionId)
+    if (shell?.snapshot.phase === 'adjudicating' || shell?.snapshot.phase === 'submitting') return
+    const previous = readPersistedDraft(chat.store.getSnapshot().draft)
+    const updated = typeof previous === 'string' ? previous + text : { ...previous, text: previous.text + text }
+    chat.actions.setDraft(updated)
+    shell?.setDraft(updated)
+    return true
+  })
   ctx.effect(() => ctx.on('conversation/draft-initialize',
     (payload: { sessionId: SessionId; prompt?: string; clearPreviousDraft?: boolean }) => {
       const { sessionId, ...options } = payload
@@ -501,6 +540,8 @@ export function apply(ctx: Context): void {
   // frame while strict session slots fill only their session-bound regions.
   // The reserved `conversation` key keeps the layout's main selection on this
   // surface until a global panel is explicitly selected.
+  const intents = ctx.get('conversationIntents')
+  const intentSnapshot = intents?.snapshot ?? createSnapshotStore<import('@deepseek-ai/dsh-client-runtime/client').ConversationIntentsSnapshot>({ saved: [] })
   slots.register({
     name: 'main',
     key: 'conversation',
@@ -512,7 +553,11 @@ export function apply(ctx: Context): void {
       'conversation.workbench.pane.header': { kind: 'list', scope: 'session' },
     },
     inject: (): ConversationViewportInjected => ({
-      hooks: { viewportAvailable },
+      hooks: { viewportAvailable, conversationIntents: intentSnapshot, draftFailures: chatStore.draftFailures },
+      onRetryNodeDraft: (id) => { chatStore.retryDraft(id) },
+      onIntentInput: (id, text) => { intents?.edit(id, text) },
+      onIntentRetry: (id) => { intents?.resume(id) },
+      onIntentHide: () => { intents?.hide() },
       onViewportFocus: (id) => { viewport.focus(id) },
       onViewportRemove: (id) => { viewport.remove(id); layout.closeDetails(id) },
       onViewportRatios: (ratios) => { viewport.setPaneRatios(ratios) },
@@ -561,7 +606,7 @@ export function apply(ctx: Context): void {
       'conversation.hero.brand.mark': { kind: 'single', scope: 'root' },
       'conversation.hero.workspace': { kind: 'single', scope: 'root' },
       'conversation.hero.context': { kind: 'list', scope: 'root' },
-      'conversation.hero.agentPreset': { kind: 'single', scope: 'root' },
+      'conversation.hero.agentPreset': { kind: 'single', scope: 'session-maybe' },
     },
     slots: {
       views: { scope: 'session' },

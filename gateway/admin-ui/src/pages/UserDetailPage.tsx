@@ -1,3 +1,4 @@
+import { useProjectChoices } from '../components/project-choices.tsx'
 /** User-centric administration: account, qualifications, model overrides, memberships, and quota. */
 import { usePendingEdits } from '../pending-edits.tsx'
 import { ArrowLeft, KeyRound, Pencil, Power, Trash2, UserRound } from 'lucide-react'
@@ -34,7 +35,6 @@ import {
   type AdminUser,
   type GrantMode,
   type ModelGovernanceRow,
-  type Project,
   type UserMembership,
   type UserQuotaMode,
   type UserQuotaView,
@@ -433,7 +433,7 @@ function UserModelAccess({ userId, role }: { userId: number; role: UserRole }) {
 function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: userDetailZh, en: userDetailEn }), [])
   const [memberships, setMemberships] = useState<UserMembership[] | null>(null)
-  const [projects, setProjects] = useState<Project[]>([])
+  const { projects, setProjects, readNames, moreNames } = useProjectChoices()
   const [loading, setLoading] = useState(true)
   const [pendingKey, setPendingKey] = useState('')
   const [error, setError] = useState('')
@@ -444,7 +444,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
   const load = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
     try {
-      const [membershipResult, projectRows] = await Promise.all([listUserMemberships(userId), listProjects()])
+      const [membershipResult, projectRows] = await Promise.all([listUserMemberships(userId), listProjects(undefined, 'directory')])
       setMemberships(membershipResult.memberships)
       setProjects(projectRows)
       setError('')
@@ -584,7 +584,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
           )}
           <div className="sectionBody">
             <form className="memberAddRow" onSubmit={event => void onAdd(event)}>
-              <select className="select" aria-label={t('joinProjectAria')} value={addProjectId} disabled={pendingKey !== ''} onChange={event => setAddProjectId(event.target.value)}>
+              <select onFocus={() => readNames(joinable.map(project => project.id))} className="select" aria-label={t('joinProjectAria')} value={addProjectId} disabled={pendingKey !== ''} onChange={event => { readNames([Number(event.target.value)]); setAddProjectId(event.target.value) }}>
                 <option value="">{t('selectProject')}</option>
                 {joinable.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
               </select>
@@ -594,6 +594,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
               </select>
               <Button type="submit" variant="secondary" loading={pendingKey === 'member:add'} disabled={addProjectId === ''}>{t('joinProject')}</Button>
             </form>
+            {moreNames(joinable.map(project => project.id))}
           </div>
         </>
       )}

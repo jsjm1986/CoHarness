@@ -62,6 +62,7 @@ const rpcDomainErrorSchema = z.discriminatedUnion('code', [
       })),
     }),
   }),
+  z.object({ code: z.literal('prompt-durability-unavailable'), message: z.string(), details: z.object({ sessionId: z.string() }) }),
   z.object({ code: z.literal('session-archived'), message: z.string(), details: z.object({ sessionId: z.string() }) }),
   z.object({ code: z.literal('session-writer-held'), message: z.string(), details: z.object({ sessionId: z.string() }) }),
   z.object({ code: z.literal('model-unavailable'), message: z.string(), details: z.object({ provider: z.string(), model: z.string() }) }),
