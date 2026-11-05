@@ -1324,6 +1324,10 @@ describe('PythonPtcRuntime — programs and bindings', () => {
       bindings: [],
     }))
     expect(result.error).toBeUndefined()
+    // Length first: the string diff of a 200 KiB entry is display-truncated,
+    // so a mismatch under CI only shows identical 'A' prefixes. The count and
+    // byte lengths expose whether an entry was truncated, split, or doubled.
+    expect(result.logs.map(entry => entry.length)).toEqual([size])
     expect(result.logs).toEqual(['A'.repeat(size)])
   })
 

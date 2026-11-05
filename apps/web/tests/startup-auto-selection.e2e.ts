@@ -627,7 +627,10 @@ describe('web e2e: startup auto-selection', () => {
         if (path === '/api/terminal/list') terminalCalls++
       }
       await targetPage.addInitScript(() => {
-        let inner = window.fetch.bind(window)
+        // Re-evaluation on a same-realm navigation must not bind inner to the
+        // wrapper itself (that would recurse every request into stack overflow).
+        const host = window as unknown as { __diagFetchInner?: typeof window.fetch }
+        if (host.__diagFetchInner === undefined) host.__diagFetchInner = window.fetch.bind(window)
         const wrapped = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
           try {
             const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input)
@@ -635,12 +638,12 @@ describe('web e2e: startup auto-selection', () => {
               console.warn(`[diag] history-stack ${new Error('history issuer').stack?.replace(/\s+/g, ' ') ?? 'none'}`)
             }
           } catch { /* diagnostics must never break the request */ }
-          return inner(input, init)
+          return host.__diagFetchInner!(input, init)
         }
         Object.defineProperty(window, 'fetch', {
           configurable: true,
           get: () => wrapped,
-          set: (value: typeof window.fetch) => { inner = value.bind(window) },
+          set: (value: typeof window.fetch) => { host.__diagFetchInner = value.bind(window) },
         })
       })
       targetPage.on('request', countHistory)
