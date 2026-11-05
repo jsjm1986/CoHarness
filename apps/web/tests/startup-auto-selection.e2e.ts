@@ -626,6 +626,23 @@ describe('web e2e: startup auto-selection', () => {
         if (path === '/api/session.historyIndex') indexCalls++
         if (path === '/api/terminal/list') terminalCalls++
       }
+      await targetPage.addInitScript(() => {
+        let inner = window.fetch.bind(window)
+        const wrapped = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+          try {
+            const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input)
+            if (url.includes('/api/session.history')) {
+              console.warn(`[diag] history-stack ${new Error('history issuer').stack?.replace(/\s+/g, ' ') ?? 'none'}`)
+            }
+          } catch { /* diagnostics must never break the request */ }
+          return inner(input, init)
+        }
+        Object.defineProperty(window, 'fetch', {
+          configurable: true,
+          get: () => wrapped,
+          set: (value: typeof window.fetch) => { inner = value.bind(window) },
+        })
+      })
       targetPage.on('request', countHistory)
       targetPage.on('response', observeHistory)
       targetPage.on('framenavigated', (frame) => { if (frame === targetPage.mainFrame()) console.log(`[diag] navigated -> ${frame.url()}`) })
