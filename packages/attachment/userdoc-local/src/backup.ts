@@ -10,6 +10,7 @@ import { DocumentIdentityStore, type DocumentIdentityRecord } from './identity.t
 import { DocumentIdentityStorage, type DocumentIdentityLocations } from './identity-storage.ts'
 import { isInside, pathForDocId } from './name.ts'
 import { withDocumentHandle } from './handle.ts'
+import { syncDocumentDirectory, syncDocumentFile } from './directory-sync.ts'
 import type { DocumentFileObjectId } from './file-object.ts'
 import { loadNodeSqlite } from '@deepseek-ai/dsh-session-persistence-sqlite'
 
@@ -228,8 +229,7 @@ export async function restoreDocumentIdentityBackup(
     for (const item of retained) {
       await utimes(item.source, item.record.modifiedAt / 1000, item.record.modifiedAt / 1000)
       const info = await lstat(item.source, { bigint: true })
-      const handle = await open(item.source, constants.O_RDONLY | constants.O_NOFOLLOW)
-      await withDocumentHandle(handle, () => handle.sync())
+      await syncDocumentFile(item.source)
       records.push({ ...item.record, file: { device: String(info.dev), inode: String(info.ino) }, modifiedAt: Number(info.mtimeNs) / 1e6 })
     }
     signal?.throwIfAborted()
@@ -254,12 +254,11 @@ export async function restoreDocumentIdentityBackup(
     const changedDirectories = new Set([
       locations.stateRoot, locations.filesRoot, ...[...retained, ...markers].flatMap(item => item.paths.map(path => dirname(path))),
     ])
-    for (const directory of changedDirectories) {
-      const handle = await open(directory, 'r')
+    for (const directory of changedDirectories) await syncDocumentDirectory(directory)
+    {
+      const handle = await open(storage.databasePath, process.platform === 'win32' ? constants.O_RDWR : constants.O_RDONLY | constants.O_NOFOLLOW)
       await withDocumentHandle(handle, () => handle.sync())
     }
-    const handle = await open(storage.databasePath, constants.O_RDONLY | constants.O_NOFOLLOW)
-    await withDocumentHandle(handle, () => handle.sync())
     signal?.throwIfAborted()
   })
 }
@@ -382,8 +381,10 @@ export async function recoverDocumentIdentityMount(
     const database = new DatabaseSync(storage.databasePath)
     try { new DocumentIdentityStore(locations.root, database).recoverMount(storage.binding) } finally { database.close() }
     await storage.bindDomain(rootId, false)
-    for (const path of [locations.filesRoot, locations.stateRoot, storage.databasePath]) {
-      const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+    await syncDocumentDirectory(locations.filesRoot)
+    await syncDocumentDirectory(locations.stateRoot)
+    {
+      const handle = await open(storage.databasePath, process.platform === 'win32' ? constants.O_RDWR : constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
       await withDocumentHandle(handle, () => handle.sync())
     }
   })

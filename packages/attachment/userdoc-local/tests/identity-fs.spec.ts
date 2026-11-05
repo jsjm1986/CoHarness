@@ -159,7 +159,9 @@ it.each([3, 4])('refuses a schema %s file-by-file copy before changing its ident
   expect(await f.owner.stat(original.docId)).toEqual(original)
 })
 
-it('refuses an existing connection after its metadata file is replaced', async () => {
+// Windows grants no FILE_SHARE_DELETE on the open SQLite handle, so replacing
+// the metadata file is impossible there — the scenario cannot occur natively.
+it.skipIf(process.platform === 'win32')('refuses an existing connection after its metadata file is replaced', async () => {
   const f = await fixture(), original = await f.publish()
   const database = join(f.locations.stateRoot, 'metadata.sqlite'), copied = join(f.locations.stateRoot, 'replacement.sqlite')
   await copyFile(database, copied)

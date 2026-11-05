@@ -141,7 +141,10 @@ it.each([new Error('Native queue failed'), 'Native queue failed'])('retains a na
   expectClosed()
 })
 
-it.each([0, 13])('transfers native errno without a replacement fallback: %s', async (errno) => {
+// errno-name lookup reads the HOST libuv table: a Windows host cannot name a
+// POSIX errno even while the platform shim reports 'linux', so the named-code
+// transfer case only runs where the real syscall could.
+it.each(process.platform === 'win32' ? [0] : [0, 13])('transfers native errno without a replacement fallback: %s', async (errno) => {
   state.failedCall = 'syscall('; state.errno = errno
   await expect(move(scope => scope.rename())).rejects.toMatchObject({ code: errno === 0 ? 'EIO' : 'EACCES', syscall: 'renameat2' })
   expect(state.calls.filter(entry => entry.declaration.includes('syscall('))).toHaveLength(1)
