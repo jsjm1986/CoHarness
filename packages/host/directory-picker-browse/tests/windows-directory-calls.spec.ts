@@ -101,7 +101,7 @@ it('opens roots and one UTF-16 child with synchronous, handle-relative, no-repar
     expect(request?.slice(6, 9)).toEqual([7, 1, 0x00200021])
     await calls.child(11, 'created', true)
     expect(state.creates[1]?.[7]).toBe(2)
-    expect(state.creates[1]?.[1]).toBe(0)
+    expect(state.creates[1]?.[1]).toBe(0x001000a4)
     expect(await calls.reader(11)).toBe(12)
     expect(state.creates[2]?.[1]).toBe(0x00100081)
     expect(state.creates[2]?.[2]).toMatchObject({ RootDirectory: 11, ObjectName: { Buffer: Buffer.from('', 'utf16le') } })

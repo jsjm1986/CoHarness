@@ -65,7 +65,7 @@ it('flushes a Windows directory through a backup-semantics handle', async () => 
   Object.defineProperty(process, 'platform', { ...platform, value: 'win32' })
   await syncDocumentDirectory(directory)
   const create = state.calls.find(call => call.name === 'CreateFileW')
-  expect(create?.args).toEqual([directory, 0x80, 7, null, 3, 0x02000000, 0])
+  expect(create?.args).toEqual([directory, 0x40000000, 7, null, 3, 0x02000000, 0])
   expect(state.calls.map(call => call.name)).toEqual(['CreateFileW', 'FlushFileBuffers'])
   expect(state.unloads).toBe(1)
 })

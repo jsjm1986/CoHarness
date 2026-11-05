@@ -6,7 +6,9 @@ import type { KoffiFunc } from 'koffi'
 import { withDocumentHandle } from './handle.ts'
 
 const FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
-const FILE_READ_ATTRIBUTES = 0x80
+// FlushFileBuffers requires a write-capable handle; FILE_READ_ATTRIBUTES
+// alone fails with ERROR_ACCESS_DENIED.
+const GENERIC_WRITE = 0x40000000
 
 /* v8 ignore start -- Windows omits O_NOFOLLOW; lexical links and opened-file evidence are checked separately. */
 // oxlint-disable-next-line typescript/no-unnecessary-condition -- some supported platforms omit O_NOFOLLOW.
@@ -34,7 +36,7 @@ async function syncWindowsDirectory(path: string): Promise<void> {
       (path: string, access: number, share: number, security: null, creation: number, flags: number, template: number) => number | bigint
     >
     const handle = await new Promise<number | bigint>((accept, reject) => {
-      create.async(toNamespacedPath(path), FILE_READ_ATTRIBUTES, 7, null, 3, FILE_FLAG_BACKUP_SEMANTICS, 0,
+      create.async(toNamespacedPath(path), GENERIC_WRITE, 7, null, 3, FILE_FLAG_BACKUP_SEMANTICS, 0,
         (error: unknown, result: number | bigint) => {
           if (error !== null) reject(error instanceof Error ? error : new Error('Windows directory open failed.', { cause: error }))
           else if (BigInt(result) === -1n) reject(windowsDirectoryError('CreateFileW', lastError(), path))
