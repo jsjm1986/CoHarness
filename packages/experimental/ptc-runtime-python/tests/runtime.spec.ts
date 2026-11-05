@@ -1313,7 +1313,11 @@ describe('PythonPtcRuntime — programs and bindings', () => {
     // arbitrary pipe boundaries inside one native write. Stray capture holds a
     // per-stream residual and admits only on a real `\n`, so a 200 KiB blast
     // with no newline reads back as exactly one entry with no interior breaks.
-    const { runtime } = await setup({ maxLogBytes: 300_000 })
+    // The settlement drain shares graceMs with the exit wait; under an
+    // instrumented coverage partition the event loop can starve pipe reads for
+    // more than the 3s default while the finished 200 KiB write is still queued
+    // in the kernel buffer, so this run takes a wider cleanup bound.
+    const { runtime } = await setup({ maxLogBytes: 300_000, graceMs: 30_000 })
     const size = 200_000
     const result = await runtime.run(runtime.resolve({
       program: ['import os', `os.write(1, b"A" * ${size})`, 'return None'].join('\n'),
