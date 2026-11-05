@@ -24,7 +24,10 @@ it.each([
       NODE_OPTIONS: undefined, NODE_PATH: undefined, DSH_HOME: join(root, '.dsh'), DSH_AGENTS_HOME: join(root, '.agents'), TMPDIR: root,
       DSH_TELEMETRY_DISABLED: '1', DSH_MANAGED_DATA_MANIFEST: undefined,
       TSX_TSCONFIG_PATH: mode === 'src' ? resolve(import.meta.dirname, '../../../../tsconfig.json') : undefined,
-    } })
+    } }).catch((error: Error & { stdout?: string; stderr?: string }) => {
+      error.message += `\nstdout:\n${error.stdout}\nstderr:\n${error.stderr}`
+      throw error
+    })
     await expect(result.stdout).toMatchFileSnapshot(resolve(import.meta.dirname, `expected/${fixture}.jsonl`))
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 100_000)
