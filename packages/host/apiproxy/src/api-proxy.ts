@@ -3796,6 +3796,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       return { refused: err(request, forbidden) }
     }
     if (!routeServed(selection.provider)) {
+      console.warn('[draft-diag] routeServed refused', sessionId, selection.provider)
       return {
         refused: err(request, {
           code: 'model-unavailable',
@@ -5068,11 +5069,17 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           })
         }
         const authorized = await authorizeSession(sessionId, 'write')
-        if ('error' in authorized) return err(request, authorized.error)
+        if ('error' in authorized) {
+          console.warn('[draft-diag] refuse authorize', sessionId, JSON.stringify(authorized.error))
+          return err(request, authorized.error)
+        }
         // An archived session admits no input; clients may hold a stale
         // mounted view until the archive baseline lands.
         const archived = archivedInputError(sessionId)
-        if (archived !== undefined) return err(request, archived)
+        if (archived !== undefined) {
+          console.warn('[draft-diag] refuse archived', sessionId)
+          return err(request, archived)
+        }
         const canonicalTimeZone = clientTimeZone === undefined
           ? undefined
           : canonicalClientTimeZone(clientTimeZone)
@@ -5084,8 +5091,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           })
         }
         const resolved = await turnAgentFor<{ accepted: true }>(request, sessionId)
-        if ('refused' in resolved) return resolved.refused
+        if ('refused' in resolved) {
+          console.warn('[draft-diag] refuse turnAgentFor', sessionId)
+          return resolved.refused
+        }
         const agent = resolved.agent
+        console.warn('[draft-diag] agent resolved', sessionId, agent.id)
         // Request identity and optional browser zone ride the exact durable user message.
         const participant = projectParticipant(authorized.authority)
         const source = {
@@ -5118,9 +5129,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             // Re-decide after the awaited conversion/stamp: a session archived
             // mid-request admits no input.
             const archived = archivedInputError(sessionId)
-            if (archived !== undefined) return err(request, archived)
+            if (archived !== undefined) {
+              console.warn('[draft-diag] refuse mid-admit archived', sessionId)
+              return err(request, archived)
+            }
             if (mode === 'steer') agent.steer(message)
             else agent.followup(message)
+            console.warn('[draft-diag] admitted', sessionId, mode)
           } catch (error: unknown) {
             if (error instanceof AttachmentError) {
               return err(request, {
