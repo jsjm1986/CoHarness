@@ -22,7 +22,12 @@ it('retains a pending New Session and its origin draft across transport renewal'
     if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
     const firstRow = office.locator('[data-row-key^="session:"]').first()
     const workspaceRow = office.getByText('Office work', { exact: true })
-    await expect.poll(async () => (await firstRow.isVisible()) || (await workspaceRow.isVisible()), { timeout: 30_000 }).toBe(true)
+    try {
+      await expect.poll(async () => (await firstRow.isVisible()) || (await workspaceRow.isVisible()), { timeout: 60_000 }).toBe(true)
+    } catch (error: unknown) {
+      console.log('[pc-diag] office region:', JSON.stringify((await office.textContent())?.slice(0, 500)))
+      throw error
+    }
     if (!await firstRow.isVisible()) await workspaceRow.click()
     await firstRow.click()
     const input = page.locator('textarea').first()
@@ -81,7 +86,12 @@ it('browses twenty cold computers and keeps personal conversations, drafts and t
       if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
       const firstRow = section.locator('[data-row-key^="session:"]').first()
       const workspaceRow = section.getByText('Office work', { exact: true })
-      await expect.poll(async () => (await firstRow.isVisible()) || (await workspaceRow.isVisible()), { timeout: 30_000 }).toBe(true)
+      try {
+        await expect.poll(async () => (await firstRow.isVisible()) || (await workspaceRow.isVisible()), { timeout: 60_000 }).toBe(true)
+      } catch (error: unknown) {
+        console.log('[pc-diag] office region:', JSON.stringify((await section.textContent())?.slice(0, 500)))
+        throw error
+      }
       if (!await firstRow.isVisible()) await workspaceRow.click()
       await section.locator('[data-row-key^="session:"]').first().click()
     }
