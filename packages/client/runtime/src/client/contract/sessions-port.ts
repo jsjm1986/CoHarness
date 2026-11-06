@@ -100,6 +100,7 @@ export interface SessionsPort extends Pick<ISessions, 'retain' | 'keyFor' | 'run
    * connection lifetime; ambient restores use it to yield a selection the
    * user committed rather than superseding it.
    * @param id - runtime-qualified session id.
+   * @returns `true` when the Session's Agent was published by an explicit open.
    */
   isActivated(id: SessionId | undefined): boolean
   /** Clear the current selection into the no-session view state. */

@@ -312,6 +312,7 @@ export class SessionManager {
    * Whether an explicit open published the Session's Agent during this
    * connection lifetime; ambient presentations and restores never qualify.
    * @param sessionId - candidate Session identity.
+   * @returns `true` when the Session's Agent was published by an explicit open.
    */
   isActivated(sessionId: SessionId): boolean {
     return this.activated.has(sessionId)

@@ -1076,6 +1076,7 @@ export class SessionRuntimePool implements ISessions {
    * this connection lifetime; ambient restores use it to yield a selection
    * the user committed rather than superseding it.
    * @param id - runtime-qualified Session identity.
+   * @returns `true` when the Session's Agent was published by an explicit open.
    */
   isActivated(id: SessionId | undefined): boolean {
     if (id === undefined) return false

@@ -666,6 +666,7 @@ export class SessionRuntime implements ISessions {
    * connection lifetime; ambient selection paths use it to yield to a
    * user-committed selection.
    * @param id - candidate Session identity.
+   * @returns `true` when the Session's Agent was published by an explicit open.
    */
   isActivated(id: SessionId): boolean {
     return this.manager.isActivated(id)
