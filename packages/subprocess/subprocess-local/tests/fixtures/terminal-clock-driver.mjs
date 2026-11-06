@@ -130,6 +130,19 @@ for (const scenario of selected === 'all' ? ['normal', 'frozen', 'recovery', 'pa
         if (unreadable && args[0] === '/bin/ps') { observationRefusals++; throw expected }
         return originalCommand(...args)
       }
+      // The failed unload's host-exit finalizer may force-stop live members
+      // where identity signalling survives the observation fault: /bin/ps is
+      // already refused on darwin, and on linux each signal's identity fence
+      // reads the target's own stat row — refuse the sibling's so its shell
+      // provably survives and stays unconfirmed for the retention checks
+      // below, instead of racing the kill's done→release() settle edge.
+      if (process.platform === 'linux') {
+        const siblingStat = `/proc/${sibling.pid}/stat`
+        filesystem.readFileSync = (...args) => {
+          if (unreadable && args[0] === siblingStat) { observationRefusals++; throw expected }
+          return originalReadFile(...args)
+        }
+      }
       syncBuiltinESMExports()
       unreadable = true
       await ctx.fiber.dispose()
@@ -138,15 +151,6 @@ for (const scenario of selected === 'all' ? ['normal', 'frozen', 'recovery', 'pa
       assert.ok(observationRefusals > 0, 'The owned process-table fault must reach cleanup')
       assert.ok(logged.some(error => unavailable(error) || error?.errors?.some(unavailable)))
       assert.ok(retainedExits.every(listener => process.listeners('exit').includes(listener)))
-      // The failed unload's host-exit finalizer may have force-stopped the
-      // sibling where identity signalling survived the observation fault. If it
-      // did, drain the done→release() settle while observation is still refused
-      // so release()'s terminate re-fails: the sibling stays tracked — and the
-      // exit callback armed — for the retention checks below.
-      if (alive(sibling.pid) === false) {
-        await bounded(sibling.done, 5000)
-        await assert.rejects(bounded(sibling.terminate(), 5000), unavailable)
-      }
       unreadable = false
     }
     if (scenario === 'partial') {
