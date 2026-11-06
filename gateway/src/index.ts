@@ -127,6 +127,7 @@ import { PostgresDocumentCatalogService } from './postgres/document-catalog-serv
 import { PostgresDocumentLocations } from './postgres/document-locations.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { createGatewayServer, scopeCookie, type GatewayDeps } from './server.ts'
+import { ReleaseAssets } from './release-assets.ts'
 import { GatewayPerformanceObserver } from './performance-observer.ts'
 import { createUsageIntakeServer } from './usage-intake.ts'
 import { removeBootstrapAdminPassword, writeBootstrapAdminPassword } from './bootstrap-admin.ts'
@@ -474,6 +475,7 @@ const deps: GatewayDeps = {
   migrationPlan: () => migrationPlan(pool, cfg.deployMigrationsDir),
   maintenanceGate,
   writerSpan,
+  releaseAssets: ReleaseAssets.forConfig(cfg),
   databasePerformance: () => ({
     total: pool.totalCount,
     idle: pool.idleCount,

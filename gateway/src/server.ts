@@ -206,6 +206,15 @@ export interface GatewayDeps {
    */
   writerSpan?: () => (() => void)
   readiness?: (signal?: AbortSignal) => Awaitable<void>
+  /**
+   * Optional center-local server for the release's built web frontend dist.
+   * When present, byte-deterministic `/assets/*` and `/favicon.svg` requests
+   * are answered from the center's own release files — identical bytes to
+   * what any same-release Runtime would serve — instead of pinning a Runtime
+   * and proxying the owning node. Absent keeps Referer-pinned forwarding for
+   * every asset path.
+   */
+  releaseAssets?: Pick<import('./release-assets.ts').ReleaseAssets, 'serve'>
 }
 
 /** Backup execution wiring shared by the admin backup routes. */
@@ -1217,6 +1226,15 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       await handlers.admin(req, res, user, pathname, body)
       return
     }
+    // Release-bundled files are identical on every computer running this
+    // release: answer them from the center's own dist without selecting a
+    // Runtime, so unpinned asset URLs share one browser cache entry and never
+    // traverse a remote node hop. `/plugins/*` stays runtime-owned: combo and
+    // chunk bodies are synthesized per Runtime composition, `/plugins/events`
+    // is a live channel, and the Referer block below still pins any asset
+    // path this release's dist does not hold.
+    if (deps.releaseAssets !== undefined && (pathname.startsWith('/assets/') || pathname === '/favicon.svg')
+      && await deps.releaseAssets.serve(req, res, pathname)) return
     let selectedUrl = new URL(req.url ?? '/', 'http://gateway')
     let selection = selectedUrl.searchParams
     if ((pathname.startsWith('/assets/') || pathname.startsWith('/plugins/') || pathname === '/favicon.svg') && deps.runtimeCatalog !== undefined && !selection.has('dshRuntime') && req.headers.referer !== undefined) {
