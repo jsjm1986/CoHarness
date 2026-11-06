@@ -16,6 +16,8 @@ mux 的 `subscribe()` 把静默后缀 —— `session.firstLifecycleSeq` 起、�
 
 命令源不再注册 `warm` 钩子:预期式的目录预热会解析一个 `agent` 类型的远程参数,不激活它要服务的冷会话就无法运行。`CommandDirectory` 本就是惰性拉取 —— 首个 `candidates`/`matchEnter`/`matchSpace` 读取会调用 `ensureReady` —— 目录改为在 `/` 意图出现时加载,而恢复该会话 Agent 在此时才属正当。`directory.warm()` 已无任何调用方,一并移除。
 
+移除 `warm` 同时删掉了打开流程唯一的 Agent 解析,因此"打开发布 Agent"契约改由 `session.activate` 承载:一个类型化 RPC,按 write 域授权、拒绝已归档会话并解析 `agentFor`(幂等恢复)。conversation slot 注入 `activate` 与注册方私有的 `hooks.activationReady` 源 —— 初始工作区选择未决、或所需执行权限缺少已验证账户时为 false —— `ConversationSession` 在就绪翻转时激活。仅挂载不构成边界:slot 主体在选择加载遮罩下就已渲染,因此"打开即呈现"由门控而非挂载效应决定。
+
 ## Alternatives considered
 
 **在基线中报告页内口径的 `lastSeq`。** `session.seq` 是连续日志长度且每个序号都是真实事件 —— 标记也不例外 —— 不存在"被过滤"的口径;低报它会把一次持久追加对投影隐藏。
@@ -26,13 +28,15 @@ mux 的 `subscribe()` 把静默后缀 —— `session.firstLifecycleSeq` 起、�
 
 **保留 `warm`,但仅在存在活跃 Agent 时拉取。** 客户端快照不暴露 Agent 存活事实,钩子无法区分"免费预热"与"冷恢复";用 `running` 之类的启发式门控会在静止中的活跃 Agent 上误判。`commands.list` 也可以像 `sessions.models` 那样加一条 detached standing-scope 目录路径,但 standing 组合的命令视图与 Agent 解析后的视图并不一致,而惰性路径已满足全部消费方。
 
+**在 `sessions.open` 触发 `activate`。** pool 的 open 是客户端导航,环境焦点与恢复路径共用同一入口,并非"对话已呈现"信号;就绪门控区分的是展示给用户的打开与仅存在于后台的打开。
+
 ## Consequences
 
-启动自动选择端到端断言 `historyCalls === 1` 在慢速 CI 时序下成立;同规格中 `ctx.agents.get(id) === undefined` 也成立,因为挂载期间模型选择器与命令目录都不再恢复 Agent。任何构造期静默追加 —— 不只 `session/end-seed` —— 都在每条订阅路径上由同一循环回放,而真实缺失的历史仍按原样走 `mergeTail` 修复。`sessions.models` 对冷会话不再执行 live SSH 准入;读取仍由授权门控。在冷会话中输入 `/` 会恢复其 Agent —— 这正是契约所保留的意图驱动激活。
+启动自动选择端到端断言 `historyCalls === 1` 在慢速 CI 时序下成立;同规格中 `ctx.agents.get(id) === undefined` 也成立,因为挂载期间模型选择器与命令目录都不再恢复 Agent。任何构造期静默追加 —— 不只 `session/end-seed` —— 都在每条订阅路径上由同一循环回放,而真实缺失的历史仍按原样走 `mergeTail` 修复。`sessions.models` 对冷会话不再执行 live SSH 准入;读取仍由授权门控。在冷会话中输入 `/` 会恢复其 Agent —— 这正是契约所保留的意图驱动激活。打开会话再次经 `session.activate` 发布其活跃 Agent,恢复后台任务、定时与计划评审流程断言的显式打开契约,而就绪门控仍使未决启动与未验证权限的打开保持冷态。
 
 ## Verification
 
-`api-proxy-collaboration.spec.ts` 断言 mux 流对带 seed 的恢复先产出 `session/event(session/end-seed, seq 1)` 再产出 `session/subscribed(lastSeq 1)`。`api-proxy-models.spec.ts` 与 `api-proxy-cold.spec.ts` 覆盖 detached 选择分层与归属栅栏(48 个用例)。`service.client.spec.ts` 钉住契约:`/` 源不再注册 `warm` 钩子,首个 `candidates` 拉取对每个会话键只取一次。web 端到端规格保留 `historyCalls === 1` 与无 Agent 断言不变。
+`api-proxy-collaboration.spec.ts` 断言 mux 流对带 seed 的恢复先产出 `session/event(session/end-seed, seq 1)` 再产出 `session/subscribed(lastSeq 1)`。`api-proxy-models.spec.ts` 与 `api-proxy-cold.spec.ts` 覆盖 detached 选择分层与归属栅栏(48 个用例)。`service.client.spec.ts` 钉住契约:`/` 源不再注册 `warm` 钩子,首个 `candidates` 拉取对每个会话键只取一次。web 端到端规格保留 `historyCalls === 1` 与无 Agent 断言不变;打开已保存会话并轮询活跃 Agent 的各套件端到端覆盖 `session.activate`。
 
 ## Related
 

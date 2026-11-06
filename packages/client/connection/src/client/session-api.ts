@@ -44,6 +44,7 @@ export function sessionAddressApi(
       attachment: method(a => a.sessions.attachment.bind(a.sessions), ['sessionId']),
       updateQueue: method(a => a.sessions.updateQueue.bind(a.sessions), ['sessionId']),
       cancel: method(a => a.sessions.cancel.bind(a.sessions), ['sessionId']),
+      activate: method(a => a.sessions.activate.bind(a.sessions), ['sessionId']),
     },
     subagents: { history: method(a => a.subagents.history.bind(a.subagents), ['parentSessionId', 'childSessionId']) },
     desktop: {

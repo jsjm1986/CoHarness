@@ -19,8 +19,9 @@ import { RpcId, serverRequestJson } from '../api/rpc.ts'
 import type { Wire } from '../api/rpc.schema.ts'
 import { clientRequestSchema, clientResponseSchema } from '../api/rpc.schema.ts'
 import {
-  sessionCancelRequestSchema,
+  sessionActivateRequestSchema,
   sessionAttachmentRequestSchema,
+  sessionCancelRequestSchema,
   sessionCreateRequestSchema,
   sessionForkRequestSchema,
   sessionHistoryRequestSchema,
@@ -115,6 +116,7 @@ const UNARY_ROUTES: UnaryRoutes = {
   'session.attachment': { schema: sessionAttachmentRequestSchema, invoke: (api, r) => api.sessions.attachment(r) },
   'session.updateQueue': { schema: sessionUpdateQueueRequestSchema, invoke: (api, r) => api.sessions.updateQueue(r) },
   'session.cancel': { schema: sessionCancelRequestSchema, invoke: (api, r) => api.sessions.cancel(r) },
+  'session.activate': { schema: sessionActivateRequestSchema, invoke: (api, r) => api.sessions.activate(r) },
   'subagent.history': { schema: subagentHistoryRequestSchema, invoke: (api, r, signal) => api.subagents.history(r, signal) },
   'jobs.output': { schema: jobsOutputRequestSchema, invoke: (api, r) => api.jobs.output(r) },
   'jobs.kill': { schema: jobsKillRequestSchema, invoke: (api, r) => api.jobs.kill(r) },

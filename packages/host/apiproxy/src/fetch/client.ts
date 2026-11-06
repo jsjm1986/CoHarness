@@ -24,8 +24,9 @@ import {
   hostFileApplicationsValueSchema, hostListDirectoryValueSchema, hostOpenPathValueSchema, hostPickDirectoryValueSchema,
 } from '../api/host.schema.ts'
 import {
-  sessionCancelValueSchema,
+  sessionActivateValueSchema,
   sessionAttachmentValueSchema,
+  sessionCancelValueSchema,
   sessionCreateValueSchema,
   sessionForkValueSchema,
   sessionHistoryIndexValueSchema,
@@ -99,6 +100,7 @@ export interface IApiClient {
     attachment(payload: RequestPayload<'session.attachment'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.attachment'>>>
     updateQueue(payload: RequestPayload<'session.updateQueue'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.updateQueue'>>>
     cancel(payload: RequestPayload<'session.cancel'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.cancel'>>>
+    activate(payload: RequestPayload<'session.activate'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.activate'>>>
   }
   subagents: {
     history(payload: RequestPayload<'subagent.history'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'subagent.history'>>>
@@ -200,6 +202,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'session.attachment': sessionAttachmentValueSchema,
   'session.updateQueue': sessionUpdateQueueValueSchema,
   'session.cancel': sessionCancelValueSchema,
+  'session.activate': sessionActivateValueSchema,
   'subagent.history': historyWireValueSchema,
   'jobs.output': jobsOutputValueSchema,
   'jobs.kill': jobsKillValueSchema,
@@ -795,6 +798,7 @@ export abstract class AbstractApiClient implements IApiClient {
     attachment: (payload, signal) => this.callUnary('session.attachment', payload, signal),
     updateQueue: (payload, signal) => this.callUnary('session.updateQueue', payload, signal),
     cancel: (payload, signal) => this.callUnary('session.cancel', payload, signal),
+    activate: (payload, signal) => this.callUnary('session.activate', payload, signal),
   }
 
   readonly subagents: IApiClient['subagents'] = {

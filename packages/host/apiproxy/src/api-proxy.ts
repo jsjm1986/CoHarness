@@ -5191,6 +5191,19 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
       },
 
+      async activate(request) {
+        const { sessionId } = request.payload
+        const authorized = await authorizeSession(sessionId, 'write')
+        if ('error' in authorized) return err(request, authorized.error)
+        const archived = archivedInputError(sessionId)
+        if (archived !== undefined) return err(request, archived)
+        // Presentation is the open-intent boundary: a rendered conversation
+        // publishes the live Agent while ambient scope reads stay cold.
+        const found = await agentFor(sessionId)
+        if ('error' in found) return err(request, found.error)
+        return ok(request, { accepted: true as const })
+      },
+
       async updateQueue(request) {
         const { sessionId, itemId, action } = request.payload
         const authorized = await authorizeSession(sessionId, 'write')

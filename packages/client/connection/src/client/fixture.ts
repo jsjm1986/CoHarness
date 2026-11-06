@@ -2905,6 +2905,9 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         }
         return ok(request, { accepted: true as const })
       },
+      // The fixture tracks no Agent liveness; presentation is already served
+      // by its always-resolvable session logs.
+      activate: request => ok(request, { accepted: true as const }),
     },
     subagents: {
       history: (request, signal) => {
@@ -3594,6 +3597,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'session.attachment': return this.api.sessions.attachment(request)
       case 'session.updateQueue': return this.api.sessions.updateQueue(request)
       case 'session.cancel': return this.api.sessions.cancel(request)
+      case 'session.activate': return this.api.sessions.activate(request)
       case 'subagent.history': return this.api.subagents.history(request, signal)
       case 'jobs.output': return this.api.jobs.output(request)
       case 'jobs.kill': return this.api.jobs.kill(request)
