@@ -164,9 +164,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'The sessions-service face injected as `ctx.sessions`.',
     methods: [
       {
-        signature: 'open(id: SessionId): void',
-        description: 'Select a session as current.',
-        parameters: [{ name: 'id', description: 'session id (must exist in the list; unknown ids fail loud).' }],
+        signature: 'open(id: SessionId, options?: { activate?: boolean }): void',
+        description: 'Select a session as current. Explicit selection publishes the Session\'s live Agent on the Host; automatic selection paths (startup restore, retained panes) pass `activate: false` so their presentations stay cold.',
+        parameters: [{ name: 'id', description: 'session id (must exist in the list; unknown ids fail loud).' }, { name: 'options', description: '`activate: false` keeps the presented Session cold.' }],
       },
       {
         signature: 'openSubagent(address: SubagentAddress): void',
