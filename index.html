@@ -154,6 +154,23 @@ h1 .hl{background:linear-gradient(transparent 64%,rgba(37,71,224,.17) 64%,rgba(3
 .c-foot b{color:#c9d8f2;font-weight:600}
 .runtime-in{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:start}
 
+/* fleet diagram */
+.fleet{display:flex;flex-direction:column;align-items:center;margin:56px 0 12px}
+.f-hub{display:flex;align-items:center;gap:18px;background:var(--panel);border:1px solid var(--line2);border-radius:13px;padding:15px 24px;box-shadow:0 20px 50px -24px rgba(16,24,40,.22)}
+.f-hub .fk{font:600 10.5px var(--mono);letter-spacing:.12em;color:var(--acc);border:1px solid var(--line2);border-radius:6px;padding:4px 9px;background:var(--acc-soft)}
+.f-hub b{display:block;font-size:15px;font-weight:650;white-space:nowrap}
+.f-hub i{display:block;font-style:normal;font:11.5px var(--mono);color:var(--faint);letter-spacing:.05em;margin-top:2px;white-space:nowrap}
+.f-trunk{width:1px;height:26px;background:var(--line2)}
+.f-nodes{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;width:100%;margin-top:26px;position:relative}
+.f-nodes::before{content:"";position:absolute;top:-26px;left:calc((100% - 36px)/6);right:calc((100% - 36px)/6);height:1px;background:var(--line2)}
+.f-node{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;transition:transform .25s ease,box-shadow .25s ease}
+.f-node:hover{transform:translateY(-2px);box-shadow:0 16px 40px -20px rgba(16,24,40,.22)}
+.f-node::before{content:"";position:absolute;top:-26px;left:50%;width:1px;height:26px;background:var(--line2)}
+.f-nh{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.f-nh b{font:600 13px var(--mono);letter-spacing:.03em}
+.f-os{font:10.5px var(--mono);letter-spacing:.08em;color:var(--faint);white-space:nowrap}
+.f-node p{margin:11px 0 2px;font-size:13px;color:var(--sub)}
+
 /* folio rows */
 .rows{display:flex;flex-direction:column;border-top:1px solid var(--line)}
 .rows .row{display:grid;grid-template-columns:44px 220px 1fr;gap:22px;padding:22px 0;border-bottom:1px solid var(--line);align-items:baseline;transition:background .2s ease}
@@ -254,6 +271,11 @@ html.js .reveal.on{opacity:1;transform:none}
   .cap-item{grid-template-columns:1fr;gap:4px}
   .gnum{font-size:56px;top:-6px;transform:none}
   .sec-head h2,.sec-head .sub{max-width:calc(100% - 84px)}
+  .fleet{margin:44px 0 8px}
+  .f-hub{width:100%;flex-wrap:wrap;row-gap:10px}
+  .f-hub i{white-space:normal}
+  .f-nodes{grid-template-columns:1fr;gap:14px;margin-top:18px}
+  .f-trunk,.f-nodes::before,.f-node::before{display:none}
 }
 @media (max-width:560px){
   .wrap{padding:0 20px}
@@ -279,6 +301,7 @@ html.js .reveal.on{opacity:1;transform:none}
     <div class="nav-links" id="navLinks">
       <a href="#admin" data-i18n="nav.admin">管理后台</a>
       <a href="#runtime" data-i18n="nav.runtime">工作方式</a>
+      <a href="#fleet" data-i18n="nav.fleet">多台电脑</a>
       <a href="#principles" data-i18n="nav.principles">协作理念</a>
       <a href="#capabilities" data-i18n="nav.capabilities">能力</a>
       <a href="#scenes" data-i18n="nav.scenes">场景</a>
@@ -298,6 +321,7 @@ html.js .reveal.on{opacity:1;transform:none}
         <div class="menu-panel" id="menuPanel">
           <a href="#admin" data-i18n="nav.admin">管理后台</a>
           <a href="#runtime" data-i18n="nav.runtime">工作方式</a>
+          <a href="#fleet" data-i18n="nav.fleet">多台电脑</a>
           <a href="#principles" data-i18n="nav.principles">协作理念</a>
           <a href="#capabilities" data-i18n="nav.capabilities">能力</a>
           <a href="#scenes" data-i18n="nav.scenes">场景</a>
@@ -398,11 +422,40 @@ html.js .reveal.on{opacity:1;transform:none}
   </div>
 </section>
 
-<section class="sec" id="principles">
+<section class="sec" id="fleet">
   <div class="wrap">
     <div class="sec-head reveal">
       <span class="gnum" aria-hidden="true">03</span>
-      <div class="idx">SEC.03 · PHILOSOPHY</div>
+      <div class="idx">SEC.03 · MULTI-COMPUTER</div>
+      <h2 data-i18n="fl.title">工位不够，加台电脑就行</h2>
+      <p class="sub" data-i18n="fl.sub">办公室的 Mac mini、文件服务器、闲置的 PC，都能加入进来分担团队的工作环境——员工用起来没区别，还是那个网址。</p>
+    </div>
+    <div class="fleet reveal">
+      <div class="f-hub">
+        <span class="fk">CENTER</span>
+        <div><b data-i18n="fl.hub">管理中心</b><i data-i18n="fl.hubs">登录 · 分派 · 权限 · 审计 · 账本</i></div>
+      </div>
+      <div class="f-trunk" aria-hidden="true"></div>
+      <div class="f-nodes">
+        <div class="f-node"><div class="f-nh"><b>mac-mini</b><span class="f-os">MACOS · ARM64</span></div><p data-i18n="fl.n1">办公室角落的闲置机，顶起设计组的工位</p></div>
+        <div class="f-node"><div class="f-nh"><b>filesrv-01</b><span class="f-os">LINUX · X64</span></div><p data-i18n="fl.n2">机房的文件服务器，几个项目共用</p></div>
+        <div class="f-node"><div class="f-nh"><b>office-pc</b><span class="f-os">WINDOWS · X64</span></div><p data-i18n="fl.n3">前台的旧 PC，临时工位随开随用</p></div>
+      </div>
+    </div>
+    <div class="rows reveal">
+      <div class="row"><span class="n">01</span><b data-i18n="fl.1t">加一台电脑，就像发一封邀请</b><p data-i18n="fl.1p">管理员在后台点一下，给新机器生成一个加入码；那台机填上码就上线干活——Mac、Linux、Windows 都一样。</p></div>
+      <div class="row"><span class="n">02</span><b data-i18n="fl.2t">角落里吃灰的旧电脑也能上岗</b><p data-i18n="fl.2p">只要它能连上中心的网址，就能帮团队分担工位：它不用对外开门，也拿不到数据库密码，安心放在角落干活。</p></div>
+      <div class="row"><span class="n">03</span><b data-i18n="fl.3t">哪台机给谁用，你说了算</b><p data-i18n="fl.3p">研发的电脑可以只开研发的工位，前台的项目跑另一台；每台机还能限制能开哪类工位。哪天不想用了，后台撤掉，它马上和团队断开。</p></div>
+      <div class="row"><span class="n">04</span><b data-i18n="fl.4t">每个工位都知道跑在哪台机上</b><p data-i18n="fl.4p">个人工位和项目工位都固定在一台机上，资料也存在那里；哪台机临时不在线，页面就如实标出来，不会把你的工作悄悄挪到别处。</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="principles">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="gnum" aria-hidden="true">04</span>
+      <div class="idx">SEC.04 · PHILOSOPHY</div>
       <h2 data-i18n="pr.title">协作的单位是共享的工作，不是转发聊天记录</h2>
       <p class="sub" data-i18n="pr.sub">项目会记住持续的 AI 工作环境、每个人的贡献、任务委派关系、待决的审批和可恢复的进度——关掉浏览器、停掉某个 AI，工作还在原地。</p>
     </div>
@@ -418,8 +471,8 @@ html.js .reveal.on{opacity:1;transform:none}
 <section class="sec tint" id="capabilities">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="gnum" aria-hidden="true">04</span>
-      <div class="idx">SEC.04 · CAPABILITIES</div>
+      <span class="gnum" aria-hidden="true">05</span>
+      <div class="idx">SEC.05 · CAPABILITIES</div>
       <h2 data-i18n="cap.title">覆盖人机协作的完整链路</h2>
       <p class="sub" data-i18n="cap.sub">以下均为当前代码库中已实现的能力。</p>
     </div>
@@ -443,8 +496,8 @@ html.js .reveal.on{opacity:1;transform:none}
 <section class="sec" id="scenes">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="gnum" aria-hidden="true">05</span>
-      <div class="idx">SEC.05 · SCENARIOS</div>
+      <span class="gnum" aria-hidden="true">06</span>
+      <div class="idx">SEC.06 · SCENARIOS</div>
       <h2 data-i18n="sc2.title">从日常业务到研发协作，一个平台装下</h2>
       <p class="sub" data-i18n="sc2.sub">以下是我们自己部署中真实在跑的项目形态。</p>
     </div>
@@ -460,8 +513,8 @@ html.js .reveal.on{opacity:1;transform:none}
 <section class="sec tint" id="screens">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="gnum" aria-hidden="true">06</span>
-      <div class="idx">SEC.06 · EVIDENCE</div>
+      <span class="gnum" aria-hidden="true">07</span>
+      <div class="idx">SEC.07 · EVIDENCE</div>
       <h2 data-i18n="sc.title">成员日常看到的工作台</h2>
       <p class="sub" data-i18n="sc.sub">以下截图与录屏均来自真实运行的 CoHarness 实例，不是效果图。</p>
     </div>
@@ -482,8 +535,8 @@ html.js .reveal.on{opacity:1;transform:none}
 <section class="sec" id="mobile">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="gnum" aria-hidden="true">07</span>
-      <div class="idx">SEC.07 · MOBILE</div>
+      <span class="gnum" aria-hidden="true">08</span>
+      <div class="idx">SEC.08 · MOBILE</div>
       <h2 data-i18n="mb.title">手机上也是完整的工作台</h2>
       <p class="sub" data-i18n="mb.sub">同一套 Web 应用自适应手机：浏览器直接访问已部署的系统，另有 Android 壳可选；推送通知可开。</p>
     </div>
@@ -509,8 +562,8 @@ html.js .reveal.on{opacity:1;transform:none}
 <section class="sec" id="start">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="gnum" aria-hidden="true">08</span>
-      <div class="idx">SEC.08 · QUICK START</div>
+      <span class="gnum" aria-hidden="true">09</span>
+      <div class="idx">SEC.09 · QUICK START</div>
       <h2 data-i18n="st.title">两条路：先在自己机器上试，或给团队正式部署</h2>
     </div>
     <div class="paths">
@@ -533,8 +586,8 @@ html.js .reveal.on{opacity:1;transform:none}
 <section class="sec" id="opensource">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="gnum" aria-hidden="true">09</span>
-      <div class="idx">SEC.09 · OPEN &amp; SELF-HOSTED</div>
+      <span class="gnum" aria-hidden="true">10</span>
+      <div class="idx">SEC.10 · OPEN &amp; SELF-HOSTED</div>
       <h2 data-i18n="os.title">开源、自托管：代码和数据都在你手里</h2>
       <p class="sub" data-i18n="os.sub">Apache-2.0。全部实现可审：管理后台、工作环境编排、文档与部署。所有数据落在自有基础设施，模型走你们自己的 Key，用量账本不记录密钥和聊天内容。</p>
     </div>
@@ -546,7 +599,8 @@ html.js .reveal.on{opacity:1;transform:none}
       <li data-i18n="os.5">Android 壳可选，手机访问已部署系统</li>
       <li data-i18n="os.6">数据主权：数据在你自己的基础设施上，模型用自己的 Key</li>
       <li data-i18n="os.7">独立部署、自主演进：harness 本身是你的资产，随团队需求快速迭代</li>
-      <li data-i18n="os.8">独立衍生自 DeepSeek Harness，保留上游版权与许可声明</li>
+      <li data-i18n="os.8">多机扩展：闲置电脑加入就能分担工作环境，员工仍用一个网址</li>
+      <li data-i18n="os.9">独立衍生自 DeepSeek Harness，保留上游版权与许可声明</li>
     </ul>
     <div class="notice reveal" data-i18n="os.notice">当前为预览阶段：对外接口、配置、数据库结构与部署流程可能还会调整；对外开放服务前，请先阅读仓库里的 SAFETY.md 与部署手册。</div>
   </div>
@@ -584,7 +638,7 @@ html.js .reveal.on{opacity:1;transform:none}
 const dict = {
   en: {
     'nav.admin': 'Admin center', 'nav.runtime': 'How it runs', 'nav.principles': 'Philosophy', 'nav.capabilities': 'Capabilities',
-    'nav.scenes': 'Scenarios', 'nav.screens': 'Interface', 'nav.mobile': 'Mobile', 'nav.start': 'Quick start', 'nav.oss': 'Open source', 'nav.menu': 'Menu',
+    'nav.fleet': 'Machines', 'nav.scenes': 'Scenarios', 'nav.screens': 'Interface', 'nav.mobile': 'Mobile', 'nav.start': 'Quick start', 'nav.oss': 'Open source', 'nav.menu': 'Menu',
     'hero.kick': '',
     'hero.title': 'Run your AI team <span class="hl">like a team</span>',
     'hero.sub': 'Enterprise AI adoption isn\u2019t about more AI accounts — it\u2019s about bringing AI into real collaboration. CoHarness gives a team permission-tiered shared workspaces: a private environment per member, a shared one per project, capabilities assembled from plugins, and enterprise-grade governance over models, usage, and every action.',
@@ -617,6 +671,14 @@ const dict = {
     'rt.4t': 'Three permission tiers + directory-level grants', 'rt.4p': 'Workspaces mount read-only, workspace-write, or full-access tiers; sessions authorize by exact directory and filter out what a participant may not see; a project directory may not overlap any member’s personal directory.',
     'rt.5t': 'Real isolation on the server', 'rt.5p': 'In development, processes run locally; on Linux in production every workspace runs under its own system account with filesystem isolation — an ordinary project workspace sees only its own project directory.',
     'rt.6t': 'A resident operations seat', 'rt.6p': 'Admins also get an always-on AI workspace dedicated to the platform itself: read-only queries by default, every write needs a fresh one-time approval, and every query is audited — even the operations channel is governed, which is why it can be trusted.',
+    'fl.title': 'Out of desks? Add a computer',
+    'fl.sub': 'The office Mac mini, the file server, a spare PC — any of them can join and share the team\u2019s workspaces. For members nothing changes: it is still one address.',
+    'fl.hub': 'Admin center', 'fl.hubs': 'sign-in · dispatch · permissions · audit · ledger',
+    'fl.n1': 'an idle office machine running the design team\u2019s desks', 'fl.n2': 'the rack server, shared by several projects', 'fl.n3': 'a retired front-desk PC, ready when someone needs a desk',
+    'fl.1t': 'Adding a machine is like sending an invite', 'fl.1p': 'An admin taps once in the console to mint a join code; the machine types it in and comes online to share the work — Mac, Linux, and Windows all join the same way.',
+    'fl.2t': 'A dusty spare PC can still clock in', 'fl.2p': 'As long as it can reach the center\u2019s address it can share the team\u2019s desks: it never opens itself to the outside and never sees a database password — it just works quietly in the corner.',
+    'fl.3t': 'You decide who works on which machine', 'fl.3p': 'The R&D box can serve R&D desks only while the front-office project runs elsewhere; each machine can also be limited to certain desk types. Retire one in the console and it leaves the team at once.',
+    'fl.4t': 'Every desk has a known home', 'fl.4p': 'Personal and project desks each live on one machine, and their material is stored there too. If a machine is offline the page says so honestly — work is never quietly moved elsewhere.',
     'pr.title': 'The unit of collaboration is shared work, not a forwarded chat link',
     'pr.sub': 'A project remembers the running AI workspace, each participant’s contribution, delegation relationships, pending approvals, and recoverable progress — close the browser or stop an agent, and the work stays put.',
     'pr.1t': 'Assembled your way, not a fixed pipeline', 'pr.1p': 'Which models, which tools the AI gets, who may approve what, and how work is delegated all compose through plugins and configuration — fitted to how the team actually works.',
@@ -674,7 +736,8 @@ const dict = {
     'os.5': 'Optional Android shell for reaching a deployed system from phones',
     'os.6': 'Data sovereignty: data on your own infrastructure, models on your own keys',
     'os.7': 'Independently deployed, free to evolve: the harness itself is your asset, iterating fast with the team',
-    'os.8': 'Independently derived from DeepSeek Harness, with upstream copyright and license notices preserved',
+    'os.8': 'Multi-machine scale-out: idle computers join to share workspaces while members keep one address',
+    'os.9': 'Independently derived from DeepSeek Harness, with upstream copyright and license notices preserved',
     'cl.title': 'Reading the code is the audit',
     'cl.sub': 'The admin console, workspace orchestration, docs, and deployment all live in the repository. Preview stage — issues and PRs welcome.',
     'cl.cta1': 'View on GitHub', 'cl.cta2': 'Back to quick start',
