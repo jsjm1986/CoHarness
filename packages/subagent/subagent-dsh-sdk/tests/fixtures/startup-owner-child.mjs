@@ -1,10 +1,10 @@
 /** Deterministic child profile records physical startup and completes one model turn. */
 import { appendFileSync } from 'node:fs'
+import { LlmAdapter } from '@deepseek-ai/dsh-llm'
 
 export const inject = ['llm']
 export async function apply(ctx, config) {
   appendFileSync(config.record, JSON.stringify({ started: true }) + '\n')
-  const { LlmAdapter } = await import(config.llmEntry)
   class Adapter extends LlmAdapter {
     async resolveModel(provider, model) { return { provider, id: model, name: model } }
     async *stream() {

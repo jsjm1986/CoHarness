@@ -91,6 +91,7 @@ try{await harness.start();throw new Error('SDK launch unexpectedly succeeded')}c
     await expect(harness.start()).rejects.toBeInstanceOf(TransportClosedError)
     await mkdir(cwd)
     expect((await harness.run('retry the owned launch')).finalResponse).toBe('hello from fake runtime')
+    await harness.close()
   })
 
   it('joins a failed spawn when close begins before its error event', async () => {
