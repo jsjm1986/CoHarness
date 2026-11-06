@@ -19,11 +19,15 @@ it('retains a pending New Session and its origin draft across transport renewal'
     await page.goto(fixture.url, { waitUntil: 'networkidle' })
     const office = page.getByRole('region', { name: 'Office computer', exact: true })
     const heading = office.getByRole('button', { name: 'Office computer', exact: true })
-    if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
     const firstRow = office.locator('[data-row-key^="session:"]').first()
     const workspaceRow = office.getByText('Office work', { exact: true })
     try {
-      await expect.poll(async () => (await firstRow.isVisible()) || (await workspaceRow.isVisible()), { timeout: 60_000 }).toBe(true)
+      await expect.poll(async () => {
+        // The collapsed default tracks the active computer and remounts drop
+        // explicit expansion, so re-arm the click inside the poll.
+        if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
+        return (await firstRow.isVisible()) || (await workspaceRow.isVisible())
+      }, { timeout: 60_000 }).toBe(true)
     } catch (error: unknown) {
       console.log('[pc-diag] office region:', JSON.stringify((await office.textContent())?.slice(0, 500)))
       throw error
@@ -83,11 +87,13 @@ it('browses twenty cold computers and keeps personal conversations, drafts and t
     const openOffice = async (owner: typeof page): Promise<void> => {
       const section = owner.getByRole('region', { name: 'Office computer', exact: true })
       const heading = section.getByRole('button', { name: 'Office computer', exact: true })
-      if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
       const firstRow = section.locator('[data-row-key^="session:"]').first()
       const workspaceRow = section.getByText('Office work', { exact: true })
       try {
-        await expect.poll(async () => (await firstRow.isVisible()) || (await workspaceRow.isVisible()), { timeout: 60_000 }).toBe(true)
+        await expect.poll(async () => {
+          if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
+          return (await firstRow.isVisible()) || (await workspaceRow.isVisible())
+        }, { timeout: 60_000 }).toBe(true)
       } catch (error: unknown) {
         console.log('[pc-diag] office region:', JSON.stringify((await section.textContent())?.slice(0, 500)))
         throw error

@@ -219,7 +219,12 @@ describe('web e2e: Session draft initialization', () => {
     onTestFailed(async () => {
       if (sessionId === undefined) return
       const types = (await hostEvents(sessionId)).map(event => event.type)
-      console.log('[draft-init] host events at failure:', JSON.stringify(types))
+      const live = scaffold.ctx.sessions.get(SessionId(sessionId))
+      const agent = scaffold.ctx.agents.get(SessionId(sessionId))
+      console.log('[draft-init] host events at failure:', sessionId, JSON.stringify(types),
+        'live:', live === undefined ? 'unattached' : JSON.stringify(live.snapshotEvents().map(event => event.type)),
+        'agent:', agent === undefined ? 'none'
+          : `session===live:${agent.session === live} ${JSON.stringify(agent.session.snapshotEvents().map(event => event.type))}`)
     })
     const stop = scaffold.ctx.on('agent/pre-step', ({ agent }, next) => {
       if (agent.id === sessionId) throw new Error('The workspace is unavailable before input admission.')
