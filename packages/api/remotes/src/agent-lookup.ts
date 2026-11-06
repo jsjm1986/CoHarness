@@ -185,7 +185,6 @@ export function createApiRemoteAgentResolver(
             && hasApiRemoteSubagentOwner(ctx, publishedSession, publishedAgent)) {
             throw new ApiRemoteSubagentSessionOwnership(sessionId)
           }
-          console.warn(`[sess-diag] agents.resume ${sessionId}\n${new Error('trace').stack?.split('\n').slice(2, 10).join('\n') ?? ''}`)
           const handle = await ctx.agents.resume({
             resumeSessionId: sessionId,
             ...options.agentOptions === undefined ? {} : { agentOptions: options.agentOptions() },
