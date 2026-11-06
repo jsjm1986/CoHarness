@@ -1800,8 +1800,10 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
 
     if (pathname === '/account/api/context' && req.method === 'GET') {
       res.setHeader('cache-control', 'no-store')
-      const resolved = await selectedContext()
-      const scopes = await deps.collaboration?.projectsForUser(user.id) ?? []
+      const [resolved, scopes] = await Promise.all([
+        selectedContext(),
+        deps.collaboration?.projectsForUser(user.id) ?? Promise.resolve([]),
+      ])
       // `projectsForUser` already establishes the membership set. Use one
       // scoped batch detail query for owner flags instead of scanning the
       // organization catalog or issuing one detail query per membership.
