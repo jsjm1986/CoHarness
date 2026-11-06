@@ -586,10 +586,11 @@ export class WorkspaceRuntime implements IWorkspaces {
         }).then((sessionId) => {
           if (disposed || navigation.aborted) return
           return commitSessionNavigation(this.sessions, sessionId, navigation, () => {
-            // The captured current is stale after the reuse flight; open only
-            // when the live selection is still empty or still that Session.
+            // The captured current is stale after the reuse flight; the
+            // re-adopted blank supersedes ambient drift but never a selection
+            // the user explicitly committed while it was in flight.
             const live = this.sessions.list.getSnapshot().current
-            if (sessionId !== live && (live === undefined || live === current)) {
+            if (sessionId !== live && !this.sessions.isActivated(live)) {
               this.sessions.open(sessionId, { activate: false })
             }
             setState('done')

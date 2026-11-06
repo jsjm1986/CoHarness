@@ -279,6 +279,36 @@ it('does not overwrite a completed user selection when the saved restore lands l
   } finally { await f.ctx.fiber.dispose() }
 })
 
+it('still restores the saved Session over an ambient selection the user never committed', async () => {
+  const storage = new Map<string, string>()
+  const rawSaved = 'saved-on-b' as SessionId, rawLocal = 'ambient-local' as SessionId
+  const saved = clientSessionKey(target(2), rawSaved)
+  storage.set(`dsh.personal.current.v1.account:7.runtime:${target(1).runtimeId}`, JSON.stringify({ sessionId: saved }))
+  vi.stubGlobal('location', { search: `?dshRuntime=${target(1).runtimeId}` })
+  vi.stubGlobal('sessionStorage', { getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => { storage.set(key, value) } })
+  const f = await fixture(), policy = new ProjectUiPolicyRuntime()
+  ctxPolicy(f.ctx, policy)
+  f.api.onList = async () => ok({ items: [{ sessionId: rawLocal, updatedAt: 1, running: false, blank: false }] })
+  f.remoteApi.onList = async () => ok({ items: [{ sessionId: rawSaved, updatedAt: 1, running: false, blank: false }] })
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url.startsWith('/account/api/scope?')
+    ? new Response(null, { status: 204, headers: { location: `/?dshRuntime=${target(2).runtimeId}` } })
+    : new Response(JSON.stringify({ activeRuntime: target(1),
+      personalWorkspaces: [group(1), group(2)], items: [{ sessionId: rawSaved, runtime: target(2),
+        title: 'Saved on B', updatedAt: 1, blank: false }] }), { headers: { 'content-type': 'application/json' } })))
+  try {
+    await f.base.refresh()
+    // An ambient selection (startup restore, retained pane) never activated
+    // its Agent, so the account's last personal selection still supersedes it.
+    f.sessions.open(rawLocal, { activate: false })
+    installPersonalDirectory(f.ctx, f.connection, f.sessions, f.workspaces)
+    f.hostDescription.set({ version: 'test', cwd: '/work', attachedSessions: 0, home: '/home/test', canOpenPath: true,
+      executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(7)
+    await vi.waitFor(() => { expect(f.sessions.list.getSnapshot().current).toBe(saved) })
+  } finally { await f.ctx.fiber.dispose() }
+})
+
 it('keeps captured directory operations on B after selection returns to the bootstrap computer', async () => {
   const f = await fixture()
   try {

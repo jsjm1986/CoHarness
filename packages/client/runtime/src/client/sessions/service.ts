@@ -662,6 +662,16 @@ export class SessionRuntime implements ISessions {
   }
 
   /**
+   * Whether an explicit open published this Session's Agent during this
+   * connection lifetime; ambient selection paths use it to yield to a
+   * user-committed selection.
+   * @param id - candidate Session identity.
+   */
+  isActivated(id: SessionId): boolean {
+    return this.manager.isActivated(id)
+  }
+
+  /**
    * Open a healthy catalog child through its direct-parent address.
    * @param address - catalog-derived parent and child ids.
    */

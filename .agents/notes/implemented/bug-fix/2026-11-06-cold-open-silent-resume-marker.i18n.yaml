@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-06-cold-open-silent-resume-marker.md
 document:
-  en: d4f9bc7b9e6ab78a0c22cbc779bca81b3e8757ff
-  zh: cc242b8092fdd70dedd57e08aed1e150a617d33e
+  en: cdc45311a44f9e6e98e0b20d04f4f05f4a96d359
+  zh: 2aabab0d40dfd6e1d4c16e96433726f997cbeff7
 /agent-note-startup-reads-no-longer-race-the-silent-resume-marker:
   en: 7eda40fae0d80583
   zh: a417c1447075547b
@@ -12,8 +12,8 @@ document:
   en: 34d0f3f0c3f7f14e
   zh: fffcdce57bb66f90
 /agent-note-startup-reads-no-longer-race-the-silent-resume-marker/decision:
-  en: 3fbed8d6c1068df3
-  zh: 1fcab92d75239b4f
+  en: 2f7e9abecc11a1e4
+  zh: 5e7300a23ce87d7c
 /agent-note-startup-reads-no-longer-race-the-silent-resume-marker/alternatives-considered:
   en: 8aa981f2d584c8e0
   zh: 16b00c7e979d739e

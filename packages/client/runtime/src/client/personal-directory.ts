@@ -84,13 +84,12 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
       if (!await sessions.ensureSession(address.runtime, address.sessionId, signal)) return
       signal.throwIfAborted()
       // Restoring the account's last selection is ambient presentation, not a
-      // user open — the presented Session stays cold until engagement. An
-      // explicit navigation completed while the restore was in flight owns
-      // the selection: open only while it is still empty or already the
-      // saved Session awaiting its presentation.
+      // user open — the presented Session stays cold until engagement. The
+      // restore supersedes ambient selections (including the startup's own)
+      // but never one the user explicitly committed while it was in flight.
       await commitSessionNavigation(sessions, saved, signal, () => {
         const live = sessions.list.getSnapshot().current
-        if (live === undefined || live === saved) sessions.open(saved, { activate: false })
+        if (live === saved || !sessions.isActivated(live)) sessions.open(saved, { activate: false })
       })
     }).catch((error: unknown) => {
       if (!navigation.aborted) console.error('[personal-directory] Selected conversation could not be restored:', error)

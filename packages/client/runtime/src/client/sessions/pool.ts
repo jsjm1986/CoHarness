@@ -1071,6 +1071,18 @@ export class SessionRuntimePool implements ISessions {
     if (this.personalDirectory) this.releaseUnused(this.stagedIds)
   }
 
+  /**
+   * Whether the given Session was selected through an explicit open during
+   * this connection lifetime; ambient restores use it to yield a selection
+   * the user committed rather than superseding it.
+   * @param id - runtime-qualified Session identity.
+   */
+  isActivated(id: SessionId | undefined): boolean {
+    if (id === undefined) return false
+    const owner = this.ownerFor(id)
+    return owner !== undefined && owner.runtime.isActivated(this.originalId(id, owner))
+  }
+
   clear(): void {
     this.activeSession = undefined
     this.base.clear()

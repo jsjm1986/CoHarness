@@ -95,6 +95,13 @@ export interface SessionsPort extends Pick<ISessions, 'retain' | 'keyFor' | 'run
    *   (startup restore never publishes an Agent on its own).
    */
   open(id: SessionId, options?: { activate?: boolean }): void
+  /**
+   * Whether the Session was selected through an explicit open during this
+   * connection lifetime; ambient restores use it to yield a selection the
+   * user committed rather than superseding it.
+   * @param id - runtime-qualified session id.
+   */
+  isActivated(id: SessionId | undefined): boolean
   /** Clear the current selection into the no-session view state. */
   clear(): void
 }

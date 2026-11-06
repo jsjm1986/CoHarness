@@ -309,6 +309,15 @@ export class SessionManager {
   }
 
   /**
+   * Whether an explicit open published the Session's Agent during this
+   * connection lifetime; ambient presentations and restores never qualify.
+   * @param sessionId - candidate Session identity.
+   */
+  isActivated(sessionId: SessionId): boolean {
+    return this.activated.has(sessionId)
+  }
+
+  /**
    * Select a healthy child through its durable direct-parent address.
    * @param address - catalog-derived parent and child ids.
    */
