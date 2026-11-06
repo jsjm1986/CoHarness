@@ -35,7 +35,7 @@
 import { sidebarTargetFromElement, type SidebarRightTarget } from './focus.ts'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { createSnapshotStore, type ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
-import type { FloatRect, PaneId, TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
+import type { DockMode, FloatRect, PaneId, TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { activeDockPaneId, canSplit, findContentTab, dockPaneIds, findTabPane, getPane } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -410,6 +410,18 @@ export class SidebarRightController implements ISidebarRight {
     const tab = surface.layout.tabs[tabId]
     if (tab === undefined || !canCloseTab(surface, tabId)) return
     this.removeAfterCleanup(sessionId, tab, () => { actions.closeTab(sessionId, tabId) })
+  }
+
+  /**
+   * Set one session's panel display mode, for a tab's own action; nothing
+   * happens for a session whose store was never adopted or whose adoption was
+   * released. Not part of `ISidebarRight`: the Tab domain's path.
+   * @param sessionId - the session the acting tab is in.
+   * @param mode - the display mode to apply.
+   */
+  setPanelModeIn(sessionId: SessionId, mode: DockMode): void {
+    const actions = this.actionsFor(sessionId)
+    if (actions !== undefined) actions.setMode(sessionId, mode)
   }
 
   private removeAfterCleanup(sessionId: SessionId, tab: TabRecord, commit: () => void): void {

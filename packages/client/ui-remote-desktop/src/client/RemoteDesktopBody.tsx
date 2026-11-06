@@ -1,12 +1,17 @@
 /** Remote-desktop tab body: grant status, explicit consent, attach, and the RFB screen. */
-import { useEffect, useRef, useState, type ReactNode, type SyntheticEvent } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { DockMode } from '@deepseek-ai/dsh-client-ui-dockkit'
+import {
+  Button, IconChevronDownOutline14, IconFullscreenOutline16, IconMinimizeOutline16, Menu, SegmentedControl,
+  type MenuEntry,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   RemoteDesktopStatusView, RemoteDesktopTargetView,
 } from '@deepseek-ai/dsh-api-remote-desktop-controller/types'
 import type { RemoteDesktopAttachment } from '@deepseek-ai/dsh-api-remote-desktop-controller/client'
-import type { RemoteDesktopInjected, RemoteDesktopScreen } from './face.ts'
+import type { RemoteDesktopInjected, RemoteDesktopQuality, RemoteDesktopScreen, RemoteDesktopZoom } from './face.ts'
 import type {} from './locales.ts'
 import css from './RemoteDesktopBody.module.css'
 
@@ -41,7 +46,7 @@ function issueOf(error: unknown): string {
  * @returns the status, consent, or screen surface for the tab's target.
  */
 export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabInfo, t }: BodyProps): ReactNode {
-  const { tab } = useTabInfo()
+  const { sidebar, tab } = useTabInfo()
   const params = tab.navigation.params
   const target: RemoteDesktopTargetView | undefined = params !== undefined && 'nodeId' in params
     ? { nodeId: params.nodeId, ...(params.desktop === undefined ? {} : { desktop: params.desktop }) }
@@ -49,6 +54,16 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' })
   const [retry, setRetry] = useState(0)
   const gate = useRef<AbortController | undefined>(undefined)
+
+  // A live desktop wants the whole frame: ask once per mount, at the first
+  // moment the tab is both live and on screen. An operator who backs out of
+  // fullscreen is not re-pulled until the body remounts.
+  const fullscreenAsked = useRef(false)
+  useEffect(() => {
+    if (phase.kind !== 'live' || !tab.visible || fullscreenAsked.current || sidebar.fullscreen) return
+    fullscreenAsked.current = true
+    tab.actions.setPanelMode('fullscreen')
+  }, [phase.kind, tab.visible, sidebar.fullscreen, tab.actions])
 
   const deny = (error: unknown): void => {
     setPhase({ kind: 'denied', code: issueOf(error), message: error instanceof Error ? error.message : String(error) })
@@ -115,25 +130,26 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
     case 'denied': return (
       <div className={css.notice}>
         <p>{phase.code === 'failed' ? t('failed').replace('{message}', phase.message) : t(phase.code as 'forbidden' | 'unavailable' | 'stale' | 'consentRequired')}</p>
-        <button type="button" className={css.action} onClick={() => { setRetry(count => count + 1) }}>{t('retry')}</button>
+        <Button variant="outline" size="sm" onClick={() => { setRetry(count => count + 1) }}>{t('retry')}</Button>
       </div>
     )
     case 'consent': return (
       <div className={css.consent}>
         <h2 className={css.heading}>{t('consentTitle')}</h2>
         <p>{(phase.status.level === 'control' ? t('consentControl') : t('consentView')).replace('{node}', phase.status.target.nodeId)}</p>
-        {phase.status.recording && <p className={css.recording}>{t('consentRecording')}</p>}
+        {phase.status.recording && <p className={css.recordingLine}>{t('consentRecording')}</p>}
         <p className={css.detail}>
           {t('desktop')}: {phase.status.target.desktop ?? '—'} · {phase.status.level === 'control' ? t('control') : t('viewOnly')}
         </p>
-        <button type="button" className={css.action} onClick={() => void consentNow(phase.status)}>{t('consentAction')}</button>
+        <Button variant="primary" size="md" className={css.consentAction} onClick={() => void consentNow(phase.status)}>{t('consentAction')}</Button>
       </div>
     )
     case 'attaching': return <p className={css.notice}>{t('attaching')}</p>
     case 'live': return (
       <RfbSurface
         openScreen={openScreen} url={phase.attachment.url} spec={phase.attachment.spec}
-        t={t} onReconnect={() => { setRetry(count => count + 1) }}
+        t={t} fullscreen={sidebar.fullscreen} onPanelMode={(mode) => { tab.actions.setPanelMode(mode) }}
+        onReconnect={() => { setRetry(count => count + 1) }}
       />
     )
   }
@@ -142,9 +158,11 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
 /** The live surface: chrome controls plus the RFB canvas. Mounts the screen
  * once per attachment URL, answers the server's credentials challenge inside
  * the tab, and offers disconnect/reconnect around the stream's own lifecycle. */
-function RfbSurface({ openScreen, url, spec, t, onReconnect }: Pick<RemoteDesktopInjected, 'openScreen'> & Pick<BodyProps, 't'> & {
+function RfbSurface({ openScreen, url, spec, t, fullscreen, onPanelMode, onReconnect }: Pick<RemoteDesktopInjected, 'openScreen'> & Pick<BodyProps, 't'> & {
   url: string
   spec: RemoteDesktopAttachment['spec']
+  fullscreen: boolean
+  onPanelMode: (mode: DockMode) => void
   onReconnect: () => void
 }): ReactNode {
   const container = useRef<HTMLDivElement>(null)
@@ -153,6 +171,13 @@ function RfbSurface({ openScreen, url, spec, t, onReconnect }: Pick<RemoteDeskto
   const [closed, setClosed] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [zoom, setZoom] = useState<RemoteDesktopZoom>('fit')
+  const [quality, setQuality] = useState<RemoteDesktopQuality>('balanced')
+  const [qualityOpen, setQualityOpen] = useState(false)
+  // Refs carry the operator's picks across attachments without restarting the
+  // mount effect: a reconnect re-applies them, a live change only re-tunes.
+  const picks = useRef<{ zoom: RemoteDesktopZoom; quality: RemoteDesktopQuality }>({ zoom: 'fit', quality: 'balanced' })
+  const zoomId = useId()
   useEffect(() => {
     const host = container.current
     if (host === null) return
@@ -164,12 +189,24 @@ function RfbSurface({ openScreen, url, spec, t, onReconnect }: Pick<RemoteDeskto
       onDisconnected: () => { setClosed(true) },
     })
     screen.current = next
+    next.setZoom(picks.current.zoom)
+    next.setQuality(picks.current.quality)
     return () => { screen.current = undefined; next.disconnect() }
   }, [openScreen, url, spec.level])
   const disconnect = (): void => {
     setChallenge(undefined)
     screen.current?.disconnect()
     setClosed(true)
+  }
+  const changeZoom = (next: RemoteDesktopZoom): void => {
+    picks.current = { ...picks.current, zoom: next }
+    setZoom(next)
+    screen.current?.setZoom(next)
+  }
+  const changeQuality = (next: RemoteDesktopQuality): void => {
+    picks.current = { ...picks.current, quality: next }
+    setQuality(next)
+    screen.current?.setQuality(next)
   }
   const sendCredentials = (event: SyntheticEvent): void => {
     event.preventDefault()
@@ -182,17 +219,65 @@ function RfbSurface({ openScreen, url, spec, t, onReconnect }: Pick<RemoteDeskto
     setPassword('')
     setChallenge(undefined)
   }
+  const qualityItems: readonly MenuEntry[] = (['sharp', 'balanced', 'smooth'] as const).map(level => ({
+    id: level,
+    label: t(`quality_${level}`),
+  }))
   return <div className={css.screen}>
     <div className={css.chrome}>
-      <span className={css.badge}>{spec.level === 'control' ? t('control') : t('viewOnly')}</span>
-      {spec.recording && <span className={css.recording}>{t('consentRecording')}</span>}
-      {!closed && <button type="button" className={css.action} onClick={disconnect}>{t('disconnect')}</button>}
+      <span className={css.badge} data-level={spec.level}>{spec.level === 'control' ? t('control') : t('viewOnly')}</span>
+      {spec.recording && <span className={css.recording}>{t('recording')}</span>}
+      <span className={css.chromeDivider} />
+      <SegmentedControl
+        id={zoomId}
+        label={t('zoom')}
+        value={zoom}
+        disabled={closed}
+        options={[
+          { value: 'fit', label: t('zoomFit') },
+          { value: 'actual', label: t('zoomActual'), title: t('zoomActualHint') },
+        ]}
+        onChange={changeZoom}
+      />
+      <Menu
+        open={qualityOpen}
+        portal
+        selectedId={quality}
+        anchor={(
+          <Button
+            variant="ghost" size="toolbar" disabled={closed}
+            title={t('quality')}
+            onClick={() => { setQualityOpen(open => !open) }}
+          >
+            {t('quality')}: {t(`quality_${quality}`)}
+            <IconChevronDownOutline14 />
+          </Button>
+        )}
+        items={qualityItems}
+        onSelect={(id) => { changeQuality(id as RemoteDesktopQuality); setQualityOpen(false) }}
+        onClose={() => { setQualityOpen(false) }}
+      />
+      <span className={css.chromeSpacer} />
+      {spec.level === 'control' && !closed && (
+        <Button variant="ghost" size="toolbar" title={t('ctrlAltDelHint')}
+          onClick={() => { screen.current?.sendCtrlAltDel() }}>
+          {t('ctrlAltDel')}
+        </Button>
+      )}
+      <Button
+        variant="ghost" size="toolbar"
+        icon={fullscreen ? <IconMinimizeOutline16 /> : <IconFullscreenOutline16 />}
+        title={fullscreen ? t('exitFullscreen') : t('fullscreen')}
+        aria-label={fullscreen ? t('exitFullscreen') : t('fullscreen')}
+        onClick={() => { onPanelMode(fullscreen ? 'push' : 'fullscreen') }}
+      />
+      {!closed && <Button variant="outline" size="sm" onClick={disconnect}>{t('disconnect')}</Button>}
     </div>
     <div ref={container} className={css.canvas}>
       {closed && (
         <div className={css.auth}>
           <p>{t('closed')}</p>
-          <button type="button" className={css.action} onClick={onReconnect}>{t('reconnect')}</button>
+          <Button variant="primary" size="sm" className={css.consentAction} onClick={onReconnect}>{t('reconnect')}</Button>
         </div>
       )}
       {challenge !== undefined && !closed && (
@@ -207,7 +292,7 @@ function RfbSurface({ openScreen, url, spec, t, onReconnect }: Pick<RemoteDeskto
               value={password} placeholder={t('password')} aria-label={t('password')}
               onChange={(event) => { setPassword(event.currentTarget.value) }} />
           )}
-          <button type="submit" className={css.action}>{t('credentialsAction')}</button>
+          <Button variant="primary" size="sm" className={css.consentAction} type="submit">{t('credentialsAction')}</Button>
         </form>
       )}
     </div>

@@ -18,7 +18,7 @@
  */
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
-import type { LayoutState, PaneId, TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
+import type { DockMode, LayoutState, PaneId, TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { findTabPane } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -37,6 +37,8 @@ export interface SidebarRightNavigator {
   openTabIn(sessionId: SessionId, kind: string, options?: SidebarRightOpenTabOptions): void
   /** Close a tab of one session. */
   closeIn(sessionId: SessionId, tabId: TabId): void
+  /** Set one session's panel display mode. */
+  setPanelModeIn(sessionId: SessionId, mode: DockMode): void
 }
 
 /** `ctx.workspaceResources.pin` wrapper: hold an address's content open for as long as `signal` lives. */
@@ -209,6 +211,7 @@ export class TabDomain {
         openTab: (kind, options = {}) => {
           navigator.openTabIn(sessionId, kind, { ...place(options), params: options.params })
         },
+        setPanelMode: (mode) => { navigator.setPanelModeIn(sessionId, mode) },
         close: () => { navigator.closeIn(sessionId, tabId) },
       },
     }

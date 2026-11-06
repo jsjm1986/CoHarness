@@ -96,7 +96,7 @@ interface SidebarRightTabParamsMap {}        // key: kind — a page type declar
 
 **一个 `open(address)` 包打天下，外加拼页地址的帮助函数。** 第一版页也按地址打开，于是业务包需要 `sidebar://<kind>` 字面量或来自 Sidebar 包的 `sidebarAddress(kind)` 帮助函数。两者都被值引用规则禁止，也都泄露了尚未设计的导航 scheme。把面拆成 `openResource` 与 `openTab`，唯一的字面量留在包内，且每种模式各自定型参数。
 
-**打开时点名某个实现（`?impl=`）、`find(address)`、`mode()`/`setMode()`、布局快照、`features` 清单。** 都考虑过并留在外面。点名实现属于尚不存在的导航协议；`find` 与快照会把该面变成布局的视图，而它本该是对布局的控制；呈现模式是 UI 开关不是插件关心的事；能力清单在该面尚在收敛时为时过早。
+**打开时点名某个实现（`?impl=`）、`find(address)`、`mode()`/`setMode()`、布局快照、`features` 清单。** 都考虑过并留在外面。点名实现属于尚不存在的导航协议；`find` 与快照会把该面变成布局的视图，而它本该是对布局的控制；呈现模式是 UI 开关不是插件关心的事；能力清单在该面尚在收敛时为时过早。该面至今没有模式操作；标签页的绑定动作后来为它自己的 Session 获得了这项操作——见 [Remote-desktop tabs drive the panel display mode through their bound actions](../feature/2026-11-06-remote-desktop-panel-mode-and-live-chrome.zh.md)。
 
 **用 Slot 优先级表达 extension 接管 builtin，随后是注册表铸造的坑位键。** 第一次尝试让覆盖方经一个导出常量以更低的 Slot 优先级注册正文——这是动态插件间的值引用，也是拿第二套规则（Slot 优先级）替注册表的规则站台。第二次尝试让注册表为每次注册铸一个键并从 `register()` 返回，这把注册变成了两步且顺序敏感的舞步。让实现自己声明 `id`——必填、唯一、与它注册坑位所用的同一个串——既不需要常量，也不需要铸键与顺序，还给了注册表拒绝重复所需的身份。
 

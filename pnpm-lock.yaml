@@ -4471,6 +4471,9 @@ importers:
       '@deepseek-ai/dsh-client-runtime':
         specifier: workspace:*
         version: link:../runtime
+      '@deepseek-ai/dsh-client-ui-dockkit':
+        specifier: workspace:*
+        version: link:../ui-dockkit
       '@deepseek-ai/dsh-client-ui-primitives':
         specifier: workspace:*
         version: link:../ui-primitives
@@ -6410,12 +6413,12 @@ importers:
       '@deepseek-ai/dsh-goal-round-driver':
         specifier: workspace:*
         version: link:../../goal/goal-round-driver
-      '@deepseek-ai/dsh-host-apiproxy':
-        specifier: workspace:*
-        version: link:../../host/apiproxy
       '@deepseek-ai/dsh-hmr':
         specifier: workspace:*
         version: link:../../boot/hmr
+      '@deepseek-ai/dsh-host-apiproxy':
+        specifier: workspace:*
+        version: link:../../host/apiproxy
       '@deepseek-ai/dsh-jobs':
         specifier: workspace:*
         version: link:../../jobs/jobs

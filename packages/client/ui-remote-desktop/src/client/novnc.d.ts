@@ -33,8 +33,20 @@ declare module '@novnc/novnc/lib/rfb.js' {
     viewOnly: boolean
     /** Scale the remote framebuffer to the container size. */
     scaleViewport: boolean
+    /** Clip the framebuffer to the container size instead of scaling it; the container scrolls. */
+    clipViewport: boolean
+    /** Pan the clipped framebuffer by dragging inside the viewport. */
+    dragViewport: boolean
+    /** Ask the server to resize its session to the container; no-op when the server lacks the capability. */
+    resizeSession: boolean
     /** Focus the canvas when the pointer clicks it. */
     focusOnClick: boolean
+    /** JPEG quality hint 0–9 for Tight-style encodings. */
+    qualityLevel: number
+    /** Zlib effort hint 0–9 for Tight-style encodings. */
+    compressionLevel: number
+    /** Send the Ctrl+Alt+Delete chord. */
+    sendCtrlAltDel(): void
     /** Resume the handshake after `credentialsrequired` with the operator's values. */
     sendCredentials(credentials: Record<string, string>): void
     /** End the connection and release the canvas. */

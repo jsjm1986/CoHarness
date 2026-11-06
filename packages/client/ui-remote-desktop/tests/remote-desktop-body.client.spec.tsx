@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import { RemoteDesktopBody } from '../src/client/RemoteDesktopBody.tsx'
-import type { RemoteDesktopInjected } from '../src/client/face.ts'
+import type { RemoteDesktopInjected, RemoteDesktopScreen } from '../src/client/face.ts'
 import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
@@ -23,12 +23,20 @@ function fixture(consented: boolean) {
   const status = vi.fn<RemoteDesktopInjected['status']>().mockResolvedValue(statusView(consented))
   const confirm = vi.fn<RemoteDesktopInjected['confirm']>().mockResolvedValue(ATTACHMENT.spec)
   const attach = vi.fn<RemoteDesktopInjected['attach']>().mockResolvedValue(ATTACHMENT)
-  const disconnect = vi.fn()
-  const sendCredentials = vi.fn()
-  const openScreen = vi.fn<RemoteDesktopInjected['openScreen']>().mockReturnValue({ disconnect, sendCredentials })
+  const screen_: RemoteDesktopScreen = {
+    disconnect: vi.fn(), sendCredentials: vi.fn(),
+    setZoom: vi.fn(), setQuality: vi.fn(), sendCtrlAltDel: vi.fn(),
+  }
+  const openScreen = vi.fn<RemoteDesktopInjected['openScreen']>().mockReturnValue(screen_)
+  const setPanelMode = vi.fn()
   const gate = new AbortController()
   const useTabInfo = () => ({
-    tab: { id: 'tab-1', signal: gate.signal, navigation: { params: TARGET } },
+    sidebar: { expanded: true, fullscreen: false },
+    panel: { id: 'pane-1' },
+    tab: {
+      id: 'tab-1', visible: true, signal: gate.signal, navigation: { params: TARGET },
+      actions: { setPanelMode },
+    },
   })
   const props = {
     status, confirm, attach, openScreen,
@@ -39,12 +47,15 @@ function fixture(consented: boolean) {
       return text
     },
   }
-  return { status, confirm, attach, openScreen, disconnect, sendCredentials, props }
+  return { status, confirm, attach, openScreen, setPanelMode, screen: screen_, props }
 }
+
+const renderBody = (f: ReturnType<typeof fixture>) =>
+  render(<RemoteDesktopBody {...(f.props as ComponentProps<typeof RemoteDesktopBody>)} />)
 
 it('shows the consent card before attach and mounts the screen after confirm', async () => {
   const f = fixture(false)
-  render(<RemoteDesktopBody {...(f.props as ComponentProps<typeof RemoteDesktopBody>)} />)
+  renderBody(f)
   await screen.findByText(en.consentTitle)
   expect(f.attach).not.toHaveBeenCalled()
   expect(screen.getByText(en.consentRecording)).toBeTruthy()
@@ -60,7 +71,7 @@ it('shows the consent card before attach and mounts the screen after confirm', a
 
 it('skips consent when the status already covers the grant set', async () => {
   const f = fixture(true)
-  render(<RemoteDesktopBody {...(f.props as ComponentProps<typeof RemoteDesktopBody>)} />)
+  renderBody(f)
   await waitFor(() => { expect(f.attach).toHaveBeenCalled() })
   expect(f.confirm).not.toHaveBeenCalled()
 })
@@ -68,7 +79,7 @@ it('skips consent when the status already covers the grant set', async () => {
 it.each([false, true])('explains an unavailable desktop before consent or attach (consented=%s)', async (consented) => {
   const f = fixture(consented)
   f.status.mockResolvedValue({ ...statusView(consented), available: false })
-  render(<RemoteDesktopBody {...(f.props as ComponentProps<typeof RemoteDesktopBody>)} />)
+  renderBody(f)
   await screen.findByText(en.unavailable)
   expect(f.confirm).not.toHaveBeenCalled()
   expect(f.attach).not.toHaveBeenCalled()
@@ -81,15 +92,15 @@ it.each([false, true])('explains an unavailable desktop before consent or attach
 
 it('disconnects the screen on unmount', async () => {
   const f = fixture(true)
-  const view = render(<RemoteDesktopBody {...(f.props as ComponentProps<typeof RemoteDesktopBody>)} />)
+  const view = renderBody(f)
   await waitFor(() => { expect(f.openScreen).toHaveBeenCalled() })
   view.unmount()
-  expect(f.disconnect).toHaveBeenCalled()
+  expect(f.screen.disconnect).toHaveBeenCalled()
 })
 
 it('answers the server credentials challenge inside the tab', async () => {
   const f = fixture(true)
-  render(<RemoteDesktopBody {...(f.props as ComponentProps<typeof RemoteDesktopBody>)} />)
+  renderBody(f)
   await waitFor(() => { expect(f.openScreen).toHaveBeenCalled() })
   const options = f.openScreen.mock.calls[0]![2]
   await act(async () => { options.onCredentialsRequired?.(['username', 'password']) })
@@ -97,5 +108,36 @@ it('answers the server credentials challenge inside the tab', async () => {
   fireEvent.change(screen.getByLabelText(en.username), { target: { value: 'operator' } })
   fireEvent.change(screen.getByLabelText(en.password), { target: { value: 'secret' } })
   await act(async () => { screen.getByRole('button', { name: en.credentialsAction }).click() })
-  expect(f.sendCredentials).toHaveBeenCalledWith({ username: 'operator', password: 'secret' })
+  expect(f.screen.sendCredentials).toHaveBeenCalledWith({ username: 'operator', password: 'secret' })
+})
+
+it('asks the panel for fullscreen once the stream is live and visible', async () => {
+  const f = fixture(true)
+  renderBody(f)
+  await waitFor(() => { expect(f.openScreen).toHaveBeenCalled() })
+  expect(f.setPanelMode).toHaveBeenCalledExactlyOnceWith('fullscreen')
+})
+
+it('retunes the live screen from the zoom and quality chrome', async () => {
+  const f = fixture(true)
+  renderBody(f)
+  await waitFor(() => { expect(f.openScreen).toHaveBeenCalled() })
+  expect(f.screen.setZoom).toHaveBeenCalledWith('fit')
+  expect(f.screen.setQuality).toHaveBeenCalledWith('balanced')
+  fireEvent.click(screen.getByRole('tab', { name: en.zoomActual }))
+  expect(f.screen.setZoom).toHaveBeenLastCalledWith('actual')
+  fireEvent.click(screen.getByRole('button', { name: `${en.quality}: ${en.quality_balanced}` }))
+  fireEvent.click(screen.getByRole('menuitem', { name: en.quality_smooth }))
+  expect(f.screen.setQuality).toHaveBeenLastCalledWith('smooth')
+})
+
+it('sends Ctrl+Alt+Delete and toggles the panel mode from the chrome', async () => {
+  const f = fixture(true)
+  renderBody(f)
+  await waitFor(() => { expect(f.openScreen).toHaveBeenCalled() })
+  f.setPanelMode.mockClear()
+  fireEvent.click(screen.getByRole('button', { name: en.ctrlAltDel }))
+  expect(f.screen.sendCtrlAltDel).toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: en.fullscreen }))
+  expect(f.setPanelMode).toHaveBeenCalledExactlyOnceWith('fullscreen')
 })

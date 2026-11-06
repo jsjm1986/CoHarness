@@ -4,15 +4,33 @@ import type {
   RemoteDesktopGrantView, RemoteDesktopLevelView, RemoteDesktopSpecView, RemoteDesktopStatusView, RemoteDesktopTargetView,
 } from '@deepseek-ai/dsh-api-remote-desktop-controller/types'
 
+/** Framebuffer-to-viewport fit: `fit` scales to the container, `actual` shows native pixels clipped to the viewport. */
+export type RemoteDesktopZoom = 'fit' | 'actual'
+
+/** Tight-encoding effort preset, traded against bandwidth; `balanced` is noVNC's shipped default. */
+export type RemoteDesktopQuality = 'smooth' | 'balanced' | 'sharp'
+
 /** RFB screen handle returned by the injected `openScreen`; the tab owns teardown. */
 export interface RemoteDesktopScreen {
   /** End the RFB connection and remove its canvas. */
-  disconnect(): void
+  readonly disconnect: () => void
   /**
    * Resume the handshake after a `credentialsrequired` prompt.
    * @param credentials - operator-supplied values for the fields the server asked for.
    */
-  sendCredentials(credentials: { readonly username?: string; readonly password?: string }): void
+  readonly sendCredentials: (credentials: { readonly username?: string; readonly password?: string }) => void
+  /**
+   * Apply the framebuffer-to-viewport fit.
+   * @param zoom - `fit` maps to `scaleViewport`; `actual` to `clipViewport` plus `dragViewport` panning.
+   */
+  readonly setZoom: (zoom: RemoteDesktopZoom) => void
+  /**
+   * Apply an encoding quality preset.
+   * @param quality - `smooth` compresses hardest for slow links, `sharp` favors clarity.
+   */
+  readonly setQuality: (quality: RemoteDesktopQuality) => void
+  /** Send the Ctrl+Alt+Delete chord; the server drops it under a view-only level. */
+  readonly sendCtrlAltDel: () => void
 }
 
 /** The remote-desktop sidebar seat's Remote calls, bound to the owning Session. */
