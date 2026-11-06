@@ -69,6 +69,8 @@ export interface GatewayConfig {
   keepAliveTimeoutMs: number
   /** Maximum interval between durable access-revocation reads and listener reconnects. */
   accessInvalidationPollMs: number
+  /** Memoization window for runtime-credential resolution; access invalidations flush early. */
+  runtimeTokenCacheMs: number
   /** Heartbeat interval for a managed runtime's execution revocation stream. */
   executionWatchHeartbeatMs: number
   /** Maximum bytes retained or streamed from one runtime upstream response. */
@@ -879,6 +881,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     databaseStartupRetryInitialMs,
     databaseStartupRetryMaxMs,
     accessInvalidationPollMs: timerDelay(env.HGW_ACCESS_INVALIDATION_POLL_MS, 1_000, 'HGW_ACCESS_INVALIDATION_POLL_MS'),
+    runtimeTokenCacheMs: timerDelay(env.HGW_RUNTIME_TOKEN_CACHE_MS, 2_000, 'HGW_RUNTIME_TOKEN_CACHE_MS'),
     executionWatchHeartbeatMs: timerDelay(env.HGW_EXECUTION_WATCH_HEARTBEAT_MS, DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS, 'HGW_EXECUTION_WATCH_HEARTBEAT_MS'),
     runtimeCredentialDir,
     organizationModelCredentialKeyFile,

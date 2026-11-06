@@ -54,12 +54,21 @@ function activeOwnerPredicate(target: RuntimeTarget): string {
 
 /** PostgreSQL instance rows scoped to one organization and compute node. */
 export class PostgresInstanceRepository implements InstanceRepository {
+  private readonly tokenCache = new Map<string, { subject: RuntimeCredentialSubject | null; expiresAt: number }>()
+  private readonly tokenFlights = new Map<string, Promise<RuntimeCredentialSubject | null>>()
+
   constructor(
     private readonly context: PostgresRuntimeContext,
     private readonly instancePortBase: number,
     private readonly nodeProjects?:NodeProjectMetadata,
     private readonly nodeFiles?:NodeProjectFiles,
+    private readonly runtimeTokenCacheMs = 0,
   ) {}
+
+  /** Drop every memoized credential verdict; access invalidation and local fencing call this. */
+  invalidateRuntimeTokenCache(): void {
+    this.tokenCache.clear()
+  }
 
   /** Verify a placed project's files before allocating or launching a new process. */
   async checkProjectStorage(target:RuntimeTarget):Promise<void|(()=>Promise<void>)>{
@@ -303,6 +312,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
       const blockedIntent = intent !== 'explicit' && (reason === 'manual' || intent === 'webhook' && reason !== 'idle')
       throw new RuntimeStartBlockedError(eligible !== null && blockedIntent ? eligible.stopReason : 'unavailable')
     }
+    this.invalidateRuntimeTokenCache()
     return Number(generation)
   }
 
@@ -485,6 +495,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
         AND owner.organization_id=i.organization_id AND i.organization_id=$1
         AND i.assigned_node_id=$2 AND owner.public_id=$3 AND i.generation=$4 AND ${runtimeAddress(target, 6)}`,
     [this.context.organizationId, this.context.nodeId, target.id, generation, reason ?? null, target.runtimeId ?? null])
+    if (result.rowCount === 1) this.invalidateRuntimeTokenCache()
     return result.rowCount === 1
   }
 
@@ -586,6 +597,22 @@ export class PostgresInstanceRepository implements InstanceRepository {
 
   private async authenticateToken(token: string, cleanup: boolean): Promise<RuntimeCredentialSubject | null> {
     const hash = createHash('sha256').update(token).digest()
+    if (this.runtimeTokenCacheMs <= 0) return this.authenticateTokenQuery(hash, cleanup)
+    const key = `${cleanup ? 'cleanup' : 'run'}:${hash.toString('hex')}`
+    const cached = this.tokenCache.get(key)
+    if (cached !== undefined && cached.expiresAt > Date.now()) return cached.subject
+    const flight = this.tokenFlights.get(key)
+    if (flight !== undefined) return flight
+    const pending = this.authenticateTokenQuery(hash, cleanup).then(subject => {
+      if (this.tokenCache.size >= 256) this.tokenCache.clear()
+      this.tokenCache.set(key, { subject, expiresAt: Date.now() + this.runtimeTokenCacheMs })
+      return subject
+    }).finally(() => { this.tokenFlights.delete(key) })
+    this.tokenFlights.set(key, pending)
+    return pending
+  }
+
+  private async authenticateTokenQuery(hash: Buffer, cleanup: boolean): Promise<RuntimeCredentialSubject | null> {
     const result = await this.context.pool.query<{
       organization_id: string
       runtime_id: RuntimeId

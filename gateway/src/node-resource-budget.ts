@@ -8,7 +8,7 @@ import { resourcePolicySchema, type ResourceStatus } from '@deepseek-ai/dsh-reso
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
 import type { RuntimeTarget } from './instances.ts'
 import type { RuntimeId } from './runtime-catalog.ts'
-import { pressureCredits, type NodePressureConfig, type NodePressureObservation } from './node-resource-pressure.ts'
+import { type NodePressureConfig, type NodePressureObservation } from './node-resource-pressure.ts'
 import { isDatabaseContentionError, transaction } from './postgres/database.ts'
 import { RuntimeCapacityError } from './runtime-capacity.ts'
 
@@ -136,26 +136,17 @@ export class NodeResourceBudget {
    * @returns completion after fair queued admissions commit.
    */
   async observe(observation: NodePressureObservation): Promise<void> {
-    await this.lock(async (client, limits) => {
-      const { capturedAt, ...sample } = observation
-      const before = performance.now() - capturedAt
-      if (before >= limits.staleMs) return
-      const clock = (await client.query<{ observed_at: string }>('SELECT clock_timestamp()::text observed_at')).rows[0]!.observed_at
-      // The two ages enclose capture time despite transit; the lower bound owns credit expiration.
-      const age = performance.now() - capturedAt
-      if (age >= limits.staleMs) return
-      const changed = await client.query(`WITH observation AS MATERIALIZED (
-        SELECT $4::timestamptz-$5::double precision*interval '1 millisecond' captured_at,
-          $4::timestamptz-$6::double precision*interval '1 millisecond' captured_before
-      ) UPDATE harness.node_resource_state SET pressure=$3::jsonb,sampled_at=observation.captured_at,
-        sampled_before=GREATEST(sampled_before,observation.captured_before),
-        valid_until=CASE WHEN $8=0 THEN GREATEST(valid_until,observation.captured_at+$7*interval '1 millisecond')
-          ELSE observation.captured_at+$7*interval '1 millisecond' END,credits=$8 FROM observation WHERE ${NODE}
-        AND observation.captured_at+$7*interval '1 millisecond'>clock_timestamp()
-        AND ($8=0 OR sampled_before IS NULL OR sampled_before<=observation.captured_at-$9*interval '1 millisecond') RETURNING node_id`,
-      [this.organizationId, this.nodeId, JSON.stringify(sample), clock, age, before, limits.staleMs, pressureCredits(sample, limits), limits.sampleMs])
-      if (changed.rowCount !== 0) await this.schedule(client)
-    })
+    const { capturedAt, ...sample } = observation
+    // One server call carries the whole round: capture age at dispatch bounds the
+    // sample the same way the former pre/post-lock pair did for the lock queue.
+    const elapsed = performance.now() - capturedAt
+    try {
+      await this.pool.query('SELECT harness.observe_node_resources($1,$2,$3::jsonb,$4,$5::jsonb)',
+        [this.organizationId, this.nodeId, JSON.stringify(sample), elapsed, JSON.stringify(this.config)])
+    } catch (error) {
+      if (!isDatabaseContentionError(error)) throw error
+      throw new NodeResourceBudgetError(503, 'database-busy', 'Resource accounting is busy. Retry after the current operation settles.', { cause: error })
+    }
   }
 
   /**

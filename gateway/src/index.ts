@@ -237,7 +237,7 @@ const documentCatalog = new PostgresDocumentCatalogService(context, cfg.archiveR
 const documentCatalogHandlers = createDocumentCatalogHandlers(documentCatalog, audit)
 const push = createPostgresPushService(context, cfg)
 const principalKeys = loadPrincipalKeys(cfg.principalKeyDir, cfg.organizationSlug, cfg.principalAssertionTtlMs)
-const instanceRepository = new PostgresInstanceRepository(context, cfg.instancePortBase, nodeProjects, nodeFiles)
+const instanceRepository = new PostgresInstanceRepository(context, cfg.instancePortBase, nodeProjects, nodeFiles, cfg.runtimeTokenCacheMs)
 const conversations = new PostgresConversationStore(pool, contentVolume)
 // Launcher is local child-process (dev) unless HGW_LAUNCHER=systemd (Linux prod);
 // the systemd options factory is only evaluated in the systemd case.
@@ -274,6 +274,7 @@ await resourceBudget.configure()
 const gatewayModelBudget = await GatewayModelBudget.open(resourceBudget, join(nodeControlPaths(cfg.stateRoot).gatewayModels, context.nodeId))
 const accessMonitor = new PostgresAccessMonitor(context, cfg.accessInvalidationPollMs)
 const localAccessMonitor = scopeAccessMonitor(accessMonitor, context.nodeId as RuntimeNodeId)
+localAccessMonitor.subscribe(() => { instanceRepository.invalidateRuntimeTokenCache() })
 const progress = new PostgresProgressService(context, { nodeContent: contentVolume, collaboration, governance, budget: gatewayModelBudget, accessMonitor: localAccessMonitor,
   usage: new PostgresProgressUsage(context, governance, cfg.progress.usageReplayBatchSize, assertCurrentDataEpoch, contentVolume),
   trackWrite: operation => trackWriter(operation), assertDataEpoch: assertCurrentDataEpoch,
