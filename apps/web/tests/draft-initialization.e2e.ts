@@ -216,6 +216,11 @@ describe('web e2e: Session draft initialization', () => {
     await startSession(page, wid, {})
     await expect.poll(() => selected(page), { timeout: 15_000 }).not.toBeUndefined()
     const sessionId = await selected(page)
+    onTestFailed(async () => {
+      if (sessionId === undefined) return
+      const types = (await hostEvents(sessionId)).map(event => event.type)
+      console.log('[draft-init] host events at failure:', JSON.stringify(types))
+    })
     const stop = scaffold.ctx.on('agent/pre-step', ({ agent }, next) => {
       if (agent.id === sessionId) throw new Error('The workspace is unavailable before input admission.')
       return next()

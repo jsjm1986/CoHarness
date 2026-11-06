@@ -3784,11 +3784,17 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     request: RpcRequest<unknown>, sessionId: SessionId,
   ): Promise<{ agent: Agent } | { refused: RpcResponse<T> }> {
     const found = await agentFor(sessionId)
-    if ('error' in found) return { refused: err(request, found.error) }
+    if ('error' in found) {
+      console.warn('[draft-diag] agentFor refused', sessionId, JSON.stringify(found.error))
+      return { refused: err(request, found.error) }
+    }
     const agent = found.agent
     const selection = selectionFor(agent).current
     const forbidden = modelRefusal(selection.provider, selection.model)
-    if (forbidden !== undefined) return { refused: err(request, forbidden) }
+    if (forbidden !== undefined) {
+      console.warn('[draft-diag] modelRefusal', sessionId, JSON.stringify(forbidden))
+      return { refused: err(request, forbidden) }
+    }
     if (!routeServed(selection.provider)) {
       return {
         refused: err(request, {
@@ -5053,6 +5059,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
       async prompt(request) {
         const { sessionId, mode, content, clientTimeZone, requestId } = request.payload
+        console.warn('[draft-diag] prompt received', sessionId, mode)
         if (!hasPromptContent(content)) {
           return err(request, {
             code: 'bad-request',
@@ -5129,6 +5136,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 details: { reason: error.code },
               })
             }
+            console.warn('[draft-diag] prompt throw', sessionId, String(error))
             return err(request, {
               code: 'agent-busy',
               message: 'prompt rejected',
