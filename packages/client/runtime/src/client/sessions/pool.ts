@@ -1059,12 +1059,12 @@ export class SessionRuntimePool implements ISessions {
     return source
   }
 
-  open(id: SessionId): void {
+  open(id: SessionId, options?: { activate?: boolean }): void {
     this.beginNavigation()
     const owner = this.ownerFor(id)
     if (owner === undefined) throw new Error(`sessions.select: unknown session ${id}`)
     this.activeSession = clientSessionKey(owner.target, this.originalId(id, owner))
-    owner.runtime.open(this.originalId(id, owner))
+    owner.runtime.open(this.originalId(id, owner), options)
     this.currentProvideSnapshot = owner.runtime.currentProvideInfo.getSnapshot()
     this.rebuild()
     this.notifyProvide()

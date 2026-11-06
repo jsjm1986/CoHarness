@@ -155,6 +155,7 @@ export function createApiRemoteAgentResolver(
   }
 
   const agentFor = async (sessionId: SessionId): Promise<ApiRemoteAgentResult> => {
+    console.warn(`[act-diag] agentFor ${sessionId}\n${new Error().stack?.split('\n').slice(2, 7).join('\n') ?? ''}`)
     let admission: Disposable
     try { admission = ctx.agents.reserveUse([sessionId]) } catch (error: unknown) {
       return { error: { code: 'internal', message: String(error), details: {} } }
@@ -243,13 +244,20 @@ export function createApiRemoteAgentResolver(
 
   ctx.inject(['typert'], (typeCtx) => {
     const resolveAgent = async (sessionId: SessionId): Promise<Agent> => {
+      console.warn(`[act-diag] resolveAgent entry ${sessionId}\n${new Error().stack?.split('\n').slice(2, 8).join('\n') ?? ''}`)
       const found = await agentFor(sessionId)
       if ('error' in found) throw new TypertLookupFailure(found.error)
       return found.agent
     }
     typeCtx.typert.lookups.configure('agent', resolveAgent)
-    typeCtx.typert.lookups.configure('session', async sessionId => (await resolveAgent(sessionId)).session)
-    typeCtx.typert.contexts.configureHost('agent', async sessionId => (await resolveAgent(sessionId)).ctx)
+    typeCtx.typert.lookups.configure('session', async (sessionId) => {
+      console.warn(`[act-diag] lookup session ${sessionId}\n${new Error().stack?.split('\n').slice(2, 8).join('\n') ?? ''}`)
+      return (await resolveAgent(sessionId)).session
+    })
+    typeCtx.typert.contexts.configureHost('agent', async (sessionId) => {
+      console.warn(`[act-diag] context agent ${sessionId}\n${new Error().stack?.split('\n').slice(2, 8).join('\n') ?? ''}`)
+      return (await resolveAgent(sessionId)).ctx
+    })
   })
 
   return {
