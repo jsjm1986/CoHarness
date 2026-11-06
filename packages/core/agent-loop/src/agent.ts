@@ -266,7 +266,6 @@ export class ReactLoopAgent implements Agent {
       if (reason?.kind !== 'disposed' && (this.phase.kind === 'maintenance' || wakeAfterAbort)) {
         this.phase.wakeRequested = true
       }
-      console.warn('[draft-diag] wake latched', this.id, this.phase.kind, reason?.kind)
       return
     }
     const driver = Promise.withResolvers<undefined>()
@@ -281,10 +280,9 @@ export class ReactLoopAgent implements Agent {
     let task: Promise<void>
     try {
       task = this.loopCtx.agents.withInitiator(this, () => this.kick())
-    } catch (error: unknown) {
+    } catch {
       // withInitiator rejects synchronously only when its scope is closing;
       // kick is async. No driver started, so teardown can finish quiescence.
-      console.warn('[draft-diag] initiator threw', this.id, String(error))
       this.setPhase({ kind: 'idle', lastTurn: this.phase.lastTurn })
       driver.resolve(undefined)
       return
@@ -314,7 +312,6 @@ export class ReactLoopAgent implements Agent {
       // Reported failures and cancellation are contained at the driver boundary.
       // A failed or aborted turn parks accepted-but-unclaimed input until a
       // later waking send, matching the existing cancellation contract.
-      console.warn('[draft-diag] kick threw', this.id, String(_error))
       this.pendingWakes.clear()
     } finally {
       /* v8 ignore next -- kick owns a running phase until this driver boundary */
