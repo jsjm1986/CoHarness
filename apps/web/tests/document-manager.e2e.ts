@@ -1268,7 +1268,7 @@ describe('web e2e: document manager', () => {
 
     await rowAction('Copy to…')
     const copy = page.getByRole('dialog', { name: 'Copy Document Snapshots', exact: true })
-    await copy.getByRole('radiogroup', { name: 'Target folder' }).getByRole('radio', { name: 'Root folder', exact: true }).waitFor()
+    await copy.getByRole('radiogroup', { name: 'Target folder' }).getByRole('textbox', { name: 'Search destination folders' }).waitFor()
     await assertFits(copy)
     await shot('copy')
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'secondary-copy.expected.md'), await captureStableAria(page, '[data-documents-dialog="copy"]', scaffold.workspaceCwd), MODE)
