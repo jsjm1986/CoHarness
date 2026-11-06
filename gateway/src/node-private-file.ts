@@ -6,6 +6,14 @@ import { runGatewayChildCommand } from './child-command.ts'
 /** Declared private-file verdicts; each caller maps them to its own error type. */
 export type PrivateFileState = 'private' | 'unreadable' | 'not-private'
 
+/**
+ * Resolves a path's owner-private ACL verdict on Windows. The default
+ * {@link probeWindowsAclPrivate} spawns one PowerShell child per call, so
+ * hot-path callers may inject a bounded resolver — only 'private' verdicts
+ * are safe to replay.
+ */
+export type WindowsAclProbe = (file: string, signal?: AbortSignal) => Promise<PrivateFileState>
+
 /** SIDs equivalent to the owner boundary on Windows: LocalSystem and the Administrators group. */
 const WINDOWS_BOUNDARY_SIDS = new Set(['S-1-5-18', 'S-1-5-32-544'])
 
@@ -63,15 +71,16 @@ const WINDOWS_ACL_TIGHTEN = '& { ' + [
  * @param info - stat result already read from the open handle.
  * @param maxBytes - declared size ceiling for the state document.
  * @param signal - caller cancellation for the Windows ACL probe.
+ * @param aclProbe - Windows ACL verdict resolver; defaults to a fresh PowerShell spawn.
  * @returns 'private' when the file may hold credentials; otherwise a declared reason.
  */
 export async function privateFileState(file: string, info: { isFile(): boolean; size: number; mode: number; uid: number },
-  maxBytes: number, signal?: AbortSignal): Promise<PrivateFileState> {
+  maxBytes: number, signal?: AbortSignal, aclProbe: WindowsAclProbe = probeWindowsAclPrivate): Promise<PrivateFileState> {
   if (!info.isFile() || info.size > maxBytes) return 'not-private'
   if (process.platform !== 'win32') {
     return (info.mode & 0o077) === 0 && info.uid === process.getuid!() ? 'private' : 'not-private'
   }
-  return await windowsAclPrivate(file, signal)
+  return await windowsAclPrivate(file, signal, aclProbe)
 }
 
 // Foreign modification rights: DeleteSubdirectoriesAndFiles (0x40),
@@ -167,21 +176,35 @@ async function protectedObjectState(directory:string,mode:number,file:boolean,si
  * @param directory - absolute directory path.
  * @param info - stat result already read from the path.
  * @param signal - caller cancellation for the Windows ACL probe.
+ * @param aclProbe - Windows ACL verdict resolver; defaults to a fresh PowerShell spawn.
  * @returns 'private' when only the owner and OS-boundary principals hold grants.
  */
 export async function privateDirectoryState(directory: string,
-  info: { isDirectory(): boolean; mode: number; uid: number }, signal?: AbortSignal): Promise<PrivateFileState> {
+  info: { isDirectory(): boolean; mode: number; uid: number }, signal?: AbortSignal,
+  aclProbe: WindowsAclProbe = probeWindowsAclPrivate): Promise<PrivateFileState> {
   if (!info.isDirectory()) return 'not-private'
   if (process.platform !== 'win32') {
     return (info.mode & 0o077) === 0 && info.uid === process.getuid!() ? 'private' : 'not-private'
   }
-  return await windowsAclPrivate(directory, signal)
+  return await windowsAclPrivate(directory, signal, aclProbe)
 }
 
-async function windowsAclPrivate(file: string, signal?: AbortSignal): Promise<PrivateFileState> {
+// `O_NOFOLLOW` is inert on Windows, so the reparse-point check re-lstats the
+// path on every call; only the PowerShell verdict itself is delegable.
+async function windowsAclPrivate(file: string, signal: AbortSignal | undefined, aclProbe: WindowsAclProbe): Promise<PrivateFileState> {
   const link = await lstat(file).catch(() => undefined)
   if (link === undefined) return 'unreadable'
   if (link.isSymbolicLink()) return 'not-private'
+  return await aclProbe(file, signal)
+}
+
+/**
+ * Spawn the PowerShell ACL probe for one path.
+ * @param file - absolute file or directory path.
+ * @param signal - caller cancellation for the child process.
+ * @returns 'private' when every Allow grant is the owner SID or an OS-boundary principal.
+ */
+export async function probeWindowsAclPrivate(file: string, signal?: AbortSignal): Promise<PrivateFileState> {
   const probe = await runGatewayChildCommand('powershell.exe',
     ['-NoProfile', '-NonInteractive', '-Command', windowsPrivateProbe(false), file], 10_000, signal, 4096).catch(() => undefined)
   let acl: z.infer<typeof windowsAclSchema> | undefined

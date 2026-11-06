@@ -7,9 +7,17 @@ import { isAbsolute, join } from 'node:path'
 import { tryLockExclusive } from '@deepseek-ai/node-addon-system/flock'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import { z } from 'zod'
-import { privateDirectoryState, privateFileState, syncStateDirectory, tightenPrivateFileAcl } from './node-private-file.ts'
+import { privateDirectoryState, privateFileState, probeWindowsAclPrivate, syncStateDirectory, tightenPrivateFileAcl,
+  type PrivateFileState, type WindowsAclProbe } from './node-private-file.ts'
 
 const OWNER_RECORD_BYTES = 65_536
+/**
+ * Bound on a replayed 'private' Windows ACL verdict inside one store. Each
+ * verdict costs a PowerShell spawn while the record open/read and lock-inode
+ * checks stay per-request, so a committed verdict replays briefly; failures
+ * never replay, and a changed record-file identity re-probes before expiry.
+ */
+const PRIVATE_ACL_CACHE_MS = 10_000
 const identitySchema = z.object({
   node: z.string().min(1),
   kind: z.enum(['user', 'project']),
@@ -64,6 +72,8 @@ export class LocalRuntimeOwnerStore {
   readonly recordPath: string
   readonly lockPath: string
   readonly cancellationPath: string
+  private directoryAclAt: number | undefined
+  private recordAcl: { at: number; mtimeMs: number; ctimeMs: number; size: number } | undefined
 
   constructor(readonly directory: string, identity: unknown) {
     if (!isAbsolute(directory)) throw new Error('Local runtime ownership requires an absolute private directory')
@@ -91,7 +101,8 @@ export class LocalRuntimeOwnerStore {
     }
     try {
       const stat = await handle.stat()
-      if (await privateFileState(this.recordPath, stat, OWNER_RECORD_BYTES) !== 'private') {
+      if (await privateFileState(this.recordPath, stat, OWNER_RECORD_BYTES, undefined,
+        (file, signal) => this.recordAclProbe(file, stat, signal)) !== 'private') {
         throw new Error('Local runtime owner record is not a bounded private file')
       }
       const bytes = Buffer.alloc(OWNER_RECORD_BYTES + 1)
@@ -229,9 +240,44 @@ export class LocalRuntimeOwnerStore {
 
   private async verifyDirectory(): Promise<void> {
     const stat = await lstat(this.directory)
-    if (await privateDirectoryState(this.directory, stat) !== 'private') {
+    if (await privateDirectoryState(this.directory, stat, undefined, this.directoryAclProbe) !== 'private') {
       throw new Error('Local runtime ownership requires a private directory')
     }
+  }
+
+  /**
+   * ACL probe for the owning directory: replay a committed 'private' verdict
+   * while it stays within {@link PRIVATE_ACL_CACHE_MS}, re-probe every other
+   * verdict so the check stays fail-closed. The directory lstat and
+   * reparse-point checks still run on every call.
+   */
+  private readonly directoryAclProbe: WindowsAclProbe = async (file, signal) => {
+    const now = Date.now()
+    if (this.directoryAclAt !== undefined && now - this.directoryAclAt < PRIVATE_ACL_CACHE_MS) return 'private'
+    const state = await probeWindowsAclPrivate(file, signal)
+    this.directoryAclAt = state === 'private' ? now : undefined
+    return state
+  }
+
+  /**
+   * ACL probe for the record file: replay a 'private' verdict only while the
+   * just-opened file keeps the identity that earned it. Republish renames a
+   * new file into place, which changes mtimeMs/ctimeMs/size and forces a
+   * fresh probe ahead of {@link PRIVATE_ACL_CACHE_MS}.
+   * @param file - record path, fixed per store.
+   * @param stat - stat result already read from this read's open handle.
+   * @param signal - caller cancellation for the child process.
+   * @returns the cached or freshly probed verdict.
+   */
+  private async recordAclProbe(file: string, stat: { mtimeMs: number; ctimeMs: number; size: number },
+    signal?: AbortSignal): Promise<PrivateFileState> {
+    const now = Date.now(), cached = this.recordAcl
+    if (cached !== undefined && now - cached.at < PRIVATE_ACL_CACHE_MS
+      && cached.mtimeMs === stat.mtimeMs && cached.ctimeMs === stat.ctimeMs && cached.size === stat.size) return 'private'
+    const state = await probeWindowsAclPrivate(file, signal)
+    this.recordAcl = state === 'private'
+      ? { at: now, mtimeMs: stat.mtimeMs, ctimeMs: stat.ctimeMs, size: stat.size } : undefined
+    return state
   }
 }
 

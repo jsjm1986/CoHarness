@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-06-owner-acl-verdict-replay.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-06-owner-acl-verdict-replay.md
+document:
+  en: dfd4f18f509a938f5723237f267072f7618d7f99
+  zh: a55df6c31b3570996a4b54e4f48b3fb0e960b8df
+/agent-note-the-local-runtime-owner-store-replays-windows-acl-verdicts-within-a-bounded-window:
+  en: 8a05b4ad134f8bb6
+  zh: 100b535d227d6576
+/agent-note-the-local-runtime-owner-store-replays-windows-acl-verdicts-within-a-bounded-window/problem:
+  en: c78ce8a5131df8f5
+  zh: c59312707c7161a4
+/agent-note-the-local-runtime-owner-store-replays-windows-acl-verdicts-within-a-bounded-window/decision:
+  en: 069661bf927f4691
+  zh: f2360e575f0088ea
+/agent-note-the-local-runtime-owner-store-replays-windows-acl-verdicts-within-a-bounded-window/alternatives-considered:
+  en: 132919fffee11ef8
+  zh: ffe00a07da1b37af
+/agent-note-the-local-runtime-owner-store-replays-windows-acl-verdicts-within-a-bounded-window/consequences:
+  en: 0be973e615e227c5
+  zh: d7d0ac7d00a307a9
+/agent-note-the-local-runtime-owner-store-replays-windows-acl-verdicts-within-a-bounded-window/testing:
+  en: e9ca9e5ac2c9b055
+  zh: 92d3db513cdaa1aa
