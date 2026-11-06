@@ -50,7 +50,7 @@ function sessionFakeFor() {
 async function bench(desktop = false, developerTools = stubDeveloperTools()) {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('connection', {
-    api: { settings: {} }, isLoopback: desktop,
+    api: { settings: {}, sessions: { activate: () => Promise.resolve({ accepted: true as const }) } }, isLoopback: desktop,
     hostDescription: {
       getSnapshot: () => desktop ? { canOpenPath: true, executionAuthorityRequired: false } : undefined,
       subscribe: () => () => {},

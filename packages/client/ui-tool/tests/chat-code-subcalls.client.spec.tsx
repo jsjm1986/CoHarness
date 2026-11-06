@@ -162,7 +162,7 @@ async function bench(snapshot: ConversationSnapshot) {
   ctx.provide('workspaces', workspaces)
   ctx.provide('layout', layout)
   ctx.provide('connection', {
-    api: { settings: {} },
+    api: { settings: {}, sessions: { activate: () => Promise.resolve({ accepted: true as const }) } },
     isLoopback: true,
     hostDescription: { getSnapshot: () => ({ canOpenPath: true, executionAuthorityRequired: false }), subscribe: () => () => {} },
   } as never)

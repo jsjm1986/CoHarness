@@ -27,7 +27,7 @@ function sidebarRightTabsFake() {
 async function bench(withBrowserRegistry = true) {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('connection', {
-    api: { settings: {} }, isLoopback: false,
+    api: { settings: {}, sessions: { activate: () => Promise.resolve({ accepted: true as const }) } }, isLoopback: false,
     hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
   })
   // The plugin injects both; these specs exercise no settings path.
