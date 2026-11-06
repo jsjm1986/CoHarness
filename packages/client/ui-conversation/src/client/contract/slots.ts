@@ -737,13 +737,6 @@ export interface ConversationSessionInjected {
     write: (draft: string | DraftSnapshot) => void,
     initialDraft?: string | DraftSnapshot,
   ) => () => void
-  /** Publish the session's live Agent now that its conversation is presented. */
-  activate: () => void
-  /** Framework-bound sources: presentation gates for ambient startup states. */
-  hooks: {
-    /** Initial selection settled and any required account verification is complete. */
-    activationReady: ObservableSnapshot<boolean>
-  }
 }
 
 /** Business callbacks injected into the strict session header seat. */

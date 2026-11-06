@@ -649,11 +649,16 @@ export class SessionRuntime implements ISessions {
 
   /**
    * Select a listed or retained catalog-addressed session as current.
+   * Explicit selection publishes the Session's live Agent on the Host;
+   * automatic selection paths (startup restore, retained panes) pass
+   * `activate: false` so their presentations stay cold.
    * @param id - listed or addressed session id.
+   * @param options - `activate: false` keeps the presented Session cold.
    */
-  open(id: SessionId): void {
+  open(id: SessionId, options?: { activate?: boolean }): void {
     this.beginNavigation()
     this.manager.select(id)
+    if (options?.activate !== false) this.manager.activate(id)
   }
 
   /**

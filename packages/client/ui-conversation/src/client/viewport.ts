@@ -656,6 +656,8 @@ export class ConversationViewportController implements ConversationViewport {
   }
 
   private select(sessionId: SessionId): void {
-    if (this.sessions.list.getSnapshot().current !== sessionId) this.sessions.open(sessionId)
+    // Pane focus can come from a restored layout rather than a user pick, so
+    // it must not publish the Agent on its own — engagement still resolves it.
+    if (this.sessions.list.getSnapshot().current !== sessionId) this.sessions.open(sessionId, { activate: false })
   }
 }

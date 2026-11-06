@@ -586,7 +586,7 @@ export class WorkspaceRuntime implements IWorkspaces {
         }).then((sessionId) => {
           if (disposed || navigation.aborted) return
           return commitSessionNavigation(this.sessions, sessionId, navigation, () => {
-            if (sessionId !== current) this.sessions.open(sessionId)
+            if (sessionId !== current) this.sessions.open(sessionId, { activate: false })
             setState('done')
           })
         }).catch((reason: unknown) => {
@@ -610,7 +610,7 @@ export class WorkspaceRuntime implements IWorkspaces {
             || this.list.getSnapshot().archivedSessionIds.includes(sessionId)) {
             throw new Error('Session was archived during initial selection')
           }
-          if (snapshot.current === undefined) this.sessions.open(sessionId)
+          if (snapshot.current === undefined) this.sessions.open(sessionId, { activate: false })
           setState('done')
         })
       }).catch((reason: unknown) => {

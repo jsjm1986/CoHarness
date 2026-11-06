@@ -530,35 +530,11 @@ export function apply(ctx: Context): void {
     sync()
     return () => { stop(); viewport.setEnabled(false) }
   }, 'ui-conversation: workbench contribution availability')
-  const activationReadyListeners = new Set<() => void>()
-  let activationReadyValue = false
-  const activationReady = {
-    getSnapshot: () => activationReadyValue,
-    subscribe: (listener: () => void): (() => void) => {
-      activationReadyListeners.add(listener)
-      return () => { activationReadyListeners.delete(listener) }
-    },
-  }
-  const computeActivationReady = (policy: ProjectUiPolicySnapshot | undefined): boolean =>
-    workspaces.list.getSnapshot().initialSelectionPending !== true
-    && (connection.hostDescription.getSnapshot()?.executionAuthorityRequired !== true
-      || policy?.verifiedAccountId !== undefined)
-  const refreshActivationReady = (policy: ProjectUiPolicySnapshot | undefined): void => {
-    const next = computeActivationReady(policy)
-    if (next === activationReadyValue) return
-    activationReadyValue = next
-    for (const listener of activationReadyListeners) listener()
-  }
-  activationReadyValue = computeActivationReady(ctx.get('projectUiPolicy')?.getSnapshot())
-  ctx.effect(() => workspaces.list.subscribe(() => {
-    refreshActivationReady(ctx.get('projectUiPolicy')?.getSnapshot())
-  }), 'ui-conversation: activation readiness on selection settle')
   ctx.inject(['projectUiPolicy'], inner => inner.effect(() => {
     const sync = (): void => {
       const required = connection.hostDescription.getSnapshot()?.executionAuthorityRequired
       const account = inner.projectUiPolicy.getSnapshot().verifiedAccountId
       viewport.setPersistenceScope(required === false ? 'local' : account !== undefined ? `account:${account}` : undefined)
-      refreshActivationReady(inner.projectUiPolicy.getSnapshot())
     }
     const stopHost = connection.hostDescription.subscribe(sync)
     const stopIdentity = inner.projectUiPolicy.subscribe(sync)
@@ -673,15 +649,6 @@ export function apply(ctx: Context): void {
         views,
         releaseSessionImages: (id) => { conversation.releaseSessionImages(id) },
         bindDraftMirror: (write, initialDraft) => inputHub.shell(sessionId).bindMirror(write, initialDraft),
-        activate: () => {
-          const target = sessions.runtimeTargetFor?.(sessionId)
-          const transport = target === undefined ? connection : connection.forTarget?.(target)
-          void transport?.api.sessions.activate({ sessionId }).then(
-            () => undefined,
-            (error: unknown) => { console.warn('[ui-conversation] session activation failed:', error) },
-          )
-        },
-        hooks: { activationReady },
       }
     },
   }, ConversationSession)

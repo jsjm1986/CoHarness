@@ -33,7 +33,7 @@ const sessionFake = () => ({
 async function bench() {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('connection', {
-    api: { settings: {}, sessions: { activate: () => Promise.resolve({ accepted: true as const }) } }, isLoopback: false,
+    api: { settings: {} }, isLoopback: false,
     hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
   })
   runtime.provide('remote', { $on: () => () => {} })

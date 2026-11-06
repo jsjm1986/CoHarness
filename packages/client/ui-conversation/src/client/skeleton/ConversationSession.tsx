@@ -235,8 +235,8 @@ export function ConversationSessionHeader({
  * @returns the active view area, or null while the Session remains blank.
  */
 export function ConversationSession({
-  sessionId, useSession, useActivationReady, inputActions, useStore, actions,
-  renderSlot, views, bindDraftMirror, releaseSessionImages, activate, compact = false, view,
+  sessionId, useSession, inputActions, useStore, actions,
+  renderSlot, views, bindDraftMirror, releaseSessionImages, compact = false, view,
 }: ConversationSessionProps) {
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
@@ -247,18 +247,12 @@ export function ConversationSession({
   const storedDraft = useStore(s => s.draft)
   // `?? null`: persisted snapshots from before the inspect field rehydrate without it.
   const inspect = useStore(s => s.inspect ?? null)
-  const activationReady = useActivationReady(ready => ready)
 
   useEffect(() => {
     bindDraftMirror(actions.setDraft, storedDraft)
     // Mount-only (deps pinned to inputActions): later store writes come from
     // the Session-owned mirror, including while this view is unmounted.
   }, [inputActions])
-
-  // A presented session body is the open intent that publishes the live
-  // Agent; ambient startup states (unsettled selection, unverified account)
-  // stay cold until readiness flips. Resume is idempotent Host-side.
-  useEffect(() => { if (activationReady) activate() }, [activate, activationReady, sessionId])
 
   useEffect(() => () => {
     releaseSessionImages(sessionId)

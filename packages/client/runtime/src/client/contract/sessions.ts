@@ -122,10 +122,13 @@ export interface ISessions {
    */
   readonly searchResultLimit: number
   /**
-   * Select a session as current.
+   * Select a session as current. Explicit selection publishes the Session's
+   * live Agent on the Host; automatic selection paths (startup restore,
+   * retained panes) pass `activate: false` so their presentations stay cold.
    * @param id - session id (must exist in the list; unknown ids fail loud).
+   * @param options - `activate: false` keeps the presented Session cold.
    */
-  open(id: SessionId): void
+  open(id: SessionId, options?: { activate?: boolean }): void
   /**
    * Open a healthy catalog child through its exact direct-parent address.
    * @param address - catalog-derived parent and child ids.

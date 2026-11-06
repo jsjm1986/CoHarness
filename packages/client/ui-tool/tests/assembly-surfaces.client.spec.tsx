@@ -69,7 +69,7 @@ const LAYOUT_CHILDREN = {
 async function bench(nodes: ToolResultNode[]) {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('connection', {
-    api: { settings: {}, sessions: { activate: () => Promise.resolve({ accepted: true as const }) } },
+    api: { settings: {} },
     isLoopback: false,
     hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
   })

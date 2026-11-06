@@ -51,7 +51,7 @@ function WorkspaceProbe({ open }: EmptyWorkspaceOwnerProps) {
 async function bench(opts?: { blank?: boolean }) {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('connection', {
-    api: { settings: {}, sessions: { activate: () => Promise.resolve({ accepted: true as const }) } }, isLoopback: false,
+    api: { settings: {} }, isLoopback: false,
     hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
   })
   // The plugin injects both; these specs exercise no settings path.
@@ -83,7 +83,7 @@ describe('resident composer', () => {
   it('renders the locked view state while no session exists at all', async () => {
     const runtime = await SlotTestRuntime.create()
     runtime.provide('connection', {
-      api: { settings: {}, sessions: { activate: () => Promise.resolve({ accepted: true as const }) } }, isLoopback: false,
+      api: { settings: {} }, isLoopback: false,
       hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
     })
     // The plugin injects both; these specs exercise no settings path.
@@ -117,7 +117,7 @@ describe('resident composer', () => {
   it('keeps the complete Hero tree mounted when the first Workspace session appears', async () => {
     const runtime = await SlotTestRuntime.create()
     runtime.provide('connection', {
-      api: { settings: {}, sessions: { activate: () => Promise.resolve({ accepted: true as const }) } }, isLoopback: false,
+      api: { settings: {} }, isLoopback: false,
       hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
     })
     // The plugin injects both; these specs exercise no settings path.
@@ -190,7 +190,7 @@ describe('prompt rejection through the assembled composer', () => {
   it('renders the promptError alert strip and keeps the draft in the machine', async () => {
     const runtime = await SlotTestRuntime.create()
     runtime.provide('connection', {
-      api: { settings: {}, sessions: { activate: () => Promise.resolve({ accepted: true as const }) } }, isLoopback: false,
+      api: { settings: {} }, isLoopback: false,
       hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
     })
     // The plugin injects both; these specs exercise no settings path.

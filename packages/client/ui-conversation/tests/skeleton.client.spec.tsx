@@ -226,8 +226,6 @@ function mount(
           views={views}
           releaseSessionImages={vi.fn()}
           bindDraftMirror={(write, initialDraft) => wiring.bindMirror(write, initialDraft)}
-          activate={vi.fn()}
-          useActivationReady={bindSnapshotSelector(createSnapshotStore(true))}
         />
       )
     }
