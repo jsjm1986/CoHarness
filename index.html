@@ -270,7 +270,7 @@ html.js .reveal.on{opacity:1;transform:none}
   .rows .row>p{grid-column:2}
   .cap-item{grid-template-columns:1fr;gap:4px}
   .gnum{font-size:56px;top:-6px;transform:none}
-  .sec-head h2,.sec-head .sub{max-width:calc(100% - 84px)}
+  .sec-head h2,.sec-head .sub,.sec-head .idx{max-width:calc(100% - 84px)}
   .fleet{margin:44px 0 8px}
   .f-hub{width:100%;flex-wrap:wrap;row-gap:10px}
   .f-hub i{white-space:normal}
@@ -426,9 +426,9 @@ html.js .reveal.on{opacity:1;transform:none}
   <div class="wrap">
     <div class="sec-head reveal">
       <span class="gnum" aria-hidden="true">03</span>
-      <div class="idx">SEC.03 · MULTI-COMPUTER</div>
-      <h2 data-i18n="fl.title">工位不够，加台电脑就行</h2>
-      <p class="sub" data-i18n="fl.sub">办公室的 Mac mini、文件服务器、闲置的 PC，都能加入进来分担团队的工作环境——员工用起来没区别，还是那个网址。</p>
+      <div class="idx">SEC.03 · MACHINES</div>
+      <h2 data-i18n="fl.title">数据要真隔离，就放到不同的电脑上</h2>
+      <p class="sub" data-i18n="fl.sub">工位不只跑在一台服务器上：财务的机器只开财务的工位、研发的机器只跑研发的工位——工位产生的数据，物理上就不在一台机。macOS、Linux、Windows 都能加入，员工访问的还是同一个网址。</p>
     </div>
     <div class="fleet reveal">
       <div class="f-hub">
@@ -437,16 +437,16 @@ html.js .reveal.on{opacity:1;transform:none}
       </div>
       <div class="f-trunk" aria-hidden="true"></div>
       <div class="f-nodes">
-        <div class="f-node"><div class="f-nh"><b>mac-mini</b><span class="f-os">MACOS · ARM64</span></div><p data-i18n="fl.n1">办公室角落的闲置机，顶起设计组的工位</p></div>
-        <div class="f-node"><div class="f-nh"><b>filesrv-01</b><span class="f-os">LINUX · X64</span></div><p data-i18n="fl.n2">机房的文件服务器，几个项目共用</p></div>
-        <div class="f-node"><div class="f-nh"><b>office-pc</b><span class="f-os">WINDOWS · X64</span></div><p data-i18n="fl.n3">前台的旧 PC，临时工位随开随用</p></div>
+        <div class="f-node"><div class="f-nh"><b>mac-mini</b><span class="f-os">MACOS · ARM64</span></div><p data-i18n="fl.n1">设计部专用：设计组的工位和素材数据都落在它身上</p></div>
+        <div class="f-node"><div class="f-nh"><b>filesrv-01</b><span class="f-os">LINUX · X64</span></div><p data-i18n="fl.n2">机房公共机：几个公共项目共用</p></div>
+        <div class="f-node"><div class="f-nh"><b>office-pc</b><span class="f-os">WINDOWS · X64</span></div><p data-i18n="fl.n3">财务部专用：账目相关的工位独占一台</p></div>
       </div>
     </div>
     <div class="rows reveal">
-      <div class="row"><span class="n">01</span><b data-i18n="fl.1t">加一台电脑，就像发一封邀请</b><p data-i18n="fl.1p">管理员在后台点一下，给新机器生成一个加入码；那台机填上码就上线干活——Mac、Linux、Windows 都一样。</p></div>
-      <div class="row"><span class="n">02</span><b data-i18n="fl.2t">角落里吃灰的旧电脑也能上岗</b><p data-i18n="fl.2p">只要它能连上中心的网址，就能帮团队分担工位：它不用对外开门，也拿不到数据库密码，安心放在角落干活。</p></div>
-      <div class="row"><span class="n">03</span><b data-i18n="fl.3t">哪台机给谁用，你说了算</b><p data-i18n="fl.3p">研发的电脑可以只开研发的工位，前台的项目跑另一台；每台机还能限制能开哪类工位。哪天不想用了，后台撤掉，它马上和团队断开。</p></div>
-      <div class="row"><span class="n">04</span><b data-i18n="fl.4t">每个工位都知道跑在哪台机上</b><p data-i18n="fl.4p">个人工位和项目工位都固定在一台机上，资料也存在那里；哪台机临时不在线，页面就如实标出来，不会把你的工作悄悄挪到别处。</p></div>
+      <div class="row"><span class="n">01</span><b data-i18n="fl.1t">一个部门一台电脑，数据真的分开</b><p data-i18n="fl.1p">财务的工位跑财务的机器、研发的工位跑研发的机器：工位产生的会话、文档、记忆都存在那台机上——部门边界天然就是物理边界，隔离不用只靠软件层。</p></div>
+      <div class="row"><span class="n">02</span><b data-i18n="fl.2t">机密项目还能独占一台机</b><p data-i18n="fl.2p">敏感项目的工位锁在专门的电脑上，别的机器上连它的目录都不出现；数据落在哪台机、谁能碰到，审计一眼看清。</p></div>
+      <div class="row"><span class="n">03</span><b data-i18n="fl.3t">三套操作系统，按你现有资产来</b><p data-i18n="fl.3p">macOS、Linux、Windows（x64 / arm64）都能做承载机：办公室的 Mac mini、机房的文件服务器、行政的 Windows PC——有什么用什么，不用统一换设备。</p></div>
+      <div class="row"><span class="n">04</span><b data-i18n="fl.4t">加机像发邀请，撤了立刻断</b><p data-i18n="fl.4p">管理员在后台给新机器发个加入码，它填上码、主动连上中心就开工——不用对外开门，也拿不到数据库密码；哪天撤掉授权，它马上和团队断开，工位归属在后台一清二楚。</p></div>
     </div>
   </div>
 </section>
@@ -599,7 +599,7 @@ html.js .reveal.on{opacity:1;transform:none}
       <li data-i18n="os.5">Android 壳可选，手机访问已部署系统</li>
       <li data-i18n="os.6">数据主权：数据在你自己的基础设施上，模型用自己的 Key</li>
       <li data-i18n="os.7">独立部署、自主演进：harness 本身是你的资产，随团队需求快速迭代</li>
-      <li data-i18n="os.8">多机扩展：闲置电脑加入就能分担工作环境，员工仍用一个网址</li>
+      <li data-i18n="os.8">多机部署：一个部门一台电脑，工位与数据物理分开；员工仍用一个网址</li>
       <li data-i18n="os.9">独立衍生自 DeepSeek Harness，保留上游版权与许可声明</li>
     </ul>
     <div class="notice reveal" data-i18n="os.notice">当前为预览阶段：对外接口、配置、数据库结构与部署流程可能还会调整；对外开放服务前，请先阅读仓库里的 SAFETY.md 与部署手册。</div>
@@ -671,14 +671,14 @@ const dict = {
     'rt.4t': 'Three permission tiers + directory-level grants', 'rt.4p': 'Workspaces mount read-only, workspace-write, or full-access tiers; sessions authorize by exact directory and filter out what a participant may not see; a project directory may not overlap any member’s personal directory.',
     'rt.5t': 'Real isolation on the server', 'rt.5p': 'In development, processes run locally; on Linux in production every workspace runs under its own system account with filesystem isolation — an ordinary project workspace sees only its own project directory.',
     'rt.6t': 'A resident operations seat', 'rt.6p': 'Admins also get an always-on AI workspace dedicated to the platform itself: read-only queries by default, every write needs a fresh one-time approval, and every query is audited — even the operations channel is governed, which is why it can be trusted.',
-    'fl.title': 'Out of desks? Add a computer',
-    'fl.sub': 'The office Mac mini, the file server, a spare PC — any of them can join and share the team\u2019s workspaces. For members nothing changes: it is still one address.',
+    'fl.title': 'Real separation means separate computers',
+    'fl.sub': 'Workspaces do not all live on one server: finance desks run on the finance machine, R&D desks on theirs — the data those desks produce is physically apart. macOS, Linux, and Windows can all join, and members still use one address.',
     'fl.hub': 'Admin center', 'fl.hubs': 'sign-in · dispatch · permissions · audit · ledger',
-    'fl.n1': 'an idle office machine running the design team\u2019s desks', 'fl.n2': 'the rack server, shared by several projects', 'fl.n3': 'a retired front-desk PC, ready when someone needs a desk',
-    'fl.1t': 'Adding a machine is like sending an invite', 'fl.1p': 'An admin taps once in the console to mint a join code; the machine types it in and comes online to share the work — Mac, Linux, and Windows all join the same way.',
-    'fl.2t': 'A dusty spare PC can still clock in', 'fl.2p': 'As long as it can reach the center\u2019s address it can share the team\u2019s desks: it never opens itself to the outside and never sees a database password — it just works quietly in the corner.',
-    'fl.3t': 'You decide who works on which machine', 'fl.3p': 'The R&D box can serve R&D desks only while the front-office project runs elsewhere; each machine can also be limited to certain desk types. Retire one in the console and it leaves the team at once.',
-    'fl.4t': 'Every desk has a known home', 'fl.4p': 'Personal and project desks each live on one machine, and their material is stored there too. If a machine is offline the page says so honestly — work is never quietly moved elsewhere.',
+    'fl.n1': 'the design team\u2019s own box: desks and assets stay on it', 'fl.n2': 'the rack server shared by the public projects', 'fl.n3': 'finance\u2019s own machine: ledger work keeps to itself',
+    'fl.1t': 'One computer per department means truly separate data', 'fl.1p': 'Finance desks run on the finance machine and R&D desks on theirs: the sessions, documents, and memory a desk creates all stay on that machine — the department boundary is a physical one, not just a software rule.',
+    'fl.2t': 'A confidential project can own a whole machine', 'fl.2p': 'Pin a sensitive project\u2019s desk to a dedicated computer and its directory never even appears on other machines. Where the data sits and who can touch it is obvious in the audit.',
+    'fl.3t': 'Three operating systems — use what you already own', 'fl.3p': 'macOS, Linux, and Windows (x64 / arm64) can all carry desks: the office Mac mini, the rack file server, the admin\u2019s Windows PC. No need to standardize on new hardware.',
+    'fl.4t': 'Join like an invite; revoke and it is gone', 'fl.4p': 'Admins mint a join code in the console; the machine enters it, reaches out to the center, and starts working — no public door needed and no database password held. Revoke the grant and it leaves the team at once, with every desk\u2019s home machine clear in the console.',
     'pr.title': 'The unit of collaboration is shared work, not a forwarded chat link',
     'pr.sub': 'A project remembers the running AI workspace, each participant’s contribution, delegation relationships, pending approvals, and recoverable progress — close the browser or stop an agent, and the work stays put.',
     'pr.1t': 'Assembled your way, not a fixed pipeline', 'pr.1p': 'Which models, which tools the AI gets, who may approve what, and how work is delegated all compose through plugins and configuration — fitted to how the team actually works.',
@@ -736,7 +736,7 @@ const dict = {
     'os.5': 'Optional Android shell for reaching a deployed system from phones',
     'os.6': 'Data sovereignty: data on your own infrastructure, models on your own keys',
     'os.7': 'Independently deployed, free to evolve: the harness itself is your asset, iterating fast with the team',
-    'os.8': 'Multi-machine scale-out: idle computers join to share workspaces while members keep one address',
+    'os.8': 'Multi-computer: a machine per department keeps workspaces and data physically apart, behind one address',
     'os.9': 'Independently derived from DeepSeek Harness, with upstream copyright and license notices preserved',
     'cl.title': 'Reading the code is the audit',
     'cl.sub': 'The admin console, workspace orchestration, docs, and deployment all live in the repository. Preview stage — issues and PRs welcome.',
