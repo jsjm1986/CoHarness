@@ -165,16 +165,20 @@ Node settings are resolved before file or network acquisition.
 | Node variable | Default | Meaning |
 |---|---|---|
 | `HGW_NODE_CENTER_URL` | Required | HTTPS origin; loopback HTTP is accepted locally |
+| `HGW_NODE_CENTER_DIAL_URLS` | `HGW_NODE_CENTER_URL` | Comma-separated ordered origins the agent dials instead; each follows the center-URL rule |
 | `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | Credential file private to its owning account (mode 0600 on macOS/Linux, an ACL limited to the file owner plus SYSTEM and Administrators on Windows) |
 | `HGW_NODE_ENROLLMENT_TOKEN` | Required for a new state file | Administrator ticket; enrolled records use their saved credential |
 | `HGW_NODE_AGENT_REQUEST_TIMEOUT_MS` | 10000 | Network request and shutdown-release timeout |
 | `HGW_NODE_AGENT_RETRY_MS` | 3000 | Delay between idempotent control retries |
+| `HGW_NODE_AGENT_DIAL_PREFERRED_RETRY_MS` | 60000 | After a dial fallback, the first fresh attempt at least this long later re-probes the first dial origin |
 | `HGW_NODE_AGENT_CHANNEL_ENABLED` | `1` | `0` disables the control socket; incompatible with a local service bridge |
 | `HGW_NODE_AGENT_CHANNEL_MAX_INFLIGHT` | 4 | Concurrent read-only probe handlers |
 | `HGW_NODE_AGENT_CHANNEL_MAX_FRAME_BYTES` | 16384 | Complete received/sent control-message byte limit |
 | `HGW_NODE_AGENT_CHANNEL_MAX_BUFFERED_BYTES` | 65536 | Outbound control buffer budget |
 | `HGW_NODE_LOCAL_GATEWAY_URL` | Unset | Fixed `http://127.0.0.1:<port>` or IPv6 loopback origin for the existing Gateway |
 | `HGW_NODE_AGENT_SERVICE_MAX_CONNECTIONS` | 16 | Concurrent local Gateway bridges, independent of probes |
+
+`HGW_NODE_CENTER_DIAL_URLS` names the transport, never the identity. Every listed origin must reach the same center: the credential file still binds `HGW_NODE_CENTER_URL`, and enrollment, identity and state checks do not move. The list covers deployments where the public origin is not the node's best route — an SSH reverse tunnel to loopback (`http://127.0.0.1:<port>`), a LAN address, a mesh overlay, then the public origin last. An attempt that gets no HTTP response — a refused connection, a timeout, a socket that dies before `open` — moves dialing to the next entry; any HTTP response, including a refusal, counts as reaching a center and never triggers failover. An in-flight attempt is never replayed to another origin; only the next fresh attempt sees the change.
 
 <a id="recovery"></a>
 

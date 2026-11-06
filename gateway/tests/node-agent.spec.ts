@@ -54,6 +54,33 @@ it.each(['0', '-1', '1.5', '2147483648'])('refuses invalid outbound timing %s', 
   expect(() => loadNodeAgentConfig({ HGW_NODE_CENTER_URL: 'https://example.invalid', HGW_NODE_AGENT_REQUEST_TIMEOUT_MS: value })).toThrow()
 })
 
+it('defaults the dial list to the center origin and validates every entry', () => {
+  const resolve = (value?: string) => loadNodeAgentConfig({
+    HGW_NODE_CENTER_URL: 'https://center.example',
+    ...(value === undefined ? {} : { HGW_NODE_CENTER_DIAL_URLS: value }),
+  })
+  expect(resolve().centerDialUrls).toEqual(['https://center.example'])
+  expect(resolve('   ').centerDialUrls).toEqual(['https://center.example'])
+  expect(resolve('https://relay.example,https://center.example').centerDialUrls)
+    .toEqual(['https://relay.example', 'https://center.example'])
+  expect(resolve('https://a.example, http://127.0.0.1:4000 ,http://[::1]:3000').centerDialUrls)
+    .toEqual(['https://a.example', 'http://127.0.0.1:4000', 'http://[::1]:3000'])
+  for (const value of ['https://a.example,,https://b.example', 'https://a.example,', ',https://a.example',
+    'https://a.example,https://a.example', 'https://a.example,https://A.EXAMPLE', 'http://192.168.1.2,https://b.example',
+    'https://u:p@a.example', 'https://a.example/path', 'not-a-url']) {
+    expect(() => resolve(value)).toThrowError(/HGW_NODE_CENTER_DIAL_URLS/u)
+  }
+})
+
+it.each(['0', '-1', '1.5', '2147483648'])('refuses invalid preferred-retry timing %s', value => {
+  expect(() => loadNodeAgentConfig({ HGW_NODE_CENTER_URL: 'https://example.invalid', HGW_NODE_AGENT_DIAL_PREFERRED_RETRY_MS: value })).toThrow()
+})
+
+it('defaults the preferred-retry window to sixty seconds', () => {
+  expect(loadNodeAgentConfig({ HGW_NODE_CENTER_URL: 'https://example.invalid' }).dialPreferredRetryMs).toBe(60_000)
+  expect(loadNodeAgentConfig({ HGW_NODE_CENTER_URL: 'https://example.invalid', HGW_NODE_AGENT_DIAL_PREFERRED_RETRY_MS: '5000' }).dialPreferredRetryMs).toBe(5000)
+})
+
 describe.skipIf(process.platform === 'win32')('POSIX node agent lifecycle', () => {
   it.each([
     { name: 'enrollment response interruption', phase: 'enroll', status: 200, interrupted: true, retry: true,
@@ -119,7 +146,7 @@ describe.skipIf(process.platform === 'win32')('POSIX node agent lifecycle', () =
       return response
     })
     releases.push(async () => { observer.mockRestore() })
-    const running = runNodeAgent({ centerUrl: base, stateFile, enrollmentToken: ticket(),
+    const running = runNodeAgent({ centerUrl: base, centerDialUrls: [base], dialPreferredRetryMs: 60_000, stateFile, enrollmentToken: ticket(),
       requestTimeoutMs: 10_000, retryMs: 1 }, stop.signal, event => {
       events.push(event)
       if (event.status === 'connected' && events.some(value => value.status === 'degraded')) stop.abort()
@@ -177,7 +204,7 @@ describe.skipIf(process.platform === 'win32')('POSIX node agent lifecycle', () =
       if (!reply.declared) { res.write(reply.body.slice(0, 2048)); res.end(reply.body.slice(2048)) }
       else res.end(reply.body)
     })
-    await expect(runNodeAgent({ centerUrl: base, stateFile: join(directory, 'access.json'),
+    await expect(runNodeAgent({ centerUrl: base, centerDialUrls: [base], dialPreferredRetryMs: 60_000, stateFile: join(directory, 'access.json'),
       enrollmentToken: ticket(), requestTimeoutMs: 10_000, retryMs: 1 },
     new AbortController().signal, event => { events.push(event) }))
       .rejects.toMatchObject({ code: 'node-agent/invalid-response', retryable: false })
@@ -190,7 +217,7 @@ describe.skipIf(process.platform === 'win32')('POSIX node agent lifecycle', () =
     const identity = { protocolVersion: 1, organizationId: randomUUID(), nodeId: randomUUID(), executionReady: false }
     const calls: string[] = []
     const base = await listener((req, res) => { calls.push(req.url!); req.resume(); res.end(JSON.stringify(identity)) })
-    await expect(runNodeAgent({ centerUrl: base, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(),
+    await expect(runNodeAgent({ centerUrl: base, centerDialUrls: [base], dialPreferredRetryMs: 60_000, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(),
       requestTimeoutMs: 2000, retryMs: 1000, expectedIdentity: { organizationId: identity.organizationId, nodeId: randomUUID() } as NonNullable<import('../src/node-agent.ts').NodeAgentConfig['expectedIdentity']> },
     new AbortController().signal, () => {})).rejects.toMatchObject({ code: 'node-agent/center-identity-mismatch' })
     expect(calls).toEqual(['/internal/nodes/enroll'])
@@ -204,7 +231,7 @@ describe.skipIf(process.platform === 'win32')('POSIX node agent lifecycle', () =
       if (req.url === '/internal/nodes/enroll') res.end(JSON.stringify(identity))
       else { res.writeHead(409, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'node-access/detached' })) }
     })
-    await runNodeAgent({ centerUrl: base, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 },
+    await runNodeAgent({ centerUrl: base, centerDialUrls: [base], dialPreferredRetryMs: 60_000, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 },
       new AbortController().signal, event => { events.push(event) })
     expect(events.at(-1)).toEqual({ status: 'stopped' })
     expect(events.filter(event => event.status === 'stopped')).toHaveLength(1)
@@ -232,7 +259,7 @@ describe.skipIf(process.platform === 'win32')('POSIX node agent lifecycle', () =
         res.end(JSON.stringify({ ...identity, connectionId: value.connectionId, epoch: '1', expiresAt: new Date(Date.now() + 30_000).toISOString(), heartbeatMs: 1000 }))
       })().catch(error => { res.destroy(error as Error) })
     })
-    const config = { centerUrl: base, stateFile, enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 }
+    const config = { centerUrl: base, centerDialUrls: [base], dialPreferredRetryMs: 60_000, stateFile, enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 }
     const first = new AbortController()
     const firstRun = runNodeAgent(config, first.signal, () => {})
     releases.push(async () => { first.abort(); await firstRun })
@@ -267,7 +294,7 @@ describe.skipIf(process.platform === 'win32')('POSIX node agent lifecycle', () =
       waiting.resolve()
     })
     const controller = new AbortController(), events: NodeAgentEvent[] = []
-    const running = runNodeAgent({ centerUrl: base, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(), requestTimeoutMs: 10_000, retryMs: 1000 }, controller.signal, event => { events.push(event) })
+    const running = runNodeAgent({ centerUrl: base, centerDialUrls: [base], dialPreferredRetryMs: 60_000, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(), requestTimeoutMs: 10_000, retryMs: 1000 }, controller.signal, event => { events.push(event) })
     releases.push(async () => { controller.abort(); await running })
     await waiting.promise
     controller.abort()
@@ -284,7 +311,7 @@ describe.skipIf(process.platform === 'win32')('POSIX node agent lifecycle', () =
       if (req.url === '/internal/nodes/enroll') { res.end(JSON.stringify(identity)); return }
       res.writeHead(409); res.end(JSON.stringify({ error: 'node-access/already-connected' }))
     })
-    await expect(runNodeAgent({ centerUrl: base, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 }, new AbortController().signal, event => { events.push(event) }))
+    await expect(runNodeAgent({ centerUrl: base, centerDialUrls: [base], dialPreferredRetryMs: 60_000, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 }, new AbortController().signal, event => { events.push(event) }))
       .rejects.toMatchObject({ code: 'node-access/already-connected', refused: true })
     expect(events.at(-1)).toEqual({ status: 'stopped' })
   })
@@ -302,7 +329,7 @@ describe.skipIf(process.platform === 'win32')('POSIX node agent lifecycle', () =
           epoch: '1', expiresAt: new Date(Date.now() + 30_000).toISOString(), heartbeatMs: 1000 }))
       })().catch(error => { res.destroy(error as Error) })
     })
-    await expect(runNodeAgent({ centerUrl: base, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 }, new AbortController().signal, event => { events.push(event) }))
+    await expect(runNodeAgent({ centerUrl: base, centerDialUrls: [base], dialPreferredRetryMs: 60_000, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 }, new AbortController().signal, event => { events.push(event) }))
       .rejects.toMatchObject({ code: 'node-agent/center-identity-mismatch' })
     expect(events.at(-1)).toEqual({ status: 'stopped-lease-uncertain' })
   })
@@ -312,7 +339,7 @@ describe.skipIf(process.platform === 'win32')('POSIX node agent lifecycle', () =
     let forwarded = 0
     const destination = await listener((req, res) => { forwarded += 1; req.resume(); res.end('{}') })
     const base = await listener((req, res) => { req.resume(); res.writeHead(307, { location: destination }); res.end() })
-    await expect(runNodeAgent({ centerUrl: base, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 }, new AbortController().signal, () => {}))
+    await expect(runNodeAgent({ centerUrl: base, centerDialUrls: [base], dialPreferredRetryMs: 60_000, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 }, new AbortController().signal, () => {}))
       .rejects.toMatchObject({ code: 'node-agent/center-refused', retryable: false })
     expect(forwarded).toBe(0)
   })
@@ -320,9 +347,81 @@ describe.skipIf(process.platform === 'win32')('POSIX node agent lifecycle', () =
   it('refuses a credential file readable by other users before sending an enrollment request', async () => {
     const directory = await root(), stateFile = join(directory, 'access.json')
     const base = await listener((req, res) => { req.resume(); res.writeHead(401); res.end('{}') })
-    const config = { centerUrl: base, stateFile, enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 }
+    const config = { centerUrl: base, centerDialUrls: [base], dialPreferredRetryMs: 60_000, stateFile, enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 }
     await expect(runNodeAgent(config, new AbortController().signal, () => {})).rejects.toThrow()
     await chmod(stateFile, 0o644)
     await expect(runNodeAgent(config, new AbortController().signal, () => {})).rejects.toMatchObject({ code: 'node-agent/state-must-be-private' })
+  })
+
+  it('dials the next configured origin after a network refusal and keeps center identity', async () => {
+    const directory = await root(), stateFile = join(directory, 'access.json')
+    const identity = { protocolVersion: 1, organizationId: randomUUID(), nodeId: randomUUID(), executionReady: false }
+    const events: NodeAgentEvent[] = [], calls: string[] = []
+    const base = await listener((req, res) => {
+      calls.push(req.url!)
+      void (async () => {
+        let raw = ''
+        for await (const chunk of req) raw += String(chunk)
+        if (req.url === '/internal/nodes/enroll') { res.end(JSON.stringify(identity)); return }
+        if (req.url === '/internal/nodes/disconnect') { res.writeHead(204); res.end(); return }
+        const value = JSON.parse(raw) as { connectionId: string }
+        res.end(JSON.stringify({ ...identity, connectionId: value.connectionId, epoch: '1',
+          expiresAt: new Date(Date.now() + 30_000).toISOString(), heartbeatMs: 1000 }))
+      })().catch(error => { res.destroy(error as Error) })
+    })
+    const dead = await new Promise<string>((resolve, reject) => {
+      const probe = createServer()
+      probe.once('error', reject)
+      probe.listen(0, '127.0.0.1', () => {
+        const origin = `http://127.0.0.1:${String((probe.address() as AddressInfo).port)}`
+        probe.close(error => { if (error) reject(error); else resolve(origin) })
+      })
+    })
+    const stop = new AbortController(), connected = deferred<void>()
+    const running = runNodeAgent({ centerUrl: base, centerDialUrls: [dead, base], dialPreferredRetryMs: 60_000,
+      stateFile, enrollmentToken: ticket(), requestTimeoutMs: 10_000, retryMs: 1 }, stop.signal, event => {
+        events.push(event)
+        if (event.status === 'connected') connected.resolve()
+      })
+    releases.push(async () => { stop.abort(); await running })
+    await connected.promise
+    stop.abort()
+    await running
+    expect(events).toContainEqual({ status: 'dial-origin', origin: base, reason: 'node-dial/transport-failure' })
+    expect(calls).toEqual(expect.arrayContaining(['/internal/nodes/enroll', '/internal/nodes/connect', '/internal/nodes/disconnect']))
+    const saved = JSON.parse(await readFile(stateFile, 'utf8')) as { centerUrl: string }
+    expect(saved.centerUrl).toBe(base)
+  })
+
+  it('keeps the credential file bound to the center URL, never to a dial origin', async () => {
+    const directory = await root(), stateFile = join(directory, 'access.json')
+    const identity = { protocolVersion: 1, organizationId: randomUUID(), nodeId: randomUUID(), executionReady: false }
+    const connected = deferred<void>()
+    const base = await listener((req, res) => {
+      void (async () => {
+        let raw = ''
+        for await (const chunk of req) raw += String(chunk)
+        if (req.url === '/internal/nodes/enroll') { res.end(JSON.stringify(identity)); return }
+        if (req.url === '/internal/nodes/disconnect') { res.writeHead(204); res.end(); return }
+        const value = JSON.parse(raw) as { connectionId: string }
+        res.end(JSON.stringify({ ...identity, connectionId: value.connectionId, epoch: '1',
+          expiresAt: new Date(Date.now() + 30_000).toISOString(), heartbeatMs: 1000 }))
+      })().catch(error => { res.destroy(error as Error) })
+    })
+    const first = new AbortController()
+    const firstRun = runNodeAgent({ centerUrl: base, centerDialUrls: [base], dialPreferredRetryMs: 60_000, stateFile,
+      enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 }, first.signal, event => {
+        if (event.status === 'connected') connected.resolve()
+      })
+    releases.push(async () => { first.abort(); await firstRun })
+    await connected.promise
+    first.abort()
+    await firstRun
+    const otherCalls: string[] = []
+    const other = await listener((req, res) => { otherCalls.push(req.url!); req.resume(); res.end('{}') })
+    await expect(runNodeAgent({ centerUrl: other, centerDialUrls: [other, base], dialPreferredRetryMs: 60_000,
+      stateFile, requestTimeoutMs: 2000, retryMs: 1000 }, new AbortController().signal, () => {}))
+      .rejects.toMatchObject({ code: 'node-agent/center-identity-mismatch' })
+    expect(otherCalls).toEqual([])
   })
 })

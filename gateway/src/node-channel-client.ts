@@ -3,6 +3,7 @@ import { uptime } from 'node:os'
 import { setTimeout as delay } from 'node:timers/promises'
 import WebSocket from 'ws'
 import type { NodeCredential, NodeLease } from './node-access.ts'
+import type { NodeDialer } from './node-dialer.ts'
 import {
   NODE_CHANNEL_PATH, NODE_CHANNEL_PROTOCOL, NODE_CONNECTION_HEADER, NODE_EPOCH_HEADER, NodeChannelError,
   nodeChannelCommandSchema, type NodeChannelClientLimits, type NodeChannelErrorCode, type NodeProbeId, type NodeProbeInfo,
@@ -24,7 +25,8 @@ interface ServiceSlot {
 
 /** Explicit client configuration resolved before acquiring a socket. */
 export interface NodeChannelClientConfig {
-  centerUrl: string
+  /** Ordered center dial candidates; the agent owns one instance per process. */
+  dialer: NodeDialer
   credential: NodeCredential
   lease: NodeLease
   limits: NodeChannelClientLimits
@@ -61,7 +63,8 @@ export async function localNodeProbe(signal: AbortSignal, executionReady = false
 async function connect(config: NodeChannelClientConfig, signal: AbortSignal,
   report: (event: NodeChannelClientEvent) => void, provider: NodeProbeProvider): Promise<void> {
   signal.throwIfAborted()
-  const url = new URL(NODE_CHANNEL_PATH, config.centerUrl)
+  const origin = config.dialer.current()
+  const url = new URL(NODE_CHANNEL_PATH, origin)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
   const socket = new WebSocket(url, NODE_CHANNEL_PROTOCOL, {
     headers: { authorization: `Bearer ${config.credential}`, [NODE_CONNECTION_HEADER]: config.lease.connectionId, [NODE_EPOCH_HEADER]: config.lease.epoch },
@@ -70,6 +73,15 @@ async function connect(config: NodeChannelClientConfig, signal: AbortSignal,
   const jobs = new Map<NodeProbeId, AbortController>(), services = new Map<NodeProbeId, ServiceJob>()
   const serviceSlots = new Set<ServiceSlot>(), work = new Set<Promise<void>>()
   let ready = false, failure: unknown
+  // Failover tracks only attempts that got no HTTP response; a refused upgrade
+  // reached a center, so it is a channel failure like before, not a dial change.
+  let opened = false, responded = false
+  socket.once('open', () => { opened = true })
+  socket.once('unexpected-response', (_request, response) => {
+    responded = true
+    failure = new NodeChannelError(503, 'node-channel/disconnected', new Error(`Unexpected server response: ${String(response.statusCode)}`))
+    socket.terminate()
+  })
   let pulse: ReturnType<typeof setInterval> | undefined
   const stop = () => { socket.terminate() }
   signal.addEventListener('abort', stop, { once: true })
@@ -177,7 +189,10 @@ async function connect(config: NodeChannelClientConfig, signal: AbortSignal,
     for (const job of services.values()) job.controller.abort()
     await Promise.allSettled([...work])
   }
-  if (!signal.aborted) throw failure instanceof NodeChannelError ? failure : new NodeChannelError(503, 'node-channel/disconnected', failure)
+  if (!signal.aborted) {
+    if (!opened && !responded) config.dialer.failed(origin, failure)
+    throw failure instanceof NodeChannelError ? failure : new NodeChannelError(503, 'node-channel/disconnected', failure)
+  }
 }
 
 /**

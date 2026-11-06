@@ -504,7 +504,7 @@ describePg('PostgreSQL outbound node access', () => {
       const controller = new AbortController()
       let connected = false, ready!: () => void, refused!: (error: unknown) => void
       const readiness = new Promise<void>((done, reject) => { ready = done; refused = reject })
-      const completion = runNodeAgent({ centerUrl: f.base, stateFile: join(f.root, file), enrollmentToken: ticket.token,
+      const completion = runNodeAgent({ centerUrl: f.base, centerDialUrls: [f.base], dialPreferredRetryMs: 60_000, stateFile: join(f.root, file), enrollmentToken: ticket.token,
         requestTimeoutMs: 10_000, retryMs: 100 }, controller.signal, event => {
         if (event.status === 'connected') { connected = true; ready() }
       }).then(() => { if (!connected) refused(new Error('Node agent stopped before readiness')); return null }, error => { refused(error); return error as unknown })

@@ -5,6 +5,7 @@ import { pipeline } from 'node:stream/promises'
 import WebSocket, { createWebSocketStream } from 'ws'
 import { z } from 'zod'
 import { nodeUuidSchema, type NodeCredential, type NodeLease } from './node-access.ts'
+import type { NodeDialer } from './node-dialer.ts'
 import { NODE_CONNECTION_HEADER, NODE_EPOCH_HEADER, NodeChannelError, type NodeProbeId } from './node-channel-protocol.ts'
 import { readResponseJson } from './response-budget.ts'
 
@@ -42,7 +43,8 @@ export const nodeServiceIdentitySchema = z.object({
 /** Local service connection configuration, resolved independently of browser input. */
 export interface NodeServiceBridgeConfig {
   localUrl: string
-  centerUrl: string
+  /** Ordered center dial candidates shared with the channel and control requests. */
+  dialer: NodeDialer
   credential: NodeCredential
   lease: NodeLease
   requestTimeoutMs: number
@@ -125,10 +127,16 @@ export async function runNodeServiceBridge(config: NodeServiceBridgeConfig, id: 
   let earlyError: Error | undefined
   const observe = (error: Error) => { earlyError = error }
   gateway.on('error', observe)
-  const url = new URL(`${NODE_SERVICE_STREAM_PATH}${id}`, config.centerUrl)
+  const origin = config.dialer.current()
+  const url = new URL(`${NODE_SERVICE_STREAM_PATH}${id}`, origin)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
   const socket = new WebSocket(url, NODE_SERVICE_STREAM_PROTOCOL, { headers, followRedirects: false,
     perMessageDeflate: false, maxPayload: NODE_SERVICE_FRAME_BYTES, handshakeTimeout: config.requestTimeoutMs })
+  // Failover tracks only attempts that got no HTTP response; a refused upgrade
+  // reached a center, so it is a stream failure like before, not a dial change.
+  let opened = false, responded = false
+  socket.once('open', () => { opened = true })
+  socket.once('unexpected-response', () => { responded = true; socket.terminate() })
   const wire = nodeServiceDuplex(socket)
   const observeWire = (error: Error) => { earlyError = error; gateway.destroy() }
   wire.on('error', observeWire)
@@ -150,6 +158,9 @@ export async function runNodeServiceBridge(config: NodeServiceBridgeConfig, id: 
     })
     if (earlyError !== undefined) throw earlyError
     await Promise.all([pipeline(gateway, wire), pipeline(wire, gateway)])
+  } catch (error) {
+    if (!signal.aborted && !opened && !responded) config.dialer.failed(origin, error)
+    throw error
   } finally {
     signal.removeEventListener('abort', abort)
     abort()

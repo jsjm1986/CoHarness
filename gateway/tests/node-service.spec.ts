@@ -23,6 +23,7 @@ import { RuntimeCatalogError, type RuntimeCatalogEntry, type RuntimeId, type Run
 import { NodeAccessError, type NodeCredential, type NodeLease } from '../src/node-access.ts'
 import { GatewayNodeChannels } from '../src/node-channel.ts'
 import { runNodeChannel } from '../src/node-channel-client.ts'
+import { NodeDialer, type NodeDialReason } from '../src/node-dialer.ts'
 import { loadNodeChannelClientLimits, NODE_CHANNEL_PROTOCOL } from '../src/node-channel-protocol.ts'
 import { GatewayNodeServices, loadNodeServiceConfig } from '../src/node-service.ts'
 import { GatewayNodeServiceProxy } from '../src/node-service-proxy.ts'
@@ -56,7 +57,15 @@ async function close(server: Server): Promise<void> {
   await new Promise<void>((done, reject) => { server.close(error => { if (error) reject(error); else done() }) })
 }
 
-async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false, ambiguousPersonal = false) {
+/** A closed loopback port: the first dial candidate answers ECONNREFUSED. */
+async function deadPort(): Promise<string> {
+  const probe = createServer()
+  const url = await listen(probe)
+  await close(probe)
+  return url
+}
+
+async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false, ambiguousPersonal = false, dialFallback = false) {
   const root = await mkdtemp(join(tmpdir(), 'hgw-node-service-'))
   releases.push(() => rm(root, { recursive: true, force: true }))
   const db = openDb(join(root, 'accounts.sqlite'))
@@ -191,8 +200,11 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
   })
   const remoteBase = await listen(remote), base = await listen(center)
   centerConfig.publicOrigins.push(base); remoteConfig.publicOrigins.push(base, remoteBase)
-  agent = runNodeChannel({ centerUrl: base, credential, lease,
-    limits: loadNodeChannelClientLimits({})!, requestTimeoutMs: 5000, retryMs: 60_000,
+  const dialEvents: Array<{ origin: string; reason: NodeDialReason }> = []
+  const dialUrls = dialFallback ? [await deadPort(), base] : [base]
+  agent = runNodeChannel({ dialer: new NodeDialer(dialUrls, 60_000, (origin, reason) => { dialEvents.push({ origin, reason }) }),
+    credential, lease,
+    limits: loadNodeChannelClientLimits({})!, requestTimeoutMs: 5000, retryMs: dialFallback ? 5 : 60_000,
     localGatewayUrl: remoteBase, maxServices: centerConfig.nodeService.maxPerNode }, agentStop.signal,
   event => { if (event.status === 'channel-ready') ready.resolve() },
   async () => ({ platform: 'linux', architecture: 'x64', uptimeSeconds: 1, executionReady: false }))
@@ -205,7 +217,7 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
   }
   const cookie = await login('owner')
   return { base, remoteBase, nodeId, localNodeId, environment, cookie, login, admin, users, channels, services, proxy, lease, credential, centerDeps,
-    remoteStarts, localStarts,
+    remoteStarts, localStarts, dialEvents,
     slow, slowResponse, counters: () => ({ localCalls, remoteCalls }), remoteHttpConnections: () => remoteHttpSockets.size,
     disableForwarding: () => { centerDeps.nodeServiceProxy = undefined },
     misbind: () => { remoteDeps.nodeServiceIdentity!.nodeId = localNodeId },
@@ -213,7 +225,7 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
     replaceChannel: async () => {
       Object.assign(lease, { connectionId: randomUUID(), epoch: String(BigInt(lease.epoch) + 1n) })
       const stop = new AbortController(), replacementReady = deferred<void>()
-      const replacement = runNodeChannel({ centerUrl: base, credential, lease: { ...lease },
+      const replacement = runNodeChannel({ dialer: new NodeDialer([base], 60_000, () => {}), credential, lease: { ...lease },
         limits: loadNodeChannelClientLimits({})!, requestTimeoutMs: 5000, retryMs: 60_000,
         localGatewayUrl: remoteBase, maxServices: centerConfig.nodeService.maxPerNode }, stop.signal,
       event => { if (event.status === 'channel-ready') replacementReady.resolve() },
@@ -264,13 +276,24 @@ it('keeps the idle outbound control socket active independently of authority ren
     socket.send(JSON.stringify({ ...lease, kind: 'ready', channelVersion: 1 }))
   })
   const origin = await listen(server)
-  channel = runNodeChannel({ centerUrl: origin, credential: `dsh_node_${randomBytes(32).toString('base64url')}` as NodeCredential,
+  channel = runNodeChannel({ dialer: new NodeDialer([origin], 60_000, () => {}),
+    credential: `dsh_node_${randomBytes(32).toString('base64url')}` as NodeCredential,
     lease, limits: loadNodeChannelClientLimits({})!, requestTimeoutMs: 5000, retryMs: 60_000 }, stop.signal, () => {})
   await ping.promise
   stop.abort()
   await channel
   await closed.promise
   expect(sockets.clients.size).toBe(0)
+})
+
+it('dials the channel and its service streams through the next candidate after a refusal', async () => {
+  const f = await fixture({}, false, false, true)
+  expect(f.dialEvents).toEqual([{ origin: f.base, reason: 'node-dial/transport-failure' }])
+  const response = await fetch(`${f.base}/api/echo?dshRuntime=${f.environment.id}`, {
+    method: 'POST', headers: { cookie: f.cookie, origin: f.base, 'content-type': 'application/octet-stream' }, body: 'x',
+  })
+  expect(response.status).toBe(200)
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 1 })
 })
 
 it('forwards an exact remote environment with the existing login and streams binary request chunks', async () => {
