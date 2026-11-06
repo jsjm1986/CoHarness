@@ -12,12 +12,14 @@
  */
 
 import type { ServerResponse } from 'node:http'
+import { statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { precompressBody, selectVariant } from '@deepseek-ai/dsh-host-webserver'
+import type { PrecompressedBody } from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-client-connection'
-import type {} from '@deepseek-ai/dsh-host-webserver'
 
 /** Stable Cordis plugin name. */
 export const name = 'frontend-static'
@@ -53,8 +55,29 @@ const STATIC_MISS_CODES: ReadonlySet<string | undefined> = new Set([
   'ENOTDIR',
 ])
 
-/** Vite asset paths carry a content hash and can be cached across shell reloads. */
+/**
+ * Vite asset paths carry a content hash and can be cached across shell reloads.
+ * The Gateway keeps a copy of this predicate for its shareable-asset forwarding;
+ * keep both aligned.
+ */
 const IMMUTABLE_ASSET_PATH = /^\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+$/u
+
+/** Precompressed variants held for one file generation of an immutable asset. */
+export interface StaticBodyEntry {
+  /** File signature the variants were built from; a changed file gets a fresh entry. */
+  stamp: { mtimeMs: number; size: number }
+  body: PrecompressedBody
+}
+
+/** Optional encoding inputs for immutable asset responses. */
+export interface StaticServeOptions {
+  /** The request's `accept-encoding` header value; omission serves identity. */
+  acceptEncoding?: string | string[] | undefined
+  /** Owner-held variant cache keyed by resolved file path. */
+  bodies: Map<string, StaticBodyEntry>
+  /** Reports a failed background encoding; the dropped variant leaves identity served. */
+  onEncodingError: (error: unknown) => void
+}
 
 /**
  * Serve one GET/HEAD static request from the dist root.
@@ -65,11 +88,14 @@ const IMMUTABLE_ASSET_PATH = /^\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+$/u
  * @param authorizeIndex - authenticates an index response before its bytes are read.
  * @param renderIndex - produces the index.html body (structured injection
  * rendering) for the dist root and configured index path.
+ * @param options - immutable-asset encoding inputs; without them every file
+ * response ships identity bytes.
  */
 export async function serveStatic(
   pathname: string, res: ServerResponse, distRoot: string, distIndex: string,
   authorizeIndex: () => boolean,
   renderIndex: () => Promise<string>,
+  options?: StaticServeOptions,
 ): Promise<void> {
   const target = resolve(normalize(join(distRoot, pathname)))
   // Traversal rejection: the target must be distRoot itself (`/`) or stay under
@@ -81,6 +107,7 @@ export async function serveStatic(
     return
   }
   let body: string | Buffer
+  let file: Buffer | undefined
   let type: string
   try {
     if (target === distRoot || target === distIndex) {
@@ -88,7 +115,8 @@ export async function serveStatic(
       body = await renderIndex()
       type = HTML_MIME
     } else {
-      body = await readFile(target)
+      file = await readFile(target)
+      body = file
       type = MIME[extname(target)] ?? 'application/octet-stream'
     }
   } catch (error) {
@@ -99,13 +127,34 @@ export async function serveStatic(
     res.end()
     return
   }
+  let variant: { coding: 'br' | 'gzip'; body: Promise<Buffer> } | undefined
+  if (IMMUTABLE_ASSET_PATH.test(pathname) && options !== undefined && file !== undefined) {
+    const stat = statSync(target)
+    let entry = options.bodies.get(target)
+    if (entry === undefined || entry.stamp.mtimeMs !== stat.mtimeMs || entry.stamp.size !== stat.size) {
+      const bytes = file
+      entry = {
+        stamp: { mtimeMs: stat.mtimeMs, size: stat.size },
+        body: precompressBody(() => Promise.resolve(bytes), options.onEncodingError),
+      }
+      options.bodies.set(target, entry)
+      // Schedule the variants off the request path; the producer closes over
+      // bytes already read and cannot reject.
+      void entry.body.identity()
+    }
+    variant = selectVariant(entry.body, options.acceptEncoding)
+  }
   res.writeHead(200, {
     'content-type': type,
     ...(IMMUTABLE_ASSET_PATH.test(pathname)
-      ? { 'cache-control': 'public, max-age=31536000, immutable' }
+      ? {
+        'cache-control': 'public, max-age=31536000, immutable',
+        vary: 'accept-encoding',
+        ...(variant === undefined ? {} : { 'content-encoding': variant.coding }),
+      }
       : {}),
   })
-  res.end(body)
+  res.end(variant === undefined ? body : await variant.body)
 }
 
 /**
@@ -121,6 +170,7 @@ export function apply(ctx: Context, config: Config): void {
     const body = ctx.webServer.renderIndex(await readFile(distIndex, 'utf8'))
     return body.replace(/<head(?:\s[^>]*)?>/i, open => `${open}<base href="./">`)
   }
+  const bodies = new Map<string, StaticBodyEntry>()
   ctx.effect(() => ctx.webServer.registerFallback(async (req, res) => {
     // Non-GET/HEAD without a matching named route is 405 (fallback-only
     // semantics: named routes own their method handling).
@@ -138,6 +188,13 @@ export function apply(ctx: Context, config: Config): void {
       distIndex,
       () => ctx.connection.authorizeIndex(req, res),
       renderIndex,
+      {
+        acceptEncoding: req.headers['accept-encoding'],
+        bodies,
+        onEncodingError: (error: unknown) => {
+          ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
+        },
+      },
     )
   }), 'frontend-static: fallback seat')
 }

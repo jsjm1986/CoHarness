@@ -514,6 +514,31 @@ function sendAdminGate(res: ServerResponse, pathname: string, error: string): vo
   send(res, 403, error, 'text/plain')
 }
 
+// Byte-deterministic paths: the URL alone names the same bytes on every
+// Runtime. Keep the asset regex aligned with IMMUTABLE_ASSET_PATH in
+// packages/host/frontend-static; the chunk form mirrors the modules package's
+// CLIENT_CHUNK route contract.
+const SHARED_ASSET_PATH = /^\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+$/u
+const SHARED_PLUGIN_CHUNK_PATH = /^\/plugins\/.+\/client\.[A-Za-z0-9][A-Za-z0-9._-]*\.js(?:\.map)?$/u
+
+/**
+ * Whether one Referer-selected path is byte-deterministic across Runtimes and
+ * can be forwarded without a visible runtime pin.
+ * @param pathname - decoded request pathname.
+ * @param url - the full request URL (query identifies the content revision).
+ * @returns true for content-hashed `/assets/*` and `/plugins/*` URLs carrying
+ * a content-addressed revision; runtime-specific or unrevisioned paths stay on
+ * the pin redirect.
+ */
+function shareableImmutableRequest(pathname: string, url: URL): boolean {
+  if (SHARED_ASSET_PATH.test(pathname)) return true
+  // `/plugins/events`, `/favicon.svg`, and revision-less plugin URLs are not
+  // byte-deterministic; the combo `??` marker and `rev` parameter name bytes.
+  if (pathname === '/plugins/combo.js') return url.search.startsWith('??') && url.searchParams.has('rev')
+  if (SHARED_PLUGIN_CHUNK_PATH.test(pathname)) return url.searchParams.has('rev')
+  return false
+}
+
 function redirect(res: ServerResponse, location: string, cookies: string[] = []): void {
   res.writeHead(302, { location, ...(cookies.length > 0 ? { 'set-cookie': cookies } : {}) })
   res.end()
@@ -1192,15 +1217,25 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       await handlers.admin(req, res, user, pathname, body)
       return
     }
-    const selectedUrl = new URL(req.url ?? '/', 'http://gateway')
-    const selection = selectedUrl.searchParams
+    let selectedUrl = new URL(req.url ?? '/', 'http://gateway')
+    let selection = selectedUrl.searchParams
     if ((pathname.startsWith('/assets/') || pathname.startsWith('/plugins/') || pathname === '/favicon.svg') && deps.runtimeCatalog !== undefined && !selection.has('dshRuntime') && req.headers.referer !== undefined) {
       const referer = new URL(req.headers.referer, 'http://gateway')
       const id = referer.searchParams.get('dshRuntime')
       if (id !== null && (cfg.publicOrigins.includes(referer.origin) || referer.host === req.headers.host)) {
         await deps.runtimeCatalog?.resolveForAccount(user, id)
-        redirect(res, pinRuntimeRequestPath(req.url ?? '/', id as import('./runtime-catalog.ts').RuntimeId))
-        return
+        if ((req.method === 'GET' || req.method === 'HEAD') && shareableImmutableRequest(pathname, selectedUrl)) {
+          // The URL names the same bytes on every Runtime: forward under the
+          // Referer's runtime and keep the browser-visible URL unpinned, so
+          // browser and CDN caches share it across runtimes. The normal
+          // selected-runtime pipeline below forwards remote or serves local.
+          req.url = pinRuntimeRequestPath(req.url ?? '/', id as import('./runtime-catalog.ts').RuntimeId)
+          selectedUrl = new URL(req.url, 'http://gateway')
+          selection = selectedUrl.searchParams
+        } else {
+          redirect(res, pinRuntimeRequestPath(req.url ?? '/', id as import('./runtime-catalog.ts').RuntimeId))
+          return
+        }
       }
     }
     if (pathname === '/' && req.method === 'GET' && deps.runtimeCatalog !== undefined && !selection.has('dshRuntime')) {

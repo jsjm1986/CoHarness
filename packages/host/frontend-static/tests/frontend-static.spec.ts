@@ -132,7 +132,21 @@ describe('real Loader composition', () => {
     const hashed = await fetch(`http://127.0.0.1:${String(port)}/assets/app-12345678.js`)
     expect(hashed.status).toBe(200)
     expect(hashed.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+    expect(hashed.headers.get('vary')).toBe('accept-encoding')
     await hashed.text()
+
+    // The first read schedules Brotli and gzip variants in the background;
+    // once settled, Brotli wins among the accepted codings.
+    const assetUrl = `http://127.0.0.1:${String(port)}/assets/app-12345678.js`
+    await expect.poll(async () => (
+      (await fetch(assetUrl, { headers: { 'accept-encoding': 'br' } })).headers.get('content-encoding')
+    )).toBe('br')
+    const brotli = await fetch(assetUrl, { headers: { 'accept-encoding': 'gzip, br' } })
+    expect(brotli.headers.get('content-encoding')).toBe('br')
+    expect(await brotli.text()).toBe('export const hashed = true')
+    const gzip = await fetch(assetUrl, { headers: { 'accept-encoding': 'gzip' } })
+    expect(gzip.headers.get('content-encoding')).toBe('gzip')
+    expect(await gzip.text()).toBe('export const hashed = true')
     expect(await request(port, '/app.js')).toMatchObject({ status: 200, type: 'text/javascript; charset=utf-8', body: 'export {}' })
     expect(await request(port, '/manifest.webmanifest')).toMatchObject({
       status: 200,

@@ -81,7 +81,7 @@ Admin 部署页提供独立的电脑接入区域，包含登记、显式重发�
 
 主入口启用多电脑模式、代理配置 `HGW_NODE_LOCAL_GATEWAY_URL` 后，携带获授权 `dshRuntime` 的 API 请求选择该环境所在电脑。管理员 API 可显式选择 `dshNode=<节点 UUID>`，并重新核验当前管理员权限。目标 Gateway 继续检查现有浏览器会话、源站、账号及业务权限，处理请求前校验目标节点请求头。浏览器始终使用中心源站。
 
-现有个人／项目选择及空间 Cookie 也从中心元数据解析所在电脑。根 HTML、资源、账号 API 与运行时 HTTP／WebSocket 流量使用所选电脑。切换空间先解析有界请求体，再转发到精确 Runtime。属主选择存在歧义时返回409并要求 `dshRuntime`，不会选择第一个环境。组合了目录服务时，账号上下文和工作台目录响应包含 `environment: { id, nodeId }`。Admin 专用 API 不要求管理员在所选电脑拥有个人 Runtime。
+现有个人／项目选择及空间 Cookie 也从中心元数据解析所在电脑。根 HTML、资源、账号 API 与运行时 HTTP／WebSocket 流量使用所选电脑。字节确定性的浏览器 URL——`/plugins` 下的 `??` combo 或带 `rev` 的 `client.*.js` chunk 及 source map、带内容哈希的 `/assets/*` 路径——在来源页选定的 Runtime 下完成授权后就地转发，而不是用 `dshRuntime` 重定向应答，因此未钉选的 URL 能在各电脑间共享同一份缓存；授权总是先于转发执行。Runtime 专属或未带 revision 的路径——`/plugins/events`、无 revision 的插件或资源 URL——保持重定向钉选。切换空间先解析有界请求体，再转发到精确 Runtime。属主选择存在歧义时返回409并要求 `dshRuntime`，不会选择第一个环境。组合了目录服务时，账号上下文和工作台目录响应包含 `environment: { id, nodeId }`。Admin 专用 API 不要求管理员在所选电脑拥有个人 Runtime。
 
 账号偏好、推送设备登记及 `GET /account/api/projects` 使用共享账号存储，不选择或连接 Runtime。工作台目录使用已授权的归属元数据，所选分配在另一台电脑时也不要求本机存储。项目创建保留显式选择的目标电脑。浏览器 SVG 图标沿用来源标签页中已验证的 Runtime 选择。
 

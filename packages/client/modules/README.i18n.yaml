@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/modules/README.md
 document:
-  en: 54c55358245631416e3ef6a17ef74e8b5f01ce6b
-  zh: 3ea8331e6f95b093f3f6121d3f037f658b2bb69d
+  en: 656f5181463c6cfd28dcca213a73d4f2774482ac
+  zh: 2dd9db1f68d252dbc405d23410b13b6cf111c5a8
 /:
   en: 97d39db1617684ea
   zh: de11ba354583a044
@@ -48,8 +48,8 @@ document:
   en: 6d16b74acb333e3b
   zh: fcb3a20cc8c39e4a
 /deepseek-ai-dsh-client-modules/understand-the-implementation/incremental-composition:
-  en: 20f1d66449924c84
-  zh: 4786a97eb9c06370
+  en: 86f5fe17f8681712
+  zh: bbd89124bbb88cbe
 /deepseek-ai-dsh-client-modules/understand-the-implementation/boot-manifest-injection:
   en: 253d9f265cd83ed0
   zh: 9d0f8df84d9d3ac9
@@ -69,8 +69,8 @@ document:
   en: ca75c51c89c2c9b0
   zh: 2026c1566df4f78c
 /deepseek-ai-dsh-client-modules/known-limitations-and-deferred-work:
-  en: bbeb76146cd93994
-  zh: 4c56b71c0a5517ad
+  en: 3bbb165b4ccfcb01
+  zh: 55bb678773a53d68
 /deepseek-ai-dsh-client-modules/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

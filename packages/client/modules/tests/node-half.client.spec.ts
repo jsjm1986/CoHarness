@@ -1,11 +1,11 @@
 /** Node-half composition diagnostics for package metadata and built client bundles. */
 
-import { Hash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { SourceMap } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { brotliDecompressSync, gunzipSync } from 'node:zlib'
 import { pathToFileURL } from 'node:url'
 import { runInNewContext } from 'node:vm'
 import { Context, FiberState, type Fiber } from '@deepseek-ai/cordis'
@@ -163,7 +163,7 @@ function construct(packageNames: string[]): ClientModuleRegistry {
 }
 
 /** Invoke the registered plugin route and capture status, headers, and bytes. */
-async function routeRequest(route: Promise<WebRoute>, url: string, method = 'GET'): Promise<{
+async function routeRequest(route: Promise<WebRoute>, url: string, method = 'GET', acceptEncoding?: string): Promise<{
   status: number
   headers: Record<string, string> | undefined
   body: Buffer
@@ -183,7 +183,12 @@ async function routeRequest(route: Promise<WebRoute>, url: string, method = 'GET
     },
   } as unknown as ServerResponse
   const resolved = new URL(url, 'http://localhost/')
-  await (await route).handler({ method, url: `${resolved.pathname}${resolved.search}` } as IncomingMessage, response)
+  const request = {
+    method,
+    url: `${resolved.pathname}${resolved.search}`,
+    headers: acceptEncoding === undefined ? {} : { 'accept-encoding': acceptEncoding },
+  } as IncomingMessage
+  await (await route).handler(request, response)
   return { status, headers, body }
 }
 
@@ -725,26 +730,77 @@ describe('client bundle activation', () => {
     expect(onGraphChanged).not.toHaveBeenCalled()
   })
 
-  it('hashes only metadata when publishing initial and rebuilt artifact revisions', () => {
-    const packageName = '@fixture/metadata-revision'
-    const clientPath = writePackage(packageName)
-    mkdirSync(dirname(clientPath), { recursive: true })
-    const bundle = `module.exports = ${JSON.stringify('x'.repeat(64 * 1024))}\n`
-    writeFileSync(clientPath, bundle)
-    const update = vi.spyOn(Hash.prototype, 'update')
-    try {
-      const service = construct([packageName])
-      writeFileSync(clientPath, `module.exports = ${JSON.stringify('y'.repeat(64 * 1024))}\n`)
-      service.rebuilt(packageName)
-      const inputBytes = update.mock.calls.map(([input]) => Buffer.byteLength(input))
-      expect(inputBytes.length).toBeGreaterThan(0)
-      expect(inputBytes.reduce((total, bytes) => total + bytes, 0)).toBeLessThan(4 * 1024)
-    } finally {
-      update.mockRestore()
-    }
+  it('derives artifact revisions from bytes so identical artifacts share URLs', () => {
+    const firstName = '@fixture/byte-revision-first'
+    const secondName = '@fixture/byte-revision-second'
+    const firstPath = writePackage(firstName)
+    const secondPath = writePackage(secondName)
+    mkdirSync(dirname(firstPath), { recursive: true })
+    mkdirSync(dirname(secondPath), { recursive: true })
+    writeFileSync(firstPath, 'module.exports = { shared: true }\n')
+    writeFileSync(secondPath, 'module.exports = { shared: true }\n')
+    // Distinct filesystem generations of the same bytes must not split the revision.
+    utimesSync(firstPath, new Date(1_600_000_000_000), new Date(1_600_000_000_000))
+    utimesSync(secondPath, new Date(1_700_000_000_000), new Date(1_700_000_000_000))
+    const first = construct([firstName]).graph().entries[0]!
+    const second = construct([secondName]).graph().entries[0]!
+    expect(second.rev).toBe(first.rev)
+    expect(second.url).toBe(first.url.replace(firstName, secondName))
+
+    writeFileSync(secondPath, 'module.exports = { shared: false }\n')
+    const changed = construct([secondName]).graph().entries[0]!
+    expect(changed.rev).not.toBe(first.rev)
   })
 
-  it.each(['bytes', 'build stamp'])('agrees with a fresh registry after rebuilding changed %s', (change) => {
+  it('folds package-local chunk bytes into the revision so a chunk-only edit moves URLs', () => {
+    const packageName = '@fixture/chunk-revision'
+    const clientPath = writePackage(packageName)
+    mkdirSync(dirname(clientPath), { recursive: true })
+    writeFileSync(clientPath, 'module.exports = {}\n')
+    writeFileSync(join(dirname(clientPath), 'client.extra.js'), 'module.exports = { chunk: 1 }\n')
+    const first = construct([packageName]).graph().entries[0]!
+    writeFileSync(join(dirname(clientPath), 'client.extra.js'), 'module.exports = { chunk: 2 }\n')
+    const changed = construct([packageName]).graph().entries[0]!
+    expect(changed.rev).not.toBe(first.rev)
+    // A chunk file disappearing is likewise a different artifact generation.
+    rmSync(join(dirname(clientPath), 'client.extra.js'))
+    const removed = construct([packageName]).graph().entries[0]!
+    expect(removed.rev).not.toBe(changed.rev)
+  })
+
+  it('serves Brotli, gzip, or identity for one immutable response by Accept-Encoding', async () => {
+    const packageName = '@fixture/precompressed'
+    writeBuiltPackage(packageName, {})
+    const { service, route } = constructWithRoute([packageName])
+    const url = service.graph().entries[0]!.url
+
+    const identity = await routeRequest(route, url, 'GET', 'identity')
+    expect(identity.status).toBe(200)
+    expect(identity.headers?.['content-encoding']).toBeUndefined()
+    expect(identity.headers?.vary).toBe('accept-encoding')
+    const plain = identity.body
+
+    // Variants compress in the background; poll until Brotli settles.
+    await expect.poll(async () => (
+      (await routeRequest(route, url, 'GET', 'br')).headers?.['content-encoding']
+    )).toBe('br')
+    const brotli = await routeRequest(route, url, 'GET', 'gzip, br')
+    expect(brotli.headers?.['content-encoding']).toBe('br')
+    expect(brotliDecompressSync(brotli.body)).toEqual(plain)
+
+    const gzip = await routeRequest(route, url, 'GET', 'gzip')
+    expect(gzip.headers?.['content-encoding']).toBe('gzip')
+    expect(gunzipSync(gzip.body)).toEqual(plain)
+
+    const unsupported = await routeRequest(route, url, 'GET', 'deflate')
+    expect(unsupported.headers?.['content-encoding']).toBeUndefined()
+    expect(unsupported.body).toEqual(plain)
+  })
+
+  it.each([
+    ['bytes', true],
+    ['build stamp', false],
+  ])('agrees with a fresh registry after rebuilding changed %s', (change, moved) => {
     const packageName = '@fixture/changed-rebuild'
     const clientPath = writePackage(packageName)
     mkdirSync(dirname(clientPath), { recursive: true })
@@ -762,7 +818,8 @@ describe('client bundle activation', () => {
     }
 
     const rev = service.rebuilt(packageName)
-    expect(rev).not.toBe(before.entries[0]!.rev)
+    if (moved) expect(rev).not.toBe(before.entries[0]!.rev)
+    else expect(rev).toBe(before.entries[0]!.rev)
     expect(construct([packageName]).graph()).toEqual(service.graph())
   })
 
@@ -835,6 +892,7 @@ describe('client bundle activation', () => {
     expect(singleMap.headers).toEqual({
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'public, max-age=31536000, immutable',
+      vary: 'accept-encoding',
     })
     expect(JSON.parse(singleMap.body.toString('utf8'))).toMatchObject({
       version: 3,

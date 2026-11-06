@@ -426,6 +426,55 @@ it('pins the browser SVG icon to its referring tab when several personal Runtime
   expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 1 })
 })
 
+it('forwards content-addressed browser assets to the referring Runtime without redirecting', async () => {
+  const f = await fixture({}, true)
+  const referer = `${f.base}/?dshRuntime=${f.environment.id}`
+  const forwarded = [
+    '/assets/index-ABc12345.js',
+    '/plugins/combo.js??@deepseek-ai/dsh-client-modules/client.js&rev=abcdef123456',
+    '/plugins/@deepseek-ai/dsh-client-modules/client.lazy.js?rev=abcdef123456',
+    '/plugins/@deepseek-ai/dsh-client-modules/client.lazy.js.map?rev=abcdef123456',
+  ]
+  for (const path of forwarded) {
+    const response = await fetch(`${f.base}${path}`, { headers: { cookie: f.cookie, referer }, redirect: 'manual' })
+    expect(response.status).toBe(200)
+    expect(response.url).toBe(`${f.base}${path}`)
+    const value = await response.json() as { node: string, runtime: string, path: string }
+    expect(value.node).toBe(f.nodeId)
+    expect(value.runtime).toBe(f.environment.id)
+    expect(value.path).toBe(`${path}${path.includes('?') ? '&' : '?'}dshRuntime=${f.environment.id}`)
+  }
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: forwarded.length })
+})
+
+it('keeps pinning runtime-specific and unrevisioned browser resource URLs', async () => {
+  const f = await fixture({}, true)
+  const referer = `${f.base}/?dshRuntime=${f.environment.id}`
+  for (const path of [
+    '/plugins/events',
+    '/plugins/combo.js',
+    '/plugins/@deepseek-ai/dsh-client-modules/client.js',
+    '/plugins/@deepseek-ai/dsh-client-modules/client.lazy.js',
+    '/assets/plugin-client.js',
+  ]) {
+    const response = await fetch(`${f.base}${path}`, { headers: { cookie: f.cookie, referer }, redirect: 'manual' })
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe(`${path}?dshRuntime=${f.environment.id}`)
+    await response.arrayBuffer()
+  }
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
+})
+
+it('rejects an unauthenticated content-addressed asset before any forwarding', async () => {
+  const f = await fixture({}, true)
+  const response = await fetch(`${f.base}/plugins/combo.js??@deepseek-ai/dsh-client-modules/client.js&rev=abcdef123456`, {
+    headers: { referer: `${f.base}/?dshRuntime=${f.environment.id}` }, redirect: 'manual',
+  })
+  expect(response.status).toBe(401)
+  await response.arrayBuffer()
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
+})
+
 it('delivers parsed scope changes to the existing owning service and rejects selector conflicts before starting', async () => {
   const f = await fixture({}, true)
   const changed = await fetch(`${f.base}/account/api/scope`, { method: 'POST',
