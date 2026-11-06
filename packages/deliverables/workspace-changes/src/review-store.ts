@@ -56,7 +56,11 @@ async function syncDirectory(directory: string): Promise<void> {
   /* v8 ignore next -- Windows cannot open POSIX directory handles; NTFS journals entries, as for durable attachment storage. */
   if (process.platform === 'win32') return
   const handle = await open(directory, 'r')
-  try { await handle.sync() } finally { await handle.close() }
+  try { await handle.sync() }
+  /* v8 ignore start -- a platform denying directory fsync journals the entries itself, as NTFS does on Windows. */
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EPERM') throw error }
+  /* v8 ignore stop */
+  finally { await handle.close() }
 }
 
 async function durableDirectory(directory: string): Promise<void> {

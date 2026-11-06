@@ -87,6 +87,10 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
   const posixCoverageExclusions = platform === 'win32'
     ? [
       'packages/deliverables/workspace-changes/src/execution.ts',
+      // The POSIX pinned-directory impl keeps parent grants through fd
+      // identity; its entire suite skips on win32, where the CreateFileW
+      // twin in pinned-directory-win32.ts owns the same contract.
+      'packages/host/directory-picker-browse/src/pinned-directory.ts',
       // Directory-handle fsync, symlink refusal, and read-failure paths are
       // POSIX semantics covered by suites that skip on win32; the residue
       // stays measured on Linux and macOS.

@@ -21,17 +21,12 @@ it('retains a pending New Session and its origin draft across transport renewal'
     const heading = office.getByRole('button', { name: 'Office computer', exact: true })
     const firstRow = office.locator('[data-row-key^="session:"]').first()
     const workspaceRow = office.getByText('Office work', { exact: true })
-    try {
-      await expect.poll(async () => {
-        // The collapsed default tracks the active computer and remounts drop
-        // explicit expansion, so re-arm the click inside the poll.
-        if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
-        return (await firstRow.isVisible()) || (await workspaceRow.isVisible())
-      }, { timeout: 60_000 }).toBe(true)
-    } catch (error: unknown) {
-      console.log('[pc-diag] office region:', JSON.stringify((await office.textContent())?.slice(0, 500)))
-      throw error
-    }
+    await expect.poll(async () => {
+      // The collapsed default tracks the active computer and remounts drop
+      // explicit expansion, so re-arm the click inside the poll.
+      if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
+      return (await firstRow.isVisible()) || (await workspaceRow.isVisible())
+    }, { timeout: 60_000 }).toBe(true)
     if (!await firstRow.isVisible()) await workspaceRow.click()
     await firstRow.click()
     const input = page.locator('textarea').first()
@@ -89,15 +84,10 @@ it('browses twenty cold computers and keeps personal conversations, drafts and t
       const heading = section.getByRole('button', { name: 'Office computer', exact: true })
       const firstRow = section.locator('[data-row-key^="session:"]').first()
       const workspaceRow = section.getByText('Office work', { exact: true })
-      try {
-        await expect.poll(async () => {
-          if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
-          return (await firstRow.isVisible()) || (await workspaceRow.isVisible())
-        }, { timeout: 60_000 }).toBe(true)
-      } catch (error: unknown) {
-        console.log('[pc-diag] office region:', JSON.stringify((await section.textContent())?.slice(0, 500)))
-        throw error
-      }
+      await expect.poll(async () => {
+        if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
+        return (await firstRow.isVisible()) || (await workspaceRow.isVisible())
+      }, { timeout: 60_000 }).toBe(true)
       if (!await firstRow.isVisible()) await workspaceRow.click()
       await section.locator('[data-row-key^="session:"]').first().click()
     }

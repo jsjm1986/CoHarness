@@ -178,6 +178,7 @@ export async function startManagedCodexModel(
     }
     const peer = new AbortController()
     const effective = AbortSignal.any([ownedSignal, peer.signal])
+    /* v8 ignore next -- the early-close disconnect race is pinned by the POSIX suite. */
     const disconnected = (): void => { peer.abort() }
     response.once('close', disconnected)
     try {

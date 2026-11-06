@@ -221,8 +221,9 @@ export function apply(ctx: Context, config: Config): void {
         reviewStore: store,
         /* v8 ignore start -- the POSIX execution world is exercised only by POSIX-gated suites. */
         ...execution === undefined ? {} : { execution },
+        git: execution === undefined ? localGit : gitResolver(execution),
         /* v8 ignore stop */
-        git: execution === undefined ? localGit : gitResolver(execution), tempRoot: tmpdir(), maxFiles: config.maxFiles,
+        tempRoot: tmpdir(), maxFiles: config.maxFiles,
         maxFileBytes: config.maxFileBytes, diffTimeoutMs: config.diffTimeoutMs,
         warn: (message) => { ctx.logger.warn(message) },
       })

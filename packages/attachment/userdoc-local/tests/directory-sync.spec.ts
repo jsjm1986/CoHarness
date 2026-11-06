@@ -1,6 +1,6 @@
 /** Durable namespace and file flushes: POSIX descriptor sync and the Windows backup-semantics path. */
 import { constants } from 'node:fs'
-import { join } from 'node:path'
+import { join, toNamespacedPath } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { syncDocumentDirectory, syncDocumentFile } from '../src/directory-sync.ts'
@@ -65,7 +65,7 @@ it('flushes a Windows directory through a backup-semantics handle', async () => 
   Object.defineProperty(process, 'platform', { ...platform, value: 'win32' })
   await syncDocumentDirectory(directory)
   const create = state.calls.find(call => call.name === 'CreateFileW')
-  expect(create?.args).toEqual([directory, 0x40000000, 7, null, 3, 0x02000000, 0])
+  expect(create?.args).toEqual([toNamespacedPath(directory), 0x40000000, 7, null, 3, 0x02000000, 0])
   expect(state.calls.map(call => call.name)).toEqual(['CreateFileW', 'FlushFileBuffers'])
   expect(state.unloads).toBe(1)
 })

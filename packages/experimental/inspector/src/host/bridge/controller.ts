@@ -374,6 +374,7 @@ function spawnWorker(boot: InspectorWorkerBoot<MessagePort>): Worker {
 
 function sourceWorkerEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {}
+  /* v8 ignore next -- a platform-variant guard; each lane can cover only its own side. */
   if (process.platform === 'win32') {
     env.TMP = tmpdir()
     env.TEMP = tmpdir()

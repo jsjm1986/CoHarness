@@ -34,6 +34,7 @@ interface StorageObject {
 }
 
 function privateAccess(info: { uid: number | bigint; mode: number | bigint }): void {
+  /* v8 ignore next 3 -- POSIX uid/mode refusal; win32 has no getuid, so the guard can never hold there. */
   if (process.getuid !== undefined && (BigInt(info.uid) !== BigInt(process.getuid()) || (BigInt(info.mode) & 0o077n) !== 0n)) {
     throw new Error('Private document storage must be accessible only to its owning process account.')
   }
@@ -59,6 +60,7 @@ function same(left: StorageObject, right: StorageObject): boolean {
 }
 
 async function persistentObject(path: string, expected: StorageObject): Promise<StorageObject> {
+  /* v8 ignore start -- win32 returns early; the DirectoryHandle identity recheck after it is POSIX-only code. */
   if (process.platform === 'win32') return expected
   const { DirectoryHandle } = await import('@deepseek-ai/node-addon-system/directory')
   const handle = await DirectoryHandle.open(path)
@@ -70,15 +72,18 @@ async function persistentObject(path: string, expected: StorageObject): Promise<
     if (!same(await directory(path, false), expected)) throw new Error('Document storage directory changed while its volume identity was read.')
     return { ...expected, ...volume === undefined ? {} : { volume } }
   })
+  /* v8 ignore stop */
 }
 
 function recordedObject(value: unknown, expected: StorageObject, persistent: boolean): boolean {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     && 'device' in value && typeof value.device === 'string' && /^(?:0|[1-9][0-9]*)$/u.test(value.device)
     && 'inode' in value && value.inode === expected.inode
+    /* v8 ignore start -- only POSIX persistence writes a volume id, so win32 lanes never measure this arm. */
     && (persistent && 'volume' in value
       ? typeof value.volume === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(value.volume) && value.volume === expected.volume
       : value.device === expected.device)
+    /* v8 ignore stop */
 }
 
 async function containsDirectory(path: string, expected: StorageObject): Promise<boolean> {
@@ -134,6 +139,7 @@ export class DocumentIdentityStorage {
     const documentObject = await persistentObject(locations.root, documents)
     const fileObject = await persistentObject(locations.filesRoot, files)
     const stateObject = await persistentObject(locations.stateRoot, state)
+    /* v8 ignore next -- volumes exist only on POSIX; on win32 both sides stay undefined, so the refusal cannot fire. */
     if (documentObject.volume !== fileObject.volume) throw new Error('Retained document objects require the same persistent filesystem.')
     return new DocumentIdentityStorage({ ...locations }, { documents: documentObject, files: fileObject }, stateObject)
   }
@@ -160,6 +166,7 @@ export class DocumentIdentityStorage {
     if (!info.isFile() || info.isSymbolicLink() || info.ino === 0n) throw new Error('Private document metadata is not regular.')
     privateAccess(info)
     const identity = { device: String(info.dev), inode: String(info.ino),
+      /* v8 ignore next -- the stored volume exists only where POSIX persistence wrote one. */
       ...String(info.dev) === this.state.device && this.state.volume !== undefined ? { volume: this.state.volume } : {} }
     if (this.metadata !== undefined && !same(this.metadata, identity)) {
       throw new Error('Private document metadata file changed after it was opened.')
