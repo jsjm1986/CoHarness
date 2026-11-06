@@ -12,6 +12,7 @@ import { parseCookies, SCOPE_COOKIE } from './server.ts'
 import { RuntimeCatalogError } from './runtime-catalog.ts'
 import { nodeUuidSchema } from './node-access.ts'
 import { NODE_SERVICE_TARGET_HEADER, NodeServiceError } from './node-service-stream.ts'
+import { FORWARDED_PRINCIPAL_HEADER } from './forwarded-principal.ts'
 import type { GatewayNodeServices } from './node-service.ts'
 import type { NodeServiceConfig } from './node-service.ts'
 import { NodeServiceHttpPool } from './node-service-http-pool.ts'
@@ -87,7 +88,8 @@ export class GatewayNodeServiceProxy {
     private readonly services: Pick<GatewayNodeServices, 'open' | 'revalidate' | 'released' | 'capacity'>,
     private readonly timeoutMs: number,
     config: NodeServiceConfig,
-    private readonly monitor?: GatewayAccessMonitor) {
+    private readonly monitor?: GatewayAccessMonitor,
+    private readonly forwardIssuer?: (target: RuntimeNodeId, user: UserRow) => string) {
     if (directory.resolvePlacement !== undefined && directory.resetScopeCookie === undefined) {
       throw new Error('Node service owner routing requires the Gateway scope-cookie formatter')
     }
@@ -180,12 +182,16 @@ export class GatewayNodeServiceProxy {
     return operation
   }
 
-  private outgoing(req: IncomingMessage, target: Target, stream: Duplex | Agent, upgrade: boolean, body?: string) {
+  private outgoing(req: IncomingMessage, target: Target, stream: Duplex | Agent, upgrade: boolean, body?: string, actor?: UserRow) {
     const agent = stream instanceof Agent ? stream : new Agent({ keepAlive: false, maxSockets: 1 })
     if (!(stream instanceof Agent)) agent.createConnection = () => stream
     const forwarded = headers(req.headers, upgrade)
     forwarded[NODE_SERVICE_TARGET_HEADER] = target.nodeId
     delete forwarded['x-dsh-gateway-principal']
+    delete forwarded[FORWARDED_PRINCIPAL_HEADER]
+    if (actor !== undefined && this.forwardIssuer !== undefined) {
+      forwarded[FORWARDED_PRINCIPAL_HEADER] = this.forwardIssuer(target.nodeId, actor)
+    }
     const path = target.runtimeId === undefined ? req.url ?? '/' : pinRuntimeRequestPath(req.url ?? '/', target.runtimeId)
     if (body !== undefined) forwarded['content-length'] = Buffer.byteLength(body)
     const outgoing = request({ hostname: 'node.gateway.invalid', port: 80, method: req.method,
@@ -235,16 +241,16 @@ export class GatewayNodeServiceProxy {
       && (isExplicitSessionRequest(req.method, url.pathname) || isExplicitScopeRequest(req.method, url))) {
       throw new NodeServiceError(409, 'node-service/mismatch')
     }
-    return this.forwardSelectedHttp(req,res,target,actor.id,parsed?.body)
+    return this.forwardSelectedHttp(req,res,target,actor,parsed?.body)
   }
 
-  private async forwardSelectedHttp(req: IncomingMessage, res: ServerResponse, target: Target, actorId: number, body?: string): Promise<boolean> {
+  private async forwardSelectedHttp(req: IncomingMessage, res: ServerResponse, target: Target, actor: UserRow | number, body?: string): Promise<boolean> {
     if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
     await this.directory.assertNode?.(target.nodeId)
     const owner = new AbortController()
     const signal = AbortSignal.any([owner.signal, this.lifetime.signal])
     const abort = () => { if (!res.writableFinished) owner.abort() }
-    const active: Active = { ...target, userId: actorId, abort: () => { owner.abort() } }
+    const active: Active = { ...target, userId: typeof actor === 'number' ? actor : actor.id, abort: () => { owner.abort() } }
     this.active.add(active)
     req.once('aborted', abort); res.once('close', abort)
     if (req.aborted || res.destroyed || res.writableEnded) owner.abort()
@@ -256,7 +262,8 @@ export class GatewayNodeServiceProxy {
       dispose = () => { lease.destroy() }
       signal.throwIfAborted()
       let complete = false
-      const operation = this.outgoing(req, target, lease.agent, false, body)
+      const operation = this.outgoing(req, target, lease.agent, false, body,
+        typeof actor === 'number' ? undefined : actor)
       dispose = () => {
         if (complete) lease.release()
         else { operation.dispose(); lease.destroy() }
@@ -328,7 +335,7 @@ export class GatewayNodeServiceProxy {
       const stream = await this.services.open(target.nodeId, signal)
       dispose = () => { stream.destroy() }
       signal.throwIfAborted()
-      const operation = this.outgoing(req, target, stream, true)
+      const operation = this.outgoing(req, target, stream, true, undefined, actor)
       dispose = operation.dispose
       const { outgoing } = operation
       const cancel = () => { outgoing.destroy(new NodeServiceError(409, 'node-service/cancelled')) }

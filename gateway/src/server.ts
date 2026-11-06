@@ -137,6 +137,8 @@ export interface GatewayDeps {
   }
   /** Durable revocations shared by Gateways using the same organization. */
   accessMonitor?: import('./access-invalidation.ts').GatewayAccessMonitor
+  /** Peer-signed forwarded-request assertion verifier; null falls back to session validation. */
+  forwardedPrincipal?: (assertion: string) => Promise<UserRow | null>
   governance?: GatewayModelGovernanceService
   collaboration?: GatewayCollaborationService
   /** Optional human-facing project progress journal; absent without PostgreSQL. */
@@ -772,7 +774,17 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
   }
 
   const currentUser = async (req: IncomingMessage): Promise<{ token: string; user: UserRow } | null> => {
+    // A peer-signed assertion proves the forwarding Gateway already validated
+    // this session; only requests that demonstrably arrived over the
+    // node-service channel may honor it.
+    const forward = req.headers['x-dsh-gateway-forward']
+    const arrivedForThisNode = req.headers[NODE_SERVICE_TARGET_HEADER] !== undefined
+      && req.headers[NODE_SERVICE_TARGET_HEADER] === deps.nodeServiceIdentity?.nodeId
     const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
+    if (typeof forward === 'string' && arrivedForThisNode && deps.forwardedPrincipal !== undefined) {
+      const user = await deps.forwardedPrincipal(forward)
+      if (user !== null) return { token: token ?? '', user }
+    }
     if (token === undefined) return null
     const user = await timeOperation('authorize',async()=>auth.validate(token))
     return user === null ? null : { token, user }

@@ -6,6 +6,7 @@ import { PostgresNodeAccessService } from './postgres/node-access-service.ts'
 import { GatewayNodeChannels } from './node-channel.ts'
 import { GatewayNodeServices } from './node-service.ts'
 import { GatewayNodeServiceProxy } from './node-service-proxy.ts'
+import { forwardIssuerOf, verifyGatewayForward } from './forwarded-principal.ts'
 import { NodeResourceBudget } from './node-resource-budget.ts'
 import { NodeResourcePressure } from './node-resource-pressure.ts'
 import { GatewayModelBudget } from './gateway-model-budget.ts'
@@ -416,7 +417,8 @@ const nodeServiceProxy = new GatewayNodeServiceProxy({
   resetScopeCookie: () => scopeCookie('personal', cfg),
   authorizeAdministratorNode: (actor, id) => nodeAccess.authorizeAdministratorNode(actor, id),
   authorizeAccountNode: (actor, id) => computerAccess.authorize(actor.id, id),
-}, nodeServices, cfg.upstreamTimeoutMs, cfg.nodeService, accessMonitor)
+}, nodeServices, cfg.upstreamTimeoutMs, cfg.nodeService, accessMonitor,
+(target, user) => principalKeys.signer.issueForward({ issuerNode: context.nodeId, audienceNode: target, user }))
 const runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter({ collaboration, instances }), {
   catalog: runtimeCatalog, localNodeId: context.nodeId as RuntimeNodeId,
 })
@@ -442,6 +444,13 @@ const deps: GatewayDeps = {
   nodeServiceIdentity: {
     nodeId: context.nodeId as RuntimeNodeId, organizationId: context.organizationId,
     authorize: (token, input) => nodeAccess.authorizeChannel(token, input),
+  },
+  forwardedPrincipal: async assertion => {
+    const issuerNode = forwardIssuerOf(assertion)
+    const issuerKey = issuerNode === null ? null : await principalDirectory.issuerKey(issuerNode)
+    return issuerKey === null ? null
+      : verifyGatewayForward(assertion, issuerKey, {
+        audienceNode: context.nodeId as RuntimeNodeId, organization: cfg.organizationSlug })?.user ?? null
   },
   runtimeRouter,
   performance: performanceObserver,

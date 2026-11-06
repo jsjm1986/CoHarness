@@ -103,7 +103,7 @@ function signedPayload(value: unknown, privateKey: KeyObject): string {
   return `${payload}.${signature}`
 }
 
-function verifiedPayload(assertion: string, publicKey: KeyObject, label: string): unknown {
+export function verifiedPayload(assertion: string, publicKey: KeyObject, label: string): unknown {
   const parts = assertion.split('.')
   if (parts.length !== 2 || parts[0] === '' || parts[1] === '') throw new Error(`invalid ${label}`)
   const payload = parts[0]!
@@ -196,6 +196,24 @@ export class GatewayPrincipalSigner {
       throw new Error('expired or foreign principal assertion')
     }
     return claims
+  }
+
+  /** Sign one bounded assertion that a peer Gateway verified its session already. */
+  issueForward(input: {
+    issuerNode: string
+    audienceNode: string
+    user: UserRow
+    now?: number
+  }): string {
+    const now = input.now ?? Date.now()
+    const issuedAt = process.platform === 'win32' ? now - WINDOWS_PRINCIPAL_CLOCK_TICK_MS : now
+    const claims = {
+      version: 1, issuer: 'harness-gateway', audience: 'dsh-node',
+      issuerNode: input.issuerNode, audienceNode: input.audienceNode,
+      organization: this.organization, user: input.user,
+      issuedAt, expiresAt: now + this.ttlMs, nonce: randomUUID(),
+    }
+    return signedPayload(claims, this.privateKey)
   }
 
   /** Issue a non-expiring capability for one lazy project-root materialization. */
