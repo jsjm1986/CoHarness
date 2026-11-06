@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-06-cold-open-silent-resume-marker.md
 document:
-  en: 00df92473bc1236d2a992123e963d556016e0229
-  zh: 0fe8d0cf1c84783eabde3eeec8f1958aee2518a7
+  en: 30bc0032ef95ad17fb5a2603aa35f7921501da0a
+  zh: 5e9191f1ad63b10d39763d9f310e73bdb1d40f9f
 /agent-note-startup-reads-no-longer-race-the-silent-resume-marker:
   en: 7eda40fae0d80583
   zh: a417c1447075547b
@@ -12,17 +12,17 @@ document:
   en: 34d0f3f0c3f7f14e
   zh: fffcdce57bb66f90
 /agent-note-startup-reads-no-longer-race-the-silent-resume-marker/decision:
-  en: 1d841151071e9add
-  zh: 07bd9db92bd0e333
+  en: d494968d07e030a0
+  zh: 9b1a48c02f293e29
 /agent-note-startup-reads-no-longer-race-the-silent-resume-marker/alternatives-considered:
   en: 8aa981f2d584c8e0
   zh: 16b00c7e979d739e
 /agent-note-startup-reads-no-longer-race-the-silent-resume-marker/consequences:
-  en: 10bffceb156e124b
-  zh: 55fbde305fc08b76
+  en: 94b7a2744bb8997e
+  zh: f6a32793b6093db4
 /agent-note-startup-reads-no-longer-race-the-silent-resume-marker/verification:
-  en: 6885cc9075be1a73
-  zh: babe7d19fcb07c03
+  en: 22a16fd744ed4dae
+  zh: ec958dbf93b0069c
 /agent-note-startup-reads-no-longer-race-the-silent-resume-marker/related:
   en: 6b8b5310a85f6304
   zh: 8c863ad17b9dd2c4

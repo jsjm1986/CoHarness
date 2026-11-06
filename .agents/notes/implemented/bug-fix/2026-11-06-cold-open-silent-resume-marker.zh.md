@@ -16,7 +16,7 @@ mux 的 `subscribe()` 把静默后缀 —— `session.firstLifecycleSeq` 起、�
 
 命令源不再注册 `warm` 钩子:预期式的目录预热会解析一个 `agent` 类型的远程参数,不激活它要服务的冷会话就无法运行。`CommandDirectory` 本就是惰性拉取 —— 首个 `candidates`/`matchEnter`/`matchSpace` 读取会调用 `ensureReady` —— 目录改为在 `/` 意图出现时加载,而恢复该会话 Agent 在此时才属正当。`directory.warm()` 已无任何调用方,一并移除。
 
-移除 `warm` 同时删掉了打开流程唯一的 Agent 解析,因此"打开发布 Agent"契约改由 `session.activate` 承载:一个类型化 RPC,按 write 域授权、拒绝已归档会话并解析 `agentFor`(幂等恢复)。客户端从 `sessions.open` —— 选择边界 —— 而非呈现处触发它:`SessionManager.activate` 记录该意图并发出 RPC,而自动选择路径(启动 `startInitialSelection`、保留的 workbench 窗格聚焦、个人目录恢复)传 `activate: false`。`desktop.status` 经 `liveOnly` 分支用 `ctx.agents.get` 读取同意状态:无活跃 Agent 的会话回答 `null` —— 没有拥有它的 Agent 就不存在托管同意状态 —— 而 `desktop.confirm` 保留完整解析,因为显式写入有权恢复。挂载本就不可能构成边界:conversation slot 在选择加载遮罩下就已渲染,且启动规格要求自动恢复的 current 会话在呈现后保持冷态。`handleConnected` 仅对已在 `activated` 集合中的身份重新激活,因此重启只会重新发布用户显式打开过的 Agent,而不会恢复仅被呈现过的会话。
+移除 `warm` 同时删掉了打开流程唯一的 Agent 解析,因此"打开发布 Agent"契约改由 `session.activate` 承载:一个类型化 RPC,按 write 域授权、拒绝已归档会话并解析 `agentFor`(幂等恢复)。客户端从 `sessions.open` —— 选择边界 —— 而非呈现处触发它:`SessionManager.activate` 记录该意图并发出 RPC,而自动选择路径(启动 `startInitialSelection`、保留的 workbench 窗格聚焦、个人目录恢复)传 `activate: false`。`desktop.status` 经 `liveOnly` 分支用 `ctx.agents.get` 读取同意状态:无活跃 Agent 的会话回答 `null` —— 没有拥有它的 Agent 就不存在托管同意状态 —— 而 `desktop.confirm` 保留完整解析,因为显式写入有权恢复。挂载本就不可能构成边界:conversation slot 在选择加载遮罩下就已渲染,且启动规格要求自动恢复的 current 会话在呈现后保持冷态。`handleConnected` 仅对已在 `activated` 集合中的身份重新激活,因此重启只会重新发布用户显式打开过的 Agent,而不会恢复仅被呈现过的会话。环境恢复同样只填充无人认领的选区:在途恢复的 `beginNavigation` 若起于一次已提交的用户导航之后,仍可能在提交点重新打开所存会话,因此个人目录的回调仅在 `current` 仍为空时执行打开,而保存空白的重认领仅在存活选区仍为空或仍是该会话时执行打开 —— 已完成的显式导航永远胜出。
 
 ## Alternatives considered
 
@@ -32,11 +32,11 @@ mux 的 `subscribe()` 把静默后缀 —— `session.firstLifecycleSeq` 起、�
 
 ## Consequences
 
-启动自动选择端到端断言 `historyCalls === 1` 在慢速 CI 时序下成立;同规格中 `ctx.agents.get(id) === undefined` 在呈现后也成立,因为被恢复的 current 会话不经过 `sessions.open`。任何构造期静默追加 —— 不只 `session/end-seed` —— 都在每条订阅路径上由同一循环回放,而真实缺失的历史仍按原样走 `mergeTail` 修复。`sessions.models` 对冷会话不再执行 live SSH 准入;读取仍由授权门控。在冷会话中输入 `/` 会恢复其 Agent —— 这正是契约所保留的意图驱动激活。显式 `sessions.open` 经 `session.activate` 发布活跃 Agent,恢复后台任务、定时与计划评审流程断言的打开契约,而启动恢复与窗格聚焦保持冷态;重连只重新发布用户显式打开过的会话,重启 e2e 因此仍能观测到挂接基线。随呈现挂载的环境读 —— 如桌面确认状态点 —— 不再恢复它所装饰的会话。
+启动自动选择端到端断言 `historyCalls === 1` 在慢速 CI 时序下成立;同规格中 `ctx.agents.get(id) === undefined` 在呈现后也成立,因为被恢复的 current 会话不经过 `sessions.open`。任何构造期静默追加 —— 不只 `session/end-seed` —— 都在每条订阅路径上由同一循环回放,而真实缺失的历史仍按原样走 `mergeTail` 修复。`sessions.models` 对冷会话不再执行 live SSH 准入;读取仍由授权门控。在冷会话中输入 `/` 会恢复其 Agent —— 这正是契约所保留的意图驱动激活。显式 `sessions.open` 经 `session.activate` 发布活跃 Agent,恢复后台任务、定时与计划评审流程断言的打开契约,而启动恢复与窗格聚焦保持冷态;重连只重新发布用户显式打开过的会话,重启 e2e 因此仍能观测到挂接基线。随呈现挂载的环境读 —— 如桌面确认状态点 —— 不再恢复它所装饰的会话;而在用户自身导航之后落地的环境恢复也不会重新打开所存会话,已呈现的选择保持原样。
 
 ## Verification
 
-`api-proxy-collaboration.spec.ts` 断言 mux 流对带 seed 的恢复先产出 `session/event(session/end-seed, seq 1)` 再产出 `session/subscribed(lastSeq 1)`。`api-proxy-models.spec.ts` 与 `api-proxy-cold.spec.ts` 覆盖 detached 选择分层与归属栅栏(48 个用例)。`service.client.spec.ts` 钉住契约:`/` 源不再注册 `warm` 钩子,首个 `candidates` 拉取对每个会话键只取一次。web 端到端规格保留 `historyCalls === 1` 与呈现后无 Agent 断言;显式打开套件经 `session.activate` 轮询活跃 Agent,`server-restart.e2e.ts` 覆盖重连重发布,`session-api.client.spec.ts` 验证 `sessions.activate` 路由到所属 runtime,`desktop.spec.ts` 断言无活跃 Agent 的会话 `status` 返回 `null` 且不调用解析器。
+`api-proxy-collaboration.spec.ts` 断言 mux 流对带 seed 的恢复先产出 `session/event(session/end-seed, seq 1)` 再产出 `session/subscribed(lastSeq 1)`。`api-proxy-models.spec.ts` 与 `api-proxy-cold.spec.ts` 覆盖 detached 选择分层与归属栅栏(48 个用例)。`service.client.spec.ts` 钉住契约:`/` 源不再注册 `warm` 钩子,首个 `candidates` 拉取对每个会话键只取一次。web 端到端规格保留 `historyCalls === 1` 与呈现后无 Agent 断言;显式打开套件经 `session.activate` 轮询活跃 Agent,`server-restart.e2e.ts` 覆盖重连重发布,`session-api.client.spec.ts` 验证 `sessions.activate` 路由到所属 runtime,`desktop.spec.ts` 断言无活跃 Agent 的会话 `status` 返回 `null` 且不调用解析器,`personal-directory.client.spec.ts` 固定已完成的用户选择不被迟到落地的保存恢复覆盖。
 
 ## Related
 

@@ -244,6 +244,41 @@ it('waits for bootstrap identity verification before restoring only the saved fo
   } finally { await f.ctx.fiber.dispose() }
 })
 
+it('does not overwrite a completed user selection when the saved restore lands late', async () => {
+  const storage = new Map<string, string>()
+  const rawSaved = 'saved-on-b' as SessionId, rawLocal = 'picked-local' as SessionId
+  const saved = clientSessionKey(target(2), rawSaved)
+  const picked = clientSessionKey(target(1), rawLocal)
+  storage.set(`dsh.personal.current.v1.account:7.runtime:${target(1).runtimeId}`, JSON.stringify({ sessionId: saved }))
+  vi.stubGlobal('location', { search: `?dshRuntime=${target(1).runtimeId}` })
+  vi.stubGlobal('sessionStorage', { getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => { storage.set(key, value) } })
+  const f = await fixture(), policy = new ProjectUiPolicyRuntime()
+  ctxPolicy(f.ctx, policy)
+  f.api.onList = async () => ok({ items: [{ sessionId: rawLocal, updatedAt: 1, running: false, blank: false }] })
+  f.remoteApi.onList = async () => ok({ items: [{ sessionId: rawSaved, updatedAt: 1, running: false, blank: false }] })
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url.startsWith('/account/api/scope?')
+    ? new Response(null, { status: 204, headers: { location: `/?dshRuntime=${target(2).runtimeId}` } })
+    : new Response(JSON.stringify({ activeRuntime: target(1),
+      personalWorkspaces: [group(1), group(2)], items: [{ sessionId: rawSaved, runtime: target(2),
+        title: 'Saved on B', updatedAt: 1, blank: false }] }), { headers: { 'content-type': 'application/json' } })))
+  try {
+    await f.base.refresh()
+    // The user selection commits before the ambient restore begins.
+    f.sessions.open(rawLocal)
+    expect(f.sessions.list.getSnapshot().current).toBe(picked)
+    installPersonalDirectory(f.ctx, f.connection, f.sessions, f.workspaces)
+    f.hostDescription.set({ version: 'test', cwd: '/work', attachedSessions: 0, home: '/home/test', canOpenPath: true,
+      executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(7)
+    // The restore still reaches its retained open on B, then must yield: the
+    // selection it would fill is already owned by the user's Session.
+    await vi.waitFor(() => { expect(f.remoteApi.callsOf('session.history')).not.toHaveLength(0) })
+    await Promise.resolve()
+    expect(f.sessions.list.getSnapshot().current).toBe(picked)
+  } finally { await f.ctx.fiber.dispose() }
+})
+
 it('keeps captured directory operations on B after selection returns to the bootstrap computer', async () => {
   const f = await fixture()
   try {
