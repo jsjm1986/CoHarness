@@ -1609,7 +1609,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-host-directory-picker-browse`
 
-- `source`: [`packages/host/directory-picker-browse/src/index.ts:321`](../packages/host/directory-picker-browse/src/index.ts)
+- `source`: [`packages/host/directory-picker-browse/src/index.ts:322`](../packages/host/directory-picker-browse/src/index.ts)
 
 ```ts config-catalog
 /** Validated plugin configuration. */
