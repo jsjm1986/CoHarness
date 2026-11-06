@@ -24,19 +24,31 @@ interface Options {
 export function createDesktopApi(ctx: Context, options: Options): DesktopApi {
   const lifetime = new AbortController(), pending = new Set<Promise<unknown>>()
   ctx.effect(() => async () => { lifetime.abort(); await Promise.allSettled([...pending]) }, 'apiproxy: desktop confirmation')
+  function invoke<T>(request: RpcRequest<{ sessionId: SessionId }>, external: AbortSignal | undefined,
+    operation: (agent: Agent, signal: AbortSignal) => Promise<T>, liveOnly?: false): Promise<RpcResponse<T>>
+  function invoke<T>(request: RpcRequest<{ sessionId: SessionId }>, external: AbortSignal | undefined,
+    operation: (agent: Agent, signal: AbortSignal) => Promise<T>, liveOnly: true): Promise<RpcResponse<T | null>>
   async function invoke<T>(request: RpcRequest<{ sessionId: SessionId }>, external: AbortSignal | undefined,
-    operation: (agent: Agent, signal: AbortSignal) => Promise<T>): Promise<RpcResponse<T>> {
+    operation: (agent: Agent, signal: AbortSignal) => Promise<T>, liveOnly = false): Promise<RpcResponse<T | null>> {
     let signal = external === undefined ? lifetime.signal : AbortSignal.any([external, lifetime.signal])
-    const work = (async (): Promise<RpcResponse<T>> => {
+    const work = (async (): Promise<RpcResponse<T | null>> => {
       try {
         signal.throwIfAborted()
         const authorized = await options.authorize(request.payload.sessionId)
         if ('error' in authorized) return { rpcId: request.rpcId, result: { ok: false, error: authorized.error } }
         signal = options.signal(signal, authorized.authority)
-        const found = await options.agent(request.payload.sessionId)
-        if ('error' in found) return { rpcId: request.rpcId, result: { ok: false, error: found.error } }
+        let agent: Agent
+        if (liveOnly) {
+          const live = ctx.agents.get(request.payload.sessionId)
+          if (live === undefined) return { rpcId: request.rpcId, result: { ok: true, value: null } }
+          agent = live
+        } else {
+          const found = await options.agent(request.payload.sessionId)
+          if ('error' in found) return { rpcId: request.rpcId, result: { ok: false, error: found.error } }
+          agent = found.agent
+        }
         signal.throwIfAborted()
-        const value = await operation(found.agent, signal)
+        const value = await operation(agent, signal)
         signal.throwIfAborted()
         const current = await options.authorize(request.payload.sessionId, authorized.authority)
         if ('error' in current) return { rpcId: request.rpcId, result: { ok: false, error: current.error } }
@@ -57,7 +69,7 @@ export function createDesktopApi(ctx: Context, options: Options): DesktopApi {
       const unavailableReason = computerUseUnavailableReason(ctx)
       if (unavailableReason !== undefined) return { unavailableReason }
       return await ctx.get('computerUseAuthorization')?.confirmation?.read(agent, abort) ?? null
-    }),
+    }, true),
     confirm: (request, signal) => invoke(request, signal, async (agent, abort) => {
       const unavailableReason = computerUseUnavailableReason(ctx)
       if (request.payload.confirmed && unavailableReason !== undefined) throw new ComputerUseUnavailableError(unavailableReason)

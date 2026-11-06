@@ -3528,7 +3528,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               if (presetId !== undefined || !resolvable) throw error
               composition = await composeAgent(undefined, inspected.meta.sshTarget)
             }
-            console.warn(`[act-diag] ensureSession-resume-blank ${sessionId}\n${new Error().stack?.split('\n').slice(2, 7).join('\n') ?? ''}`)
             return sessionOwner.own(await ctx.agents.resume({
               resumeSessionId: sessionId,
               agentOptions: agentOptions(),
@@ -3552,7 +3551,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           // rebuilding it differently would replay tool calls the model can no
           // longer make. The persisted SSH binding likewise re-mounts from the
           // header, re-resolved under the resuming caller's authority.
-          console.warn(`[act-diag] ensureSession-resume-stored ${sessionId}\n${new Error().stack?.split('\n').slice(2, 7).join('\n') ?? ''}`)
           return sessionOwner.own(await ctx.agents.resume({
             resumeSessionId: sessionId,
             agentOptions: agentOptions(),
