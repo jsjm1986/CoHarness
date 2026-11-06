@@ -34,3 +34,12 @@ export async function runGatewayChildCommand(command: string, args: string[], ti
     cancellation?.[Symbol.dispose]()
   }
 }
+
+/**
+ * Distinguish a command killed by its own deadline or cancellation from an autonomous exit.
+ * @param error - rejection from runGatewayChildCommand.
+ * @returns whether the child was killed instead of answering on its own.
+ */
+export function isDeadlineKilledCommand(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { killed?: unknown }).killed === true
+}
