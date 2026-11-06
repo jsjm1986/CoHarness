@@ -305,9 +305,10 @@ async function directoryRow(
         finally { await closeForCaller(opened, signal) }
       }
     } catch (error) {
-      /* v8 ignore next 3 -- mid-probe aborts and probe+abort aggregates are pinned by the POSIX race suite. */
+      /* v8 ignore start -- mid-probe aborts and probe+abort aggregates are pinned by the POSIX race suite. */
       if (signal?.aborted) throw asError(signal.reason)
       if (error instanceof AggregateError) throw error
+      /* v8 ignore stop */
       // Broken or cyclic symlink: stat is the probe, failure means "not enterable".
       return null
     }
