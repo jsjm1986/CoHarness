@@ -18,7 +18,9 @@ Status: implemented
 
 **先合并整个请求解析链。** /account/api/context 链路是 session→user→scope→runtime→admission 的数据依赖读，逐端点合并有收益，但采样循环与 token 见证流会持续乘算 RTT。观测轮与 token 见证无条件运行且频率高于任何单端点，故先行收敛。
 
-**中心签发的授权断言。** 目标节点验签代替查询。这仍是计划的下一步，但需要信任注册表：各网关目前持有独立 Ed25519 密钥对（`principal.ts`)，在公钥经 PostgreSQL 分发之前中心签的断言节点无法验证。本次两项改动与该协议无关并先行拿到大部分延迟收益。
+**中心签发的授权断言。** 目标节点验签代替查询。这仍是计划的下一步；其信任注册表现在已存在：`harness.compute_nodes.principal_public_key`（迁移 `122_node_principal_keys.sql`)，各网关在启动时发布，另有 `NodePrincipalDirectory`——带 TTL 缓存的签发方公钥读取器，仅认可持有有效受管代理租约的节点或无代理行的节点（中心这类直接配置的网关，其撤销即行状态）。断言签发与目标侧验证在其上的后续工作中实现。
+
+**跨节点写路径清理。** 缓存是进程级的：某网关上的 `markStopped`/`beginStart` 只清本进程。远程网关仍经 2 秒 TTL 获知变化，因为 runtime 生命周期写不提升 `access_revision`；资源操作内部的代际检查在该窗口内继续围篱任何陈旧判定。
 
 **无失效通道的更长 token TTL。** 否决：撤销必须以通知速度而非 TTL 速度传播，故缓存订阅既有 access-invalidation 通道而非延长陈旧窗口。
 

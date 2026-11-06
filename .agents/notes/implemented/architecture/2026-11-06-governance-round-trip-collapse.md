@@ -18,7 +18,9 @@ Remote node gateways reach the central PostgreSQL through an SSH tunnel at ~200m
 
 **Merge the whole request-resolution chain first.** The /account/api/context chain is data-dependent session→user→scope→runtime→admission reads; batching it pays off per request but leaves the continuous sampler and token streams multiplying RTTs forever. The observation round and token witness run unconditionally and at higher frequency than any single endpoint, so they were collapsed first.
 
-**Signed center-issued authorization assertions.** The destination node would verify a signature instead of querying. That remains the planned next step, but it needs a trust registry: each gateway currently holds an independent Ed25519 keypair (`principal.ts`), so the center cannot sign anything a node can verify until public keys are distributed through PostgreSQL. The two changes here are prerequisites-agnostic and deliver most of the latency win without a key-distribution protocol.
+**Signed center-issued authorization assertions.** The destination node would verify a signature instead of querying. That remains the planned next step; its trust registry now exists as `harness.compute_nodes.principal_public_key` (migration `122_node_principal_keys.sql`), which each gateway publishes at startup, plus `NodePrincipalDirectory`, a TTL-cached issuer-key reader that only honors nodes with a live managed agent lease or no agent row (directly provisioned gateways such as the center, whose revocation is row status). Assertion issuing and destination verification build on this in a follow-up.
+
+**Cross-node write-path clearing.** The cache is per-process: a `markStopped`/`beginStart` on one gateway clears only that process. Remote gateways still learn the change through the 2s TTL, since runtime lifecycle writes do not bump `access_revision`; downstream generation checks inside resource operations fence any stale verdict within that window.
 
 **Longer token TTL without invalidation.** Rejected: revocation must propagate at notification speed, not TTL speed, so the cache subscribes to the existing access-invalidation channel instead of lengthening staleness.
 

@@ -296,6 +296,38 @@ describePg('organization computer use', () => {
     await expect(new PostgresRuntimeCatalog(f.a, f.cfg.runtimeCatalog).resolveForAccount(f.member, runtime.id)).rejects.toMatchObject({ status: 404 })
   })
 
+  it('memoizes runtime token verdicts until invalidation or a local fencing write', async () => {
+    const f = await fixture()
+    let witnessQueries = 0
+    const countingPool = new Proxy(pool, { get(actual, key) {
+      if (key === 'query') return async (sql: string, values?: readonly unknown[]) => {
+        if (typeof sql === 'string' && sql.includes('i.runtime_token_hash=$3')) witnessQueries++
+        return actual.query(sql, values === undefined ? undefined : [...values])
+      }
+      const value: unknown = Reflect.get(actual, key, actual)
+      return typeof value === 'function' ? value.bind(actual) : value
+    } })
+    const repository = new PostgresInstanceRepository({ ...f.a, pool: countingPool }, f.cfg.instancePortBase,
+      undefined, undefined, 60_000)
+    const target = { kind: 'user' as const, id: f.member.id }
+    const token = 'private-fixture-runtime'
+    await repository.beginStart(target, Date.now(), createHash('sha256').update(token).digest(), 'explicit')
+    expect(await repository.authenticateRuntimeToken(token)).not.toBeNull()
+    expect(await repository.authenticateRuntimeToken(token)).not.toBeNull()
+    expect(witnessQueries).toBe(1)
+    // The durable verdict still answers until the subscription wake clears it.
+    await f.access.set(f.admin, f.member.id, f.a.nodeId, { enabled: false, revision: '1' })
+    expect(await repository.authenticateRuntimeToken(token)).not.toBeNull()
+    repository.invalidateRuntimeTokenCache()
+    expect(await repository.authenticateRuntimeToken(token)).toBeNull()
+    // A local fencing write clears the same process without waiting for the channel.
+    await f.access.set(f.admin, f.member.id, f.a.nodeId, { enabled: true, revision: '2' })
+    const generation = await repository.beginStart(target, Date.now(), createHash('sha256').update(token).digest(), 'explicit')
+    expect(await repository.authenticateRuntimeToken(token)).not.toBeNull()
+    expect(await repository.markStopped(target, generation)).toBe(true)
+    expect(await repository.authenticateRuntimeToken(token)).toBeNull()
+  })
+
   it('binds a runtime generation to its live node connection without releasing cleanup or another computer', async () => {
     const f = await fixture(), nodes = new PostgresNodeAccessService(f.a, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
     const ticket = await nodes.issue(f.admin, { name: 'computer-c', requestId: randomUUID() })

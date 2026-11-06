@@ -81,6 +81,7 @@ import { PostgresWebhookEndpointService, WebhookSecretCipher } from './postgres/
 import { GatewayWebhookIntake } from './webhook-intake.ts'
 import { loadPrincipalKeys, PRINCIPAL_HEADER } from './principal.ts'
 import { createProxyHandlers } from './proxy.ts'
+import { NodePrincipalDirectory } from './postgres/node-principal-directory.ts'
 import { PostgresAccessMonitor, scopeAccessMonitor } from './access-invalidation.ts'
 import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
@@ -237,6 +238,9 @@ const documentCatalog = new PostgresDocumentCatalogService(context, cfg.archiveR
 const documentCatalogHandlers = createDocumentCatalogHandlers(documentCatalog, audit)
 const push = createPostgresPushService(context, cfg)
 const principalKeys = loadPrincipalKeys(cfg.principalKeyDir, cfg.organizationSlug, cfg.principalAssertionTtlMs)
+// Peer gateways verify forwarded-request assertions against this published key.
+await pool.query('UPDATE harness.compute_nodes SET principal_public_key=$3 WHERE organization_id=$1 AND id=$2',
+  [context.organizationId, context.nodeId, principalKeys.publicKeyPem])
 const instanceRepository = new PostgresInstanceRepository(context, cfg.instancePortBase, nodeProjects, nodeFiles, cfg.runtimeTokenCacheMs)
 const conversations = new PostgresConversationStore(pool, contentVolume)
 // Launcher is local child-process (dev) unless HGW_LAUNCHER=systemd (Linux prod);
@@ -274,7 +278,11 @@ await resourceBudget.configure()
 const gatewayModelBudget = await GatewayModelBudget.open(resourceBudget, join(nodeControlPaths(cfg.stateRoot).gatewayModels, context.nodeId))
 const accessMonitor = new PostgresAccessMonitor(context, cfg.accessInvalidationPollMs)
 const localAccessMonitor = scopeAccessMonitor(accessMonitor, context.nodeId as RuntimeNodeId)
-localAccessMonitor.subscribe(() => { instanceRepository.invalidateRuntimeTokenCache() })
+const principalDirectory = new NodePrincipalDirectory(context, cfg.runtimeTokenCacheMs)
+localAccessMonitor.subscribe(() => {
+  instanceRepository.invalidateRuntimeTokenCache()
+  principalDirectory.invalidate()
+})
 const progress = new PostgresProgressService(context, { nodeContent: contentVolume, collaboration, governance, budget: gatewayModelBudget, accessMonitor: localAccessMonitor,
   usage: new PostgresProgressUsage(context, governance, cfg.progress.usageReplayBatchSize, assertCurrentDataEpoch, contentVolume),
   trackWrite: operation => trackWriter(operation), assertDataEpoch: assertCurrentDataEpoch,
