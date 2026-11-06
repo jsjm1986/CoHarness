@@ -159,6 +159,7 @@ describe('ReviewTab', () => {
       bindCommands: vi.fn(() => () => {}),
       openResource: openResourceMock,
       openTab: vi.fn<SidebarRightTabActions['openTab']>(),
+      setPanelMode: vi.fn<SidebarRightTabActions['setPanelMode']>(),
       close: vi.fn<SidebarRightTabActions['close']>(),
     }
     const injected = {

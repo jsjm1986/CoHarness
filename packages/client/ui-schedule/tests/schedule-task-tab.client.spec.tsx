@@ -66,7 +66,7 @@ const RESTORED = Symbol('restored record without navigation parameters')
 
 function tabInfo(params: unknown, revision = 1): SidebarRightTabInfo {
   const actions: SidebarRightTabActions = {
-    bindCommands: vi.fn(() => vi.fn()), openResource: vi.fn(), openTab: vi.fn(), close: vi.fn(),
+    bindCommands: vi.fn(() => vi.fn()), openResource: vi.fn(), openTab: vi.fn(), setPanelMode: vi.fn(), close: vi.fn(),
   }
   return {
     sidebar: { expanded: true, fullscreen: false },
