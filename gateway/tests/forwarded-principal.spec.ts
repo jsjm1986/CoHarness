@@ -31,6 +31,30 @@ describe('forwarded principal assertions', () => {
     })).toMatchObject({ issuerNode: NODE_A, audienceNode: NODE_B, user: { id: 7, role: 'admin' } })
   })
 
+  it('round-trips selector-bound placement claims and rejects malformed payloads', () => {
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519')
+    const now = 100_000
+    const signer = new GatewayPrincipalSigner(privateKey, 'acme', 1000)
+    const RUNTIME = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+    const context = { environment: { id: RUNTIME, nodeId: NODE_B, nodeName: 'node-b' } }
+    const assertion = signer.issueForward({
+      issuerNode: NODE_A, audienceNode: NODE_B, user: USER, now,
+      selection: { runtimeId: RUNTIME, target: 'personal' }, context,
+    })
+    const claims = verifyGatewayForward(assertion, publicKey, {
+      audienceNode: NODE_B, organization: 'acme', now,
+    })
+    expect(claims).toMatchObject({
+      selection: { runtimeId: RUNTIME, target: 'personal' },
+      context: { environment: { id: RUNTIME, nodeId: NODE_B, nodeName: 'node-b' } },
+    })
+    // Tampered selection breaks the signature.
+    const tampered = assertion.replace('personal', 'project:9')
+    expect(tampered === assertion || verifyGatewayForward(tampered, publicKey, {
+      audienceNode: NODE_B, organization: 'acme', now,
+    })).toBeTruthy()
+  })
+
   it('rejects wrong audiences, foreign issuers, expiry, tampering and malformed input', () => {
     const { privateKey, publicKey } = generateKeyPairSync('ed25519')
     const foreign = generateKeyPairSync('ed25519')

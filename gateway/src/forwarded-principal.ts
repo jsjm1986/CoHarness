@@ -1,6 +1,6 @@
 import { createPublicKey, type KeyObject } from 'node:crypto'
 import type { UserRow } from './auth.ts'
-import type { RuntimeNodeId } from './runtime-catalog.ts'
+import type { RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
 import { verifiedPayload } from './principal.ts'
 
 export const FORWARDED_PRINCIPAL_HEADER = 'x-dsh-gateway-forward'
@@ -20,6 +20,20 @@ export interface GatewayForwardClaims {
   audienceNode: RuntimeNodeId
   organization: string
   user: UserRow
+  /**
+   * The request selectors this assertion was issued for; a destination only
+   * trusts `context` when its own parsed selectors equal these exactly.
+   */
+  selection?: { runtimeId: RuntimeId | null; target: string | null }
+  /**
+   * The authorized environment the issuer's placement already produced. Scope
+   * and runtime storage stay node-local on the destination, so only the
+   * placement result travels; the destination adopts it as a checked
+   * `RuntimePlacement` when the selector binding matches exactly.
+   */
+  context?: {
+    environment: { id: RuntimeId; nodeId: RuntimeNodeId; nodeName?: string }
+  }
   issuedAt: number
   expiresAt: number
   nonce: string
@@ -50,6 +64,22 @@ function forwardClaims(value: unknown): GatewayForwardClaims {
     || claims.expiresAt <= claims.issuedAt
     || typeof claims.nonce !== 'string' || claims.nonce === '') {
     throw new Error('invalid forwarded principal claims')
+  }
+  if (claims.selection !== undefined) {
+    const selection = record(claims.selection)
+    if (selection === undefined
+      || (selection.runtimeId !== null && typeof selection.runtimeId !== 'string')
+      || (selection.target !== null && typeof selection.target !== 'string')) {
+      throw new Error('invalid forwarded principal claims')
+    }
+  }
+  if (claims.context !== undefined) {
+    const context = record(claims.context), environment = record(context?.environment)
+    if (context === undefined || environment === undefined || typeof environment.id !== 'string'
+      || typeof environment.nodeId !== 'string'
+      || (environment.nodeName !== undefined && typeof environment.nodeName !== 'string')) {
+      throw new Error('invalid forwarded principal claims')
+    }
   }
   return value as GatewayForwardClaims
 }

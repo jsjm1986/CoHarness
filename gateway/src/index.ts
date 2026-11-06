@@ -418,7 +418,18 @@ const nodeServiceProxy = new GatewayNodeServiceProxy({
   authorizeAdministratorNode: (actor, id) => nodeAccess.authorizeAdministratorNode(actor, id),
   authorizeAccountNode: (actor, id) => computerAccess.authorize(actor.id, id),
 }, nodeServices, cfg.upstreamTimeoutMs, cfg.nodeService, accessMonitor,
-(target, user) => principalKeys.signer.issueForward({ issuerNode: context.nodeId, audienceNode: target, user }))
+async (target, user) => {
+  // Attach the placement this Gateway already authorized so the destination
+  // can adopt it as a checked placement; scope and runtime storage are
+  // node-local data the destination resolves itself.
+  const environment = target.environment
+  return principalKeys.signer.issueForward({
+    issuerNode: context.nodeId, audienceNode: target.nodeId, user,
+    selection: { runtimeId: target.runtimeId ?? null, target: target.resolvedTarget ?? null },
+    ...(environment === undefined || target.resolvedTarget === undefined
+      ? {} : { context: { environment: { id: environment.id, nodeId: environment.node.id, nodeName: environment.node.name } } }),
+  })
+})
 const runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter({ collaboration, instances }), {
   catalog: runtimeCatalog, localNodeId: context.nodeId as RuntimeNodeId,
 })
@@ -450,7 +461,7 @@ const deps: GatewayDeps = {
     const issuerKey = issuerNode === null ? null : await principalDirectory.issuerKey(issuerNode)
     return issuerKey === null ? null
       : verifyGatewayForward(assertion, issuerKey, {
-        audienceNode: context.nodeId as RuntimeNodeId, organization: cfg.organizationSlug })?.user ?? null
+        audienceNode: context.nodeId as RuntimeNodeId, organization: cfg.organizationSlug })
   },
   runtimeRouter,
   performance: performanceObserver,

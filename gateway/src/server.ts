@@ -138,7 +138,7 @@ export interface GatewayDeps {
   /** Durable revocations shared by Gateways using the same organization. */
   accessMonitor?: import('./access-invalidation.ts').GatewayAccessMonitor
   /** Peer-signed forwarded-request assertion verifier; null falls back to session validation. */
-  forwardedPrincipal?: (assertion: string) => Promise<UserRow | null>
+  forwardedPrincipal?: (assertion: string) => Promise<import('./forwarded-principal.ts').GatewayForwardClaims | null>
   governance?: GatewayModelGovernanceService
   collaboration?: GatewayCollaborationService
   /** Optional human-facing project progress journal; absent without PostgreSQL. */
@@ -773,7 +773,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     return probe
   }
 
-  const currentUser = async (req: IncomingMessage): Promise<{ token: string; user: UserRow } | null> => {
+  const currentUser = async (req: IncomingMessage): Promise<{ token: string; user: UserRow;
+      forward?: import('./forwarded-principal.ts').GatewayForwardClaims } | null> => {
     // A peer-signed assertion proves the forwarding Gateway already validated
     // this session; only requests that demonstrably arrived over the
     // node-service channel may honor it.
@@ -782,18 +783,39 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       && req.headers[NODE_SERVICE_TARGET_HEADER] === deps.nodeServiceIdentity?.nodeId
     const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
     if (typeof forward === 'string' && arrivedForThisNode && deps.forwardedPrincipal !== undefined) {
-      const user = await deps.forwardedPrincipal(forward)
-      if (user !== null) return { token: token ?? '', user }
+      const claims = await deps.forwardedPrincipal(forward)
+      if (claims !== null) return { token: token ?? '', user: claims.user, forward: claims }
     }
     if (token === undefined) return null
     const user = await timeOperation('authorize',async()=>auth.validate(token))
     return user === null ? null : { token, user }
   }
 
-  const requestContext = (req: IncomingMessage, user: UserRow, checked?:RuntimePlacement) => {
+  /** Parse the selector target exactly as the destination router would; no query. */
+  const parsedTarget = (raw: string | null | undefined): 'personal' | `project:${number}` =>
+    raw !== undefined && raw !== null && /^project:[1-9][0-9]*$/u.test(raw) ? raw as `project:${number}` : 'personal'
+
+  const requestContext = (req: IncomingMessage, user: UserRow, checked?:RuntimePlacement,
+    forward?: import('./forwarded-principal.ts').GatewayForwardClaims) => {
     const query = new URL(req.url ?? '/', 'http://x').searchParams
-    return runtimeRouter.resolve(user, { runtimeId: query.get('dshRuntime'), target: query.get('dshTarget'),
-      scopeCookie: parseCookies(req.headers.cookie).get(SCOPE_COOKIE) },checked)
+    const runtimeId = query.get('dshRuntime'), target = query.get('dshTarget')
+    const scopeCookie = parseCookies(req.headers.cookie).get(SCOPE_COOKIE)
+    // A bound assertion supplies the placement the issuer already authorized;
+    // it is adopted only when this request's parsed selectors equal the signed
+    // selectors exactly and the claimed environment lands on this node. The
+    // destination still resolves scope and node-local runtime storage itself.
+    const claimed = forward?.context, effectiveTarget = target ?? parsedTarget(scopeCookie)
+    if (claimed !== undefined && forward?.selection !== undefined
+      && (forward.selection.runtimeId ?? null) === runtimeId
+      && (forward.selection.target ?? null) === effectiveTarget
+      && claimed.environment.nodeId === deps.nodeServiceIdentity?.nodeId) {
+      const claimedTarget = forward.selection.target as 'personal' | `project:${number}`
+      return runtimeRouter.resolve(user, { runtimeId, target: claimedTarget, scopeCookie },
+        { target: claimedTarget, local: true, resetScope: false,
+          environment: { id: claimed.environment.id,
+            node: { id: claimed.environment.nodeId, name: claimed.environment.nodeName } } as RuntimePlacement['environment'] })
+    }
+    return runtimeRouter.resolve(user, { runtimeId, target, scopeCookie },checked)
   }
 
   const conversationRuntime = (context: GatewayRequestContext): import('./runtime-catalog.ts').RuntimeId => {
@@ -1107,7 +1129,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       || pathname.startsWith('/admin/api/deployment/nodes/access/') || pathname.startsWith('/admin/api/deployment/project-names/')
       || pathname.startsWith('/admin/api/deployment/project-content-migrations/'))
     if (!await writesOpen(req, res, pathname, nodeAccessWrite)) return
-    const { token, user } = session
+    const { token, user, forward } = session
 
     if (pathname === '/logout' && req.method === 'POST') {
       await auth.revoke(token)
@@ -1360,7 +1382,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (month !== undefined && !/^\d{4}-(?:0[1-9]|1[0-2])$/u.test(month)) {
         send(res, 400, '{"error":"invalid-month"}', 'application/json'); return
       }
-      const resolvedUsage = await requestContext(req, user)
+      const resolvedUsage = await requestContext(req, user, undefined, forward)
       if (resolvedUsage.resetScope) res.setHeader('set-cookie', scopeCookie('personal', cfg))
       const projectId = resolvedUsage.context.scope.kind === 'project' ? resolvedUsage.context.scope.projectId : undefined
       const selectedNodeId = resolvedUsage.context.environment?.nodeId
@@ -1542,7 +1564,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     }
 
     let contextFlight: ReturnType<typeof requestContext> | undefined
-    const selectedContext = () => contextFlight ??= requestContext(req, user,admittedPlacement).then(resolved => {
+    const selectedContext = () => contextFlight ??= requestContext(req, user,admittedPlacement, forward).then(resolved => {
       if (resolved.resetScope) res.setHeader('set-cookie', scopeCookie('personal', cfg))
       return resolved
     })
@@ -1582,9 +1604,9 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       } else if (req.method !== 'GET') { res.setHeader('allow', 'GET, PUT, DELETE'); send(res, 405, '', 'application/json'); return }
       const identity=deps.nodeServiceIdentity
       const authorize=async()=>{
-        const fresh=await auth.validate(token)
+        const fresh=forward!==undefined?user:await auth.validate(token)
         if (!fresh || fresh.id!==user.id || fresh.mustChangePassword) throw new CollaborationDeniedError('forbidden')
-        const resolved=(await requestContext(req,fresh)).context
+        const resolved=(await requestContext(req,fresh,undefined,forward)).context
         const environment=resolved.environment,scope=resolved.scope
         if (!environment || environment.id!==requestedRuntime || environment.nodeId!==identity.nodeId ||
           target!==(scope.kind==='personal'?'personal':`project:${scope.projectId}`)) throw new RuntimeCatalogError(400,'runtime-catalog/target-mismatch')
@@ -2764,7 +2786,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (deps.nodeServiceProxy !== undefined && await deps.nodeServiceProxy.upgrade(req, socket, head, session.user)) {
         upgradeStatus = 101; return
       }
-      const resolved = await requestContext(req, session.user)
+      const resolved = await requestContext(req, session.user, undefined, session.forward)
       upgradeStatus = 101
       await handlers.upgrade(req, socket, head, resolved.context)
     }

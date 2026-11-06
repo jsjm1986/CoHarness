@@ -203,6 +203,8 @@ export class GatewayPrincipalSigner {
     issuerNode: string
     audienceNode: string
     user: UserRow
+    selection?: { runtimeId: string | null; target: string | null }
+    context?: unknown
     now?: number
   }): string {
     const now = input.now ?? Date.now()
@@ -211,6 +213,8 @@ export class GatewayPrincipalSigner {
       version: 1, issuer: 'harness-gateway', audience: 'dsh-node',
       issuerNode: input.issuerNode, audienceNode: input.audienceNode,
       organization: this.organization, user: input.user,
+      ...(input.selection === undefined ? {} : { selection: input.selection }),
+      ...(input.context === undefined ? {} : { context: input.context }),
       issuedAt, expiresAt: now + this.ttlMs, nonce: randomUUID(),
     }
     return signedPayload(claims, this.privateKey)

@@ -18,7 +18,11 @@ Status: implemented
 
 **先合并整个请求解析链。** /account/api/context 链路是 session→user→scope→runtime→admission 的数据依赖读，逐端点合并有收益，但采样循环与 token 见证流会持续乘算 RTT。观测轮与 token 见证无条件运行且频率高于任何单端点，故先行收敛。
 
-**中心签发的授权断言。** 会话段现已实现。转发网关附加 `x-dsh-gateway-forward`——`GatewayPrincipalSigner.issueForward` 签发的 Ed25519 断言，携带已验证的 `UserRow`、`issuerNode`、`audienceNode`、组织与 `principalAssertionTtlMs` 存活窗口。`GatewayNodeServiceProxy` 对每个转发的 HTTP 与 WebSocket 请求盖章，先删除客户端自带同名头。目标侧 `currentUser` 仅在请求确经节点服务通道到达（`x-dsh-target-node` 等于本节点 id）时才采纳：经 `NodePrincipalDirectory` 取签发方公钥，`verifyGatewayForward` 校验签名、精确受众、组织与存活窗口；失败回退普通会话验证。验证通过的断言完全跳过会话续期与权威快照——下游每条查询仍内嵌自身权限谓词，故撤销粒度为断言 TTL 加上既有 access-invalidation 对在途操作的中止。信任注册表为 `harness.compute_nodes.principal_public_key`（迁移 `122_node_principal_keys.sql`)，各网关启动时发布，仅认可持有有效受管代理租约的节点或无代理行的节点（中心这类直接配置的网关，其撤销即行状态）。上线天然分阶段：跑新代码的目标侧仍经回退路径应答旧对端，未发布公钥的对端只是验签失败走会话路径。
+**中心签发的授权断言。** 转发网关附加 `x-dsh-gateway-forward`——`GatewayPrincipalSigner.issueForward` 签发的 Ed25519 断言。`GatewayNodeServiceProxy` 对每个转发的 HTTP 与 WebSocket 请求盖章，先删除客户端自带同名头。目标侧 `currentUser` 仅在请求确经节点服务通道到达（`x-dsh-target-node` 等于本节点 id）时才采纳：经 `NodePrincipalDirectory` 取签发方公钥，`verifyGatewayForward` 校验签名、精确受众、组织与存活窗口；失败回退普通会话验证。验证通过的断言完全跳过会话续期与权威快照——下游每条查询仍内嵌自身权限谓词，故撤销粒度为断言 TTL 加上既有 access-invalidation 对在途操作的中止。
+
+断言还会携带签发方已授权的放置结果。`issueForward` 可选签名 `selection`(`runtimeId`、`target`）与 `context`(`environment`)：代理在每个转发 `Target` 中记录请求的精确选择子与已解析的目录环境。scope 与 runtime 存储是节点本地数据（按 `assigned_node_id` 键控），签发方无法诚实产出，故刻意不放入断言。目标侧 `requestContext` 仅在断言验证通过**且**请求解析出的选择子（`dshRuntime`、`dshTarget` 或 scope cookie）与 `selection` 完全相等**且**声明环境落在本节点时才采纳：随后以受检 `RuntimePlacement` 调用 `runtimeRouter.resolve`，跳过每次请求的目录放置遍历，同时仍自行解析 scope 与节点本地 owner 存储。任何不匹配回退常规 resolve 路径，上下文声明绝不可能把放置扩到目标侧自身计算结果之外。
+
+信任注册表为 `harness.compute_nodes.principal_public_key`（迁移 `122_node_principal_keys.sql`)，各网关启动时发布，仅认可持有有效受管代理租约的节点或无代理行的节点（中心这类直接配置的网关，其撤销即行状态）。上线天然分阶段：跑新代码的目标侧仍经回退路径应答旧对端，未发布公钥的对端只是验签失败走会话路径。
 
 **跨节点写路径清理。** 缓存是进程级的：某网关上的 `markStopped`/`beginStart` 只清本进程。远程网关仍经 2 秒 TTL 获知变化，因为 runtime 生命周期写不提升 `access_revision`；资源操作内部的代际检查在该窗口内继续围篱任何陈旧判定。
 

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-06-governance-round-trip-collapse.md
 document:
-  en: 6db04249570636299cd3ffc22056b92ce7def091
-  zh: e84fa65913254664919a890a9f609a9bb01af77b
+  en: 906c6ffe16ae0cd1a3be67dabb582e45b2ddc36e
+  zh: 007c29e2361e354a50549b9f76478300c9876ff2
 /agent-note-collapse-serial-governance-round-trips-for-tunnel-nodes:
   en: dd1d0335d333e37c
   zh: d3601c5704b3a356
@@ -15,8 +15,8 @@ document:
   en: d10fbd6a5caafe13
   zh: 661941f82ee47f23
 /agent-note-collapse-serial-governance-round-trips-for-tunnel-nodes/alternatives-considered:
-  en: 401b8a7d34d8289f
-  zh: 9ac822d54606ae06
+  en: dde88425661431e8
+  zh: 9a288aa352d9cd55
 /agent-note-collapse-serial-governance-round-trips-for-tunnel-nodes/consequences:
   en: e367791069a49fcc
   zh: dc92285de41fed0c
