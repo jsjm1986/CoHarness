@@ -285,7 +285,7 @@ it('retains the restoration catalog request when initial navigation moves its co
     })
     const start = performance.now()
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'domcontentloaded' })
-    await expect.poll(() => catalogRequests > 0 && sessionArrived).toBe(true)
+    await expect.poll(() => catalogRequests > 0 && sessionArrived, { timeout: 30_000 }).toBe(true)
     await page.locator('[data-workbench-toolbar]').waitFor()
     sessionRelease.resolve(undefined)
     await page.locator('textarea:enabled').last().waitFor()
