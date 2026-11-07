@@ -867,6 +867,11 @@ jobs:
           docker pull postgres:17.6-bookworm
           node tests/run-node-content-postgres.mjs
         working-directory: gateway
+      - name: Test peer takeover recovery on disposable volumes
+        run: |
+          command -v restic || sudo apt-get install -y --no-install-recommends restic
+          HGW_TEST_RESTIC="$(command -v restic)" node tests/run-node-content-postgres.mjs --recovery
+        working-directory: gateway
       - name: Preserve gate evidence
         if: always()
         uses: ./.github/actions/gate-evidence
