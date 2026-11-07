@@ -45,16 +45,16 @@ export async function withWindowsDirectoryMove<T>(
       (handle: number | bigint, buffer: Buffer) => number
     >
     const rename = library.func('__stdcall', 'MoveFileExW', 'int', ['str16', 'str16', 'uint']) as KoffiFunc<(source: string, target: string, flags: number) => number>
+    // Synchronous calls keep GetLastError honest: koffi's async path runs on a
+    // worker thread but delivers the callback on the JS thread, where the
+    // thread-local error code no longer belongs to the failed call.
     const native = <Args extends unknown[], R extends number | bigint>(
       call: KoffiFunc<(...args: Args) => R>, args: Args, syscall: string, path: string, failed: (result: R) => boolean,
-    ): Promise<R> => new Promise((accept, reject) => {
-      call.async(...args, (error: unknown, result: R) => {
-        const code = lastError()
-        if (error !== null) reject(error instanceof Error ? error : new Error('Windows directory operation failed.', { cause: error }))
-        else if (failed(result)) reject(windowsError(syscall, code, path))
-        else accept(result)
-      })
-    })
+    ): R => {
+      const result = call(...args)
+      if (failed(result)) throw windowsError(syscall, lastError(), path)
+      return result
+    }
     const roots = [{ root, expected: expectedRoot }, { root: targetRoot, expected: expectedTargetRoot }]
     const parents = new Set([root, targetRoot])
     for (const [selectedRoot, path] of [[root, source], [targetRoot, target]] as const) {

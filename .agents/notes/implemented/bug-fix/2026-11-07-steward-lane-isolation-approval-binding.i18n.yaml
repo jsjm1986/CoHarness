@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-07-steward-lane-isolation-approval-binding.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-07-steward-lane-isolation-approval-binding.md
+document:
+  en: 9a6f5cc1d1ddc145451afd4a549c558345b9c65e
+  zh: cd77e73c7be122caac76c9a760af516e37d30890
+/agent-note-steward-read-lane-isolation-and-statement-bound-approvals:
+  en: 0f2b17b23f7a201a
+  zh: 9561ab2c685b8b34
+/agent-note-steward-read-lane-isolation-and-statement-bound-approvals/problem:
+  en: 1dbf82b389f289ad
+  zh: 0d566c4e8ce5727f
+/agent-note-steward-read-lane-isolation-and-statement-bound-approvals/decision:
+  en: c2484011836493c8
+  zh: 5d4684bb8c9ae982
+/agent-note-steward-read-lane-isolation-and-statement-bound-approvals/alternatives-considered:
+  en: 64430943c98dba95
+  zh: 5fc09d441d816a7f
+/agent-note-steward-read-lane-isolation-and-statement-bound-approvals/consequences:
+  en: 4f191d372530c0a3
+  zh: 8c00db38e74718d1

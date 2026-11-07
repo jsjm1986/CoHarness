@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-07-per-node-steward-projects.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-07-per-node-steward-projects.md
+document:
+  en: b4d670973c5d495faebc2b44acc09d3d9d74bf96
+  zh: ef442f706cfd243da29ce714c3b6519b87f4917f
+/agent-note-per-node-steward-projects-bound-through-steward-node-id:
+  en: 30aaf1d0a4366a6a
+  zh: 4d532a7965576121
+/agent-note-per-node-steward-projects-bound-through-steward-node-id/problem:
+  en: fff735af620c12cc
+  zh: 87137a973e5e749f
+/agent-note-per-node-steward-projects-bound-through-steward-node-id/decision:
+  en: 1bd04ec98b38b696
+  zh: 1f451b2b50c9eea1
+/agent-note-per-node-steward-projects-bound-through-steward-node-id/alternatives-considered:
+  en: 6ed0c4daa931d8da
+  zh: 9b4377a880091cc4
+/agent-note-per-node-steward-projects-bound-through-steward-node-id/consequences:
+  en: 6ae4afa6a7ba6d14
+  zh: 129146f0dd401254
+/agent-note-per-node-steward-projects-bound-through-steward-node-id/verification:
+  en: 9be07b8b4ccbd190
+  zh: 323699cb7c7ab5b2

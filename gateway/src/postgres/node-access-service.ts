@@ -52,6 +52,15 @@ interface AgentRow {
 
 type AgentLookup = { kind: 'node'; id: string } | { kind: 'credential'; hash: Buffer }
 
+/** JSON payload from `harness.node_heartbeat`/`harness.node_channel_lease`; status mirrors the service error names. */
+const leasePayloadSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('ok'), nodeId: z.string(), connectionId: z.string(),
+    epoch: z.string(), executionReady: z.boolean(), expiresAtMs: z.number().finite(),
+  }).strict(),
+  z.object({ status: z.enum(['unauthorized', 'detached', 'lease-lost', 'mode-disabled']) }).strict(),
+])
+
 /** Authenticated node registry; leases report connectivity and never acknowledge stopped writers. */
 export class PostgresNodeAccessService {
   /**
@@ -114,7 +123,15 @@ export class PostgresNodeAccessService {
           FOR SHARE`, [this.context.organizationId, request.nodeId, this.context.nodeId])
       const nodeId = node.rows[0]?.id
       if (nodeId === undefined) throw new NodeAccessError(409, 'node-access/name-conflict')
-      await tx.query("INSERT INTO harness.node_agents(organization_id,node_id,attachment_state) VALUES($1,$2,'pending')", [this.context.organizationId, nodeId])
+      try {
+        await tx.query("INSERT INTO harness.node_agents(organization_id,node_id,attachment_state) VALUES($1,$2,'pending')", [this.context.organizationId, nodeId])
+      } catch (error) {
+        // Two administrators can pass the FOR SHARE NOT EXISTS probe for the
+        // same node; the second loses on node_agents' primary key — surface
+        // the typed conflict instead of a raw 23505.
+        if ((error as { code?: string }).code === '23505') throw new NodeAccessError(409, 'node-access/name-conflict')
+        throw error
+      }
       await tx.query('UPDATE harness.deployment_topology SET revision=revision+1 WHERE organization_id=$1', [this.context.organizationId])
       return this.ticket(tx, actorId, nodeId, 1, request.requestId)
     })
@@ -334,18 +351,21 @@ export class PostgresNodeAccessService {
 
   /**
    * Renew only the exact, unexpired connection generation.
+   * One SQL function performs the primary gate, credential recheck, epoch match and conditional
+   * lease update atomically, preserving the former five-statement transaction's error taxonomy.
    * @param token - node bearer credential, rechecked on every heartbeat.
    * @param input - current connection UUID and decimal epoch.
    * @returns renewed control lease; expiry cannot be revived by a delayed heartbeat.
    */
   async heartbeat(token: string, input: unknown): Promise<NodeLease> {
     const request = parse(leaseRequestSchema, input)
-    return transaction(this.context.pool, async tx => {
-      await this.primary(tx, false)
-      const row = await this.authenticate(tx, token)
-      if (!row.live || row.connection_id !== request.connectionId || row.connection_epoch !== request.epoch) throw new NodeAccessError(409, 'node-access/lease-lost')
-      return this.renew(tx, row, true)
-    })
+    const credential = nodeCredentialSchema.safeParse(token)
+    if (!credential.success) throw new NodeAccessError(401, 'node-access/unauthorized')
+    const result = await this.context.pool.query<{ lease: unknown }>(
+      'SELECT harness.node_heartbeat($1,$2,$3,$4,$5,$6) lease',
+      [this.context.organizationId, digest(credential.data), request.connectionId, request.epoch,
+        this.config.leaseMs, this.context.nodeId])
+    return this.acceptedLease(result.rows[0]?.lease)
   }
 
   /**
@@ -357,14 +377,28 @@ export class PostgresNodeAccessService {
    */
   async authorizeChannel(token: string, input: unknown): Promise<NodeLease> {
     const request = parse(leaseRequestSchema, input)
-    return transaction(this.context.pool, async tx => {
-      const row = await this.authenticate(tx, token, 'SHARE')
-      if (!row.live || row.connection_id !== request.connectionId || row.connection_epoch !== request.epoch) {
-        throw new NodeAccessError(409, 'node-access/lease-lost')
-      }
-      return { ...this.identity(row.node_id, row.execution_ready), connectionId: row.connection_id as NodeLease['connectionId'],
-        epoch: row.connection_epoch as NodeLease['epoch'], expiresAt: row.lease_expires_at!.toISOString(), heartbeatMs: this.config.heartbeatMs }
-    })
+    const credential = nodeCredentialSchema.safeParse(token)
+    if (!credential.success) throw new NodeAccessError(401, 'node-access/unauthorized')
+    const result = await this.context.pool.query<{ lease: unknown }>(
+      'SELECT harness.node_channel_lease($1,$2,$3,$4,$5) lease',
+      [this.context.organizationId, digest(credential.data), request.connectionId, request.epoch,
+        this.context.nodeId])
+    return this.acceptedLease(result.rows[0]?.lease)
+  }
+
+  /** Map the lease function's validated payload back onto the service's typed error contract. */
+  private acceptedLease(payload: unknown): NodeLease {
+    if (payload === undefined) throw new Error('node lease function returned no row')
+    const parsed = leasePayloadSchema.safeParse(payload)
+    if (!parsed.success) throw new Error('node lease function returned a malformed payload')
+    const lease = parsed.data
+    if (lease.status !== 'ok') {
+      throw new NodeAccessError(lease.status === 'unauthorized' ? 401 : 409,
+        `node-access/${lease.status}` as 'node-access/lease-lost')
+    }
+    return { ...this.identity(lease.nodeId, lease.executionReady),
+      connectionId: lease.connectionId as NodeLease['connectionId'], epoch: lease.epoch as NodeLease['epoch'],
+      expiresAt: new Date(lease.expiresAtMs).toISOString(), heartbeatMs: this.config.heartbeatMs }
   }
 
   /**

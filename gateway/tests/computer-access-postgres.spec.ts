@@ -58,6 +58,9 @@ describePg('organization computer use', () => {
     const admin = await users.create({ username: 'admin', password: 'pw-12345678', role: 'admin' })
     const member = await users.create({ username: 'member', password: 'pw-12345678' })
     const remote = await remoteUsers.create({ username: 'remote', password: 'pw-12345678', role: 'admin' })
+    await users.changeOwnPassword(admin.id, 'pw-12345678')
+    await users.changeOwnPassword(member.id, 'pw-12345678')
+    await remoteUsers.changeOwnPassword(remote.id, 'pw-12345678')
     const access = new PostgresComputerAccess(a, cfg.runtimeCatalog), remoteAccess = new PostgresComputerAccess(b, cfg.runtimeCatalog)
     const projects = new PostgresProjectService(b, cfg)
     const project = await projects.createManaged({ name: 'Remote project', ownerUserId: remote.id })
@@ -311,7 +314,7 @@ describePg('organization computer use', () => {
       undefined, undefined, 60_000)
     const target = { kind: 'user' as const, id: f.member.id }
     const token = 'private-fixture-runtime'
-    await repository.beginStart(target, Date.now(), createHash('sha256').update(token).digest(), 'explicit')
+    const started = await repository.beginStart(target, Date.now(), createHash('sha256').update(token).digest(), 'explicit')
     expect(await repository.authenticateRuntimeToken(token)).not.toBeNull()
     expect(await repository.authenticateRuntimeToken(token)).not.toBeNull()
     expect(witnessQueries).toBe(1)
@@ -321,6 +324,8 @@ describePg('organization computer use', () => {
     repository.invalidateRuntimeTokenCache()
     expect(await repository.authenticateRuntimeToken(token)).toBeNull()
     // A local fencing write clears the same process without waiting for the channel.
+    // The revoked runtime has meanwhile drained to stopped, as the node agent settles it.
+    expect(await repository.markStopped(target, started)).toBe(true)
     await f.access.set(f.admin, f.member.id, f.a.nodeId, { enabled: true, revision: '2' })
     const generation = await repository.beginStart(target, Date.now(), createHash('sha256').update(token).digest(), 'explicit')
     expect(await repository.authenticateRuntimeToken(token)).not.toBeNull()

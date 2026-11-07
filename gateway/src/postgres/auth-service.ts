@@ -8,6 +8,8 @@ import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 
 const LOCK_WINDOW_MS = 10 * 60 * 1000
 const LOCK_THRESHOLD = 5
+/** Valid argon2id encoding at the production parameters; verifies (and costs) like a real hash, always rejects. */
+const DUMMY_PASSWORD_HASH = '$argon2id$v=19$m=19456,t=2,p=1$jXVYi2qhgjpSj3RGmuYeVg$boG4Z6yJ9CoKKvdNf2rURS5weuV0ctWo01r8ITOdopM'
 
 interface PostgresAuthUser {
   public_id: string
@@ -90,9 +92,12 @@ export class PostgresAuthService {
         WHERE u.organization_id=$1 AND u.username=$2
           AND (SELECT status FROM harness.organizations WHERE id=$1)='active'`, [this.context.organizationId, username])
       const row = result.rows[0]
-      const accepted = row !== undefined && row.status === 'active' && row.membership_status === 'active'
+      const eligible = row !== undefined && row.status === 'active' && row.membership_status === 'active'
         && row.deleted_at === null
-        && await verifyPassword(row.password_hash, password)
+      // Ineligible attempts verify a fixed valid dummy hash so response time
+      // does not reveal whether the username or membership exists.
+      const verified = await verifyPassword(row?.password_hash ?? DUMMY_PASSWORD_HASH, password)
+      const accepted = eligible && verified
       const token = accepted ? randomBytes(32).toString('base64url') : undefined
       return await transaction(this.context.pool, async (client) => {
         // Serialize the check-and-record transition across Gateway processes,
@@ -198,9 +203,24 @@ export class PostgresAuthService {
   }
 
   async revoke(token: string): Promise<void> {
-    await this.context.pool.query(`UPDATE harness.auth_sessions
-      SET revoked_at=now(),revoked_reason='logout'
-      WHERE organization_id=$1 AND token_hash=$2 AND revoked_at IS NULL`,
-    [this.context.organizationId, tokenHash(token)])
+    // Session renewal takes FOR UPDATE on this row on every validated request;
+    // a logout racing that renewal must outlast the brief lock instead of
+    // surfacing lock_not_available (55P03) as a 500.
+    let lastError: unknown
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        await this.context.pool.query(`UPDATE harness.auth_sessions
+          SET revoked_at=now(),revoked_reason='logout'
+          WHERE organization_id=$1 AND token_hash=$2 AND revoked_at IS NULL`,
+        [this.context.organizationId, tokenHash(token)])
+        return
+      } catch (error) {
+        if (error === null || typeof error !== 'object' || !('code' in error)
+          || String(error.code) !== '55P03' || attempt === 3) throw error
+        lastError = error
+        await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))
+      }
+    }
+    throw lastError
   }
 }

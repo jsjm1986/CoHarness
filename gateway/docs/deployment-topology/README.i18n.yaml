@@ -3,7 +3,7 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/docs/deployment-topology/README.md
 document:
-  en: 743889e16af4a48f66cc06a34d92cb8461c5b9b1
+  en: 56213770d814c0f28ccccdefbb25967a58092996
   zh: 4fb02a0c13710b7ab9de8ef0d0428b2624489cca
 /:
   en: d6a832ed60e0d6a5
@@ -18,7 +18,7 @@ document:
   en: b9c01c68bab9a1fa
   zh: 042e3d085faf1a79
 /deployment-modes-and-computer-connections/administration-and-setup:
-  en: a9ea0401a3793c9b
+  en: f461360e5f711b89
   zh: e55b70bb3d5d0091
 /deployment-modes-and-computer-connections/transitions-and-recovery:
   en: fbc6404c49f23800

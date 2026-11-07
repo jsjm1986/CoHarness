@@ -54,6 +54,10 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' })
   const [retry, setRetry] = useState(0)
   const gate = useRef<AbortController | undefined>(undefined)
+  // The operator's zoom/quality picks outlive each RfbSurface mount: a phase
+  // round-trip (attach → live → reconnect) unmounts the surface, so the picks
+  // ride on the body and each surface mounts with them pre-applied.
+  const picks = useRef<{ zoom: RemoteDesktopZoom; quality: RemoteDesktopQuality }>({ zoom: 'fit', quality: 'balanced' })
 
   // A live desktop wants the whole frame: ask once per mount, at the first
   // moment the tab is both live and on screen. An operator who backs out of
@@ -150,6 +154,7 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
         openScreen={openScreen} url={phase.attachment.url} spec={phase.attachment.spec}
         t={t} fullscreen={sidebar.fullscreen} onPanelMode={(mode) => { tab.actions.setPanelMode(mode) }}
         onReconnect={() => { setRetry(count => count + 1) }}
+        picks={picks}
       />
     )
   }
@@ -158,12 +163,13 @@ export function RemoteDesktopBody({ status, confirm, attach, openScreen, useTabI
 /** The live surface: chrome controls plus the RFB canvas. Mounts the screen
  * once per attachment URL, answers the server's credentials challenge inside
  * the tab, and offers disconnect/reconnect around the stream's own lifecycle. */
-function RfbSurface({ openScreen, url, spec, t, fullscreen, onPanelMode, onReconnect }: Pick<RemoteDesktopInjected, 'openScreen'> & Pick<BodyProps, 't'> & {
+function RfbSurface({ openScreen, url, spec, t, fullscreen, onPanelMode, onReconnect, picks }: Pick<RemoteDesktopInjected, 'openScreen'> & Pick<BodyProps, 't'> & {
   url: string
   spec: RemoteDesktopAttachment['spec']
   fullscreen: boolean
   onPanelMode: (mode: DockMode) => void
   onReconnect: () => void
+  picks: { current: { zoom: RemoteDesktopZoom; quality: RemoteDesktopQuality } }
 }): ReactNode {
   const container = useRef<HTMLDivElement>(null)
   const screen = useRef<RemoteDesktopScreen | undefined>(undefined)
@@ -171,12 +177,11 @@ function RfbSurface({ openScreen, url, spec, t, fullscreen, onPanelMode, onRecon
   const [closed, setClosed] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [zoom, setZoom] = useState<RemoteDesktopZoom>('fit')
-  const [quality, setQuality] = useState<RemoteDesktopQuality>('balanced')
+  const [zoom, setZoom] = useState<RemoteDesktopZoom>(picks.current.zoom)
+  const [quality, setQuality] = useState<RemoteDesktopQuality>(picks.current.quality)
   const [qualityOpen, setQualityOpen] = useState(false)
   // Refs carry the operator's picks across attachments without restarting the
   // mount effect: a reconnect re-applies them, a live change only re-tunes.
-  const picks = useRef<{ zoom: RemoteDesktopZoom; quality: RemoteDesktopQuality }>({ zoom: 'fit', quality: 'balanced' })
   const zoomId = useId()
   useEffect(() => {
     const host = container.current
@@ -273,7 +278,13 @@ function RfbSurface({ openScreen, url, spec, t, fullscreen, onPanelMode, onRecon
       />
       {!closed && <Button variant="outline" size="sm" onClick={disconnect}>{t('disconnect')}</Button>}
     </div>
-    <div ref={container} className={css.canvas}>
+    <div
+      ref={container}
+      id={`${zoomId}-${zoom}-panel`}
+      role="tabpanel"
+      aria-labelledby={`${zoomId}-${zoom}`}
+      className={css.canvas}
+    >
       {closed && (
         <div className={css.auth}>
           <p>{t('closed')}</p>

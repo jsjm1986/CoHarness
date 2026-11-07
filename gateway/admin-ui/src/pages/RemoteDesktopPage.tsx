@@ -17,7 +17,27 @@ import { zh, en } from './remote-desktop.copy.ts'
 import { DesktopEnvironmentNotice } from '../components/DesktopEnvironmentNotice.tsx'
 
 const rdCopy = () => translateCopy(adminLanguage(), { zh, en })
-const messageOf = (error: unknown): string => error instanceof Error ? error.message : rdCopy()('operationFailed')
+type RdCopyKey = keyof typeof zh
+const ERROR_KEYS: Record<string, RdCopyKey> = {
+  'remote-desktop-grant-exists': 'errorGrantExists',
+  'remote-desktop-target-unconfigured': 'errorTargetUnconfigured',
+  'remote-desktop-username-without-passwordref': 'errorUsernameNeedsRef',
+  'remote-desktop-endpoint-duplicate': 'errorEndpointDuplicate',
+  'remote-desktop-grant-not-found': 'errorGrantNotFound',
+  'remote-desktop-grant-revoked': 'errorGrantNotFound',
+  'remote-desktop-port-invalid': 'errorPortInvalid',
+  'remote-desktop-principal-invalid': 'errorPrincipalInvalid',
+  'remote-desktop-level-invalid': 'errorLevelInvalid',
+  'remote-desktop-store-unavailable': 'errorStoreUnavailable',
+  'remote-desktop-unavailable': 'errorUnavailable',
+  forbidden: 'errorDenied', unauthorized: 'errorDenied', '403': 'errorDenied',
+  'password-change-required': 'errorSession', 'account-changed': 'errorSession', '401': 'errorSession',
+  maintenance: 'errorMaintenance', 'stale-epoch': 'errorMaintenance', unavailable: 'errorUnavailable',
+}
+const messageOf = (error: unknown): string => {
+  const key = error instanceof Error ? ERROR_KEYS[error.message] : undefined
+  return rdCopy()(key ?? 'operationFailed')
+}
 
 interface EndpointDraft { nodeId: string; desktop: string; host: string; port: string; username: string; passwordRef: string }
 const EMPTY_ENDPOINT: EndpointDraft = { nodeId: '', desktop: '', host: '', port: '5900', username: '', passwordRef: '' }
@@ -28,7 +48,7 @@ const EMPTY_GRANT: GrantDraft = { principal: '', endpoint: '', level: 'view', re
 const targetLabel = (target: { nodeId: string; desktop?: string }) =>
   target.desktop === undefined || target.desktop === '' ? target.nodeId : `${target.nodeId} · ${target.desktop}`
 const endpointKeyOf = (e: { nodeId: string; desktop?: string }) => `${e.nodeId} ${e.desktop ?? ''}`
-const timeLabel = (ms: number) => new Date(ms).toLocaleString()
+const timeLabel = (ms: number) => new Date(ms).toLocaleString(adminLanguage() === 'zh' ? 'zh-CN' : 'en-US')
 
 export function RemoteDesktopPage() {
   const [endpoints, setEndpoints] = useState<RemoteDesktopEndpoint[] | null>(null)
@@ -104,12 +124,16 @@ export function RemoteDesktopPage() {
   }
 
   const changeLevel = async (grant: RemoteDesktopGrant, level: 'view' | 'control') => {
+    if (busy) return
+    setBusy(true)
     try {
       await setRemoteDesktopGrantLevel(grant.id, level)
       setNotice(t('noticeLevelChanged'))
       await reload()
     } catch (err) {
       setError(messageOf(err))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -257,10 +281,16 @@ export function RemoteDesktopPage() {
           <Button type="button" variant="primary" disabled={busy}
             onClick={() => {
               if (endpointDraft === null) return
+              const port = Number(endpointDraft.port)
+              if (endpointDraft.nodeId.trim() === '' || endpointDraft.host.trim() === ''
+                || !Number.isInteger(port) || port < 1 || port > 65535) {
+                setError(t('endpointInvalid'))
+                return
+              }
               void saveEndpoints([...endpointList, {
                 nodeId: endpointDraft.nodeId.trim(),
                 host: endpointDraft.host.trim(),
-                port: Number(endpointDraft.port),
+                port,
                 ...(endpointDraft.desktop.trim() === '' ? {} : { desktop: endpointDraft.desktop.trim() }),
                 ...(endpointDraft.username.trim() === '' ? {} : { username: endpointDraft.username.trim() }),
                 ...(endpointDraft.passwordRef.trim() === '' ? {} : { passwordRef: endpointDraft.passwordRef.trim() }),

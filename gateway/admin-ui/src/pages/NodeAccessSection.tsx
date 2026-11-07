@@ -3,6 +3,7 @@ import { usePendingEdits } from '../pending-edits.tsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Copy, Plus, RefreshCw } from 'lucide-react'
 import type { NodeEnrollmentId } from '../../../src/node-access.ts'
+import { randomUUID } from '../../../../packages/util/crypto/src/index.ts'
 import {
   AdminRequestError, issueNodeEnrollment, listNodeAccess, reissueNodeEnrollment, revokeNodeAccess, detachNodeAccess, listDeploymentCandidates,
   type NodeAccessEntry, type NodeAccessPage, type NodeEnrollment,
@@ -25,6 +26,8 @@ function mutationMessage(error: unknown, t: CopyTranslate<NodeAccessCopyKey>): {
     'node-service/busy': 'computerBusy',
     'node-access/name-conflict': 'nameConflict', 'node-access/revision-conflict': 'revisionConflict',
     'node-access/enrollment-already-issued': 'issuedBefore', 'maintenance': 'maintenance', 'stale-epoch': 'maintenance',
+    'node-access/mode-disabled': 'modeDisabled', 'node-access/not-found': 'notFound',
+    'node-access/detached': 'nodeDetached',
   }
   if (error.status === 401 || error.status === 403) return { message: t('denied'), uncertain: false }
   const known = Object.hasOwn(key, error.code) ? key[error.code] : undefined
@@ -102,7 +105,7 @@ export function NodeAccessSection() {
 
   const reread = () => { setRefresh(value => value + 1) }
   const open = (next: Action) => {
-    setAction(next); setName(''); setExisting(''); setCandidateCursor(undefined); setActionError(''); setUncertain(false); setNotice('')
+    setAction(next); setName(''); setExisting(''); setCandidateCursor(undefined); setCandidates(undefined); setCandidateError(''); setActionError(''); setUncertain(false); setNotice('')
   }
   const close = () => { if (!busy.current) { setAction(null); setActionError(''); setUncertain(false) } }
   const time = (value: string) => new Date(value).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
@@ -120,7 +123,7 @@ export function NodeAccessSection() {
         await revokeNodeAccess(action.node)
         if (mounted.current) { setNotice(t('revokedNotice', { name: computerName })); setAction(null) }
       } else {
-        const requestId = crypto.randomUUID() as NodeEnrollmentId
+        const requestId = randomUUID() as NodeEnrollmentId
         const receipt = action.kind === 'create' ? existing === '' ? await issueNodeEnrollment(computerName, requestId)
           : await issueNodeEnrollment(computerName, requestId, existing as import('../api.ts').RuntimeNodeId)
           : await reissueNodeEnrollment(action.node, requestId)
@@ -181,7 +184,7 @@ export function NodeAccessSection() {
                   <td className="nodeAccessName">{node.name}</td>
                   <td><StatusBadge tone={STATUS[node.status]}>{t(node.status)}</StatusBadge></td>
                   <td>{node.platform === null ? t('unknownSystem')
-                    : `${node.platform === 'darwin' ? 'macOS' : node.platform === 'linux' ? 'Linux' : 'Windows'} · ${node.architecture ?? ''}`}</td>
+                    : `${node.platform === 'darwin' ? 'macOS' : node.platform === 'linux' ? 'Linux' : 'Windows'}${node.architecture ? ` · ${node.architecture}` : ''}`}</td>
                   <td>{node.lastSeenAt === null ? t('never') : <time dateTime={node.lastSeenAt}>{time(node.lastSeenAt)}</time>}</td>
                   <td><div className="rowActions">
                     <Button variant="ghost" onClick={() => open({ kind: 'reissue', node })}>{t('reissue')}</Button>
@@ -219,7 +222,8 @@ export function NodeAccessSection() {
         }}><option value="">{t('registerNew')}</option>
           {existing !== '' && !candidates?.items.some(item => item.nodeId === existing) && <option value={existing}>{name}</option>}
           {candidates?.items.map(item => <option key={item.nodeId} value={item.nodeId}>{item.name}</option>)}
-        </select>{candidates?.nextCursor && <Button onClick={() => setCandidateCursor(candidates.nextCursor!)}>{t('candidatesMore')}</Button>}</Field></>}
+        </select></Field>
+        {candidates?.nextCursor && <Button disabled={acting || uncertain} onClick={() => setCandidateCursor(candidates.nextCursor!)}>{t('candidatesMore')}</Button>}</>}
         {action?.kind === 'create' && existing === '' ? (
           <Field label={t('name')} hint={t('nameHint')}>
             <input ref={nameInput} aria-label={t('name')} aria-description={t('nameHint')} value={name} maxLength={64} placeholder={t('namePlaceholder')} disabled={acting || uncertain}

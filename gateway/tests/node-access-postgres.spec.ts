@@ -301,7 +301,7 @@ describePg('PostgreSQL outbound node access', () => {
     }
   })
 
-  it('authorizes one current channel with three database round trips', async () => {
+  it('authorizes one current channel with one database round trip', async () => {
     const f = await fixture(), ticket = await f.issue(), secret = credential()
     await f.nodes.enroll(ticket.token, enrollment(secret))
     const lease = await f.nodes.connect(secret, { connectionId: randomUUID() })
@@ -314,9 +314,30 @@ describePg('PostgreSQL outbound node access', () => {
       const nodes = new PostgresNodeAccessService({ ...f.context, pool: reader }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
       await expect(nodes.authorizeChannel(secret, { connectionId: lease.connectionId, epoch: lease.epoch })).resolves.toEqual(lease)
       const statements = queries.flatMap(query => query.mock.calls.map(([statement]) => statement))
-      expect(statements).toHaveLength(3)
-      expect(statements[0]).toBe('BEGIN')
-      expect(statements.at(-1)).toBe('COMMIT')
+      expect(statements).toHaveLength(1)
+      expect(statements[0]).toContain('harness.node_channel_lease')
+    } finally {
+      await reader.end()
+      for (const query of queries) query.mockRestore()
+    }
+  })
+
+  it('renews a current lease with one database round trip', async () => {
+    const f = await fixture(), ticket = await f.issue(), secret = credential()
+    await f.nodes.enroll(ticket.token, enrollment(secret))
+    const lease = await f.nodes.connect(secret, { connectionId: randomUUID() })
+    const reader = createPostgresPool(databaseUrl!, { max: 1 })
+    const queries: Array<MockInstance<PoolClient['query']>> = []
+    reader.on('connect', client => {
+      queries.push(vi.spyOn(client, 'query'))
+    })
+    try {
+      const nodes = new PostgresNodeAccessService({ ...f.context, pool: reader }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
+      await expect(nodes.heartbeat(secret, { connectionId: lease.connectionId, epoch: lease.epoch }))
+        .resolves.toMatchObject({ connectionId: lease.connectionId, epoch: lease.epoch })
+      const statements = queries.flatMap(query => query.mock.calls.map(([statement]) => statement))
+      expect(statements).toHaveLength(1)
+      expect(statements[0]).toContain('harness.node_heartbeat')
     } finally {
       await reader.end()
       for (const query of queries) query.mockRestore()

@@ -1330,6 +1330,7 @@ export class InstanceManager {
     if (process.platform !== 'win32') {
       const owner = lstatSync(dshHome)
       chownSync(join(dshHome, '.env'), owner.uid, owner.gid)
+      chmodSync(join(dshHome, '.env'), 0o600)
     }
   }
 

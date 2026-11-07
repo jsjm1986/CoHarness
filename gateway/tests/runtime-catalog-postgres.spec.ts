@@ -5,14 +5,14 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Pool } from 'pg'
+import type { Pool, QueryResultRow } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import WebSocket, { WebSocketServer } from 'ws'
 import { InstanceManager } from '../src/instances.ts'
 import { PostgresAuditService } from '../src/postgres/audit-service.ts'
 import { PostgresAuthService } from '../src/postgres/auth-service.ts'
 import { PostgresCollaborationService } from '../src/postgres/collaboration-service.ts'
-import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
+import { createPostgresPool, runMigrations, type Queryable } from '../src/postgres/database.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
 import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import { PostgresRuntimeCatalog } from '../src/postgres/runtime-catalog.ts'
@@ -307,7 +307,35 @@ describePg('PostgreSQL runtime environment directory', () => {
     await expect(f.catalog.resolveForAccount(f.member, randomUUID())).rejects.toMatchObject({ status: 404 })
     await expect(f.catalog.resolveForAccount(f.member, 'personal')).rejects.toMatchObject({ status: 400 })
     await pool.query('DELETE FROM harness.instances WHERE runtime_id=$1', [own.id])
-    await expect(f.catalog.resolveForAccount(f.member, own.id)).rejects.toMatchObject({ status: 404 })
+    await expect(new PostgresRuntimeCatalog(f.context, f.cfg.runtimeCatalog).resolveForAccount(f.member, own.id))
+      .rejects.toMatchObject({ status: 404 })
+  })
+
+  it('shares one resolution round trip within a burst and revalidates after the memo window', async () => {
+    const f = await fixture()
+    const own = (await f.catalog.pageForAccount(f.member, {})).items[0]!
+    let catalogQueries = 0
+    const counting: Queryable = {
+      query: <R extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
+        if (text.includes('harness.runtime_environments')) catalogQueries += 1
+        return f.context.pool.query<R>(text, values as unknown[] | undefined)
+      },
+    }
+    const catalog = new PostgresRuntimeCatalog({ ...f.context, pool: counting }, f.cfg.runtimeCatalog)
+    const [first, second] = await Promise.all([
+      catalog.resolveForAccount(f.member, own.id),
+      catalog.resolveForAccount(f.member, own.id),
+    ])
+    expect(second).toEqual(first)
+    expect(await catalog.resolveForAccount(f.member, own.id)).toEqual(first)
+    expect(catalogQueries).toBe(1)
+    await new Promise(resolve => setTimeout(resolve, 850))
+    expect(await catalog.resolveForAccount(f.member, own.id)).toEqual(first)
+    expect(catalogQueries).toBe(2)
+    const denied = randomUUID()
+    await expect(catalog.resolveForAccount(f.member, denied)).rejects.toMatchObject({ status: 404 })
+    await expect(catalog.resolveForAccount(f.member, denied)).rejects.toMatchObject({ status: 404 })
+    expect(catalogQueries).toBe(4)
   })
 
   it('rejects forged identities, changed owners and reassignment of an active process', async () => {

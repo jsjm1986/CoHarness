@@ -83,6 +83,10 @@ await writeFile(pidFile, String(child.pid), { mode: 0o600 }); child.unref(); awa
     }, { timeout: 15_000, interval: 100 }).catch(async (error: unknown) => {
       throw new Error(`Isolated Gateway did not become ready:\n${(await readFile(join(directory, 'gateway.log'), 'utf8')).slice(-12000)}`, { cause: error })
     })
+    // The bootstrap admin always starts with must_change_password; privileged
+    // store operations require a qualified credential, so mark the fixture
+    // account as having completed its first-login password change.
+    await pool.query('UPDATE harness.password_credentials SET must_change_password=false')
   }, 30_000)
 
   afterAll(async () => {

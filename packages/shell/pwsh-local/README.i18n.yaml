@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/shell/pwsh-local/README.md
 document:
-  en: 57a049bb2118f4427b178e01944a7d18cc096379
-  zh: a5a3b59167fb996e422758c2ebdbf4a9b7e4f782
+  en: fb68b74c50f09f3aeca386a89809cd28fdc1cdd9
+  zh: 9157d6988bfa44c45134a2a3a1f7a30ec26b8a56
 /:
   en: 07482fe1f03de5e9
   zh: 8ec16b9f9ac73b38
@@ -27,8 +27,8 @@ document:
   en: 47119e8b4e884a5d
   zh: f9dfb155f06c4b73
 /deepseek-ai-dsh-pwsh-local/use-this-package/running-commands:
-  en: b8161d5bbfac18fe
-  zh: f4c3478f73d4a62a
+  en: 4efdad2fb48249bf
+  zh: 3defab71c69c973a
 /deepseek-ai-dsh-pwsh-local/use-this-package/background-processes:
   en: a1db78c49925bb77
   zh: 38e07434a95cdfc0
@@ -60,8 +60,8 @@ document:
   en: 40294c1c31b74824
   zh: 34e8ce685b239061
 /deepseek-ai-dsh-pwsh-local/known-limitations-and-deferred-work:
-  en: 09461e2cde33185c
-  zh: 0425312bfdd430d5
+  en: 97050c29a7ee3a59
+  zh: 909f80fd027e013d
 /deepseek-ai-dsh-pwsh-local/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

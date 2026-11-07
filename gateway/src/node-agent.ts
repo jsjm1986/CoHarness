@@ -347,6 +347,9 @@ export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal,
         mayHaveLease = true
         let value: unknown
         try {
+          // executionReady means a local Gateway endpoint is configured, not
+          // that it was probed; a dead or outdated local Gateway still reports
+          // ready and its service calls fail per request (fail-safe direction).
           value = lease === undefined ? await request(config, dialer, 'connect', state.credential, { connectionId, executionReady: config.localGatewayUrl !== undefined }, signal)
             : await request(config, dialer, 'heartbeat', state.credential, { connectionId, epoch: lease.epoch }, signal)
         } catch (error) {
@@ -378,7 +381,13 @@ export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal,
           await stopChannel(); lease = undefined; mayHaveLease = false
           return
         }
-        if (error instanceof NodeAgentError && error.refused && error.code === 'node-access/lease-lost') {
+        // lease-lost and already-connected are both recoverable refusals: the
+        // recorded holder is gone or is our own just-stopped incarnation whose
+        // lease still has TTL, so drop state and let the retry loop reacquire
+        // once the center's lease actually expires. A second agent holding the
+        // lease forever keeps this instance degraded rather than exit-churning
+        // under the supervision floor.
+        if (error instanceof NodeAgentError && error.refused && ['node-access/lease-lost', 'node-access/already-connected'].includes(error.code)) {
           await stopChannel()
           lease = undefined
           mayHaveLease = false

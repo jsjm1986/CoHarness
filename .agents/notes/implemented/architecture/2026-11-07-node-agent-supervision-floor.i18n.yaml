@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-07-node-agent-supervision-floor.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-07-node-agent-supervision-floor.md
+document:
+  en: 6d0d082212e4bbece8cc43e87349184797924a4b
+  zh: d1cefc1a54def6afc1c9dbd9f39f7cf0313528fe
+/agent-note-node-agent-supervision-floor:
+  en: fb194a632af8c29b
+  zh: e6370651f7c65e80
+/agent-note-node-agent-supervision-floor/problem:
+  en: 4b832fd0576fcc5d
+  zh: 91cd27b25ea8c6a5
+/agent-note-node-agent-supervision-floor/decision:
+  en: bb4602e519485c0f
+  zh: 3f20a8e9bd5279c3
+/agent-note-node-agent-supervision-floor/alternatives-considered:
+  en: e4c73595bb021a75
+  zh: 43d4ff07b2a4c56c
+/agent-note-node-agent-supervision-floor/consequences:
+  en: 429acdbbb4a92595
+  zh: d73191bc82361b61
+/agent-note-node-agent-supervision-floor/verification:
+  en: c84b985c3f0b3e39
+  zh: 13777afd2049b50f

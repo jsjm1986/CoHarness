@@ -25,19 +25,19 @@ async function repository(root: string) {
   await git(['config', 'user.email', 'fixture@example.test'])
   await writeFile(join(sourcePath, 'README.md'), 'initial source\n')
   await git(['add', 'README.md']); await git(['commit', '-m', 'Initial source'])
-  return { sourcePath, workspacePath, prepareTimeoutMs: 15000, prepareKillGraceMs: 1000, git }
+  return { sourcePath, workspacePath, prepareTimeoutMs: 15000, prepareKillGraceMs: 1000, runtimeUser: '', git }
 }
 
 it('prepares a plain directory without a source repository', async () => {
   const root = await directory(), workspacePath = join(root, 'plain')
-  await prepareStewardWorktree({ workspacePath, sourcePath: '', prepareTimeoutMs: 15000, prepareKillGraceMs: 1000 }, new AbortController().signal)
+  await prepareStewardWorktree({ workspacePath, sourcePath: '', prepareTimeoutMs: 15000, prepareKillGraceMs: 1000, runtimeUser: '' }, new AbortController().signal)
   await writeFile(join(workspacePath, 'retained.txt'), 'retained')
   expect(await readFile(join(workspacePath, 'retained.txt'), 'utf8')).toBe('retained')
 })
 
 it('refuses cancellation before directory preparation', async () => {
   const root = await directory(), signal = AbortSignal.abort(new Error('preparation cancelled'))
-  await expect(prepareStewardWorktree({ workspacePath: join(root, 'absent'), sourcePath: '', prepareTimeoutMs: 15000, prepareKillGraceMs: 1000 }, signal))
+  await expect(prepareStewardWorktree({ workspacePath: join(root, 'absent'), sourcePath: '', prepareTimeoutMs: 15000, prepareKillGraceMs: 1000, runtimeUser: '' }, signal))
     .rejects.toThrow('preparation cancelled')
   await expect(readFile(join(root, 'absent'))).rejects.toHaveProperty('code', 'ENOENT')
 })
@@ -68,7 +68,7 @@ it('uses a detached checkout when the retained provisioning branch contains late
 it('preserves a source lookup failure instead of attempting a detached checkout', async () => {
   const root = await directory(), trace = join(root, 'git-trace.jsonl')
   vi.stubEnv('GIT_TRACE2_EVENT', trace)
-  await expect(prepareStewardWorktree({ sourcePath: join(root, 'missing'), workspacePath: join(root, 'workspace'), prepareTimeoutMs: 15000, prepareKillGraceMs: 1000 }, new AbortController().signal))
+  await expect(prepareStewardWorktree({ sourcePath: join(root, 'missing'), workspacePath: join(root, 'workspace'), prepareTimeoutMs: 15000, prepareKillGraceMs: 1000, runtimeUser: '' }, new AbortController().signal))
     .rejects.toMatchObject({ code: 128, killed: false })
   const events = (await readFile(trace, 'utf8')).trim().split('\n').map(line => JSON.parse(line) as { event: string; argv?: string[] })
   const commands = events.filter(row => row.event === 'start').map(row => row.argv)
@@ -82,7 +82,7 @@ it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('preserves a
   await mkdir(workspacePath)
   await chmod(workspacePath, 0)
   try {
-    await expect(prepareStewardWorktree({ sourcePath: root, workspacePath, prepareTimeoutMs: 15000, prepareKillGraceMs: 1000 }, new AbortController().signal))
+    await expect(prepareStewardWorktree({ sourcePath: root, workspacePath, prepareTimeoutMs: 15000, prepareKillGraceMs: 1000, runtimeUser: '' }, new AbortController().signal))
       .rejects.toHaveProperty('code', 'EACCES')
   } finally { await chmod(workspacePath, 0o700) }
 })
@@ -95,7 +95,7 @@ it.skipIf(process.platform === 'win32').each(['cancel', 'deadline'] as const)(
     await writeFile(join(bin, 'git'), `#!${process.execPath}\nrequire('node:fs').writeFileSync(${JSON.stringify(pidFile)},String(process.pid));setInterval(()=>{},1000)\n`, { mode: 0o700 })
     vi.stubEnv('PATH', bin + delimiter + (process.env.PATH ?? ''))
     const controller = new AbortController()
-    const reading = prepareStewardWorktree({ sourcePath: root, workspacePath: join(root, 'workspace'), prepareTimeoutMs: mode === 'deadline' ? 5000 : 15000, prepareKillGraceMs: 1000 }, controller.signal)
+    const reading = prepareStewardWorktree({ sourcePath: root, workspacePath: join(root, 'workspace'), prepareTimeoutMs: mode === 'deadline' ? 5000 : 15000, prepareKillGraceMs: 1000, runtimeUser: '' }, controller.signal)
     const outcome = reading.then(() => undefined, (error: unknown) => error)
     try {
       let pid = 0

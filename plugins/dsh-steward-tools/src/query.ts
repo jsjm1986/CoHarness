@@ -14,8 +14,12 @@ export function isReadOnly(sql: string): boolean {
   return READONLY_HEAD.test(sql.replace(NOISE, ''))
 }
 
-/** One line of statement preview for the approval prompt. */
+/**
+ * Statement preview for the approval prompt. Approving the wrong statement is
+ * the lane's deception surface, so the prompt keeps every line of the
+ * statement and truncates only well past what a reviewer can scan.
+ */
 export function statementPreview(sql: string): string {
-  const head = sql.replace(NOISE, '').split('\n', 1)[0]?.trim() ?? ''
-  return head.length > 160 ? `${head.slice(0, 157)}...` : head
+  const body = sql.replace(NOISE, '').trim()
+  return body.length > 2000 ? `${body.slice(0, 1997)}...` : body
 }

@@ -84,15 +84,22 @@ describePg('PostgreSQL steward space', () => {
     return sessionId
   }
 
-  /** Record a granted approval response in one conversation for one responder. */
-  const addApproval = async (sessionId: string, responderInternalId: string): Promise<string> => {
+  /** Record a granted approval response plus the tool/call event the ask rode on. */
+  const addApproval = async (sessionId: string, responderInternalId: string, sql = 'UPDATE harness.projects SET name=name'): Promise<string> => {
     const approvalId = randomUUID()
+    const callId = randomUUID()
     const runtimeId = sessionRuntimes.get(sessionId)
     if (runtimeId === undefined) throw new Error('Approval fixture Session has no allocation')
+    const event = JSON.stringify({ type: 'tool/call', data: { callId, arguments: JSON.stringify({ sql }) } })
+    const queryFields = JSON.stringify({ callId, argumentsJson: JSON.stringify(JSON.stringify({ sql })) })
+    await pool.query(`INSERT INTO harness.conversation_events(organization_id,runtime_id,session_id,seq,event_type,occurred_at,event,payload_bytes,query_fields)
+      SELECT $4,$5,$1,COALESCE(MAX(seq),-1)+1,'tool/call',now(),$2::json,$3,$6::jsonb
+      FROM harness.conversation_events WHERE session_id=$1`,
+      [sessionId, event, Buffer.byteLength(event), organizationId, runtimeId, queryFields])
     await pool.query(`INSERT INTO harness.conversation_interaction_responses(
-      organization_id,runtime_id,interaction_kind,interaction_id,conversation_id,responder_user_id,outcome)
-      VALUES($1,$5,'approval',$2,$3,$4,to_jsonb('allowed-once'::text))`,
-      [organizationId, approvalId, sessionId, responderInternalId, runtimeId])
+      organization_id,runtime_id,interaction_kind,interaction_id,conversation_id,responder_user_id,outcome,call_id)
+      VALUES($1,$5,'approval',$2,$3,$4,to_jsonb('allowed-once'::text),$6)`,
+      [organizationId, approvalId, sessionId, responderInternalId, runtimeId, callId])
     return approvalId
   }
 
@@ -116,7 +123,7 @@ describePg('PostgreSQL steward space', () => {
     collaboration = new PostgresCollaborationService(context)
     instances = new PostgresInstanceRepository(context, 41_000)
     pluginState = new PostgresPluginState(context)
-    stewardQueries = new StewardQueryService(context, true)
+    stewardQueries = new StewardQueryService(context, true, context.pool)
     stewardAccess = new StewardAccess(context)
 
     const steward = await projects.ensureSteward({ name: 'Steward', path: workspace })
@@ -255,7 +262,7 @@ describePg('PostgreSQL steward space', () => {
     expect(await stewardQueries.stewardTarget(stewardInternalId)).toBe(true)
     expect(await stewardQueries.stewardTarget(standardInternalId)).toBe(false)
     expect(await stewardQueries.stewardTarget(undefined)).toBe(false)
-    expect(await new StewardQueryService(context, false).stewardTarget(stewardInternalId)).toBe(false)
+    expect(await new StewardQueryService(context, false, context.pool).stewardTarget(stewardInternalId)).toBe(false)
   })
 
   it('executes reads, journals every attempt, and gates writes on a qualified approval', async () => {
@@ -289,8 +296,19 @@ describePg('PostgreSQL steward space', () => {
       sql: 'UPDATE harness.projects SET name=name', dryRun: false, approvalId: memberApproval, rowLimit: 500,
     })).rejects.toMatchObject({ status: 403, code: 'steward-approval-invalid' })
 
+    // An approval spends only the statement the operator previewed: the same
+    // approval id over a different statement denies before it can be spent.
+    const bound = await addApproval(stewardSession, admin.id, 'UPDATE harness.projects SET name=name WHERE id IS NULL')
+    await expect(stewardQueries.query(subject, {
+      sql: 'UPDATE harness.projects SET name=name', dryRun: false, approvalId: bound, rowLimit: 500,
+    })).rejects.toMatchObject({ status: 403, code: 'steward-approval-invalid' })
+    const boundApplied = await stewardQueries.query(subject, {
+      sql: 'UPDATE harness.projects SET name=name WHERE id IS NULL', dryRun: false, approvalId: bound, rowLimit: 500,
+    })
+    expect(boundApplied).toMatchObject({ classification: 'write', rowCount: 0 })
+
     // A qualified administrator's approval inside the steward space executes.
-    const granted = await addApproval(stewardSession, admin.id)
+    const granted = await addApproval(stewardSession, admin.id, 'UPDATE harness.projects SET name=name WHERE false')
     const applied = await stewardQueries.query(subject, {
       sql: 'UPDATE harness.projects SET name=name WHERE false', dryRun: false, approvalId: granted, rowLimit: 500,
     })
@@ -308,8 +326,8 @@ describePg('PostgreSQL steward space', () => {
       WHERE organization_id=$1 GROUP BY status,classification`, [organizationId])
     const tally = Object.fromEntries(journal.rows.map(row => [`${row.status}:${row.classification}`, Number(row.count)]))
     expect(tally['ok:read']).toBe(1)
-    expect(tally['ok:write']).toBe(2)
-    expect(tally['denied:write']).toBe(5)
+    expect(tally['ok:write']).toBe(3)
+    expect(tally['denied:write']).toBe(6)
 
     // Every journaled attempt is mirrored once into the administrator-facing
     // audit log, without the statement text, which stays inside steward_query_log.
@@ -318,7 +336,7 @@ describePg('PostgreSQL steward space', () => {
       WHERE organization_id=$1 AND action='steward.query' GROUP BY outcome,detail`, [organizationId])
     const journaled = journal.rows.reduce((sum, row) => sum + Number(row.count), 0)
     expect(mirror.rows.reduce((sum, row) => sum + Number(row.count), 0)).toBe(journaled)
-    expect(journaled).toBe(8)
+    expect(journaled).toBe(10)
     expect(mirror.rows.every(row => JSON.stringify(row.detail).includes('UPDATE') === false)).toBe(true)
     expect(mirror.rows.some(row => row.outcome === 'failure')).toBe(true)
     expect(mirror.rows.some(row => row.outcome === 'success')).toBe(true)
@@ -342,17 +360,65 @@ describePg('PostgreSQL steward space', () => {
     expect(Number(journal.rows[0]!.count)).toBe(2)
   })
 
+  it('denies read-lane statements that call session-escaping functions', async () => {
+    const subject = { organizationId, projectInternalId: stewardInternalId, runtimeId: stewardRuntimeId, generation: 1 }
+    for (const sql of [
+      `SELECT set_config('search_path','public',false)`,
+      'SELECT pg_terminate_backend(1)',
+      'SELECT pg_cancel_backend(1)',
+      'SELECT pg_advisory_lock(1)',
+      'SELECT pg_sleep(60)',
+      "SELECT pg_read_file('/etc/passwd')",
+      "SELECT * FROM dblink('dbname=x','SELECT 1') AS d(v int)",
+    ]) {
+      await expect(stewardQueries.query(subject, { sql, dryRun: false, rowLimit: 1 }))
+        .rejects.toMatchObject({ status: 403, code: 'steward-statement-forbidden' })
+    }
+    // Denied names inside literals or comments do not shift the verdict.
+    const literal = await stewardQueries.query(subject, {
+      sql: `SELECT 'pg_terminate_backend' AS name -- pg_advisory_lock
+`, dryRun: false, rowLimit: 1,
+    })
+    expect(literal.rows).toEqual([{ name: 'pg_terminate_backend' }])
+    const journal = await pool.query<{ count: string }>(
+      `SELECT COUNT(*)::text count FROM harness.steward_query_log
+      WHERE organization_id=$1 AND status='denied' AND error='statement-forbidden'`, [organizationId])
+    expect(Number(journal.rows[0]!.count)).toBe(7)
+  })
+
+  it('keeps dry-run EXPLAIN pinned to planning: option tricks and the deny-list still apply', async () => {
+    const subject = { organizationId, projectInternalId: stewardInternalId, runtimeId: stewardRuntimeId, generation: 1 }
+    // A payload-led ANALYZE used to complete `EXPLAIN` into `EXPLAIN ANALYZE`
+    // and execute the inner statement with no approval or deny-list scrutiny.
+    // With the explicit ANALYZE OFF option list the leading keyword no longer
+    // parses, so every attempt fails at planning and is journaled as an error.
+    for (const sql of [
+      'ANALYZE SELECT pg_sleep(60)',
+      'ANALYZE VERBOSE UPDATE harness.projects SET name=name',
+      'SELECT 1; ANALYZE SELECT 1',
+    ]) {
+      await expect(stewardQueries.query(subject, { sql, dryRun: true, rowLimit: 1 })).rejects.toThrow()
+    }
+    // The read-lane deny list screens dry-run previews the same as execution.
+    await expect(stewardQueries.query(subject, {
+      sql: 'SELECT pg_sleep(60)', dryRun: true, rowLimit: 1,
+    })).rejects.toMatchObject({ status: 403, code: 'steward-statement-forbidden' })
+    // Ordinary plans still return.
+    const plan = await stewardQueries.query(subject, { sql: 'SELECT 1', dryRun: true, rowLimit: 1 })
+    expect(plan.plan?.length).toBeGreaterThan(0)
+  })
+
   it('spends an allowed-once approval on exactly one write, including under concurrency', async () => {
     const subject = { organizationId, projectInternalId: stewardInternalId, runtimeId: stewardRuntimeId, generation: 1 }
     const stewardSession = await addConversation(stewardInternalId, admin.id, 'project')
-    const approval = await addApproval(stewardSession, admin.id)
     const write = { sql: 'UPDATE harness.projects SET name=name WHERE false', dryRun: false, rowLimit: 500 }
+    const approval = await addApproval(stewardSession, admin.id, write.sql)
 
     await stewardQueries.query(subject, { ...write, approvalId: approval })
     await expect(stewardQueries.query(subject, { ...write, approvalId: approval }))
       .rejects.toMatchObject({ status: 403, code: 'steward-approval-invalid' })
 
-    const concurrent = await addApproval(stewardSession, admin.id)
+    const concurrent = await addApproval(stewardSession, admin.id, write.sql)
     const [first, second] = await Promise.allSettled([
       stewardQueries.query(subject, { ...write, approvalId: concurrent }),
       stewardQueries.query(subject, { ...write, approvalId: concurrent }),
@@ -458,9 +524,10 @@ describePg('PostgreSQL steward space', () => {
   it('drains write RETURNING rows without returning them or losing the affected count', async () => {
     await qualify(admin.publicId, true)
     const stewardSession = await addConversation(stewardInternalId, admin.id, 'project')
-    const approvalId = await addApproval(stewardSession, admin.id)
+    const returning = `UPDATE harness.projects SET name=name WHERE id='${standardInternalId}' RETURNING repeat('维', 100000) AS value`
+    const approvalId = await addApproval(stewardSession, admin.id, returning)
     const result = await stewardQueries.query({ organizationId, projectInternalId: stewardInternalId, runtimeId: stewardRuntimeId, generation: 1 }, {
-      sql: `UPDATE harness.projects SET name=name WHERE id='${standardInternalId}' RETURNING repeat('维', 100000) AS value`,
+      sql: returning,
       dryRun: false, rowLimit: 1, approvalId,
     })
     expect(result).toMatchObject({ columns: ['value'], rows: null, rowCount: 1, truncated: false })
@@ -469,7 +536,7 @@ describePg('PostgreSQL steward space', () => {
   it('journals reads, plans, errors and denials with a one-connection pool', async () => {
     const single = createPostgresPool(DATABASE_URL!, { max: 1, connectionTimeoutMillis: 1000 })
     try {
-      const service = new StewardQueryService({ ...context, pool: single }, true)
+      const service = new StewardQueryService({ ...context, pool: single }, true, single)
       const sql = 'SELECT 1 AS single_connection_read'
       const subject = { organizationId, projectInternalId: stewardInternalId, runtimeId: stewardRuntimeId, generation: 1 }
       await service.query(subject, { sql, dryRun: false, rowLimit: 1 })

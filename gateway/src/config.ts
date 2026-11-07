@@ -166,6 +166,8 @@ export interface GatewayConfig {
   databaseMaxCheckoutQueue: number
   /** PostgreSQL connection checkout deadline, in milliseconds. */
   databaseConnectionTimeoutMs: number
+  /** Connections kept open between bursts; remote nodes avoid a multi-RTT handshake per new client. */
+  databaseMinConnections: number
   idleTimeoutMs: number
   readinessTimeoutMs: number
   sessionTtlMs: number
@@ -734,6 +736,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   if (resourceBudget.maxQueuedPerUser > resourceBudget.maxQueued || resourceBudget.maxQueuedPerProject > resourceBudget.maxQueued) {
     throw new Error('HGW_RESOURCE_MAX_QUEUED_PER_USER and HGW_RESOURCE_MAX_QUEUED_PER_PROJECT must not exceed HGW_RESOURCE_MAX_QUEUED')
   }
+  const databaseMinConnections = (() => {
+    const resolved = Number(env.HGW_DATABASE_MIN_CONNECTIONS ?? 0)
+    if (!Number.isSafeInteger(resolved) || resolved < 0) throw new Error('HGW_DATABASE_MIN_CONNECTIONS must be a non-negative safe integer')
+    return resolved
+  })()
+  const databaseMaxConnections = positiveSafeInteger(env.HGW_DATABASE_MAX_CONNECTIONS, 10, 'HGW_DATABASE_MAX_CONNECTIONS')
+  if (databaseMinConnections > databaseMaxConnections) throw new Error('HGW_DATABASE_MIN_CONNECTIONS must not exceed HGW_DATABASE_MAX_CONNECTIONS')
   const idleTimeoutMs = positiveSafeInteger(env.HGW_IDLE_TIMEOUT_MS, 30 * 60 * 1000, 'HGW_IDLE_TIMEOUT_MS')
   const readinessTimeoutMs = timerDelay(env.HGW_READINESS_TIMEOUT_MS, 30 * 1000, 'HGW_READINESS_TIMEOUT_MS')
   const systemdCommandTimeoutMs = timerDelay(env.HGW_SYSTEMD_COMMAND_TIMEOUT_MS, 120_000, 'HGW_SYSTEMD_COMMAND_TIMEOUT_MS')
@@ -803,6 +812,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     }
     if (!SYSTEMD_ACCOUNT_RE.test(stewardRuntimeUser) || stewardRuntimeUser === 'root') {
       throw new Error('HGW_STEWARD_RUNTIME_USER is not a valid systemd account')
+    }
+    // ensureSteward seeds `name·nodeName` through normalizeProjectName; a
+    // combination that can never normalize must fail here, not at first boot.
+    const seedName = `${env.HGW_STEWARD_PROJECT_NAME ?? '维护中枢'}·${env.HGW_COMPUTE_NODE_NAME ?? 'local'}`.trim()
+    if (seedName === '' || seedName === '.' || seedName === '..' || seedName.length > 120
+      || /[\\/\u0000-\u001f\u007f]/u.test(seedName)) {
+      throw new Error('HGW_STEWARD_PROJECT_NAME and HGW_COMPUTE_NODE_NAME must combine into one valid project name')
     }
   }
   const memoryMax = systemdMemoryValue(env.HGW_MEMORY_MAX ?? '1G', 'HGW_MEMORY_MAX')
@@ -926,9 +942,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     resourceBudget,
     performanceEnabled, performanceOperationSamples,
     performanceEventLoopResolutionMs: timerDelay(env.HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS, 20, 'HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS'),
-    databaseMaxConnections: positiveSafeInteger(env.HGW_DATABASE_MAX_CONNECTIONS, 10, 'HGW_DATABASE_MAX_CONNECTIONS'),
+    databaseMaxConnections,
     databaseMaxCheckoutQueue: positiveSafeInteger(env.HGW_DATABASE_MAX_CHECKOUT_QUEUE, 256, 'HGW_DATABASE_MAX_CHECKOUT_QUEUE'),
     databaseConnectionTimeoutMs: timerDelay(env.HGW_DATABASE_CONNECTION_TIMEOUT_MS, 5_000, 'HGW_DATABASE_CONNECTION_TIMEOUT_MS'),
+    databaseMinConnections,
     idleTimeoutMs,
     readinessTimeoutMs,
     sessionTtlMs,

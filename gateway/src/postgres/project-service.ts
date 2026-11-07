@@ -215,8 +215,11 @@ export class PostgresProjectService {
         await this.assertNotReserved(client, canonical, input.origin === 'user')
         const names=await projectNamePolicy(client,this.context.organizationId)
         const request:ProjectNameRequest={organizationId:this.context.organizationId,nodeId:this.context.nodeId,projectId,actorUserId:input.actorUserId,operation:'create',name:input.name}
-        if (names && !nameAuthority) throw new NodeContentUnavailable('Project creation requires verification from the primary entry.')
-        const proof=names ? identify(request) : undefined
+        // Steward names are system-generated and reserved; each node seeds its
+        // steward without a browser actor, so no primary-signed proof can
+        // exist. Migration 125 mirrors this exemption in the coverage trigger.
+        if (names && !nameAuthority && input.kind!=='steward') throw new NodeContentUnavailable('Project creation requires verification from the primary entry.')
+        const proof=names && input.kind!=='steward' ? identify(request) : undefined
         const selected=input.kind==='steward'?undefined:this.placement?.publication
         const publication=typeof selected==='function'?selected():selected
         const physical=publication && !publication.missing().length
@@ -225,9 +228,10 @@ export class PostgresProjectService {
         const store=physical?await this.placement!.ready!():undefined
         const alias='hgw-project-'+projectId
         const project = await client.query<{ id: string; public_id: string }>(`INSERT INTO harness.projects(
-          organization_id,name,created_by,origin,owner_user_id,model_access_default_allowed,kind,id
-        ) VALUES($1,$2,$3,$4,$5,true,$6,$7) RETURNING id,public_id::text`, [
+          organization_id,name,created_by,origin,owner_user_id,model_access_default_allowed,kind,id,steward_node_id
+        ) VALUES($1,$2,$3,$4,$5,true,$6,$7,$8) RETURNING id,public_id::text`, [
           this.context.organizationId, store?alias:input.name, createdBy, input.origin, owner, input.kind ?? 'standard',projectId,
+          input.kind === 'steward' ? this.context.nodeId : null,
         ])
         const row = project.rows[0]
         if (row === undefined) throw new Error('project insert returned no row')
@@ -290,32 +294,73 @@ export class PostgresProjectService {
       const detail = await this.getById(existing.id)
       if (detail !== null) return detail
     }
-    const name = normalizeProjectName(input.name)
+    // Steward projects are per-node: a project owns at most one runtime
+    // instance organization-wide, so each node seeds its own steward project
+    // bound through steward_node_id. The node name keeps the reserved name
+    // unique across nodes.
+    const name = normalizeProjectName(`${input.name}·${this.context.nodeName}`)
     const canonical = resolveProjectDirectory(input.path)
+    const seed = (seedName: string) => this.insert({
+      name: seedName,
+      resolveDirectory: () => canonical,
+      createdBy: input.createdBy ?? null,
+      origin: 'admin',
+      ownerUserId: null,
+      kind: 'steward',
+    })
     try {
-      return await this.insert({
-        name,
-        resolveDirectory: () => canonical,
-        createdBy: input.createdBy ?? null,
-        origin: 'admin',
-        ownerUserId: null,
-        kind: 'steward',
-      })
+      return await seed(name)
     } catch (error) {
       // A name collision with an administrator-created project must not block
       // seeding; fall back to a suffixed reserved name once.
       if (error instanceof Error && error.message.startsWith('duplicate project name')) {
-        return this.insert({
-          name: normalizeProjectName(`${name}-steward`),
-          resolveDirectory: () => canonical,
-          createdBy: input.createdBy ?? null,
-          origin: 'admin',
-          ownerUserId: null,
-          kind: 'steward',
-        })
+        try { return await seed(normalizeProjectName(`${name}-steward`)) } catch (retryError) { error = retryError }
+      }
+      // insert() wraps 23505 into a plain Error, so the violated constraint
+      // survives only in the message text.
+      if (error instanceof Error && error.message.includes('projects_steward_per_node')) {
+        const recovered = await this.recoverSteward(canonical)
+        if (recovered !== null) return recovered
       }
       throw error
     }
+  }
+
+  /**
+   * Return the steward row bound to this node after a per-node seeding
+   * collision, restoring a lost active mount. An archived bound row stays dead:
+   * nothing can legitimately archive a steward through the API, so such a row
+   * is migration residue, not a live space.
+   */
+  private async recoverSteward(canonical: string): Promise<ProjectRow | null> {
+    const bound = await this.context.pool.query<{ id: string; public_id: string; status: string }>(
+      `SELECT id,public_id::text,status::text FROM harness.projects
+       WHERE organization_id=$1 AND kind='steward' AND steward_node_id=$2
+       ORDER BY public_id LIMIT 1`,
+      [this.context.organizationId, this.context.nodeId],
+    )
+    const row = bound.rows[0]
+    if (row === undefined || row.status !== 'active') return null
+    await transaction(this.context.pool, async tx => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-port:${this.context.nodeId}`])
+      // project_mounts keys on (project_id, node_id): a missing-status row
+      // still occupies the slot, so revive in place rather than insert.
+      await tx.query(
+        `INSERT INTO harness.project_mounts(organization_id,project_id,node_id,local_path,canonical_path)
+         VALUES($1,$2,$3,$4,$4)
+         ON CONFLICT (project_id,node_id) DO UPDATE
+         SET local_path=EXCLUDED.local_path,canonical_path=EXCLUDED.canonical_path,status='active'`,
+        [this.context.organizationId, row.id, this.context.nodeId, canonical],
+      )
+      const [port] = await allocateInstancePorts(tx, this.context.nodeId, this.cfg.instancePortBase, 1, this.context.nodeName)
+      await tx.query(
+        `INSERT INTO harness.instances(organization_id,project_id,assigned_node_id,port)
+         SELECT $1,$2,$3,$4 WHERE NOT EXISTS(
+           SELECT FROM harness.instances WHERE organization_id=$1 AND project_id=$2)`,
+        [this.context.organizationId, row.id, this.context.nodeId, port],
+      )
+    })
+    return await this.getById(publicNumber(row.public_id, 'project'))
   }
 
   /** Current steward project target visible on this node, when seeded. */
@@ -325,7 +370,7 @@ export class PostgresProjectService {
       FROM harness.projects p
       JOIN harness.project_mounts pm ON pm.project_id=p.id AND pm.organization_id=p.organization_id
         AND pm.node_id=$2 AND pm.status='active'
-      WHERE p.organization_id=$1 AND p.kind='steward' AND p.status='active'
+      WHERE p.organization_id=$1 AND p.kind='steward' AND p.status='active' AND p.steward_node_id=$2
       ORDER BY p.public_id LIMIT 1`,
       [this.context.organizationId, this.context.nodeId],
     )

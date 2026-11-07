@@ -30,14 +30,28 @@ function fixture(consented: boolean) {
   const openScreen = vi.fn<RemoteDesktopInjected['openScreen']>().mockReturnValue(screen_)
   const setPanelMode = vi.fn()
   const gate = new AbortController()
-  const useTabInfo = () => ({
+  type TabInfo = ReturnType<ComponentProps<typeof RemoteDesktopBody>['useTabInfo']>
+  const info: TabInfo = {
     sidebar: { expanded: true, fullscreen: false },
-    panel: { id: 'pane-1' },
+    panel: { id: 'pane-1' as TabInfo['panel']['id'] },
     tab: {
-      id: 'tab-1', visible: true, signal: gate.signal, navigation: { params: TARGET },
-      actions: { setPanelMode },
+      id: 'tab-1' as TabInfo['tab']['id'],
+      kind: 'remoteDesktop',
+      contentId: 'sidebar://remoteDesktop',
+      title: '',
+      visible: true,
+      signal: gate.signal,
+      navigation: { address: 'sidebar://remoteDesktop', params: TARGET, revision: 1 },
+      actions: {
+        bindCommands: vi.fn(() => vi.fn()),
+        openResource: vi.fn(),
+        openTab: vi.fn(),
+        setPanelMode,
+        close: vi.fn(),
+      },
     },
-  })
+  }
+  const useTabInfo: ComponentProps<typeof RemoteDesktopBody>['useTabInfo'] = () => info
   const props = {
     status, confirm, attach, openScreen,
     useTabInfo,

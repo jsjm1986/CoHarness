@@ -12,10 +12,12 @@ fi
 BACKUP_DIR="${HGW_POSTGRES_BACKUP_DIR:-$HOME/harness-postgres-backups}"
 RETENTION="${HGW_POSTGRES_BACKUP_RETENTION:-30}"
 case "$RETENTION" in
-  ''|*[!0-9]*|0) echo 'HGW_POSTGRES_BACKUP_RETENTION must be a positive integer' >&2; exit 2 ;;
+  ''|*[!0-9]*|0*) echo 'HGW_POSTGRES_BACKUP_RETENTION must be a positive integer without leading zeros' >&2; exit 2 ;;
 esac
 STAMP="$(date +%Y%m%d-%H%M%S)"
-NAME="harness-$STAMP.dump"
+# Two runs inside one second (or two hosts sharing the directory) would
+# otherwise publish over the same name; the pid suffix keeps each mv distinct.
+NAME="harness-$STAMP-$$.dump"
 mkdir -p "$BACKUP_DIR"
 TMP="$BACKUP_DIR/.$NAME.tmp.$$"
 cleanup() { rm -f -- "$TMP"; }

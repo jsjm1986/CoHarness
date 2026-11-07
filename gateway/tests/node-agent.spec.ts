@@ -303,16 +303,24 @@ describe.skipIf(process.platform === 'win32')('POSIX node agent lifecycle', () =
     expect(events.at(-1)).toEqual({ status: 'stopped-lease-uncertain' })
   })
 
-  it('reports a declared connection refusal without claiming an uncertain acquisition', async () => {
+  it('keeps retrying a declared already-connected refusal while reporting degradation', async () => {
     const directory = await root(), events: NodeAgentEvent[] = []
     const identity = { protocolVersion: 1, organizationId: randomUUID(), nodeId: randomUUID(), executionReady: false }
+    let connects = 0
     const base = await listener((req, res) => {
       req.resume()
       if (req.url === '/internal/nodes/enroll') { res.end(JSON.stringify(identity)); return }
+      connects += 1
       res.writeHead(409); res.end(JSON.stringify({ error: 'node-access/already-connected' }))
     })
-    await expect(runNodeAgent({ centerUrl: base, centerDialUrls: [base], dialPreferredRetryMs: 60_000, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 1000 }, new AbortController().signal, event => { events.push(event) }))
-      .rejects.toMatchObject({ code: 'node-access/already-connected', refused: true })
+    const stop = new AbortController()
+    const running = runNodeAgent({ centerUrl: base, centerDialUrls: [base], dialPreferredRetryMs: 60_000, stateFile: join(directory, 'access.json'), enrollmentToken: ticket(), requestTimeoutMs: 2000, retryMs: 20 }, stop.signal, event => { events.push(event) })
+    const started = Date.now()
+    while (connects < 3 && Date.now() - started < 10_000) await new Promise(resolve => setTimeout(resolve, 10))
+    stop.abort()
+    await expect(running).resolves.toBeUndefined()
+    expect(connects).toBeGreaterThanOrEqual(3)
+    expect(events).toContainEqual({ status: 'degraded', reason: 'node-access/already-connected' })
     expect(events.at(-1)).toEqual({ status: 'stopped' })
   })
 

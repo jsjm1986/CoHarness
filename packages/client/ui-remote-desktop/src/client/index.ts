@@ -64,6 +64,9 @@ export function apply(ctx: Context): void {
           // noVNC stays out of the registration module: a stream pays the import
           // only when it actually opens, so mounting the sidebar costs nothing.
           let localClose = false
+          // A failed dynamic import surfaces through onDisconnected so the
+          // surface shows its closed/reconnect state instead of a black canvas;
+          // `ready` therefore never rejects and callers guard on undefined.
           const ready = import('./rfb.ts').then(({ RFB }) => {
             const rfb = new RFB(container, url, {})
             rfb.viewOnly = options.viewOnly
@@ -78,24 +81,25 @@ export function apply(ctx: Context): void {
             })
             rfb.addEventListener('disconnect', () => { if (!localClose) options.onDisconnected?.() })
             return rfb
-          })
+          }).catch(() => { options.onDisconnected?.(); return undefined })
           return {
             sendCredentials: (credentials) => {
               const offer: Record<string, string> = {}
               if (credentials.username !== undefined) offer.username = credentials.username
               if (credentials.password !== undefined) offer.password = credentials.password
-              void ready.then((rfb) => { rfb.sendCredentials(offer) })
+              void ready.then((rfb) => { rfb?.sendCredentials(offer) })
             },
-            setZoom: (zoom) => { void ready.then((rfb) => { applyZoom(rfb, zoom) }) },
+            setZoom: (zoom) => { void ready.then((rfb) => { if (rfb !== undefined) applyZoom(rfb, zoom) }) },
             setQuality: (quality) => {
               void ready.then((rfb) => {
+                if (rfb === undefined) return
                 const level = QUALITY_LEVELS[quality]
                 rfb.qualityLevel = level.quality
                 rfb.compressionLevel = level.compression
               })
             },
-            sendCtrlAltDel: () => { void ready.then((rfb) => { rfb.sendCtrlAltDel() }) },
-            disconnect: () => { localClose = true; void ready.then((rfb) => { rfb.disconnect() }) },
+            sendCtrlAltDel: () => { void ready.then((rfb) => { rfb?.sendCtrlAltDel() }) },
+            disconnect: () => { localClose = true; void ready.then((rfb) => { rfb?.disconnect() }) },
           }
         },
       }),

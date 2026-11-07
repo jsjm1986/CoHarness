@@ -36,6 +36,9 @@ export interface WindowsJobInternals {
   probeCurrentTokenJobSupport?: typeof probeCurrentTokenJobSupport
 }
 
+/** Bound for a connected runner to act on a terminate request before it is presumed wedged. */
+const RUNNER_TERMINATE_TIMEOUT_MS = 5_000
+
 type RunnerProcess = Omit<ReturnType<typeof spawn>, 'send' | 'stdio'> & {
   send?: ReturnType<typeof spawn>['send']
   stdio: Array<Readable | Writable | null>
@@ -71,6 +74,7 @@ class WindowsJobOwner implements BoundProcessOwner {
   private cancellationReason: unknown
   private cancellationReasonSet = false
   private terminationSent = false
+  private infrastructureFailed = false
 
   constructor(
     private readonly runner: RunnerProcess,
@@ -88,16 +92,29 @@ class WindowsJobOwner implements BoundProcessOwner {
     }
     if (this.terminationSent || !this.runner.connected) return
     this.terminationSent = true
+    // A connected runner whose event loop is wedged would accept the IPC write
+    // and never process it; the Job still needs its owner gone, so bound the
+    // wait and kill the runner — Job close sweeps the tree on handle release.
+    const deadline = setTimeout(() => {
+      this.failAndKill(new Error('Windows Job runner did not process its terminate request'))
+    }, RUNNER_TERMINATE_TIMEOUT_MS)
+    deadline.unref()
+    void this.exited.then(() => clearTimeout(deadline), () => clearTimeout(deadline))
     try {
       this.runner.send?.({ type: 'terminate' }, (error) => {
-        if (error === null || this.directResultType() !== undefined) return
-        this.failInfrastructure(error)
-        this.terminateForHostExit()
+        if (error === null) return
+        this.failAndKill(error)
       })
     } catch (error) {
-      this.failInfrastructure(error)
-      this.terminateForHostExit()
+      this.failAndKill(error)
     }
+  }
+
+  private failAndKill(error: unknown): void {
+    if (this.infrastructureFailed || this.directResultType() !== undefined) return
+    this.infrastructureFailed = true
+    this.failInfrastructure(error)
+    this.terminateForHostExit()
   }
 
   mapStartFailure(failure: unknown, serialized: SerializedRunnerError): unknown {

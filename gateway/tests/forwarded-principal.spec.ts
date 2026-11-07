@@ -1,4 +1,4 @@
-import { generateKeyPairSync, createPublicKey } from 'node:crypto'
+import { generateKeyPairSync, createPublicKey, sign } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type { UserRow } from '../src/auth.ts'
 import { GatewayPrincipalSigner } from '../src/principal.ts'
@@ -77,9 +77,33 @@ describe('forwarded principal assertions', () => {
     expect(verifyGatewayForward(`${payload}.${signature}x`, publicKey, input)).toBeNull()
     expect(verifyGatewayForward('not-an-assertion', publicKey, input)).toBeNull()
     expect(forwardIssuerOf('not-an-assertion')).toBeNull()
+    // A well-formed payload naming a non-node issuer never reaches the
+    // directory query — malformed issuers fall back to session validation.
+    const junkIssuer = `${Buffer.from(JSON.stringify({ issuerNode: 'junk' })).toString('base64url')}.sig`
+    expect(forwardIssuerOf(junkIssuer)).toBeNull()
     // A PEM string resolves the same public key.
     const pem = publicKey.export({ type: 'spki', format: 'pem' }) as string
     expect(verifyGatewayForward(assertion, pem, input)?.user.id).toBe(7)
     expect(createPublicKey(privateKey).equals(publicKey)).toBe(true)
+  })
+
+  it('rejects non-integer and fractional timestamps even when correctly signed', () => {
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519')
+    const now = 100_000
+    const forge = (issuedAt: number, expiresAt: number): string => {
+      const payload = Buffer.from(JSON.stringify({
+        version: 1, issuer: 'harness-gateway', audience: 'dsh-node',
+        issuerNode: NODE_A, audienceNode: NODE_B, organization: 'acme',
+        user: USER, issuedAt, expiresAt, nonce: 'n1',
+      })).toString('base64url')
+      return `${payload}.${sign(null, Buffer.from(payload), privateKey).toString('base64url')}`
+    }
+    const input = { audienceNode: NODE_B, organization: 'acme', now }
+    // An effectively eternal assertion (unsafe integer > 2^53) is malformed.
+    expect(verifyGatewayForward(forge(now, 1e18), publicKey, input)).toBeNull()
+    // Fractional timestamps cannot come from a real issuer clock either.
+    expect(verifyGatewayForward(forge(now, now + 0.5), publicKey, input)).toBeNull()
+    // A sane window still verifies.
+    expect(verifyGatewayForward(forge(now, now + 100), publicKey, input)).not.toBeNull()
   })
 })

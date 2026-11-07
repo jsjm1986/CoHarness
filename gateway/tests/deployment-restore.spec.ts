@@ -116,6 +116,7 @@ describePg('transactional PostgreSQL backup restore', () => {
     const cfg = testConfig(join(directory, 'issuer-history'))
     const users = new PostgresUserService(context, cfg)
     const original = await users.create({ username: 'original-admin', password: 'test-password', role: 'admin' })
+    await users.changeOwnPassword(original.id, 'test-password')
     const topology = new PostgresDeploymentTopology(context, { legacyForwarding: false, refreshAfterMs: 30000,
       pageSize: 10, maxBytes: 65536, allowedOrigins: ['https://issuer.example.test'] })
     await topology.save(original, { revision: '0', enabled: true, primaryOrigin: 'https://issuer.example.test' })
@@ -128,6 +129,7 @@ describePg('transactional PostgreSQL backup restore', () => {
     const incompatible = await commands.backup(join(directory, 'issuer-backups'), databaseUrl!, [])
     await pool.query('ALTER TABLE harness.node_agent_enrollments DROP CONSTRAINT node_agent_enrollments_created_by_organization_id_fkey')
     const later = await users.create({ username: 'later-admin', password: 'test-password', role: 'admin' })
+    await users.changeOwnPassword(later.id, 'test-password')
     const nodes = new PostgresNodeAccessService(context, cfg.nodeAccess, cfg.runtimeCatalog)
     const worker = (await pool.query<{ id: string }>("SELECT id FROM harness.compute_nodes WHERE organization_id=$1 AND name='prepared-worker'", [organization])).rows[0]!.id
     const ticket = await nodes.issue(later, { requestId: randomUUID(), nodeId: worker })

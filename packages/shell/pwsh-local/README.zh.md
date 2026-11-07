@@ -59,7 +59,7 @@ kind: "package-reference"
 
 ### 运行命令
 
-用 `execute` 运行命令并从执行结果的 `result()` 读取输出；非零退出、超时或取消都会返回描述性结果，只有基础设施失败才会导致调用被拒绝。命令字符串作为单个参数传给 `-Command`：由 PowerShell 自己解析文本，不存在中间 shell，因此没有需要转义的 shell 引号层，原生 Win32 路径也原样通过。每条命令都先固定 UTF-8 输出，因此即使在 Windows PowerShell 5.1 兜底上，非 ASCII 输出也不会乱码。环境默认面向模型：`NO_COLOR=1 PAGER=cat GIT_PAGER=cat`（没有 `TERM=dumb`——那是 POSIX 概念），调用方显式提供的条目仍然优先。
+用 `execute` 运行命令并从执行结果的 `result()` 读取输出；非零退出、超时或取消都会返回描述性结果，只有基础设施失败才会导致调用被拒绝。命令字符串作为单个参数传给 `-Command`：由 PowerShell 自己解析文本，不存在中间 shell，因此没有需要转义的 shell 引号层，原生 Win32 路径也原样通过。每条命令都先在 FullLanguage 下固定 UTF-8 输出，因此即使在 Windows PowerShell 5.1 兜底上，非 ASCII 输出也不会乱码。环境默认面向模型：`NO_COLOR=1 PAGER=cat GIT_PAGER=cat`（没有 `TERM=dumb`——那是 POSIX 概念），调用方显式提供的条目仍然优先。
 
 ```text
 const execution = await ctx.shell.execute(ctx.shell.resolve({ command: 'Get-ChildItem' }))
@@ -150,6 +150,7 @@ if (result.timedOut) console.log('timed out after', result.timeoutMs)
 - **后台提供方失败提示只投递一次**——`SubprocessHandle.done` 可能在目标开始执行前或后被拒绝，因此执行器会将不指明失败阶段的 `subprocess failed before reporting an outcome: …` 注入且仅注入一个 `readOutput()` 增量；丢弃该增量的读取方无法恢复它。
 - **Windows 终止不报告信号**——被强制终止的进程以退出码 1、`signal: null` 结算，因此基于信号的状态分类在 Windows 上不适用；`kill()` 发起的停止仍会直接标记为 `killed`。
 - **编码 preamble 位于命令之前**——PowerShell 要求 `param(...)`、`#requires` 与 `using` 语句位于脚本最顶部，因此以其中一种开头的命令无法在 UTF-8 输出 preamble 下运行；`param(...)` 脚本请包进 `& { … }`，`using`/`#requires` 脚本请改从文件运行。
+- **ConstrainedLanguage 下跳过编码 preamble**——该模式下类型成员写入被拒（`CannotCreateTypeConstrainedLanguage`)，因此 UTF-8 固定以 `FullLanguage` 为前提；pwsh 7 受限于 CLM 时默认仍输出 UTF-8,而 Windows PowerShell 5.1 受限于 CLM 时只能输出 OEM 代码页，因为不存在 CLM 允许的固定手段。
 - **Windows PowerShell 5.1 下的非 ASCII stdin 可能被错误解码**——preamble 只固定输出编码；`[Console]::InputEncoding` 保持主机默认，因为在重定向 stdin 下设置它会抛出异常；pwsh 7 默认 UTF-8，不受影响。
 
 <a id="dev-note"></a>

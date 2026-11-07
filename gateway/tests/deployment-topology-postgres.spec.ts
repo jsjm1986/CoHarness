@@ -49,6 +49,9 @@ pg('deployment topology', () => {
     const admin = await users.create({ username: 'admin', password: 'test-password', role: 'admin' })
     const member = await users.create({ username: 'member', password: 'test-password' })
     const worker = await remoteUsers.create({ username: 'worker', password: 'test-password' })
+    await users.changeOwnPassword(admin.id, 'test-password')
+    await users.changeOwnPassword(member.id, 'test-password')
+    await remoteUsers.changeOwnPassword(worker.id, 'test-password')
     const options = { legacyForwarding: false, refreshAfterMs: 30000, pageSize: 10, maxBytes: 65536, allowedOrigins: ['https://primary.example.test'] }
     const topology = new PostgresDeploymentTopology(a, options), local = new PostgresDeploymentTopology(b, options)
     const nodes = new PostgresNodeAccessService(a, cfg.nodeAccess, cfg.runtimeCatalog)

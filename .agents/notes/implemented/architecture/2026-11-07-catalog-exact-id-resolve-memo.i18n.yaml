@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-07-catalog-exact-id-resolve-memo.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-07-catalog-exact-id-resolve-memo.md
+document:
+  en: 322436c3d4fc879359a51c01bb2056f8655f9438
+  zh: ed562906bf9f51f5b9c642a5e1259f3df12ce294
+/agent-note-burst-memoization-of-exact-id-runtime-catalog-resolution:
+  en: c92c57f99730550c
+  zh: 504bcfc62af3d0a7
+/agent-note-burst-memoization-of-exact-id-runtime-catalog-resolution/problem:
+  en: 61cee7daaa99afa7
+  zh: bf9017af229be359
+/agent-note-burst-memoization-of-exact-id-runtime-catalog-resolution/decision:
+  en: 82c196e05953cdcd
+  zh: a2c455a06083ce1f
+/agent-note-burst-memoization-of-exact-id-runtime-catalog-resolution/why-exact-id-resolution-is-safe-to-memoize:
+  en: 3dba9939cd4138b9
+  zh: 11a7729ae27e5b0a
+/agent-note-burst-memoization-of-exact-id-runtime-catalog-resolution/alternatives-considered:
+  en: 6ac5af3ddd753b20
+  zh: 01aa32167b66fae0
+/agent-note-burst-memoization-of-exact-id-runtime-catalog-resolution/consequences:
+  en: ea4e09d950dc91e0
+  zh: 9dc7d212ccb3b365

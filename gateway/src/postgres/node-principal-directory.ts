@@ -12,7 +12,7 @@ import type { PostgresRuntimeContext } from './runtime-context.ts'
  * stale row cannot outlive its credential.
  */
 export class NodePrincipalDirectory {
-  private readonly keys = new Map<string, { pem: string; expiresAt: number }>()
+  private readonly keys = new Map<string, { pem: string | null; expiresAt: number }>()
 
   constructor(
     private readonly context: PostgresRuntimeContext,
@@ -31,20 +31,24 @@ export class NodePrincipalDirectory {
    */
   async issuerKey(nodeId: string): Promise<KeyObject | null> {
     const cached = this.keys.get(nodeId)
-    if (cached !== undefined && cached.expiresAt > Date.now()) return createPublicKey(cached.pem)
+    if (cached !== undefined && cached.expiresAt > Date.now()) {
+      return cached.pem === null ? null : createPublicKey(cached.pem)
+    }
     const result = await this.context.pool.query<{ pem: string | null }>(
       `SELECT n.principal_public_key::text pem FROM harness.compute_nodes n
        WHERE n.organization_id=$1 AND n.id=$2 AND n.status='active'
          AND (NOT EXISTS (SELECT 1 FROM harness.node_agents a
              WHERE a.organization_id=n.organization_id AND a.node_id=n.id)
            OR EXISTS (SELECT 1 FROM harness.node_agents a
-             WHERE a.organization_id=n.organization_id AND a.node_id=n.id
-               AND a.attachment_state='managed' AND a.lease_expires_at>clock_timestamp()))`,
+               WHERE a.organization_id=n.organization_id AND a.node_id=n.id
+                 AND a.attachment_state='managed' AND a.lease_expires_at>clock_timestamp()))`,
       [this.context.organizationId, nodeId])
     const pem = result.rows[0]?.pem ?? null
-    if (pem === null) return null
+    // Negative verdicts are memoized too: the forward header is client-settable,
+    // so an unknown issuer would otherwise cost a database read per request.
+    // Enrollment clears the entry through the access monitor's invalidate().
     if (this.keys.size >= 64) this.keys.clear()
     this.keys.set(nodeId, { pem, expiresAt: Date.now() + this.ttlMs })
-    return createPublicKey(pem)
+    return pem === null ? null : createPublicKey(pem)
   }
 }

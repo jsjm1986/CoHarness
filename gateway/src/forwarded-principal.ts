@@ -1,6 +1,7 @@
 import { createPublicKey, type KeyObject } from 'node:crypto'
 import type { UserRow } from './auth.ts'
 import type { RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
+import { nodeUuidSchema } from './node-access.ts'
 import { verifiedPayload } from './principal.ts'
 
 export const FORWARDED_PRINCIPAL_HEADER = 'x-dsh-gateway-forward'
@@ -60,7 +61,8 @@ function forwardClaims(value: unknown): GatewayForwardClaims {
     || (user.homeNodeId !== undefined && typeof user.homeNodeId !== 'string')
     || typeof user.mustChangePassword !== 'boolean'
     || typeof user.autoReviewEligible !== 'boolean'
-    || typeof claims.issuedAt !== 'number' || typeof claims.expiresAt !== 'number'
+    || typeof claims.issuedAt !== 'number' || !Number.isSafeInteger(claims.issuedAt)
+    || typeof claims.expiresAt !== 'number' || !Number.isSafeInteger(claims.expiresAt)
     || claims.expiresAt <= claims.issuedAt
     || typeof claims.nonce !== 'string' || claims.nonce === '') {
     throw new Error('invalid forwarded principal claims')
@@ -87,13 +89,16 @@ function forwardClaims(value: unknown): GatewayForwardClaims {
 /**
  * Read the unverified `issuerNode` so the caller can resolve its published key;
  * the value only becomes trustworthy after `verifyGatewayForward` succeeds.
+ * Anything that is not a node id never reaches the directory query — callers
+ * treat the assertion as absent, keeping malformed issuers on the ordinary
+ * session path instead of surfacing a database type error.
  */
 export function forwardIssuerOf(assertion: string): RuntimeNodeId | null {
   try {
     const payload = assertion.split('.')[0]
     if (payload === undefined || payload === '') return null
     const claims = record(JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')))
-    return typeof claims?.issuerNode === 'string' && claims.issuerNode !== ''
+    return typeof claims?.issuerNode === 'string' && nodeUuidSchema.safeParse(claims.issuerNode).success
       ? claims.issuerNode as RuntimeNodeId : null
   } catch {
     return null

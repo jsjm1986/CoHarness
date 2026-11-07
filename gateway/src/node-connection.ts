@@ -4,6 +4,7 @@ import { constants } from 'node:fs'
 import { mkdir, open, rename, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
+import { fileURLToPath } from 'node:url'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { z } from 'zod'
 import { loadNodeAgentConfig, type NodeAgentConfig } from './node-agent.ts'
@@ -180,7 +181,12 @@ export class GatewayNodeConnection {
       }
       const command = process.platform === 'darwin' ? ['launchctl', 'kickstart', '-k', this.service]
         : process.platform === 'linux' ? ['systemctl', '--no-ask-password', '--no-pager', 'restart', this.service]
-        : process.platform === 'win32' ? ['schtasks.exe', '/Run', '/TN', this.service] : undefined
+        // schtasks /Run is start-only: on a wedged-but-Running task it is either
+        // dropped by IgnoreNew or reports an error without touching the process.
+        // The task script's -Restart mode performs the atomic stop+start this
+        // button means, entirely on the node and outside the agent's tree.
+        : process.platform === 'win32' ? ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+          fileURLToPath(new URL('../deploy/windows/node-agent-task.ps1', import.meta.url)), '-Restart', '-TaskName', this.service] : undefined
       if (command === undefined) throw new NodeConfigurationError(409, 'node-connection-platform-unsupported')
       try { await runGatewayChildCommand(command[0]!, command.slice(1), this.cfg.systemdCommandTimeoutMs, signal, 8192) }
       catch (error) { throw new NodeConfigurationError(409, 'node-connection-service-start-failed', { cause: error }) }

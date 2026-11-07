@@ -137,14 +137,22 @@ import type { GatewayModelGovernanceService } from './services.ts'
 
 
 const effectiveEnvironment = await loadManagedNodeEnvironment(process.env)
+/** Consumed nonces of accepted forwarded assertions: nonce → expiresAt. */
+const forwardNonceLedger = new Map<string, number>()
 const cfg = loadConfig(effectiveEnvironment)
 if (cfg.releaseId !== undefined) console.log(`[gateway] release ${cfg.releaseId}`)
 const databaseUrl = await databaseUrlFromFile(effectiveEnvironment)
 const pool = createPostgresPool(databaseUrl, {
   max: cfg.databaseMaxConnections,
+  min: cfg.databaseMinConnections,
   maxCheckoutQueue: cfg.databaseMaxCheckoutQueue,
   connectionTimeoutMillis: cfg.databaseConnectionTimeoutMs,
 })
+if (cfg.databaseMinConnections > 0) {
+  void Promise.all(Array.from({ length: cfg.databaseMinConnections },
+    async () => { (await pool.connect()).release() }))
+    .catch((error: unknown) => { console.error('[gateway] PostgreSQL pool warm-up failed:', error) })
+}
 const startupAbort = new AbortController()
 const onStartupSignal = (): void => { startupAbort.abort() }
 process.once('SIGINT', onStartupSignal)
@@ -395,7 +403,16 @@ const tunnelAccess = new GatewayTunnelAccess({
   envBinaryPath: cfg.cloudflaredBin,
 })
 const pluginState = new PostgresPluginState(context, contentVolume, nodeFiles)
-const stewardQuery = new StewardQueryService(context, cfg.steward.enabled)
+// Statements run on their own small pool: a session-state escape (deny-listed
+// functions, advisory locks, listeners) can then never reach a connection the
+// rest of the Gateway shares; journals still write through the main pool.
+const stewardStatementPool = createPostgresPool(databaseUrl, {
+  max: 4,
+  maxCheckoutQueue: cfg.databaseMaxCheckoutQueue,
+  connectionTimeoutMillis: cfg.databaseConnectionTimeoutMs,
+  application_name: 'dsh-steward-query',
+})
+const stewardQuery = new StewardQueryService(context, cfg.steward.enabled, stewardStatementPool)
 const performanceObserver = new GatewayPerformanceObserver({
   enabled: cfg.performanceEnabled,
   eventLoopResolutionMs: cfg.performanceEventLoopResolutionMs,
@@ -457,11 +474,27 @@ const deps: GatewayDeps = {
     authorize: (token, input) => nodeAccess.authorizeChannel(token, input),
   },
   forwardedPrincipal: async assertion => {
-    const issuerNode = forwardIssuerOf(assertion)
-    const issuerKey = issuerNode === null ? null : await principalDirectory.issuerKey(issuerNode)
-    return issuerKey === null ? null
-      : verifyGatewayForward(assertion, issuerKey, {
-        audienceNode: context.nodeId as RuntimeNodeId, organization: cfg.organizationSlug })
+    // Any failure here — malformed assertion, directory outage, bad issuer —
+    // resolves to null so the request falls back to ordinary session
+    // validation; a broken forward path must not become a 500.
+    try {
+      const issuerNode = forwardIssuerOf(assertion)
+      const issuerKey = issuerNode === null ? null : await principalDirectory.issuerKey(issuerNode)
+      const claims = issuerKey === null ? null
+        : verifyGatewayForward(assertion, issuerKey, {
+          audienceNode: context.nodeId as RuntimeNodeId, organization: cfg.organizationSlug })
+      if (claims === null) return null
+      // A captured assertion stays replayable within its TTL unless the nonce
+      // is consumed; the ledger is bounded by assertion expiry and each issued
+      // assertion mints a fresh nonce, so a duplicate is replay evidence.
+      const now = Date.now()
+      for (const [nonce, expiry] of forwardNonceLedger) if (expiry <= now) forwardNonceLedger.delete(nonce)
+      if (forwardNonceLedger.has(claims.nonce)) return null
+      forwardNonceLedger.set(claims.nonce, claims.expiresAt)
+      return claims
+    } catch {
+      return null
+    }
   },
   runtimeRouter,
   performance: performanceObserver,
@@ -521,7 +554,8 @@ const deps: GatewayDeps = {
 }
 
 await assertCurrentDataEpoch()
-onWritesReopened = () => { scheduleModelGovernanceRefresh(deps) }
+const reopenModelGovernance = (): void => { scheduleModelGovernanceRefresh(deps) }
+onWritesReopened = reopenModelGovernance
 try {
   await admitWriter(async () => {
     if (await deps.users.count() === 0) {
@@ -855,7 +889,9 @@ const ensureStewardSpace = async (): Promise<void> => {
   await instances.ensureRunning({ kind: 'project', id: steward.id, name: steward.name, path: steward.path, steward: true }, 'explicit')
 }
 const stewardEnsure = fencedTask('steward space', ensureStewardSpace)
-onWritesReopened = () => stewardEnsure.run()
+// Both reopen effects must run: assigning a bare closure would discard the
+// model-governance refresh registered earlier.
+onWritesReopened = () => { reopenModelGovernance(); stewardEnsure.run() }
 stewardEnsure.run()
 
 const reaperTask = fencedTask('idle reaper', async () => {

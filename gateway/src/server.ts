@@ -776,8 +776,9 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
   const currentUser = async (req: IncomingMessage): Promise<{ token: string; user: UserRow;
       forward?: import('./forwarded-principal.ts').GatewayForwardClaims } | null> => {
     // A peer-signed assertion proves the forwarding Gateway already validated
-    // this session; only requests that demonstrably arrived over the
-    // node-service channel may honor it.
+    // this session. The target header is only a routing marker — clients can
+    // set it — so assertion acceptance rests on signature verification and the
+    // nonce ledger in deps.forwardedPrincipal, not on the header itself.
     const forward = req.headers['x-dsh-gateway-forward']
     const arrivedForThisNode = req.headers[NODE_SERVICE_TARGET_HEADER] !== undefined
       && req.headers[NODE_SERVICE_TARGET_HEADER] === deps.nodeServiceIdentity?.nodeId

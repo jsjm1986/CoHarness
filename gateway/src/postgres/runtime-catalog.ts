@@ -57,12 +57,37 @@ function decodeCursor(value: string | undefined, expected: Omit<Cursor, 'after'>
 
 /** PostgreSQL-backed environment metadata with current actor and project authorization. */
 export class PostgresRuntimeCatalog {
+  /** Bound on resolve memo entries; resolution staleness is capped by {@link RESOLVE_MEMO_MS}, not eviction. */
+  private static readonly RESOLVE_MEMO_MAX = 512
+  /** Exact-id resolution shares one round trip across a forwarded-request burst; owner and landing selectors stay
+   * unmemoized because ambiguity and landing order must observe every concurrent environment change. */
+  private static readonly RESOLVE_MEMO_MS = 800
+  private readonly resolveMemo = new Map<string, { at: number; value: Promise<RuntimeCatalogEntry> }>()
+
   /**
    * @param context - authenticated organization and local Gateway node.
    * @param limits - deployment-validated row and complete-response byte limits.
    */
   constructor(private readonly context: Pick<PostgresRuntimeContext, 'organizationId' | 'nodeId'> & { pool: Queryable },
     private readonly limits: RuntimeCatalogLimits, private readonly entryNodeId?: RuntimeNodeId) {}
+
+  /** Run one catalog resolution per key per TTL window; denials and results share the same short staleness budget. */
+  private resolveMemoized(key: string, load: () => Promise<RuntimeCatalogEntry>): Promise<RuntimeCatalogEntry> {
+    const hit = this.resolveMemo.get(key)
+    const now = Date.now()
+    if (hit !== undefined && now - hit.at < PostgresRuntimeCatalog.RESOLVE_MEMO_MS) return hit.value
+    const held = { at: now, value: load() }
+    held.value = held.value.then(entry => entry, (error: unknown) => {
+      if (this.resolveMemo.get(key) === held) this.resolveMemo.delete(key)
+      throw error
+    })
+    this.resolveMemo.set(key, held)
+    if (this.resolveMemo.size > PostgresRuntimeCatalog.RESOLVE_MEMO_MAX) {
+      const oldest = this.resolveMemo.keys().next().value
+      if (oldest !== undefined) this.resolveMemo.delete(oldest)
+    }
+    return held.value
+  }
 
   /**
    * List the actor's personal and authorized project environments without contacting nodes.
@@ -103,6 +128,9 @@ export class PostgresRuntimeCatalog {
 
   /**
    * Resolve one authorized environment before its placement is dispatched by the runtime router.
+   * Owner, node, and identity of an exact environment are immutable while active, so one request burst reuses a
+   * positive resolution for at most {@link RESOLVE_MEMO_MS} milliseconds; retirement and access loss still bind
+   * within that window because downstream attach fences on generation and live instance rows.
    * @param actor - authenticated account whose current access is rechecked.
    * @param id - untrusted environment UUID from the request URL.
    * @returns the exact authorized environment and its node, without starting or contacting it.
@@ -110,9 +138,11 @@ export class PostgresRuntimeCatalog {
    */
   async resolveForAccount(actor: UserRow, id: string): Promise<RuntimeCatalogEntry> {
     if (!UUID.test(id)) throw new RuntimeCatalogError(400, 'runtime-catalog/invalid-id')
-    const entry = (await this.page(actor, { limit: '1' }, 'account', id as RuntimeId)).items[0]
-    if (entry === undefined) throw new RuntimeCatalogError(404, 'runtime-catalog/not-found')
-    return entry
+    return this.resolveMemoized(`account:${actor.id}:${id}`, async () => {
+      const entry = (await this.page(actor, { limit: '1' }, 'account', id as RuntimeId)).items[0]
+      if (entry === undefined) throw new RuntimeCatalogError(404, 'runtime-catalog/not-found')
+      return entry
+    })
   }
 
   /**

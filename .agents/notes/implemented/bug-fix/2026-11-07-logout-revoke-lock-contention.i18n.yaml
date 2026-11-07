@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-07-logout-revoke-lock-contention.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-07-logout-revoke-lock-contention.md
+document:
+  en: 608d11f9e8f6fc715dbe922f4337709ab738a776
+  zh: 6897db75922588ca3a9ce2f6683fd16a0cac7e02
+/agent-note-logout-revoke-outlasts-renewal-row-locks-instead-of-failing:
+  en: e061c4159ab4f000
+  zh: 9a52d714e305f1c1
+/agent-note-logout-revoke-outlasts-renewal-row-locks-instead-of-failing/problem:
+  en: 523071f50544465f
+  zh: 7e4b25f7bbdd6be8
+/agent-note-logout-revoke-outlasts-renewal-row-locks-instead-of-failing/decision:
+  en: bef92695d0b8d455
+  zh: 55cedc6f162cd4f0
+/agent-note-logout-revoke-outlasts-renewal-row-locks-instead-of-failing/alternatives-considered:
+  en: ec2caea79fe16419
+  zh: 66c5004cd6671f9f
+/agent-note-logout-revoke-outlasts-renewal-row-locks-instead-of-failing/consequences:
+  en: 11a98dc8f54df5df
+  zh: cb002c15eb910a8e

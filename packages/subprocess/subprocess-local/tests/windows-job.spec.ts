@@ -331,6 +331,44 @@ describe('Windows parent runner contract', () => {
     await expect(spawned.result.owner.waitForExit()).rejects.toThrow('exit code 127')
   })
 
+  it('kills a connected runner that never processes its terminate request', async () => {
+    vi.useFakeTimers()
+    try {
+      const spawned = launch()
+      spawned.child.deferSendCallbacks = true
+      spawned.result.owner.signal('SIGTERM', new Error('caller aborted'))
+      expect(spawned.child.sent.at(-1)).toEqual({ type: 'terminate' })
+      expect(spawned.child.killed).toEqual([])
+      const direct = expect(spawned.result.direct).rejects.toThrow('did not process its terminate request')
+      vi.advanceTimersByTime(5_000)
+      expect(spawned.child.killed).toEqual(['SIGKILL'])
+      await direct
+      spawned.child.connected = false
+      spawned.child.exit(null, 'SIGKILL')
+      await expect(spawned.result.owner.waitForExit()).rejects.toThrow('did not process its terminate request')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not kill a runner that settled after its direct result', async () => {
+    vi.useFakeTimers()
+    try {
+      const spawned = launch()
+      spawned.child.emit('message', { type: 'target-exit', exitCode: 7 })
+      await expect(spawned.result.direct).resolves.toEqual({ exitCode: 7, signal: null })
+      spawned.result.owner.signal('SIGTERM')
+      expect(spawned.child.sent.at(-1)).toEqual({ type: 'terminate' })
+      spawned.child.connected = false
+      spawned.child.exit(0, null)
+      await expect(spawned.result.owner.waitForExit()).resolves.toBeUndefined()
+      vi.advanceTimersByTime(10_000)
+      expect(spawned.child.killed).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('rejects direct and wait for runner error or abnormal runner exit', async () => {
     const failed = launch()
     failed.child.emit('message', {

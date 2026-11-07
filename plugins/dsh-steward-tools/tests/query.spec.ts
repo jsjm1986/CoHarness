@@ -53,10 +53,10 @@ describe('isReadOnly', () => {
 })
 
 describe('statementPreview', () => {
-  it('keeps one trimmed line and truncates long heads', () => {
-    expect(statementPreview('  -- c\nUPDATE t SET a=1\nRETURNING *')).toBe('UPDATE t SET a=1')
-    const long = `UPDATE t SET ${'x'.repeat(300)}=1`
-    expect(statementPreview(long).length).toBe(160)
+  it('keeps the whole statement and truncates only very long bodies', () => {
+    expect(statementPreview('  -- c\nUPDATE t SET a=1\nRETURNING *')).toBe('UPDATE t SET a=1\nRETURNING *')
+    const long = `UPDATE t SET ${'x'.repeat(2200)}=1`
+    expect(statementPreview(long).length).toBe(2000)
     expect(statementPreview(long).endsWith('...')).toBe(true)
   })
 })

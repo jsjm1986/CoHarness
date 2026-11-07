@@ -22,7 +22,7 @@ it('requests a single uncached page with the view-owned abort signal', async () 
 })
 
 it.each([
-  { items: [{ ...node, executionReady: true }], nextCursor: null },
+  { items: [{ ...node, executionReady: 'yes' }], nextCursor: null },
   { items: [{ ...node, nodeId: 'wrong-id' }], nextCursor: null },
   { items: Array.from({ length: 201 }, () => node), nextCursor: null },
 ])('refuses incompatible or unbounded directory responses', async value => {

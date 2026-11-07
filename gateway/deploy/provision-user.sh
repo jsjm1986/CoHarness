@@ -22,6 +22,6 @@ if ! id -u "$ACCOUNT" >/dev/null 2>&1; then
 fi
 
 mkdir -p "$USERS_ROOT/$USERNAME/home" "$USERS_ROOT/$USERNAME/dsh"
-chown -R "$ACCOUNT:$ACCOUNT" "$USERS_ROOT/$USERNAME"
+chown -R "$ACCOUNT:" "$USERS_ROOT/$USERNAME"
 chmod 750 "$USERS_ROOT/$USERNAME"
 echo "provisioned $USERS_ROOT/$USERNAME for $ACCOUNT"

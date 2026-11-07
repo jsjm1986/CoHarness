@@ -5,7 +5,7 @@ export const zh = {
   existing: '已部署电脑', registerNew: '预登记新电脑', candidatesMore: '更多已部署电脑', candidateFailed: '未能读取已部署电脑，请重新打开窗口重试',
   title: '接入电脑',
   meta: '统一查看组织电脑的连接状态。',
-  scope: '当前支持 macOS / Linux 电脑接入。完成部署、电脑授权与 Runtime 配置后，即可在对应电脑工作；每个项目固定在其所属电脑。',
+  scope: '当前支持 macOS / Linux / Windows 电脑接入。完成部署、电脑授权与 Runtime 配置后，即可在对应电脑工作；每个项目固定在其所属电脑。',
   add: '添加电脑', refresh: '刷新电脑列表', more: '下一页', previous: '返回首页',
   loading: '正在读取电脑列表', empty: '尚未接入其他电脑', emptyDetail: '添加电脑并签发一次性接入码，再在对应电脑运行节点服务。',
   table: '组织电脑连接状态', name: '电脑名称', system: '系统', connection: '连接', seen: '最近连接', actions: '操作',
@@ -28,6 +28,9 @@ export const zh = {
   denied: '当前账号没有此操作的权限。请重新登录或联系组织管理员。',
   maintenance: '中心正在维护或等待重启，暂不能变更接入信息。请稍后刷新。',
   refused: '操作被拒绝，请检查输入并刷新列表后再操作。',
+  modeDisabled: '当前未启用多电脑接入。',
+  notFound: '该电脑已不在列表中，请刷新后重试。',
+  nodeDetached: '该电脑已退出接入，请刷新列表。',
 } as const
 
 export type NodeAccessCopyKey = keyof typeof zh
@@ -37,7 +40,7 @@ export const en: Record<NodeAccessCopyKey, string> = {
   detachDetail: 'Stop this computer’s Runtimes and transfers first. Detachment revokes center credentials and retains all data for independent local work.', detachedNotice: '{name} detached. Local data is retained.', computerBusy: 'A Runtime, transfer or connection is still active. Stop the Runtimes and close this computer’s workbench, administration and transfer connections before trying again.',
   existing: 'Deployed computer', registerNew: 'Register a new computer', candidatesMore: 'More deployed computers', candidateFailed: 'Could not read deployed computers. Reopen this dialog to try again.',
   title: 'Computer access', meta: 'Manage connection access for organization computers.',
-  scope: 'macOS / Linux computers can enroll. Complete deployment, computer access grants and Runtime setup to work on that computer. Each project stays on its assigned computer.',
+  scope: 'macOS / Linux / Windows computers can enroll. Complete deployment, computer access grants and Runtime setup to work on that computer. Each project stays on its assigned computer.',
   add: 'Add computer', refresh: 'Refresh computers', more: 'Next page', previous: 'First page',
   loading: 'Loading computers', empty: 'No additional computers enrolled', emptyDetail: 'Add a computer and issue a one-time enrollment code, then run the node service on that computer.',
   table: 'Organization computer connections', name: 'Computer name', system: 'System', connection: 'Connection', seen: 'Last connected', actions: 'Actions',
@@ -60,4 +63,7 @@ export const en: Record<NodeAccessCopyKey, string> = {
   denied: 'Your account cannot perform this operation. Sign in again or contact an organization administrator.',
   maintenance: 'The center is in maintenance or awaiting a restart. Refresh later before changing access.',
   refused: 'The request was refused. Check the input and refresh before trying again.',
+  modeDisabled: 'Multi-computer access is not enabled.',
+  notFound: 'This computer is no longer listed; refresh and retry.',
+  nodeDetached: 'This computer has detached; refresh the list.',
 }

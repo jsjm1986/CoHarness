@@ -5,6 +5,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { LocalSubprocessRuntime } from '@deepseek-ai/dsh-subprocess-local'
 import type { StewardSpaceConfig } from './config.ts'
 import { scrubbedGatewayChildEnv } from './child-environment.ts'
+import { documentRuntimeAccess } from './document-storage.ts'
 
 class StewardGitCommandError extends Error {
   readonly killed: boolean
@@ -24,12 +25,20 @@ class StewardGitCommandError extends Error {
  * @returns after directory preparation or successful Git checkout, before Runtime allocation.
  */
 export async function prepareStewardWorktree(
-  config: Pick<StewardSpaceConfig, 'workspacePath' | 'sourcePath' | 'prepareTimeoutMs' | 'prepareKillGraceMs'>,
+  config: Pick<StewardSpaceConfig, 'workspacePath' | 'sourcePath' | 'prepareTimeoutMs' | 'prepareKillGraceMs' | 'runtimeUser'>,
   lifetime: AbortSignal,
 ): Promise<void> {
   const signal = AbortSignal.any([lifetime, AbortSignal.timeout(config.prepareTimeoutMs)])
   signal.throwIfAborted()
   await mkdir(config.workspacePath, { recursive: true })
+  // Managed Linux nodes run the steward Runtime under a dedicated account
+  // while the Gateway provisions as root: grant the shared-runtime group
+  // write access, mirroring shared-project document directories. Hosts
+  // without managed accounts resolve no access adjustment.
+  if (config.runtimeUser !== '') {
+    const access = await documentRuntimeAccess(config.runtimeUser, true, config.prepareTimeoutMs, signal)
+    await access.prepareDirectory?.(config.workspacePath)
+  }
   signal.throwIfAborted()
   if (config.sourcePath === '') return
   try {

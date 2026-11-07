@@ -59,7 +59,7 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 ### Running commands
 
-Run a command with `execute` and read its output from the execution's `result()`; a nonzero exit, a timeout, or a cancellation resolves descriptively, and only infrastructure failures reject. The command string rides as one argument to `-Command`: PowerShell parses the text itself and no intermediate shell exists, so there is no shell-quoting layer to escape and native Win32 paths pass through unchanged. Every command pins UTF-8 output first, so non-ASCII output is not garbled even on the Windows PowerShell 5.1 fallback. The environment is model-friendly: `NO_COLOR=1 PAGER=cat GIT_PAGER=cat` (no `TERM=dumb` — a POSIX concept), with explicit caller-provided entries still winning.
+Run a command with `execute` and read its output from the execution's `result()`; a nonzero exit, a timeout, or a cancellation resolves descriptively, and only infrastructure failures reject. The command string rides as one argument to `-Command`: PowerShell parses the text itself and no intermediate shell exists, so there is no shell-quoting layer to escape and native Win32 paths pass through unchanged. Every command pins UTF-8 output first under FullLanguage, so non-ASCII output is not garbled even on the Windows PowerShell 5.1 fallback. The environment is model-friendly: `NO_COLOR=1 PAGER=cat GIT_PAGER=cat` (no `TERM=dumb` — a POSIX concept), with explicit caller-provided entries still winning.
 
 ```text
 const execution = await ctx.shell.execute(ctx.shell.resolve({ command: 'Get-ChildItem' }))
@@ -149,6 +149,7 @@ These limits define when this executor is a poor fit. They are current package c
 - **A background provider-failure note is single-delivery** — `SubprocessHandle.done` can reject before or after target execution begins, so the executor injects the stage-neutral `subprocess failed before reporting an outcome: …` into exactly one `readOutput()` delta; a reader that discards that delta cannot recover it.
 - **Windows termination reports no signal** — a force-killed process settles as exit 1 with `signal: null`, so signal-based status classification does not apply on Windows; `kill()`-initiated stops still stamp `killed` directly.
 - **The encoding preamble precedes the command** — PowerShell requires `param(...)`, `#requires`, and `using` statements at the very top of a script, so a command whose first statement is one of those cannot run under the UTF-8 output preamble; wrap a `param(...)` script in `& { … }`, and run `using`/`#requires` scripts from a file instead.
+- **The encoding preamble is skipped under ConstrainedLanguage** — type member writes are denied there (`CannotCreateTypeConstrainedLanguage`), so the UTF-8 pin is gated on `FullLanguage`; pwsh 7 confined under CLM still emits UTF-8 by default, while Windows PowerShell 5.1 confined under CLM emits the OEM codepage because no CLM-legal pin exists.
 - **Non-ASCII stdin under Windows PowerShell 5.1 may be mis-decoded** — the preamble pins output encoding only; `[Console]::InputEncoding` stays at the host default because setting it under redirected stdin throws; pwsh 7 defaults to UTF-8 and is unaffected.
 
 <a id="dev-note"></a>
