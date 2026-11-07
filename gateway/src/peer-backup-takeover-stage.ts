@@ -349,6 +349,8 @@ export async function stagePeerProject(
     await confirmRoots(tx, op, files)
     const target = recoveryBinding(op, 'target')
     const schedule = await readProjectScheduleWitness(tx, target, limits, signal)
+    // A leftover 'active' candidate from a completed takeover holds the
+    // UNIQUE(organization_id,runtime_id) slot forever; no retry can pass.
     await tx.query(
       `INSERT INTO node_content.recovery_candidates(operation_id,organization_id,project_id,runtime_id,source_node_id,source_volume_id,source_epoch,
       destination_node_id,destination_volume_id,destination_epoch,point_id,manifest_digest,schedule_digest,files_digest,target_files_digest,protected_roots,phase,verified_at)
@@ -371,7 +373,11 @@ export async function stagePeerProject(
         files.targetFilesDigest,
         JSON.stringify(files.protectedRoots),
       ],
-    )
+    ).catch((error: unknown) => {
+      if (error !== null && typeof error === 'object' && 'code' in error && String(error.code) === '23505')
+        throw new PeerBackupError(409, 'peer-backup/already-recovered', true)
+      throw error
+    })
     await tx.query("UPDATE node_content.spaces SET publication_state='sealed' WHERE organization_id=$1 AND project_id=$2", [
       op.organizationId,
       op.projectId,

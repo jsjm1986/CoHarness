@@ -75,7 +75,15 @@ export class PeerRecoveryStageRoots {
       WHERE operation_id=$1 AND organization_id=$2 AND project_id=$3 AND runtime_id=$4 AND node_id=$5 AND volume_id=$6 AND withdrawn_at IS NULL`,
     [op.id,op.organizationId,op.projectId,op.runtimeId,op.targetNode,op.targetVolume])).rows)
     for(const root of rows) {
-      if(!matches(await identity(dirname(root.root_path)),{device:root.parent_device,inode:root.parent_inode})) return refuse()
+      if(!matches(await identity(dirname(root.root_path)),{device:root.parent_device,inode:root.parent_inode})) {
+        // The parent itself was replaced (e.g. the runtime root recreated):
+        // anything at the recorded paths is foreign and must not be moved.
+        // Releasing the record unblocks cleanup instead of wedging on refuse().
+        await this.volume.writeVolume(async tx=>{
+          await tx.query('UPDATE node_content.recovery_stage_roots SET withdrawn_at=clock_timestamp() WHERE operation_id=$1 AND id=$2 AND withdrawn_at IS NULL',[op.id,root.id])
+        })
+        continue
+      }
       if(!matches(await identity(root.retained_path),root)) {
         const temporary=await identity(root.temporary_path)
         const source=matches(temporary,root)?root.temporary_path:root.root_path

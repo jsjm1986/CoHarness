@@ -83,8 +83,12 @@ export class PeerProjectRecovery {
     private readonly fileGate?: PeerProjectFileGate,
   ) {}
 
-  private async admin<T>(actor: number, work: (tx: PoolClient) => Promise<T>): Promise<T> {
+  private async admin<T>(actor: number, work: (tx: PoolClient) => Promise<T>,
+    preLock?: (tx: PoolClient) => Promise<void>): Promise<T> {
     return transaction(this.context.pool, async (tx) => {
+      // Advisory locks precede every row lock so a port allocator can never
+      // wait on a gateway that waits on administrator or user rows.
+      if (preLock !== undefined) await preLock(tx)
       await lockAdministrator(tx, this.context, actor)
       if (
         !(
@@ -183,7 +187,13 @@ export class PeerProjectRecovery {
           input.targetNode,
           input.targetVolume,
         ],
-      )
+      ).catch((error: unknown) => {
+        // ON CONFLICT covers only the request id; one_project_takeover rejects
+        // a second operation for the same project with a bare 23505.
+        if (error !== null && typeof error === 'object' && 'code' in error && String(error.code) === '23505')
+          denied('recovery-operation-active')
+        throw error
+      })
       if (
         !inserted.rowCount &&
         !(
@@ -253,7 +263,18 @@ export class PeerProjectRecovery {
   /** An approval that has not retired the source can be cancelled without affecting its Runtime or files. */
   async cancel(actor: number, id: string): Promise<void> {
     await this.admin(actor, async (tx) => {
+      // A 'retiring' op may or may not have committed its irreversible source
+      // fence on the node's content volume. Move it to 'retreat' and let the
+      // source worker prove which side of the fence it is on before releasing
+      // the runtime freeze. lockAdministrator serializes against the fence
+      // window, which holds the same locks on a second connection.
+      const retreated = await tx.query(
+        `UPDATE harness.project_recovery_operations SET phase='retreat',retry_at=clock_timestamp(),last_error=NULL
+        WHERE organization_id=$1 AND id=$2 AND phase='retiring'`,
+        [this.context.organizationId, id],
+      )
       if (
+        !retreated.rowCount &&
         !(
           await tx.query(
             `UPDATE harness.project_recovery_operations SET phase='cancelled',retry_at=clock_timestamp(),last_error=NULL WHERE organization_id=$1 AND id=$2
@@ -264,6 +285,43 @@ export class PeerProjectRecovery {
       )
         denied('verified-writer-fence-required')
       await this.audit(tx, actor, 'cancel', id)
+    })
+  }
+  /** Resolve a retreat on the source computer: no landed fence means retirement never became irreversible. */
+  async resolveRetreat(id: string, signal: AbortSignal): Promise<void> {
+    if (!this.volume) throw new PeerBackupError(503, 'peer-backup/private-storage-required')
+    const op = await this.get(id)
+    const fence = (
+      await this.volume.readVolume(
+        async (db) =>
+          db.query<{ schedule_digest: string; files_digest: string; generation: number; stop_operation_id: string }>(
+            `SELECT schedule_digest,files_digest,generation::float8 generation,stop_operation_id::text
+        FROM node_content.recovery_source_fences WHERE operation_id=$1 AND organization_id=$2 AND runtime_id=$3`,
+            [id, op.organizationId, op.runtimeId],
+          ),
+        signal,
+      )
+    ).rows[0]
+    await transaction(this.context.pool, async (tx) => {
+      if (fence) {
+        // The fence won the race: finish the interrupted 'old-fenced' commit
+        // from its own evidence rather than pretending retirement never ran.
+        if (fence.schedule_digest !== op.scheduleDigest || fence.files_digest !== op.filesDigest)
+          denied('fence-evidence-conflict')
+        const done = await tx.query(
+          `UPDATE harness.project_recovery_operations SET phase='old-fenced',old_fenced_at=now(),source_schedule_digest=$3,
+        stopped_generation=$4,stop_operation_id=$5,source_files_digest=$6 WHERE organization_id=$1 AND id=$2 AND phase='retreat'`,
+          [op.organizationId, id, fence.schedule_digest, fence.generation, fence.stop_operation_id, fence.files_digest],
+        )
+        if (!done.rowCount) denied('recovery-approval-changed')
+        return
+      }
+      const done = await tx.query(
+        `UPDATE harness.project_recovery_operations SET phase='cancelled',retry_at=clock_timestamp(),last_error=NULL
+        WHERE organization_id=$1 AND id=$2 AND phase='retreat'`,
+        [op.organizationId, id],
+      )
+      if (!done.rowCount) denied('recovery-approval-changed')
     })
   }
   /** A replacement cannot touch an assigned volume or any release belonging to another approval. */
@@ -524,7 +582,12 @@ export class PeerProjectRecovery {
           AND s.quiescent_at IS NOT NULL AND i.generation=s.generation AND i.generation=$4 AND i.runtime_token_hash IS NULL
           AND i.desired_state='stopped' AND i.observed_state='stopping' FOR UPDATE OF s,i,r NOWAIT`,
         [op.id, op.sourceNode, lease.operationId, lease.generation, actor, op.publicId],
-      )
+      ).catch((error: unknown) => {
+        if (error !== null && typeof error === 'object' && 'code' in error && String(error.code) === '55P03') {
+          denied('recovery-contended')
+        }
+        throw error
+      })
       if (!verified.rowCount) denied('source-not-stopped')
       if (op.phase === 'retire-approved')
         await tx.query(
@@ -550,12 +613,16 @@ export class PeerProjectRecovery {
           AND NOT EXISTS(SELECT FROM harness.runtime_destructive_operations s WHERE s.organization_id=r.organization_id AND s.runtime_id=r.runtime_id)
           FOR UPDATE OF r,i,b NOWAIT`,
         [op.organizationId, id],
-      )
+      ).catch((error: unknown) => {
+        if (error !== null && typeof error === 'object' && 'code' in error && String(error.code) === '55P03') {
+          denied('recovery-contended')
+        }
+        throw error
+      })
       if (!held.rowCount) denied('verified-writer-fence-required')
       await tx.query("UPDATE harness.project_recovery_operations SET phase='switching' WHERE id=$1", [id])
       await tx.query("SELECT set_config('hgw.recovery_operation',$1,true)", [id])
       if (!op.targetPortBase) denied('target-port-range-required')
-      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['gateway-port:' + op.targetNode])
       const [port] = await allocateInstancePorts(tx, op.targetNode, op.targetPortBase!, 1, op.targetNode)
       await tx.query(
         `UPDATE harness.instances SET assigned_node_id=$3,port=$4,applied_policy_revision=0,node_connection_id=NULL,
@@ -593,6 +660,8 @@ export class PeerProjectRecovery {
       ])
       await tx.query("UPDATE harness.project_recovery_operations SET phase='published',published_at=now() WHERE id=$1", [id])
       await this.audit(tx, actor, 'activate', id)
+    }, async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['gateway-port:' + op.targetNode])
     })
   }
 

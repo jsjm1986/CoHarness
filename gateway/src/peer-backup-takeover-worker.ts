@@ -31,6 +31,7 @@ export async function runPeerRecoveryPhase(deps: PeerTakeoverDependencies, signa
       JOIN harness.peer_backup_policies p ON p.id=r.policy_id
       WHERE r.organization_id=$1 AND r.retry_at<=clock_timestamp() AND (
         (r.phase='cancelled' AND r.target_node_id=$2 AND NOT EXISTS(SELECT FROM harness.project_recovery_cleanups c WHERE c.operation_id=r.id))
+        OR (r.source_node_id=$2 AND r.phase='retreat')
         OR p.revision=harness.recovery_policy_revision(r.id,r.policy_revision) AND p.enabled AND
           (r.target_node_id=$2 AND (r.phase='prepared' OR r.phase='published' AND r.target_activated_at IS NULL)
           OR r.source_node_id=$2 AND r.phase IN('retire-approved','retiring')))
@@ -79,6 +80,7 @@ export async function runPeerRecoveryPhase(deps: PeerTakeoverDependencies, signa
         }
         await service.confirmTarget(op.id, signal)
       } else if (op.phase === 'published' && op.targetNode === context.nodeId) await service.activateTarget(op.id, signal)
+      else if (op.phase === 'retreat' && op.sourceNode === context.nodeId) await service.resolveRetreat(op.id, signal)
       else if (
         ['retire-approved', 'retiring'].includes(op.phase) &&
         op.sourceNode === context.nodeId &&
@@ -88,10 +90,21 @@ export async function runPeerRecoveryPhase(deps: PeerTakeoverDependencies, signa
     } catch (error) {
       if (signal.aborted) throw error
       const reason = error instanceof PeerBackupError ? error.code : 'peer-backup/recovery-unavailable'
+      if (!(error instanceof PeerBackupError))
+        console.error('[gateway] peer recovery phase failed:', error)
+      // Terminal failures stay parked until a reapproval re-arms retry_at;
+      // 'infinity' keeps the row out of worker selection without deleting it.
+      const terminal = error instanceof PeerBackupError && error.terminal
       await context.pool.query(
-        `UPDATE harness.project_recovery_operations SET retry_at=clock_timestamp()+interval '1 minute',last_error=$3
+        `UPDATE harness.project_recovery_operations SET retry_at=$5,last_error=$3
         WHERE organization_id=$1 AND id=$2 AND phase=$4`,
-        [context.organizationId, selected.id, reason,selected.phase],
+        [
+          context.organizationId,
+          selected.id,
+          reason,
+          selected.phase,
+          terminal ? 'infinity' : new Date(Date.now() + 60000),
+        ],
       )
     }
     })

@@ -59,6 +59,8 @@ export class PeerBackupError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
+    /** Terminal failures stop worker retries; a reapproval re-arms retry_at. */
+    readonly terminal = false,
   ) {
     super(code)
   }
