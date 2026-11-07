@@ -103,6 +103,22 @@ export class PostgresAuthService {
         // Serialize the check-and-record transition across Gateway processes,
         // not just within this Node instance.
         await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-login:${this.context.organizationId}:${canonicalUsername}`])
+        // Lock the identity rows before touching login_attempts: a user
+        // mutation holds FOR UPDATE on u,m and then deletes attempts, so
+        // taking attempt-row locks first here would let a two-table cycle form.
+        const user = row === undefined ? { rows: [] as PostgresAuthIdentity[] }
+          : await client.query<PostgresAuthIdentity>(
+          `SELECT u.id::text AS id,u.public_id::text,u.username::text,u.display_name,u.status,u.deleted_at,u.home_path,
+            m.role,m.status membership_status,c.must_change_password,c.password_hash,u.auto_review_eligible
+           FROM harness.users u
+           JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
+           JOIN harness.password_credentials c ON c.user_id=u.id
+           WHERE u.organization_id=$1 AND u.public_id=$2
+             AND (SELECT status FROM harness.organizations WHERE id=$1)='active'
+           FOR SHARE OF u,m,c`,
+          [this.context.organizationId, row.public_id],
+        )
+        const current = user.rows[0]
         await client.query(`DELETE FROM harness.login_attempts
           WHERE organization_id=$1 AND occurred_at <= clock_timestamp()-($2::double precision * interval '1 millisecond')`,
         [this.context.organizationId, LOCK_WINDOW_MS])
@@ -122,22 +138,10 @@ export class PostgresAuthService {
         await client.query(`DELETE FROM harness.login_attempts
           WHERE organization_id=$1 AND username=$2 AND succeeded=false`,
         [this.context.organizationId, username])
-        // Re-read the complete identity under the transaction lock. Password
+        // The identity was re-read under the transaction lock above. Password
         // verification happened before the lock; a concurrent role, display
         // name, membership, or credential change must not be reflected by the
         // token returned from this login attempt.
-        const user = await client.query<PostgresAuthIdentity>(
-          `SELECT u.id::text AS id,u.public_id::text,u.username::text,u.display_name,u.status,u.deleted_at,u.home_path,
-            m.role,m.status membership_status,c.must_change_password,c.password_hash,u.auto_review_eligible
-           FROM harness.users u
-           JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
-           JOIN harness.password_credentials c ON c.user_id=u.id
-           WHERE u.organization_id=$1 AND u.public_id=$2
-             AND (SELECT status FROM harness.organizations WHERE id=$1)='active'
-           FOR SHARE OF u,m,c`,
-          [this.context.organizationId, row.public_id],
-        )
-        const current = user.rows[0]
         if (current === undefined || current.status !== 'active' || current.membership_status !== 'active'
           || current.deleted_at !== null || current.password_hash !== row.password_hash) {
           await client.query(`INSERT INTO harness.login_attempts(

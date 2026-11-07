@@ -290,6 +290,10 @@ const localAccessMonitor = scopeAccessMonitor(accessMonitor, context.nodeId as R
 const principalDirectory = new NodePrincipalDirectory(context, cfg.runtimeTokenCacheMs)
 localAccessMonitor.subscribe(() => {
   instanceRepository.invalidateRuntimeTokenCache()
+})
+// Issuer-key entries are keyed by *foreign* nodes: a revocation on another
+// node emits that node's id, which the scoped monitor would filter out.
+accessMonitor.subscribe(() => {
   principalDirectory.invalidate()
 })
 const progress = new PostgresProgressService(context, { nodeContent: contentVolume, collaboration, governance, budget: gatewayModelBudget, accessMonitor: localAccessMonitor,

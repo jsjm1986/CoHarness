@@ -217,24 +217,24 @@ describePg('PostgreSQL project creation and mutations', () => {
       await expect.poll(() => waiting(writing.applicationName, 'SELECT pg_advisory_xact_lock'), { timeout: 10_000 }).toBe(true)
       expect(await readdir(f.cfg.projectsRoot)).toEqual([])
       if (state === 'role') {
+        // Advisory-first ordering: the create holds no user rows while it
+        // waits on the port lock, so the revocation commits during the wait;
+        // the queued create then observes the demotion and is refused.
         revoked = new PostgresUserService(revoking.context, f.cfg).setRole(f.creator, 'user').catch((error: unknown) => error)
-        await expect.poll(() => waiting(revoking.applicationName), { timeout: 10_000 }).toBe(true)
+        expect(await revoked).toBeUndefined()
       } else await pool.query("UPDATE harness.organizations SET status='disabled' WHERE id=$1", [f.context.organizationId])
       await blocker.query('COMMIT'); committed = true
     } finally {
       if (!committed) await blocker.query('ROLLBACK')
       blocker.release(); await Promise.all([created, revoked])
     }
+    expect(await created).toMatchObject({ code: 'forbidden' })
+    expect(await readdir(f.cfg.projectsRoot)).toEqual([])
     if (state === 'role') {
-      expect(await created).toMatchObject({ origin: 'admin' }); expect(await revoked).toBeUndefined()
+      expect(await revoked).toBeUndefined()
       await expect(service.create({ name: 'Later administrator provisioning', createdBy: f.creator, actorUserId: f.creator }))
         .rejects.toMatchObject({ code: 'forbidden' })
-      expect(await readdir(f.cfg.projectsRoot)).toEqual(['Queued administrator provisioning'])
-    } else {
-      expect(await created).toMatchObject({ code: 'forbidden' })
-      expect(await readdir(f.cfg.projectsRoot)).toEqual([])
-      expect(await service.list()).toEqual([])
-    }
+    } else expect(await service.list()).toEqual([])
   })
 
   it.each(['active', 'recipient-account', 'recipient-membership', 'recipient-membership-removed', 'organization', 'project', 'inviter-membership'] as const)(
@@ -333,7 +333,7 @@ describePg('PostgreSQL project creation and mutations', () => {
 
   it.each((['accept', 'create'] as const).flatMap(operation =>
     (['account', 'membership'] as const).map(revocation => ({ operation, revocation })),
-  ))('retains an admitted $operation account while $revocation revocation waits', async ({ operation, revocation }) => {
+  ))('orders a queued $operation against $revocation revocation', async ({ operation, revocation }) => {
     const f = await fixture(), writing = isolated(f.context, 'account-write'), revoking = isolated(f.context, 'account-revoke')
     const service = new PostgresProjectService(writing.context, f.cfg), users = new PostgresUserService(revoking.context, f.cfg)
     const project = operation === 'accept' ? await f.service.createManaged({ name: 'Retained invitation scope', ownerUserId: f.creator }) : undefined
@@ -352,14 +352,22 @@ describePg('PostgreSQL project creation and mutations', () => {
       const revoke = revocation === 'account' ? users.setStatus(f.member, 'disabled')
         : revoking.context.pool.query("UPDATE harness.memberships SET status='disabled' WHERE organization_id=$1 AND user_id=(SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2)", [f.context.organizationId, f.member])
       revoked = revoke.then(() => { revokedEarly = true }, (error: unknown) => error)
-      await expect.poll(() => waiting(revoking.applicationName), { timeout: 10_000 }).toBe(true)
-      expect(revokedEarly).toBe(false)
+      if (project === undefined) {
+        // createManaged takes the port advisory before user rows, so the
+        // revocation commits during the wait; the queued create then observes
+        // post-revocation state and is refused instead of being retained.
+        await revoked
+        expect(revokedEarly).toBe(true)
+      } else {
+        await expect.poll(() => waiting(revoking.applicationName), { timeout: 10_000 }).toBe(true)
+        expect(revokedEarly).toBe(false)
+      }
     } finally {
       await blocker.query('ROLLBACK'); blocker.release(); await Promise.all([changed, revoked])
     }
     expect(await revoked).toBeUndefined()
     if (operation === 'accept') expect(await changed).toBeUndefined()
-    else expect(await changed).toMatchObject({ name: input.name })
+    else expect(await changed).toMatchObject({ code: 'forbidden' })
     await expect(mutate()).rejects.toMatchObject({ code: 'forbidden' })
   })
 

@@ -193,6 +193,10 @@ export class PostgresProjectService {
     let candidate:{store:NodeContentStore;runtimeId:import('../runtime-catalog.ts').RuntimeId}|undefined
     try {
       const publicId = await withProjectNameProof(this.context.pool,nameAuthority,async (client,identify) => {
+        // The port allocation lock precedes every row lock: instance
+        // initialize() holds it while waiting on gateway-admin, so taking it
+        // after user/membership shares would let a three-party cycle form.
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-port:${this.context.nodeId}`])
         if (input.actorUserId !== undefined) {
           const actor = await this.activeMutationUser(client, input.actorUserId, 'actor',
             input.origin === 'admin' ? 'administrator' : 'member')
@@ -209,7 +213,6 @@ export class PostgresProjectService {
           ? null
           : await this.mutationUser(client, input.ownerUserId)
         if (input.ownerUserId !== null && owner === null) throw new Error(`unknown user ${String(input.ownerUserId)}`)
-        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-port:${this.context.nodeId}`])
         if (input.actorUserId !== undefined) await this.assertOrganizationActive(client)
         const canonical = input.resolveDirectory()
         await this.assertNotReserved(client, canonical, input.origin === 'user')
@@ -336,7 +339,7 @@ export class PostgresProjectService {
     const bound = await this.context.pool.query<{ id: string; public_id: string; status: string }>(
       `SELECT id,public_id::text,status::text FROM harness.projects
        WHERE organization_id=$1 AND kind='steward' AND steward_node_id=$2
-       ORDER BY public_id LIMIT 1`,
+       ORDER BY (status='active') DESC, public_id LIMIT 1`,
       [this.context.organizationId, this.context.nodeId],
     )
     const row = bound.rows[0]

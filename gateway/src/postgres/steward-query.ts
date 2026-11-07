@@ -365,7 +365,7 @@ export class StewardQueryService {
         AND sp.node_id=harness.project_node_id(r.organization_id,$3) AND sp.enabled
       WHERE r.organization_id=$1 AND r.runtime_id=$4 AND r.interaction_kind='approval' AND r.interaction_id=$2
         AND harness.project_computer_use_allowed(r.organization_id,u.id,$3)
-        AND r.responded_at > now() - interval '${APPROVAL_TTL_MINUTES} minutes'
+        AND r.responded_at > clock_timestamp() - interval '${APPROVAL_TTL_MINUTES} minutes'
         AND r.outcome = to_jsonb('allowed-once'::text)
         AND NOT EXISTS (
           SELECT 1 FROM harness.steward_query_log l
