@@ -301,6 +301,18 @@ describePg('PostgreSQL outbound node access', () => {
     }
   })
 
+  it('lets the agent computer gateway re-verify its own lease while foreign computers stay mode-disabled', async () => {
+    const f = await fixture(), ticket = await f.issue(), secret = credential()
+    await f.nodes.enroll(ticket.token, enrollment(secret))
+    const lease = await f.nodes.connect(secret, { connectionId: randomUUID() })
+    const local = new PostgresNodeAccessService({ ...f.context, nodeId: ticket.nodeId }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
+    await expect(local.authorizeChannel(secret, { connectionId: lease.connectionId, epoch: lease.epoch })).resolves.toEqual(lease)
+    const other = await f.nodes.issue(f.admin, { name: 'other', requestId: randomUUID() })
+    const foreign = new PostgresNodeAccessService({ ...f.context, nodeId: other.nodeId }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
+    await expect(foreign.authorizeChannel(secret, { connectionId: lease.connectionId, epoch: lease.epoch }))
+      .rejects.toMatchObject({ status: 409, code: 'node-access/mode-disabled' })
+  })
+
   it('authorizes one current channel with one database round trip', async () => {
     const f = await fixture(), ticket = await f.issue(), secret = credential()
     await f.nodes.enroll(ticket.token, enrollment(secret))
